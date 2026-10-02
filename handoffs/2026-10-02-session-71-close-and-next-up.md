@@ -8,13 +8,25 @@ Research behind this file (four readers, two checkers, all read-only) is in `han
 
 ## START HERE — session 72
 
+**Franky's plan for session 72 (said Oct 2, end of S71): open a new chat and start on the landing page revamp, using the reference sites below.** The dated table still applies around it.
+
+**Landing page references (Franky, Oct 2).** He sent the links without saying what he likes in each, so the first step is to open every one at phone and desktop width, note what stands out (first screen, type, motion, how the work is shown, how fast it says what the thing is), and show him 2 or 3 directions to pick from:
+- https://gertix.studio/
+- https://www.marcuslorenzet.com/
+- https://elenagonci.com/#pillar-stack
+- https://kstoimenov.com/
+- https://pesselev-collective.com/ (Franky: this one "has insight and cool reference sites as well that they've worked on": follow its case studies for more references)
+- https://behfar.dev/
+
+These are mostly studio and personal portfolio sites, so they serve both jobs: the look of the Vibe landing page, and Franky's own portfolio site (section C). Take the craft (type, pacing, motion, how work is presented), not the copy. The Vibe page still has to say what Vibe is and who it is for on the first screen, in Vibe's brand (near-black, coral, the soft wordmark).
+
 **0. Ask Franky first (dated work depends on the answers):**
 - Is the `hello@connectvibe.app` mailbox done (f2, due Sun Oct 4)?
 - Has the D-U-N-S number arrived? Did James file the LLC amendment (Oct 3)? Is the EIN done?
 - What did the founders' meetings settle? Nothing from Sept 26 is written down.
 - His thoughts on the Terms review (`handoffs/legal-2026-09-29/12-results.md`: ten outcomes, nineteen calls). The Terms work has been stopped on this since Sept 30.
-- His fine-tuning notes from the phone test, and whether he sent a real photo DM.
-- The reference websites for the landing page.
+- The rest of his fine-tuning notes from the phone test (the first one is recorded below), and whether he sent a real photo DM.
+- What he likes in each landing page reference (the links are above).
 
 **1. Then work in date order.** October is full. The three new asks (desktop chat, landing page, portfolio) are real work on top of dates that were already tight, so they are slotted below, not stacked on top.
 
@@ -63,7 +75,7 @@ Zero clubs are signed today (SAE is a test page). That is still the main focus f
 
 **The demo, recommended: a short screen-recorded video** (25 to 35 seconds, phone layout, Night, eight shots) recorded from the local practice copy with an invented cast, so no real student ever appears. It needs a new demo seed (today's test names look fake on camera). The same footage serves Instagram, the store screenshots and the portfolio. A clickable demo site is a November job, as a separate site on its own fake-data database; nothing fake goes into production (session 55 removed exactly that).
 
-**Order:** Franky sends 3 to 5 reference sites (for each: the one thing he likes) → build the new page with still screenshots the week of Oct 5 → record the final video after the Oct 15 freeze (week of Oct 19) so it shows the chat everyone gets on Oct 26.
+**Order:** review Franky's six reference sites (listed under START HERE) and show him 2 or 3 directions → build the new page with still screenshots the week of Oct 5 → record the final video after the Oct 15 freeze (week of Oct 19) so it shows the chat everyone gets on Oct 26.
 
 **Calls for Franky:** the hero line; keep or retire the Otto intro and the rings (recommended: retire, keep the orb as an accent); where "Bring your club" goes (recommended: an email to help@, answered by Rylan); the school-names wording (ask James for the lawyer's answer). All twelve are in `s72-prep/landing.md`.
 
@@ -72,6 +84,8 @@ Zero clubs are signed today (SAE is a test page). That is still the main focus f
 A new, separate repo (for example `~/franky-site`) with its own Vercel project and domain. Not in `~/vibe`, not in `~/vibe-marketing`. Static pages (Astro), no database, no login. It holds the Vibe case study with the demo video, two to four other projects, about, resume, contact. Keep off it: the journal, security findings, real student data, equity language. **When:** after the demo video exists and after the Oct 16 store submission. **Gather now:** what the site is for (internships, recruiters, investors, clients), a three-sentence bio, other projects with screenshots, the resume PDF, and an OK from James and Rylan on how the team is described.
 
 ## Obsidian: why nothing is connected, and the fix
+
+**Franky asked (Oct 2): "is the Obsidian map necessary?" No.** It changes nothing in the app, the launch or the handoffs; it only makes the graph view look connected and gives a session timeline to click through. **Parked until after launch. Do not build it unless Franky asks.** The free tidy-up is the "Orphans" toggle below. The diagnosis stays here so nobody has to redo it.
 
 **Why.** Obsidian only draws a line when a note contains a `[[link]]`. The vault shows 443 notes; 425 of them are the handoffs folder (through the `Founder/Handoffs` link), and the handoffs point at each other with file paths in backticks and "session 63" in plain words. That is text to Obsidian, not a link. Only 14 notes hold a real link, so 404 of 443 (91%) are loose dots. The one hub, `Founder/Handoffs Index.md`, was written by hand and stops at session 52. Claude's memory notes do link to each other, but they live outside the vault. Settings are fine; nothing is hidden. One pointer is broken: `Founder/vibe_journal.html` still points at the journal's old place.
 
@@ -88,6 +102,8 @@ A new, separate repo (for example `~/franky-site`) with its own Vercel project a
 Also noticed: the vault has no backup (the Daily notes exist only on this Mac), and `Inbox/` is empty. Details: `s72-prep/obsidian-verified.md`.
 
 ## Small choices left from the week swipe (for Franky's fine-tuning)
+
+- **FROM FRANKY (Oct 2): the "This week" pill is "just a tiny bit too big". Make it smaller.** It is in `src/components/mobile/messages/home/YourWeek.tsx` (the `offset !== 0` button in the title row): today the visible pill is 26px tall, 12px / 700 text, padding `0 10px 0 6px`, a 13px chevron, inside a 38px-tall tap area. Suggested: 22px tall, 11px text, padding `0 8px 0 5px`, an 11px chevron; keep the tap area at 38px or more (shrink the look, not the target), and check that it still does not push the centred title. Phone change: commit and push, then Franky checks on his phone.
 
 - Two faint arrows at the edges of the day strip, shown at rest (`EDGE_HINTS_AT_REST` in `home/YourWeek.tsx`; one line to turn off).
 - The month calendar opens from the bottom; the mockup hung it from the top.
