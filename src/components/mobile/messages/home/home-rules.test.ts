@@ -281,6 +281,11 @@ test("weekCardLine / weekCardLabel / spokenShort: Live now, Ended, the short tim
   assert.deepEqual(rules.weekCardLine(live, NOW), { kind: "live", text: "Live now" });
   assert.deepEqual(rules.weekCardLine(fri, NOW), { kind: "time", text: "Sat 7 PM" });
   assert.deepEqual(rules.weekCardLine(ended, NOW), { kind: "ended", text: "Ended" });
+  // S71 amendment 4: on another week the card names the weekday, never the date.
+  const later = week({ id: "d", title: "Study Night", starts_at: iso(local(2026, 9, 18, 19, 30)), room_state: "soon" });
+  assert.deepEqual(rules.weekCardLine(later, NOW), { kind: "time", text: "Oct 18 7:30 PM" });
+  assert.deepEqual(rules.weekCardLine(later, NOW, true), { kind: "time", text: "Sun 7:30 PM" });
+  assert.deepEqual(rules.weekCardLine(ended, NOW, true), { kind: "ended", text: "Ended" });
   assert.equal(rules.weekCardLabel(live, NOW), "Fall Formal room, Salsa Club, live now, you're going");
   assert.equal(rules.weekCardLabel(fri, NOW), "Fright Night room, Film Society, Saturday 7 PM, you're going");
   assert.equal(rules.weekCardLabel(ended, NOW), "Open Mic room, ended, you said maybe");
@@ -288,4 +293,115 @@ test("weekCardLine / weekCardLabel / spokenShort: Live now, Ended, the short tim
   assert.equal(rules.spokenShort("Oct 8 7:30 PM"), "October 8 7:30 PM");
   assert.equal(rules.spokenShort("7:30 PM"), "7:30 PM");
   assert.equal(rules.eventStateSpoken("soon", iso(local(2026, 9, 8, 22, 0)), NOW), "10 PM");
+});
+
+/* ------------------------------ S71 amendment 4: the month sheet ------------------------------ */
+
+test("dayHeading / planCountText / dayCaption: `Fri, Oct 9` and `Tomorrow · 1 plan`", () => {
+  assert.equal(rules.dayHeading(local(2026, 9, 9)), "Fri, Oct 9");
+  assert.equal(rules.dayHeading(local(2027, 0, 3)), "Sun, Jan 3");
+  assert.equal(rules.planCountText(0), "No plans");
+  assert.equal(rules.planCountText(1), "1 plan");
+  assert.equal(rules.planCountText(2), "2 plans");
+  // NOW is Thursday Oct 8, 9:00 PM.
+  assert.equal(rules.dayCaption(local(2026, 9, 8), NOW, 1), "Today · 1 plan");
+  assert.equal(rules.dayCaption(local(2026, 9, 9), NOW, 1), "Tomorrow · 1 plan", "three hours away, but the next calendar day");
+  assert.equal(rules.dayCaption(local(2026, 9, 9), NOW, 0), "Tomorrow · No plans");
+  assert.equal(rules.dayCaption(local(2026, 9, 10), NOW, 2), "2 plans", "no word for any other day");
+  assert.equal(rules.dayCaption(local(2026, 9, 7), NOW, 0), "No plans", "yesterday has no word either");
+  // Across the 25-hour Nov 1 (DST ends): Sunday is still "Tomorrow" from Saturday.
+  assert.equal(rules.dayCaption(local(2026, 10, 1), local(2026, 9, 31, 12, 0), 0), "Tomorrow · No plans");
+  assert.equal(rules.dayCaption(local(2026, 10, 2), local(2026, 10, 1, 0, 30), 3), "Tomorrow · 3 plans");
+  assert.equal(rules.dayWhen(local(2026, 9, 8), NOW), "Today");
+  assert.equal(rules.dayWhen(local(2026, 9, 9), NOW), "Tomorrow");
+  assert.equal(rules.dayWhen(local(2026, 9, 10), NOW), null);
+  assert.equal(rules.dayWhen(local(2026, 9, 7), NOW), null);
+});
+
+test("isPastDay: only a day before today dims", () => {
+  assert.equal(rules.isPastDay(local(2026, 9, 7), NOW), true);
+  assert.equal(rules.isPastDay(local(2026, 9, 8), NOW), false, "today, even late at night");
+  assert.equal(rules.isPastDay(local(2026, 9, 9), NOW), false);
+});
+
+test("monthDayLabel: the grid day's label, with today, selected, the counts and live now", () => {
+  const live = week({ id: "a" });
+  const fri = week({ id: "b", title: "Fright Night", starts_at: iso(local(2026, 9, 9, 19, 0)), room_state: "soon" });
+  const maybe = week({ id: "c", title: "Build Night", starts_at: iso(local(2026, 9, 10, 14, 0)), room_state: "soon", viewer_status: "maybe" });
+  const maybe2 = week({ id: "d", title: "Open Mic", starts_at: iso(local(2026, 9, 10, 20, 0)), room_state: "soon", viewer_status: "maybe" });
+  const going2 = week({ id: "e", title: "Open Practice", starts_at: iso(local(2026, 9, 10, 9, 0)), room_state: "soon" });
+  const off = { today: false, selected: false };
+  assert.equal(rules.monthDayLabel(local(2026, 9, 1), [], off), "Thursday, October 1, nothing planned");
+  assert.equal(rules.monthDayLabel(local(2026, 9, 8), [live], { today: true, selected: false }), "Thursday, October 8, today, 1 event you're going to, live now");
+  assert.equal(rules.monthDayLabel(local(2026, 9, 9), [fri], { today: false, selected: true }), "Friday, October 9, selected, 1 event you're going to");
+  assert.equal(rules.monthDayLabel(local(2026, 9, 10), [maybe], off), "Saturday, October 10, 1 event you said maybe to");
+  assert.equal(rules.monthDayLabel(local(2026, 9, 10), [maybe, maybe2], off), "Saturday, October 10, 2 events you said maybe to");
+  assert.equal(rules.monthDayLabel(local(2026, 9, 10), [going2, maybe, maybe2], off), "Saturday, October 10, 1 event you're going to, 2 you said maybe to");
+  assert.equal(rules.monthDayLabel(local(2026, 9, 8), [], { today: true, selected: true }), "Thursday, October 8, today, selected, nothing planned");
+  assert.equal(rules.spokenDay(local(2026, 9, 8)), "Thursday October 8");
+});
+
+test("planRows: the day's plans by start, `<club> · <time>`, the label, and no club", () => {
+  const late = week({ id: "late", title: "Fright Night", starts_at: iso(local(2026, 9, 9, 19, 0)), room_state: "soon", org: { handle: "film", name: "Film Society" } });
+  const early = week({ id: "early", title: "Build Night", starts_at: iso(local(2026, 9, 9, 14, 30)), room_state: "soon", viewer_status: "maybe", room_id: null });
+  const noClub = week({ id: "solo", title: "Study Jam", starts_at: iso(local(2026, 9, 9, 23, 30)), room_state: null, room_id: null, org: null, org_id: null });
+  const otherDay = week({ id: "other", starts_at: iso(local(2026, 9, 10, 0, 0)) });
+  const rows = rules.planRows(local(2026, 9, 9), [late, noClub, otherDay, early]);
+  assert.deepEqual(rows.map((r) => r.entry.id), ["early", "late", "solo"], "sorted by start; midnight of the next day is not this day's");
+  assert.deepEqual(rows.map((r) => r.line), ["Salsa Club · 2:30 PM", "Film Society · 7 PM", "11:30 PM"]);
+  assert.deepEqual(rows.map((r) => r.time), ["2:30 PM", "7 PM", "11:30 PM"]);
+  assert.deepEqual(rows.map((r) => r.club), ["Salsa Club", "Film Society", null]);
+  assert.equal(rows[1].label, "Fright Night, Film Society, Friday October 9 at 7 PM, you're going. Open the event room");
+  assert.equal(rows[0].label, "Build Night, Salsa Club, Friday October 9 at 2:30 PM, you said maybe", "no room: nothing to open");
+  assert.equal(rows[2].label, "Study Jam, Friday October 9 at 11:30 PM, you're going");
+  assert.deepEqual(rules.planRows(local(2026, 9, 12), [late, early]), []);
+});
+
+test("planRows: the time is the event's own clock, whatever today is", () => {
+  // A plan months away still reads `7 PM`, never `Mar 12 7 PM`.
+  const far = week({ id: "far", title: "Spring Gala", starts_at: iso(local(2027, 2, 12, 19, 0)), room_state: "soon" });
+  const rows = rules.planRows(local(2027, 2, 12), [far]);
+  assert.equal(rows[0].time, "7 PM");
+  assert.equal(rows[0].line, "Salsa Club · 7 PM");
+  assert.equal(rows[0].label, "Spring Gala, Salsa Club, Friday March 12 at 7 PM, you're going. Open the event room");
+});
+
+test("sheetReturnFocus: the opener while it is on the page, else the week's title, nothing when an event chat is opening", () => {
+  const day = { isConnected: true, name: "day" };
+  const gone = { isConnected: false, name: "a day of the week the strip left" };
+  const title = { isConnected: true, name: "title" };
+  // The strip stayed on its week: back to the day (or the title) that was pressed.
+  assert.equal(rules.sheetReturnFocus(day, title, false), day);
+  assert.equal(rules.sheetReturnFocus(title, title, false), title);
+  // The strip moved to the picked day's week: the pressed day is gone, the title takes it.
+  assert.equal(rules.sheetReturnFocus(gone, title, false), title);
+  assert.equal(rules.sheetReturnFocus(null, title, false), title, "no opener known");
+  // Nothing left to focus: no call at all (never a detached node).
+  assert.equal(rules.sheetReturnFocus(gone, null, false), null);
+  assert.equal(rules.sheetReturnFocus(gone, { isConnected: false, name: "title" }, false), null);
+  // A plan row opened its event chat: the home under it takes no focus.
+  assert.equal(rules.sheetReturnFocus(day, title, true), null);
+  assert.equal(rules.sheetReturnFocus(gone, title, true), null);
+});
+
+test("calendarUrl / rsvpEntries: the read's address, and only well-formed rsvp entries come back", () => {
+  const from = local(2026, 9, 5);
+  const to = new Date(2026, 9, 11, 23, 59, 59, 999);
+  assert.equal(rules.calendarUrl(from, to), `/api/me/calendar?from=${encodeURIComponent(from.toISOString())}&to=${encodeURIComponent(to.toISOString())}`);
+  assert.equal(rules.rsvpEntries(null), null);
+  assert.equal(rules.rsvpEntries({ ok: true }), null, "no entries array: the read failed");
+  assert.deepEqual(rules.rsvpEntries({ entries: [] }), []);
+  const got = rules.rsvpEntries({
+    entries: [
+      { kind: "rsvp", id: "a", title: "Fall Formal", starts_at: "2026-10-08T23:30:00.000Z", ends_at: "2026-10-09T03:00:00.000Z", location: "Hall", color: "#5BD18C", viewer_status: "going", org: { handle: "salsa", name: "Salsa Club", verified: true }, org_id: "org-1", room_id: "room-1", room_state: "live" },
+      { kind: "rsvp", id: "b", title: "Open Mic", starts_at: "2026-10-09T23:00:00.000Z", ends_at: "2026-10-10T01:00:00.000Z", viewer_status: "maybe", org: null },
+      { kind: "personal", id: "p", title: "Dentist", starts_at: "2026-10-09T15:00:00.000Z", ends_at: null },
+      { kind: "rsvp", id: 7, title: "No id", starts_at: "2026-10-09T15:00:00.000Z" },
+      null,
+    ],
+  });
+  assert.deepEqual(got, [
+    { id: "a", title: "Fall Formal", starts_at: "2026-10-08T23:30:00.000Z", ends_at: "2026-10-09T03:00:00.000Z", viewer_status: "going", org: { handle: "salsa", name: "Salsa Club" }, org_id: "org-1", room_id: "room-1", room_state: "live" },
+    { id: "b", title: "Open Mic", starts_at: "2026-10-09T23:00:00.000Z", ends_at: "2026-10-10T01:00:00.000Z", viewer_status: "maybe", org: null, org_id: null, room_id: null, room_state: null },
+  ]);
 });

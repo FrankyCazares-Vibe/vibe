@@ -13,7 +13,7 @@ import { asLoadFailure, LoadFailed, type LoadFailure } from "@/components/feedba
 import { arrivalWrites, channelOfEntry } from "@/lib/chat/layer-stack";
 import type { RoomKind, ThreadMessagesResponse } from "@/lib/chat/types";
 import { useChatV2 } from "@/lib/chat/use-chat-v2";
-import { adoptLayerEntry, clearLayersThen, isLayerPop } from "@/lib/chat/use-layer-history";
+import { adoptLayerEntry, clearLayersInto, clearLayersThen, isLayerPop } from "@/lib/chat/use-layer-history";
 import { vibeRequest } from "@/lib/feedback/request";
 import { toast } from "@/lib/feedback/toast";
 
@@ -262,15 +262,24 @@ function MessagesMobileV2({ initialHandle, initialChannelId }: { initialHandle?:
     const id = view.kind === "club" ? view.roomId : view.threadId;
     const mark = { vibeChat: id, depth: 1 };
     const swap = openRef.current !== null;
-    // A sheet of the view being swapped out has its own entry on top: it
-    // goes first (`clearLayersThen` runs at once when there is none).
-    clearLayersThen(() => {
-      if (swap) window.history.replaceState(mark, "", channelUrl(id));
-      else {
-        window.history.pushState(mark, "", channelUrl(id));
+    if (swap) {
+      // A sheet of the view being swapped out has its own entry on top: it
+      // goes first (`clearLayersThen` runs at once when there is none).
+      clearLayersThen(() => window.history.replaceState(mark, "", channelUrl(id)));
+    } else {
+      // From the home. The home's month sheet (S71 amendment 4) has its own
+      // entry on top of the home's: a plan row opens its room with the sheet
+      // up, and that entry BECOMES the room's (`replaceState`). Never a step
+      // back off the sheet and then a push: Chrome would mark the home's
+      // entry to be skipped by its Back button (`layer-stack.ts`, the note
+      // on the history-manipulation intervention; ClubSpace's `openEvent`
+      // does the same over the "+" tray). No sheet open: a push, as before.
+      clearLayersInto((mode) => {
+        if (mode === "replace") window.history.replaceState(mark, "", channelUrl(id));
+        else window.history.pushState(mark, "", channelUrl(id));
         noBackRef.current = false;
-      }
-    });
+      });
+    }
     openRef.current = view;
     setComposeOpen(false);
     setOpen(view);

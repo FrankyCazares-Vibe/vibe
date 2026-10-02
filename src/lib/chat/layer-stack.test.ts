@@ -698,3 +698,93 @@ test("spaceEntryAfterLayer: only the space's own entry, and only when there is a
   assert.equal(spaceEntryNamesLayer({ vibeChat: "ev", depth: 1 }, "ev"), true, "…and the caller remembers to");
   assert.equal(spaceEntryAfterLayer({ vibeChat: "ev", depth: 1 }, "ev", "ev"), null);
 });
+
+// ── S71 amendment 4: the month sheet, a layer over the HOME's entry ──────────
+
+const OTHER_PAGE = { page: "campus" };
+const EVENT_SPACE = { vibeChat: "event", depth: 1 };
+
+test("the month sheet over the home: its entry is `{ sheet: 1 }`, and Back closes the sheet alone", () => {
+  const b = browser([OTHER_PAGE, HOME]);
+  const sheet = layer();
+  b.tap(); // a day of the strip
+  b.stack.open(sheet.handle);
+  assert.equal(b.length(), 3);
+  assert.deepEqual(b.state(), { sheet: 1 }, "the home's entry carries no room marks");
+  b.back();
+  assert.equal(sheet.seen.pops, 1);
+  assert.equal(b.state(), HOME, "still on Messages");
+  assert.deepEqual(b.kinds, ["layer"], "the shell does nothing for it");
+  assert.equal(b.stack.size(), 0);
+});
+
+test("the month sheet closed by its scrim steps off its own entry; a later Back leaves the home as before", () => {
+  const b = browser([OTHER_PAGE, HOME]);
+  const sheet = layer();
+  b.tap();
+  const id = b.stack.open(sheet.handle);
+  b.tap(); // the scrim
+  b.stack.close(id);
+  b.flush();
+  assert.equal(sheet.seen.pops, 0, "it closed itself: no onPop");
+  assert.equal(b.state(), HOME);
+  assert.deepEqual(b.kinds, ["layer"]);
+  b.back();
+  assert.deepEqual(b.state(), OTHER_PAGE);
+  assert.deepEqual(b.kinds, ["layer", "other"]);
+});
+
+test("a plan row with the month sheet open: the sheet's entry BECOMES the space's, the event chat is pushed on it, and Back peels one layer at a time", () => {
+  const b = browser([OTHER_PAGE, HOME]);
+  const sheet = layer();
+  b.tap(); // a day
+  b.stack.open(sheet.handle);
+  b.tap(); // the plan row
+  // MessagesMobile.openView (from the home) → clearLayersInto.
+  const modes: string[] = [];
+  b.stack.clearInto((mode) => {
+    modes.push(mode);
+    if (mode === "replace") b.replace(EVENT_SPACE);
+    else b.navigate(EVENT_SPACE);
+  });
+  assert.deepEqual(modes, ["replace"], "at once, no step back");
+  assert.equal(sheet.seen.pops, 1, "the sheet's own state closes");
+  // ClubSpace's mount, an event room: clearLayersThen(() => push depth 2).
+  b.stack.clearThen(() => b.navigate(EVENT));
+  b.flush();
+  assert.equal(b.length(), 4, "the other page, the home, the space, the event chat");
+  assert.equal(b.pushes(), 2, "the sheet's push and the event chat's");
+  assert.deepEqual(b.kinds, [], "no traversal at all");
+  assert.equal(b.trapped(), false, "the browser's Back still stops on every entry");
+  b.back();
+  assert.deepEqual(b.state(), EVENT_SPACE);
+  b.back();
+  assert.equal(b.state(), HOME);
+  assert.deepEqual(b.kinds, ["other", "other"], "both are the room owners'");
+});
+
+test("why not clearThen there: a step back off the sheet and then a push would make the browser's Back skip the home", () => {
+  const b = browser([OTHER_PAGE, HOME]);
+  const sheet = layer();
+  b.tap();
+  b.stack.open(sheet.handle);
+  b.tap(); // the plan row
+  b.stack.clearThen(() => b.navigate(EVENT_SPACE));
+  b.flush();
+  assert.equal(sheet.seen.pops, 1);
+  assert.deepEqual(b.state(), EVENT_SPACE);
+  assert.equal(b.trapped(), true, "the tap no longer counts after the traversal: this is the case openView avoids");
+});
+
+test("openView from the home with no sheet open (a club row, a week card): a plain push, as before", () => {
+  const b = browser([OTHER_PAGE, HOME]);
+  const modes: string[] = [];
+  b.tap();
+  b.stack.clearInto((mode) => {
+    modes.push(mode);
+    b.navigate(EVENT_SPACE);
+  });
+  assert.deepEqual(modes, ["push"]);
+  assert.equal(b.length(), 3);
+  assert.equal(b.trapped(), false);
+});

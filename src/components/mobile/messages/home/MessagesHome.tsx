@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { asLoadFailure, LoadFailed, type LoadFailure } from "@/components/feedback/LoadFailed";
 import type { InboxClub, InboxResponse, RoomKind } from "@/lib/chat/types";
-import { weekRange, type WeekRange } from "@/lib/chat/week";
+import { clampWeekOffset, sheetStartDay, weekOffsetOf, weekRange, weekRangeAt, type WeekRange } from "@/lib/chat/week";
 import { vibeRequest } from "@/lib/feedback/request";
 
 import { useNightTheme } from "../theme";
@@ -14,7 +14,8 @@ import { FONT, palette, SERIF } from "../v2-tokens";
 
 import { ClubRow } from "./ClubRow";
 import { HomeEmpty } from "./HomeEmpty";
-import { allBadgeCount, badgeText, HOME_FILTERS, type HomeFilter, mergeHomeRows, type WeekEntry } from "./home-rules";
+import { allBadgeCount, badgeText, calendarUrl, HOME_FILTERS, type HomeFilter, mergeHomeRows, rsvpEntries, type WeekEntry } from "./home-rules";
+import { MonthSheet } from "./MonthSheet";
 import { PersonRow } from "./PersonRow";
 import { YourWeek } from "./YourWeek";
 
@@ -31,7 +32,20 @@ import { YourWeek } from "./YourWeek";
  * (a timer that counts from the LAST list read, whatever started it) and on
  * return to visible at most once per 30 s (`LIST_RESYNC_MS`); the calendar on
  * mount and on return to visible at most once per 5 min, never on the timer;
- * the first two again when `refreshKey` changes (after a view closed, 11.10).
+ * all three again when `refreshKey` changes (after a view closed, 11.10): the
+ * two lists and the week on screen.
+ *
+ * S71 amendment 4: the week strip swipes. The home keeps `weekOffset` (0 =
+ * the device's current week, −4 to +26) and one calendar read PER WEEK, kept
+ * in a cache keyed by the week's Monday, so a week seen before is drawn at
+ * once. A week comes on screen → it is read when it never was or when its
+ * last read is older than 5 min (the cards on screen stay while that read is
+ * out); the return to visible re-reads the week ON SCREEN by the same 5-min
+ * rule. The home's refresh (`refreshKey`) and the month sheet closing read
+ * the week on screen at once and make every other cached week due again
+ * (`refreshWeek`), so the strip never keeps an RSVP's old answer next to the
+ * sheet's new one. A failure is kept for its own week only. Tapping the title
+ * or a day opens the month sheet (`MonthSheet`), which reads its own months.
  *
  * States: the skeleton until BOTH threads and inbox answered (the week has
  * its own); `inbox` failing alone → `Couldn't load your clubs.` in the list's
@@ -45,7 +59,7 @@ const WEEK_RESYNC_MS = 5 * 60_000;
 export type MessagesHomeProps = {
   filter: HomeFilter;
   onFilter: (filter: HomeFilter) => void;
-  /** Bumped by the shell after a view closes: the list reads run again. */
+  /** Bumped by the shell after a view closes: the list reads and the week on screen run again. */
   refreshKey: number;
   /** The dm/group lists as they arrive (null on a failure), so the shell can resolve `?to=` and name the open thread. */
   onThreads: (threads: ThreadEntry[] | null, requests: ThreadEntry[] | null) => void;
@@ -56,27 +70,8 @@ export type MessagesHomeProps = {
   onCompose: () => void;
 };
 
-type CalendarBody = { ok?: boolean; entries?: unknown };
-
-function isRsvpEntry(x: unknown): x is WeekEntry & { kind: "rsvp" } {
-  if (!x || typeof x !== "object") return false;
-  const e = x as Record<string, unknown>;
-  return e.kind === "rsvp" && typeof e.id === "string" && typeof e.title === "string" && typeof e.starts_at === "string";
-}
-
-function toWeekEntry(e: WeekEntry & { kind: "rsvp" }): WeekEntry {
-  return {
-    id: e.id,
-    title: e.title,
-    starts_at: e.starts_at,
-    ends_at: e.ends_at,
-    viewer_status: e.viewer_status === "maybe" ? "maybe" : "going",
-    org: e.org && typeof e.org === "object" ? { handle: e.org.handle, name: e.org.name } : null,
-    org_id: typeof e.org_id === "string" ? e.org_id : null,
-    room_id: typeof e.room_id === "string" ? e.room_id : null,
-    room_state: e.room_state ?? null,
-  };
-}
+/** One week of the cache: its cards (null until its first read answers) and that read's failure. */
+type WeekSlot = { entries: WeekEntry[] | null; failure: LoadFailure | null };
 
 /** The three reads and their schedule (11.1). */
 function useHomeData(refreshKey: number, onThreads: MessagesHomeProps["onThreads"]) {
@@ -85,18 +80,28 @@ function useHomeData(refreshKey: number, onThreads: MessagesHomeProps["onThreads
   const [threadsErr, setThreadsErr] = useState<LoadFailure | null>(null);
   const [clubs, setClubs] = useState<InboxClub[] | null>(null);
   const [clubsErr, setClubsErr] = useState<LoadFailure | null>(null);
-  const [week, setWeek] = useState<WeekEntry[] | null>(null);
-  const [weekErr, setWeekErr] = useState<LoadFailure | null>(null);
+  // The weeks read so far, keyed by the week's Monday 00:00 (its `getTime()`).
+  const [weeks, setWeeks] = useState<Record<number, WeekSlot>>({});
+  // `slide` is the way the last change went (+1 = to a later week), for the strip's slide-in.
+  const [weekAt, setWeekAt] = useState<{ offset: number; slide: -1 | 0 | 1 }>({ offset: 0, slide: 0 });
+  const weekOffset = weekAt.offset;
   // One clock for the whole list (1.2), reset on every list read.
   const [now, setNow] = useState(() => new Date());
-  const [range, setRange] = useState<WeekRange>(() => weekRange(new Date()));
+  // The week on screen: `weekOffset` weeks from the week `now` falls in.
+  const range = weekRangeAt(now, weekOffset);
+  const weekKey = range.start.getTime();
   const threadsLoadedRef = useRef(false);
   const clubsLoadedRef = useRef(false);
-  const weekLoadedRef = useRef(false);
   const listSeqRef = useRef(0);
-  const weekSeqRef = useRef(0);
   const listAtRef = useRef(0);
-  const weekAtRef = useRef(0);
+  // Per week: the newest read's number (an older answer is dropped) and when
+  // that read started (`Date.now()`).
+  const weekSeqRef = useRef(new Map<number, number>());
+  const weekAtRef = useRef(new Map<number, number>());
+  const weekOffsetRef = useRef(0);
+  useEffect(() => {
+    weekOffsetRef.current = weekOffset;
+  }, [weekOffset]);
   // The 30-s list timer (11.1 "every 30 s while visible"), re-armed by every
   // list read so the 30 s count from the last read: a close's refetch, a
   // Retry or a return to visible does not double up with the timer's read.
@@ -156,25 +161,49 @@ function useHomeData(refreshKey: number, onThreads: MessagesHomeProps["onThreads
     [],
   );
 
-  const readWeek = useCallback(async () => {
-    const seq = ++weekSeqRef.current;
-    weekAtRef.current = Date.now();
-    const at = new Date();
-    const r = weekRange(at);
-    const res = await vibeRequest<CalendarBody>(
-      `/api/me/calendar?from=${encodeURIComponent(r.start.toISOString())}&to=${encodeURIComponent(r.end.toISOString())}`,
-      { cache: "no-store", quiet: true, failure: "Couldn't load your week." },
-    );
-    if (seq !== weekSeqRef.current) return;
-    if (res.ok && Array.isArray(res.data.entries)) {
-      weekLoadedRef.current = true;
-      setRange(r);
-      setWeekErr(null);
-      setWeek(res.data.entries.filter(isRsvpEntry).map(toWeekEntry));
-    } else if (!weekLoadedRef.current) {
-      setWeekErr(asLoadFailure(res, "Couldn't load your week."));
+  // One week's read (Monday 00:00 to Sunday 23:59:59.999 local). The answer
+  // goes to that week's slot whatever week is on screen by then; a refetch
+  // that fails keeps the cards and stays quiet.
+  const readWeek = useCallback(async (r: WeekRange) => {
+    const key = r.start.getTime();
+    const seq = (weekSeqRef.current.get(key) ?? 0) + 1;
+    weekSeqRef.current.set(key, seq);
+    weekAtRef.current.set(key, Date.now());
+    const res = await vibeRequest<unknown>(calendarUrl(r.start, r.end), { cache: "no-store", quiet: true, failure: "Couldn't load your week." });
+    if (weekSeqRef.current.get(key) !== seq) return;
+    const entries = res.ok ? rsvpEntries(res.data) : null;
+    if (entries) {
+      setWeeks((prev) => ({ ...prev, [key]: { entries, failure: null } }));
+    } else {
+      const failure = asLoadFailure(res, "Couldn't load your week.");
+      setWeeks((prev) => (prev[key]?.entries ? prev : { ...prev, [key]: { entries: null, failure } }));
     }
   }, []);
+
+  /** Read `r` unless its last read started less than 5 min ago (or is still out). */
+  const readWeekIfStale = useCallback(
+    async (r: WeekRange) => {
+      const at = weekAtRef.current.get(r.start.getTime()) ?? 0;
+      if (Date.now() - at >= WEEK_RESYNC_MS) await readWeek(r);
+    },
+    [readWeek],
+  );
+
+  /**
+   * A refresh of the week (S71 amendment 4, "the home's refresh re-reads the
+   * week on screen"): `r` is read now, whatever its age, and every other
+   * week of the cache is due again, so it is read the next time it comes on
+   * screen (its cards stay drawn while that read is out). Without this the
+   * strip kept an RSVP's old answer while the month sheet, which reads at
+   * every open, showed the new one.
+   */
+  const refreshWeek = useCallback(
+    async (r: WeekRange) => {
+      weekAtRef.current.clear();
+      await readWeek(r);
+    },
+    [readWeek],
+  );
 
   // The first reads, and the list reads again on `refreshKey` (a view closed).
   // The reads answer in a callback after their `await`, never in the effect.
@@ -185,37 +214,89 @@ function useHomeData(refreshKey: number, onThreads: MessagesHomeProps["onThreads
     void run();
   }, [readLists, refreshKey]);
 
+  // `refreshKey` moved (a view closed, a thread changed): the week on screen
+  // again too. Not on the mount: the effect below reads the first week.
+  const refreshSeenRef = useRef(refreshKey);
   useEffect(() => {
+    if (refreshSeenRef.current === refreshKey) return;
+    refreshSeenRef.current = refreshKey;
     const run = async () => {
-      await readWeek();
+      await refreshWeek(weekRangeAt(new Date(), weekOffsetRef.current));
     };
     void run();
-  }, [readWeek]);
+  }, [refreshKey, refreshWeek]);
 
-  // Return to visible: the lists at most once per 30 s, the week at most
-  // once per 5 min (11.1). The timer above is the only other list reader;
-  // nothing else reads the week.
+  // The week on screen: on mount, after a swipe, and when the device's week
+  // rolls over under offset 0 (`weekKey` is that week's Monday).
+  useEffect(() => {
+    const run = async () => {
+      await readWeekIfStale(weekRange(new Date(weekKey)));
+    };
+    void run();
+  }, [weekKey, readWeekIfStale]);
+
+  // Return to visible: the lists at most once per 30 s, the week on screen
+  // at most once per 5 min (11.1). The timer above is the only other list
+  // reader; the two effects above and `refreshWeek` (the month sheet closing)
+  // are the only other week readers.
   useEffect(() => {
     const onVisible = () => {
       if (document.visibilityState !== "visible") return;
       if (Date.now() - listAtRef.current >= LIST_RESYNC_MS) void readLists();
-      if (Date.now() - weekAtRef.current >= WEEK_RESYNC_MS) void readWeek();
+      void readWeekIfStale(weekRangeAt(new Date(), weekOffsetRef.current));
     };
     document.addEventListener("visibilitychange", onVisible);
     return () => document.removeEventListener("visibilitychange", onVisible);
-  }, [readLists, readWeek]);
+  }, [readLists, readWeekIfStale]);
 
   const retryLists = useCallback(() => {
     setThreadsErr(null);
     setClubsErr(null);
     void readLists();
   }, [readLists]);
+  // Retry on a week's failure line: the week on screen back to its loading state, and its read again.
   const retryWeek = useCallback(() => {
-    setWeekErr(null);
-    void readWeek();
-  }, [readWeek]);
+    setWeeks((prev) => {
+      if (!prev[weekKey]?.failure) return prev;
+      const next = { ...prev };
+      delete next[weekKey];
+      return next;
+    });
+    void readWeek(weekRange(new Date(weekKey)));
+  }, [readWeek, weekKey]);
+  /** Move the strip to `offset` (clamped to −4 … +26); a move to the week already on screen changes nothing. */
+  const setWeekOffset = useCallback((offset: number) => {
+    setWeekAt((prev) => {
+      const next = clampWeekOffset(offset);
+      return next === prev.offset ? prev : { offset: next, slide: next > prev.offset ? 1 : -1 };
+    });
+  }, []);
+  const stepWeek = useCallback((delta: 1 | -1) => {
+    setWeekAt((prev) => {
+      const next = clampWeekOffset(prev.offset + delta);
+      return next === prev.offset ? prev : { offset: next, slide: delta };
+    });
+  }, []);
 
-  return { threads, requests, threadsErr, clubs, clubsErr, week, weekErr, now, range, retryLists, retryWeek };
+  const slot = weeks[weekKey];
+  return {
+    threads,
+    requests,
+    threadsErr,
+    clubs,
+    clubsErr,
+    week: slot?.entries ?? null,
+    weekErr: slot?.failure ?? null,
+    now,
+    range,
+    weekOffset,
+    weekSlide: weekAt.slide,
+    setWeekOffset,
+    stepWeek,
+    refreshWeek,
+    retryLists,
+    retryWeek,
+  };
 }
 
 /**
@@ -258,6 +339,23 @@ export function MessagesHome({ filter, onFilter, refreshKey, onThreads, onOpenCl
     </div>
   );
   const openClub = (club: InboxClub) => (roomId: string, roomKind: RoomKind) => onOpenClub(club.org.handle, roomId, roomKind);
+  // A week card or a plan of the month sheet: the room's id with the club's handle when the entry carries one.
+  const openRoom = (e: WeekEntry) => (e.room_id ? onOpenRoom(e.room_id, e.org?.handle ?? null) : undefined);
+  // The month sheet (S71 amendment 4): the day it opens on and the control
+  // that was pressed (focus goes back to it on close); null = closed.
+  const [sheet, setSheet] = useState<{ day: Date; opener: HTMLElement | null } | null>(null);
+  const weekTitleRef = useRef<HTMLButtonElement | null>(null);
+  // From the title: today when the week on screen holds it, else that week's Monday. From a day: that day.
+  const openMonth = (day: Date | null, opener: HTMLElement | null) => setSheet({ day: day ?? sheetStartDay(d.now, d.range), opener });
+  // Every way out of the sheet lands here: the strip moves to the picked
+  // day's week (the bounds hold) and that week is read again, so the strip
+  // and the sheet (which read its months when it opened) say the same.
+  const closeMonth = (picked: Date) => {
+    setSheet(null);
+    const offset = clampWeekOffset(weekOffsetOf(d.now, picked));
+    d.setWeekOffset(offset);
+    void d.refreshWeek(weekRangeAt(d.now, offset));
+  };
 
   let list: React.ReactNode;
   if (pending) {
@@ -370,7 +468,20 @@ export function MessagesHome({ filter, onFilter, refreshKey, onThreads, onOpenCl
         </button>
       </header>
 
-      <YourWeek entries={d.week} failure={d.weekErr} onRetry={d.retryWeek} now={d.now} range={d.range} onOpenRoom={(e) => (e.room_id ? onOpenRoom(e.room_id, e.org?.handle ?? null) : undefined)} />
+      <YourWeek
+        entries={d.week}
+        failure={d.weekErr}
+        onRetry={d.retryWeek}
+        now={d.now}
+        range={d.range}
+        offset={d.weekOffset}
+        slide={d.weekSlide}
+        onStep={d.stepWeek}
+        onThisWeek={() => d.setWeekOffset(0)}
+        onOpenMonth={openMonth}
+        onOpenRoom={openRoom}
+        titleRef={weekTitleRef}
+      />
 
       <div role="tablist" aria-label="Show" style={{ flexShrink: 0, height: 45, boxSizing: "border-box", padding: "0 12px", display: "flex", alignItems: "center", gap: 2, borderTop: `1px solid ${t.hairline}` }}>
         {HOME_FILTERS.map((f) => {
@@ -442,6 +553,8 @@ export function MessagesHome({ filter, onFilter, refreshKey, onThreads, onOpenCl
       <section aria-label={LIST_LABEL[filter]} style={{ flexGrow: 1, minHeight: 0, paddingTop: 2, paddingBottom: 24, display: "flex", flexDirection: "column" }}>
         {list}
       </section>
+
+      {sheet ? <MonthSheet initialDay={sheet.day} opener={sheet.opener} now={d.now} night={night} onClose={closeMonth} onOpenRoom={openRoom} returnFocusTo={weekTitleRef} /> : null}
 
       <div
         aria-hidden="true"

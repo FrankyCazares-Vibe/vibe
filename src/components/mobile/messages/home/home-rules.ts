@@ -7,10 +7,13 @@
  *
  * `HomeFilter` is the home's own name (11.0, SPLIT-M2), never a widening of
  * `messages/types.ts`'s `Tab`.
+ *
+ * S71 amendment 4 (the end of the file): the month sheet's words — a grid
+ * day's label, the picked day's heading and caption, its plan rows.
  */
 
 import type { InboxClub, RoomState } from "@/lib/chat/types";
-import { isSameLocalDay } from "@/lib/chat/week";
+import { dayDiff, isSameLocalDay } from "@/lib/chat/week";
 import { eventTimeShort, rowTime, rowTimeSpoken } from "@/lib/chat/when";
 
 import type { ThreadEntry } from "../types";
@@ -288,10 +291,22 @@ export function dayLabel(day: Date, entries: readonly WeekEntry[], today: boolea
   return today ? `${date}, today: ${clauses}` : `${date}: ${clauses}`;
 }
 
-/** 1.2 week card, line 1: `Live now` (glowing dot), `Ended` on `after`, else `eventTimeShort` (N5). */
-export function weekCardLine(e: WeekEntry, now: Date): { kind: "live" | "ended" | "time"; text: string } {
+/**
+ * 1.2 week card, line 1: `Live now` (glowing dot), `Ended` on `after`, else `eventTimeShort` (N5).
+ * `otherWeek` (S71 amendment 4): on a week that is not the current one the
+ * day strip above names the days, so the card says the weekday (`Sun 7 PM`),
+ * never `Oct 11 7 PM` beside `Tue 7 PM`.
+ */
+export function weekCardLine(e: WeekEntry, now: Date, otherWeek = false): { kind: "live" | "ended" | "time"; text: string } {
   if (e.room_state === "live") return { kind: "live", text: "Live now" };
   if (e.room_state === "after") return { kind: "ended", text: "Ended" };
+  if (otherWeek) {
+    const start = new Date(e.starts_at);
+    if (!Number.isNaN(start.getTime())) {
+      // `eventTimeShort` of a day against itself is the clock alone (`7 PM`).
+      return { kind: "time", text: `${["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][start.getDay()]} ${eventTimeShort(start, start)}` };
+    }
+  }
   return { kind: "time", text: eventTimeShort(e.starts_at, now) };
 }
 
@@ -303,4 +318,152 @@ export function weekCardLabel(e: WeekEntry, now: Date): string {
   const r = rsvpClause(e.viewer_status);
   if (r) parts.push(r);
   return parts.join(", ");
+}
+
+/* ------------------------------------------------------------------------ *
+ * S71 amendment 4: the month sheet (R3_Month).
+ * ------------------------------------------------------------------------ */
+
+const WEEKDAY_SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
+const MONTH_SHORT = Object.keys(MONTH_LONG);
+
+/** `Friday October 9` (a day inside a spoken sentence). */
+export function spokenDay(day: Date): string {
+  return `${WEEKDAY_LONG[WEEKDAY_SHORT[day.getDay()]]} ${MONTH_LONG[MONTH_SHORT[day.getMonth()]]} ${day.getDate()}`;
+}
+
+/** The picked day's heading: `Fri, Oct 9`. */
+export function dayHeading(day: Date): string {
+  return `${WEEKDAY_SHORT[day.getDay()]}, ${MONTH_SHORT[day.getMonth()]} ${day.getDate()}`;
+}
+
+/** `No plans` / `1 plan` / `2 plans`. */
+export function planCountText(count: number): string {
+  if (count <= 0) return "No plans";
+  return count === 1 ? "1 plan" : `${count} plans`;
+}
+
+/**
+ * The caption right of the heading: `Today · 1 plan`, `Tomorrow · No plans`;
+ * any other day the count alone (`2 plans`). By calendar day, not by hours.
+ */
+export function dayCaption(day: Date, now: Date, count: number): string {
+  const when = dayWhen(day, now);
+  return when ? `${when} · ${planCountText(count)}` : planCountText(count);
+}
+
+/** `Today`, `Tomorrow`, or null for any other day (the caption's first half; all of it while the plans load). */
+export function dayWhen(day: Date, now: Date): "Today" | "Tomorrow" | null {
+  const away = dayDiff(now, day);
+  return away === 0 ? "Today" : away === 1 ? "Tomorrow" : null;
+}
+
+/** True for a day before today (the grid dims it). */
+export function isPastDay(day: Date, now: Date): boolean {
+  return dayDiff(now, day) < 0;
+}
+
+/**
+ * A grid day's `aria-label` (R3_Month:110-140): `<Weekday>, <Month D>[,
+ * today][, selected], ` then `nothing planned` · `1 event you're going to` ·
+ * `2 events you said maybe to` · `1 event you're going to, 1 you said maybe
+ * to`, and `, live now` when one of them is.
+ */
+export function monthDayLabel(day: Date, entries: readonly WeekEntry[], flags: { today: boolean; selected: boolean }): string {
+  const parts = [`${WEEKDAY_LONG[WEEKDAY_SHORT[day.getDay()]]}, ${MONTH_LONG[MONTH_SHORT[day.getMonth()]]} ${day.getDate()}`];
+  if (flags.today) parts.push("today");
+  if (flags.selected) parts.push("selected");
+  const going = entries.filter((e) => e.viewer_status === "going").length;
+  const maybe = entries.length - going;
+  const events = (n: number) => `${n} ${n === 1 ? "event" : "events"}`;
+  if (entries.length === 0) parts.push("nothing planned");
+  else if (maybe === 0) parts.push(`${events(going)} you're going to`);
+  else if (going === 0) parts.push(`${events(maybe)} you said maybe to`);
+  else parts.push(`${events(going)} you're going to`, `${maybe} you said maybe to`);
+  if (entries.some((e) => e.room_state === "live")) parts.push("live now");
+  return parts.join(", ");
+}
+
+/** One plan of the picked day (R3_Month:151-158). */
+export type PlanRow = {
+  entry: WeekEntry;
+  /** The club's name; null when the entry has no club. */
+  club: string | null;
+  /** The start's clock time on its own day: `7 PM`, `7:30 PM`. */
+  time: string;
+  /** `Film Society · 7 PM`; the time alone without a club. */
+  line: string;
+  /** `Fright Night, Film Society, Friday October 9 at 7 PM, you're going`, plus `. Open the event room` when it has one. */
+  label: string;
+};
+
+/** The day's plans, sorted by start; a row opens its event chat only when `entry.room_id` is set. */
+export function planRows(day: Date, entries: readonly WeekEntry[]): PlanRow[] {
+  return entriesOn(day, entries).map((entry) => {
+    // `eventTimeShort` against the event's own day answers the clock alone.
+    const time = eventTimeShort(entry.starts_at, new Date(entry.starts_at));
+    const club = entry.org?.name?.trim() || null;
+    const said = entry.viewer_status === "going" ? "you're going" : "you said maybe";
+    const spoken = [entry.title, ...(club ? [club] : []), `${spokenDay(new Date(entry.starts_at))} at ${time}`, said].join(", ");
+    return {
+      entry,
+      club,
+      time,
+      line: club ? `${club} · ${time}` : time,
+      label: entry.room_id ? `${spoken}. Open the event room` : spoken,
+    };
+  });
+}
+
+/**
+ * What takes focus when the month sheet closes (S71 amendment 4):
+ * - nothing when it closed because an event chat is opening (the chat takes
+ *   focus; the home under it must not);
+ * - the control that opened it (a day of the strip, the week's title) while
+ *   that control is still on the page;
+ * - else `fallback`, the week's title: the day that opened it left with its
+ *   week when the strip moved to the picked day's week.
+ * The sheet always answers Radix's close-focus event itself: with no
+ * `Drawer.Trigger`, Radix would otherwise focus nothing and stop the focus
+ * scope's own restore, leaving focus on `<body>`.
+ */
+export function sheetReturnFocus<T extends { isConnected: boolean }>(opener: T | null, fallback: T | null, openingRoom: boolean): T | null {
+  if (openingRoom) return null;
+  if (opener?.isConnected) return opener;
+  return fallback?.isConnected ? fallback : null;
+}
+
+/** `GET /api/me/calendar` for a range: `from` / `to` are the two instants the home shows between (a week, a month's grid). */
+export function calendarUrl(from: Date, to: Date): string {
+  return `/api/me/calendar?from=${encodeURIComponent(from.toISOString())}&to=${encodeURIComponent(to.toISOString())}`;
+}
+
+/**
+ * The `rsvp` entries of a calendar answer as the home's `WeekEntry`s (the
+ * personal entries and anything malformed are left out; a missing room field
+ * is null, `viewer_status` anything but `maybe` is `going`). Null when the
+ * body has no `entries` array: the read failed.
+ */
+export function rsvpEntries(body: unknown): WeekEntry[] | null {
+  const list = body && typeof body === "object" ? (body as { entries?: unknown }).entries : null;
+  if (!Array.isArray(list)) return null;
+  const out: WeekEntry[] = [];
+  for (const x of list) {
+    if (!x || typeof x !== "object") continue;
+    const e = x as Record<string, unknown>;
+    if (e.kind !== "rsvp" || typeof e.id !== "string" || typeof e.title !== "string" || typeof e.starts_at !== "string") continue;
+    const org = e.org && typeof e.org === "object" ? (e.org as { handle: string; name: string }) : null;
+    out.push({
+      id: e.id,
+      title: e.title,
+      starts_at: e.starts_at,
+      ends_at: e.ends_at as string,
+      viewer_status: e.viewer_status === "maybe" ? "maybe" : "going",
+      org: org ? { handle: org.handle, name: org.name } : null,
+      org_id: typeof e.org_id === "string" ? e.org_id : null,
+      room_id: typeof e.room_id === "string" ? e.room_id : null,
+      room_state: (e.room_state as RoomState | null | undefined) ?? null,
+    });
+  }
+  return out;
 }
