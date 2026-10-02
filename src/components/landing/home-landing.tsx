@@ -1,75 +1,52 @@
 "use client";
 
+import { Fraunces } from "next/font/google";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Fragment, useEffect, useMemo, useState, type CSSProperties } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 
-import { OttoOrb } from "@/components/the-map/OttoOrb";
 import { enabledSchoolSystems } from "@/lib/auth/school-email-domains";
 import { SYSTEM_LABEL } from "@/lib/iu/campuses";
 import { APP_STORE_URL, PLAY_STORE_URL } from "@/lib/native/store-links";
 import { isIosPlatform, type Platform } from "@/lib/pwa/display-mode";
 import { usePlatform } from "@/lib/pwa/use-standalone";
-import { useIsMobile } from "@/lib/use-is-mobile";
 
-import { OrbitalRingSystem, OrbitDetail, type RingId } from "./landing-orbit";
-import { TypewriterSequence } from "./landing-typewriter";
+import { NightSky, type SkyLight } from "./night-sky";
+import "./landing.css";
+
+// The soft wordmark face (the share card's: SOFT 100, opsz 144). The app-wide
+// Fraunces link in layout.tsx has no SOFT axis, so the landing loads its own.
+const soft = Fraunces({ subsets: ["latin"], axes: ["SOFT", "opsz"], variable: "--font-soft", display: "swap" });
 
 const WARP_DURATION_MS = 750;
 const LOGIN_HREF = "/auth/login";
 const SIGNUP_HREF = "/auth/signup";
+const CLUB_HREF = "mailto:help@connectvibe.app?subject=Bring%20my%20club%20to%20Vibe";
 // Reads the code flag PURDUE_SIGNUPS_ENABLED (never an env var), so the server
-// render and the hydrated page agree. Turning Purdue off removes its chip.
+// render and the hydrated page agree. Turning Purdue off removes its label.
 const LANDING_SCHOOL_LABELS: readonly string[] = enabledSchoolSystems().map((s) => SYSTEM_LABEL[s]);
 
-// Module-level so the array reference is stable across re-renders — passing
-// an inline literal to TypewriterSequence makes its useEffect deps "change"
-// every render and re-types the intro from scratch each time the parent
-// updates state.
-//
-// Desktop keeps the two-line cadence ("vibe." / "I'm Otto. This is your
-// campus…"). On mobile the second line was too long and wrapped its
-// brand-coral period onto its own line, which looked broken. Splitting
-// it into three shorter beats fixes the wrap and gives Otto more
-// presence on the small screen.
-const HERO_SENTENCES_DESKTOP = [
-  "Hey, welcome to vibe.",
-  "I'm Otto. This is your campus, all in one place.",
+type Kind = "clubs" | "events" | "people";
+
+/** The three things you can do. `rgb` is the colour that kind's lights lean toward. */
+const KINDS: Record<Kind, { eyebrow: string; title: string; body: string; rgb: string; screen: string | null }> = {
+  clubs: { eyebrow: "Clubs", title: "Find your clubs.", body: "Follow the ones you're curious about, join the ones you love, and keep up with their posts and chats in one place.", rgb: "255,92,53", screen: null },
+  events: { eyebrow: "Events", title: "See what's on.", body: "Everything happening on campus this week, in one place. RSVP in a tap so you never miss it.", rgb: "246,196,104", screen: null },
+  people: { eyebrow: "Each other", title: "Find each other.", body: "Meet people from your major and your clubs, and make your profile look like you.", rgb: "150,186,255", screen: null },
+};
+const KIND_ORDER: Kind[] = ["clubs", "events", "people"];
+
+/** The lights in the hero sky. Invented, generic names: never a real club or person. */
+const LIGHTS: (SkyLight & { kind: Kind; label: string })[] = [
+  { id: "film", kind: "clubs", label: "Film club", rgb: "255,92,53", size: 9, m: [0.2, 0.17], d: [0.56, 0.26] },
+  { id: "robotics", kind: "clubs", label: "Robotics", rgb: "255,146,124", size: 6, m: [0.8, 0.14], d: [0.86, 0.2] },
+  { id: "tonight", kind: "events", label: "Tonight, 7 pm", rgb: "246,196,104", size: 11, m: [0.62, 0.29], d: [0.72, 0.42] },
+  { id: "openmic", kind: "events", label: "Open mic", rgb: "255,224,170", size: 6, m: [0.14, 0.36], d: [0.58, 0.64] },
+  { id: "study", kind: "people", label: "Study group", rgb: "150,186,255", size: 8, m: [0.4, 0.45], d: [0.8, 0.7] },
+  { id: "major", kind: "people", label: "From your major", rgb: "196,178,255", size: 6, m: [0.82, 0.44], d: [0.92, 0.48] },
 ];
-const HERO_SENTENCES_MOBILE = [
-  "Hey, welcome to vibe.",
-  "I'm Otto.",
-  "This is your campus, all in one place.",
-];
+const LINKS: [number, number][] = [[0, 2], [1, 2], [0, 3], [3, 4], [2, 4], [2, 5], [4, 5]];
 
-// The store listings (APP_STORE_URL / PLAY_STORE_URL) come from
-// src/lib/native/store-links.ts, shared with /get and Settings: null until
-// that store's env var holds a real listing for that store, so a typo or a
-// half-filled env var renders no link rather than a link to somewhere else.
-type StoreLink = { key: string; href: string; lead: string; store: string };
-
-const APP_STORE_LINK: StoreLink | null = APP_STORE_URL
-  ? { key: "app-store", href: APP_STORE_URL, lead: "Get Vibe on", store: "the App Store" }
-  : null;
-const PLAY_STORE_LINK: StoreLink | null = PLAY_STORE_URL
-  ? { key: "play-store", href: PLAY_STORE_URL, lead: "Get Vibe on", store: "Google Play" }
-  : null;
-
-/**
- * Which store links to show. A phone sees only its own store, and nothing
- * when that store isn't set: an iPhone shown a Google Play link is a dead
- * button. A computer, and the server render before the platform is known,
- * sees every store that is set. Neither set means an empty list, and the
- * block renders nothing at all.
- */
-function storeLinksFor(platform: Platform | null): StoreLink[] {
-  if (isIosPlatform(platform)) return APP_STORE_LINK ? [APP_STORE_LINK] : [];
-  if (platform?.startsWith("android-")) return PLAY_STORE_LINK ? [PLAY_STORE_LINK] : [];
-  return [APP_STORE_LINK, PLAY_STORE_LINK].filter((l): l is StoreLink => l !== null);
-}
-
-// Footer: who runs Vibe and the pages App Review looks for. Brighter than the
-// footer's own 0.35 text so the links read as links on the dark background.
 const FOOTER_LINKS = [
   { href: "/legal/terms", label: "Terms" },
   { href: "/legal/privacy", label: "Privacy" },
@@ -77,347 +54,178 @@ const FOOTER_LINKS = [
   { href: "/support", label: "Support" },
 ] as const;
 
-const FOOTER_LINK_STYLE: CSSProperties = {
-  display: "inline-block",
-  padding: "4px 0",
-  color: "rgba(250,247,242,0.7)",
-  textDecoration: "none",
-};
+// The store listings come from src/lib/native/store-links.ts: null until that
+// store's env var holds a real listing, so a half-filled env var renders no link.
+type StoreLink = { key: string; href: string; store: string };
+const APP_STORE_LINK: StoreLink | null = APP_STORE_URL ? { key: "app-store", href: APP_STORE_URL, store: "the App Store" } : null;
+const PLAY_STORE_LINK: StoreLink | null = PLAY_STORE_URL ? { key: "play-store", href: PLAY_STORE_URL, store: "Google Play" } : null;
 
-const RING_ORDER: RingId[] = ["pulse", "scene", "connect"];
-const RING_COLOR: Record<RingId, string> = {
-  pulse: "#FF5C35",
-  scene: "#F5C842",
-  connect: "#7B5FE0",
-};
+/** A phone sees only its own store; a computer (and the server render) sees every store that is set. */
+function storeLinksFor(platform: Platform | null): StoreLink[] {
+  if (isIosPlatform(platform)) return APP_STORE_LINK ? [APP_STORE_LINK] : [];
+  if (platform?.startsWith("android-")) return PLAY_STORE_LINK ? [PLAY_STORE_LINK] : [];
+  return [APP_STORE_LINK, PLAY_STORE_LINK].filter((l): l is StoreLink => l !== null);
+}
+
+const at = (l: SkyLight, i: number, rgb: string) => ({ "--mx": l.m[0], "--my": l.m[1], "--dx": l.d[0], "--dy": l.d[1], "--i": i, "--rgb": rgb }) as CSSProperties;
 
 export function HomeLanding() {
   const router = useRouter();
-  const [focused, setFocused] = useState<RingId | null>(null);
-  const [introDone, setIntroDone] = useState(false);
+  const [active, setActive] = useState<string | null>(null);
   const [warping, setWarping] = useState(false);
-  const [visited, setVisited] = useState<Set<RingId>>(() => new Set());
-  const unlocked = visited.size === RING_ORDER.length;
-  const isMobile = useIsMobile();
-  const heroSentences = isMobile ? HERO_SENTENCES_MOBILE : HERO_SENTENCES_DESKTOP;
+  // The light under a mouse. A tap toggles its card; a click on a light the
+  // mouse already opened leaves it open (a touch fires neither enter nor leave here).
+  const hovered = useRef<string | null>(null);
+  const open = LIGHTS.find((l) => l.id === active) ?? null;
 
-  const handlePick = (id: RingId) => {
-    setFocused(id);
-    setVisited((prev) => {
-      if (prev.has(id)) return prev;
-      const next = new Set(prev);
-      next.add(id);
-      return next;
-    });
-  };
-
-  // Hyperdrive: intercept any element marked data-warp-trigger, play the
-  // streak animation, then navigate to that element's own href (sign-up for
-  // the sun and the "new here" link, login for returning users). Capture
-  // phase + stopPropagation so we beat Next.js Link's onClick (which would
-  // otherwise navigate immediately and skip the animation). Skip
-  // modifier-clicks so cmd/ctrl/middle-click still open in a new tab.
+  // The warp: any element marked data-warp-trigger plays the streak, then
+  // goes to its own href. Capture phase so it beats Next's Link; modifier
+  // clicks still open a new tab. With reduced motion it navigates at once.
   useEffect(() => {
     function onClick(e: MouseEvent) {
-      if (warping) return;
-      if (e.button !== 0) return;
-      if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
-      const target = e.target as HTMLElement | null;
-      const trigger = target?.closest("[data-warp-trigger]");
+      if (warping || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+      const trigger = (e.target as HTMLElement | null)?.closest("[data-warp-trigger]");
       if (!trigger) return;
       e.preventDefault();
       e.stopPropagation();
-      // Whichever element carries data-warp-trigger gets the warp — gating
-      // (visit-all-three) is enforced at render time by deciding which
-      // elements expose the attribute. The Skip link bypasses the gate
-      // for returning users by always exposing it.
       const href = trigger.getAttribute("href");
       const dest = href && href.startsWith("/") ? href : LOGIN_HREF;
+      const still = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
       setWarping(true);
       router.prefetch(dest);
-      window.setTimeout(() => router.push(dest), WARP_DURATION_MS);
+      window.setTimeout(() => router.push(dest), still ? 0 : WARP_DURATION_MS);
     }
     document.addEventListener("click", onClick, true);
     return () => document.removeEventListener("click", onClick, true);
   }, [router, warping]);
 
-  // When a ring gets focused, scroll the orbital section into view so the
-  // dolly transition isn't happening below the fold.
   useEffect(() => {
-    if (!focused) return;
-    const el = document.getElementById("vibe-landing-orbit-section");
-    if (el && typeof el.scrollIntoView === "function") {
-      el.scrollIntoView({ behavior: "smooth", block: "start" });
-    }
-  }, [focused]);
-
-  // Allow ESC to back out of orbit detail.
-  useEffect(() => {
-    if (!focused) return;
-    function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") setFocused(null);
-    }
+    if (!active) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setActive(null); };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [focused]);
+  }, [active]);
+
+  // Sections below the hero rise in once, the first time they are seen.
+  useEffect(() => {
+    const seen = new IntersectionObserver((entries) => {
+      for (const e of entries) if (e.isIntersecting) { e.target.classList.add("is-in"); seen.unobserve(e.target); }
+    }, { threshold: 0.2 });
+    document.querySelectorAll(".vln-rise").forEach((el) => seen.observe(el));
+    return () => seen.disconnect();
+  }, []);
 
   return (
-    <div className={`vibe-landing-root ${warping ? "vibe-landing-warp" : ""}`}>
-      <Starfield />
-
-      {/* ---- Hero — typewriter ----------------------------------------- */}
-      <section className="vibe-landing-hero">
-        <div className="vibe-landing-hero-orb">
-          <OttoOrb size={56} />
-        </div>
-        {/* Keyed by viewport class so the typewriter remounts cleanly when
-            the user resizes across the breakpoint — otherwise the internal
-            `typed` state (sized to the old array length) goes out of sync
-            with the new sentence count. */}
-        <TypewriterSequence
-          key={isMobile ? "mobile" : "desktop"}
-          sentences={heroSentences}
-          speed={60}
-          pauseBetween={700}
-          onDone={() => setIntroDone(true)}
-        />
-        <div
-          className="vibe-landing-scrollcue"
-          style={{ opacity: introDone ? 1 : 0 }}
-          aria-hidden
-        >
-          <span className="vibe-landing-scrollcue-line" />
-          <span style={{ fontSize: 11, letterSpacing: "0.18em", textTransform: "uppercase" }}>
-            scroll
-          </span>
-        </div>
-      </section>
-
-      {/* ---- Orbital scene --------------------------------------------- */}
-      <section id="vibe-landing-orbit-section" className="vibe-landing-orbit-section">
-        <div className="vibe-landing-orbit-eyebrow">
-          {focused
-            ? "What this form does"
-            : unlocked
-              ? "All three explored. You're in."
-              : `Pick a form to see how it works · ${visited.size}/${RING_ORDER.length}`}
-        </div>
-        <div className="vibe-landing-orbit-stage">
-          <OrbitalRingSystem focused={focused} onPick={handlePick} unlocked={unlocked} />
-          <OrbitDetail focused={focused} onClose={() => setFocused(null)} />
-        </div>
-      </section>
-
-      {/* ---- Bottom rail: progress + hint + schools ------------------- */}
-      <section className="vibe-landing-cta">
-        <div className="vibe-landing-cta-progress" aria-label={`${visited.size} of ${RING_ORDER.length} forms explored`}>
-          {RING_ORDER.map((id) => {
-            const isVisited = visited.has(id);
-            return (
-              <span
-                key={id}
-                className={`vibe-landing-cta-progress-dot${isVisited ? " is-visited" : ""}`}
-                style={{
-                  borderColor: RING_COLOR[id],
-                  background: isVisited ? RING_COLOR[id] : "transparent",
-                  boxShadow: isVisited ? `0 0 12px ${RING_COLOR[id]}90` : "none",
-                }}
-              />
-            );
-          })}
-        </div>
-
-        <p className="vibe-landing-cta-hint">
-          {unlocked
-            ? "Tap the sun to step inside."
-            : `Tap each form above to keep going · ${visited.size}/${RING_ORDER.length}`}
-        </p>
-
-        <div className="vibe-landing-schools">
-          {LANDING_SCHOOL_LABELS.map((label, i) => (
-            <Fragment key={label}>
-              {i > 0 ? <span aria-hidden="true">·</span> : null}
-              <span>{label}</span>
-            </Fragment>
-          ))}
-          <span className="vibe-landing-schools-soon">live</span>
-        </div>
-
-        <p className="vibe-landing-cta-foot">
-          Sign up with your school email. Your campus. Your people. Yourself.
-        </p>
-
-        {/* Both doors are always visible: a new student should never have to
-            discover the three-ring dance to find the sign-up. */}
-        <a
-          href={SIGNUP_HREF}
-          data-warp-trigger
-          className="vibe-landing-skip vibe-landing-signup"
-        >
-          New here?{" "}
-          <span className="vibe-landing-skip-action">
-            Create your account <span aria-hidden style={{ marginLeft: 4 }}>→</span>
-          </span>
-        </a>
-        <a
-          href={LOGIN_HREF}
-          data-warp-trigger
-          className="vibe-landing-skip vibe-landing-skip-secondary"
-        >
-          Already have an account?{" "}
-          <span className="vibe-landing-skip-action">
-            Log in <span aria-hidden style={{ marginLeft: 4 }}>→</span>
-          </span>
-        </a>
-
-        <StoreLinks />
-      </section>
-
-      {/* No data-warp-trigger here or on anything around it: the capture
-          handler above would hijack these links through closest() and play
-          the warp before opening them (and any href not starting with "/"
-          would go to /auth/login instead). The footer rule doesn't wrap, and
-          uppercase with wide tracking overflows a 375px phone, so the row
-          wraps here. */}
-      <footer
-        className="vibe-landing-footer"
-        style={{ flexWrap: "wrap", gap: "8px 16px" }}
-      >
-        <span>© CONNECTVIBE. LLC</span>
-        <nav
-          aria-label="Legal and support"
-          style={{ display: "flex", flexWrap: "wrap", gap: "8px 16px" }}
-        >
-          {FOOTER_LINKS.map((l) => (
-            <Link key={l.href} href={l.href} style={FOOTER_LINK_STYLE}>
-              {l.label}
-            </Link>
-          ))}
+    <div className={`vln-root ${soft.variable}${warping ? " is-warping" : ""}`}>
+      <header className="vln-bar">
+        <span className="vln-wordmark">vibe<i>.</i></span>
+        <nav aria-label="Account">
+          <a href={LOGIN_HREF} data-warp-trigger className="vln-textlink">Log in</a>
+          <a href={SIGNUP_HREF} data-warp-trigger className="vln-btn vln-btn-sm">Sign up</a>
         </nav>
+      </header>
+
+      <section className="vln-hero" onClick={() => setActive(null)}>
+        <NightSky lights={LIGHTS} links={LINKS} activeId={active} warping={warping} />
+        {LIGHTS.map((l, i) => (
+          <button
+            key={l.id}
+            type="button"
+            className="vln-light"
+            style={at(l, i, l.rgb)}
+            aria-expanded={active === l.id}
+            aria-controls="vln-pop"
+            onClick={(e) => { e.stopPropagation(); setActive(active === l.id && hovered.current !== l.id ? null : l.id); }}
+            onPointerEnter={(e) => { if (e.pointerType === "mouse") { hovered.current = l.id; setActive(l.id); } }}
+            onPointerLeave={() => { hovered.current = null; }}
+          >
+            <span className="vln-light-label">{l.label}</span>
+          </button>
+        ))}
+        {open ? (
+          <div id="vln-pop" className="vln-pop" style={at(open, 0, open.rgb)} onClick={(e) => e.stopPropagation()}>
+            <span className="vln-eyebrow">{KINDS[open.kind].eyebrow}</span>
+            <strong>{KINDS[open.kind].title}</strong>
+            <p>{KINDS[open.kind].body}</p>
+            <a href={`#vln-${open.kind}`} onClick={() => setActive(null)}>More below <span aria-hidden="true">↓</span></a>
+          </div>
+        ) : null}
+
+        <div className="vln-hero-copy">
+          <h1>The social app for <em>your campus.</em></h1>
+          <p>Find your clubs, your events, and each other. Free with your school email.</p>
+          <div className="vln-cta">
+            <a href={SIGNUP_HREF} data-warp-trigger className="vln-btn">Sign up</a>
+            <a href="#vln-doors" className="vln-btn vln-btn-ghost">Bring your club</a>
+          </div>
+          <span className="vln-hint">Tap a light to see what&apos;s out there.</span>
+        </div>
+      </section>
+
+      <section className="vln-kinds" aria-label="What you can do on Vibe">
+        {KIND_ORDER.map((k) => (
+          <article key={k} id={`vln-${k}`} className="vln-kind vln-rise" style={{ "--rgb": KINDS[k].rgb } as CSSProperties}>
+            <span className="vln-dot" aria-hidden="true" />
+            <span className="vln-eyebrow">{KINDS[k].eyebrow}</span>
+            <h2>{KINDS[k].title}</h2>
+            <p>{KINDS[k].body}</p>
+            {/* eslint-disable-next-line @next/next/no-img-element -- a still of the app, added once the demo cast exists */}
+            {KINDS[k].screen ? <img className="vln-screen" src={KINDS[k].screen} alt="" loading="lazy" /> : null}
+          </article>
+        ))}
+      </section>
+
+      <section id="vln-doors" className="vln-doors">
+        <div className="vln-door vln-rise">
+          <span className="vln-eyebrow">For students</span>
+          <h2>Step inside.</h2>
+          <p>Sign up with your school email. It&apos;s free, and only students can join.</p>
+          <a href={SIGNUP_HREF} data-warp-trigger className="vln-btn">Create your account</a>
+        </div>
+        <div className="vln-door vln-rise" style={{ "--rgb": KINDS.events.rgb } as CSSProperties}>
+          <span className="vln-eyebrow">For clubs</span>
+          <h2>Bring your club.</h2>
+          <p>A page, your events, and a chat your members will open. Write to us and we&apos;ll set it up with you.</p>
+          <a href={CLUB_HREF} className="vln-btn vln-btn-ghost">Email us</a>
+        </div>
+      </section>
+
+      <section className="vln-close vln-rise">
+        <span className="vln-wordmark vln-wordmark-xl">vibe<i>.</i></span>
+        <p className="vln-tagline">Your campus. Your people. Yourself.</p>
+        <a href={SIGNUP_HREF} data-warp-trigger className="vln-btn">Sign up</a>
+        <a href={LOGIN_HREF} data-warp-trigger className="vln-textlink">Already have an account? Log in</a>
+        <StoreLinks />
+        <span className="vln-schools">{LANDING_SCHOOL_LABELS.join(" · ")}</span>
+      </section>
+
+      {/* No data-warp-trigger in the footer: the warp would hijack these links. */}
+      <footer className="vln-footer">
+        <span>© CONNECTVIBE. LLC</span>
+        <nav aria-label="Legal and support">
+          {FOOTER_LINKS.map((l) => <Link key={l.href} href={l.href}>{l.label}</Link>)}
+        </nav>
+        <p>Vibe is not affiliated with Indiana University or Purdue University.</p>
       </footer>
     </div>
   );
 }
 
-/* ---------------------------------------------------------------------- */
-/* "Get Vibe on …" — the store listings, once they exist.                   */
-/* ---------------------------------------------------------------------- */
-
 /**
- * Store links under the two doors (Franky's decision D3: install means the
- * real store apps). Renders NOTHING while NEXT_PUBLIC_APP_STORE_URL and
- * NEXT_PUBLIC_PLAY_STORE_URL are both unset, so the landing never shows a
- * button that goes nowhere.
- *
- * Plain text links on purpose, never a drawn badge: Apple and Google each
- * publish official badge art with rules about how it's used, and an imitation
- * is worse than none.
- * TODO(Franky): swap each text link for the official badge ("Download on the
- * App Store", "Get it on Google Play") once you've downloaded the art from
- * Apple's and Google's marketing pages, and add a QR code to /get for
- * computers. The store app itself should never show this block (it would be
- * an ad for the app you're already in): hide it there when the shell lands.
- *
- * Like the footer, nothing here carries data-warp-trigger: these links leave
- * Vibe, and the warp would turn any href not starting with "/" into /auth/login.
+ * Store links (Franky's decision D3: install means the real store apps).
+ * Renders nothing while both store env vars are unset. Plain text links on
+ * purpose, never a drawn badge: Apple and Google publish official badge art
+ * with rules, and an imitation is worse than none. No data-warp-trigger:
+ * these links leave Vibe.
  */
 function StoreLinks() {
-  const platform = usePlatform();
-  const links = storeLinksFor(platform);
+  const links = storeLinksFor(usePlatform());
   if (links.length === 0) return null;
   return (
-    <nav
-      aria-label="Get the Vibe app"
-      style={{
-        display: "flex",
-        flexWrap: "wrap",
-        justifyContent: "center",
-        gap: "10px 24px",
-        marginTop: 4,
-      }}
-    >
+    <nav aria-label="Get the Vibe app" className="vln-stores">
       {links.map((l) => (
-        <a
-          key={l.key}
-          href={l.href}
-          style={{
-            fontFamily: "DM Sans, sans-serif",
-            fontSize: 13,
-            fontWeight: 600,
-            color: "rgba(250,247,242,0.8)",
-            textDecoration: "none",
-          }}
-        >
-          {l.lead}{" "}
-          <span style={{ color: "#FF5C35", fontWeight: 700 }}>{l.store}</span>
-          <span aria-hidden style={{ marginLeft: 6 }}>→</span>
-        </a>
+        <a key={l.key} href={l.href}>Get Vibe on <b>{l.store}</b> <span aria-hidden="true">→</span></a>
       ))}
     </nav>
-  );
-}
-
-/* ---------------------------------------------------------------------- */
-/* Sparse twinkling star field — deterministic so SSR + client match.       */
-/* ---------------------------------------------------------------------- */
-
-function Starfield() {
-  // Pre-stringified at fixed precision so SSR + client render byte-identical
-  // inline styles. Also emits per-star radial vectors (--sc/--ss/--sa) the
-  // hyperdrive keyframe reads to streak each star outward from page center.
-  const stars = useMemo(() => {
-    const noise = (i: number, k: number) => {
-      const v = Math.sin(i * 12.9898 + k * 78.233) * 43758.5453;
-      return ((v % 1) + 1) % 1;
-    };
-    const fix = (n: number, d: number) => n.toFixed(d);
-    return Array.from({ length: 70 }, (_, i) => {
-      const xPct = noise(i, 1) * 100;
-      const yPct = noise(i, 2) * 100;
-      const dx = xPct - 50;
-      const dy = yPct - 50;
-      // Avoid divide-by-zero for stars exactly at center; nudge outward.
-      const len = Math.max(Math.sqrt(dx * dx + dy * dy), 0.01);
-      const cos = dx / len;
-      const sin = dy / len;
-      const angle = Math.atan2(dy, dx);
-      const size = fix(1 + noise(i, 3) * 1.8, 2);
-      return {
-        left: `${fix(xPct, 3)}%`,
-        top: `${fix(yPct, 3)}%`,
-        width: `${size}px`,
-        height: `${size}px`,
-        opacity: fix(0.25 + noise(i, 6) * 0.55, 3),
-        animationDelay: `${fix(noise(i, 4) * 4, 2)}s`,
-        animationDuration: `${fix(3 + noise(i, 5) * 4, 2)}s`,
-        sc: fix(cos, 4),
-        ss: fix(sin, 4),
-        sa: `${fix(angle, 4)}rad`,
-      };
-    });
-  }, []);
-
-  return (
-    <div className="vibe-landing-stars" aria-hidden>
-      {stars.map((s, i) => (
-        <span
-          key={i}
-          style={
-            {
-              left: s.left,
-              top: s.top,
-              width: s.width,
-              height: s.height,
-              opacity: s.opacity,
-              animationDelay: s.animationDelay,
-              animationDuration: s.animationDuration,
-              "--sc": s.sc,
-              "--ss": s.ss,
-              "--sa": s.sa,
-            } as React.CSSProperties
-          }
-        />
-      ))}
-    </div>
   );
 }
