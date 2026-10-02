@@ -98,13 +98,13 @@ export function YourWeek({
       {liveId && bloomLeft !== null ? (
         <div aria-hidden="true" style={{ position: "absolute", zIndex: -1, left: bloomLeft, top: 54, width: 340, height: 118, pointerEvents: "none", background: t.bloom }} />
       ) : null}
-      <div style={{ height: 18, boxSizing: "border-box", padding: "0 16px", display: "flex", alignItems: "center", gap: 8 }}>
+      {/* The title alone, centred (Franky, S71: the "Sep 28 – Oct 4 · your RSVPs"
+          caption made the top feel cluttered). The dates are still spoken: the
+          day strip's label below carries `range.spoken`. */}
+      <div style={{ height: 18, boxSizing: "border-box", padding: "0 16px", display: "flex", alignItems: "center", justifyContent: "center" }}>
         <h2 id="your-week-heading" style={{ margin: 0, fontFamily: SERIF, fontWeight: 700, fontSize: 16, lineHeight: 1, letterSpacing: "-0.2px", color: t.ink }}>
           Your week
         </h2>
-        <span style={{ marginLeft: "auto", fontSize: 12, fontWeight: 600, lineHeight: 1, color: t.muted, whiteSpace: "nowrap" }}>
-          {range.label} · your RSVPs
-        </span>
       </div>
 
       <nav aria-label={`Your week, ${range.spoken}`} style={{ marginTop: 2, height: 44, boxSizing: "border-box", padding: "0 12px", display: "flex", justifyContent: "space-between" }}>
