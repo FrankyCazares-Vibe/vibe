@@ -1,5 +1,9 @@
 # The invented cast for screenshots and the demo video (S72, 2026-10-02)
 
+> **Changed later on Oct 2 (Franky):** the lead is now **Franky himself**, on his own profile, not Maya. Maya stays in the cast as an ordinary student. The campus on screen is Bloomington (or Indianapolis); Franky allowed either. He sends the event to **James**. Everything below that says "Maya" as the lead now reads "Franky".
+>
+> **Pictures (Franky's own, in `~/vibe-demo-photos`, never in the repo):** five without recognisable faces are in use (a foggy campus, the campus at night, the SAE letters, a sea turtle, a lawn event). Held until Franky says the people in them agree: the sand dunes, the two on the field, the kitten, the gorilla statue, the kitchen (it also shows an IUPUI shirt). Not used: the look-alike contest flyer (a celebrity's photo and live QR codes).
+
 Franky answered the five questions on Oct 2; this is the cast with his answers in. It lives ONLY in the practice database on this Mac (`scripts/demo-seed.mjs`, same safety gate as `scripts/local-seed.mjs`: it refuses any database that is not 127.0.0.1). Nothing invented ever goes into production.
 
 ## Franky's answers (Oct 2)
