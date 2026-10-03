@@ -82,8 +82,10 @@
 
 /* Below the hero */
 /* Emerging with the scroll: home-landing sets --p (0 to 1) on each .vln-rise.
-   1 here, so the page reads in full before (or without) JavaScript. */
-.vln-rise { --p: 1; opacity: var(--p); transform: translate3d(0, calc((1 - var(--p)) * 56px), 0); will-change: transform, opacity; }
+   1 here, so the page reads in full before (or without) JavaScript.
+   will-change names transform only: with opacity too, Chrome left a readout's
+   screen at half brightness through its whole switch-on, then popped it lit. */
+.vln-rise { --p: 1; opacity: var(--p); transform: translate3d(0, calc((1 - var(--p)) * 56px), 0); will-change: transform; }
 
 /* A labelled hairline between parts of the page; the line draws itself in. */
 .vln-rule { display: flex; align-items: center; gap: 14px; max-width: 1120px; margin: 0 auto; padding: 64px 20px 0; font: 500 10.5px/1 var(--font-mono), monospace; letter-spacing: 0.16em; text-transform: uppercase; color: var(--muted); }
@@ -115,9 +117,94 @@
 .vln-kind:focus { outline: none; }
 .vln-panel h2 { font-size: clamp(34px, 9vw, 44px); font-weight: 800; line-height: 1; }
 .vln-panel p { margin: 14px 0 0; max-width: 34em; font-size: 15px; line-height: 1.55; color: #CFC8BE; }
-.vln-screen { display: block; width: 100%; max-width: 280px; margin: 22px auto 0; border-radius: 26px; border: 1px solid var(--line); }
+
+/* The readout (S72 design 2, readout.tsx): one real screen from the demo
+   film in a hairline window, corner ticks inside it in the kind's colour,
+   and a mono caption strip under it. The screen sits still: no pan. */
+.vln-readout { max-width: 400px; margin: 24px 0 0; }
+/* The caption strip's own 44px is the panel's bottom margin. */
+.vln-kind { padding-bottom: 6px; }
+.vln-readout-win { position: relative; aspect-ratio: 4 / 5; overflow: hidden; border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 3px; background: #070606; }
+.vln-readout-win img { display: block; width: 100%; height: 100%; object-fit: cover; object-position: top; }
+/* A crop whose bottom edge cuts through a card fades out instead. */
+.vln-readout-win.is-cut img { -webkit-mask-image: linear-gradient(#000 78%, transparent); mask-image: linear-gradient(#000 78%, transparent); }
+.vln-readout-win::before { content: ""; position: absolute; inset: 6px; z-index: 2; pointer-events: none; --c: rgba(var(--rgb), 0.95); background:
+  linear-gradient(var(--c), var(--c)) 0 0 / 9px 1px, linear-gradient(var(--c), var(--c)) 0 0 / 1px 9px,
+  linear-gradient(var(--c), var(--c)) 100% 0 / 9px 1px, linear-gradient(var(--c), var(--c)) 100% 0 / 1px 9px,
+  linear-gradient(var(--c), var(--c)) 0 100% / 9px 1px, linear-gradient(var(--c), var(--c)) 0 100% / 1px 9px,
+  linear-gradient(var(--c), var(--c)) 100% 100% / 9px 1px, linear-gradient(var(--c), var(--c)) 100% 100% / 1px 9px;
+  background-repeat: no-repeat; }
+/* The one-time switch-on: readout.tsx sets data-scan="off" on a readout
+   below the fold, then "on" once it is well into view. Off, a dark veil
+   with faint scan rows covers the screen; on, its lit top edge sweeps down
+   once and the veil slides out of the window. No data-scan, no veil. */
+.vln-readout[data-scan] .vln-readout-win::after { content: ""; position: absolute; inset: 0; z-index: 1; pointer-events: none;
+  background: linear-gradient(rgb(var(--rgb)), rgb(var(--rgb))) 0 0 / 100% 1px no-repeat, repeating-linear-gradient(rgba(255, 255, 255, 0.04) 0 1px, transparent 1px 3px), rgba(8, 7, 7, 0.86);
+  box-shadow: 0 -12px 26px -6px rgba(var(--rgb), 0.6); }
+/* Past the bottom by more than its glow, so no light is left at the edge. */
+.vln-readout[data-scan="on"] .vln-readout-win::after { transform: translate3d(0, calc(100% + 44px), 0); transition: transform 1.3s cubic-bezier(0.5, 0.05, 0.25, 1); }
+.vln-readout figcaption { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 44px; margin-top: 2px; font: 500 10.5px/1 var(--font-mono), monospace; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); }
+.vln-readout figcaption a { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; color: rgb(var(--rgb)); text-decoration: none; letter-spacing: 0.08em; }
+.vln-readout figcaption a:hover { color: var(--cream); }
 
 .vln-door .vln-btn { margin-top: 20px; }
+
+/* 04 · A day on Vibe (S72, day-on-vibe.tsx): big type over a hairline list
+   of the day's moments, and the demo film in a phone-screen readout. On a
+   phone: title, list, film, line. From 760px the film stands to the right.
+   --rgb is the moment on screen (the section sets it; each row has its own). */
+.vln-day { display: grid; grid-template-columns: minmax(0, 1fr); gap: 26px; max-width: 1120px; margin: 0 auto; padding: 22px 20px 0; }
+.vln-day h2 { font-size: clamp(52px, 15.5vw, 132px); font-weight: 800; line-height: 0.92; }
+/* Focus lands on the heading or the film only from code (use-day-film): no ring. */
+.vln-day h2:focus, .vln-film:focus { outline: none; }
+.vln-day-list { margin: 0; padding: 0; list-style: none; border-top: 1px solid rgba(255, 255, 255, 0.14); }
+.vln-day-list li { border-bottom: 1px solid rgba(255, 255, 255, 0.09); }
+.vln-day-list button, .vln-day-row { display: grid; grid-template-columns: 7.4em minmax(0, 1fr); align-items: center; gap: 12px; width: 100%; min-height: 48px; padding: 8px 2px; border: 0; color: rgba(246, 241, 234, 0.72); font: 500 16px/1.3 "DM Sans", sans-serif; text-align: left;
+  background: linear-gradient(rgb(var(--rgb)), rgb(var(--rgb))) 0 100% / 0 1px no-repeat, linear-gradient(rgba(var(--rgb), 0.3), rgba(var(--rgb), 0.3)) 0 100% / 0 1px no-repeat; }
+.vln-day-list button { cursor: pointer; transition: color 0.2s ease; }
+.vln-day-list b { display: inline-flex; align-items: center; gap: 10px; font: 500 10.5px/1 var(--font-mono), monospace; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); }
+.vln-day-list b::before { content: ""; flex: none; width: 5px; height: 5px; border-radius: 50%; background: rgb(var(--rgb)); opacity: 0.5; }
+/* The moment playing (or, with no film, the one the still shows): cream text,
+   its label and dot lit in its own colour, a faint line under the whole row
+   and a bright one that runs along it with the film (--cp, from use-day-film).
+   Hue as well as lightness, so it reads apart from the rows around it. */
+.vln-day-list button:hover, :is(.vln-day-list button[aria-current="true"], .vln-day-row[data-on]) { color: var(--cream); }
+:is(.vln-day-list button[aria-current="true"], .vln-day-row[data-on]) { background-size: calc(var(--cp, 0) * 100%) 1px, 100% 1px; }
+.vln-day-list .vln-day-row[data-on] { background-size: 100% 1px, 100% 1px; }
+:is(.vln-day-list button[aria-current="true"], .vln-day-row[data-on]) b { color: rgb(var(--rgb)); }
+:is(.vln-day-list button[aria-current="true"], .vln-day-row[data-on]) b::before { opacity: 1; box-shadow: 0 0 10px 2px rgba(var(--rgb), 0.7); }
+.vln-day-list button:focus-visible, .vln-film-toggle:focus-visible { outline: 2px solid var(--cream); outline-offset: 2px; }
+.vln-day-note { margin: 0; max-width: 34em; font-size: 14px; line-height: 1.55; color: var(--muted); }
+
+/* The film's readout: hairline frame, corner ticks, a mono strip on top, and
+   under the screen the film's progress line, Play/Pause and the part of the
+   day on screen. --fw keeps the whole readout inside one screen height
+   (780 x 1688 is 0.462 wide for its height). */
+.vln-film { --fw: clamp(200px, min(280px, 70vw, calc((100svh - 170px) * 0.462)), 320px); position: relative; justify-self: center; margin: 6px 0 0; border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 4px; background: linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0.012)); scroll-margin-top: 24px; }
+.vln-film::before, .vln-film::after { content: ""; position: absolute; width: 12px; height: 12px; border: solid rgb(var(--rgb)); pointer-events: none; }
+.vln-film::before { top: -1px; left: -1px; border-width: 1px 0 0 1px; }
+.vln-film::after { bottom: -1px; right: -1px; border-width: 0 1px 1px 0; }
+.vln-film-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 4px 8px; min-height: 40px; padding: 8px 12px; border-bottom: 1px solid rgba(255, 255, 255, 0.09); font: 500 10px/1.2 var(--font-mono), monospace; letter-spacing: 0.12em; text-transform: uppercase; color: var(--cream); }
+.vln-film-head i { width: 5px; height: 5px; border-radius: 50%; background: rgba(var(--rgb), 0.45); }
+.vln-film[data-playing] .vln-film-head i { background: rgb(var(--rgb)); box-shadow: 0 0 10px 2px rgba(var(--rgb), 0.7); }
+.vln-film-screen { position: relative; width: var(--fw); aspect-ratio: 780 / 1688; margin: 10px; border-radius: 20px; overflow: hidden; background: #050404; }
+.vln-film-screen video, .vln-film-poster, .vln-film-poster img { position: absolute; inset: 0; display: block; width: 100%; height: 100%; object-fit: cover; }
+.vln-film-poster { transition: opacity 0.4s ease; }
+.vln-film-poster[data-off] { opacity: 0; pointer-events: none; }
+.vln-film-track { display: block; position: relative; height: 1px; margin: 0 10px; background: rgba(255, 255, 255, 0.16); }
+.vln-film-track i { position: absolute; inset: 0; background: rgb(var(--rgb)); transform: scaleX(var(--fp, 0)); transform-origin: 0 50%; }
+.vln-film-foot { display: flex; align-items: center; gap: 12px; min-height: 64px; padding: 10px; box-sizing: border-box; }
+/* The part of the day on screen, so a phone showing only the film still says it. */
+.vln-film-now { display: grid; justify-items: end; gap: 5px; min-width: 0; margin: 0 0 0 auto; text-align: right; }
+.vln-film-now b { font: 500 10px/1 var(--font-mono), monospace; letter-spacing: 0.14em; text-transform: uppercase; color: rgb(var(--rgb)); }
+.vln-film-now span { font: 500 13px/1.25 "DM Sans", sans-serif; color: var(--cream); }
+/* With no film, the label alone: a caption under the still. */
+.vln-film-now:only-child { justify-items: start; margin: 0; text-align: left; }
+.vln-film-toggle { display: inline-flex; flex: none; align-items: center; justify-content: center; gap: 9px; min-width: 96px; min-height: 44px; padding: 0 16px; border: 1px solid rgba(255, 255, 255, 0.16); border-radius: 999px; background: rgba(255, 255, 255, 0.04); color: var(--cream); font: 500 10.5px/1 var(--font-mono), monospace; letter-spacing: 0.14em; text-transform: uppercase; cursor: pointer; }
+.vln-film-toggle:hover { background: rgba(255, 255, 255, 0.08); }
+.vln-film-toggle::before { content: ""; box-sizing: border-box; width: 8px; height: 10px; border-style: solid; border-width: 5px 0 5px 8px; border-color: transparent transparent transparent rgb(var(--rgb)); }
+.vln-film-toggle[data-state="playing"]::before { border-width: 0 3px; border-color: rgb(var(--rgb)); }
+.vln-sr-only { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
 
 .vln-orbits { position: absolute; left: 50%; top: 150px; width: 0; height: 0; }
 .vln-orbits span { position: absolute; left: 0; top: 0; translate: -50% -50%; rotate: -8deg; border-radius: 50%; border: 1px solid rgba(255, 255, 255, 0.08); }
@@ -158,12 +245,42 @@
   .vln-orbits { top: 190px; }
   .vln-doors { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; padding: 22px 40px 0; }
   .vln-footer { padding: 20px 40px 24px; }
+  /* The day: title, list and line on the left, the film to the right of all three. */
+  .vln-day { grid-template-columns: minmax(0, 1fr) auto; grid-template-rows: auto auto 1fr; column-gap: clamp(40px, 6vw, 88px); row-gap: 30px; padding: 26px 40px 0; }
+  .vln-day h2 { font-size: clamp(56px, 7.4vw, 112px); }
+  /* The line closes the left column level with the film's foot, so the two columns end together. */
+  .vln-day-note { align-self: end; padding-bottom: 18px; }
+  .vln-day > .vln-film { grid-column: 2; grid-row: 1 / 4; align-self: center; margin: 0; }
+  .vln-film { --fw: clamp(220px, calc((100svh - 220px) * 0.462), 300px); }
+}
+/* One column of panels from 760px to 999px: the screen stands beside the
+   text instead of filling a 700px-wide panel. */
+@media (min-width: 760px) and (max-width: 999px) {
+  .vln-kind { display: grid; grid-template-columns: minmax(0, 1fr) 300px; grid-template-rows: auto auto 1fr; column-gap: 40px; }
+  .vln-kind > .vln-panel-head { grid-column: 1 / -1; }
+  .vln-kind > p { align-self: start; }
+  .vln-kind > .vln-readout { grid-column: 2; grid-row: 2 / 4; margin: 0; }
 }
 /* Three kinds side by side only from 1000px, where a column is wide enough
    for its heading and text (the strip label drops a name that won't fit). */
 @media (min-width: 1000px) {
   .vln-kinds { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .vln-kind h2 { font-size: clamp(28px, 2.9vw, 36px); }
+  /* The three screens line up along the bottom, whatever each text's length. */
+  .vln-kind { display: flex; flex-direction: column; }
+  .vln-kind > .vln-readout { margin-top: auto; padding-top: 24px; }
+  /* Roomier rows beside a tall film, so the list fills more of its column. */
+  .vln-day-list button { min-height: 60px; }
+  /* The three switch on together here: one after another instead, left to right. */
+  .vln-kind:nth-child(2) .vln-readout[data-scan="on"] .vln-readout-win::after { transition-delay: 0.12s; }
+  .vln-kind:nth-child(3) .vln-readout[data-scan="on"] .vln-readout-win::after { transition-delay: 0.24s; }
+}
+/* A phone: a square crop of each screen, so three of them don't double the
+   page. The cut edge fades; the DM keeps its bottom, the newest message. */
+@media (max-width: 759px) {
+  .vln-readout-win { aspect-ratio: 1; }
+  .vln-readout-win img { -webkit-mask-image: linear-gradient(#000 80%, transparent); mask-image: linear-gradient(#000 80%, transparent); }
+  .vln-readout-win.is-bottom img { object-position: bottom; -webkit-mask-image: linear-gradient(transparent, #000 20%); mask-image: linear-gradient(transparent, #000 20%); }
 }
 @keyframes vln-fade-only { from { opacity: 0; } }
 
@@ -175,4 +292,7 @@
   .vln-panel { clip-path: none; }
   .vln-orbits b { animation: none; }
   .vln-btn { transition: none; }
+  /* No veil and no sweep; the film never starts by itself (use-day-film). */
+  .vln-readout[data-scan] .vln-readout-win::after { display: none; }
+  .vln-film-poster, .vln-day-list button { transition: none; }
 }

@@ -80,6 +80,7 @@ With the wrong database the take stops at "the screen never settled: the feed"; 
 | `data.mjs` | Checks the practice data, remembers it before a take, puts it back after. |
 | `cut.sh` | Joins the three reels and writes the two films and the poster. |
 | `check.mjs` | Compares the two films frame by frame; the cut fails if the framed one repeats frames. |
+| `stills.sh`, `stills.mjs` | The landing's committed stills and film poster (`public/landing/`), cut from the master: frame times and crops are in `stills.sh`. Photo-free screens only; look at each one before committing. A new take moves the screens: check the times first. |
 
 ## Changing the storyboard
 

@@ -320,11 +320,14 @@ export async function proxy(request: NextRequest) {
 // response the browser may keep, and no suspension redirect — a restricted
 // student's worker would otherwise get the notice instead of /offline.html
 // (sw.js refuses redirected responses, so its offline precache would fail).
-// The `$` makes each one an exact root path, not a prefix. Careful with this
+// The `$` makes each one an exact root path, not a prefix. Pictures and
+// films in public/ skip it too (avif, mp4 and webm since S72: the landing's
+// stills and its local demo film, otherwise each one a getUser() call on
+// the busiest public page; no route ends in those). Careful with this
 // line: a stray `|` is an empty alternative that matches every path, and then
 // the proxy silently never runs. `node scripts/check-pwa.mjs` tests it.
 export const config = {
   matcher: [
-    "/((?!_next/static|_next/image|favicon\\.ico|sw\\.js$|offline\\.html$|manifest\\.webmanifest$|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    "/((?!_next/static|_next/image|favicon\\.ico|sw\\.js$|offline\\.html$|manifest\\.webmanifest$|.*\\.(?:svg|png|jpg|jpeg|gif|webp|avif|mp4|webm)$).*)",
   ],
 };

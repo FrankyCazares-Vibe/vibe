@@ -7,11 +7,14 @@ import { Fragment, useEffect, useLayoutEffect, useRef, useState, type CSSPropert
 
 import { enabledSchoolSystems } from "@/lib/auth/school-email-domains";
 import { SYSTEM_LABEL } from "@/lib/iu/campuses";
+import { HAS_DEMO_FILM } from "@/lib/landing/demo-media";
 import { APP_STORE_URL, PLAY_STORE_URL } from "@/lib/native/store-links";
 import { isIosPlatform, type Platform } from "@/lib/pwa/display-mode";
 import { usePlatform } from "@/lib/pwa/use-standalone";
 
+import { DayOnVibe, MOMENTS, type DayHandle, type MomentId } from "./day-on-vibe";
 import { NightSky, type SkyLight } from "./night-sky";
+import { Readout, type Still } from "./readout";
 import "./landing.css";
 
 // The soft wordmark face (the share card's: SOFT 100, opsz 144). The app-wide
@@ -33,11 +36,24 @@ const LANDING_SCHOOL_LABELS: readonly string[] = enabledSchoolSystems().map((s) 
 
 type Kind = "clubs" | "events" | "people";
 
-/** The three things you can do. `rgb` is the colour that kind's lights lean toward. */
-const KINDS: Record<Kind, { eyebrow: string; title: string; body: string; rgb: string; screen: string | null }> = {
-  clubs: { eyebrow: "Clubs", title: "Find your clubs.", body: "Follow the ones you’re curious about, join the ones you love, and keep up with their posts and chats in one place.", rgb: "255,92,53", screen: null },
-  events: { eyebrow: "Events", title: "See what’s on.", body: "What your clubs have on this week, in one place. RSVP in a tap so you never miss it.", rgb: "246,196,104", screen: null },
-  people: { eyebrow: "Each other", title: "Find each other.", body: "Meet people from your major and your clubs, and make your profile look like you.", rgb: "150,186,255", screen: null },
+/**
+ * The three things you can do. `rgb` is the colour that kind's lights lean
+ * toward. `still` is one real screen from the demo film (readout.tsx), and
+ * `moment` the part of the day it comes from in "A day on Vibe".
+ */
+const KINDS: Record<Kind, { eyebrow: string; title: string; body: string; rgb: string; still: Still; moment: MomentId }> = {
+  clubs: {
+    eyebrow: "Clubs", title: "Find your clubs.", body: "Follow the ones you’re curious about, join the ones you love, and keep up with their posts and chats in one place.", rgb: "255,92,53", moment: "evening",
+    still: { stem: "still-orgs", fig: "Orgs", alt: "The Orgs tab in Vibe: North Hall, Tower Floor 3 and Finance Club, each with a Following, Join or Request button." },
+  },
+  events: {
+    eyebrow: "Events", title: "See what’s on.", body: "What your clubs have on this week, in one place. RSVP in a tap so you never miss it.", rgb: "246,196,104", moment: "afternoon",
+    still: { stem: "still-events", fig: "Events", fade: true, alt: "The Events tab in Vibe: Blitz Night by Chess Club, Friday from 7 to 10 pm in the Campus Center, marked Going, with Resume Review Night below it." },
+  },
+  people: {
+    eyebrow: "Each other", title: "Find each other.", body: "Meet people from your major and your clubs, message them, and make your profile look like you.", rgb: "150,186,255", moment: "night",
+    still: { stem: "still-dm", fig: "Messages", bottom: true, alt: "A direct message in Vibe: two friends plan a cookout, then one asks “hey are you going to blitz night tonight?”" },
+  },
 };
 const KIND_ORDER: Kind[] = ["clubs", "events", "people"];
 
@@ -88,6 +104,7 @@ export function HomeLanding() {
   const hero = useRef<HTMLElement>(null);
   const openLight = useRef<HTMLButtonElement>(null);
   const pop = useRef<HTMLDivElement>(null);
+  const day = useRef<DayHandle>(null);
   const open = LIGHTS.find((l) => l.id === active) ?? null;
 
   const hold = () => window.clearTimeout(closing.current);
@@ -276,22 +293,28 @@ export function HomeLanding() {
               </header>
               <h2>{KINDS[k].title}</h2>
               <p>{KINDS[k].body}</p>
-              {/* eslint-disable-next-line @next/next/no-img-element -- a still of the app, added once the demo cast exists */}
-              {KINDS[k].screen ? <img className="vln-screen" src={KINDS[k].screen} alt="" loading="lazy" /> : null}
+              <Readout
+                still={KINDS[k].still}
+                n={i + 1}
+                watch={HAS_DEMO_FILM ? { part: MOMENTS.find((m) => m.id === KINDS[k].moment)?.part ?? "", go: () => day.current?.watch(KINDS[k].moment) } : undefined}
+              />
             </article>
           ))}
         </section>
 
-        <div className="vln-rule vln-rise"><span>Two ways in</span><i aria-hidden="true" /><span aria-hidden="true">04 — 05</span></div>
+        <div className="vln-rule vln-rise"><span>A day on Vibe</span><i aria-hidden="true" /><span aria-hidden="true">04</span></div>
+        <DayOnVibe ref={day} />
+
+        <div className="vln-rule vln-rise"><span>Two ways in</span><i aria-hidden="true" /><span aria-hidden="true">05 — 06</span></div>
         <section id="vln-doors" className="vln-doors">
           <div className="vln-door vln-panel vln-rise">
-            <header className="vln-panel-head"><b>04</b><span>For students</span><em><span>Free</span></em></header>
+            <header className="vln-panel-head"><b>05</b><span>For students</span><em><span>Free</span></em></header>
             <h2>Step inside.</h2>
             <p>Sign up with your school email. It’s free, and only people who have one can join.</p>
             <a href={SIGNUP_HREF} data-warp-trigger className="vln-btn">Create your account</a>
           </div>
           <div className="vln-door vln-panel vln-rise" data-lag={1} style={{ "--rgb": KINDS.events.rgb } as CSSProperties}>
-            <header className="vln-panel-head"><b>05</b><span>For clubs</span><em><span>help@connectvibe.app</span></em></header>
+            <header className="vln-panel-head"><b>06</b><span>For clubs</span><em><span>help@connectvibe.app</span></em></header>
             <h2>Bring your club.</h2>
             <p>A page, your events, and a chat your members will open. Write to us and we’ll set it up with you.</p>
             <a href={CLUB_HREF} className="vln-btn vln-btn-ghost">Email us</a>
