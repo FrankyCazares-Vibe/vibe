@@ -45,6 +45,29 @@ Franky (Oct 3): ~100 hand-picked testers, product-fit data, launch "end of the m
 - **Not built yet:** the product-fit survey and the founders' cohort dashboard (next, once the first wave is in); a CAPTCHA (Cloudflare Turnstile).
 - Notes: `handoffs/s72-prep/waitlist/` (PLAN.md, BUILD.md, signup-gate.md, email-admin-data.md).
 
+## 3b. Go live: every step that needs Franky's OK (or someone else)
+
+In order. The commands for each are in `handoffs/s72-prep/waitlist/BUILD.md` section 6.2 (a to k). The session runs a production command only after Franky says yes in chat for that step.
+
+| # | Step | Who | What they do |
+|---|---|---|---|
+| 1 | Privacy Policy lines live | **James + the lawyer**, Franky approves the words | Add to `/legal/privacy`: what the waitlist collects and why; Supabase, Vercel and Resend handle it; kept up to 40 days (30 if never confirmed); accounts keep only a wave tag; "Take me off the list" in every email. Also for the lawyer: is the invite email "transactional" (CAN-SPAM), which postal address to publish (the LLC has none yet), any survey prizes, using the IU and Purdue names. **Nothing below starts before this.** |
+| 2 | Email budget | **Franky** | Start on Resend's free plan (100 emails a day for the whole app; the waitlist keeps to 40 code emails + 30 confirm emails a day; invite waves of about 25) or upgrade (~$20 a month) and raise the two caps on Vercel. |
+| 3 | Daily clean-up secret | **Franky** (session gives the exact clicks) | Vercel > Settings > Environment Variables > Production: `CRON_SECRET` = a random string (`openssl rand -hex 32`), set BEFORE the deploy. |
+| 4 | Real-phone walk | **Franky** (session can guide) | The landing page and the waitlist on a real iPhone (Safari, Low Power Mode) and a real Android phone, signed out, on the preview. |
+| 5 | Merge `landing-night` into main | **Franky says yes**, session does it | Pushing main deploys at once: the new landing page and the waitlist go live together. The session runs step 6 first or right after, so there is no window where the form saves nothing. |
+| 6 | Seven database updates | **Franky says yes**, session runs them | Migrations `20261003100000` to `170000` in order, sign-up stays CLOSED (`signup_open` false), Franky's account added as the only one who can see full emails. |
+| 7 | Check the deploy really is new | session | The served CSS and `/waitlist` are the new build (the S65 stale-CSS lesson). |
+| 8 | Switch the code check on | **Franky says yes**; dashboard click is Franky's (or the session via the API with his yes) | Supabase > Authentication > Hooks > Before user created > `auth_hooks.hook_waitlist_gate`. Then the session checks permissions and that magic link / OAuth / anonymous sign-in are off and email confirmation is on. |
+| 9 | Sign-up rate limit | **Franky decides** | Supabase > Authentication > Rate limits: write the sign-up number down and tighten it if loose. CAPTCHA (Cloudflare Turnstile) is a later build; do NOT just switch it on (it would refuse every sign-in). |
+| 10 | Live test | **James or Rylan** (a school email with no Vibe account) + Franky in the admin | Join the waitlist → confirm email → Franky sees them in Admin > Waitlist → sends a code (batch `test-1`) → they sign up with it. Also: the review account still signs in; a sign-up with no code is refused (403); Vercel > Cron Jobs > Run shows 200 (a 308 means set `www.connectvibe.app` as the domain the cron calls). Then remove the test entry. |
+| 11 | Store review note | **Franky** | One sentence in the App Store and Play review notes: "Vibe is opening in waves; new visitors join a waitlist; please sign in with the review account." (Before the Oct 16 submission.) |
+| 12 | First wave | **Franky (James, Rylan)** | Officers first (add them by hand), then their clubs and friends in waves of about 25, plus ~10 students in no club. |
+| — | If anything goes wrong | **Franky says yes**, session does it | Roll back: set `signup_open` to true (sign-up opens as before) and turn the hook off. |
+| — | Launch day | **Franky** | One switch: `signup_open` true opens sign-up for everyone; the buttons go back to "Sign up" on their own. |
+
+**Other decisions waiting on Franky (not blocking the waitlist):** the title rotation (two rounds and rest, one round, or a pause button); the smaller film on slow Android connections (keep or always sharp); headshots for him, James and Rylan; James's and Rylan's year and major for the cast; the sign-up page in the landing's dark look or as today; the next build (the product-fit survey and the founders' results page) once the first wave is in.
+
 ## 4. Smaller things done
 
 - The "This week" pill is smaller (`5a00446`), Franky's S71 note.
@@ -55,6 +78,7 @@ Franky (Oct 3): ~100 hand-picked testers, product-fit data, launch "end of the m
 - The `landing-night` worktree lives in the S72 scratchpad and will not exist in S73. Recreate: `git worktree add <dir> landing-night`, copy `node_modules` with `cp -cR`, copy `.env.development.local` from the main checkout (never `.env.local`), add `CHAT_V2_ENABLED=true` and `CHAT_V2_ALLOWLIST=*`, set `BILLING_ENABLED=false` and `PUSH_ENABLED=false`, and copy `supabase/.temp/` from the main checkout so `supabase start` keeps the production image versions. The local stack's auth hook is on (from that worktree's `supabase/config.toml`); local sign-up stays OPEN. Put the two film files in `public/landing-media/` only if you set the env var to use them.
 - The local database holds the waitlist tables and the demo cast; re-run `node scripts/demo-seed.mjs` on the day of any re-shoot.
 - `caffeinate -ims` was left running so the Mac stays awake for phone-driven work; Remote Control is on for the S72 chat.
+- **Franky restarted the Mac and Claude after S72 (Oct 3).** A restart empties `/private/tmp`, so the S72 scratchpad is gone: the worktree (everything in it was committed and pushed to `landing-night`; run `git worktree prune` in `~/vibe`), the three design and four title prototypes, the web encodes of the film (both are on Blob; re-make them from `~/vibe-demo-video/vibe-demo-30s-master.mp4` as in `handoffs/s72-prep/demo-notes/author-*.md` if needed), the dev server and the keep-awake. The research notes were copied into `handoffs/s72-prep/demo-notes/` (the new chat's selectors and traps `chat.md`, profiles `profiles.md`, orgs and a cleanliness audit `orgs-audit.md`, the three capture methods and their skeptics' verdicts). Local Supabase data survives in Docker; start it again with `supabase start` from `~/vibe` (that config has no waitlist hook, which is harmless while local sign-up is open).
 
 ## 6. Gotchas learned in S72
 
