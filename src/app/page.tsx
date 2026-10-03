@@ -1,9 +1,29 @@
+import type { Metadata, Viewport } from "next";
 import { redirect } from "next/navigation";
 
 import { HomeLanding } from "@/components/landing/home-landing";
 import { appShellFromRequest } from "@/lib/native/server";
 
 export const dynamic = "force-dynamic";
+
+const TITLE = "Vibe: the social app for your campus";
+const DESCRIPTION =
+  "Vibe is the social app for college students. Find your clubs, see what they have on this week, and meet people from your major. Free with your school email.";
+
+// Search results and link previews for the landing. openGraph and twitter
+// replace the layout's objects whole (metadata merges shallowly), so they
+// repeat its fields; the picture still comes from src/app/opengraph-image.tsx.
+export const metadata: Metadata = {
+  title: TITLE,
+  description: DESCRIPTION,
+  alternates: { canonical: "/" },
+  openGraph: { type: "website", siteName: "Vibe", locale: "en_US", url: "/", title: TITLE, description: DESCRIPTION },
+  twitter: { card: "summary_large_image", title: TITLE, description: DESCRIPTION },
+};
+
+// The landing is always Night, so the browser bars are too, in either app
+// theme (syncThemeColorMeta in src/lib/theme/theme.ts keeps "/" dark after load).
+export const viewport: Viewport = { themeColor: "#0C0B0B" };
 
 /**
  * The landing page, for browsers only. Inside the store apps every "← back"

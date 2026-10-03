@@ -52,14 +52,20 @@ export function CustomCursor() {
     ring.style.transform = `translate3d(${rx - 14}px, ${ry - 14}px, 0)`;
     document.body.classList.add("vibe-cursor-active");
 
+    // Hidden until the first move: until then mx/my are the middle of the
+    // window, not the pointer, and the dot sat there mid-page (the landing's
+    // hero) until the mouse moved.
+    let moved = false;
     function hideCursor() {
       dot!.classList.add("vibe-cursor-hidden");
       ring!.classList.add("vibe-cursor-hidden");
     }
     function showCursor() {
+      if (!moved) return;
       dot!.classList.remove("vibe-cursor-hidden");
       ring!.classList.remove("vibe-cursor-hidden");
     }
+    hideCursor();
     function setHover(on: boolean) {
       if (on) {
         dot!.classList.add("hover");
@@ -73,6 +79,12 @@ export function CustomCursor() {
     // Both the document's mousemove and the iframe's forwarded moves land
     // here, so the ring restarts from either.
     function applyPosition(x: number, y: number) {
+      if (!moved) {
+        // The ring starts on the pointer, not trailing in from the middle.
+        moved = true;
+        rx = x;
+        ry = y;
+      }
       mx = x;
       my = y;
       dot!.style.transform = `translate3d(${mx - 4}px, ${my - 4}px, 0)`;

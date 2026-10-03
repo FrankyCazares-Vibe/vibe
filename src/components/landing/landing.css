@@ -8,13 +8,20 @@
   --coral: #FF5C35;
   --line: rgba(255, 255, 255, 0.09);
   --rgb: 255, 92, 53;
+  /* The page: a coral bloom in the corner and a faint grid. The hero's fade
+     paints the same layers from the same origin (both start at the top left). */
+  --page: radial-gradient(900px 700px at 0% 0%, rgba(255, 92, 53, 0.13), transparent 62%), linear-gradient(rgba(255, 255, 255, 0.022) 1px, transparent 1px) 0 0 / 56px 56px, linear-gradient(90deg, rgba(255, 255, 255, 0.022) 1px, transparent 1px) 0 0 / 56px 56px, var(--ink);
   position: relative;
   min-height: 100vh;
   color: var(--cream);
   font-family: "DM Sans", sans-serif;
-  background: radial-gradient(900px 700px at 0% 0%, rgba(255, 92, 53, 0.13), transparent 62%), linear-gradient(rgba(255, 255, 255, 0.022) 1px, transparent 1px) 0 0 / 56px 56px, linear-gradient(90deg, rgba(255, 255, 255, 0.022) 1px, transparent 1px) 0 0 / 56px 56px, var(--ink);
+  background: var(--page);
   overflow-x: clip;
 }
+/* Night behind the page too while the landing is shown, in the app's Light
+   theme as well: the overscroll, the iPhone bars and the page edges would
+   otherwise show the app's cream around it. */
+:root:has(.vln-root), :root:has(.vln-root) body { background: #0C0B0B; color-scheme: dark; }
 .vln-root h1, .vln-root h2, .vln-wordmark, .vln-pop strong {
   font-family: var(--font-soft), "Fraunces", serif;
   font-variation-settings: "SOFT" 100, "opsz" 144;
@@ -40,7 +47,19 @@
 /* Hero */
 .vln-hero { position: relative; height: 100svh; min-height: 620px; max-height: 1100px; overflow: hidden; }
 .vln-sky { position: absolute; inset: 0; width: 100%; height: 100%; }
-.vln-hero::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 30%; background: linear-gradient(180deg, transparent, var(--ink)); pointer-events: none; }
+/* The sky hands over to the page: its last 30% fades into the page's own
+   background, grid included, so the grid runs on with no edge. */
+.vln-hero::after { content: ""; position: absolute; inset: 0; background: var(--page); -webkit-mask-image: linear-gradient(180deg, transparent 70%, #000); mask-image: linear-gradient(180deg, transparent 70%, #000); pointer-events: none; }
+
+/* Two slow clouds of colour behind the sky, so the black is never flat. Each
+   is painted once and drifted by the compositor (x and y on their own clocks,
+   as the canvas drew them); radius 0.6 x the hero's longer side. */
+.vln-clouds { position: absolute; inset: 0; pointer-events: none; transition: opacity 0.7s ease; --far: max(60vw, clamp(372px, 60svh, 660px)); }
+.vln-clouds::before, .vln-clouds::after { content: ""; position: absolute; width: calc(var(--far) * 2); height: calc(var(--far) * 2); margin: calc(var(--far) * -1) 0 0 calc(var(--far) * -1); will-change: transform, translate; animation: vln-drift-x var(--tx) ease-in-out var(--dx0) infinite alternate, vln-drift-y var(--ty) ease-in-out var(--dy0) infinite alternate; }
+.vln-clouds::before { left: 74%; top: 28%; --ax: 7vw; --tx: 28s; --dx0: -14s; --ty: 34.5s; --dy0: -34.5s; background: radial-gradient(closest-side, rgba(120, 112, 255, 0.075), rgba(120, 112, 255, 0.0225) 35%, rgba(120, 112, 255, 0)); }
+.vln-clouds::after { left: 18%; top: 60%; --ax: 6vw; --tx: 31.4s; --dx0: -31.4s; --ty: 25s; --dy0: -12.5s; background: radial-gradient(closest-side, rgba(255, 92, 53, 0.085), rgba(255, 92, 53, 0.0255) 35%, rgba(255, 92, 53, 0)); }
+@keyframes vln-drift-x { from { translate: calc(var(--ax) * -1) 0; } to { translate: var(--ax) 0; } }
+@keyframes vln-drift-y { from { transform: translateY(-6svh); } to { transform: translateY(6svh); } }
 
 .vln-light { position: absolute; z-index: 2; left: calc(var(--mx) * 100%); top: calc(var(--my) * 100%); width: 48px; height: 48px; margin: -24px 0 0 -24px; padding: 0; border: none; border-radius: 50%; background: transparent; cursor: pointer; -webkit-tap-highlight-color: transparent; }
 .vln-light-label { position: absolute; left: 50%; top: calc(100% + 2px); transform: translateX(-50%); white-space: nowrap; font: 600 11px/1 "DM Sans", sans-serif; letter-spacing: 0.02em; color: rgba(246, 241, 234, 0.72); opacity: 0; animation: vln-fade 0.7s ease forwards; animation-delay: calc(0.9s + var(--i) * 0.17s); transition: color 0.2s ease; }
@@ -49,7 +68,9 @@
 .vln-pop { position: absolute; z-index: 4; width: 244px; left: clamp(12px, calc(var(--mx) * 100% - 122px), calc(100% - 256px)); top: calc(var(--my) * 100% + 40px); padding: 14px 16px 12px; border-radius: 16px; background: rgba(22, 21, 21, 0.86); border: 1px solid rgba(var(--rgb), 0.28); box-shadow: 0 24px 60px rgba(0, 0, 0, 0.55); -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); animation: vln-pop 0.22s ease both; }
 .vln-pop strong { display: block; margin-top: 6px; font-size: 20px; font-weight: 800; }
 .vln-pop p { margin: 6px 0 8px; font-size: 13px; line-height: 1.5; color: #CFC8BE; }
-.vln-pop a { display: inline-flex; align-items: center; min-height: 32px; font-size: 12.5px; font-weight: 700; color: rgb(var(--rgb)); text-decoration: none; }
+/* A low light's card on a short screen: above the light instead (home-landing measures). */
+.vln-pop.is-up { translate: 0 calc(-100% - 80px); }
+.vln-pop a { display: inline-flex; align-items: center; gap: 6px; min-height: 32px; font-size: 12.5px; font-weight: 700; color: rgb(var(--rgb)); text-decoration: none; }
 .vln-eyebrow { font: 700 10.5px/1 "DM Sans", sans-serif; letter-spacing: 0.16em; text-transform: uppercase; color: rgb(var(--rgb)); }
 
 .vln-hero-copy { position: absolute; z-index: 3; left: 20px; right: 20px; bottom: max(28px, env(safe-area-inset-bottom)); animation: vln-rise 0.7s ease both; }
@@ -60,8 +81,9 @@
 .vln-hint { display: block; margin-top: 16px; font-size: 12px; color: var(--muted); }
 
 /* Below the hero */
-/* Emerging with the scroll: home-landing sets --p (0 to 1) on each .vln-rise. */
-.vln-rise { --p: 0; opacity: var(--p); transform: translate3d(0, calc((1 - var(--p)) * 56px), 0); will-change: transform, opacity; }
+/* Emerging with the scroll: home-landing sets --p (0 to 1) on each .vln-rise.
+   1 here, so the page reads in full before (or without) JavaScript. */
+.vln-rise { --p: 1; opacity: var(--p); transform: translate3d(0, calc((1 - var(--p)) * 56px), 0); will-change: transform, opacity; }
 
 /* A labelled hairline between parts of the page; the line draws itself in. */
 .vln-rule { display: flex; align-items: center; gap: 14px; max-width: 1120px; margin: 0 auto; padding: 64px 20px 0; font: 500 10.5px/1 var(--font-mono), monospace; letter-spacing: 0.16em; text-transform: uppercase; color: var(--muted); }
@@ -69,18 +91,28 @@
 
 /* Panels (S72, after sibaldesign.com and bleibtgleich.dev): flat, hairline
    border, a small labelled strip on top, corner ticks in the kind's colour.
-   They switch on with the scroll: wiped in from the left, top line first. */
-.vln-kinds, .vln-doors { display: grid; gap: 14px; padding: 18px 20px 0; max-width: 1120px; margin: 0 auto; scroll-margin-top: 24px; }
-.vln-panel { position: relative; padding: 0 20px 26px; border-radius: 4px; background: linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0.012)); border: 1px solid rgba(255, 255, 255, 0.11); clip-path: inset(0 calc((1 - var(--p)) * 100%) 0 0); scroll-margin-top: 24px; transition: border-color 0.25s ease, background 0.25s ease; }
+   They switch on with the scroll: wiped in from the left, top line first.
+   minmax(0, 1fr), never plain 1fr: a column must not grow to fit the
+   one-line header strip (that pushed the panels off every phone).
+   scroll-margin-top leaves room for the rise a panel still has to do when a
+   "More below" or "Bring your club" link lands on it. */
+.vln-kinds, .vln-doors { display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; padding: 18px 20px 0; max-width: 1120px; margin: 0 auto; scroll-margin-top: 80px; }
+.vln-panel { position: relative; padding: 0 20px 26px; border-radius: 4px; background: linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0.012)); border: 1px solid rgba(255, 255, 255, 0.11); clip-path: inset(0 calc((1 - var(--p)) * 100%) 0 0); scroll-margin-top: 80px; transition: border-color 0.25s ease, background 0.25s ease; }
 .vln-panel:hover { border-color: rgba(var(--rgb), 0.55); background: linear-gradient(180deg, rgba(var(--rgb), 0.07), rgba(255, 255, 255, 0.012)); }
 .vln-panel::before, .vln-panel::after { content: ""; position: absolute; width: 10px; height: 10px; border: solid rgb(var(--rgb)); pointer-events: none; }
 .vln-panel::before { top: -1px; left: -1px; border-width: 1px 0 0 1px; }
 .vln-panel::after { bottom: -1px; right: -1px; border-width: 0 1px 1px 0; }
 .vln-panel-head { display: flex; align-items: center; gap: 10px; height: 40px; margin: 0 -20px 26px; padding: 0 20px; border-bottom: 1px solid rgba(255, 255, 255, 0.09); font: 500 10.5px/1 var(--font-mono), monospace; letter-spacing: 0.14em; text-transform: uppercase; color: var(--cream); }
 .vln-panel-head b { font-weight: 500; color: rgb(var(--rgb)); }
-.vln-panel-head b, .vln-panel-head span { flex: none; white-space: nowrap; }
+.vln-panel-head > b, .vln-panel-head > span { flex: none; white-space: nowrap; }
 .vln-panel-head b::after { content: ""; display: inline-block; width: 5px; height: 5px; margin-left: 10px; border-radius: 50%; background: rgb(var(--rgb)); box-shadow: 0 0 10px 2px rgba(var(--rgb), 0.7); vertical-align: 1px; }
-.vln-panel-head em { margin-left: auto; min-width: 0; font-style: normal; letter-spacing: 0.08em; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* The right-hand label shows only the names that fit whole: a name that
+   doesn't wraps onto a second line the strip hides (screen readers still
+   read it). A single name too long for the strip gets an ellipsis. */
+.vln-panel-head em { display: flex; flex-wrap: wrap; justify-content: flex-end; height: 14px; line-height: 14px; margin-left: auto; min-width: 0; overflow: hidden; font-style: normal; letter-spacing: 0.08em; color: var(--muted); }
+.vln-panel-head em span { min-width: 0; white-space: pre; overflow: hidden; text-overflow: ellipsis; }
+/* "More below" focuses the panel it lands on; the panel itself isn't a control. */
+.vln-kind:focus { outline: none; }
 .vln-panel h2 { font-size: clamp(34px, 9vw, 44px); font-weight: 800; line-height: 1; }
 .vln-panel p { margin: 14px 0 0; max-width: 34em; font-size: 15px; line-height: 1.55; color: #CFC8BE; }
 .vln-screen { display: block; width: 100%; max-width: 280px; margin: 22px auto 0; border-radius: 26px; border: 1px solid var(--line); }
@@ -99,13 +131,14 @@
 .vln-stores a { color: rgba(246, 241, 234, 0.8); font-size: 13px; font-weight: 600; text-decoration: none; }
 .vln-stores b { color: var(--coral); }
 
-.vln-footer { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; padding: 20px 20px max(24px, env(safe-area-inset-bottom)); border-top: 1px solid var(--line); font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: rgba(246, 241, 234, 0.4); }
-.vln-footer nav { display: flex; flex-wrap: wrap; gap: 8px 16px; }
-.vln-footer a { display: inline-block; padding: 4px 0; color: rgba(246, 241, 234, 0.7); text-decoration: none; }
+.vln-footer { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; padding: 20px 20px max(24px, env(safe-area-inset-bottom)); border-top: 1px solid var(--line); font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.vln-footer nav { display: flex; flex-wrap: wrap; gap: 0 16px; }
+.vln-footer a { display: inline-flex; align-items: center; min-height: 44px; color: rgba(246, 241, 234, 0.7); text-decoration: none; }
 .vln-footer p { flex-basis: 100%; margin: 4px 0 0; letter-spacing: 0; text-transform: none; font-size: 12px; }
 
 /* Leaving for sign-up: the page lets go while the sky streaks. */
 .vln-root.is-warping .vln-hero-copy, .vln-root.is-warping .vln-light, .vln-root.is-warping .vln-pop, .vln-root.is-warping .vln-bar { opacity: 0; transition: opacity 0.4s ease; animation: none; }
+.vln-root.is-warping .vln-clouds { opacity: 0; }
 
 @keyframes vln-orbit { from { offset-distance: 0%; } to { offset-distance: 100%; } }
 @keyframes vln-fade { to { opacity: 1; } }
@@ -121,16 +154,22 @@
   .vln-hero-copy h1 { font-size: clamp(48px, 6.2vw, 84px); }
   .vln-hero-copy p { font-size: 17px; }
   .vln-rule { padding: 88px 40px 0; }
-  .vln-kind h2 { font-size: clamp(28px, 2.9vw, 36px); }
-  .vln-kinds { grid-template-columns: repeat(3, 1fr); gap: 18px; padding: 22px 40px 0; }
+  .vln-kinds { gap: 18px; padding: 22px 40px 0; }
   .vln-orbits { top: 190px; }
-  .vln-doors { grid-template-columns: repeat(2, 1fr); gap: 18px; padding: 22px 40px 0; }
+  .vln-doors { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; padding: 22px 40px 0; }
   .vln-footer { padding: 20px 40px 24px; }
+}
+/* Three kinds side by side only from 1000px, where a column is wide enough
+   for its heading and text (the strip label drops a name that won't fit). */
+@media (min-width: 1000px) {
+  .vln-kinds { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .vln-kind h2 { font-size: clamp(28px, 2.9vw, 36px); }
 }
 @keyframes vln-fade-only { from { opacity: 0; } }
 
 @media (prefers-reduced-motion: reduce) {
   .vln-hero-copy, .vln-pop { animation: none; }
+  .vln-clouds::before, .vln-clouds::after { animation: none; will-change: auto; }
   .vln-light-label { animation: none; opacity: 1; }
   .vln-rise { opacity: 1; transform: none; }
   .vln-panel { clip-path: none; }

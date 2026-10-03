@@ -9,6 +9,8 @@ export type SkyLight = { id: string; rgb: string; size: number; m: [number, numb
 export const SKY_WIDE_PX = 760;
 
 const WARP_MS = 700;
+/** A frame this soon after the last drawn one is skipped: only screens above about 110 Hz ask that often. */
+const MIN_GAP_MS = 9;
 const DUST_TINTS = ["246,241,234", "255,176,146", "172,196,255"] as const;
 
 /** Small seeded generator, so the sky is the same sky on every visit. */
@@ -27,9 +29,12 @@ const ease = (u: number) => (u <= 0 ? 0 : u >= 1 ? 1 : 1 - Math.pow(1 - u, 3));
 /**
  * The landing hero's sky, drawn on one canvas: drifting dust, the lights
  * (each its own colour, with an orbit and a moon), the thin lines between
- * them, sparks that travel the lines, two slow clouds of colour and a shooting
- * star now and then. `warping` streaks the dust outward on the way
- * to sign-up. With reduced motion it draws one still frame and stops.
+ * them, sparks that travel the lines and a shooting star now and then.
+ * `warping` streaks the dust outward on the way to sign-up. With reduced
+ * motion it draws one still frame and stops. Every other frame on 120 Hz screens.
+ * The two slow clouds of colour behind it are CSS (.vln-clouds in
+ * landing.css): full-screen gradients redrawn every frame were most of the
+ * frame when a phone draws canvas on the CPU.
  * Decorative only: the lights' buttons and labels are real DOM in home-landing.
  */
 export function NightSky({ lights, links, activeId, warping }: { lights: SkyLight[]; links: [number, number][]; activeId: string | null; warping: boolean }) {
@@ -51,7 +56,7 @@ export function NightSky({ lights, links, activeId, warping }: { lights: SkyLigh
     const dust = Array.from({ length: 560 }, () => ({ x: rand(), y: rand(), z: 0.15 + rand() * 0.85, r: 0.35 + rand() * 0.9, ph: rand() * 6.28, sp: 0.4 + rand() * 1.3, tint: rand() < 0.12 ? 1 : rand() < 0.12 ? 2 : 0 }));
     const sparks: { link: number; at: number; flip: boolean }[] = [];
     const t0 = performance.now();
-    let w = 0, h = 0, dpr = 1, raf = 0, onScreen = true, nextSpark = 2200;
+    let w = 0, h = 0, dpr = 1, raf = 0, onScreen = true, nextSpark = 2200, lastDraw = -Infinity;
     let px = 0, py = 0, tx = 0, ty = 0;
     let shot: { at: number; x: number; y: number; dir: number } | null = null, nextShot = 3800;
 
@@ -104,11 +109,6 @@ export function NightSky({ lights, links, activeId, warping }: { lights: SkyLigh
       }
       ctx.globalAlpha = 1;
       ctx.globalCompositeOperation = "lighter";
-
-      // Two slow clouds of colour behind everything, so the black is never flat.
-      const far = Math.max(w, h) * 0.6;
-      glow(w * (0.74 + 0.07 * Math.sin(t / 9000)), h * (0.28 + 0.06 * Math.cos(t / 11000)), far, "120,112,255", 0.075 * (1 - warp));
-      glow(w * (0.18 + 0.06 * Math.cos(t / 10000)), h * (0.6 + 0.06 * Math.sin(t / 8000)), far, "255,92,53", 0.085 * (1 - warp));
 
       // A shooting star now and then, across the top of the sky.
       if (!still && !shot && t > nextShot) shot = { at: t, x: w * (0.15 + rand() * 0.7), y: h * (0.04 + rand() * 0.26), dir: rand() < 0.5 ? 1 : -1 };
@@ -194,8 +194,15 @@ export function NightSky({ lights, links, activeId, warping }: { lights: SkyLigh
       });
     };
 
+    // A 120 Hz screen asks for a frame every 8.3 ms: draw every other one
+    // (60 a second; 144 Hz draws 72). 60 to 100 Hz screens, and the demo
+    // recorder's 60 fps clock, draw every frame: a cap at 16.7 ms would halve
+    // a 75 or 90 Hz screen, whose frames come 13.3 or 11.1 ms apart.
     const loop = (now: number) => {
-      draw(now);
+      if (now - lastDraw >= MIN_GAP_MS) {
+        lastDraw = now;
+        draw(now);
+      }
       raf = onScreen && !document.hidden ? requestAnimationFrame(loop) : 0;
     };
     const wake = () => { if (!still && !raf && onScreen && !document.hidden) raf = requestAnimationFrame(loop); };

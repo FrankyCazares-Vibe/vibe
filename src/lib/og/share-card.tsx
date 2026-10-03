@@ -27,7 +27,7 @@ const CORAL = "#FF5C35";
 
 const WORDMARK = "vibe.";
 const TAGLINE = "Your campus. Your people. Yourself.";
-const CAPTION = "BUILT IN INDIANAPOLIS";
+const CAPTION = "THE SOCIAL APP FOR YOUR CAMPUS";
 
 type FontSpec = NonNullable<
   ConstructorParameters<typeof ImageResponse>[1]

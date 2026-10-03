@@ -1,9 +1,9 @@
 "use client";
 
-import { Fraunces } from "next/font/google";
+import localFont from "next/font/local";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState, type CSSProperties } from "react";
+import { Fragment, useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type FocusEvent, type PointerEvent } from "react";
 
 import { enabledSchoolSystems } from "@/lib/auth/school-email-domains";
 import { SYSTEM_LABEL } from "@/lib/iu/campuses";
@@ -15,8 +15,13 @@ import { NightSky, type SkyLight } from "./night-sky";
 import "./landing.css";
 
 // The soft wordmark face (the share card's: SOFT 100, opsz 144). The app-wide
-// Fraunces link in layout.tsx has no SOFT axis, so the landing loads its own.
-const soft = Fraunces({ subsets: ["latin"], axes: ["SOFT", "opsz"], variable: "--font-soft", display: "swap" });
+// Fraunces link in layout.tsx has no SOFT axis, so the landing loads its own,
+// under its own family name ("frauncesSoft", from the const): next/font/google
+// names its face plain "Fraunces", and the layout's Google faces won over it.
+// The file is Google Fonts' Fraunces latin subset (wght, opsz, SOFT axes),
+// under the OFL: its licence sits beside it in fraunces-soft.OFL.txt. The
+// stand-in until it loads is a serif sized to match, so the swap stays serif.
+const frauncesSoft = localFont({ src: "./fraunces-soft.woff2", weight: "100 900", style: "normal", variable: "--font-soft", display: "swap", adjustFontFallback: "Times New Roman" });
 
 const WARP_DURATION_MS = 750;
 const LOGIN_HREF = "/auth/login";
@@ -30,8 +35,8 @@ type Kind = "clubs" | "events" | "people";
 
 /** The three things you can do. `rgb` is the colour that kind's lights lean toward. */
 const KINDS: Record<Kind, { eyebrow: string; title: string; body: string; rgb: string; screen: string | null }> = {
-  clubs: { eyebrow: "Clubs", title: "Find your clubs.", body: "Follow the ones you're curious about, join the ones you love, and keep up with their posts and chats in one place.", rgb: "255,92,53", screen: null },
-  events: { eyebrow: "Events", title: "See what's on.", body: "Everything happening on campus this week, in one place. RSVP in a tap so you never miss it.", rgb: "246,196,104", screen: null },
+  clubs: { eyebrow: "Clubs", title: "Find your clubs.", body: "Follow the ones you’re curious about, join the ones you love, and keep up with their posts and chats in one place.", rgb: "255,92,53", screen: null },
+  events: { eyebrow: "Events", title: "See what’s on.", body: "What your clubs have on this week, in one place. RSVP in a tap so you never miss it.", rgb: "246,196,104", screen: null },
   people: { eyebrow: "Each other", title: "Find each other.", body: "Meet people from your major and your clubs, and make your profile look like you.", rgb: "150,186,255", screen: null },
 };
 const KIND_ORDER: Kind[] = ["clubs", "events", "people"];
@@ -40,7 +45,7 @@ const KIND_ORDER: Kind[] = ["clubs", "events", "people"];
 const LIGHTS: (SkyLight & { kind: Kind; label: string })[] = [
   { id: "film", kind: "clubs", label: "Film club", rgb: "255,92,53", size: 9, m: [0.2, 0.17], d: [0.56, 0.26] },
   { id: "robotics", kind: "clubs", label: "Robotics", rgb: "255,146,124", size: 6, m: [0.8, 0.14], d: [0.86, 0.2] },
-  { id: "tonight", kind: "events", label: "Tonight, 7 pm", rgb: "246,196,104", size: 11, m: [0.62, 0.29], d: [0.72, 0.42] },
+  { id: "tonight", kind: "events", label: "Tonight", rgb: "246,196,104", size: 11, m: [0.62, 0.29], d: [0.72, 0.42] },
   { id: "openmic", kind: "events", label: "Open mic", rgb: "255,224,170", size: 6, m: [0.14, 0.36], d: [0.58, 0.64] },
   { id: "study", kind: "people", label: "Study group", rgb: "150,186,255", size: 8, m: [0.4, 0.45], d: [0.8, 0.7] },
   { id: "major", kind: "people", label: "From your major", rgb: "196,178,255", size: 6, m: [0.82, 0.44], d: [0.92, 0.48] },
@@ -76,11 +81,43 @@ export function HomeLanding() {
   // The light under a mouse. A tap toggles its card; a click on a light the
   // mouse already opened leaves it open (a touch fires neither enter nor leave here).
   const hovered = useRef<string | null>(null);
+  // A card the mouse opened closes a moment after the mouse leaves both the
+  // light and the card. A click, Enter or focus inside it pins it open.
+  const pinned = useRef(false);
+  const closing = useRef(0);
+  const hero = useRef<HTMLElement>(null);
+  const openLight = useRef<HTMLButtonElement>(null);
+  const pop = useRef<HTMLDivElement>(null);
   const open = LIGHTS.find((l) => l.id === active) ?? null;
+
+  const hold = () => window.clearTimeout(closing.current);
+  const letGo = (e: PointerEvent) => {
+    if (e.pointerType !== "mouse") return;
+    hovered.current = null;
+    hold();
+    closing.current = window.setTimeout(() => { if (!pinned.current) setActive(null); }, 350);
+  };
+  // Focus moving on past the open light and its card closes the card, so it
+  // never sits over the next light's focus ring. A click on the card's text
+  // moves focus nowhere (relatedTarget null) and leaves it open.
+  const onFocusOut = (e: FocusEvent) => {
+    const to = e.relatedTarget;
+    if (to && !openLight.current?.contains(to) && !pop.current?.contains(to)) setActive(null);
+  };
+
+  // A card that would run past the bottom of the sky (a low light on a short
+  // screen) opens upward instead. Measured before paint, so it never jumps.
+  useLayoutEffect(() => {
+    const card = pop.current, box = hero.current;
+    if (!card || !box) return;
+    card.classList.toggle("is-up", card.getBoundingClientRect().bottom > box.getBoundingClientRect().bottom - 12);
+  }, [active]);
 
   // The warp: any element marked data-warp-trigger plays the streak, then
   // goes to its own href. Capture phase so it beats Next's Link; modifier
-  // clicks still open a new tab. With reduced motion it navigates at once.
+  // clicks still open a new tab. It navigates at once with reduced motion,
+  // and when the sky is mostly off screen (the buttons further down), where
+  // the streak would play out of sight and the click would just seem slow.
   useEffect(() => {
     function onClick(e: MouseEvent) {
       if (warping || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
@@ -91,9 +128,10 @@ export function HomeLanding() {
       const href = trigger.getAttribute("href");
       const dest = href && href.startsWith("/") ? href : LOGIN_HREF;
       const still = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      const skyInView = (hero.current?.getBoundingClientRect().bottom ?? 0) > window.innerHeight * 0.4;
       setWarping(true);
       router.prefetch(dest);
-      window.setTimeout(() => router.push(dest), still ? 0 : WARP_DURATION_MS);
+      window.setTimeout(() => router.push(dest), still || !skyInView ? 0 : WARP_DURATION_MS);
     }
     document.addEventListener("click", onClick, true);
     return () => document.removeEventListener("click", onClick, true);
@@ -101,15 +139,22 @@ export function HomeLanding() {
 
   useEffect(() => {
     if (!active) return;
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setActive(null); };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      // Focus on the card's link would fall to the page with the card: hand it back to the light.
+      if (pop.current?.contains(document.activeElement)) openLight.current?.focus();
+      setActive(null);
+    };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [active]);
 
   // Everything below the hero emerges with the scroll: each .vln-rise gets
   // --p, 0 below the fold to 1 once it is well into view, and landing.css
-  // turns that into the slide, the scale and the glow. offsetTop, not
-  // getBoundingClientRect: the transform must not feed back into its own input.
+  // turns that into the slide, the scale and the glow. --p is 1 in the CSS,
+  // so with no JavaScript (or before it runs) everything shows; this hides
+  // what is still below the fold. offsetTop, not getBoundingClientRect: the
+  // transform must not feed back into its own input.
   useEffect(() => {
     const els = Array.from(document.querySelectorAll<HTMLElement>(".vln-rise"));
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
@@ -138,7 +183,7 @@ export function HomeLanding() {
   }, []);
 
   return (
-    <div className={`vln-root ${soft.variable}${warping ? " is-warping" : ""}`}>
+    <div className={`vln-root ${frauncesSoft.variable}${warping ? " is-warping" : ""}`}>
       <header className="vln-bar">
         <span className="vln-wordmark">vibe<i>.</i></span>
         <nav aria-label="Account">
@@ -147,92 +192,129 @@ export function HomeLanding() {
         </nav>
       </header>
 
-      <section className="vln-hero" onClick={() => setActive(null)}>
-        <NightSky lights={LIGHTS} links={LINKS} activeId={active} warping={warping} />
-        {LIGHTS.map((l, i) => (
-          <button
-            key={l.id}
-            type="button"
-            className="vln-light"
-            style={at(l, i, l.rgb)}
-            aria-expanded={active === l.id}
-            aria-controls="vln-pop"
-            onClick={(e) => { e.stopPropagation(); setActive(active === l.id && hovered.current !== l.id ? null : l.id); }}
-            onPointerEnter={(e) => { if (e.pointerType === "mouse") { hovered.current = l.id; setActive(l.id); } }}
-            onPointerLeave={() => { hovered.current = null; }}
-          >
-            <span className="vln-light-label">{l.label}</span>
-          </button>
-        ))}
-        {open ? (
-          <div id="vln-pop" className="vln-pop" style={at(open, 0, open.rgb)} onClick={(e) => e.stopPropagation()}>
-            <span className="vln-eyebrow">{KINDS[open.kind].eyebrow}</span>
-            <strong>{KINDS[open.kind].title}</strong>
-            <p>{KINDS[open.kind].body}</p>
-            <a href={`#vln-${open.kind}`} onClick={() => setActive(null)}>More below <span aria-hidden="true">↓</span></a>
+      <main>
+        <section ref={hero} className="vln-hero" onClick={() => setActive(null)}>
+          <div className="vln-clouds" aria-hidden="true" />
+          <NightSky lights={LIGHTS} links={LINKS} activeId={active} warping={warping} />
+
+          {/* The copy comes before the lights in the page order, so keyboard and
+              screen-reader users meet the headline and Sign up first; the
+              lights are absolutely placed, so the order doesn't move them. */}
+          <div className="vln-hero-copy">
+            <h1>The social app for <em>your campus.</em></h1>
+            <p>Find your clubs, your events, and each other. Free with your school email.</p>
+            <div className="vln-cta">
+              <a href={SIGNUP_HREF} data-warp-trigger className="vln-btn">Sign up</a>
+              <a href="#vln-doors" className="vln-btn vln-btn-ghost">Bring your club</a>
+            </div>
+            <span className="vln-hint">Pick a light to see what’s out there.</span>
           </div>
-        ) : null}
 
-        <div className="vln-hero-copy">
-          <h1>The social app for <em>your campus.</em></h1>
-          <p>Find your clubs, your events, and each other. Free with your school email.</p>
-          <div className="vln-cta">
-            <a href={SIGNUP_HREF} data-warp-trigger className="vln-btn">Sign up</a>
-            <a href="#vln-doors" className="vln-btn vln-btn-ghost">Bring your club</a>
+          {/* Each card comes right after its own light, so Tab goes light,
+              card, next light; it never leaves focus under an open card. */}
+          {LIGHTS.map((l, i) => (
+            <Fragment key={l.id}>
+              <button
+                ref={active === l.id ? openLight : undefined}
+                type="button"
+                className="vln-light"
+                style={at(l, i, l.rgb)}
+                aria-expanded={active === l.id}
+                // Only while its card exists: an id that isn't in the page points nowhere.
+                aria-controls={active === l.id ? "vln-pop" : undefined}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  const next = active === l.id && hovered.current !== l.id ? null : l.id;
+                  pinned.current = next !== null;
+                  setActive(next);
+                }}
+                onPointerEnter={(e) => {
+                  if (e.pointerType !== "mouse") return;
+                  hold();
+                  hovered.current = l.id;
+                  if (active !== l.id) { pinned.current = false; setActive(l.id); }
+                }}
+                onPointerLeave={letGo}
+                onBlur={active === l.id ? onFocusOut : undefined}
+              >
+                <span className="vln-light-label">{l.label}</span>
+              </button>
+              {open && open.id === l.id ? (
+                <div
+                  ref={pop}
+                  id="vln-pop"
+                  className="vln-pop"
+                  style={at(open, 0, open.rgb)}
+                  onClick={(e) => e.stopPropagation()}
+                  onPointerEnter={(e) => { if (e.pointerType === "mouse") hold(); }}
+                  onPointerLeave={letGo}
+                  onFocus={() => { pinned.current = true; }}
+                  onBlur={onFocusOut}
+                >
+                  <span className="vln-eyebrow">{KINDS[open.kind].eyebrow}</span>
+                  <strong>{KINDS[open.kind].title}</strong>
+                  <p>{KINDS[open.kind].body}</p>
+                  {/* Focus goes on to the panel it scrolls to, not back to the top of the page. */}
+                  <a href={`#vln-${open.kind}`} onClick={() => { setActive(null); document.getElementById(`vln-${open.kind}`)?.focus({ preventScroll: true }); }}>
+                    More below <span aria-hidden="true">↓</span>
+                  </a>
+                </div>
+              ) : null}
+            </Fragment>
+          ))}
+        </section>
+
+        <div className="vln-rule vln-rise"><span>What’s out there</span><i aria-hidden="true" /><span aria-hidden="true">01 — 03</span></div>
+        <section className="vln-kinds" aria-label="What you can do on Vibe">
+          {KIND_ORDER.map((k, i) => (
+            <article key={k} id={`vln-${k}`} tabIndex={-1} className="vln-kind vln-panel vln-rise" data-lag={i} style={{ "--rgb": KINDS[k].rgb } as CSSProperties}>
+              <header className="vln-panel-head">
+                <b>0{i + 1}</b>
+                <span>{KINDS[k].eyebrow}</span>
+                {/* One span per light: the strip shows the names that fit whole (landing.css). */}
+                <em>{LIGHTS.filter((l) => l.kind === k).map((l, j) => <span key={l.id}>{j ? ` · ${l.label}` : l.label}</span>)}</em>
+              </header>
+              <h2>{KINDS[k].title}</h2>
+              <p>{KINDS[k].body}</p>
+              {/* eslint-disable-next-line @next/next/no-img-element -- a still of the app, added once the demo cast exists */}
+              {KINDS[k].screen ? <img className="vln-screen" src={KINDS[k].screen} alt="" loading="lazy" /> : null}
+            </article>
+          ))}
+        </section>
+
+        <div className="vln-rule vln-rise"><span>Two ways in</span><i aria-hidden="true" /><span aria-hidden="true">04 — 05</span></div>
+        <section id="vln-doors" className="vln-doors">
+          <div className="vln-door vln-panel vln-rise">
+            <header className="vln-panel-head"><b>04</b><span>For students</span><em><span>Free</span></em></header>
+            <h2>Step inside.</h2>
+            <p>Sign up with your school email. It’s free, and only people who have one can join.</p>
+            <a href={SIGNUP_HREF} data-warp-trigger className="vln-btn">Create your account</a>
           </div>
-          <span className="vln-hint">Tap a light to see what&apos;s out there.</span>
-        </div>
-      </section>
+          <div className="vln-door vln-panel vln-rise" data-lag={1} style={{ "--rgb": KINDS.events.rgb } as CSSProperties}>
+            <header className="vln-panel-head"><b>05</b><span>For clubs</span><em><span>help@connectvibe.app</span></em></header>
+            <h2>Bring your club.</h2>
+            <p>A page, your events, and a chat your members will open. Write to us and we’ll set it up with you.</p>
+            <a href={CLUB_HREF} className="vln-btn vln-btn-ghost">Email us</a>
+          </div>
+        </section>
 
-      <div className="vln-rule vln-rise"><span>What&apos;s out there</span><i aria-hidden="true" /><span aria-hidden="true">01 — 03</span></div>
-      <section className="vln-kinds" aria-label="What you can do on Vibe">
-        {KIND_ORDER.map((k, i) => (
-          <article key={k} id={`vln-${k}`} className="vln-kind vln-panel vln-rise" data-lag={i} style={{ "--rgb": KINDS[k].rgb } as CSSProperties}>
-            <header className="vln-panel-head">
-              <b>0{i + 1}</b>
-              <span>{KINDS[k].eyebrow}</span>
-              <em>{LIGHTS.filter((l) => l.kind === k).map((l) => l.label).join(" · ")}</em>
-            </header>
-            <h2>{KINDS[k].title}</h2>
-            <p>{KINDS[k].body}</p>
-            {/* eslint-disable-next-line @next/next/no-img-element -- a still of the app, added once the demo cast exists */}
-            {KINDS[k].screen ? <img className="vln-screen" src={KINDS[k].screen} alt="" loading="lazy" /> : null}
-          </article>
-        ))}
-      </section>
-
-      <div className="vln-rule vln-rise"><span>Two ways in</span><i aria-hidden="true" /><span aria-hidden="true">04 — 05</span></div>
-      <section id="vln-doors" className="vln-doors">
-        <div className="vln-door vln-panel vln-rise">
-          <header className="vln-panel-head"><b>04</b><span>For students</span><em>Free</em></header>
-          <h2>Step inside.</h2>
-          <p>Sign up with your school email. It&apos;s free, and only students can join.</p>
-          <a href={SIGNUP_HREF} data-warp-trigger className="vln-btn">Create your account</a>
-        </div>
-        <div className="vln-door vln-panel vln-rise" data-lag={1} style={{ "--rgb": KINDS.events.rgb } as CSSProperties}>
-          <header className="vln-panel-head"><b>05</b><span>For clubs</span><em>help@connectvibe.app</em></header>
-          <h2>Bring your club.</h2>
-          <p>A page, your events, and a chat your members will open. Write to us and we&apos;ll set it up with you.</p>
-          <a href={CLUB_HREF} className="vln-btn vln-btn-ghost">Email us</a>
-        </div>
-      </section>
-
-      <section className="vln-close vln-rise">
-        {/* The wordmark as a sun: three orbits, one small planet per kind. */}
-        <div className="vln-orbits" aria-hidden="true">
-          {KIND_ORDER.map((k, i) => {
-            const w = 340 + i * 190, h = Math.round(w * 0.34);
-            const path = `path("M 0 ${h / 2} A ${w / 2} ${h / 2} 0 1 1 ${w} ${h / 2} A ${w / 2} ${h / 2} 0 1 1 0 ${h / 2}")`;
-            return <span key={k} style={{ width: w, height: h, "--rgb": KINDS[k].rgb } as CSSProperties}><b style={{ offsetPath: path, animationDuration: `${14 + i * 9}s`, animationDelay: `${-i * 5}s` }} /></span>;
-          })}
-        </div>
-        <span className="vln-wordmark vln-wordmark-xl">vibe<i>.</i></span>
-        <p className="vln-tagline">Your campus. Your people. Yourself.</p>
-        <a href={SIGNUP_HREF} data-warp-trigger className="vln-btn">Sign up</a>
-        <a href={LOGIN_HREF} data-warp-trigger className="vln-textlink">Already have an account? Log in</a>
-        <StoreLinks />
-        <span className="vln-schools">{LANDING_SCHOOL_LABELS.join(" · ")}</span>
-      </section>
+        <section className="vln-close vln-rise">
+          {/* The wordmark as a sun: three orbits, one small planet per kind. */}
+          <div className="vln-orbits" aria-hidden="true">
+            {KIND_ORDER.map((k, i) => {
+              const w = 340 + i * 190, h = Math.round(w * 0.34);
+              const path = `path("M 0 ${h / 2} A ${w / 2} ${h / 2} 0 1 1 ${w} ${h / 2} A ${w / 2} ${h / 2} 0 1 1 0 ${h / 2}")`;
+              return <span key={k} style={{ width: w, height: h, "--rgb": KINDS[k].rgb } as CSSProperties}><b style={{ offsetPath: path, animationDuration: `${14 + i * 9}s`, animationDelay: `${-i * 5}s` }} /></span>;
+            })}
+          </div>
+          <span className="vln-wordmark vln-wordmark-xl">vibe<i>.</i></span>
+          <p className="vln-tagline">Your campus. Your people. Yourself.</p>
+          <a href={SIGNUP_HREF} data-warp-trigger className="vln-btn">Sign up</a>
+          <a href={LOGIN_HREF} data-warp-trigger className="vln-textlink">Already have an account? Log in</a>
+          <StoreLinks />
+          <span className="vln-schools">{LANDING_SCHOOL_LABELS.join(" · ")}</span>
+        </section>
+      </main>
 
       {/* No data-warp-trigger in the footer: the warp would hijack these links. */}
       <footer className="vln-footer">

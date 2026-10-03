@@ -125,13 +125,20 @@ export function applyTheme(pref: ThemePref): ResolvedTheme {
   return theme;
 }
 
-/** Client only. Paints every `meta[name=theme-color]` for `theme`, writing
- *  only the ones that differ, so a MutationObserver that calls it never
- *  feeds itself. `applyTheme` uses it; ThemeSync calls it alone when Next
- *  puts a fresh (cream) viewport meta in the head on a navigation. */
+/** Pages that are always Night, whatever the theme: the landing (S72). Their
+ *  browser chrome stays dark too, or a Light student's iPhone bars go cream
+ *  around a black page. src/app/page.tsx sets the same colour in its viewport. */
+export const NIGHT_ONLY_PATHS: readonly string[] = ["/"];
+
+/** Client only. Paints every `meta[name=theme-color]` for `theme` (dark on a
+ *  NIGHT_ONLY_PATHS page), writing only the ones that differ, so a
+ *  MutationObserver that calls it never feeds itself. `applyTheme` uses it;
+ *  ThemeSync calls it alone when Next puts a fresh (cream) viewport meta in
+ *  the head on a navigation. */
 export function syncThemeColorMeta(theme: ResolvedTheme): void {
   if (typeof document === "undefined") return;
-  const color = THEME_META_COLORS[theme];
+  const path = typeof window !== "undefined" ? window.location?.pathname : undefined;
+  const color = THEME_META_COLORS[path && NIGHT_ONLY_PATHS.includes(path) ? "dark" : theme];
   document.querySelectorAll<HTMLMetaElement>('meta[name="theme-color"]').forEach((meta) => {
     if (meta.content !== color) meta.setAttribute("content", color);
   });
