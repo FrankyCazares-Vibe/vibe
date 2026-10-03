@@ -13,6 +13,7 @@ import { isIosPlatform, type Platform } from "@/lib/pwa/display-mode";
 import { usePlatform } from "@/lib/pwa/use-standalone";
 
 import { DayOnVibe, MOMENTS, type DayHandle, type MomentId } from "./day-on-vibe";
+import { HeroTitle } from "./hero-title";
 import { NightSky, type SkyLight } from "./night-sky";
 import { Readout, type Still } from "./readout";
 import "./landing.css";
@@ -218,7 +219,7 @@ export function HomeLanding() {
               screen-reader users meet the headline and Sign up first; the
               lights are absolutely placed, so the order doesn't move them. */}
           <div className="vln-hero-copy">
-            <h1>The social app for <em>your campus.</em></h1>
+            <HeroTitle />
             <p>Find your clubs, your events, and each other. Free with your school email.</p>
             <div className="vln-cta">
               <a href={SIGNUP_HREF} data-warp-trigger className="vln-btn">Sign up</a>

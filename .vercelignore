@@ -14,5 +14,5 @@ otto_mockups/
 /mobile/
 # The landing's demo film, local copy (gitignored too): it shows real people's
 # photos. A `vercel` CLI deploy from this Mac would otherwise publish it at
-# /landing-media/. Production reads it from NEXT_PUBLIC_DEMO_MEDIA_BASE.
+# /landing-media/. Every build reads it from Vercel Blob (src/lib/landing/demo-media.ts).
 /public/landing-media/
