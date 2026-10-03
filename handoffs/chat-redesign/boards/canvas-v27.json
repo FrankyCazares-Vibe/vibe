@@ -435,6 +435,38 @@
       "h": 900,
       "title": "Calm 3 · Quiet split · a club open",
       "is_interactive": true
+    },
+    "D3_Tuck.dc.html": {
+      "x": 0,
+      "y": 20140,
+      "w": 1440,
+      "h": 900,
+      "title": "Round 3 · home (press Play, click a chat, switch from the slim list)",
+      "is_interactive": true
+    },
+    "D3_Tuck_Club.dc.html": {
+      "x": 1520,
+      "y": 20140,
+      "w": 1440,
+      "h": 900,
+      "title": "Round 3 · a club open, with its events and Board on the right",
+      "is_interactive": true
+    },
+    "D3_Tuck_DM.dc.html": {
+      "x": 3040,
+      "y": 20140,
+      "w": 1440,
+      "h": 900,
+      "title": "Round 3 · a direct message, full width",
+      "is_interactive": true
+    },
+    "D3_Tuck_DMPinned.dc.html": {
+      "x": 4560,
+      "y": 20140,
+      "w": 1440,
+      "h": 900,
+      "title": "Round 3 · the pinned idea (needs new work)",
+      "is_interactive": true
     }
   },
   "createdOnFiles": {
@@ -669,6 +701,22 @@
       "size": 24,
       "fill": "pink",
       "text": "3 · Quiet split. The list stays where it is and goes quiet (smaller and greyed) while a chat is open. It changes the least and reuses the phone's rows as they are. The cost: nothing really minimizes, so it may still read as panels."
+    },
+    "row12": {
+      "kind": "title1",
+      "x": 0,
+      "y": 19880,
+      "w": 240,
+      "maxW": 6000,
+      "text": "12 · Round 3 · option 2, refined: a club panel on the right, full-width DMs"
+    },
+    "d12": {
+      "x": 0,
+      "y": 21100,
+      "w": 1800,
+      "size": 24,
+      "fill": "green",
+      "text": "Option 2, with what you asked for. My Calendar is back in the nav. A club opens with a quiet panel on the right about that club: its next events, then its latest Board posts, then members. The Board strip above the chat is gone while the panel shows, so nothing appears twice; hide the panel and the strip comes back. A direct message takes the full width, with no panel. The last board is the pinned idea: Pinned and Shared beside a DM. Shared can be read from messages you already have; Pinned is new (pinning a message does not exist yet). Press Play on the first board: click Salsa Club, hide and show the panel, click Maya R. in the slim list."
     }
   },
   "order": [
@@ -729,7 +777,11 @@
     "D2_2_TuckAway.dc.html",
     "D2_2_TuckAway_Open.dc.html",
     "D2_3_QuietSplit.dc.html",
-    "D2_3_QuietSplit_Open.dc.html"
+    "D2_3_QuietSplit_Open.dc.html",
+    "D3_Tuck.dc.html",
+    "D3_Tuck_Club.dc.html",
+    "D3_Tuck_DM.dc.html",
+    "D3_Tuck_DMPinned.dc.html"
   ],
   "pages": [],
   "title": "Vibe S67 Design Directions"
