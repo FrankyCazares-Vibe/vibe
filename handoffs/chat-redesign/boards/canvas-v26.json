@@ -387,6 +387,54 @@
       "w": 1440,
       "h": 900,
       "title": "C · The phone screen in one column (fallback)"
+    },
+    "D2_1_StepIn.dc.html": {
+      "x": 0,
+      "y": 16680,
+      "w": 1440,
+      "h": 900,
+      "title": "Calm 1 · Step in · home (press Play, click a chat)",
+      "is_interactive": true
+    },
+    "D2_1_StepIn_Open.dc.html": {
+      "x": 1520,
+      "y": 16680,
+      "w": 1440,
+      "h": 900,
+      "title": "Calm 1 · Step in · a club open",
+      "is_interactive": true
+    },
+    "D2_2_TuckAway.dc.html": {
+      "x": 0,
+      "y": 17700,
+      "w": 1440,
+      "h": 900,
+      "title": "Calm 2 · Tuck away · home (press Play, click a chat)",
+      "is_interactive": true
+    },
+    "D2_2_TuckAway_Open.dc.html": {
+      "x": 1520,
+      "y": 17700,
+      "w": 1440,
+      "h": 900,
+      "title": "Calm 2 · Tuck away · a club open",
+      "is_interactive": true
+    },
+    "D2_3_QuietSplit.dc.html": {
+      "x": 0,
+      "y": 18720,
+      "w": 1440,
+      "h": 900,
+      "title": "Calm 3 · Quiet split · home (press Play, click a chat)",
+      "is_interactive": true
+    },
+    "D2_3_QuietSplit_Open.dc.html": {
+      "x": 1520,
+      "y": 18720,
+      "w": 1440,
+      "h": 900,
+      "title": "Calm 3 · Quiet split · a club open",
+      "is_interactive": true
     }
   },
   "createdOnFiles": {
@@ -589,6 +637,38 @@
       "size": 24,
       "fill": "purple",
       "text": "Layout B: Messages keeps people only and clubs live in Campus › Chat. The safest build, but it is the Option 2 you turned down on the phone: the inbox is split in two and Your week is not on the club screen. Layout C: the phone screen in one 430px column. The smallest build and every feature works, but it looks like a phone on a laptop and the list disappears while a room is open. A fallback only."
+    },
+    "row11": {
+      "kind": "title1",
+      "x": 0,
+      "y": 16420,
+      "w": 240,
+      "maxW": 4140,
+      "text": "11 · Round 2 · calmer: Your week on top, the chat grows when you open it"
+    },
+    "d11a": {
+      "x": 3040,
+      "y": 16680,
+      "w": 1100,
+      "size": 24,
+      "fill": "green",
+      "text": "1 · Step in. Home is Your week and one list. Open a chat and the list goes away: the chat is the only thing on screen, Your week folds to one line, and \"Messages\" at the top left takes you back. Press Play, then click Salsa Club or Maya R., and click the club's name for its details. The calmest of the three and the smallest build, because it is the phone's own model. The cost: switching between two chats takes two clicks."
+    },
+    "d11b": {
+      "x": 3040,
+      "y": 17700,
+      "w": 1100,
+      "size": 24,
+      "fill": "orange",
+      "text": "2 · Tuck away. Home is the list with an open stage beside it. Open a chat and the list shrinks to a slim column of names (pinned and unread only) while the chat grows. Switching chats is one click. The cost: there are still two things side by side, and it is the biggest build of the three."
+    },
+    "d11c": {
+      "x": 3040,
+      "y": 18720,
+      "w": 1100,
+      "size": 24,
+      "fill": "pink",
+      "text": "3 · Quiet split. The list stays where it is and goes quiet (smaller and greyed) while a chat is open. It changes the least and reuses the phone's rows as they are. The cost: nothing really minimizes, so it may still read as panels."
     }
   },
   "order": [
@@ -643,7 +723,13 @@
     "D_A2_WeekAcross_Night.dc.html",
     "D_A3_WeekRight_Night.dc.html",
     "D_B_Night.dc.html",
-    "D_C_Night.dc.html"
+    "D_C_Night.dc.html",
+    "D2_1_StepIn.dc.html",
+    "D2_1_StepIn_Open.dc.html",
+    "D2_2_TuckAway.dc.html",
+    "D2_2_TuckAway_Open.dc.html",
+    "D2_3_QuietSplit.dc.html",
+    "D2_3_QuietSplit_Open.dc.html"
   ],
   "pages": [],
   "title": "Vibe S67 Design Directions"

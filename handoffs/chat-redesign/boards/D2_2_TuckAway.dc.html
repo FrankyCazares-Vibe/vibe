@@ -1,0 +1,534 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Messages on desktop: the inbox tucks away when a chat opens</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght,SOFT@0,9..144,300..900,0..100;1,9..144,300..900,0..100&family=DM+Sans:wght@400;500;600;700;800&display=swap">
+<style>body{margin:0;font-family:"DM Sans",system-ui,sans-serif;background:#0C0B0B;color:#F6F1EA}a{color:#FF8A66}a:hover{color:#FF5C35}input::placeholder{color:#9C958C;opacity:1}</style>
+</helmet>
+<div style="width: 1440px; height: 900px; box-sizing: border-box; position: relative; isolation: isolate; display: flex; overflow: hidden; background: #0C0B0B; color: #F6F1EA">
+  <div aria-hidden="true" data-region="bloom" style="position: absolute; z-index: -1; left: 0; top: 0; width: 1440px; height: 900px; pointer-events: none; background: radial-gradient(520px 420px at 0% 0%, rgba(255,92,53,0.20) 0%, rgba(255,92,53,0.07) 45%, rgba(255,92,53,0) 72%), radial-gradient(300px 520px at 4% 108%, rgba(255,92,53,0.30) 0%, rgba(255,92,53,0.10) 46%, rgba(255,92,53,0) 74%)"></div>
+
+  <nav data-region="nav" aria-label="Vibe" style="width: 200px; height: 900px; flex-shrink: 0; box-sizing: border-box; padding: 22px 14px 0; display: flex; flex-direction: column">
+    <a href="#" aria-label="Vibe home" style="height: 30px; display: flex; align-items: center; text-decoration: none; color: #F6F1EA; font-family: Fraunces, Georgia, serif; font-weight: 900; font-size: 22px; line-height: 1; letter-spacing: -0.8px; font-variation-settings: 'SOFT' 100">vibe<span aria-hidden="true" style="color: #FF5C35">.</span></a>
+
+    <div style="margin-top: 25px; display: flex; flex-direction: column; gap: 3px">
+      <a href="#" style="height: 40px; box-sizing: border-box; padding: 0 11px; border-radius: 12px; display: flex; align-items: center; gap: 10px; text-decoration: none; color: #9C958C; font-size: 14px; font-weight: 500"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 9.5L12 4l9 5.5"/><path d="M4 10h16"/><path d="M6 10v8M10 10v8M14 10v8M18 10v8"/><path d="M3.5 20.5h17"/></svg>Campus</a>
+      <a href="#" style="height: 40px; box-sizing: border-box; padding: 0 11px; border-radius: 12px; display: flex; align-items: center; gap: 10px; text-decoration: none; color: #9C958C; font-size: 14px; font-weight: 500"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="6" r="2.6"/><circle cx="5" cy="18" r="2.6"/><circle cx="19" cy="18" r="2.6"/><path d="M10.7 8.3L6.3 15.7M13.3 8.3l4.4 7.4M7.6 18h8.8"/></svg>Network</a>
+      <a href="#" aria-current="page" style="height: 40px; box-sizing: border-box; padding: 0 11px; border-radius: 12px; background: rgba(255,255,255,0.07); display: flex; align-items: center; gap: 10px; text-decoration: none; color: #F6F1EA; font-size: 14px; font-weight: 600"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5.5h16v11H9l-5 4z"/></svg>Messages</a>
+      <a href="#" style="height: 40px; box-sizing: border-box; padding: 0 11px; border-radius: 12px; display: flex; align-items: center; gap: 10px; text-decoration: none; color: #9C958C; font-size: 14px; font-weight: 500"><span aria-hidden="true" style="width: 18px; height: 18px; flex-shrink: 0; display: flex; align-items: center; justify-content: center"><span style="width: 8px; height: 8px; border-radius: 999px; background: #FF5C35; box-shadow: 0 0 8px rgba(255,92,53,0.8)"></span></span>otto</a>
+      <a href="#" style="height: 40px; box-sizing: border-box; padding: 0 11px; border-radius: 12px; display: flex; align-items: center; gap: 10px; text-decoration: none; color: #9C958C; font-size: 14px; font-weight: 500"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M5.6 18.4l2.1-2.1M16.3 7.7l2.1-2.1"/></svg>Settings</a>
+    </div>
+
+    <div aria-hidden="true" style="margin-top: 12px; height: 1px; background: rgba(255,255,255,0.10)"></div>
+
+    <a href="#" aria-label="Your profile: Franky Cazares, Marketing, Year 3" style="margin-top: 13px; height: 108px; box-sizing: border-box; border-radius: 12px; border: 1px solid rgba(255,255,255,0.10); background: #161515; overflow: hidden; display: flex; flex-direction: column; text-decoration: none; color: #F6F1EA">
+      <span aria-hidden="true" style="height: 46px; flex-shrink: 0; background: radial-gradient(120px 60px at 88% 0%, rgba(255,196,128,0.55) 0%, rgba(255,196,128,0) 70%), linear-gradient(112deg, #2A0E1E 0%, #6E1F33 42%, #C2452F 78%, #FF5C35 100%)"></span>
+      <span style="flex-grow: 1; box-sizing: border-box; padding: 0 10px; display: flex; align-items: center; gap: 10px">
+        <span aria-hidden="true" style="width: 36px; height: 36px; flex-shrink: 0; border-radius: 10px; background: #232121; display: flex; align-items: center; justify-content: center; font-family: Fraunces, Georgia, serif; font-weight: 800; font-size: 12px; color: #F6F1EA">FC</span>
+        <span style="min-width: 0; display: flex; flex-direction: column; gap: 3px">
+          <span style="font-size: 12.5px; font-weight: 600; line-height: 16px; white-space: nowrap">Franky Cazares</span>
+          <span style="font-size: 10.5px; font-weight: 500; line-height: 13px; color: #9C958C; white-space: nowrap">Marketing · Year 3</span>
+        </span>
+      </span>
+    </a>
+
+  </nav>
+
+  <div data-region="messages" style="width: 1240px; height: 900px; flex-shrink: 0; box-sizing: border-box; border-left: 1px solid rgba(255,255,255,0.10); display: flex; flex-direction: column">
+  <section data-region="week" aria-labelledby="your-week-heading" style="height: {{weekH}}; flex-shrink: 0; overflow: hidden; box-sizing: border-box; padding: 0 24px; border-bottom: 1px solid rgba(255,255,255,0.10); display: grid; grid-template-columns: auto minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); column-gap: 14px; align-items: center; transition: height 320ms cubic-bezier(.2,.8,.2,1)">
+      <h2 id="your-week-heading" style="grid-area: 1 / 1; margin: 0; font-family: Fraunces, Georgia, serif; font-weight: 700; font-size: 16px; line-height: 1; letter-spacing: -0.2px; font-variation-settings: 'SOFT' 100"><button type="button" aria-haspopup="dialog" aria-label="Your week, October 5 to 11. Open the month" style="min-height: 28px; margin: 0 -6px; padding: 0 6px; border: none; border-radius: 999px; background: transparent; color: #F6F1EA; font: inherit; letter-spacing: inherit; font-variation-settings: inherit; display: inline-flex; align-items: center; gap: 4px; cursor: pointer">Your week<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#9C958C" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 9l7 7 7-7"/></svg></button></h2>
+    <div data-region="week-full" aria-hidden="{{weekFullHidden}}" style="grid-area: 1 / 2; min-width: 0; height: 75px; display: flex; align-items: center; gap: 24px; opacity: {{weekFullO}}; visibility: {{weekFullV}}; pointer-events: {{weekFullPe}}; transition: {{weekFullTr}}">
+      <div style="flex-shrink: 0; display: flex; align-items: center; gap: 4px">
+        <button type="button" aria-label="Previous week" style="width: 28px; height: 28px; padding: 0; border-radius: 999px; border: none; background: rgba(255,255,255,0.05); color: #CFC8BE; display: flex; align-items: center; justify-content: center; cursor: pointer"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></button>
+        <button type="button" aria-label="Next week" style="width: 28px; height: 28px; padding: 0; border-radius: 999px; border: none; background: rgba(255,255,255,0.05); color: #CFC8BE; display: flex; align-items: center; justify-content: center; cursor: pointer"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg></button>
+      </div>
+    <nav aria-label="Your week, October 5 to 11" style="height: 44px; flex-shrink: 0; display: flex; gap: 2px">
+      <button type="button" aria-label="Monday, October 5, nothing planned" style="width: 44px; height: 44px; padding: 0; border-radius: 14px; border: none; background: transparent; font-family: inherit; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; cursor: pointer"><span style="font-size: 10.5px; font-weight: 600; line-height: 12px; color: #9C958C">Mon</span><span style="font-size: 15px; font-weight: 700; line-height: 16px; color: #9C958C">5</span><span style="width: 5px; height: 5px; border-radius: 999px; background: transparent"></span></button>
+      <button type="button" aria-label="Tuesday, October 6, nothing planned" style="width: 44px; height: 44px; padding: 0; border-radius: 14px; border: none; background: transparent; font-family: inherit; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; cursor: pointer"><span style="font-size: 10.5px; font-weight: 600; line-height: 12px; color: #9C958C">Tue</span><span style="font-size: 15px; font-weight: 700; line-height: 16px; color: #9C958C">6</span><span style="width: 5px; height: 5px; border-radius: 999px; background: transparent"></span></button>
+      <button type="button" aria-label="Wednesday, October 7, nothing planned" style="width: 44px; height: 44px; padding: 0; border-radius: 14px; border: none; background: transparent; font-family: inherit; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; cursor: pointer"><span style="font-size: 10.5px; font-weight: 600; line-height: 12px; color: #9C958C">Wed</span><span style="font-size: 15px; font-weight: 700; line-height: 16px; color: #9C958C">7</span><span style="width: 5px; height: 5px; border-radius: 999px; background: transparent"></span></button>
+      <button type="button" aria-current="date" aria-label="Thursday, October 8, today: Fall Formal, going, live now" style="width: 44px; height: 44px; padding: 0; border-radius: 14px; border: none; background: #F6F1EA; font-family: inherit; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; cursor: pointer; box-shadow: 0 6px 16px rgba(0,0,0,0.45)"><span style="font-size: 10.5px; font-weight: 700; line-height: 12px; color: #4A4541">Thu</span><span style="font-size: 15px; font-weight: 800; line-height: 16px; color: #0C0B0B">8</span><span style="width: 5px; height: 5px; border-radius: 999px; background: #FF5C35"></span></button>
+      <button type="button" aria-label="Friday, October 9: Fright Night, going" style="width: 44px; height: 44px; padding: 0; border-radius: 14px; border: none; background: transparent; font-family: inherit; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; cursor: pointer"><span style="font-size: 10.5px; font-weight: 600; line-height: 12px; color: #CFC8BE">Fri</span><span style="font-size: 15px; font-weight: 700; line-height: 16px; color: #F6F1EA">9</span><span style="width: 5px; height: 5px; border-radius: 999px; background: #FF5C35"></span></button>
+      <button type="button" aria-label="Saturday, October 10: Build Night, maybe" style="width: 44px; height: 44px; padding: 0; border-radius: 14px; border: none; background: transparent; font-family: inherit; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; cursor: pointer"><span style="font-size: 10.5px; font-weight: 600; line-height: 12px; color: #CFC8BE">Sat</span><span style="font-size: 15px; font-weight: 700; line-height: 16px; color: #F6F1EA">10</span><span style="width: 5px; height: 5px; border-radius: 999px; background: #9C958C"></span></button>
+      <button type="button" aria-label="Sunday, October 11, nothing planned" style="width: 44px; height: 44px; padding: 0; border-radius: 14px; border: none; background: transparent; font-family: inherit; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; cursor: pointer"><span style="font-size: 10.5px; font-weight: 600; line-height: 12px; color: #CFC8BE">Sun</span><span style="font-size: 15px; font-weight: 700; line-height: 16px; color: #F6F1EA">11</span><span style="width: 5px; height: 5px; border-radius: 999px; background: transparent"></span></button>
+    </nav>
+    <div data-region="week-chips" role="group" aria-label="Event chats you RSVP’d to this week" style="flex: 1 1 0; min-width: 0; display: flex; gap: 10px; align-items: center">
+      <a href="#" aria-label="Fall Formal event chat, Salsa Club, live now, you're going" style="flex: 0 1 auto; min-width: 0; height: 50px; box-sizing: border-box; padding: 0 16px 0 14px; border-radius: 16px; border: 1px solid rgba(255,92,53,0.55); background: linear-gradient(120deg, rgba(58,22,20,0.96) 0%, rgba(30,20,19,0.96) 100%); box-shadow: 0 0 0 3px rgba(255,92,53,0.08), 0 6px 18px rgba(255,92,53,0.30), inset 0 1px 0 rgba(255,255,255,0.06); display: flex; flex-direction: column; justify-content: center; gap: 3px; text-decoration: none; color: #F6F1EA">
+        <span style="display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; line-height: 15px; color: #CFC8BE; white-space: nowrap"><span style="display: inline-flex; align-items: center; gap: 6px; font-weight: 700; color: #FF8A66"><span aria-hidden="true" style="width: 7px; height: 7px; flex-shrink: 0; border-radius: 999px; background: #FF5C35; box-shadow: 0 0 0 3px rgba(255,92,53,0.25), 0 0 8px #FF5C35"></span>Live now</span><span aria-hidden="true" style="color: #9C958C">·</span><span style="display: inline-flex; align-items: center; gap: 3px"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>Going</span></span>
+        <span style="display: flex; align-items: baseline; gap: 8px; white-space: nowrap"><span style="font-family: Fraunces, Georgia, serif; font-weight: 700; font-size: 15.5px; line-height: 18px; letter-spacing: -0.2px">Fall Formal</span><span style="font-size: 12px; font-weight: 500; line-height: 15px; color: #9C958C">Salsa Club</span></span>
+      </a>
+      <a href="#" aria-label="Fright Night event chat, Film Society, Friday 7 PM, you're going" style="flex: 0 1 auto; min-width: 0; height: 50px; box-sizing: border-box; padding: 0 16px 0 14px; border-radius: 16px; border: 1px solid transparent; background: rgba(255,255,255,0.045); display: flex; flex-direction: column; justify-content: center; gap: 3px; text-decoration: none; color: #F6F1EA">
+        <span style="display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; line-height: 15px; color: #CFC8BE; white-space: nowrap"><span>Fri 7 PM</span><span aria-hidden="true" style="color: #9C958C">·</span><span style="display: inline-flex; align-items: center; gap: 3px"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>Going</span></span>
+        <span style="display: flex; align-items: baseline; gap: 8px; white-space: nowrap"><span style="font-family: Fraunces, Georgia, serif; font-weight: 700; font-size: 15.5px; line-height: 18px; letter-spacing: -0.2px">Fright Night</span><span style="font-size: 12px; font-weight: 500; line-height: 15px; color: #9C958C">Film Society</span></span>
+      </a>
+      <a href="#" aria-label="Build Night event chat, Jag Robotics, Saturday 2 PM, you said maybe" style="flex: 0 1 auto; min-width: 0; height: 50px; box-sizing: border-box; padding: 0 16px 0 14px; border-radius: 16px; border: 1px solid transparent; background: rgba(255,255,255,0.045); display: flex; flex-direction: column; justify-content: center; gap: 3px; text-decoration: none; color: #F6F1EA">
+        <span style="display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; line-height: 15px; color: #CFC8BE; white-space: nowrap"><span>Sat 2 PM</span><span aria-hidden="true" style="color: #9C958C">·</span><span>Maybe</span></span>
+        <span style="display: flex; align-items: baseline; gap: 8px; white-space: nowrap"><span style="font-family: Fraunces, Georgia, serif; font-weight: 700; font-size: 15.5px; line-height: 18px; letter-spacing: -0.2px">Build Night</span><span style="font-size: 12px; font-weight: 500; line-height: 15px; color: #9C958C">Jag Robotics</span></span>
+      </a>
+    </div>
+    </div>
+    <div data-region="week-slim" role="group" aria-label="This week, in one line" aria-hidden="{{weekSlimHidden}}" style="grid-area: 1 / 2; min-width: 0; height: 43px; box-sizing: border-box; padding-left: 16px; display: flex; align-items: center; gap: 30px; opacity: {{weekSlimO}}; visibility: {{weekSlimV}}; pointer-events: {{weekSlimPe}}; transition: {{weekSlimTr}}">
+      <a href="#" aria-label="Fall Formal event chat, Salsa Club, live now, you’re going" style="min-height: 28px; flex-shrink: 0; display: inline-flex; align-items: center; gap: 7px; text-decoration: none; color: #F6F1EA; white-space: nowrap"><span aria-hidden="true" style="width: 7px; height: 7px; flex-shrink: 0; border-radius: 999px; background: #FF5C35"></span><span style="font-size: 12px; font-weight: 700; color: #FF8A66">Live now</span><span style="font-family: Fraunces, Georgia, serif; font-weight: 700; font-size: 14.5px; letter-spacing: -0.2px; font-variation-settings: 'SOFT' 100">Fall Formal</span></a>
+      <a href="#" aria-label="Fright Night event chat, Film Society, Friday 7 PM, you’re going" style="min-height: 28px; flex-shrink: 0; display: inline-flex; align-items: center; gap: 7px; text-decoration: none; color: #F6F1EA; white-space: nowrap"><span style="font-size: 12px; font-weight: 600; color: #9C958C">Fri 7 PM</span><span style="font-family: Fraunces, Georgia, serif; font-weight: 700; font-size: 14.5px; letter-spacing: -0.2px; font-variation-settings: 'SOFT' 100; color: #CFC8BE">Fright Night</span></a>
+      <a href="#" aria-label="Build Night event chat, Jag Robotics, Saturday 2 PM, you said maybe" style="min-height: 28px; flex-shrink: 0; display: inline-flex; align-items: center; gap: 7px; text-decoration: none; color: #F6F1EA; white-space: nowrap"><span style="font-size: 12px; font-weight: 600; color: #9C958C">Sat 2 PM</span><span style="font-family: Fraunces, Georgia, serif; font-weight: 700; font-size: 14.5px; letter-spacing: -0.2px; font-variation-settings: 'SOFT' 100; color: #CFC8BE">Build Night</span></a>
+    </div>
+  </section>
+
+  <div data-region="body" style="flex: 1 1 0; min-height: 0; position: relative; overflow: hidden">
+  <section data-region="inbox" aria-label="Messages" style="position: absolute; left: 0; bottom: 0; width: 232px; height: 856px">
+    <div data-region="inbox-wide" aria-hidden="{{wideHidden}}" style="position: absolute; left: 0; bottom: 0; width: 520px; height: 824px; display: flex; flex-direction: column; opacity: {{wideOpacity}}; clip-path: {{wideClip}}; pointer-events: {{widePe}}; transition: {{wideFade}}">
+    <header data-region="inbox-header" style="flex-shrink: 0; height: 68px; box-sizing: border-box; padding: 4px 24px 0; display: flex; align-items: center; gap: 8px">
+        <h1 style="margin: 0; margin-right: auto; font-family: Fraunces, Georgia, serif; font-weight: 800; font-size: 26px; line-height: 1; letter-spacing: -0.7px; font-variation-settings: 'SOFT' 100">Messages</h1>
+        <button type="button" aria-label="Search your chats" style="width: 34px; height: 34px; padding: 0; border: none; border-radius: 999px; background: transparent; color: #CFC8BE; display: flex; align-items: center; justify-content: center; cursor: pointer"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg></button>
+        <button type="button" aria-label="New message" style="height: 32px; box-sizing: border-box; padding: 0 13px 0 10px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.14); background: transparent; color: #F6F1EA; font-family: inherit; font-size: 13px; font-weight: 700; display: flex; align-items: center; gap: 5px; cursor: pointer"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>New</button>
+    </header>
+
+    <div data-region="filters" role="tablist" aria-label="Show" style="flex-shrink: 0; height: 45px; box-sizing: border-box; padding: 0 21px; display: flex; align-items: center; gap: 2px">
+      <button type="button" role="tab" aria-selected="true" style="height: 44px; padding: 0 3px; border: none; background: transparent; display: flex; align-items: center; cursor: pointer; font-family: inherit"><span style="height: 30px; box-sizing: border-box; padding: 0 13px; border-radius: 999px; background: #F6F1EA; color: #0C0B0B; font-size: 13px; font-weight: 700; display: flex; align-items: center">All</span></button>
+      <button type="button" role="tab" aria-selected="false" style="height: 44px; padding: 0 3px; border: none; background: transparent; display: flex; align-items: center; cursor: pointer; font-family: inherit"><span style="height: 30px; box-sizing: border-box; padding: 0 11px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.12); color: #CFC8BE; font-size: 13px; font-weight: 700; display: flex; align-items: center">Chats</span></button>
+      <button type="button" role="tab" aria-selected="false" style="height: 44px; padding: 0 3px; border: none; background: transparent; display: flex; align-items: center; cursor: pointer; font-family: inherit"><span style="height: 30px; box-sizing: border-box; padding: 0 11px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.12); color: #CFC8BE; font-size: 13px; font-weight: 700; display: flex; align-items: center">Clubs</span></button>
+      <button type="button" role="tab" aria-selected="false" aria-label="Requests, 2 waiting" style="height: 44px; padding: 0 3px; border: none; background: transparent; display: flex; align-items: center; cursor: pointer; font-family: inherit"><span style="height: 30px; box-sizing: border-box; padding: 0 8px 0 11px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.12); color: #CFC8BE; font-size: 13px; font-weight: 700; display: flex; align-items: center; gap: 6px">Requests<span aria-hidden="true" style="min-width: 18px; height: 18px; box-sizing: border-box; padding: 0 5px; border-radius: 999px; background: rgba(255,255,255,0.12); color: #F6F1EA; font-size: 11.5px; font-weight: 800; line-height: 1; display: inline-flex; align-items: center; justify-content: center">2</span></span></button>
+    </div>
+
+    <section data-region="rows" aria-label="All chats, pinned first" style="flex-grow: 1; min-height: 0; overflow: hidden; box-sizing: border-box; padding: 6px 16px 0; display: flex; flex-direction: column">
+      <a href="#" data-region="row-maya" onClick="{{ openDm }}" aria-label="Maya R., pinned" style="flex-shrink: 0; border-radius: 14px; display: flex; align-items: center; gap: 14px; padding-left: 8px; text-decoration: none; color: #F6F1EA">
+        <div aria-hidden="true" style="width: 44px; height: 44px; flex-shrink: 0; border-radius: 999px; background: #5A3A2E; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 14px; color: #FFD3C2">MR</div>
+        <div style="flex-grow: 1; min-width: 0; box-sizing: border-box; padding: 11px 10px 11px 0; border-bottom: 1px solid transparent; display: flex; flex-direction: column; gap: 2px">
+          <div style="display: flex; align-items: center; gap: 6px">
+            <span style="font-size: 15px; font-weight: 700; line-height: 1.3">Maya R.</span>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#9C958C" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="margin-left: auto; flex-shrink: 0"><path d="M9 3h6l-1 6.5 3.5 3.5h-11L10 9.5z"/><path d="M12 13v8"/></svg>
+            <sc-if value="{{ mayaUnread }}" hint-placeholder-val="{{ true }}"><span style="font-size: 12px; font-weight: 600; color: #CFC8BE">8:44 PM</span></sc-if><sc-if value="{{ mayaRead }}" hint-placeholder-val="{{ false }}"><span style="font-size: 12px; font-weight: 600; color: #9C958C">8:46 PM</span></sc-if>
+          </div>
+          <sc-if value="{{ mayaUnread }}" hint-placeholder-val="{{ true }}"><div style="display: flex; align-items: center; gap: 10px">
+            <span style="flex-grow: 1; min-width: 0; font-size: 13.5px; line-height: 1.35; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #F6F1EA">ok I’m by the photo booth, where are you</span>
+            <span role="img" aria-label="Unread" style="width: 9px; height: 9px; flex-shrink: 0; margin-right: 2px; border-radius: 999px; background: #FF5C35"></span>
+          </div></sc-if>
+          <sc-if value="{{ mayaRead }}" hint-placeholder-val="{{ false }}"><span style="font-size: 13.5px; line-height: 1.35; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #CFC8BE">You: just got my wristband, two minutes</span></sc-if>
+        </div>
+      </a>
+
+      <a href="#" aria-label="Orgo study group, group chat with Priya S. and Jonah K., pinned" style="flex-shrink: 0; border-radius: 14px; display: flex; align-items: center; gap: 14px; padding-left: 8px; text-decoration: none; color: #F6F1EA">
+        <div aria-hidden="true" style="position: relative; width: 44px; height: 44px; flex-shrink: 0">
+          <span style="position: absolute; left: 0; top: 0; width: 30px; height: 30px; border-radius: 999px; background: #4A3A5E; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 10.5px; color: #E6D8F5">PS</span>
+          <span style="position: absolute; right: 0; bottom: 0; width: 30px; height: 30px; border-radius: 999px; background: #5E4A2A; box-shadow: 0 0 0 2px #0C0B0B; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 10.5px; color: #F5E1B8">JK</span>
+        </div>
+        <div style="flex-grow: 1; min-width: 0; box-sizing: border-box; padding: 11px 10px 11px 0; border-bottom: 1px solid transparent; display: flex; flex-direction: column; gap: 2px">
+          <div style="display: flex; align-items: center; gap: 6px">
+            <span style="font-size: 15px; font-weight: 700; line-height: 1.3">Orgo study group</span>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#9C958C" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="margin-left: auto; flex-shrink: 0"><path d="M9 3h6l-1 6.5 3.5 3.5h-11L10 9.5z"/><path d="M12 13v8"/></svg>
+            <span style="font-size: 12px; font-weight: 600; color: #9C958C">8:30 PM</span>
+          </div>
+          <span style="font-size: 13.5px; line-height: 1.35; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #CFC8BE"><span style="font-weight: 700">Jonah K.:</span> practice set is up, ch. 6 is brutal</span>
+        </div>
+      </a>
+
+      <a href="#" data-region="row-salsa" onClick="{{ openClub }}" aria-label="Salsa Club. Unread Board post, Fall Formal is live now" style="flex-shrink: 0; border-radius: 14px; display: flex; align-items: center; gap: 12px; padding-left: 6px; text-decoration: none; color: #F6F1EA">
+        <div aria-hidden="true" style="width: 48px; height: 48px; flex-shrink: 0; border-radius: 999px; background: linear-gradient(145deg, #C23A72, #962858); box-shadow: inset 0 0 0 1px rgba(255,255,255,0.16); display: flex; align-items: center; justify-content: center; font-family: Fraunces, Georgia, serif; font-weight: 800; font-size: 18px; color: #FAF7F2">SC</div>
+        <div style="flex-grow: 1; min-width: 0; box-sizing: border-box; padding: 10px 10px 11px 0; border-bottom: 1px solid transparent; display: flex; flex-direction: column; gap: 3px">
+          <div style="display: flex; align-items: baseline; gap: 8px">
+            <span style="font-family: Fraunces, Georgia, serif; font-weight: 800; font-size: 16.5px; line-height: 1.25; letter-spacing: -0.3px">Salsa Club</span>
+            <span style="margin-left: auto; font-size: 12px; font-weight: 600; color: #CFC8BE">8:41 PM</span>
+          </div>
+          <div style="font-size: 13.5px; line-height: 1.35; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #F6F1EA"><span aria-hidden="true" style="display: inline-block; width: 8px; height: 8px; margin-right: 7px; border-radius: 999px; background: #FF5C35; vertical-align: 1px"></span><span style="font-weight: 700">Board:</span> Formal tonight, doors at 7:30</div>
+          <div style="display: flex; align-items: center; gap: 8px; margin-top: 1px">
+            <span style="height: 22px; box-sizing: border-box; padding: 0 9px 0 8px; border-radius: 999px; border: 1px solid rgba(255,92,53,0.50); background: rgba(255,92,53,0.14); color: #FF8A66; font-size: 12px; font-weight: 700; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap"><span aria-hidden="true" style="width: 6px; height: 6px; border-radius: 999px; background: #FF5C35"></span>Live now · Fall Formal</span>
+          </div>
+        </div>
+      </a>
+
+      <a href="#" aria-label="Devin O." style="flex-shrink: 0; border-radius: 14px; display: flex; align-items: center; gap: 14px; padding-left: 8px; text-decoration: none; color: #F6F1EA">
+        <div aria-hidden="true" style="width: 44px; height: 44px; flex-shrink: 0; border-radius: 999px; background: #2E4A5A; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 14px; color: #CFE6F2">DO</div>
+        <div style="flex-grow: 1; min-width: 0; box-sizing: border-box; padding: 11px 10px 11px 0; border-bottom: 1px solid transparent; display: flex; flex-direction: column; gap: 2px">
+          <div style="display: flex; align-items: baseline; gap: 8px">
+            <span style="font-size: 15px; font-weight: 700; line-height: 1.3">Devin O.</span>
+            <span style="margin-left: auto; font-size: 12px; font-weight: 600; color: #9C958C">8:12 PM</span>
+          </div>
+          <span style="font-size: 13.5px; line-height: 1.35; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #CFC8BE">You: saving you a spot on the rueda circle</span>
+        </div>
+      </a>
+
+      <a href="#" aria-label="Jag Robotics, unread Board post, Build Night Saturday" style="flex-shrink: 0; border-radius: 14px; display: flex; align-items: center; gap: 12px; padding-left: 6px; text-decoration: none; color: #F6F1EA">
+        <div aria-hidden="true" style="width: 48px; height: 48px; flex-shrink: 0; border-radius: 999px; background: linear-gradient(145deg, #1F7580, #155158); box-shadow: inset 0 0 0 1px rgba(255,255,255,0.14); display: flex; align-items: center; justify-content: center; font-family: Fraunces, Georgia, serif; font-weight: 800; font-size: 18px; color: #FAF7F2">JR</div>
+        <div style="flex-grow: 1; min-width: 0; box-sizing: border-box; padding: 10px 10px 11px 0; border-bottom: 1px solid transparent; display: flex; flex-direction: column; gap: 3px">
+          <div style="display: flex; align-items: baseline; gap: 8px">
+            <span style="font-family: Fraunces, Georgia, serif; font-weight: 800; font-size: 16.5px; line-height: 1.25; letter-spacing: -0.3px">Jag Robotics</span>
+            <span style="margin-left: auto; font-size: 12px; font-weight: 600; color: #CFC8BE">7:55 PM</span>
+          </div>
+          <div style="font-size: 13.5px; line-height: 1.35; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #F6F1EA"><span aria-hidden="true" style="display: inline-block; width: 8px; height: 8px; margin-right: 7px; border-radius: 999px; background: #FF5C35; vertical-align: 1px"></span><span style="font-weight: 700">Board:</span> Build Night moved to ET 202</div>
+          <div style="display: flex; align-items: center; gap: 8px; margin-top: 1px">
+            <span style="height: 22px; box-sizing: border-box; padding: 0 9px 0 7px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.10); background: rgba(255,255,255,0.05); color: #CFC8BE; font-size: 12px; font-weight: 600; display: inline-flex; align-items: center; gap: 5px; white-space: nowrap"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M8 3v4M16 3v4M3 10h18"/></svg>Sat · Build Night</span>
+          </div>
+        </div>
+      </a>
+
+      <a href="#" aria-label="Film Society, 4 new in the Lounge, Fright Night Friday" style="flex-shrink: 0; border-radius: 14px; display: flex; align-items: center; gap: 12px; padding-left: 6px; text-decoration: none; color: #F6F1EA">
+        <div aria-hidden="true" style="width: 48px; height: 48px; flex-shrink: 0; border-radius: 999px; background: linear-gradient(145deg, #8A6A22, #664C14); box-shadow: inset 0 0 0 1px rgba(255,255,255,0.14); display: flex; align-items: center; justify-content: center; font-family: Fraunces, Georgia, serif; font-weight: 800; font-size: 18px; color: #FAF7F2">FS</div>
+        <div style="flex-grow: 1; min-width: 0; box-sizing: border-box; padding: 10px 10px 11px 0; border-bottom: 1px solid transparent; display: flex; flex-direction: column; gap: 3px">
+          <div style="display: flex; align-items: baseline; gap: 8px">
+            <span style="font-family: Fraunces, Georgia, serif; font-weight: 800; font-size: 16.5px; line-height: 1.25; letter-spacing: -0.3px">Film Society</span>
+            <span style="margin-left: auto; font-size: 12px; font-weight: 600; color: #9C958C">5:47 PM</span>
+          </div>
+          <div style="font-size: 13.5px; line-height: 1.35; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #CFC8BE"><span style="font-weight: 700">Sam T.:</span> who has the HDMI adapter from last week</div>
+          <div style="display: flex; align-items: center; gap: 8px; margin-top: 1px">
+            <span style="height: 22px; box-sizing: border-box; padding: 0 9px 0 7px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.10); background: rgba(255,255,255,0.05); color: #CFC8BE; font-size: 12px; font-weight: 600; display: inline-flex; align-items: center; gap: 5px; white-space: nowrap"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M8 3v4M16 3v4M3 10h18"/></svg>Fri · Fright Night</span>
+            <span style="margin-left: auto; height: 20px; box-sizing: border-box; padding: 0 8px; border-radius: 999px; background: rgba(255,255,255,0.08); color: #CFC8BE; font-size: 11.5px; font-weight: 700; display: inline-flex; align-items: center">4 new</span>
+          </div>
+        </div>
+      </a>
+
+      <a href="#" aria-label="Priya S." style="flex-shrink: 0; border-radius: 14px; display: flex; align-items: center; gap: 14px; padding-left: 8px; text-decoration: none; color: #F6F1EA">
+        <div aria-hidden="true" style="width: 44px; height: 44px; flex-shrink: 0; border-radius: 999px; background: #4A3A5E; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 14px; color: #E6D8F5">PS</div>
+        <div style="flex-grow: 1; min-width: 0; box-sizing: border-box; padding: 11px 10px 11px 0; border-bottom: 1px solid transparent; display: flex; flex-direction: column; gap: 2px">
+          <div style="display: flex; align-items: baseline; gap: 8px">
+            <span style="font-size: 15px; font-weight: 700; line-height: 1.3">Priya S.</span>
+            <span style="margin-left: auto; font-size: 12px; font-weight: 600; color: #9C958C">Yesterday</span>
+          </div>
+          <span style="font-size: 13.5px; line-height: 1.35; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #CFC8BE">sent you the orgo notes, ch. 6 is the rough one</span>
+        </div>
+      </a>
+
+      <a href="#" aria-label="Pre-Med Society" style="flex-shrink: 0; border-radius: 14px; display: flex; align-items: center; gap: 12px; padding-left: 6px; text-decoration: none; color: #F6F1EA">
+        <div aria-hidden="true" style="width: 48px; height: 48px; flex-shrink: 0; border-radius: 999px; background: linear-gradient(145deg, #337A5A, #245942); box-shadow: inset 0 0 0 1px rgba(255,255,255,0.14); display: flex; align-items: center; justify-content: center; font-family: Fraunces, Georgia, serif; font-weight: 800; font-size: 18px; color: #FAF7F2">PM</div>
+        <div style="flex-grow: 1; min-width: 0; box-sizing: border-box; padding: 10px 10px 11px 0; border-bottom: 1px solid transparent; display: flex; flex-direction: column; gap: 3px">
+          <div style="display: flex; align-items: baseline; gap: 8px">
+            <span style="font-family: Fraunces, Georgia, serif; font-weight: 800; font-size: 16.5px; line-height: 1.25; letter-spacing: -0.3px">Pre-Med Society</span>
+            <span style="margin-left: auto; font-size: 12px; font-weight: 600; color: #9C958C">Wed</span>
+          </div>
+          <div style="font-size: 13.5px; line-height: 1.35; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #CFC8BE"><span style="font-weight: 700">Board:</span> MCAT study hall moves to Tuesdays</div>
+        </div>
+      </a>
+
+      <a href="#" aria-label="Jonah K." style="flex-shrink: 0; border-radius: 14px; display: flex; align-items: center; gap: 14px; padding-left: 8px; text-decoration: none; color: #F6F1EA">
+        <div aria-hidden="true" style="width: 44px; height: 44px; flex-shrink: 0; border-radius: 999px; background: #5E4A2A; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 14px; color: #F5E1B8">JK</div>
+        <div style="flex-grow: 1; min-width: 0; box-sizing: border-box; padding: 11px 10px 11px 0; border-bottom: 1px solid transparent; display: flex; flex-direction: column; gap: 2px">
+          <div style="display: flex; align-items: baseline; gap: 8px">
+            <span style="font-size: 15px; font-weight: 700; line-height: 1.3">Jonah K.</span>
+            <span style="margin-left: auto; font-size: 12px; font-weight: 600; color: #9C958C">Tue</span>
+          </div>
+          <span style="font-size: 13.5px; line-height: 1.35; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #CFC8BE">You: I’ll bring the flashcards Thursday</span>
+        </div>
+      </a>
+    </section>
+    </div>
+    <div data-region="inbox-slim" aria-hidden="{{slimHidden}}" style="position: absolute; left: 0; bottom: 0; width: 232px; height: 856px; box-sizing: border-box; padding: 0 10px; display: flex; flex-direction: column; opacity: {{slimOpacity}}; pointer-events: {{slimPe}}; transition: {{slimFade}}">
+      <div style="height: 64px; flex-shrink: 0; display: flex; align-items: center">
+        <button type="button" data-region="back-to-messages" onClick="{{ goHome }}" aria-label="Messages. Show the full list" style="height: 36px; padding: 0 12px 0 6px; border: none; border-radius: 999px; background: transparent; color: #F6F1EA; font-family: Fraunces, Georgia, serif; font-weight: 800; font-size: 18px; letter-spacing: -0.4px; font-variation-settings: 'SOFT' 100; display: inline-flex; align-items: center; gap: 6px; cursor: pointer"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#CFC8BE" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>Messages</button>
+      </div>
+      <nav aria-label="Pinned and unread chats" style="display: flex; flex-direction: column; gap: 2px">
+        <a href="#" data-region="slim-maya" onClick="{{ openDm }}" aria-label="Maya R." style="height: 44px; flex-shrink: 0; box-sizing: border-box; padding: 0 12px 0 10px; border-radius: 12px; background: {{slimMayaBg}}; display: flex; align-items: center; gap: 10px; text-decoration: none; transition: background 240ms ease"><span aria-hidden="true" style="width: 26px; height: 26px; flex-shrink: 0; border-radius: 999px; background: #5A3A2E; color: #FFD3C2; display: flex; align-items: center; justify-content: center; font-size: 9.5px; font-weight: 700">MR</span><span style="flex-grow: 1; min-width: 0; font-size: 14px; font-weight: 700; line-height: 20px; color: {{slimMayaInk}}; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">Maya R.</span><span role="img" aria-label="Unread" style="width: 7px; height: 7px; flex-shrink: 0; border-radius: 999px; background: #FF5C35; opacity: {{slimMayaDot}}; transition: opacity 240ms ease"></span></a>
+        <a href="#" aria-label="Orgo study group" style="height: 44px; flex-shrink: 0; box-sizing: border-box; padding: 0 12px 0 10px; border-radius: 12px; background: transparent; display: flex; align-items: center; gap: 10px; text-decoration: none; transition: background 240ms ease"><span aria-hidden="true" style="position: relative; width: 26px; height: 26px; flex-shrink: 0"><span style="position: absolute; left: 0; top: 0; width: 17px; height: 17px; border-radius: 999px; background: #4A3A5E"></span><span style="position: absolute; right: 0; bottom: 0; width: 17px; height: 17px; border-radius: 999px; background: #5E4A2A; box-shadow: 0 0 0 2px #0C0B0B"></span></span><span style="flex-grow: 1; min-width: 0; font-size: 14px; font-weight: 500; line-height: 20px; color: #CFC8BE; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">Orgo study group</span></a>
+        <a href="#" data-region="slim-salsa" onClick="{{ openClub }}" aria-label="Salsa Club, unread Board post" style="height: 44px; flex-shrink: 0; box-sizing: border-box; padding: 0 12px 0 10px; border-radius: 12px; background: {{slimSalsaBg}}; display: flex; align-items: center; gap: 10px; text-decoration: none; transition: background 240ms ease"><span aria-hidden="true" style="width: 26px; height: 26px; flex-shrink: 0; border-radius: 999px; background: linear-gradient(145deg, #C23A72, #962858); box-shadow: inset 0 0 0 1px rgba(255,255,255,0.16); color: #FAF7F2; display: flex; align-items: center; justify-content: center; font-family: Fraunces, Georgia, serif; font-size: 10.5px; font-weight: 800">SC</span><span style="flex-grow: 1; min-width: 0; font-family: Fraunces, Georgia, serif; font-size: 15px; letter-spacing: -0.2px; font-variation-settings: 'SOFT' 100; font-weight: 800; line-height: 20px; color: #F6F1EA; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">Salsa Club</span><span role="img" aria-label="Unread Board post" style="width: 7px; height: 7px; flex-shrink: 0; border-radius: 999px; background: #FF5C35"></span></a>
+        <a href="#" aria-label="Jag Robotics, unread Board post" style="height: 44px; flex-shrink: 0; box-sizing: border-box; padding: 0 12px 0 10px; border-radius: 12px; background: transparent; display: flex; align-items: center; gap: 10px; text-decoration: none; transition: background 240ms ease"><span aria-hidden="true" style="width: 26px; height: 26px; flex-shrink: 0; border-radius: 999px; background: linear-gradient(145deg, #1F7580, #155158); box-shadow: inset 0 0 0 1px rgba(255,255,255,0.16); color: #FAF7F2; display: flex; align-items: center; justify-content: center; font-family: Fraunces, Georgia, serif; font-size: 10.5px; font-weight: 800">JR</span><span style="flex-grow: 1; min-width: 0; font-family: Fraunces, Georgia, serif; font-size: 15px; letter-spacing: -0.2px; font-variation-settings: 'SOFT' 100; font-weight: 800; line-height: 20px; color: #F6F1EA; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">Jag Robotics</span><span role="img" aria-label="Unread Board post" style="width: 7px; height: 7px; flex-shrink: 0; border-radius: 999px; background: #FF5C35"></span></a>
+        <a href="#" aria-label="Film Society, new in the Lounge" style="height: 44px; flex-shrink: 0; box-sizing: border-box; padding: 0 12px 0 10px; border-radius: 12px; background: transparent; display: flex; align-items: center; gap: 10px; text-decoration: none; transition: background 240ms ease"><span aria-hidden="true" style="width: 26px; height: 26px; flex-shrink: 0; border-radius: 999px; background: linear-gradient(145deg, #8A6A22, #664C14); box-shadow: inset 0 0 0 1px rgba(255,255,255,0.16); color: #FAF7F2; display: flex; align-items: center; justify-content: center; font-family: Fraunces, Georgia, serif; font-size: 10.5px; font-weight: 800">FS</span><span style="flex-grow: 1; min-width: 0; font-family: Fraunces, Georgia, serif; font-size: 15px; letter-spacing: -0.2px; font-variation-settings: 'SOFT' 100; font-weight: 700; line-height: 20px; color: #CFC8BE; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">Film Society</span><span role="img" aria-label="New in the Lounge" style="width: 7px; height: 7px; flex-shrink: 0; box-sizing: border-box; border-radius: 999px; border: 1.5px solid #9C958C"></span></a>
+      </nav>
+    </div>
+  </section>
+
+  <div data-region="stage" style="position: absolute; left: 232px; bottom: 0; width: 1007px; height: 856px; pointer-events: none">
+    <div data-region="stage-empty" aria-hidden="{{emptyHidden}}" style="position: absolute; left: 288px; bottom: 0; width: 719px; height: 824px; box-sizing: border-box; padding-bottom: 76px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; text-align: center; opacity: {{emptyOpacity}}; pointer-events: {{emptyPe}}; transition: {{emptyFade}}">
+      <h2 style="margin: 0; font-family: Fraunces, Georgia, serif; font-weight: 700; font-size: 24px; line-height: 1.2; letter-spacing: -0.5px; font-variation-settings: 'SOFT' 100; color: #F6F1EA">Pick up where you left off.</h2>
+      <p style="margin: 0; font-size: 14px; line-height: 1.45; color: #9C958C">Choose a chat or a club from your list.</p>
+    </div>
+    <div data-region="room-layer" aria-hidden="{{roomHidden}}" style="position: absolute; left: 0; top: 0; right: 0; bottom: 0; opacity: {{roomOpacity}}; pointer-events: {{roomPe}}; transition: {{roomFade}}">
+    <sc-if value="{{ showClub }}" hint-placeholder-val="{{ false }}">
+  <main data-region="room" aria-label="Salsa Club" style="position: absolute; left: 0; top: 0; right: 0; bottom: 0; display: flex; flex-direction: column; overflow: hidden">
+    <button type="button" data-region="details-scrim" tabindex="-1" aria-label="Close" aria-hidden="{{detailsHidden}}" onClick="{{ closeDetails }}" style="position: absolute; z-index: 2; left: 0; top: 0; width: 100%; height: 100%; padding: 0; border: none; background: transparent; pointer-events: {{detailsPe}}; cursor: default"></button>
+    <header data-region="room-header" style="position: relative; z-index: 3; height: 64px; flex-shrink: 0; display: flex; justify-content: center">
+      <div data-region="room-title" style="position: relative; width: 100%; max-width: 728px; box-sizing: border-box; padding: 0 24px; display: flex; align-items: center; gap: 12px">
+      <span aria-hidden="true" style="width: 40px; height: 40px; flex-shrink: 0; border-radius: 999px; background: linear-gradient(145deg, #C23A72, #962858); box-shadow: inset 0 0 0 1px rgba(255,255,255,0.16); display: flex; align-items: center; justify-content: center; font-family: Fraunces, Georgia, serif; font-weight: 800; font-size: 15.5px; color: #FAF7F2">SC</span>
+      <div style="min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 1px">
+        <h1 style="margin: 0; font-family: Fraunces, Georgia, serif; font-weight: 800; font-size: 20px; line-height: 1.1; letter-spacing: -0.4px; font-variation-settings: 'SOFT' 100"><button type="button" data-region="room-name" onClick="{{ toggleDetails }}" aria-expanded="{{detailsOpen}}" aria-controls="club-details" aria-label="Salsa Club. Show what’s next and who’s here" style="min-height: 28px; margin: 0 -8px; padding: 0 8px; border: none; border-radius: 999px; background: {{nameBg}}; color: #F6F1EA; font: inherit; letter-spacing: inherit; font-variation-settings: inherit; display: inline-flex; align-items: center; gap: 6px; cursor: pointer; transition: background 240ms ease">Salsa Club<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#9C958C" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="transform: {{chevTurn}}; transition: transform 240ms cubic-bezier(.2,.8,.2,1)"><path d="M5 9l7 7 7-7"/></svg></button></h1>
+        <div style="display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; line-height: 15px; white-space: nowrap; color: #CFC8BE">
+          <span>{{hatLine}}</span>
+        </div>
+      </div>
+      <nav data-region="chips" aria-label="Rooms in Salsa Club" style="margin-left: auto; flex-shrink: 0; display: flex; align-items: center; gap: 6px">
+        <a href="#" aria-current="page" style="height: 44px; flex-shrink: 0; display: flex; align-items: center; text-decoration: none"><span style="height: 30px; box-sizing: border-box; padding: 0 12px; border-radius: 999px; background: #F6F1EA; color: #0C0B0B; font-size: 13px; font-weight: 700; display: flex; align-items: center; justify-content: center">Lounge</span></a>
+        <a href="#" aria-label="Board, 1 unread post" style="height: 44px; flex-shrink: 0; display: flex; align-items: center; text-decoration: none"><span style="height: 30px; box-sizing: border-box; padding: 0 10px 0 12px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.12); color: #CFC8BE; font-size: 13px; font-weight: 700; display: flex; align-items: center; gap: 6px">Board<span aria-hidden="true" style="width: 7px; height: 7px; flex-shrink: 0; border-radius: 999px; background: #FF5C35"></span></span></a>
+        <sc-if value="{{ isOfficer }}" hint-placeholder-val="{{ false }}"><a href="#" aria-label="Officers, only officers see this room" style="height: 44px; flex-shrink: 0; display: flex; align-items: center; text-decoration: none"><span style="height: 30px; box-sizing: border-box; padding: 0 12px 0 10px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.12); color: #CFC8BE; font-size: 13px; font-weight: 700; display: flex; align-items: center; gap: 5px; white-space: nowrap"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2.5"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>Officers</span></a></sc-if>
+        <a href="#" aria-label="Fall Formal, event chat, live now" style="height: 44px; flex-shrink: 0; display: flex; align-items: center; text-decoration: none"><span style="height: 30px; box-sizing: border-box; padding: 0 12px 0 10px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.12); color: #CFC8BE; font-size: 13px; font-weight: 700; display: flex; align-items: center; gap: 5px; white-space: nowrap"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M8 3v4M16 3v4M3 10h18"/></svg>Fall Formal</span></a>
+      </nav>
+      <div id="club-details" data-region="details" role="group" aria-label="About Salsa Club" aria-hidden="{{detailsHidden}}" style="position: absolute; left: 24px; top: 60px; width: 364px; box-sizing: border-box; padding: 16px; border-radius: 20px; border: 1px solid rgba(255,255,255,0.10); background: #171616; box-shadow: 0 22px 48px rgba(0,0,0,0.6); display: flex; flex-direction: column; gap: 18px; opacity: {{detailsOpacity}}; transform: {{detailsShift}}; transform-origin: 40px 0; pointer-events: {{detailsPe}}; transition: opacity 240ms ease, transform 240ms cubic-bezier(.2,.8,.2,1)">
+        <section data-region="details-upnext" aria-labelledby="details-upnext-heading" style="flex-shrink: 0; display: flex; flex-direction: column; gap: 10px">
+          <h2 id="details-upnext-heading" style="margin: 0; font-family: Fraunces, Georgia, serif; font-weight: 700; font-size: 16px; line-height: 18px; letter-spacing: -0.2px; font-variation-settings: 'SOFT' 100">Up next</h2>
+          <div style="box-sizing: border-box; padding: 12px 12px 10px; border-radius: 18px; border: none; background: rgba(255,255,255,0.05); display: flex; flex-direction: column">
+            <div style="display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; line-height: 15px; color: #FF8A66; white-space: nowrap"><span aria-hidden="true" style="width: 7px; height: 7px; flex-shrink: 0; border-radius: 999px; background: #FF5C35"></span>Live now<span style="margin-left: auto; font-weight: 600; color: #CFC8BE">18 going</span></div>
+            <div style="margin-top: 7px; font-family: Fraunces, Georgia, serif; font-weight: 700; font-size: 19px; line-height: 22px; letter-spacing: -0.3px; font-variation-settings: 'SOFT' 100">Fall Formal</div>
+            <div style="margin-top: 2px; font-size: 12.5px; font-weight: 500; line-height: 17px; color: #CFC8BE">Campus Center 450 · Tonight 7:30 PM</div>
+            <div style="margin-top: 10px; display: flex; align-items: center; gap: 8px">
+              <button type="button" aria-label="You’re going. Change your RSVP" style="height: 34px; box-sizing: border-box; padding: 0 12px 0 8px; border-radius: 999px; border: 1px solid rgba(255,92,53,0.50); background: rgba(255,92,53,0.16); color: #F6F1EA; font-family: inherit; font-size: 13px; font-weight: 700; display: inline-flex; align-items: center; gap: 6px; cursor: pointer"><span aria-hidden="true" style="width: 18px; height: 18px; flex-shrink: 0; border-radius: 999px; background: #FF5C35; color: #140806; display: flex; align-items: center; justify-content: center"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span>Going</button>
+              <a href="#" style="margin: 0 -6px 0 auto; min-height: 28px; padding: 0 6px; display: inline-flex; align-items: center; gap: 3px; font-size: 13px; font-weight: 700; color: #FF8A66; text-decoration: none; white-space: nowrap">Open event chat<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg></a>
+            </div>
+          </div>
+          <a href="#" aria-label="Open Practice event chat, Tuesday 7 PM, you said maybe" style="height: 52px; box-sizing: border-box; padding: 8px 12px; border-radius: 18px; border: none; background: rgba(255,255,255,0.05); display: flex; flex-direction: column; justify-content: space-between; text-decoration: none; color: #F6F1EA">
+            <span style="display: flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 600; line-height: 15px; color: #CFC8BE; white-space: nowrap">Tue 7 PM<span aria-hidden="true" style="color: #9C958C">·</span><span style="display: inline-flex; align-items: center; gap: 4px; font-weight: 700; color: #CFC8BE"><span aria-hidden="true" style="width: 6px; height: 6px; border-radius: 999px; background: #9C958C"></span>Maybe</span></span>
+            <span style="font-family: Fraunces, Georgia, serif; font-weight: 700; font-size: 15.5px; line-height: 17px; letter-spacing: -0.2px; font-variation-settings: 'SOFT' 100; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">Open Practice</span>
+          </a>
+        </section>
+
+        <section data-region="details-members" aria-labelledby="details-members-heading" style="flex-shrink: 0; display: flex; flex-direction: column; gap: 6px">
+          <div style="min-height: 28px; display: flex; align-items: center; gap: 7px">
+            <h2 id="details-members-heading" style="margin: 0; font-family: Fraunces, Georgia, serif; font-weight: 700; font-size: 16px; line-height: 18px; letter-spacing: -0.2px; font-variation-settings: 'SOFT' 100">Members</h2>
+            <span style="margin-right: auto; font-size: 12.5px; font-weight: 600; line-height: 18px; color: #9C958C">48</span>
+            <a href="#" aria-label="See all 48 members on Salsa Club’s page" style="min-height: 28px; margin: 0 -6px; padding: 0 6px; display: inline-flex; align-items: center; font-size: 12.5px; font-weight: 700; color: #FF8A66; text-decoration: none; white-space: nowrap">See all</a>
+          </div>
+          <div role="img" aria-label="Maya R., Devin O., Jonah K., Priya S., Sam T. and 43 more" style="height: 28px; display: flex; align-items: center">
+            <span style="width: 28px; height: 28px; flex-shrink: 0; border-radius: 999px; background: #5A3A2E; color: #FFD3C2; box-shadow: 0 0 0 2px #171616; display: flex; align-items: center; justify-content: center; font-size: 9.5px; font-weight: 700">MR</span>
+            <span style="width: 28px; height: 28px; flex-shrink: 0; margin-left: -5px; border-radius: 999px; background: #2E4A5A; color: #CFE6F2; box-shadow: 0 0 0 2px #171616; display: flex; align-items: center; justify-content: center; font-size: 9.5px; font-weight: 700">DO</span>
+            <span style="width: 28px; height: 28px; flex-shrink: 0; margin-left: -5px; border-radius: 999px; background: #5E4A2A; color: #F5E1B8; box-shadow: 0 0 0 2px #171616; display: flex; align-items: center; justify-content: center; font-size: 9.5px; font-weight: 700">JK</span>
+            <span style="width: 28px; height: 28px; flex-shrink: 0; margin-left: -5px; border-radius: 999px; background: #4A3A5E; color: #E6D8F5; box-shadow: 0 0 0 2px #171616; display: flex; align-items: center; justify-content: center; font-size: 9.5px; font-weight: 700">PS</span>
+            <span style="width: 28px; height: 28px; flex-shrink: 0; margin-left: -5px; border-radius: 999px; background: #2A4550; color: #CFE6F2; box-shadow: 0 0 0 2px #171616; display: flex; align-items: center; justify-content: center; font-size: 9.5px; font-weight: 700">ST</span>
+          </div>
+        </section>
+        <sc-if value="{{ isOfficer }}" hint-placeholder-val="{{ false }}">
+          <button type="button" data-region="details-manage" style="width: 100%; height: 40px; flex-shrink: 0; box-sizing: border-box; padding: 0 16px; border-radius: 999px; border: none; background: rgba(255,255,255,0.09); color: #F6F1EA; font-family: inherit; font-size: 13.5px; font-weight: 700; line-height: 18px; display: flex; align-items: center; justify-content: center; gap: 8px; cursor: pointer"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#CFC8BE" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink: 0"><path d="M4 7h9M19 7h1M4 17h1M11 17h9"/><circle cx="16" cy="7" r="3"/><circle cx="8" cy="17" r="3"/></svg>Manage club</button>
+        </sc-if>
+      </div>
+      </div>
+    </header>
+
+      <div data-region="room-body" style="flex-grow: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; align-items: center; opacity: {{bodyOpacity}}; transition: opacity 240ms ease">
+        <div data-region="board-strip" style="width: 100%; max-width: 728px; flex-shrink: 0; box-sizing: border-box; padding: 2px 24px 0">
+          <a href="#" aria-label="Latest from the Board, unread. Maya R.: Formal tonight: doors at 7:30. Open the Board" style="height: 44px; box-sizing: border-box; padding: 0 10px 0 12px; border-radius: 16px; border: 1px solid rgba(255,255,255,0.08); background: #161515; box-shadow: inset 0 1px 0 rgba(255,255,255,0.04); display: flex; align-items: center; gap: 8px; text-decoration: none; color: #F6F1EA">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#CFC8BE" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink: 0"><path d="M3 10.5v3a1 1 0 0 0 1 1h2.5L12 19V5L6.5 9.5H4a1 1 0 0 0-1 1z"/><path d="M16 9a4.5 4.5 0 0 1 0 6"/><path d="M18.5 6.5a8 8 0 0 1 0 11"/></svg>
+            <span style="flex-grow: 1; min-width: 0; font-size: 12.5px; font-weight: 600; line-height: 16px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #CFC8BE"><span style="font-weight: 800; color: #F6F1EA">Board</span> · Maya R. · <span style="color: #F6F1EA">Formal tonight: doors at 7:30</span></span>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#9C958C" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink: 0"><path d="M9 5l7 7-7 7"/></svg>
+          </a>
+        </div>
+
+        <section data-region="thread" aria-label="Lounge messages" style="width: 100%; max-width: 728px; flex-grow: 1; min-height: 0; position: relative; overflow: hidden; box-sizing: border-box; padding: 8px 24px 10px; display: flex; flex-direction: column; justify-content: flex-end; gap: 8px">
+          <div aria-hidden="true" style="position: absolute; z-index: 2; top: 0; left: 0; right: 0; height: 14px; pointer-events: none; background: linear-gradient(180deg, #0C0B0B 0%, rgba(12,11,11,0) 100%)"></div>
+
+          <div style="align-self: center; flex-shrink: 0; font-size: 11px; font-weight: 600; line-height: 14px; color: #9C958C">Monday</div>
+
+          <div data-region="msg-poll" style="flex-shrink: 0; display: flex; align-items: flex-end; gap: 8px">
+            <span aria-hidden="true" style="width: 28px; height: 28px; flex-shrink: 0; border-radius: 999px; background: #2E4A5A; color: #CFE6F2; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 700">DO</span>
+            <div role="group" aria-label="Poll from Devin O.: Theme for fall formal? 12 voted, names shown" style="width: 292px; box-sizing: border-box; padding: 10px 12px 9px; border-radius: 18px 18px 18px 6px; border: 1px solid rgba(255,255,255,0.08); background: #161515">
+              <div style="display: flex; align-items: center; gap: 6px; font-size: 11.5px; font-weight: 600; line-height: 15px; color: #9C958C; white-space: nowrap"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#CFC8BE" stroke-width="2.6" stroke-linecap="round" aria-hidden="true"><path d="M6 20V11M12 20V5M18 20v-6"/></svg><span><span style="font-weight: 700; color: #CFC8BE">Devin O.</span> · Poll</span></div>
+              <div style="margin-top: 4px; font-size: 15px; font-weight: 700; line-height: 1.3">Theme for fall formal?</div>
+              <div style="margin-top: 2px; display: flex; flex-direction: column">
+                <button type="button" aria-pressed="true" aria-label="Havana Nights, your pick. 7 votes, including Maya R. and Priya S." style="width: 100%; height: 44px; padding: 4px 0; border: none; background: transparent; color: #F6F1EA; font-family: inherit; text-align: left; cursor: pointer; display: block">
+                  <span style="position: relative; height: 36px; box-sizing: border-box; padding: 0 10px; border-radius: 12px; overflow: hidden; border: 1px solid rgba(255,92,53,0.50); background: rgba(255,255,255,0.04); display: flex; align-items: center; gap: 7px">
+                    <span aria-hidden="true" style="position: absolute; left: 0; top: 0; bottom: 0; width: 58%; background: rgba(255,92,53,0.24)"></span>
+                    <span aria-hidden="true" style="position: relative; width: 18px; height: 18px; flex-shrink: 0; border-radius: 999px; background: #FF5C35; color: #140806; display: flex; align-items: center; justify-content: center"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span>
+                    <span style="position: relative; min-width: 0; display: flex; flex-direction: column; align-items: flex-start"><span style="font-size: 14px; font-weight: 700; line-height: 16px; white-space: nowrap">Havana Nights</span><span style="font-size: 10.5px; font-weight: 700; line-height: 12px; color: #FF8A66; white-space: nowrap">Your pick</span></span>
+                    <span aria-hidden="true" style="position: relative; margin-left: auto; display: flex; gap: 3px">
+                      <span style="width: 20px; height: 20px; border-radius: 999px; background: #5A3A2E; color: #FFD3C2; display: flex; align-items: center; justify-content: center; font-size: 8px; font-weight: 700">MR</span>
+                      <span style="width: 20px; height: 20px; border-radius: 999px; background: #4A3A5E; color: #E6D8F5; display: flex; align-items: center; justify-content: center; font-size: 8px; font-weight: 700">PS</span>
+                    </span>
+                    <span style="position: relative; min-width: 10px; text-align: right; font-size: 13px; font-weight: 800; color: #FF8A66">7</span>
+                  </span>
+                </button>
+                <button type="button" aria-pressed="false" aria-label="Masquerade. 3 votes, including Devin O. and Sam T." style="width: 100%; height: 44px; padding: 4px 0; border: none; background: transparent; color: #F6F1EA; font-family: inherit; text-align: left; cursor: pointer; display: block">
+                  <span style="position: relative; height: 36px; box-sizing: border-box; padding: 0 10px; border-radius: 12px; overflow: hidden; border: 1px solid rgba(255,255,255,0.10); background: rgba(255,255,255,0.04); display: flex; align-items: center; gap: 7px">
+                    <span aria-hidden="true" style="position: absolute; left: 0; top: 0; bottom: 0; width: 25%; background: rgba(255,255,255,0.07)"></span>
+                    <span aria-hidden="true" style="position: relative; width: 18px; height: 18px; flex-shrink: 0; box-sizing: border-box; border-radius: 999px; border: 2px solid #6E6862"></span>
+                    <span style="position: relative; font-size: 14px; font-weight: 700; white-space: nowrap">Masquerade</span>
+                    <span aria-hidden="true" style="position: relative; margin-left: auto; display: flex; gap: 3px">
+                      <span style="width: 20px; height: 20px; border-radius: 999px; background: #2E4A5A; color: #CFE6F2; display: flex; align-items: center; justify-content: center; font-size: 8px; font-weight: 700">DO</span>
+                      <span style="width: 20px; height: 20px; border-radius: 999px; background: #2A4550; color: #CFE6F2; display: flex; align-items: center; justify-content: center; font-size: 8px; font-weight: 700">ST</span>
+                    </span>
+                    <span style="position: relative; min-width: 10px; text-align: right; font-size: 13px; font-weight: 800; color: #CFC8BE">3</span>
+                  </span>
+                </button>
+                <button type="button" aria-pressed="false" aria-label="Old Hollywood. 2 votes: Jonah K. and Ava L." style="width: 100%; height: 44px; padding: 4px 0; border: none; background: transparent; color: #F6F1EA; font-family: inherit; text-align: left; cursor: pointer; display: block">
+                  <span style="position: relative; height: 36px; box-sizing: border-box; padding: 0 10px; border-radius: 12px; overflow: hidden; border: 1px solid rgba(255,255,255,0.10); background: rgba(255,255,255,0.04); display: flex; align-items: center; gap: 7px">
+                    <span aria-hidden="true" style="position: absolute; left: 0; top: 0; bottom: 0; width: 17%; background: rgba(255,255,255,0.07)"></span>
+                    <span aria-hidden="true" style="position: relative; width: 18px; height: 18px; flex-shrink: 0; box-sizing: border-box; border-radius: 999px; border: 2px solid #6E6862"></span>
+                    <span style="position: relative; font-size: 14px; font-weight: 700; white-space: nowrap">Old Hollywood</span>
+                    <span aria-hidden="true" style="position: relative; margin-left: auto; display: flex; gap: 3px">
+                      <span style="width: 20px; height: 20px; border-radius: 999px; background: #5E4A2A; color: #F5E1B8; display: flex; align-items: center; justify-content: center; font-size: 8px; font-weight: 700">JK</span>
+                      <span style="width: 20px; height: 20px; border-radius: 999px; background: #2F4A3A; color: #CDEBD9; display: flex; align-items: center; justify-content: center; font-size: 8px; font-weight: 700">AL</span>
+                    </span>
+                    <span style="position: relative; min-width: 10px; text-align: right; font-size: 13px; font-weight: 800; color: #CFC8BE">2</span>
+                  </span>
+                </button>
+              </div>
+              <div style="margin-top: 4px; display: flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 600; line-height: 16px; color: #9C958C"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="2.8"/></svg>12 voted · names shown</div>
+            </div>
+          </div>
+
+          <div style="flex-shrink: 0; display: flex; align-items: flex-end; gap: 8px">
+            <span aria-hidden="true" style="width: 28px; height: 28px; flex-shrink: 0; border-radius: 999px; background: #4A3A5E; color: #E6D8F5; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 700">PS</span>
+            <div style="max-width: 320px; box-sizing: border-box; padding: 7px 12px 8px; border-radius: 18px 18px 18px 6px; border: 1px solid rgba(255,255,255,0.06); background: #161515; font-size: 14.5px; line-height: 1.35"><div style="font-size: 11.5px; font-weight: 700; color: #9C958C">Priya S.</div>Havana Nights. Obviously.</div>
+          </div>
+
+          <div style="align-self: center; flex-shrink: 0; padding-top: 4px; font-size: 11px; font-weight: 600; line-height: 14px; color: #9C958C">Today</div>
+
+          <div style="flex-shrink: 0; display: flex; align-items: flex-end; gap: 8px">
+            <span aria-hidden="true" style="width: 28px; height: 28px; flex-shrink: 0; border-radius: 999px; background: #2A4550; color: #CFE6F2; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 700">ST</span>
+            <div style="max-width: 320px; box-sizing: border-box; padding: 7px 12px 8px; border-radius: 18px 18px 18px 6px; border: 1px solid rgba(255,255,255,0.06); background: #161515; font-size: 14.5px; line-height: 1.35"><div style="font-size: 11.5px; font-weight: 700; color: #9C958C">Sam T.</div>Anyone walking over from Hine Hall?</div>
+          </div>
+
+          <div style="flex-shrink: 0; display: flex; align-items: flex-end; gap: 8px">
+            <span aria-hidden="true" style="width: 28px; height: 28px; flex-shrink: 0; border-radius: 999px; background: #2F4A3A; color: #CDEBD9; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 700">AL</span>
+            <div style="max-width: 320px; box-sizing: border-box; padding: 7px 12px 8px; border-radius: 18px 18px 18px 6px; border: 1px solid rgba(255,255,255,0.06); background: #161515; font-size: 14.5px; line-height: 1.35"><div style="font-size: 11.5px; font-weight: 700; color: #9C958C">Ava L.</div>Me. Wait for me by the doors.</div>
+          </div>
+
+          <div style="flex-shrink: 0; display: flex; align-items: flex-end; gap: 8px">
+            <span aria-hidden="true" style="width: 28px; height: 28px; flex-shrink: 0; border-radius: 999px; background: #5E4A2A; color: #F5E1B8; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 700">JK</span>
+            <div style="max-width: 320px; box-sizing: border-box; padding: 7px 12px 8px; border-radius: 18px 18px 18px 6px; border: 1px solid rgba(255,255,255,0.06); background: #161515; font-size: 14.5px; line-height: 1.35"><div style="font-size: 11.5px; font-weight: 700; color: #9C958C">Jonah K.</div>Coat check is by the stairs, and it’s free.</div>
+          </div>
+
+          <div style="flex-shrink: 0; display: flex; align-items: flex-end; gap: 8px">
+            <span aria-hidden="true" style="width: 28px; height: 28px; flex-shrink: 0; border-radius: 999px; background: #2E4A5A; color: #CFE6F2; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 700">DO</span>
+            <div style="max-width: 320px; box-sizing: border-box; padding: 7px 12px 8px; border-radius: 18px 18px 18px 6px; border: 1px solid rgba(255,255,255,0.06); background: #161515; font-size: 14.5px; line-height: 1.35"><div style="font-size: 11.5px; font-weight: 700; color: #9C958C">Devin O.</div>Running late. Somebody save me a spot in the rueda circle.</div>
+          </div>
+
+          <div data-region="msg-mine" style="flex-shrink: 0; align-self: flex-end; max-width: 320px; box-sizing: border-box; padding: 8px 13px 9px; border-radius: 18px 18px 6px 18px; border: 1px solid rgba(255,92,53,0.32); background: linear-gradient(180deg, rgba(255,92,53,0.30) 0%, rgba(255,92,53,0.14) 100%), #161515; box-shadow: 0 6px 18px rgba(255,92,53,0.12); font-size: 14.5px; line-height: 1.35">Got you, Devin. Front left, by the speakers.</div>
+        </section>
+
+        <footer data-region="composer" style="width: 100%; max-width: 728px; flex-shrink: 0; box-sizing: border-box; padding: 6px 24px 18px; display: flex; align-items: center; gap: 8px">
+          <button type="button" aria-haspopup="menu" aria-label="Add a poll, sign-up or event" style="width: 44px; height: 44px; flex-shrink: 0; padding: 0; border-radius: 999px; box-sizing: border-box; border: 1px solid rgba(255,255,255,0.10); background: #161515; color: #F6F1EA; display: flex; align-items: center; justify-content: center; cursor: pointer"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button>
+          <label style="flex-grow: 1; min-width: 0; height: 44px; box-sizing: border-box; padding: 0 16px; display: flex; align-items: center; border-radius: 999px; border: 1px solid rgba(255,255,255,0.10); background: #161515">
+            <input type="text" aria-label="Message the Lounge" placeholder="Message the Lounge" style="flex-grow: 1; min-width: 0; height: 40px; padding: 0; border: none; outline: none; background: transparent; color: #F6F1EA; font-family: inherit; font-size: 15px" />
+          </label>
+          <button type="button" aria-label="Send" style="width: 44px; height: 44px; flex-shrink: 0; padding: 0; border-radius: 999px; border: 1px solid rgba(255,255,255,0.10); background: #161515; color: #9C958C; display: flex; align-items: center; justify-content: center; cursor: pointer"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5M6 11l6-6 6 6"/></svg></button>
+        </footer>
+      </div>
+  </main>
+    </sc-if>
+    <sc-if value="{{ showDm }}" hint-placeholder-val="{{ false }}">
+  <main data-region="room-dm" aria-label="Direct message with Maya R." style="position: absolute; left: 0; top: 0; right: 0; bottom: 0; display: flex; flex-direction: column; overflow: hidden">
+    <header data-region="room-header" style="height: 64px; flex-shrink: 0; display: flex; justify-content: center">
+      <div data-region="room-title" style="width: 100%; max-width: 728px; box-sizing: border-box; padding: 0 24px; display: flex; align-items: center; gap: 12px">
+      <span aria-hidden="true" style="width: 38px; height: 38px; flex-shrink: 0; border-radius: 12px; background: #5A3A2E; display: flex; align-items: center; justify-content: center; font-family: Fraunces, Georgia, serif; font-weight: 700; font-size: 13px; color: #FFD3C2">MR</span>
+      <div style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px">
+        <h1 style="margin: 0; font-size: 15px; font-weight: 700; line-height: 20px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">Maya R.</h1>
+        <div style="font-size: 12px; font-weight: 500; line-height: 15px; white-space: nowrap; color: #9C958C">IU Indianapolis</div>
+      </div>
+      <button type="button" aria-label="Open Maya R.’s profile" style="width: 32px; height: 32px; flex-shrink: 0; box-sizing: border-box; padding: 0; border-radius: 9px; border: 1px solid rgba(255,255,255,0.10); background: #161515; color: #CFC8BE; display: flex; align-items: center; justify-content: center; cursor: pointer"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8.5" r="4"/><path d="M4 20.5c0-4 3.6-6.5 8-6.5s8 2.5 8 6.5"/></svg></button>
+      <button type="button" aria-haspopup="dialog" aria-label="Chat info" style="width: 32px; height: 32px; flex-shrink: 0; box-sizing: border-box; padding: 0; border-radius: 9px; border: 1px solid rgba(255,255,255,0.10); background: #161515; color: #CFC8BE; display: flex; align-items: center; justify-content: center; cursor: pointer"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" aria-hidden="true"><path d="M12 5h.01M12 12h.01M12 19h.01"/></svg></button>
+      </div>
+    </header>
+
+      <div data-region="room-body" style="flex-grow: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; align-items: center">
+        <section data-region="thread" aria-label="Messages with Maya R." style="width: 100%; max-width: 728px; flex-grow: 1; min-height: 0; position: relative; overflow: hidden; box-sizing: border-box; padding: 8px 24px 8px; display: flex; flex-direction: column; justify-content: flex-end">
+          <div aria-hidden="true" style="position: absolute; z-index: 2; top: 0; left: 0; right: 0; height: 14px; pointer-events: none; background: linear-gradient(180deg, #0C0B0B 0%, rgba(12,11,11,0) 100%)"></div>
+
+          <div style="align-self: center; flex-shrink: 0; font-size: 11px; font-weight: 500; line-height: 14px; letter-spacing: 0.2px; color: #9C958C"><span style="font-weight: 700">Yesterday</span> 9:20 PM</div>
+
+          <div style="flex-shrink: 0; margin-top: 12px; display: flex; align-items: flex-end; gap: 7px">
+            <span aria-hidden="true" style="width: 26px; height: 26px; flex-shrink: 0; border-radius: 999px; background: #5A3A2E; color: #FFD3C2; display: flex; align-items: center; justify-content: center; font-size: 9.5px; font-weight: 700">MR</span>
+            <div style="max-width: 340px; box-sizing: border-box; padding: 10px 15px; border-radius: 18px 18px 18px 4px; border: 1px solid rgba(255,255,255,0.08); background: #161515; box-shadow: inset 0 1px 0 rgba(255,255,255,0.05); font-size: 15px; line-height: 1.45">can you help carry the speakers tomorrow?</div>
+          </div>
+
+          <div data-region="msg-mine" style="flex-shrink: 0; margin-top: 26px; align-self: flex-end; max-width: 340px; box-sizing: border-box; padding: 10px 15px; border-radius: 18px 18px 4px 18px; border: 1px solid rgba(255,92,53,0.32); background: linear-gradient(180deg, rgba(255,92,53,0.30) 0%, rgba(255,92,53,0.14) 100%), #161515; font-size: 15px; line-height: 1.45">yeah of course, what time</div>
+
+          <div style="align-self: center; flex-shrink: 0; margin-top: 26px; font-size: 11px; font-weight: 500; line-height: 14px; letter-spacing: 0.2px; color: #9C958C"><span style="font-weight: 700">Today</span> 5:12 PM</div>
+
+          <div style="flex-shrink: 0; margin-top: 12px; display: flex; align-items: flex-end; gap: 7px">
+            <span aria-hidden="true" style="width: 26px; height: 26px; flex-shrink: 0; border-radius: 999px; background: #5A3A2E; color: #FFD3C2; display: flex; align-items: center; justify-content: center; font-size: 9.5px; font-weight: 700">MR</span>
+            <div style="max-width: 340px; box-sizing: border-box; padding: 10px 15px; border-radius: 18px 18px 18px 4px; border: 1px solid rgba(255,255,255,0.08); background: #161515; box-shadow: inset 0 1px 0 rgba(255,255,255,0.05); font-size: 15px; line-height: 1.45">loading dock at 5:30?</div>
+          </div>
+
+          <div style="flex-shrink: 0; margin-top: 26px; align-self: flex-end; max-width: 340px; box-sizing: border-box; padding: 10px 15px; border-radius: 18px 18px 4px 18px; border: 1px solid rgba(255,92,53,0.32); background: linear-gradient(180deg, rgba(255,92,53,0.30) 0%, rgba(255,92,53,0.14) 100%), #161515; font-size: 15px; line-height: 1.45">on my way</div>
+
+          <div style="flex-shrink: 0; margin-top: 26px; display: flex; align-items: flex-end; gap: 7px">
+            <span aria-hidden="true" style="width: 26px; height: 26px; flex-shrink: 0; border-radius: 999px; background: #5A3A2E; color: #FFD3C2; display: flex; align-items: center; justify-content: center; font-size: 9.5px; font-weight: 700">MR</span>
+            <div style="max-width: 340px; box-sizing: border-box; padding: 10px 15px; border-radius: 18px 18px 18px 4px; border: 1px solid rgba(255,255,255,0.08); background: #161515; box-shadow: inset 0 1px 0 rgba(255,255,255,0.05); font-size: 15px; line-height: 1.45">you’re the best. see you at 7:30</div>
+          </div>
+
+          <div style="align-self: center; flex-shrink: 0; margin-top: 26px; font-size: 11px; font-weight: 500; line-height: 14px; letter-spacing: 0.2px; color: #9C958C"><span style="font-weight: 700">Today</span> 8:41 PM</div>
+
+          <div style="flex-shrink: 0; margin-top: 12px; display: flex; align-items: flex-end; gap: 7px">
+            <span aria-hidden="true" style="width: 26px; height: 26px; flex-shrink: 0"></span>
+            <div style="max-width: 340px; box-sizing: border-box; padding: 10px 15px; border-radius: 18px 18px 18px 4px; border: 1px solid rgba(255,255,255,0.08); background: #161515; box-shadow: inset 0 1px 0 rgba(255,255,255,0.05); font-size: 15px; line-height: 1.45">we’re inside, come find me</div>
+          </div>
+
+          <div style="flex-shrink: 0; margin-top: 8px; display: flex; align-items: flex-end; gap: 7px">
+            <span aria-hidden="true" style="width: 26px; height: 26px; flex-shrink: 0; border-radius: 999px; background: #5A3A2E; color: #FFD3C2; display: flex; align-items: center; justify-content: center; font-size: 9.5px; font-weight: 700">MR</span>
+            <div style="max-width: 340px; box-sizing: border-box; padding: 10px 15px; border-radius: 18px 18px 18px 4px; border: 1px solid rgba(255,255,255,0.08); background: #161515; box-shadow: inset 0 1px 0 rgba(255,255,255,0.05); font-size: 15px; line-height: 1.45">ok I’m by the photo booth, where are you</div>
+          </div>
+
+          <div style="flex-shrink: 0; margin-top: 26px; align-self: flex-end; max-width: 340px; box-sizing: border-box; padding: 10px 15px; border-radius: 18px 18px 4px 18px; border: 1px solid rgba(255,92,53,0.32); background: linear-gradient(180deg, rgba(255,92,53,0.30) 0%, rgba(255,92,53,0.14) 100%), #161515; box-shadow: 0 6px 18px rgba(255,92,53,0.12); font-size: 15px; line-height: 1.45">just got my wristband, two minutes</div>
+
+          <div data-region="msg-read" style="flex-shrink: 0; margin-top: 5px; align-self: flex-end; padding-right: 2px; font-size: 11px; font-weight: 700; line-height: 14px; letter-spacing: 0.02em; color: #FF8A66">Read</div>
+
+          <div data-region="msg-typing" role="status" aria-label="Maya R. is typing" style="flex-shrink: 0; margin-top: 12px; display: flex; align-items: flex-end; gap: 7px">
+            <span aria-hidden="true" style="width: 26px; height: 26px; flex-shrink: 0; border-radius: 999px; background: #5A3A2E; color: #FFD3C2; display: flex; align-items: center; justify-content: center; font-size: 9.5px; font-weight: 700">MR</span>
+            <div aria-hidden="true" style="height: 40px; box-sizing: border-box; padding: 0 16px; border-radius: 18px 18px 18px 4px; border: 1px solid rgba(255,255,255,0.08); background: #161515; box-shadow: inset 0 1px 0 rgba(255,255,255,0.05); display: flex; align-items: center; gap: 5px">
+              <span style="width: 7px; height: 7px; border-radius: 999px; background: #CFC8BE; opacity: 0.45"></span>
+              <span style="width: 7px; height: 7px; border-radius: 999px; background: #CFC8BE; opacity: 0.7"></span>
+              <span style="width: 7px; height: 7px; border-radius: 999px; background: #CFC8BE"></span>
+            </div>
+          </div>
+        </section>
+
+        <footer data-region="composer" style="width: 100%; max-width: 728px; flex-shrink: 0; box-sizing: border-box; padding: 6px 24px 18px; display: flex; align-items: center">
+          <div style="flex-grow: 1; min-width: 0; height: 44px; box-sizing: border-box; padding: 0 6px 0 5px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.10); background: #161515; display: flex; align-items: center; gap: 4px">
+            <button type="button" aria-label="Attach photo or video" style="width: 34px; height: 34px; flex-shrink: 0; padding: 0; border: none; border-radius: 999px; background: transparent; color: #CFC8BE; display: flex; align-items: center; justify-content: center; cursor: pointer"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 11.5l-8.2 8.2a5 5 0 0 1-7.1-7.1l8.5-8.5a3.4 3.4 0 0 1 4.8 4.8l-8.4 8.4a1.7 1.7 0 0 1-2.4-2.4l7.6-7.6"/></svg></button>
+            <label style="flex-grow: 1; min-width: 0; height: 40px; display: flex; align-items: center">
+              <input type="text" aria-label="Message Maya" placeholder="Message…" style="flex-grow: 1; min-width: 0; height: 40px; padding: 0 4px; border: none; outline: none; background: transparent; color: #F6F1EA; font-family: inherit; font-size: 15px" />
+            </label>
+            <button type="button" aria-label="Send" aria-disabled="true" style="width: 32px; height: 32px; flex-shrink: 0; padding: 0; border: none; border-radius: 999px; background: rgba(255,255,255,0.10); color: #CFC8BE; display: flex; align-items: center; justify-content: center; cursor: default"><svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" aria-hidden="true"><path d="M20.5 3.5L3.5 10.2l6.6 2.6 2.7 6.7z"/></svg></button>
+          </div>
+        </footer>
+      </div>
+  </main>
+    </sc-if>
+    </div>
+  </div>
+  </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"start":{"editor":"enum","options":["home","club","dm"],"default":"home","section":"State"},"officer":{"editor":"boolean","default":false,"section":"State"},"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const st = this.state || {};
+    const view = st.view || this.props.start || 'home';
+    const open = view !== 'home';
+    const shown = open ? view : (st.last || 'club');
+    const details = !!st.details && view === 'club';
+    const officer = !!this.props.officer;
+    const seenDm = !!st.seenDm || view === 'dm';
+    const stop = (e) => { if (e && e.preventDefault) e.preventDefault(); };
+    const on = 'rgba(255,255,255,0.07)';
+    const ease = 'cubic-bezier(.2,.8,.2,1)';
+    const op = (yes) => (yes ? '1' : '0');
+    const pe = (yes) => (yes ? 'auto' : 'none');
+    const vis = (yes) => (yes ? 'visible' : 'hidden');
+    const fade = (yes) => (yes ? 'opacity 240ms ease 80ms, visibility 0s' : 'opacity 140ms ease, visibility 0s linear 140ms');
+    return {
+      isHome: !open, isClub: view === 'club', isDm: view === 'dm', isOfficer: officer,
+      showClub: shown === 'club', showDm: shown === 'dm',
+      hatLine: officer ? 'Your hat: Officer' : 'Your hat: Member',
+      weekH: open ? '44px' : '76px',
+      weekFullO: op(!open), weekFullV: vis(!open), weekFullPe: pe(!open), weekFullHidden: open, weekFullTr: fade(!open),
+      weekSlimO: op(open), weekSlimV: vis(open), weekSlimPe: pe(open), weekSlimHidden: !open, weekSlimTr: fade(open),
+      wideOpacity: op(!open), widePe: pe(!open), wideHidden: open,
+      wideClip: open ? 'inset(0px 288px 0px 0px)' : 'inset(0px 0px 0px 0px)',
+      wideFade: open ? 'opacity 150ms ease, clip-path 320ms ' + ease : 'opacity 240ms ease 120ms, clip-path 320ms ' + ease,
+      slimOpacity: op(open), slimPe: pe(open), slimHidden: !open,
+      slimFade: open ? 'opacity 220ms ease 150ms' : 'opacity 120ms ease',
+      emptyOpacity: op(!open), emptyPe: pe(!open), emptyHidden: open,
+      emptyFade: open ? 'opacity 140ms ease' : 'opacity 240ms ease 120ms',
+      roomOpacity: op(open), roomPe: pe(open), roomHidden: !open,
+      roomFade: open ? 'opacity 260ms ease 120ms' : 'opacity 140ms ease',
+      slimSalsaBg: view === 'club' ? on : 'transparent',
+      slimMayaBg: view === 'dm' ? on : 'transparent', slimMayaInk: (view === 'dm' || !seenDm) ? '#F6F1EA' : '#CFC8BE',
+      slimMayaDot: seenDm ? '0' : '1',
+      mayaUnread: !seenDm, mayaRead: seenDm,
+      detailsOpen: details, detailsHidden: !details,
+      detailsOpacity: op(details), detailsPe: pe(details),
+      detailsShift: details ? 'translateY(0px) scale(1)' : 'translateY(-6px) scale(0.98)',
+      chevTurn: details ? 'rotate(180deg)' : 'rotate(0deg)',
+      nameBg: details ? on : 'transparent',
+      bodyOpacity: details ? '0.5' : '1',
+      openClub: (e) => { stop(e); this.setState({ view: 'club', last: 'club', details: false }); },
+      openDm: (e) => { stop(e); this.setState({ view: 'dm', last: 'dm', details: false, seenDm: true }); },
+      goHome: (e) => { stop(e); this.setState({ view: 'home', details: false }); },
+      toggleDetails: (e) => { stop(e); this.setState({ details: !details }); },
+      closeDetails: (e) => { stop(e); if (details) this.setState({ details: false }); },
+    };
+  }
+}
+</script>
+</body>
+</html>
