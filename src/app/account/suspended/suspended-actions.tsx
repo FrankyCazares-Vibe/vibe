@@ -32,12 +32,16 @@ export const SUPPORT_EMAIL = "help@connectvibe.app";
 const DELETE_WORD = "delete";
 
 /**
- * Where a deleted account lands: sign-up, so somebody who deleted to start
- * over can, rather than the marketing landing page. Exported so Settings'
- * delete — the path App Review walks, and the one /legal/delete-account
- * describes — lands in the same place and the two can't drift apart.
+ * Where a deleted account lands: the front page. Not sign-up any more: while
+ * Vibe opens in waves a new account needs an access code, so sign-up would
+ * greet somebody who just left with a form asking for one. The front page
+ * is the way back in either way (sign-up when it is open, the waitlist when
+ * it isn't). In the store apps `/` goes on to /campus, which sends a
+ * signed-out student to log in. Exported so Settings' delete — the path App
+ * Review walks, and the one /legal/delete-account describes — lands in the
+ * same place and the two can't drift apart.
  */
-export const AFTER_DELETE = "/auth/signup";
+export const AFTER_DELETE = "/";
 
 /**
  * leaveDeviceClean behind our own guard. It promises never to throw and to be

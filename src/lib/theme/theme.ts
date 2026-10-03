@@ -125,10 +125,11 @@ export function applyTheme(pref: ThemePref): ResolvedTheme {
   return theme;
 }
 
-/** Pages that are always Night, whatever the theme: the landing (S72). Their
- *  browser chrome stays dark too, or a Light student's iPhone bars go cream
- *  around a black page. src/app/page.tsx sets the same colour in its viewport. */
-export const NIGHT_ONLY_PATHS: readonly string[] = ["/"];
+/** Pages that are always Night, whatever the theme: the landing (S72) and the
+ *  waitlist pages drawn in its look. Their browser chrome stays dark too, or a
+ *  Light student's iPhone bars go cream around a black page. Each page sets
+ *  the same colour in its viewport (src/app/page.tsx, src/app/waitlist). */
+export const NIGHT_ONLY_PATHS: readonly string[] = ["/", "/waitlist", "/waitlist/confirm"];
 
 /** Client only. Paints every `meta[name=theme-color]` for `theme` (dark on a
  *  NIGHT_ONLY_PATHS page), writing only the ones that differ, so a

@@ -1,6 +1,5 @@
 "use client";
 
-import localFont from "next/font/local";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Fragment, useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type FocusEvent, type PointerEvent } from "react";
@@ -11,24 +10,20 @@ import { HAS_DEMO_FILM } from "@/lib/landing/demo-media";
 import { APP_STORE_URL, PLAY_STORE_URL } from "@/lib/native/store-links";
 import { isIosPlatform, type Platform } from "@/lib/pwa/display-mode";
 import { usePlatform } from "@/lib/pwa/use-standalone";
+import { CLUB_WAITLIST_HREF, landingCta } from "@/lib/waitlist/view";
 
 import { DayOnVibe, MOMENTS, type DayHandle, type MomentId } from "./day-on-vibe";
 import { HeroTitle } from "./hero-title";
 import { NightSky, type SkyLight } from "./night-sky";
 import { Readout, type Still } from "./readout";
+import { frauncesSoft } from "./soft-font";
 import "./landing.css";
-
-// The soft wordmark face (the share card's: SOFT 100, opsz 144). The app-wide
-// Fraunces link in layout.tsx has no SOFT axis, so the landing loads its own,
-// under its own family name ("frauncesSoft", from the const): next/font/google
-// names its face plain "Fraunces", and the layout's Google faces won over it.
-// The file is Google Fonts' Fraunces latin subset (wght, opsz, SOFT axes),
-// under the OFL: its licence sits beside it in fraunces-soft.OFL.txt. The
-// stand-in until it loads is a serif sized to match, so the swap stays serif.
-const frauncesSoft = localFont({ src: "./fraunces-soft.woff2", weight: "100 900", style: "normal", variable: "--font-soft", display: "swap", adjustFontFallback: "Times New Roman" });
 
 const WARP_DURATION_MS = 750;
 const LOGIN_HREF = "/auth/login";
+// The buttons that make an account follow the launch switch (page.tsx reads
+// it, landingCta words it): "Join the waitlist" while Vibe opens in waves,
+// "Sign up" once it's open. This one is the quiet way in for an access code.
 const SIGNUP_HREF = "/auth/signup";
 const CLUB_HREF = "mailto:help@connectvibe.app?subject=Bring%20my%20club%20to%20Vibe";
 // Reads the code flag PURDUE_SIGNUPS_ENABLED (never an env var), so the server
@@ -91,8 +86,10 @@ function storeLinksFor(platform: Platform | null): StoreLink[] {
 
 const at = (l: SkyLight, i: number, rgb: string) => ({ "--mx": l.m[0], "--my": l.m[1], "--dx": l.d[0], "--dy": l.d[1], "--i": i, "--rgb": rgb }) as CSSProperties;
 
-export function HomeLanding() {
+export function HomeLanding({ signupOpen }: { signupOpen: boolean }) {
   const router = useRouter();
+  const cta = landingCta(signupOpen);
+  const doorCta = landingCta(signupOpen, "door");
   const [active, setActive] = useState<string | null>(null);
   const [warping, setWarping] = useState(false);
   // The light under a mouse. A tap toggles its card; a click on a light the
@@ -206,7 +203,7 @@ export function HomeLanding() {
         <span className="vln-wordmark">vibe<i>.</i></span>
         <nav aria-label="Account">
           <a href={LOGIN_HREF} data-warp-trigger className="vln-textlink">Log in</a>
-          <a href={SIGNUP_HREF} data-warp-trigger className="vln-btn vln-btn-sm">Sign up</a>
+          <a href={cta.href} data-warp-trigger className="vln-btn vln-btn-sm">{cta.label}</a>
         </nav>
       </header>
 
@@ -216,13 +213,13 @@ export function HomeLanding() {
           <NightSky lights={LIGHTS} links={LINKS} activeId={active} warping={warping} />
 
           {/* The copy comes before the lights in the page order, so keyboard and
-              screen-reader users meet the headline and Sign up first; the
+              screen-reader users meet the headline and the way in first; the
               lights are absolutely placed, so the order doesn't move them. */}
           <div className="vln-hero-copy">
             <HeroTitle />
             <p>Find your clubs, your events, and each other. Free with your school email.</p>
             <div className="vln-cta">
-              <a href={SIGNUP_HREF} data-warp-trigger className="vln-btn">Sign up</a>
+              <a href={cta.href} data-warp-trigger className="vln-btn">{cta.label}</a>
               <a href="#vln-doors" className="vln-btn vln-btn-ghost">Bring your club</a>
             </div>
             <span className="vln-hint">Pick a light to see what’s out there.</span>
@@ -311,14 +308,34 @@ export function HomeLanding() {
           <div className="vln-door vln-panel vln-rise">
             <header className="vln-panel-head"><b>05</b><span>For students</span><em><span>Free</span></em></header>
             <h2>Step inside.</h2>
-            <p>Sign up with your school email. It’s free, and only people who have one can join.</p>
-            <a href={SIGNUP_HREF} data-warp-trigger className="vln-btn">Create your account</a>
+            {signupOpen ? (
+              <>
+                <p>Sign up with your school email. It’s free, and only people who have one can join.</p>
+                <a href={doorCta.href} data-warp-trigger className="vln-btn">{doorCta.label}</a>
+              </>
+            ) : (
+              <>
+                {/* Draft words for Franky. */}
+                <p>We’re opening Vibe in waves. Join the waitlist with your school email, and we’ll send you an access code when it’s your turn.</p>
+                <div className="vln-door-ways">
+                  <a href={doorCta.href} data-warp-trigger className="vln-btn">{doorCta.label}</a>
+                  <a href={SIGNUP_HREF} data-warp-trigger className="vln-textlink">Got an access code? Create your account</a>
+                </div>
+              </>
+            )}
           </div>
           <div className="vln-door vln-panel vln-rise" data-lag={1} style={{ "--rgb": KINDS.events.rgb } as CSSProperties}>
             <header className="vln-panel-head"><b>06</b><span>For clubs</span><em><span>help@connectvibe.app</span></em></header>
             <h2>Bring your club.</h2>
             <p>A page, your events, and a chat your members will open. Write to us and we’ll set it up with you.</p>
-            <a href={CLUB_HREF} className="vln-btn vln-btn-ghost">Email us</a>
+            {signupOpen ? (
+              <a href={CLUB_HREF} className="vln-btn vln-btn-ghost">Email us</a>
+            ) : (
+              <div className="vln-door-ways">
+                <a href={CLUB_HREF} className="vln-btn vln-btn-ghost">Email us</a>
+                <a href={CLUB_WAITLIST_HREF} data-warp-trigger className="vln-textlink">Or join the waitlist as a club officer</a>
+              </div>
+            )}
           </div>
         </section>
 
@@ -333,7 +350,7 @@ export function HomeLanding() {
           </div>
           <span className="vln-wordmark vln-wordmark-xl">vibe<i>.</i></span>
           <p className="vln-tagline">Your campus. Your people. Yourself.</p>
-          <a href={SIGNUP_HREF} data-warp-trigger className="vln-btn">Sign up</a>
+          <a href={cta.href} data-warp-trigger className="vln-btn">{cta.label}</a>
           <a href={LOGIN_HREF} data-warp-trigger className="vln-textlink">Already have an account? Log in</a>
           <StoreLinks />
           <span className="vln-schools">{LANDING_SCHOOL_LABELS.join(" · ")}</span>

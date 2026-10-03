@@ -195,6 +195,11 @@
 .vln-readout figcaption a:hover { color: var(--cream); }
 
 .vln-door .vln-btn { margin-top: 20px; }
+/* Doors 05 and 06 while Vibe opens in waves: the button, then a quieter way
+   in beside it (or under it, on a phone). */
+.vln-door-ways { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 14px; margin-top: 20px; }
+.vln-door-ways .vln-btn { margin-top: 0; }
+.vln-door-ways .vln-textlink { padding: 0; text-decoration: underline; text-decoration-color: rgba(246, 241, 234, 0.3); text-underline-offset: 3px; }
 
 /* 04 · A day on Vibe (S72, day-on-vibe.tsx): big type over a hairline list
    of the day's moments, and the demo film in a phone-screen readout. On a

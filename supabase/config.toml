@@ -283,9 +283,13 @@ max_frequency = "5s"
 # inactivity_timeout = "8h"
 
 # This hook runs before a new user is created and allows developers to reject the request based on the incoming user object.
-# [auth.hook.before_user_created]
-# enabled = true
-# uri = "pg-functions://postgres/auth/before-user-created-hook"
+# The waitlist gate (supabase/migrations/20261003120000_waitlist_hardening.sql): a sign-up needs
+# app_settings.signup_open, the allowlist, or an access code. It lives in the auth_hooks schema,
+# which the REST API never exposes (keep it out of [api] schemas). Local sign-up stays open: the
+# local signup_open row is true (supabase/seed.sql). Production: see that migration's header.
+[auth.hook.before_user_created]
+enabled = true
+uri = "pg-functions://postgres/auth_hooks/hook_waitlist_gate"
 
 # This hook runs before a token is issued and allows you to add additional claims based on the authentication method used.
 # [auth.hook.custom_access_token]

@@ -74,6 +74,10 @@ const VERBS: Record<string, string> = {
   user_lift: "lifted the restriction on",
   image_remove: "took down a photo on",
   image_restore: "put back a photo on",
+  waitlist_invite: "sent an access code to",
+  waitlist_add: "added",
+  waitlist_remove: "removed",
+  waitlist_reveal: "looked at the email address of",
 };
 
 const TYPE_WORDS: Record<string, string> = {
@@ -85,6 +89,7 @@ const TYPE_WORDS: Record<string, string> = {
   event: "an event",
   channel: "a chat",
   report: "a report",
+  waitlist: "a waitlist entry",
 };
 
 function num(meta: Record<string, unknown> | null, key: string): number | null {
@@ -149,6 +154,9 @@ function detailLine(row: ActionRow): string {
     : [];
   if (incomplete.length > 0) bits.push(`didn't finish: ${incomplete.join(", ")}`);
   if (row.meta?.has_note === true) bits.push("a private note is on the restriction");
+  const batch = str(row.meta, "batch");
+  if (batch) bits.push(`batch ${batch}`);
+  if (row.action === "waitlist_invite" && row.meta?.single === true) bits.push("sent on its own");
   const photos = photoSlots(row);
   if (photos.length > 0) bits.push(photos.map((p) => p.label.toLowerCase()).join(" and "));
   const left = row.meta?.left as Record<string, unknown> | undefined;

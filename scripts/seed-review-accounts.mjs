@@ -560,6 +560,57 @@ async function findComment(postId, userId) {
 }
 
 // ---------------------------------------------------------------------------
+// The sign-up allowlist (migration 20261003100000_waitlist). While Vibe opens
+// in waves, Supabase Auth's before-user-created hook refuses a new account
+// without an access code unless its address is on public.signup_allowlist.
+// admin.createUser doesn't run that hook today (GoTrue v2.189.0), but a newer
+// hosted Auth might, and a deleted account 1 is re-created here; so both
+// sign-in addresses go on the list (reason 'review') before any account is
+// made. A database without the table (the gate not migrated yet) only gets a
+// warning: there is no gate there to pass.
+// ---------------------------------------------------------------------------
+const ALLOWLIST_MISSING_CODES = new Set(["PGRST205", "42P01"]);
+const ALLOWLIST_NOTE = "App Review sign-in account (scripts/seed-review-accounts.mjs)";
+
+/** The allowlist rows for the two addresses, or null when the table doesn't exist. */
+async function readAllowlist() {
+  const { data, error } = await admin
+    .from("signup_allowlist")
+    .select("email, reason")
+    .in("email", SPECS.map((s) => s.email));
+  if (error && ALLOWLIST_MISSING_CODES.has(error.code)) return null;
+  return must({ data, error }, "read the sign-up allowlist");
+}
+
+function printAllowlistPlan(rows) {
+  console.log("\nSign-up allowlist (public.signup_allowlist; the waitlist gate lets these addresses sign up)");
+  if (rows === null) {
+    console.log("  WARNING: the table doesn't exist here (the waitlist gate isn't migrated yet). Skipped.");
+    return;
+  }
+  for (const spec of SPECS) {
+    const row = rows.find((r) => r.email === spec.email);
+    console.log(
+      row?.reason === "review"
+        ? `  ${spec.email}  on the list (review); left alone`
+        : `  ${spec.email}  UPSERT {reason:"review"}${row ? ` (was ${row.reason})` : ""}`,
+    );
+  }
+}
+
+async function applyAllowlist(rows) {
+  if (rows === null) return;
+  const missing = SPECS.filter((s) => rows.find((r) => r.email === s.email)?.reason !== "review");
+  if (missing.length === 0) return;
+  must(
+    await admin
+      .from("signup_allowlist")
+      .upsert(missing.map((s) => ({ email: s.email, reason: "review", note: ALLOWLIST_NOTE })), { onConflict: "email" }),
+    "put the review addresses on the sign-up allowlist",
+  );
+}
+
+// ---------------------------------------------------------------------------
 // The writes. The dry run prints exactly these; --apply makes them.
 //   school-verified = school_email + school_verified + school_system + campus
 //                     (what src/lib/auth/school-email-apply.ts writes)
@@ -762,8 +813,10 @@ async function main() {
     { from: 2, to: 1, exists: await followExists(two.authUser?.id, one.authUser?.id) },
   ];
   const commentState = await findComment(one.post?.id, two.authUser?.id);
+  const allowlist = await readAllowlist();
 
   printPlan(states, pair, follows, commentState);
+  printAllowlistPlan(allowlist);
 
   const refusals = states.flatMap((s) => s.refusals);
   if (refusals.length > 0) {
@@ -777,6 +830,8 @@ async function main() {
     return;
   }
 
+  // The allowlist before any account is created (see readAllowlist).
+  await applyAllowlist(allowlist);
   // Accounts first: a post takes its campus from its author's row.
   const ids = [];
   for (const s of states) ids.push(await applyAccount(s));

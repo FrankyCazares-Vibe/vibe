@@ -1,0 +1,50 @@
+/* The waitlist pages (/waitlist and /waitlist/confirm): the landing's Night
+   look, one calm column. The colours and the panel come from landing.css
+   (.vln-root, .vln-panel, .vln-btn); this file adds only the form. */
+.vwl-bar { display: flex; align-items: center; justify-content: space-between; max-width: 600px; margin: 0 auto; padding: max(14px, env(safe-area-inset-top)) 20px 0; }
+.vwl-bar a.vln-wordmark { color: var(--cream); text-decoration: none; }
+.vwl-main { max-width: 600px; margin: 0 auto; padding: 22px 20px 64px; }
+.vwl-main .vln-panel { padding-bottom: 28px; }
+.vwl-main h1 { font-size: clamp(36px, 10vw, 48px); font-weight: 800; line-height: 1; }
+.vwl-main .vln-panel > p { margin: 14px 0 0; font-size: 15px; line-height: 1.55; color: #CFC8BE; }
+.vwl-main .vln-panel > p strong { color: var(--cream); overflow-wrap: anywhere; }
+
+.vwl-form { display: grid; gap: 18px; margin-top: 26px; }
+.vwl-field { display: grid; gap: 7px; }
+.vwl-label { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; font-size: 13.5px; font-weight: 600; color: var(--cream); }
+.vwl-label small { font-size: 12px; font-weight: 500; color: var(--muted); }
+.vwl-input { box-sizing: border-box; width: 100%; height: 48px; padding: 0 14px; border-radius: 8px; border: 1px solid rgba(255, 255, 255, 0.14); background: rgba(255, 255, 255, 0.04); color: var(--cream); font: 500 16px/1.2 "DM Sans", sans-serif; transition: border-color 0.2s ease, box-shadow 0.2s ease; }
+.vwl-input::placeholder { color: rgba(246, 241, 234, 0.38); }
+.vwl-input:focus { outline: none; border-color: rgba(255, 92, 53, 0.8); box-shadow: 0 0 0 3px rgba(255, 92, 53, 0.2); }
+.vwl-input[aria-invalid="true"] { border-color: rgba(255, 138, 107, 0.9); }
+select.vwl-input { appearance: none; -webkit-appearance: none; padding-right: 40px; background-image: linear-gradient(45deg, transparent 50%, var(--muted) 50%), linear-gradient(135deg, var(--muted) 50%, transparent 50%); background-position: calc(100% - 21px) 50%, calc(100% - 16px) 50%; background-size: 5px 5px; background-repeat: no-repeat; }
+select.vwl-input option { color: var(--cream); background: #1A1817; }
+.vwl-row { display: grid; grid-template-columns: minmax(0, 1fr); gap: 18px; }
+@media (min-width: 560px) { .vwl-row { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } }
+
+.vwl-check { display: grid; grid-template-columns: 20px minmax(0, 1fr); align-items: start; gap: 12px; padding: 4px 0; font-size: 14.5px; line-height: 1.45; color: #E4DDD3; cursor: pointer; }
+.vwl-check input { width: 20px; height: 20px; margin: 1px 0 0; accent-color: var(--coral); cursor: pointer; }
+.vwl-check small { display: block; margin-top: 2px; font-size: 12.5px; color: var(--muted); }
+.vwl-officer { display: grid; gap: 14px; padding: 14px; border: 1px solid rgba(255, 255, 255, 0.09); border-radius: 8px; background: rgba(255, 255, 255, 0.02); }
+
+/* .vln-panel in front: landing.css styles every .vln-panel p. */
+.vln-panel .vwl-notice { margin: 0; max-width: none; padding: 14px 0 0; border-top: 1px solid rgba(255, 255, 255, 0.09); font-size: 12.5px; line-height: 1.6; color: var(--muted); }
+.vwl-notice a, .vwl-quiet a, a.vwl-quiet { color: rgba(246, 241, 234, 0.85); text-decoration: underline; text-decoration-color: rgba(246, 241, 234, 0.3); text-underline-offset: 3px; }
+.vwl-consents { display: grid; gap: 4px; }
+.vwl-error { display: block; margin: 0; font-size: 13.5px; line-height: 1.45; color: #FF9C80; }
+.vwl-form .vln-btn { width: 100%; border: 0; cursor: pointer; font-family: inherit; }
+.vwl-form .vln-btn:disabled { opacity: 0.6; cursor: wait; transform: none; box-shadow: none; }
+@media (min-width: 560px) { .vwl-form .vln-btn { width: auto; justify-self: start; } }
+/* Bots fill every field; people never see this one. Off screen, not display:none, which some bots skip. */
+.vwl-hp { position: absolute; left: -10000px; top: auto; width: 1px; height: 1px; overflow: hidden; }
+
+.vwl-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 18px; margin-top: 24px; }
+.vwl-actions .vln-btn { border: 0; cursor: pointer; font-family: inherit; }
+.vwl-actions .vln-btn-ghost { border: 1px solid rgba(255, 255, 255, 0.16); }
+.vwl-quiet { font-size: 14px; color: var(--muted); }
+button.vwl-quiet { padding: 0; min-height: 44px; border: 0; background: none; font-family: inherit; color: rgba(246, 241, 234, 0.85); text-decoration: underline; text-decoration-color: rgba(246, 241, 234, 0.3); text-underline-offset: 3px; cursor: pointer; }
+.vwl-more { display: grid; gap: 4px; margin-top: 22px; padding-top: 16px; border-top: 1px solid rgba(255, 255, 255, 0.09); }
+.vln-panel .vwl-more p { margin: 0; font-size: 14px; line-height: 1.5; color: var(--muted); }
+.vwl-root :is(input, select, button):focus-visible { outline: 2px solid var(--cream); outline-offset: 2px; }
+.vwl-root .vwl-input:focus-visible { outline: none; }
+.vwl-root .vln-footer { max-width: 600px; margin: 0 auto; box-sizing: border-box; border-top: 0; }
