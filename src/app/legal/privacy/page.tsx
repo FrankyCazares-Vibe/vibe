@@ -1,199 +1,114 @@
-import Link from "next/link";
-
+// The text of this page is handoffs/legal-2026-10-03-privacy/
+// privacy-policy-publish.md, fact-checked sentence by sentence against the
+// code. Change the wording there first, then here: the two must read the same.
+// The sections live in the sibling sections-*.tsx files; parts.tsx holds the
+// section titles and the link helpers.
 import {
-  LegalH2,
+  LegalCallout,
   LegalLayout,
   LegalP,
+  LegalToc,
   LegalUL,
 } from "@/components/legal/LegalLayout";
 
+import { PageLink, Sec, SECTION_LINKS } from "./parts";
+import { Sections1To3 } from "./sections-1-3";
+import { Sections4To5 } from "./sections-4-5";
+import { Sections6To8 } from "./sections-6-8";
+import { Sections9To10 } from "./sections-9-10";
+import { Sections11To15 } from "./sections-11-15";
+
+// Set on the day the page goes live.
+const EFFECTIVE_DATE = "October 5, 2026";
+
 export const metadata = {
   title: "Privacy Policy · Vibe",
-  description: "What we collect, how we use it, and your rights.",
+  description: "What Vibe knows about you, who can see it and how to delete it.",
 };
 
 export default function PrivacyPage() {
   return (
     <LegalLayout
       eyebrow="Legal"
-      title="Privacy Policy"
-      effectiveDate="September 28, 2026"
+      title="Vibe Privacy Policy"
+      effectiveDate={EFFECTIVE_DATE}
     >
       <LegalP>
-        This Privacy Policy explains what information Vibe collects, how we
-        use it, and the choices you have. By using Vibe, you agree to the
-        practices described here.
+        Vibe is a campus social app for people with an Indiana University or
+        Purdue University email address. It is run by{" "}
+        <strong>CONNECTVIBE. LLC</strong>, an Indiana limited liability company
+        (&ldquo;we&rdquo;, &ldquo;us&rdquo;). Vibe is independent. It is not run
+        or backed by Indiana University, Purdue University, or any campus,
+        school or club.
       </LegalP>
       <LegalP>
-        <em>
-          This is a baseline draft for our early college rollout. Review with
-          qualified legal counsel before broad public launch.
-        </em>
+        This page says what Vibe knows about you, who can see it and how to
+        delete it. It covers connectvibe.app and the Vibe apps for iPhone and
+        Android once they are in the stores.
+      </LegalP>
+      <LegalP>
+        <strong>
+          Only on the waitlist? Go to <Sec to="11">section 11</Sec>. It is all
+          you need.
+        </strong>
       </LegalP>
 
-      <LegalH2>1. Information we collect</LegalH2>
-      <LegalP>
-        <strong>Account info you give us.</strong> Name, handle, sign-in email,
-        school, school-verified &ldquo;.edu&rdquo; email, year, major,
-        department, profile bio, links, headline, location, banner gradient or
-        photo, avatar, work history, skills, interests, and similar profile
-        fields you choose to add.
-      </LegalP>
-      <LegalP>
-        <strong>Content you create.</strong> Posts, clips, comments, replies,
-        reactions, reposts, RSVPs, calendar events, direct messages and
-        channel messages, attachments and media you upload, and the metadata
-        attached to those (timestamps, edits, view counts).
-      </LegalP>
-      <LegalP>
-        <strong>Photo location.</strong> When you upload a photo to your
-        profile or a post, we remove its location details before it&apos;s
-        stored. Videos, photos sent in chats, club logos and banners, and
-        group chat pictures keep their original details, which can include
-        where they were taken or filmed.
-      </LegalP>
-      <LegalP>
-        <strong>Connections.</strong> Who you follow, who follows you, mutuals,
-        organizations you belong to, and the org-level events you attend.
-      </LegalP>
-      <LegalP>
-        <strong>Usage and device data.</strong> Pages you visit on Vibe,
-        actions you take, IP address (used for abuse prevention and
-        rate-limiting), browser, OS, and approximate location derived from IP.
-      </LegalP>
-      <LegalP>
-        <strong>Cookies.</strong> We use a small number of strictly necessary
-        cookies for sign-in sessions and CSRF protection. We do not run
-        third-party advertising trackers.
-      </LegalP>
+      <LegalCallout id="short-version" title="The short version">
+        <LegalUL bullets>
+          <li>
+            Most of your profile, including your posts, is open to anyone on
+            the internet, and search engines can list it.
+          </li>
+          <li>
+            Club pages are public too, with their 12 newest posts and who wrote
+            them.
+          </li>
+          <li>
+            When you are signed in, we record each profile you open and each
+            post you open or pause on. You cannot turn this off. The owner sees
+            the count and, with Vibe+ (a paid plan, not on sale yet), who.
+          </li>
+          <li>
+            All three cofounders moderate Vibe, and a reported message is
+            copied for them (<Sec to="1">section 1</Sec>).
+          </li>
+          <li>
+            One cofounder can reach everything Vibe stores. We read private
+            messages only in the cases in <Sec to="5h">section 5h</Sec>.
+          </li>
+          <li>
+            We do not sell your information. Vibe has no ads and no AI
+            features, and we do not train AI on what you post.
+          </li>
+          <li>
+            Photos and videos you send in chats or post as a club can still say
+            where they were taken.
+          </li>
+          <li>
+            You can delete your account in{" "}
+            <PageLink href="/settings">Settings</PageLink>, right away. Your
+            messages vanish from other people&apos;s chats too.{" "}
+            <Sec to="8">Sections 8</Sec> and <Sec to="9">9</Sec> list what
+            stays.
+          </li>
+          <li>
+            &ldquo;Verified&rdquo; means the account could once read mail at an
+            @iu.edu or @purdue.edu address. It does not prove enrollment or
+            identity.
+          </li>
+          <li>
+            Vibe is for people 18 or older. You confirm it with a checkbox.
+          </li>
+        </LegalUL>
+      </LegalCallout>
 
-      <LegalH2>2. How we use it</LegalH2>
-      <LegalUL>
-        <li>To run the Service: authenticate you, render your profile, deliver your messages, fan out notifications, and show you content from people you follow.</li>
-        <li>To improve the Service: aggregate usage analytics that help us understand which features people use.</li>
-        <li>To keep people safe: investigate and respond to reports of harassment, spam, or other abuse, and enforce our Terms.</li>
-        <li>To communicate with you: account-related emails (verification, password reset, security notices). We will not send marketing email without your consent.</li>
-      </LegalUL>
+      <LegalToc items={SECTION_LINKS} />
 
-      <LegalH2>3. Who we share it with</LegalH2>
-      <LegalP>
-        We <strong>do not sell</strong> your personal information. We share it
-        only as needed:
-      </LegalP>
-      <LegalUL>
-        <li>
-          <strong>Other Vibe users</strong> see your public profile, posts,
-          comments, reactions, RSVPs, and the messages you send them or
-          channels you participate in.
-        </li>
-        <li>
-          <strong>Service providers</strong> who help us run Vibe: Supabase
-          (database, auth, storage), Vercel (hosting and serverless functions),
-          and Cloudflare R2 (media storage). They process data on our
-          instructions under their own security commitments.
-        </li>
-        <li>
-          <strong>Legal and safety</strong> requests: we may disclose
-          information when we reasonably believe it&apos;s needed to comply
-          with the law, enforce our Terms, or protect users from imminent
-          harm.
-        </li>
-      </LegalUL>
-
-      <LegalH2>4. Your choices and rights</LegalH2>
-      <LegalUL>
-        <li>
-          <strong>Access and correction.</strong> View and edit your profile
-          on{" "}
-          <Link
-            href="/profile"
-            style={{ color: "#FF5C35", fontWeight: 700, textDecoration: "none" }}
-          >
-            your profile page
-          </Link>
-          .
-        </li>
-        <li>
-          <strong>Delete your account.</strong> From{" "}
-          <Link
-            href="/settings"
-            style={{ color: "#FF5C35", fontWeight: 700, textDecoration: "none" }}
-          >
-            Settings → Danger zone
-          </Link>
-          . Deletion permanently removes your profile, posts, comments,
-          reactions, connections, RSVPs, messages, and chat reactions.
-        </li>
-        <li>
-          <strong>Export.</strong> Email{" "}
-          <a
-            href="mailto:hello@connectvibe.app"
-            style={{ color: "#FF5C35", fontWeight: 700, textDecoration: "none" }}
-          >
-            hello@connectvibe.app
-          </a>{" "}
-          and we&apos;ll send you a copy of the personal data we hold on you.
-        </li>
-        <li>
-          <strong>Block and report.</strong> Block users from their profile;
-          report content from the post or comment menu.
-        </li>
-      </LegalUL>
-
-      <LegalH2>5. Data retention</LegalH2>
-      <LegalP>
-        We keep your account data for as long as your account is active. When
-        you delete your account, we remove your data from our live systems
-        immediately. Encrypted backups may retain copies for up to 30 days,
-        after which they are overwritten in the normal course of operations.
-      </LegalP>
-      <LegalP>
-        We may retain limited information longer when required to comply with
-        legal obligations, resolve disputes, or enforce our Terms (for
-        example, retaining a record of a banned account&apos;s identifier so
-        the same actor can&apos;t simply re-register).
-      </LegalP>
-      <LegalP>
-        Content our moderators removed, and photos or videos kept while a
-        report about them was open, may be kept for up to a year for safety
-        and legal reasons, even after you delete your account.
-      </LegalP>
-
-      <LegalH2>6. Security</LegalH2>
-      <LegalP>
-        We use industry-standard practices to protect your data: TLS in
-        transit, encryption at rest with our cloud providers, role-based
-        access for our team, and Supabase row-level security to enforce who
-        can read what. No system is perfectly secure — please use a strong,
-        unique password and turn on multi-factor authentication if your
-        account email supports it.
-      </LegalP>
-
-      <LegalH2>7. Children</LegalH2>
-      <LegalP>
-        Vibe is for users 18 and older who are affiliated with a U.S.
-        college. We do not knowingly collect information from anyone under
-        13. If you believe a minor has signed up, contact us and we will
-        promptly remove the account.
-      </LegalP>
-
-      <LegalH2>8. Changes</LegalH2>
-      <LegalP>
-        If we make material changes to this Policy, we&apos;ll give you
-        reasonable notice (in-app or by email) before they take effect.
-      </LegalP>
-
-      <LegalH2>9. Contact</LegalH2>
-      <LegalP>
-        Questions about your privacy? Email us at{" "}
-        <a
-          href="mailto:hello@connectvibe.app"
-          style={{ color: "#FF5C35", fontWeight: 700, textDecoration: "none" }}
-        >
-          hello@connectvibe.app
-        </a>
-        .
-      </LegalP>
+      <Sections1To3 />
+      <Sections4To5 />
+      <Sections6To8 />
+      <Sections9To10 />
+      <Sections11To15 />
     </LegalLayout>
   );
 }
