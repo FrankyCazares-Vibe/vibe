@@ -221,7 +221,6 @@
 :is(.vln-day-list button[aria-current="true"], .vln-day-row[data-on]) b { color: rgb(var(--rgb)); }
 :is(.vln-day-list button[aria-current="true"], .vln-day-row[data-on]) b::before { opacity: 1; box-shadow: 0 0 10px 2px rgba(var(--rgb), 0.7); }
 .vln-day-list button:focus-visible, .vln-film-toggle:focus-visible { outline: 2px solid var(--cream); outline-offset: 2px; }
-.vln-day-note { margin: 0; max-width: 34em; font-size: 14px; line-height: 1.55; color: var(--muted); }
 
 /* The film's readout: hairline frame, corner ticks, a mono strip on top, and
    under the screen the film's progress line, Play/Pause and the part of the
@@ -295,11 +294,9 @@
   .vln-orbits { top: 190px; }
   .vln-doors { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; padding: 22px 40px 0; }
   .vln-footer { padding: 20px 40px 24px; }
-  /* The day: title, list and line on the left, the film to the right of all three. */
+  /* The day: title and list on the left, the film to the right of both. */
   .vln-day { grid-template-columns: minmax(0, 1fr) auto; grid-template-rows: auto auto 1fr; column-gap: clamp(40px, 6vw, 88px); row-gap: 30px; padding: 26px 40px 0; }
   .vln-day h2 { font-size: clamp(56px, 7.4vw, 112px); }
-  /* The line closes the left column level with the film's foot, so the two columns end together. */
-  .vln-day-note { align-self: end; padding-bottom: 18px; }
   .vln-day > .vln-film { grid-column: 2; grid-row: 1 / 4; align-self: center; margin: 0; }
   .vln-film { --fw: clamp(220px, calc((100svh - 220px) * 0.462), 300px); }
 }

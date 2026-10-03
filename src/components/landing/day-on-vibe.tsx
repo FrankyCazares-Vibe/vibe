@@ -123,9 +123,6 @@ export function DayOnVibe({ ref }: { ref?: Ref<DayHandle> }) {
           <p className="vln-film-now" aria-hidden="true"><b>{now.part}</b><span>{now.what}</span></p>
         </div>
       </figure>
-
-      {/* As a still there is no one to play anyone: the second sentence goes with the film. */}
-      <p className="vln-day-note vln-rise">The real app with sample accounts.{film ? " The three founders play themselves." : ""}</p>
     </section>
   );
 }
