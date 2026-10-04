@@ -207,7 +207,8 @@ export function WaitlistForm({ source, officer }: { source: string | null; offic
         <p className="vwl-notice">
           We collect your school email, your name and the answers above to confirm your spot, choose who gets in
           each wave and email you when it’s your turn. Supabase stores them, Vercel runs the site and Resend sends
-          our emails. {`We keep your answers for up to ${WAITLIST_RETENTION_DAYS} days.`} Every email we send has a
+          our emails. Fonts load from Google and error reports go to Sentry.{" "}
+          {`We keep your answers for up to ${WAITLIST_RETENTION_DAYS} days.`} Every email we send has a
           link to take you off the list sooner, which deletes your answers.{" "}
           <Link href="/legal/privacy#waitlist" target="_blank" rel="noopener noreferrer">Privacy Policy</Link>
         </p>
