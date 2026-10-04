@@ -31,3 +31,25 @@ export function waitlistPostRefusal(headers: {
   }
   return null;
 }
+
+/** What the form shows when the waitlist can't take an entry at all. */
+export const WAITLIST_UNAVAILABLE = "The waitlist isn't available right now. Try again later.";
+
+/**
+ * No thank-you for an entry that can't be saved (release fix, Oct 4).
+ *
+ * The route answers before it saves, so on a database that has no waitlist
+ * yet (the site was deployed before the waitlist's migration files were
+ * applied) every submit got the thank-you page while the save failed in the
+ * background. `signupSwitch` is `readSignupSwitch()`'s answer: null means the
+ * switch can't be read, and the switch arrives in the same file as the
+ * `waitlist` table, so null is "the waitlist's part of the database is not
+ * there, or the database can't be reached". -> 503
+ *
+ * True and false both pass: the switch only decides what the site's buttons
+ * say, and the form's page already sends people to sign-up while it is open.
+ * The answer is the same for everyone, so it says nothing about an address.
+ */
+export function waitlistStoreRefusal(signupSwitch: boolean | null): { status: 503; error: string } | null {
+  return signupSwitch === null ? { status: 503, error: WAITLIST_UNAVAILABLE } : null;
+}

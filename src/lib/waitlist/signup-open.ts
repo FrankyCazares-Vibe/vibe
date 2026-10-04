@@ -14,11 +14,15 @@ import { createSupabaseServiceClient, isSupabaseServiceConfigured } from "@/lib/
  * module memo; no Next cache API). No service key, an error or a non-boolean
  * answer all mean false, the closed wording, and are not remembered, so the
  * next request asks again.
+ *
+ * `readSignupSwitch` is the same read with the third answer kept: null when
+ * the switch can't be read at all. The waitlist form's route uses it to tell
+ * "closed" from "the waitlist's part of the database is not there".
  */
 const MEMO_MS = 30_000;
 
 let memo: { value: boolean; at: number } | null = null;
-let inFlight: Promise<boolean> | null = null;
+let inFlight: Promise<boolean | null> | null = null;
 
 async function readSwitch(): Promise<boolean | null> {
   if (!isSupabaseServiceConfigured()) return null;
@@ -31,15 +35,19 @@ async function readSwitch(): Promise<boolean | null> {
   }
 }
 
-export async function isSignupOpen(override?: boolean | null): Promise<boolean> {
-  if (override === true || override === false) return override;
+/**
+ * The switch as the database has it: true (open), false (closed), or null
+ * when it can't be read: no service key, an error, or `signup_is_open()` is
+ * missing because the waitlist's files are not applied to this database yet.
+ * Remembered for 30 seconds unless it is null.
+ */
+export async function readSignupSwitch(): Promise<boolean | null> {
   const now = Date.now();
   if (memo && now - memo.at < MEMO_MS) return memo.value;
   if (!inFlight) {
     inFlight = readSwitch()
       .then((value) => {
-        if (value === null) return false;
-        memo = { value, at: Date.now() };
+        if (value !== null) memo = { value, at: Date.now() };
         return value;
       })
       .finally(() => {
@@ -47,4 +55,9 @@ export async function isSignupOpen(override?: boolean | null): Promise<boolean> 
       });
   }
   return inFlight;
+}
+
+export async function isSignupOpen(override?: boolean | null): Promise<boolean> {
+  if (override === true || override === false) return override;
+  return (await readSignupSwitch()) === true;
 }

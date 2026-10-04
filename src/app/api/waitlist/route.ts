@@ -8,7 +8,8 @@ import { createSupabaseServiceClient, isSupabaseServiceConfigured } from "@/lib/
 import { remainingBudget, waitlistEmailKey } from "@/lib/waitlist/admin-view";
 import { waitlistConfirmUrl, waitlistLeaveUrl } from "@/lib/waitlist/email-content";
 import { parseWaitlistForm, type WaitlistFormValue } from "@/lib/waitlist/form";
-import { waitlistPostRefusal } from "@/lib/waitlist/request-guard";
+import { WAITLIST_UNAVAILABLE, waitlistPostRefusal, waitlistStoreRefusal } from "@/lib/waitlist/request-guard";
+import { readSignupSwitch } from "@/lib/waitlist/signup-open";
 import {
   accountExistsFor,
   dropWaitlistEntryIfDue,
@@ -48,7 +49,12 @@ function badInput(field: "form" | "email", error: string, status = 400) {
  * submit the form; 400 for input that doesn't parse (the field and the copy,
  * from `parseWaitlistForm`); 429 for the per-network limit (30 an hour: a
  * tabling table on campus Wi-Fi shares one address) and the global one (300
- * an hour, closed if the limiter is down); 503 without a service key.
+ * an hour, closed if the limiter is down); 503 without a service key, and 503
+ * when the waitlist's part of the database is not there or can't be reached
+ * (request-guard.ts `waitlistStoreRefusal`: the site deployed before the
+ * waitlist's migration files were applied). That one is the same for every
+ * address, and without it the thank-you page would show for an entry the
+ * background step can't save.
  *
  * After answering: 3 a day per address (keyed on a hash, never the address);
  * an account with this address, or a row that is confirmed, invited or joined,
@@ -99,14 +105,10 @@ export async function POST(req: Request) {
   const global = await rateLimit("waitlist-global", { limit: 300, windowSec: 3600, failClosed: true });
   if (!global.allowed) return tooManyRequests(global);
 
-  if (!isSupabaseServiceConfigured()) {
-    const body: WaitlistSubmitResponse = {
-      ok: false,
-      field: "form",
-      error: "The waitlist isn't available right now. Try again later.",
-    };
-    return NextResponse.json(body, { status: 503 });
-  }
+  if (!isSupabaseServiceConfigured()) return badInput("form", WAITLIST_UNAVAILABLE, 503);
+  // Asked once per server every 30 seconds while it answers (signup-open.ts).
+  const noStore = waitlistStoreRefusal(await readSignupSwitch());
+  if (noStore) return badInput("form", noStore.error, noStore.status);
 
   // Links point at this host locally (localhost:3102), at the site otherwise.
   const site = getSiteOriginForRequest(req);
