@@ -202,13 +202,14 @@ export function WaitlistForm({ source, officer }: { source: string | null; offic
           {errLine("wish")}
         </label>
 
-        {/* Draft notice for Franky; the Privacy Policy's waitlist lines are owed (legal v3). */}
+        {/* The short notice. The full one is section 11 of the Privacy Policy
+            (/legal/privacy#waitlist): keep the days and the providers the same in both. */}
         <p className="vwl-notice">
           We collect your school email, your name and the answers above to confirm your spot, choose who gets in
           each wave and email you when it’s your turn. Supabase stores them, Vercel runs the site and Resend sends
           our emails. {`We keep your answers for up to ${WAITLIST_RETENTION_DAYS} days.`} Every email we send has a
           link to take you off the list sooner, which deletes your answers.{" "}
-          <Link href="/legal/privacy" target="_blank" rel="noopener noreferrer">Privacy Policy</Link>
+          <Link href="/legal/privacy#waitlist" target="_blank" rel="noopener noreferrer">Privacy Policy</Link>
         </p>
         <div className="vwl-consents">
           <label className="vwl-check">
