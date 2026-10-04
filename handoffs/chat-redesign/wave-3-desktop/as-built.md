@@ -422,7 +422,7 @@ Deviations from the contract:
 - W3-3-bridge (wherever `#cPinsBtn`, the hover pin and the pane's pin controls are gated) and W3-3-campus: nothing new from this wave beyond the routes above.
 
 **Wave 4**
-- W3-4-phonepins: show a pin CONTROL (`Pin message` / `Unpin message`, `Pinned messages`) only when `pins.available && pins.pins !== null`. `available` alone is true before the first answer; on a database without the table that would show controls for a moment and the PUT would toast (2.5 row 10 (f)). Show the "not available" state on `!pins.available`.
+- W3-4-phonepins: show a pin CONTROL (`Pin message` / `Unpin message`, `Pinned messages`) only when `pins.available && pins.pins !== null`. `available` alone is true before the first answer; on a database without the table that would show controls for a moment and the PUT would toast (2.5 row 10 (f)). Show the "not available" state on `!pins.available`. (As built in wave 4, the phone's `Pinned messages` row ALSO shows after a first read that failed, so its Retry can be reached: see Wave 4, W3-4-phonepins, deviation 1.)
 - W3-4-phonepins: import `pinTextCut` from `@/lib/chat/use-message-pins` for `Show all`; do not write a length test (this supersedes wave 1's note, which gave the expression).
 - W3-4-phonepins: `author` can be null on a live pin. The words table has no string for it: see the orchestrator's list.
 
@@ -738,3 +738,229 @@ Campus (section 10 part F):
 17. Switch on: `/campus?manage=sae` opens the settings modal and the address becomes `/campus`; close it, open a profile, Back: no modal; refresh: no modal. `/campus?manage=<not my club>`: nothing opens, `manage` leaves the address. `/campus?manage=sae&tab=events`: the modal over Events, `tab=events` kept. Back from `/campus` after Manage club returns to `/messages`.
 18. Switch on: `/campus?tab=chat` and the club page's rooms link land on `/messages`; Back returns to the page before. The top bar with four pills. A pending campus tour starts once.
 19. Switch off: Campus > Chat by eye as before; `/campus?manage=sae` does nothing and keeps the parameter.
+
+## Wave 4
+
+Integrated Sat Oct 3, 2026. Four batches: W3-4-shell, W3-4-week, W3-4-lists, W3-4-phonepins. The shell, the home and the phone's pins. With this wave a person with `chat_desktop` on gets the new `/messages` on a laptop: the week band, the wide list, the slim list, New, and a dm or group in the one frame. A CLUB opens to an empty pane and the Pinned and Shared panel opens to an empty 288px column: `ClubPane` and `PinsPanel` are placeholders until wave 5 (nothing is deployed between waves). On a phone with `chat_v2` on, a dm or a group gains `Pin message` / `Unpin message`, `Pinned messages` and `Unpin from top` (2.5 row 10 (f); inert until the pins table is in that database). Not committed, not pushed, not deployed. No migration in this wave; nobody touched a database, local or production.
+
+### The gate (run in the worktree after all four batches and the integrator's two edits)
+
+| Check | Result |
+|---|---|
+| `npm run typecheck` | exit 0 |
+| `npm test` | 2,027 tests, 2,027 pass, 0 fail (the same count as after wave 3: section 9 gives wave 4 no test file, and no batch added one) |
+| `npx eslint <the 15 files of the wave>` | exit 1 with 2 errors, both in `src/components/mobile/MessagesMobile.tsx` (`:682` react-hooks/immutability, `:735` react-hooks/set-state-in-effect), both in `MessagesMobileV1`, both in the committed file too (`git show HEAD:... \| eslint --stdin` gives the same two, one line up): map 05's baseline of 2 errors. The other 14 files: no problem |
+| `npm run build` | exit 0 (`✓ Compiled successfully`; `/messages` and `/campus` are dynamic routes) |
+
+Nothing here ran in a browser. `use-desktop-open.ts`, the band's fit, the New dialog's group rule and the phone sheet's two rules have no test (they sit in `.tsx` / hook files `node --test` cannot load): they are covered by typecheck, lint, build and reading only.
+
+### Files of the wave (15: 6 changed, 9 new)
+
+Changed: `src/components/desktop/messages/MessagesDesktop.tsx` (wave 1's stub replaced), `src/components/mobile/MessagesMobile.tsx` (one line), and under `src/components/mobile/messages/`: `ConversationView.tsx`, `ConversationActionSheet.tsx`, `MessageBubble.tsx`, `ReactionPicker.tsx`.
+
+New: under `src/components/desktop/messages/`: `use-desktop-open.ts`, `ClubPane.tsx` (placeholder), `PinsPanel.tsx` (placeholder), `WeekBand.tsx`, `MonthPopover.tsx`, `InboxWide.tsx`, `SlimList.tsx`, `NewChatDialog.tsx`; and `src/components/mobile/messages/PinnedSheet.tsx`.
+
+Every file belongs to a batch; none was changed outside the batches' lists. Not edited (empty `git diff`): `contracts.ts`, `desktop-rules.ts` and its test, `dm-bridge.ts`, `DesktopDialog.tsx`, `LegacyThreadPane.tsx`, `home/MessagesHome.tsx`, `home/MonthBody.tsx`, `use-message-pins.ts`, `layer-stack.ts`, `use-layer-history.ts`, `CampusMobile.tsx`, `public/html/*`.
+
+### Integration edits (two, one rule, both on the seam between the shell and a sibling)
+
+The shell re-lays the page on the first click of a double click (the wide list tucks to 232px, the band folds from 76 to 44), so the second click lands on a different control that has just arrived under the pointer. By the approved pictures: a double click on the wide list's first row lands on the slim list's third row and opened THAT chat; a double click on the band's first card lands on the folded band's third item.
+1. `SlimList.tsx`, the row's click handler: `if (e.detail > 1) return;` after `preventDefault()`. A key press counts 0, so Enter still opens.
+2. `WeekBand.tsx`, `roomLink`'s click handler (cards and folded items): the same line.
+The `Messages` control needs none: `goHome` already answers one press at a time, and no wide-list row sits under it.
+
+### W3-4-shell: the shell and its state
+
+Files: `MessagesDesktop.tsx`, `use-desktop-open.ts` (new), `ClubPane.tsx` and `PinsPanel.tsx` (placeholders: the FINAL props from `contracts.ts`, `return null`).
+
+```ts
+// use-desktop-open.ts ("use client")
+export type DesktopOpen =
+  | { kind: "home" }
+  | { kind: "resolving"; id: string }
+  | { kind: "club"; orgHandle: string; roomId: string; roomKind: RoomKind | null; initialPage: ThreadMessagesResponse | null }
+  | { kind: "dm"; threadId: string };
+export type DesktopOpenApi = { open: DesktopOpen; filter: HomeFilter; setFilter: (filter: HomeFilter) => void; openThread: (threadId: string) => void; openClub: (orgHandle: string, roomId: string, roomKind: RoomKind | null) => void; openById: (id: string) => void; switchRoom: (roomId: string, roomKind: RoomKind | null) => void; goHome: () => void; fail: (message: string) => void };   // 3.5's text, unchanged
+export function useDesktopOpen({ initialChannelId, known }: { initialChannelId?: string; known: (id: string) => KnownChat | null }): DesktopOpenApi;
+
+// MessagesDesktop.tsx ("use client"; mounted by MessagesSwitch through next/dynamic, ssr: false)
+export function MessagesDesktop({ initialHandle, initialChannelId }: MessagesDesktopProps);
+
+// ClubPane.tsx, PinsPanel.tsx (placeholders)
+export function ClubPane(props: ClubPaneProps): null;
+export function PinsPanel(props: PinsPanelProps): null;
+```
+How the shell is laid out (what wave 5 mounts into):
+- Root: `height: 100vh`, a flex column, inside `<ChatSurfaceContext.Provider value="desktop">` (the New dialog and both right panels are inside it too). `WeekBand` (`folded={open.kind !== "home"}`), then the body row (`position: relative`, measured by the shell's one `ResizeObserver` -> `contentWidth`, the row's whole width, slim list included).
+- Body row: `InboxWide` at home, `SlimList` otherwise; then the PANE BOX (`flex: 1`, `position: relative`), one element for the page's life. In it: the empty stage (home), the skeleton (`resolving`), `ClubPane` inside `<div style={{ position: "absolute", inset: 0, display: "flex" }}>` with `key={open.orgHandle}`, and the dm frame (`LegacyThreadPane`, mounted once and never moved: when both list reads have settled, or at once when the address names a chat or carries `?to=`).
+- The Pinned box: a third item of the body row, only for a dm with the panel open: `width: 288`, `display: flex`, `background: t.page`; `flex: 0 0 288px` when `panelMode(contentWidth, 288, null, true)` says `side`, else `position: absolute; top: 0; right: 0; bottom: 0; z-index: 2` (no scrim). One element in both modes.
+
+What the shell hands `ClubPane` (all stable callbacks): `orgHandle`, `roomId`, `roomKind`, `initialPage` (non-null ONLY for a room opened by the resolving read: a deep link, a refresh, Back onto an unknown id; it always belongs to `roomId`), `night`, `contentWidth`, `onSwitchRoom` = `switchRoom` (rule 3's `replaceState`; the pane is NOT remounted, `roomId` / `roomKind` change as props and `initialPage` becomes null), `onLost(message)` = go home + an error toast with that message, `onOrg` (kept only when a field moved), `onListsChanged` = bump `refreshKey`, `onRsvpChanged` = `emitCalendarChanged` (the shell itself listens for `CALENDAR_CHANGED_EVENT` and re-reads the week on screen).
+
+What the shell hands `PinsPanel`: `threadId`, `title` (the open slim row's name: the thread's title, else `Direct message` / `Group` until the lists know it), `night`, `mode` (`"side"` | `"overlay"`), `refreshToken` (moves on the page's `pins-changed` for the open chat), `missedId` (set by `jump-missed`, cleared by the next `onJump` and by every change of chat), `onClose`, `onJump` (-> `handle.jump`), `onChanged` (-> `handle.pinsChanged`). The panel opens and closes on the page's `pins-toggle`, closes on `info-opened` and on every change of the open chat; after every change the page is told `setPanel(open)`.
+
+`refreshKey` moves: when the open chat changes or closes (not on home -> chat, not on a room chip), after a dm or group is created (`?to=` and New), on `onListsChanged`, and at most once per 600 ms for the page's `read` / `activity` / `list-changed` / a `closed` for another chat.
+
+Deviations from the contract:
+1. **`useSearchParams` is imported in `use-desktop-open.ts`** (from `next/navigation`; the Agent line bans only `router.push` / `router.replace` / `useRouter`, which are absent). It is a trigger only. Reason: a Next link to `/messages` followed while the shell is up (the left nav's `Messages`) keeps the page mounted and fires no `popstate`, so the screen kept the chat under an address that names the home. An effect keyed on the query reads the LIVE entry and applies rule 5 with no history write: no id -> the home (and the filter the address names, also when only `?tab=` differs at home); another id -> `homeBelow = false` and `reveal(id)`. After the hook's own writes it finds the address and the screen in agreement and does nothing.
+2. **Nothing is written, opened or toasted once the shell is gone.** `onPage()` is `mounted && pathname === "/messages"`; `fail()` after unmount does nothing (the contract says home + toast), and `openThread` / `openClub` / `openById` / `setFilter` / `goHome` return. `MessagesDesktop` keeps its own `aliveRef` for the `?to=` POST and the "page gave up" read. `DesktopOpenApi` was not widened.
+3. **A week card or a month plan row whose entry names its club does not go through `openById`.** It calls `openClub(handle, room_id, "event")`, or `switchRoom(room_id, "event")` when that club is already open (handles compared case-insensitively, so the pane's key never changes on spelling). So `initialPage` is null for these opens and a room that cannot be read surfaces through `ClubPane`'s `onLost`, not the shell's `Couldn't open this chat.` `openById` stays for an entry with no club.
+4. `fail()` with the home's entry underneath steps back (rule 4) instead of `replaceState("/messages")`: no second home entry is left and the filter is kept. Otherwise it is the contract's write (and the filter returns to All).
+5. Rule 1 keeps a fallback timer (`SETTLE_MS + 600` ms) after `adoptLayerEntry()` in case the landing `popstate` never comes.
+6. Rule 5 sets `homeBelow` true on Forward from the home onto the entry just left (`aboveHomeRef`); the contract only says false for the home.
+7. Rule 6's filter write goes through `clearLayersThen` although the contract excepts it (a popover closing on the same click would otherwise take the write on its own entry).
+8. Rule 9 also records whether a layer was showing in a CAPTURE listener at the start of the key's path (`RemoveConfirm` and the Report dialog are gone from the page by the time the key reaches `window`); Esc that ends an IME composition and a held key are ignored.
+9. The page's `open-failed` and `closed: lost` are not believed at once: one thread read (`?limit=1`), and when it still answers, the frame is told to open the chat again, once per 60 s; a second "gone" stands. (Wave 3's note: the page's list can be short by a soft failure.)
+10. `Couldn't open that conversation.` (the phone's line for a failed `?to=`) is a shell string outside 6.5; the empty stage's two lines are 3.2's.
+
+### W3-4-week: the band and the month
+
+Files: `WeekBand.tsx`, `MonthPopover.tsx` (both new).
+
+```ts
+export function WeekBand({ data, folded, night, onOpenRoom }: WeekBandProps);
+export function MonthPopover({ anchor, initialDay, now, night, onClose, onOpenRoom }: MonthPopoverProps);   // onClose(picked: Date | null), once per close
+// file-local in WeekBand.tsx: sentenceClip(folded), plainClick(e), entryDay(e), fitOf(count) (inside the component), StepButton, BandCard, BandItem, BandFailure, roomLink
+// file-local in MonthPopover.tsx: MonthTitle
+```
+How it behaves:
+- **The band** is a `<section>` 76px tall (44 folded, the height animates 320 ms), side padding 24. The left block (title button, the two arrows, the `This week` pill, the seven days; folded: the title alone) never shrinks. One `ResizeObserver` measures the band's box and that block; what follows is drawn only when at least 48px is left.
+- **The fit** is `bandFit(measured band + 8, measured left block, count)` (`fitOf`): the rule counts a gap after every slot and the row's last one has none. Checked by the integrator with a throwaway script (not committed): `bandFit(784, 540, 2)` -> 1 card + `+1`, `bandFit(176, 0, 1)` -> 1 card, `bandFit(175, 0, 1)` -> `+1`, and for every room from 48 to 1400 and 0, 1, 2, 3, 6, 12 events the cards (168 each), the chip (48) and the 8px gaps fit the room.
+- **Cards and folded items** are `<a href="/messages?channel=<room_id>">`; only a plain left click is answered here (`onOpenRoom(entry)`), and not the second click of a double click (integration edit 2). With no `room_id`: the same tile, `role="group"`, not a link.
+- **The month** is always anchored to the title button, whatever opened it (the title, a day, the `+N` chip), so focus returns to the title. Every close calls `closeMonth(picked)`: the band moves to the picked day's week (or stays) and that week is read again (`data.refreshWeek`). A plan row calls the shell's `onOpenRoom`; the shell's history write closes the popover on its way (its entry becomes the chat's, 3.5 rule 2).
+- The other states in the cards' place: grey cards while the week's first read is out (`fitOf(3)`), the two empty sentences with `Find events` (`/campus?tab=events`), the failure line with a pill (`BandFailure`).
+
+Deviations from the contract:
+1. **The month closes on its own anchor.** While it is open `MonthPopover` puts two native listeners on `anchor`: a click closes the month and is STOPPED (`stopPropagation`), and so is Esc pressed with focus on the title. 6.1 says a press on the anchor is the anchor's business; here the popover takes it because the picked day it hands to `onClose` lives in the popover. Stopping the click is what keeps the title from re-opening the month on the same click (React re-draws the band as closed before its own root listener runs); the title's `if (!month)` guard is the second line. Not browser-verified.
+2. The title button carries `aria-expanded` (true while the month is open). Not in the contract.
+3. `bandFit` is asked with the band 8px wider (above). H7 / 3.4 say the measured widths; `bandFit` itself is untouched.
+4. **In the full band at narrow widths the empty state is two rows**: the sentence wraps to a second line (2-line clamp) and `Find events` / the Retry pill drops under it when the two do not fit side by side. No picture shows it. Folded: one line with an ellipsis. Under 120px of room the control is not drawn; under 48px nothing is drawn after the days.
+5. The week's failure is a one-line `BandFailure` (`role="alert"`, the failure's own message; the pill is the failure's mapped action, else `Retry`), not the boxed `LoadFailed`: neither face of the band is tall enough.
+6. The `+N` chip's whole spoken name is `+2` (`aria-haspopup="dialog"`): 6.5 gives no words for it.
+7. The 48px and 120px thresholds are constants in `WeekBand.tsx` with no test.
+
+### W3-4-lists: the lists and New
+
+Files: `InboxWide.tsx`, `SlimList.tsx`, `NewChatDialog.tsx` (all new; 890 lines together against the rule of about 600).
+
+```ts
+export function InboxWide({ data, filter, night, onFilter, onOpenClub, onOpenThread, onNew }: InboxWideProps);
+export function SlimList({ rows, night, onHome, onOpen }: SlimListProps);
+export function NewChatDialog({ night, onClose, onCreated }: NewChatDialogProps);
+// NewChatDialogProps = { night: boolean; onClose: () => void; onCreated: (channelId: string) => void }   (contracts.ts)
+```
+How it behaves:
+- **`InboxWide`**: its root is the body row's flex item (`flex: 0 1 520px`, `min-width: 360`). It reads nothing (the shell's `HomeData`). The list switch is the phone's branch for branch, drawn with `ClubRow`, `PersonRow`, `ThreadRow` (requests), `HomeEmpty`, `HomeSkeleton`, `LoadFailed`, and `EmptyState` for requests only. Search is `searchRows` over the filter on screen; Esc in the field clears, then closes the field, and is stopped both times.
+- **`SlimList`**: its root is `flex: 0 0 232px`. Rows are `<a href>` (a plain left click -> `onOpen(row)`; the open row and the second click of a double click open nothing). It decides nothing: `rows` are `slimRows(...)`.
+- **`NewChatDialog`**: one person -> `POST /api/me/threads { handle }` through `vibeRequest`; several -> `{ type: "group", name?, members: <ids> }` by a hand-written `fetch` (it needs the `not_connected` ids of the refusal's body; every other failure is toasted with the same mapped line). `onCreated(channelId)`; the shell bumps the lists, opens the chat and takes the dialog away (its history entry becomes the chat's).
+- **The group rule**, as section 8 and 4.1 pin it: connections are read (all pages of 50, at most 20 pages, once) the first time a SECOND person is picked; the rule applies only while two or more are picked. So a non-connection picked as the second person IS pickable, and is then flagged (a red chip with the line, the same line under their row, `Create group` disabled until they are removed); a third non-connection is unpickable (`aria-disabled`). A failed or over-long connections read counts as "no list": nobody is greyed out and the server's `not_connected` refusal is the safety net (it names the people and marks them the same way).
+
+Deviations from the contract:
+1. **Suggested people are drawn only while fewer than two are picked.** With two or more picked and an empty search the list area reads `Search above to start a new message.` Reason: `/api/me/suggested-connections` leaves out everyone the viewer follows, so nobody on it could join a group. One condition in `NewChatDialog.tsx` (`const list = q ? ... : group ? [] : suggested`); the planner may reverse it.
+2. The picked people's chips and the `not_connected` sentence sit in a sticky block with the search (the chips box scrolls by itself past 124px); the group name field is below it and scrolls with the list. The block's measured height is written as `scroll-margin-top` on the rows and fields. The contract does not place these.
+3. A picked person the rule holds back shows the line under their row too, and that row stays pressable (it unpicks). Only a person who is NOT picked is `aria-disabled`.
+4. The wide list's search with no match reads `No matches for "<q>"`, a string 6.5 gives for the New dialog only.
+5. The heading `Suggested` over the suggested people is the phone's word (`ComposeOverlay`); 6.5 does not list it.
+6. Walk part B's words ("the second is unpickable") do not match this build (see the group rule above): the contract disagrees with itself; the code follows section 8 and 4.1.
+
+### W3-4-phonepins: the phone's pins and the old-screen line
+
+Files: `ConversationView.tsx`, `MessageBubble.tsx`, `ReactionPicker.tsx`, `ConversationActionSheet.tsx`, `PinnedSheet.tsx` (new), `MessagesMobile.tsx` (one line: `messagePins` on `MessagesMobileV2`'s `ConversationView`, `:556`; `MessagesMobileV1` and `CampusMobile` do not pass it).
+
+```ts
+// ConversationView.tsx: one new optional prop
+export function ConversationView({ ..., messagePins = false }: { ...; messagePins?: boolean });
+// MessageBubble.tsx, ReactionPicker.tsx: two new optional props each
+onPin?: () => void; pinLabel?: string;            // the picker row between Reply and Report; `pinLabel ?? "Pin message"`
+export const REACTION_EMOJIS = ["❤️", "👍", "👎", "😂", "🔥", "😮", "😢"] as const;   // untouched
+// ConversationActionSheet.tsx: one new optional prop
+onOpenPinned?: () => void;                        // draws `Pinned messages`; with it the chat-level row's other state reads `Unpin from top`
+// PinnedSheet.tsx ("use client")
+export type PinnedSheetProps = { pins: MessagePins; night: boolean; isLoaded: (messageId: string) => boolean; onJump: (messageId: string) => void; onClose: () => void };
+export function PinnedSheet({ pins, night, isLoaded, onJump, onClose }: PinnedSheetProps);
+// file-private: UNPIN_SETTLE_MS = 400, carried(pin), PinCard, wordButtonStyle
+```
+How it behaves (everything behind `messagePins`, the `post_line` items excepted):
+- `pinsOn` = `messagePins` and the list entry is a dm or a group and no room kind; the hook is `useMessagePins(threadId, { enabled: pinsOn && !isRequest })` (no `pollMs`: the phone reads on open, after its own pin or unpin, and on `reload()`).
+- `Pin message` / `Unpin message` in the long-press picker: on `available && pins !== null` (`pinControls`), never on a row still sending.
+- `Pinned messages` in the "..." sheet: on `available && (pins !== null || failure !== null)` (`pinsSheetRow`). Opening it calls `pins.reload()` first (one GET per open).
+- With `messagePins` every message row is wrapped in `<div data-mid=<id>>`, so a tap on a pin can find its row: the list scrolls it to the middle and the sheet closes. A pin whose message is not among the loaded ones opens in place to `full_text` with `That message is further back in the chat.`; a cut quote (`pinTextCut`) has `Show all`.
+- `PinnedSheet` is a `Drawer.NestedRoot` with its own history entry (`useLayerHistory(true, onClose)`). Empty: `Nothing pinned yet. Press and hold a message to pin it.` A failed first read: `LoadFailed` with Retry (`pins.reload`). An author the viewer cannot read: the time alone.
+- Both switch states (2.5 row 6): the quiet line under a room the viewer cannot post in is `viewer.post_line` when the server sends one (state `postLine`), and a send refused with `room_posters_only` turns the composer into that line (the refusal's own sentence until the room's is known).
+
+Deviations from the contract:
+1. **`Pinned messages` (and with it `Unpin from top`) also shows after a FIRST read that failed.** The orchestrator's rule (wave 2's note) was `available && pins !== null` for every control. With it the sheet's `LoadFailed` and its Retry could never be reached, and the phone has no timer that asks again. A database without the table still hides everything (a 404 is `available: false`, never `failure`). The long-press row keeps the strict gate. To reverse: `pinsSheetRow` -> `pinControls` at `ConversationView.tsx:1375`.
+2. Opening the sheet re-reads the list (4d.6 only gives the hook's call). The phone's dm view has no live update, so the list on hand is as old as the chat's opening.
+3. For 400 ms after an `Unpin`, a tap on a card's quote or on any `Unpin` is dropped (the next card has just moved under the finger; a second tap would unpin a second message for everyone). The clock is the tap's `event.timeStamp`. `Show all` is not paused.
+4. A pin with no words, photo, video or post reads `Attachment` (the phone's existing word; not in 6.5).
+5. After `Clear chat` the pin list is re-read only when `pinControls`.
+
+### Seams read on both sides
+
+- `MessagesSwitch` -> `MessagesDesktop` (`initialHandle`, `initialChannelId`; `next/dynamic`, `ssr: false`): matched. `useSearchParams` therefore never runs on the server; the build is green with `/messages` dynamic.
+- Shell -> `useHomeData(refreshKey, onThreads)`: one call under `desktop/messages/`; `onThreads` is a `useCallback` whose deps never change. `HomeData`'s fields used by the band (`now`, `range`, `weekOffset`, `week`, `weekErr`, `weekSlide`, `stepWeek`, `setWeekOffset`, `refreshWeek`, `retryWeek`) and by the wide list (`threads`, `requests`, `clubs`, `threadsErr`, `clubsErr`, `retryLists`, `now`): matched.
+- Shell -> `WeekBand` / `InboxWide` / `SlimList` / `NewChatDialog` against `contracts.ts`: matched field for field. `InboxWide.onOpenClub` wants `(handle, roomId, roomKind: RoomKind)`; the shell's `openClub` takes `RoomKind | null`: assignable. `SlimList.onOpen(row)`: the shell never acts on the open row's `target` (whose `roomKind` may be the placeholder `"room"`).
+- `WeekBand` -> `MonthPopover` -> `DesktopPopover` + `MonthBody` (`initialDay`, `now`, `night`, `onPicked`, `onOpenRoom`, `renderTitle`): matched.
+- A plan row or `onCreated` with a layer open -> the shell's `enter` -> `clearLayersInto`: the stack calls the layer's `onPop` (the popover's `close`, the New dialog's `onClose`) whatever its `canPop` says, then the layer's entry becomes the chat's (`replace`), `homeBelow` true. `MonthPopover.close` is guarded against a second call; `NewChatDialog`'s `busy` does not block it. Read in `layer-stack.ts`; not run.
+- The shell's Esc rule against the siblings: the wide list's search field and the month's anchor stop the Esc they handle; `DesktopDialog` / `DesktopPopover` count as layers. Matched by reading.
+- The double click across the shell's re-layout: fixed (integration edits).
+- `ConversationView` -> `useMessagePins` (`pins`, `available`, `failure`, `isPinned`, `pin`, `unpin`, `reload`), `PinnedSheet`, `MessageBubble` -> `ReactionPicker` (`onPin`, `pinLabel`), `ConversationActionSheet` (`onOpenPinned`): matched. The `data-mid` wrapper is a flex item of the list's column, so the bubble's own top margin stays inside it: the rows' spacing is unchanged (by reading).
+- Calm, over the nine new files and the phone diff: no hex and no `rgb(` literal except `rgba(var(--scrim-rgb), a)`; no `position: fixed` outside `DesktopDialog`; no `vaul`, `MonthSheet` or `YourWeek` under `desktop/messages/`; one glow (the band's first live card, full band only).
+
+### What the next waves must know
+
+**Wave 5**
+- **W3-5-club, the room arrives three ways.** (a) From a click (a list row, a week card, a plan row, a slim row): `roomKind` is `"lounge"`, `"board"` or `"event"`, `initialPage` is null: the pane makes the room's first read itself. (b) From the resolving read (a deep link, a refresh, Back onto an id the lists do not know): `roomKind` is the thread read's `room.kind`, `initialPage` is that read's body and belongs to `roomId`. (c) As a PROP CHANGE on the mounted pane (your own `onSwitchRoom`, or a week card of the club already open): `roomId` / `roomKind` change, `initialPage` becomes null, nothing is remounted (the pane's key is the handle). Key the `RoomView` child by `roomId` and hand it `initialPage` as given.
+- W3-5-club: a room or a club that cannot be read is YOURS to report: `onLost(message)` with the phone's words. For (a) and (c) the shell no longer shows `Couldn't open this chat.`
+- W3-5-club: `ClubPane`'s root is the ONE flex item of an `absolute; inset: 0; display: flex` box: give it `flex: 1; min-width: 0; min-height: 0` and put your right panel inside it. `contentWidth` is the body row's whole width (slim list included), which is what `panelMode` expects. Until the first measure it is 0: `panelMode` then says `hidden` (or `overlay` if opened here); do not store a choice from that frame.
+- W3-5-club: `onOrg` may be called after every space read (the shell keeps the object while nothing moved); `onListsChanged` and `onRsvpChanged` are stable; `onSwitchRoom(roomId, roomKind)` is rule 3's write and returns at once when `roomId` is already the open room.
+- W3-5-club: the shell's Esc goes home when no layer is up and focus is not in a field. A dialog of yours that is not a `DesktopDialog` / `DesktopPopover` must carry `aria-modal="true"` while it is on screen, or stop the Esc it handles.
+- W3-5-club, W3-5-panel: a link you answer in place (an event row -> its chat) should ignore the second click of a double click (`if (e.detail > 1) return;` after `preventDefault()`), as the band and the slim list now do: the pane re-lays itself under the pointer.
+- **W3-5-pins**: your root is the ONE flex item of a 288px `display: flex` box whose background is `t.page` (give it `flex: 1; min-width: 0; min-height: 0` and your own scroll). In `overlay` mode the box lies over the thread with no scrim and no border: draw the left hairline yourself in both modes. `title` is the open slim row's name (`Direct message` / `Group` until the lists or the page name the chat). `missedId` is cleared when you call `onJump`, so the same message missing twice arrives as null, then the id again. The panel is unmounted on every change of chat and on `info-opened`.
+- W3-5-pins, the gate: the phone now shows `Pinned messages` after a failed first read (W3-4-phonepins deviation 1). The desktop panel is opened by the page's own button and polls every 20 s, so it can show `LoadFailed` inside the open panel without changing any gate; decide and say which.
+- Everyone: `DesktopPopover` hears Esc only while focus is inside its box or on `<body>`. A popover whose anchor can hold focus while it is open (a pressed button in Chrome) is deaf to Esc there, and the shell's Esc stands down too (a layer is open). `MonthPopover` listens on its own anchor; the "+" tray's popover (wave 3) and any popover of wave 5 have the same gap until `DesktopDialog.tsx` covers it (below).
+
+**The orchestrator and the planner** (`contract.md` is read-only for builders; none of this was applied to it)
+- **Tests nobody owns** (each needs a file of wave 1, which this wave could not edit): (1) the band's widened ask: `bandFit(784, 540, 2)` -> `{ cards: 1, more: 1 }`, `bandFit(176, 0, 1)` -> `{ cards: 1, more: 0 }`, `bandFit(175, 0, 1)` -> `{ cards: 0, more: 1 }`, and the loop "cards*168 + the chip's 48 + 8 per gap <= room, for room 48..1400" (true today, by a throwaway script); better, move the `+ 8` into a named helper of `desktop-rules.ts`; (2) the shell's "address moved without a popstate" decision as a pure rule there: (live channel id | null, open id | null, live filter, current filter) -> `nothing` | `home` | `filter` | `open id`; (3) New's group rule as a pure function (picked ids, refused ids, connection ids or null, candidate id, is it picked -> carries the line, is unpickable, Create group held); (4) the phone's two rules in `pin-rules.ts`: `pinsSheetReachable({ available, pins, failure })` and `tapSettled(at, lastUnpinAt)`; (5) still owed from wave 3: the source-reading test of `messages.html`'s focus guards.
+- **3.5**: record that `useSearchParams` is allowed in `use-desktop-open.ts` as a read-only trigger (and reword W3-4-shell's Agent grep); add to rule 5 / rule 8 what a soft navigation to `/messages` from the left nav does while a chat is open; `fail` after unmount does nothing; `openById` is not the week card's path when the entry names its club. Section 10 part B: add the left-nav step.
+- **6.1**: the month is the exception to "a press on the anchor is the anchor's business". **`DesktopDialog.tsx` (W3-1-prep, not edited here)**: make `DesktopPopover` hear Esc on its `anchor` too; then `MonthPopover` can drop its keydown half and the "+" tray is covered.
+- **Section 10 part B against section 8 / 4.1 (the group rule): pick one.** Recommended: change the walk's words to "the second is flagged (a red chip with the line) and blocks `Create group` until removed; a third non-connection is unpickable". The other way (read connections at the FIRST pick and refuse a non-connection as the second) costs a connections read on every plain dm made in New and empties the Suggested list from the first pick on.
+- **New, the Suggested list once two are picked**: as built it is hidden (the list area reads `Search above to start a new message.`). The better version lists the viewer's connections there; it needs a heading in 6.5.
+- **6.5 has no words for**: the wide list's search with no match (as built: `No matches for "<q>"`), the band's `+N` chip's spoken name (as built: `+2`; suggested: `2 more, open the month`), the heading `Suggested`, a pin that carried nothing nameable (`Attachment`), a failed `?to=` (`Couldn't open that conversation.`).
+- **The phone's gate for `Pinned messages`** (W3-4-phonepins deviation 1) loosens the rule the orchestrator gave. Confirm it, or reverse it in one word.
+- H7 / 3.4: the band asks `bandFit` 8px wider; the full band's empty and failure states can be two rows at 1024 and 900 (no picture shows it).
+- W3-4-lists is 890 lines against about 600: accept or split.
+- 4.1, by the contract's letter: every `refreshKey` move also re-reads the calendar week (`useHomeData`, not editable here), and on desktop the page's `read` / `activity` / `list-changed` now move it (at most once per 600 ms). An active dm costs threads + inbox + calendar per burst. Consider letting the page-chatter bumps skip the week read after launch.
+- Not this wave's files, seen by reviewers: `src/app/api/me/connections/route.ts:37-55` pages an unordered read by offset (New and the old page both page it; a person can be missed or doubled across pages); `ConversationView.tsx:121` seeds `pinnedAt` / `mutedUntil` from `thread` at mount only, so on a deep link an already pinned chat's row reads `Pin to top` and a tap re-pins (pre-existing; more visible now that the row has two wordings); the phone's dm view has no live update (a pin made by the other person shows on the next sheet open); `use-message-pins.ts` without `pollMs` never retries a failed first read by itself.
+- Still open from wave 2: after `Clear chat history` the Pinned list can be empty while the chat holds 20 older pins (`pin_limit` with nothing to unpin).
+- Between waves 4 and 5 on this branch a club opens to an empty pane and the pin button opens an empty column. Nothing is deployed between waves.
+
+### Walk (DEFERRED: nobody opened a browser or started a server in wave 4)
+
+Section 10 parts A, B, D, F (history), G (the dm lines) and H (Esc) whole; nothing in them was run. On top of them:
+
+The shell (parts A, B, H):
+1. With a chat open, click `Messages` in the LEFT NAV: the home shows, the address is `/messages`, the band unfolds; Back once returns to the chat; the slim list's `Messages` control then goes home on the first press. From `/messages?tab=clubs` at home, the left nav's `Messages`: the pills return to All.
+2. The new effect does nothing on the shell's own writes: open, switch and close chats, change filters, open and close the month and New, create a chat in New, open a plan row from the month: no flicker, no skeleton flash, no extra list reads. In `next dev` (where `useSearchParams` runs through `use()`): a left-nav click does not flash the empty stage and the shell keeps its state; in StrictMode a deep link and `?to=` still open.
+3. Paste a deep link on a throttled connection, click Campus, come back to `/messages` before the first read answers: the home stays, no toast, Back does not re-open the old chat. With the resolving read or a `?to=` POST out, drag the window under 900px: the phone tree's entry is not rewritten and no desktop toast shows.
+4. In a club's Lounge (after wave 5) with a half-typed message, click that club's live event in the folded band: no skeleton, the draft and the panel stay, the address is the event room's. From the home, a week card and a month plan row open the club at once; Back returns home in one step. An entry with no club still resolves through the skeleton.
+5. **The double click** (integration edits): double-click the wide list's first, second and third row: the chat clicked opens and stays. Double-click each card of the full band: that event's chat opens and stays. Enter on a slim row and on a band card still opens it.
+
+The band and the month (part A):
+6. Click `Your week` (the month opens), click it again: the month closes and does NOT re-open; focus is on the title. The same with the month opened from a day and from `+N`. In Safari and Firefox too (Safari does not focus a clicked button). Esc with focus on the title closes the month and leaves an open chat open. Keyboard: Enter on the title opens, Shift+Tab out closes, Enter opens again; a screen reader says expanded / collapsed.
+7. Pick a day in another week, then close by clicking the title: the band moves to that week. Month open, press another day of the band, then the browser's Back: one step per layer, no stuck entry (the popover closes on pointerdown and the same press's click opens it again: `layer-stack.ts`' note on Chrome).
+8. 1024 and 900, this week and another, 1, 2 and 3 RSVPs: the cards and `+N` drawn fit, the last card is not clipped by the band's right padding, no horizontal scroll; the grey cards while loading match the room.
+9. The empty band: 1440 one row (`Nothing on your week yet.` then `Find events`); 1024 this week the sentence whole with `Find events` under or beside it, centred in the 76px band; 1024 another week `Nothing that week yet.`; 900 this week the sentence alone under 120px of room; 900 another week nothing after the days. Folded: one line. The failure line at 1440, 1024, 900: at most two lines, Retry beside or under it, nothing spills out of the band; Light and Night; the week slide still plays on the two-row state.
+10. The popover's top sits flush under the day chips; the days slide in after a week step and on return home.
+
+The lists and New (parts A, B):
+11. New: search, scroll the 20 results, pick a second and a third person, `Create group` with a non-connection in it: the red chip and the sentence stay on screen above the list; the picked row shows the line and a coral check and unpicks when pressed. The connections read finishing late flags someone already picked with the chip in view.
+12. New: pick two people, clear the search: `Search above to start a new message.`; remove one: Suggested comes back. Many picked people: the chips box scrolls by itself at 124px; in a window about 600px high the list still has room. Tab and Shift+Tab through the rows and the group name field: the focused row is never behind the sticky block.
+13. New against the local stack: one person (dm), three with a name (group), the `not_connected` refusal, a name the word filter refuses (422, field `name`). Part B's "the second is unpickable" will NOT pass as written (the planner's call above).
+14. The wide list: the hover wash against the rows' hairlines, the tint on the active Requests pill, focus rings in Light, the sticky search, the 360px minimum at a 900px window.
+
+The phone's pins (part G, 375px, Night and Light):
+15. A dm with `GET /message-pins` failing (offline, or a 503): long-press shows no `Pin message`; the "..." sheet DOES show `Pinned messages`; the sheet shows `LoadFailed` with Retry; Retry, or reopening the sheet, loads the list and the long-press row appears. A database without the pins table (a real 404): no `Pinned messages`, no `Pin message`, the chat-level row still reads `Unpin`.
+16. Two accounts in one dm: A pins; B, with the chat already open, opens `Pinned messages` and sees it. Three pins, double-tap `Unpin` on the first: only one goes; a slow second tap works; the same by keyboard / screen reader.
+17. The long-press picker with the extra row above and below the bubble; the sheet's inner scroll on iPhone; tap-to-jump's scroll position; Back closes only the sheet; drag-dismiss; a reload with the sheet open; the rows' spacing in a dm and a group with the `data-mid` wrapper.
+18. A switch-off phone (2.5 rows 6 and 7): the old who-can-post line (`viewer.post_line`) and a `room_posters_only` refusal; long-press shows no Pin; the "..." sheet has no Pinned row and still says `Unpin`.
