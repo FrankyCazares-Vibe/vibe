@@ -256,3 +256,210 @@ Deviations from the contract (6.1, 6.2):
 6. Dragging a switch-on window across 900px swaps the phone tree and the desktop shell.
 7. The phone's month at 375px with `chat_v2` on (2.5 row 10 item e; section 10 part G): open from the title and from a day, focus lands on the picked day, change month by chevron and by swipe, Today, pick a day, open a plan, close by the handle, by Back, by a drag, by the scrim; the strip moves to the picked day's week. All as on Oct 2.
 8. `DesktopDialog` and `DesktopPopover` are mounted by nobody yet: their focus, Esc, Back, Tab and window-blur rules were checked by reading only. They are walked with the first screens that use them (waves 3 to 5; section 10 part H).
+
+## Wave 2
+
+Integrated Sat Oct 3, 2026. Four batches: W3-2-roomsdb, W3-2-roomreads, W3-2-roomroutes, W3-2-pinroutes. The server only: no new screen, nothing mounts the hook yet. Not committed, not pushed, not deployed. Production was not touched by the integrator; the builders report the same (the post-policy file is applied to the LOCAL Docker stack only).
+
+### The gate (run in the worktree after all four batches)
+
+| Check | Result |
+|---|---|
+| `npm run typecheck` | exit 0 |
+| `npm test` | 2,025 tests, 2,025 pass, 0 fail (1,900 after wave 1; +125) |
+| `npx eslint <the 20 source and test files of the wave>` | exit 0, no problem in any file (nothing added to map 05's baselines) |
+| `npm run build` | exit 0 (the three new routes build) |
+| `scripts/sql/chat-room-post-policy-check.sql` on the LOCAL stack | `chat-room-post-policy-check: all 104 cases passed`, then `ROLLBACK` |
+| `scripts/sql/chat-message-pins-check.sql` (rerun after the last apply) | `all 43 cases passed`, `ROLLBACK` |
+| `scripts/sql/chat-v2-rooms-check.sql` / `chat-v2-cards-check.sql` (unchanged files) | `all 200 cases passed` / `all 181 cases passed`, `ROLLBACK` |
+
+Local database after the wave (read by the integrator): `schema_migrations` holds `20261004110000 | chat_room_post_policy` above `20261004100000 | chat_message_pins`; `channels.post_policy` is `text not null default 'everyone'`; both constraints validated; md5s `can_post_org_channel` = `ae485a1fb463cfd6f6ace3448d986fb9`, `chat_cast_vote` = `0ba4681e8816cecaa5c066ee6b03bedd`, `can_view_org_channel` = `747ee06d2e4c3e8a788129f7530ec0ae` (untouched); no room holds a rule other than `everyone`; `chat_message_pins` is empty.
+
+The integrator changed two COMMENTS and no code (see "Integration edits"). Every changed file belongs to a batch; `types.ts` was edited by W3-2-roomreads under the grant written in wave 1's notes.
+
+### Files of the wave (22: 11 changed, 11 new)
+
+Changed: `src/app/api/orgs/[slug]/channels/route.ts`, `.../channels/[channelId]/route.ts`, `.../members/route.ts`, `.../space/route.ts`, `src/lib/chat/rooms.ts`, `reads.ts`, `reads.test.ts`, `message-read.ts`, `message-read.test.ts`, `reads-routes.test.ts`, `types.ts`.
+
+New: `supabase/migrations/20261004110000_chat_room_post_policy.sql`, `scripts/sql/chat-room-post-policy-check.sql`, `src/app/api/me/threads/[id]/message-pins/route.ts`, `src/app/api/me/threads/[id]/messages/[messageId]/pin/route.ts`, `src/app/api/me/threads/[id]/shared/route.ts`, `src/lib/chat/pins-read.ts`, `pins-routes.test.ts`, `use-message-pins.ts`, `room-names.ts`, `room-names.test.ts`, `room-routes.test.ts`.
+
+### Integration edits (comments only)
+
+1. `src/lib/chat/types.ts`, the comment on `PinnedMessage.author`: was "null when the account is gone"; now says null means the VIEWER cannot read that profile (suspended or banned author) or the authors' read failed, and the pin is still live. The type is unchanged.
+2. `src/lib/chat/rooms.ts`, the file header: one sentence added saying the three `postPolicyColumn...` functions only remember a missing column (the header counted "four" functions).
+
+### W3-2-roomsdb: the post-policy migration
+
+Files: `supabase/migrations/20261004110000_chat_room_post_policy.sql` (1,028 lines), `scripts/sql/chat-room-post-policy-check.sql` (690 lines). LOCAL stack only.
+
+- Column `public.channels.post_policy text not null default 'everyone'`; constraints `channels_post_policy_check` (`in ('everyone','officers','listed')`) and `channels_post_policy_rooms_only` (`post_policy = 'everyone' or coalesce(kind = 'room', false)`).
+- `public.can_post_org_channel(cid uuid, uid uuid, root uuid) returns boolean` restated (the two new arms of 4b.2); `public.chat_cast_vote(p_poll uuid, p_option uuid, p_user uuid, p_on boolean) returns void` restated (the closed test is `v_kind = 'event'`). Both keep EXECUTE for anon, authenticated, service_role. `can_view_org_channel` is not touched.
+- The file's own behaviour check raises `P0C59`. The check script refuses anything but the local unix socket and ends `chat-room-post-policy-check: all 104 cases passed`.
+- Run it: `docker exec -i supabase_db_vibe psql -U postgres -d postgres -v ON_ERROR_STOP=1 < scripts/sql/chat-room-post-policy-check.sql`.
+- Who may put a person on a room's list (read on the local stack by the integrator): only owner and admin (`org_channel_members_insert`'s check), so a `listed` room's posters cannot add themselves.
+
+Deviations from the contract:
+1. The header's PRE-CHECK has SIX items (nine read-only queries), not the contract's list. Item 4 reads the triggers on eight tables (`channels`, `messages`, `channel_members`, `org_channel_members`, `chat_polls`, `chat_poll_options`, `chat_poll_votes`, `orgs`). Item 6 is new: who may write the rule (column privileges for anon and authenticated on `channels`, `relacl`, policies covering UPDATE), with the builder's own instruction: stop and tell Franky if anon or authenticated holds INSERT or UPDATE on `public.channels` on production. Items 4 and 6 are reads BY HAND: the file does not refuse on a different answer.
+2. 104 check cases, not the first build's 102 (C11 = PRE-CHECK 6 as a catalog case; K15 = an admin's direct insert of a room born with a rule, refused 42501). The header's REHEARSED paragraph still says 102, with an AFTER THE REVIEW paragraph under it.
+3. Extras the reviewer accepted: the apply record sits in `can_post_org_channel`'s comment; a stricter md5 compare; two extra pre-flight raises; three CHECK probes; a rollback guard; a restated `chat_cast_vote` comment; header sections beyond the contract's eight. Size 1,718 lines against "about 600".
+
+### W3-2-roomreads: rooms in the space and thread reads
+
+Files: `src/lib/chat/rooms.ts`, `reads.ts`, `reads.test.ts`, `message-read.ts`, `message-read.test.ts`, `reads-routes.test.ts`, `src/app/api/orgs/[slug]/space/route.ts`, and the one type `SpaceRoom` in `types.ts`.
+
+```ts
+// src/lib/chat/rooms.ts (server-only)
+export function postPolicyColumnMissing(now: number = Date.now()): boolean;     // true while now - lastNote < 5 * 60 * 1000
+export function notePostPolicyColumnMissing(now: number = Date.now()): void;
+export function forgetPostPolicyColumnMissing(): void;                          // tests only
+export async function loadRoom(channelId: string): Promise<Room | null>;        // select "id, kind, name, org_id, event_id, post_policy"; fallback without it; the Room ALWAYS has post_policy
+
+// src/lib/chat/reads.ts (pure)
+export function spaceCanPost(kind: RoomKind, role: ClubRole | null, state: RoomState | null, policy: PostPolicy = "everyone", listed = false): boolean;
+export function orderSpaceRooms(rooms: SpaceRoomWithPosition[]): SpaceRoom[];   // keeps locked and post_policy (eight keys)
+export function recentShown<T extends { hidden: boolean; removed: unknown }>(messages: T[], max: number): T[];   // NEW, not in the contract
+
+// src/lib/chat/message-read.ts
+export function viewerInRoom(room: Room, role: ClubRole | null, mayPost: boolean): ViewerInRoom | null;   // post_line only when !mayPost && kind === "room" && (post_policy ?? "everyone") !== "everyone"
+
+// src/lib/chat/types.ts
+export type SpaceRoom = { id: string; kind: RoomKind; name: string; unread: boolean; can_post: boolean; event: EventRef | null; locked: boolean; post_policy: PostPolicy };   // both REQUIRED now
+```
+`GET /api/orgs/[slug]/space`: rooms select `"id, kind, name, event_id, position, is_private, post_policy"`, fallback `"id, kind, name, event_id, position, is_private"`. Each room carries `locked` (`is_private === true`) and `post_policy`; `can_post = spaceCanPost(kind, role, state, policy, listed)`. `?panel=1` adds `board_recent: ChatMessage[]` (at most 3, newest first, cut from the Board page the route already reads with `{ limit: 6 }`).
+
+Deviations from the contract:
+1. `SpaceRoom.locked` and `post_policy` are required now: wave 1's open mismatch is CLOSED. Screens read them plainly (no `?? "everyone"`, no `=== true`).
+2. `viewerInRoom` resolves `room.post_policy ?? "everyone"` and sets `post_line` only when `postRuleLine` answers a string (the contract's bare compare does not compile for an optional field).
+3. `recentShown` is an extra export (the pure cut behind `board_recent`).
+4. With `?panel=1` and no Board, or nothing to show, `board_recent` is `[]`, never absent. Without `?panel=1` the key is absent. Its first entry equals `board_latest`.
+5. The by-name list read (`org_channel_members`, made only when some room is `listed`) failing is logged and read as "not listed": a non-officer's `can_post` on a `listed` room falls to false and the answer is still 200. The thread read's `viewer.can_post` corrects it on open.
+6. The "column missing" note is made on the first missing-schema failure of a select that named `post_policy`, even when the missing column is really `kind` (a database without migration A). Only effect: 5 minutes of the fallback select there.
+7. `reads-routes.test.ts` stubs `@/lib/chat/rooms` but re-exports the three memory functions from the REAL `rooms.ts` by absolute file URL. Any FUTURE test that stubs `@/lib/chat/rooms` and loads the space route or the channels route must export `postPolicyColumnMissing` and `notePostPolicyColumnMissing` from its stub.
+
+### W3-2-roomroutes: room routes, room names, the roster filter
+
+Files: `src/app/api/orgs/[slug]/channels/route.ts`, `.../channels/[channelId]/route.ts`, `.../members/route.ts` (GET only), `src/lib/chat/room-names.ts`, `room-names.test.ts`, `room-routes.test.ts`.
+
+```ts
+// src/lib/chat/room-names.ts (pure, no import)
+export function roomDisplayName(slug: string): string;    // "exec-only" -> "Exec only"; applying it twice equals once
+export function roomSlug(input: string): string | null;   // "Exec only" -> "exec-only"; null unless ^[a-z0-9][a-z0-9_-]{1,30}$
+```
+- **`GET /api/orgs/[slug]/channels`**: three-step read. (1) `${LIST_COLUMNS}, kind, post_policy` + the event filter, skipped while `postPolicyColumnMissing()`; (2) on missing schema: `notePostPolicyColumnMissing()`, then `${LIST_COLUMNS}, kind` + the event filter; (3) only if that is missing schema too: the bare read. A row has `post_policy` ONLY from step 1: read it as `row.post_policy ?? "everyone"`. Answer `{ ok: true, channels }`; any other failure is 500 `load_failed` after one read.
+- **`POST /api/orgs/[slug]/channels`**: body `{ name, topic?, is_private?, position?, post_policy? }`. Gates in order: 401; `rateLimit("room-create:" + user.id, { limit: 10, windowSec: 600 })`; publish gate; body (a bad `post_policy` is 400 `Invalid post_policy`); name rule; officer guard; a core room's name -> 409 `room_locked`; name clash -> 409 `Channel name already exists`; the cap (409 `room_limit` at `>= EXTRA_ROOM_CAP`, skipped when `kind` cannot be read). 201 `{ ok: true, channel: { id, name, topic, is_private, pinned, position, created_at, post_policy } }`: `post_policy` is ALWAYS in the answer. `post_policy` is written and selected only when it is not `everyone`; a rule asked of a database without the column -> 503 `try_again`, no second insert.
+- **`PATCH /api/orgs/[slug]/channels/[channelId]`**: body `{ name?, topic?, is_private?, position?, pinned?, post_policy? }`. `post_policy` on anything but `kind === "room"` -> 409 `room_locked` (checked BEFORE the value); a bad value -> 400 `Invalid post_policy`. Answer `{ ok: true, channel }`; `channel.post_policy` is present ONLY when the body named it. `DELETE` is untouched.
+- **`GET /api/orgs/[slug]/members?visible=1`** (exactly the value `1`): the roster without the ids of `blockedIdsFor(supabase, user.id)`; a failed block read -> 503 `try_again`. Without the parameter: today's unfiltered list. Row shape unchanged (`RosterRow`).
+
+Deviations from the contract:
+1. **PATCH on a database without the column does NOT answer 503 for every value** (contract 4.2's letter). `officers` / `listed` -> 503 `try_again`, nothing written. `everyone` -> the key is dropped and the rest of the body is written by the pre-wave update, once; the answer is 200 with `channel.post_policy: "everyone"`. A body that held ONLY `post_policy: "everyone"` writes nothing, reads the room back and answers 200. A second failure is the old 500 `Failed to update channel`. Reason: a missing column already means everyone, and the Rooms dialog sends the field on every save, so a plain rename must work after a rollback (4b.2 "Code keeps working").
+2. PATCH does not use the 5-minute memory (neither does POST): a stale memory could turn a real `officers` -> `everyone` change into a silent no-op.
+3. PATCH with `post_policy` where `kind` cannot be read (null) is 409 `room_locked`, like any non-room.
+4. POST validates `post_policy` with the body, before the officer guard: a non-officer sending a bad value reads 400, not 403.
+5. POST's cap count failing (or null) answers 500 `Failed to create channel` and writes nothing.
+6. The roster filters only for `visible=1`; `visible=true`, `visible=0` and an empty value are the unfiltered list.
+7. `room-routes.test.ts` stubs the memory trio (the memory itself is tested through `reads-routes.test.ts` and `message-read.test.ts`).
+8. The first builder's own list of eleven deviations did not reach the integrator; the lines above are what the diff shows and what the repair reported.
+
+### W3-2-pinroutes: pin and shared routes, the mappers, the hook
+
+Files (all new): the three route files, `src/lib/chat/pins-read.ts`, `pins-routes.test.ts`, `use-message-pins.ts`.
+
+```ts
+// src/lib/chat/pins-read.ts (server-only)
+export const PIN_LIST_SELECT = "message_id, pinned_at, message:messages!chat_message_pins_message_id_fkey(id, content, created_at, user_id, media_url, media_kind, attachment_id, removed_at)";   // NO users embed
+export const PIN_AUTHOR_SELECT = "id, handle, name, avatar_url";      // the authors' read, on the viewer's cookie client
+export const PIN_LIVE_SELECT = "message_id, message:messages!chat_message_pins_message_id_fkey(removed_at)";
+export const PIN_ROWS_MAX = 100;
+export const SHARED_LIMIT_DEFAULT = 30;
+export const SHARED_LIMIT_MAX = 60;
+export const SHARED_READS_MAX = 4;
+export type PinMessageRow = { id?: string; content?: string | null; created_at?: string; user_id?: string; media_url?: string | null; media_kind?: string | null; attachment_id?: string | null; removed_at?: string | null };
+export type PinRow = { message_id: string; pinned_at: string; message?: PinMessageRow | PinMessageRow[] | null };
+export function pinAuthorIds(rows: PinRow[] | null, clearedAt: string | null): string[];
+export function pinAuthors(rows: unknown[] | null): Map<string, Person>;
+export function toPinnedMessages(rows: PinRow[] | null, clearedAt: string | null, authors: ReadonlyMap<string, Person>): PinnedMessage[];
+export function pinSlots(rows: PinRow[] | null, messageId: string): { live: number; among: boolean };
+export function clampSharedLimit(raw: string | null): number;
+export function toSharedItems(rows: MessageRow[] | null, channelId: string): SharedItem[];
+
+// src/lib/chat/use-message-pins.ts ("use client")
+export type MessagePins = { pins: PinnedMessage[] | null; available: boolean; failure: LoadFailure | null; isPinned: (messageId: string) => boolean; pin: (messageId: string) => Promise<boolean>; unpin: (messageId: string) => Promise<boolean>; reload: () => void };
+export function pinTextCut(pin: Pick<PinnedMessage, "text" | "full_text">): boolean;
+export const PINS_LOAD_LINE = "Couldn't load pinned messages.";
+export function useMessagePins(threadId: string | null, options: { enabled: boolean; pollMs?: number }): MessagePins;
+
+// routes
+// GET    /api/me/threads/[id]/message-pins                   -> MessagePinsResponse   (Cache-Control: private, no-store)
+// PUT    /api/me/threads/[id]/messages/[messageId]/pin       -> PinMessageResponse    (no body)
+// DELETE /api/me/threads/[id]/messages/[messageId]/pin       -> PinMessageResponse
+// GET    /api/me/threads/[id]/shared?before=<iso>&limit=<n>  -> SharedResponse        (Cache-Control: private, no-store)
+```
+Gates as 4.3 pins them, in its order. Common: 401; `chatV2For` false -> 404 `not_found`; a non-uuid id -> 404; not a member -> `ensureMember`'s status with `{ ok: false, error: "Not a member" }`; a club room -> 400 `pins_chats_only`; the table missing -> 404 `not_found`; the service key missing or any other read failure -> 503 `try_again`. PUT and DELETE then: `rateLimit("message-pin:" + user.id, { limit: 30, windowSec: 600 })`, `requireNotRestricted`, a pending request -> 403 `pin_not_allowed`. PUT then: `dmSendBlocked` (blocked 403 `pin_not_allowed`, failed 503), the message on the cookie client, the cap, the insert (23505 -> `already: true`; 23503 -> 404).
+
+Deviations from the contract:
+1. **The pin list's authors are read on the VIEWER's cookie client, not in the service read** (4.3's row says "joined to their messages and authors"). `users.select("id, handle, name, avatar_url").in("id", <authors of the pins shown>)`; an author RLS hides (suspended, banned) is `author: null`; a failed authors' read is logged and every author is null, still 200. No authors' read when no pin is shown. Reason: the service role reads every profile; the thread sends `users: null` for the same message.
+2. **PUT selects `id, created_at, removed_at` and answers 404 `not_found` for a removed message; the cap counts only pins whose message is live** (`pinSlots`). Wave 1's note asked for both.
+3. **The shared route reads on past skipped rows**: up to `SHARED_READS_MAX` = 4 reads of `limit + 1` rows in one request, each from the previous read's last RAW row, until it has `limit` items or the rows run out. `has_more` is NEVER true with `items: []`. A run of more than about 4 x limit skipped rows in a row ends the list there (older items are then not reachable). Lifting that needs a cursor field on `SharedResponse`; not added (the type is pinned).
+4. "Was the quote cut" is `pinTextCut(pin)` (`pin.text !== pin.full_text.replace(/\s+/g, " ").trim()`), not 4d.5's length test.
+5. `MessagePins.available` is TRUE before the first answer and for every new `threadId`; it turns false after a 404 or `pins_chats_only`. See the gating rule below.
+6. The hook also treats the code `pins_chats_only` as "not available" and stops its timer until `reload()`. A newly pinned message joins `pins` with the next read (its quote comes from the server); `isPinned` answers at once.
+7. `pins-routes.test.ts` stubs three client modules so the hook file loads under `node --test`; the hook itself (`useMessagePins`) is not run by any test, only `pinTextCut`.
+
+### Seams read on both sides (all matched; no code changed)
+
+- `rooms.ts` exports the memory trio with 4.2's names and signatures; `channels/route.ts` and `space/route.ts` import `postPolicyColumnMissing` and `notePostPolicyColumnMissing` from it. PATCH and POST import neither, on purpose.
+- The migration's column, its three values and `kind = 'room'` are what `isPostPolicy`, `loadRoom`, the space route and the two room routes read and write. The rule is written only by the service role in the two room routes.
+- `PIN_LIST_SELECT` and `PIN_LIVE_SELECT` name the foreign key `chat_message_pins_message_id_fkey`; the local table has a constraint of exactly that name (read from the catalog).
+- The space route's by-name read runs on the cookie client; `org_channel_members_select` lets a person read their own rows (read from the local catalog).
+- The hook's two URLs, methods and response types are the routes'; it reads `status === 404` and `code === "pins_chats_only"`, both of which the routes send.
+- `toSharedItems` uses the thread read's own `prepareForClient` and `MESSAGE_SELECT`, so a shared item's `media_url` and `attachment` are the thread's.
+
+### What the next waves must know
+
+**Wave 3**
+- W3-3-thread, W3-3-forms: `SpaceRoom.locked` and `post_policy` are required: read them plainly. `viewer.post_line` is present only on an extra room whose rule refused this viewer.
+- W3-3-thread: `roomDisplayName` / `roomSlug` are in `@/lib/chat/room-names` (pure; safe in a client file).
+- W3-3-bridge (wherever `#cPinsBtn`, the hover pin and the pane's pin controls are gated) and W3-3-campus: nothing new from this wave beyond the routes above.
+
+**Wave 4**
+- W3-4-phonepins: show a pin CONTROL (`Pin message` / `Unpin message`, `Pinned messages`) only when `pins.available && pins.pins !== null`. `available` alone is true before the first answer; on a database without the table that would show controls for a moment and the PUT would toast (2.5 row 10 (f)). Show the "not available" state on `!pins.available`.
+- W3-4-phonepins: import `pinTextCut` from `@/lib/chat/use-message-pins` for `Show all`; do not write a length test (this supersedes wave 1's note, which gave the expression).
+- W3-4-phonepins: `author` can be null on a live pin. The words table has no string for it: see the orchestrator's list.
+
+**Wave 5**
+- W3-5-pins: the same three rules as W3-4-phonepins (gate on `available && pins !== null`, `pinTextCut`, a null author). `Show more` asks `?before=<the last item's created_at>` and only while `has_more`; an empty answer has `has_more: false` and is the end.
+- W3-5-club, W3-5-panel: with `?panel=1`, `board_recent` is always an array (`[]` when there is no Board or nothing to show); its first entry equals `board_latest`. A `listed` room's `can_post` in the space answer may be false for a listed member when the by-name read failed: trust the thread read's `viewer.can_post` once the room is open.
+- W3-5-rooms:
+  - A row of `GET /api/orgs/<handle>/channels` may have no `post_policy` key: read `row.post_policy ?? "everyone"`.
+  - Send `{ name, topic, is_private, post_policy }` on every save of an extra room if you like: a plain rename works on a database without the column. Read the saved rule from the PATCH answer's `channel.post_policy` (present whenever the body named it). Show the 503 sentence when `officers` / `listed` is refused.
+  - Never send `post_policy` for the Board, the Lounge or Officers: 409 `room_locked`.
+  - Two stored names can show the same words (`exec_only` and `exec-only` are both `Exec only`); the route's uniqueness check compares slugs. The form's validity rule should compare `roomDisplayName` against the existing rooms.
+  - Typing `Board`, `Lounge` or `Officers` as a NEW room's name gives a core room's slug and POST answers 409 `room_locked`, whose sentence ("This room can't be renamed, hidden or deleted.") reads wrongly for a create. Catch the three names in the form's validity rule with a line of your own (the planner picks the words).
+  - POST can answer 429 (10 creates per 10 minutes per person) and 500 when the cap's count fails.
+- W3-5-people: `?visible=1` is exact; a 503 `try_again` means the block read failed (show the retry, never an unfiltered list).
+
+**The orchestrator and the planner** (`contract.md` is read-only for builders; none of these was applied to it)
+- 4.2, the PATCH bullet: amend to deviation 1 of W3-2-roomroutes (503 only for `officers` / `listed`; `everyone` drops the key and runs today's update once; the answer carries `post_policy: "everyone"`).
+- 4.3, the message-pins row: the authors are read on the viewer's client (RLS decides); a hidden profile is `author: null`; a failed authors' read is nulls, not 503. The type comment in `types.ts` already says so.
+- 4.3, the shared row, and 4d.5: the route reads on past skipped rows (up to 4 reads) and `has_more` is never true with `items: []`. Decide whether `SharedResponse` gains `next_before: string | null` to lift the bound (W3-5-pins would then page by it).
+- 4d.5 (line 690): replace `full_text.length > text.length` with `pinTextCut(pin)`.
+- 4d.4: `available` is "false after a 404" AND true before the first answer; add the gating rule (`available && pins !== null`).
+- **Pick the words for a pin whose author is null** (6.5 has none). Recommendation: the time alone (`rowTime(created_at)`), no invented name.
+- **A rule gap, not a code fault**: the cap of 20 is per chat, but "Clear chat history" hides older pins per person. Someone who cleared a chat holding 20 older pins sees an empty Pinned list and still gets 409 `pin_limit` with nothing to unpin. Decide whether the sentence, the cap or the list gives.
+- 4b.3 step 4: name the header's PRE-CHECK item 6 (who may write the rule) and the widened item 4 beside "compare the three md5s"; both are reads by hand. Confirm or reword the builder's "stop and tell Franky" instruction in item 6.
+- Anything that quotes 102 cases for the post-policy check should say 104.
+- The 5-minute memory is per server instance and nothing clears it on a successful write. An instance that noted the column missing just before the production apply answers rooms as `everyone` (list, space, `loadRoom`, and a refused send reads `room_closed`'s sentence) for up to 5 minutes. 4b.3 step 5's redeploy covers production. ON THE LOCAL STACK: restart the dev server after applying or rolling back the post-policy file, before the walk.
+- `scripts/sql/chat-latest-check.sql` (migration C's check; not required by this wave) stops at its fixture lookup on the local stack as it stands: it needs `node scripts/local-seed.mjs` first. It says nothing about this wave either way.
+- `src/app/api/orgs/[slug]/channels/[channelId]/members/route.ts` (no batch of this wave; not edited): its comments still call a by-name row on a public room "harmless but not useful". With `post_policy = listed` that row now grants posting. The code already accepts it; only the comment is stale. Give the line to W3-5-rooms or W3-5-people.
+- Still open from wave 1 and untouched here: `public/html/_sharePicker.js`'s own refusal table has no `room_posters_only`.
+
+### Walk (DEFERRED: nobody opened a browser or started a server in wave 2; nothing here was run against a real PostgREST)
+
+1. Real PostgREST, local stack: `PIN_LIST_SELECT` and `PIN_LIVE_SELECT` (the `messages!chat_message_pins_message_id_fkey` embed on a table only `service_role` may read), the authors' read on the cookie client, and the shared read's `.or("media_url.not.is.null,attachment_id.not.is.null")` filter have only met stubbed clients. One real read of each is owed before the routes are trusted. Section 10 part E, all of it.
+2. Real RLS: pin a message of Blake's in a dm, suspend Blake, open the chat as Avery: `GET /message-pins` answers `author: null` for that pin.
+3. Shared paging on real rows: a dm with 31 or more shared posts in a row from a since-banned author shows no endless `Show more`; the read-on cursor (a raw `created_at` as PostgREST prints it) is accepted by the database.
+4. The hook in a browser: no pin control before the list answers (a slow phone; production between the deploy and the pins file); the optimistic pin and unpin, the revert and the toast on a refusal, the 20-second poll while visible.
+5. Part C2 on the local stack WITH the column: `GET /api/orgs/<handle>/space` answers `locked` / `post_policy` per room and `can_post` false for a member in an `officers` room and in a `listed` room they are not on; a member opening such a room reads `Only officers post here.` / `Only officers and people they picked post here.`; `?panel=1` gives at most three Board posts, newest first, never a removed or blocked author's stub.
+6. The same reads on a local database WITHOUT the column (the rollback rehearsed): 200 with every room `everyone`, and one failed select per 5 minutes in the server log, not one per poll. In the Rooms dialog there: a rename with `Everyone who can see it` saves; switching to `Only officers` shows `Try again in a moment.` and changes nothing.
+7. Part C2: creating a 6th extra room shows `This club already has 5 extra rooms. Delete one first.`
+8. Part F: a switch-off laptop's Campus > Chat rail lists the same rooms as before the build, with no event chats.
