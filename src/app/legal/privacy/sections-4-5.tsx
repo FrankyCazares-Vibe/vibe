@@ -120,9 +120,10 @@ export function Sections4To5() {
           <strong>Direct and group chats.</strong> Members see every message,
           photo, video, shared post and reaction, who is in the chat, when the
           other side last read it and who is typing. Someone added later can
-          read the whole history. A message from someone you are not connected
-          with (you do not follow each other) arrives as a request, and the
-          sender sees when you read it.
+          read the whole history. Anyone in the chat can pin a message for
+          everyone in it, and we store who pinned it and when. A message from
+          someone you are not connected with (you do not follow each other)
+          arrives as a request, and the sender sees when you read it.
         </li>
         <li>
           <strong>Blocks.</strong> A block stops new messages both ways, and a

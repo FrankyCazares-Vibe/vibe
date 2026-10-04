@@ -139,7 +139,7 @@ You see how many people viewed your profile and each of your posts. With Vibe+ y
 
 ### 5e. People in your chats
 
-- **Direct and group chats.** Members see every message, photo, video, shared post and reaction, who is in the chat, when the other side last read it and who is typing. Someone added later can read the whole history. A message from someone you are not connected with (you do not follow each other) arrives as a request, and the sender sees when you read it.
+- **Direct and group chats.** Members see every message, photo, video, shared post and reaction, who is in the chat, when the other side last read it and who is typing. Someone added later can read the whole history. Anyone in the chat can pin a message for everyone in it, and we store who pinned it and when. A message from someone you are not connected with (you do not follow each other) arrives as a request, and the sender sees when you read it.
 - **Blocks.** A block stops new messages both ways, and a one-to-one chat leaves both inboxes. Nothing is deleted. In a shared group chat, old messages stay visible and neither of you can send while the block lasts.
 - **Club chats.** Each club has a Board and a Lounge for every member, an Officers room for the club owner, club admins and people they add, and any rooms they create. Each event has a chat for club members who marked Going or Interested and for the club's owners and admins, and its member list names them. New members can read a room's whole history.
 - **Polls and sign-ups.** With names on, the room sees who picked what, and sign-ups always show names. In an "Anonymous" poll no member or officer can see who voted. The vote is still stored with your account, so the direct access in section 1 could.
