@@ -67,6 +67,7 @@ const POST_REFUSAL_STATUS: Record<PostRefusalCode, number> = {
   board_post_missing: 409,
   thread_root_not_allowed: 400,
   room_closed: 403,
+  room_posters_only: 403,
 };
 
 /**

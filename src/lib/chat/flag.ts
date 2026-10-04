@@ -27,6 +27,17 @@
  * (`chatV2For`). Routes and screens ask that, never these pieces alone.
  *
  * Ids are compared trimmed and lower-case.
+ *
+ * The file also holds the second switch, `chat_desktop`: Messages on a
+ * laptop (handoffs/chat-redesign/wave-3-desktop/contract.md section 2). Same
+ * rules, same place it may run, two variables and no clubs list:
+ *   CHAT_DESKTOP_ENABLED    exactly "true", and only where `chatV2MayRunHere`
+ *   CHAT_DESKTOP_ALLOWLIST  "*" for everyone, or a comma list of user ids; blank is nobody
+ * It never widens `chat_v2`: the whole answer for a person is
+ *   enabled AND (everyone OR listed user) AND chat_v2 on for that person,
+ * because the routes the desktop screens read answer 404 without `chat_v2`.
+ * `chatDesktopAnswer` takes the `chat_v2` answer as a parameter, so it stays
+ * pure; flag-desktop-server.ts (`chatDesktopFor`) is the one that asks for it.
  */
 
 /** The shape of every id in the database (users.id, orgs.id): a uuid. */
@@ -95,4 +106,54 @@ export function chatV2ClubIds(env: NodeJS.ProcessEnv = process.env): string[] {
     if (UUID_SHAPE.test(id)) seen.add(id);
   }
   return Array.from(seen);
+}
+
+// ---------------------------------------------------------------------------
+// chat_desktop: Messages on a laptop
+// ---------------------------------------------------------------------------
+
+/**
+ * The desktop switch: exactly "true", in a place the new chat may run. Its
+ * own variable, so the phone never waits for the laptop and a Preview build
+ * holding it by mistake does nothing.
+ */
+export function chatDesktopEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
+  return env.CHAT_DESKTOP_ENABLED === "true" && chatV2MayRunHere(env);
+}
+
+/**
+ * The desktop switch is on and its allow-list is the star. The star must be
+ * the WHOLE value, as for `chat_v2`. This is not yet "on for everyone": the
+ * person still needs `chat_v2` (`chatDesktopAnswer`).
+ */
+export function chatDesktopEveryone(env: NodeJS.ProcessEnv = process.env): boolean {
+  if (!chatDesktopEnabled(env)) return false;
+  return (env.CHAT_DESKTOP_ALLOWLIST ?? "").trim() === "*";
+}
+
+/**
+ * The desktop switch is on and its allow-list names this person. Unset or
+ * blank is nobody. The star is not a name: with `*` this answers false and
+ * `chatDesktopEveryone` answers true.
+ */
+export function chatDesktopListedUser(userId: string, env: NodeJS.ProcessEnv = process.env): boolean {
+  if (!chatDesktopEnabled(env)) return false;
+  const id = cleanId(userId);
+  if (!id || id === "*") return false;
+  return (env.CHAT_DESKTOP_ALLOWLIST ?? "")
+    .split(",")
+    .map((entry) => entry.trim().toLowerCase())
+    .some((entry) => entry !== "" && entry === id);
+}
+
+/**
+ * The whole desktop answer for a person, given their `chat_v2` answer
+ * (`chatV2For`, which the caller has already asked): on only when `chat_v2`
+ * is on for them AND the desktop switch lets them in. With `chatV2On` false
+ * this is false whatever the desktop variables hold.
+ */
+export function chatDesktopAnswer(userId: string, chatV2On: boolean, env: NodeJS.ProcessEnv = process.env): boolean {
+  if (!chatDesktopEnabled(env)) return false;
+  if (chatV2On !== true) return false;
+  return chatDesktopEveryone(env) || chatDesktopListedUser(userId, env);
 }

@@ -27,6 +27,14 @@ export type RoomState = "soon" | "live" | "after" | "closed";
 /** `org_members.role`. Chat never imports `OFFICER_ROLES`; see room-rules.ts. */
 export type ClubRole = "owner" | "admin" | "mod" | "member";
 
+/**
+ * `channels.post_policy` (wave 3, handoffs/chat-redesign/wave-3-desktop/contract.md
+ * 4c.3): who writes a new message in an extra room. `officers` = owner and
+ * admin; `listed` = they and the room's by-name list. Every other kind of
+ * room keeps its own rule and reads `everyone`.
+ */
+export type PostPolicy = "everyone" | "officers" | "listed";
+
 export type Person = { id: string; handle: string; name: string; avatar_url: string | null };
 
 export type OrgRef = {
@@ -59,6 +67,12 @@ export type Room = {
   name: string;
   org_id: string;
   event: { id: string; title: string; starts_at: string; ends_at: string } | null;
+  /**
+   * Absent = `everyone`. `loadRoom` always sets it (`everyone` when the
+   * column is missing or holds anything else); optional so a `Room` written
+   * by hand stays one.
+   */
+  post_policy?: PostPolicy;
 };
 
 export type ViewerInRoom = {
@@ -70,6 +84,12 @@ export type ViewerInRoom = {
   can_reply: boolean;
   /** Owner / admin / mod in a club room. */
   can_moderate: boolean;
+  /**
+   * `postRuleLine` of the room, only on an extra room whose rule keeps this
+   * viewer from posting (wave-3 contract 4c.3); the key is absent otherwise.
+   * The screens print it in place of the composer.
+   */
+  post_line?: string;
 };
 
 // ── 6.0 Refusals ─────────────────────────────────────────────────────────────
@@ -100,14 +120,24 @@ export type RefusalCode =
   | "cards_club_rooms_only" // 400: a card sent to a dm or a group
   | "members_only" // 403: GET /api/orgs/[slug]/space by a non-member of a visible club
   | "create_failed" // 500: club creation (the wave-1 route keeps its own text)
-  | "invalid_after"; // 400: ?after= that is not a timestamp the server could have sent
+  | "invalid_after" // 400: ?after= that is not a timestamp the server could have sent
+  // Wave 3, section 4.3 (handoffs/chat-redesign/wave-3-desktop/contract.md).
+  | "pin_limit" // 409: a pin in a chat that already holds PIN_CAP of them
+  | "pin_not_allowed" // 403: a pin or unpin in a pending request; a pin in a blocked pair
+  | "pins_chats_only" // 400: a pin route called on a club room
+  | "room_posters_only" // 403: a send to an extra room whose post_policy leaves the sender out
+  | "room_limit"; // 409: a new extra room in a club that already has EXTRA_ROOM_CAP
 
-/** The four codes `postRefusal` (room-rules.ts) picks from, section 6.2. */
+/**
+ * The five codes `postRefusal` (room-rules.ts) picks from: section 6.2's
+ * four, and wave 3's `room_posters_only`.
+ */
 export type PostRefusalCode =
   | "board_officers_only"
   | "board_post_missing"
   | "thread_root_not_allowed"
-  | "room_closed";
+  | "room_closed"
+  | "room_posters_only";
 
 /**
  * The one code whose sentence is not in the table: the word filter's, with
@@ -141,6 +171,12 @@ export const REFUSAL_SENTENCES: Readonly<Record<RefusalCode, string>> = Object.f
   members_only: "Members only.",
   create_failed: "Couldn't create the club. Try again.",
   invalid_after: "Reload to catch up.",
+  // Wave 3, section 4.3.
+  pin_limit: "This chat already has 20 pinned messages. Unpin one first.",
+  pin_not_allowed: "You can't pin messages in this chat.",
+  pins_chats_only: "Pinning only works in direct messages and group chats.",
+  room_posters_only: "Only some people can post here.",
+  room_limit: "This club already has 5 extra rooms. Delete one first.",
 });
 
 /** Every refusal: `{ ok: false, error: <plain sentence>, code }`. */
@@ -174,8 +210,12 @@ export type InvalidCardRefusal = Refusal<"invalid_card"> & { field: string };
 
 // ── 2 The flag ───────────────────────────────────────────────────────────────
 
-/** `GET /api/me/features`: the only way a screen learns the flag. */
-export type FeaturesResponse = { ok: true; chat_v2: boolean };
+/**
+ * `GET /api/me/features`: the only way a screen learns `chat_v2`.
+ * `chat_desktop` (wave-3 contract 2.1) is never true without it; the two
+ * desktop pages also receive it as a server prop.
+ */
+export type FeaturesResponse = { ok: true; chat_v2: boolean; chat_desktop: boolean };
 
 // ── 5 Cards (wave 2; pinned now) ─────────────────────────────────────────────
 
@@ -419,6 +459,19 @@ export type SpaceRoom = {
   unread: boolean;
   can_post: boolean;
   event: EventRef | null;
+  /**
+   * `channels.is_private`: Officers, event chats and private extra rooms
+   * (wave-3 contract 4.2).
+   *
+   * `locked` and `post_policy` are pinned REQUIRED (wave-3 contract 4c.3).
+   * They are optional only until W3-2-roomreads fills them at the three
+   * places a `SpaceRoom` is built (`space/route.ts`, `orderSpaceRooms`'
+   * final map in `reads.ts`, `sroom` in `reads.test.ts`): that same change
+   * drops both `?` and this paragraph, so the compiler holds all three.
+   * No screen may read them as optional (`?? "everyone"`, `=== true`).
+   */
+  locked?: boolean;
+  post_policy?: PostPolicy;
 };
 
 /** `GET /api/orgs/[slug]/space`. */
@@ -440,4 +493,49 @@ export type SpaceResponse = {
    * otherwise.
    */
   upcoming?: EventRef[];
+  /**
+   * Only with `?panel=1` (the desktop club panel's Announcements, wave-3
+   * contract 4.2): the Board's last three messages that are not hidden and
+   * not removed, newest first. Absent otherwise.
+   */
+  board_recent?: ChatMessage[];
 };
+
+// ── Wave 3: pinned messages and Shared (dms and groups) ──────────────────────
+// handoffs/chat-redesign/wave-3-desktop/contract.md 4.3. These pin a MESSAGE
+// for everyone in the chat; `/api/me/threads/[id]/pin` pins a CHAT in my list.
+
+export type PinnedMessage = {
+  message_id: string;
+  pinned_at: string;
+  /** The message's own time. */
+  created_at: string;
+  /** `pinQuote(content)`: one line, at most 140 characters; "" for a photo, video or post with no text. */
+  text: string;
+  /** The whole content, trimmed; "" when there is none. The panel opens it in place when the page cannot jump. */
+  full_text: string;
+  /** The message's author (not who pinned); null when the account is gone. */
+  author: Person | null;
+  media_kind: "image" | "video" | null;
+  has_post: boolean;
+};
+
+/** `GET /api/me/threads/[id]/message-pins`: newest pin first; `cap` is `PIN_CAP`. */
+export type MessagePinsResponse = { ok: true; pins: PinnedMessage[]; cap: number };
+
+/** `PUT` / `DELETE /api/me/threads/[id]/messages/[messageId]/pin`; `already` when it was pinned before this call. */
+export type PinMessageResponse = { ok: true; pinned: boolean; already?: true };
+
+export type SharedItem = {
+  message_id: string;
+  created_at: string;
+  user_id: string;
+  /** `messageMediaProxyUrl(channelId, messageId)`, never the stored key. */
+  media_url: string | null;
+  media_kind: "image" | "video" | null;
+  /** The shared post, exactly as the thread GET sends it for that message. */
+  attachment: AttachmentRow | null;
+};
+
+/** `GET /api/me/threads/[id]/shared`: newest first. */
+export type SharedResponse = { ok: true; items: SharedItem[]; has_more: boolean };

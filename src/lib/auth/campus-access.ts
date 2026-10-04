@@ -15,8 +15,11 @@ import { createSupabaseServiceClient } from "@/lib/supabase/service";
  * notification's /profile?post=<id>), and EVERY redirect here carries it as
  * `next` so passing a gate brings them back to that exact view. It used to
  * be a bare path, and only the Terms step carried it.
+ *
+ * Answers who passed, for a page that needs the id right after the gate
+ * (/messages asks the `chat_desktop` switch with it). Other callers ignore it.
  */
-export async function enforceCampusAccess(currentPath: string) {
+export async function enforceCampusAccess(currentPath: string): Promise<{ userId: string }> {
   const supabase = await createSupabaseServerClient();
   const {
     data: { user },
@@ -46,6 +49,7 @@ export async function enforceCampusAccess(currentPath: string) {
   if (!isOttoOnboardingComplete(row?.otto_answers)) {
     redirect(`/onboarding?next=${encodeURIComponent(currentPath)}`);
   }
+  return { userId: user.id };
 }
 
 /**

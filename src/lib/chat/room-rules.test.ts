@@ -2,7 +2,10 @@
  * Tests for `room-rules.ts` (who posts on a Board, who may remove whose
  * message, how a club room is named, which code a refused send gets) and for
  * the refusal sentences in `types.ts`
- * (handoffs/chat-redesign/wave-1-contracts.md sections 1, 6.0, 6.2, 6.3).
+ * (handoffs/chat-redesign/wave-1-contracts.md sections 1, 6.0, 6.2, 6.3),
+ * and for wave 3's room rules: the post policies, the line a room shows to
+ * someone who may not post, the cap on extra rooms
+ * (handoffs/chat-redesign/wave-3-desktop/contract.md 4.3, 4c.3).
  *
  * Run with:
  *   node --test --experimental-strip-types src/lib/chat/room-rules.test.ts
@@ -19,18 +22,23 @@ const rulesSpecifier = "./room-rules.ts";
 const typesSpecifier = "./types.ts";
 const {
   BOARD_POSTER_ROLES,
+  EXTRA_ROOM_CAP,
   OFFICER_REMOVED_REASON,
+  POST_POLICIES,
   ROOM_MODERATOR_ROLES,
   canModerate,
   clubRoomLabel,
   isClubRole,
+  isPostPolicy,
   isRoomKind,
   outranks,
   postRefusal,
+  postRuleLine,
 } = (await import(rulesSpecifier)) as typeof import("./room-rules");
 const { REFUSAL_SENTENCES, refusalBody } = (await import(typesSpecifier)) as typeof import("./types");
 
 type ClubRole = import("./types").ClubRole;
+type PostPolicy = import("./types").PostPolicy;
 type Room = import("./types").Room;
 type RoomKind = import("./types").RoomKind;
 
@@ -45,6 +53,11 @@ function room(kind: RoomKind, name = kind as string): Room {
       ? { id: "e1", title: "Fall Formal", starts_at: "2026-10-08T23:30:00Z", ends_at: "2026-10-09T03:00:00Z" }
       : null;
   return { id: "r1", kind, name, org_id: "o1", event };
+}
+
+/** An extra room with its post policy set, as `loadRoom` hands it on. */
+function extraRoom(policy: PostPolicy, name = "exec-only"): Room {
+  return { ...room("room", name), post_policy: policy };
 }
 
 // ---------------------------------------------------------------------------
@@ -74,6 +87,49 @@ test("room kinds and club roles are told from anything else", () => {
   for (const role of ["owner", "admin", "mod", "member"]) assert.equal(isClubRole(role), true, role);
   for (const bad of ["Owner", "officer", "moderator", "guest", "", null, undefined, 3, []]) {
     assert.equal(isClubRole(bad), false, String(bad));
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Extra rooms: the cap, the post policies, the line (wave 3, 4c.3)
+// ---------------------------------------------------------------------------
+
+test("a club holds at most five extra rooms", () => {
+  assert.equal(EXTRA_ROOM_CAP, 5);
+  assert.equal(REFUSAL_SENTENCES.room_limit.includes(`${EXTRA_ROOM_CAP} extra rooms`), true, "the sentence names the cap");
+});
+
+test("the three post policies, in the contract's order, and a caller cannot change them", () => {
+  assert.deepEqual([...POST_POLICIES], ["everyone", "officers", "listed"]);
+  assert.throws(() => (POST_POLICIES as unknown as string[]).push("mods"));
+  assert.deepEqual([...POST_POLICIES], ["everyone", "officers", "listed"]);
+});
+
+test("a post policy is told from anything else", () => {
+  for (const policy of ["everyone", "officers", "listed"]) assert.equal(isPostPolicy(policy), true, policy);
+  for (const bad of ["Everyone", " officers", "listed ", "members", "mods", "owner", "all", "", null, undefined, 0, true, [], {}, ["officers"]]) {
+    assert.equal(isPostPolicy(bad), false, JSON.stringify(bad));
+  }
+});
+
+test("the line a room shows to someone who may read but not post, word for word", () => {
+  assert.equal(postRuleLine("officers"), "Only officers post here.");
+  assert.equal(postRuleLine("listed"), "Only officers and people they picked post here.");
+  assert.equal(postRuleLine("everyone"), null, "nobody is kept out, so there is no line");
+});
+
+test("a value that is not a policy gets no line", () => {
+  for (const bad of ["Officers", "members", "", null, undefined]) {
+    assert.equal(postRuleLine(odd<PostPolicy>(bad)), null, String(bad));
+  }
+});
+
+test("each line reads as a sentence and keeps to the product's words", () => {
+  for (const policy of POST_POLICIES) {
+    const line = postRuleLine(policy);
+    if (line === null) continue;
+    assert.equal(/#|channel|server|thread|admin|owner/i.test(line), false, line);
+    assert.equal(line.endsWith("."), true, line);
   }
 });
 
@@ -247,18 +303,59 @@ test("everything else the database refused reads as closed", () => {
   assert.equal(postRefusal(odd<Room>({ id: "r1", kind: null }), null, "member"), "room_closed");
 });
 
-test("every answer is one of the four codes, and each has its sentence", () => {
-  const four = ["board_officers_only", "board_post_missing", "thread_root_not_allowed", "room_closed"];
-  const rooms = [null, ...(["board", "lounge", "officers", "event", "room"] as RoomKind[]).map((k) => room(k))];
+test("an extra room that restricts who posts: only some people can post, whoever asks", () => {
+  for (const policy of ["officers", "listed"] as PostPolicy[]) {
+    for (const role of ROLES) {
+      assert.equal(postRefusal(extraRoom(policy), null, role), "room_posters_only", `${policy}, ${String(role)}`);
+    }
+    assert.equal(postRefusal(extraRoom(policy), "", "member"), "room_posters_only", `${policy}, a blank root is no root`);
+  }
+});
+
+test("an extra room open to everyone, or with no policy on it, still reads as closed", () => {
+  for (const role of ROLES) {
+    assert.equal(postRefusal(extraRoom("everyone"), null, role), "room_closed", String(role));
+    assert.equal(postRefusal(room("room", "exec-only"), null, role), "room_closed", `no policy, ${String(role)}`);
+  }
+  assert.equal(postRefusal({ ...room("room"), post_policy: undefined }, null, "member"), "room_closed");
+});
+
+test("a root sent to a restricted extra room is still a root sent outside a Board", () => {
+  for (const policy of POST_POLICIES) {
+    for (const role of ROLES) {
+      assert.equal(postRefusal(extraRoom(policy), "m1", role), "thread_root_not_allowed", `${policy}, ${String(role)}`);
+    }
+  }
+});
+
+test("the post policy only counts on an extra room", () => {
+  // The database never stores one elsewhere (a check constraint); a caller could still hand one in.
+  assert.equal(postRefusal({ ...room("lounge"), post_policy: "officers" }, null, "member"), "room_closed");
+  assert.equal(postRefusal({ ...room("officers"), post_policy: "listed" }, null, "member"), "room_closed");
+  assert.equal(postRefusal({ ...room("event", "Fall Formal"), post_policy: "officers" }, null, "member"), "room_closed");
+  assert.equal(postRefusal({ ...room("board"), post_policy: "listed" }, null, "member"), "board_officers_only");
+  assert.equal(postRefusal({ ...room("board"), post_policy: "officers" }, null, "owner"), "room_closed");
+});
+
+test("every answer is one of the five codes, and each has its sentence", () => {
+  const five = ["board_officers_only", "board_post_missing", "thread_root_not_allowed", "room_closed", "room_posters_only"];
+  const rooms = [
+    null,
+    ...(["board", "lounge", "officers", "event", "room"] as RoomKind[]).map((k) => room(k)),
+    ...POST_POLICIES.map((policy) => extraRoom(policy)),
+  ];
+  const seen = new Set<string>();
   for (const r of rooms) {
     for (const root of [null, "m1"]) {
       for (const role of ROLES) {
         const code = postRefusal(r, root, role);
-        assert.equal(four.includes(code), true, code);
+        seen.add(code);
+        assert.equal(five.includes(code), true, code);
         assert.equal(typeof REFUSAL_SENTENCES[code], "string");
       }
     }
   }
+  assert.deepEqual([...seen].sort(), [...five].sort(), "and each of the five is reached");
 });
 
 // ---------------------------------------------------------------------------
@@ -289,8 +386,27 @@ test("the refusal sentences are the contract's, word for word", () => {
       members_only: "Members only.",
       create_failed: "Couldn't create the club. Try again.",
       invalid_after: "Reload to catch up.",
+      // Wave 3 (wave-3-desktop/contract.md 4.3): pinned messages and the room rules.
+      pin_limit: "This chat already has 20 pinned messages. Unpin one first.",
+      pin_not_allowed: "You can't pin messages in this chat.",
+      pins_chats_only: "Pinning only works in direct messages and group chats.",
+      room_posters_only: "Only some people can post here.",
+      room_limit: "This club already has 5 extra rooms. Delete one first.",
     },
   );
+});
+
+test("the five wave-3 sentences, each in its refusal body", () => {
+  const table: [Parameters<typeof refusalBody>[0], string][] = [
+    ["pin_limit", "This chat already has 20 pinned messages. Unpin one first."],
+    ["pin_not_allowed", "You can't pin messages in this chat."],
+    ["pins_chats_only", "Pinning only works in direct messages and group chats."],
+    ["room_posters_only", "Only some people can post here."],
+    ["room_limit", "This club already has 5 extra rooms. Delete one first."],
+  ];
+  for (const [code, error] of table) {
+    assert.deepEqual(refusalBody(code), { ok: false, error, code }, code);
+  }
 });
 
 test("no sentence uses the old wording, and none can be changed by a caller", () => {

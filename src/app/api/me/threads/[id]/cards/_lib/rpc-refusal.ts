@@ -33,14 +33,16 @@ import {
 } from "@/lib/chat/types";
 
 /**
- * The status each send refusal answers with (wave-1 contract 6.2): the same
- * four rows as `messages/route.ts:64-69`, which a route file cannot export.
+ * The status each send refusal answers with (wave-1 contract 6.2, and wave
+ * 3's `room_posters_only`): the same five rows as `messages/route.ts:64-71`,
+ * which a route file cannot export.
  */
 export const POST_REFUSAL_STATUS: Readonly<Record<PostRefusalCode, number>> = Object.freeze({
   board_officers_only: 403,
   board_post_missing: 409,
   thread_root_not_allowed: 400,
   room_closed: 403,
+  room_posters_only: 403,
 });
 
 /** What a Supabase RPC call hands back as its error. */
