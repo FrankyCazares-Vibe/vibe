@@ -463,3 +463,278 @@ Deviations from the contract:
 6. The same reads on a local database WITHOUT the column (the rollback rehearsed): 200 with every room `everyone`, and one failed select per 5 minutes in the server log, not one per poll. In the Rooms dialog there: a rename with `Everyone who can see it` saves; switching to `Only officers` shows `Try again in a moment.` and changes nothing.
 7. Part C2: creating a 6th extra room shows `This club already has 5 extra rooms. Delete one first.`
 8. Part F: a switch-off laptop's Campus > Chat rail lists the same rooms as before the build, with no event chats.
+
+## Wave 3
+
+Integrated Sat Oct 3, 2026. Four batches: W3-3-thread, W3-3-forms, W3-3-bridge, W3-3-campus. The pieces: nothing mounts them on desktop yet (`MessagesDesktop` is still wave 1's stub), so no new desktop screen is visible. What DOES change on screen with this wave is contract 2.5 row 10 items (a) to (d) on a phone with `chat_v2` on, and, for a person with `chat_desktop` on, Campus loses its Chat tab. Not committed, not pushed, not deployed. No migration in this wave; nobody touched a database, local or production.
+
+### The gate (run in the worktree after all four batches and the integrator's four edits)
+
+| Check | Result |
+|---|---|
+| `npm run typecheck` | exit 0 |
+| `npm test` | 2,027 tests, 2,027 pass, 0 fail (2,025 after wave 2; +2, both in `club/helpers.test.ts`) |
+| `npx eslint <the 19 source and test files of the wave>` | exit 0; the only output is `campus-home.tsx`'s 6 warnings, 0 errors: map 05's baseline, none of them on a line this wave wrote |
+| `npm run build` | exit 0 (`✓ Compiled successfully`; `/messages` and `/campus` build as dynamic routes) |
+
+The three static files (`messages.html`, `_miniMessenger.js`, `_sharePicker.js`) are outside eslint and tsc. They are covered only by the source-reading tests (`theme.test.ts`, `reaction-emoji.test.ts`, `dm-bridge.test.ts`: green) and by reading. Nothing in them was run.
+
+### Files of the wave (22: 20 changed, 2 new)
+
+Changed: `public/html/messages.html`, `public/html/_miniMessenger.js`, `public/html/_sharePicker.js`, `src/app/campus/page.tsx`, `src/app/campus/CampusSwitch.tsx`, `src/app/campus/campus-home.tsx`, and under `src/components/mobile/messages/`: `MessageBubble.tsx`, `ReactionPicker.tsx`, `cards/CardBubble.tsx`, `cards/EventCardView.tsx`, `club/BoardPost.tsx`, `club/BoardView.tsx`, `club/RoomChips.tsx`, `club/RoomComposer.tsx`, `club/RoomThread.tsx`, `club/RsvpSheet.tsx`, `club/helpers.ts`, `club/helpers.test.ts`, `compose/CardSheet.tsx`, `compose/CardTray.tsx`.
+
+New: `src/components/desktop/messages/LegacyThreadPane.tsx`, `src/components/mobile/messages/club/HoverActions.tsx`.
+
+Not edited, as the contract asks (empty `git diff`): `src/proxy.ts`, `public/sw.js`, `public/html/_postViewer.js`, `CampusMobile.tsx`, `use-room-poll.ts`, `ComposeSheets.tsx`, the three card sheets, `PollCardView` / `SignupCardView`, `EventAbout`, `BoardStrip`, `ClubSpace`, `EventChat`, `UpNext`, `src/components/safety/ReportSheet.tsx`.
+
+### Files outside every batch's list (both kept)
+
+1. `public/html/_sharePicker.js`: one row, `room_posters_only: "Only some people can post here."`, in its own `CHAT_REFUSALS`. No batch entry in section 8 names the file; W3-3-bridge added it on the orchestrator's word. Kept: it is the row wave 1 and wave 2 both listed as missing, the sentence is `REFUSAL_SENTENCES`' word for word, and it keeps the three static tables in step.
+2. `public/html/_miniMessenger.js`: the batch entry grants ONE line (the same row). The file has 14 changed lines: `state.postLine` (reset in `openChat`, set from `j.viewer.post_line` in `loadMessages`, printed first in `paintComposer`). Kept: it is contract 2.5 row 6 ("old screens print `viewer.post_line`") for the profile page's chat bubble, and with no `post_line` in the answer every line is today's. The orchestrator should confirm the wider grant.
+
+### Integration edits (four, all on seams between batches)
+
+1. `club/BoardView.tsx`: the Report dialog's `onClose` is one `useCallback` handler (`closeReport`), used by the modal, the phone's sheet and `useLayerHistory`. Before, an inline arrow: `ReportSheet`'s modal re-runs `dialog.focus()` whenever `onClose` changes, and the Board re-renders on every poll, so the caret left the details box every few seconds. `RoomThread` already had this fix; the Board (W3-3-forms) did not. No change on the phone.
+2. `compose/CardSheet.tsx`, `useCardPost`: `room_posters_only` now shares `try_again`'s branch (toast, close, `onReload()`) instead of the closing-only branch. Without the reload the composer under the closed sheet kept its input for up to 20 s in a room that no longer lets this person post. It is the card's half of W3-3-thread's `refusedSend` rule. Contract 4c.4 only says the list "gains the same code".
+3. `club/RoomComposer.tsx`: on the desktop surface the composer takes NO history entry of its own for the "+" tray (`useLayerHistory(trayOpen && canPost && !desktop, ...)`). There the tray is a `DesktopPopover`, which always holds its own entry, so one layer was two entries (6.1 promises one). The phone is unchanged.
+4. `club/RoomComposer.tsx`: on the desktop surface the 45 degree turn of the open "+" is on the icon, not the button. `DesktopPopover` places itself by the button's measured box, and a turned 44px box measures about 62px, so the popover would have moved about 9px on its next placement (any scroll or resize). The phone still turns the button, as today.
+
+### W3-3-thread: the thread's desktop form
+
+Files: `club/RoomChips.tsx`, `club/RoomComposer.tsx`, `club/RoomThread.tsx`, `club/HoverActions.tsx` (new), `club/helpers.ts`, `club/helpers.test.ts`, `MessageBubble.tsx`, `ReactionPicker.tsx` (one `export`), `cards/CardBubble.tsx`.
+
+```ts
+// club/HoverActions.tsx ("use client")
+export type HoverActionsProps = { night: boolean; isMine: boolean; onReact?: (emoji: string) => void; onReply?: () => void; onReport?: () => void; onRemove?: () => void; children: ReactNode; label?: string };
+export const HOVER_ACTIONS_CSS: string;      // classes vibe-hover-list, vibe-hover-row, vibe-hover-bar, vibe-hover-btn
+export function HoverActions(props: HoverActionsProps);
+
+// club/RoomChips.tsx: props unchanged
+export type RoomChipsProps = { clubName: string; rooms: SpaceRoom[]; activeRoomId: string | null; night: boolean; now: Date; onPick: (room: SpaceRoom) => void };
+export function RoomChips(props: RoomChipsProps);
+
+// club/RoomComposer.tsx: props unchanged
+export type ReplyTarget = { parent: NonNullable<ChatMessage["parent_preview"]>; authorName: string };
+export type RoomComposerProps = { roomId: string; roomKind: RoomKind; roomName: string; clubName: string; orgHandle: string; orgId?: string | null; viewer: ViewerInRoom | null; viewerId: string | null; night: boolean; poll: Pick<RoomPoll, "append" | "replace" | "remove" | "reload">; replyTo: ReplyTarget | null; onCancelReply: () => void; onSent?: () => void; officerLine?: boolean; focusToken?: number };
+export function ClosedTile({ text, night, board = false }: { text: string; night: boolean; board?: boolean });
+export function RoomComposer(props: RoomComposerProps);
+
+// club/RoomThread.tsx: props unchanged
+export type RoomThreadProps = { poll: RoomPoll; roomId: string; roomKind: RoomKind; clubName: string; night: boolean; now: Date; anchor: "bottom" | "top"; header?: React.ReactNode; onReply: (target: ReplyTarget) => void; onOpenEventChat: (roomId: string) => void; scrollToken: number; emptyBlock?: React.ReactNode };
+export function toMessageRow(m: ChatMessage): MessageRow;
+export function replyTargetOf(m: ChatMessage, isMine: boolean): ReplyTarget;
+export function ThreadSkeleton();
+export function RemoveConfirm({ night, busy, onConfirm, onCancel }: { night: boolean; busy: boolean; onConfirm: () => void; onCancel: () => void });   // not edited
+export function RoomThread(props: RoomThreadProps);
+
+// club/helpers.ts (pure; now imports roomDisplayName from @/lib/chat/room-names)
+export function chipLabel(room: Pick<SpaceRoom, "kind" | "name" | "event">): string;                 // an extra room: roomDisplayName(name)
+export function chipAriaLabel(room: Pick<SpaceRoom, "kind" | "name" | "unread" | "event"> & { locked?: boolean }, now: Date): string | null;   // extra room + locked: "<label>, only some members see this room"
+export function refusedSend(code: string | null | undefined): { tile: boolean; reread: boolean };   // NEW
+// every other export unchanged
+
+// ReactionPicker.tsx
+export const REACTION_EMOJIS = ["❤️", "👍", "👎", "😂", "🔥", "😮", "😢"] as const;
+// MessageBubble.tsx and cards/CardBubble.tsx: props unchanged
+```
+How it behaves:
+- **Chips.** Both surfaces: the lock when `room.kind === "officers" || (room.locked && room.kind !== "event")`; the megaphone before `Board`; an extra room's name as words. Desktop only: an event chip is drawn selected when it is `activeRoomId`; the `<nav>` is `{ flexShrink: 1, minWidth: 0, height: "auto", minHeight: 45, padding: 0, borderTop: "none", flexWrap: "wrap" }`. The phone's computed style is the old one.
+- **Composer.** Both surfaces: cannot post -> the Board tile, else `<ClosedTile text={viewer.post_line}>`, else `This chat is closed.`; `shownName` (words) goes to the placeholder, the tray's caption and the three sheets' room line; `anchorRef={plusRef}` to `CardTray`. A refused send: `refusedSend(code)`: the three codes turn the composer into the tile; `room_posters_only` also calls `poll.reload()` at once.
+- **Thread.** Desktop only: each row is wrapped in `HoverActions` (handlers only when the row is real and not removed), `<style>{HOVER_ACTIONS_CSS}</style>` is rendered once inside the scroller, the rows' column carries `className="vibe-hover-list"`, and Report is `ReportSheet variant="modal"` (not nested).
+- **Bubbles.** Desktop only: the long press does not arm, the bubble's own "..." is not drawn, text can be selected, the browser's menu opens, a text bubble stops at `min(520px, 100%)`. A card stays 292px.
+- **The toolbar.** The pill shows on the row's `:hover`, on KEYBOARD focus (`:focus-visible` on the row, a focused pill button, `:has(:focus-visible)`) and while its emoji row or menu is open; hidden with `opacity` and `pointer-events` only, 150 ms hide delay. The row is the one Tab stop (`role="group"`, `tabIndex={0}`); Enter or Space goes into the pill; Left / Right along the pill and the emoji row, Up / Down along the menu; Esc closes the open layer, else returns to the row. The wrapper caps its row at `min(100%, 520px)` for mine and `min(100%, 552px)` for others.
+
+Deviations from the contract:
+1. **The refused-send list is a pure helper**, `refusedSend(code)` in `club/helpers.ts`, not an inline list at `RoomComposer.tsx:226` (4c.4). Tested in `helpers.test.ts`.
+2. **One extra thread read after a `room_posters_only` refusal** (`poll.reload()`), so the tile reads the room's own sentence within about a second instead of `This chat is closed.` for up to 20 s. If that read fails the tile says `This chat is closed.` until the next full read.
+3. The desktop `<nav>` of `RoomChips` carries `flexShrink: 1` and `minWidth: 0`, which 4c.4 does not name: without them `flexWrap` can never trigger inside the club header's row.
+4. `HoverActionsProps` has one prop beyond 6.4, `label?: string`; the file also exports `HOVER_ACTIONS_CSS`.
+5. The pill shows on keyboard focus, not on plain `:focus-within` (6.4's word): a mouse click on a focusable row would otherwise leave a pill up on every clicked row.
+6. A row with no handler (a removed-content card, a `temp_` row) still gets a bare `position: relative` wrapper (no pill, no Tab stop), so the bubble is not remounted when its row turns real. The menu also answers Up / Down.
+7. The phone's `ReportSheet` and `useLayerHistory` in `RoomThread` share one stable `closeReport` handler with the desktop dialog (no behaviour change on the phone).
+8. Integration edits 3 and 4 above (the tray's history entry and the "+"'s turn on desktop).
+9. This batch's first builder's own list did not reach the integrator; items 4 to 6 are read from the code.
+
+### W3-3-forms: sheets become dialogs and popovers
+
+Files: `club/BoardView.tsx`, `club/BoardPost.tsx`, `club/RsvpSheet.tsx`, `compose/CardSheet.tsx`, `compose/CardTray.tsx`, `cards/EventCardView.tsx`.
+
+```ts
+// club/BoardView.tsx: props unchanged
+export type BoardViewProps = { poll: RoomPoll; roomId: string; night: boolean; now: Date; onOpenEventChat: (roomId: string) => void; scrollToken: number; paused?: boolean };
+export function BoardView(props: BoardViewProps);
+
+// club/BoardPost.tsx: two new optional props (onRemoveReply, onReportReply)
+export type BoardPostProps = { post: ChatMessage; roomId: string; room: ThreadRoom | null; viewer: ViewerInRoom | null; viewerId: string | null; night: boolean; now: Date; refreshToken: number; onCard: RoomPoll["replaceCard"]; onRefresh: (createdAt: string) => void; onOpenEventChat: (roomId: string) => void; onRemove?: () => void; onReport?: () => void; onRemoveReply?: (reply: ChatMessage) => void; onReportReply?: (reply: ChatMessage) => void; onToggleReaction?: (emoji: string) => void; onReplied: () => void; onMissing: () => void };
+export function BoardPost(props: BoardPostProps);
+// file-local: MoreMenu({ night, at, onReport, onRemove }) with at: "byline" | "replyTouch" | "replyPointer"
+
+// club/RsvpSheet.tsx: props unchanged
+export type RsvpSheetProps = { eventId: string; current: EventRef["viewer_status"]; night: boolean; onClose: () => void; onChanged: () => void };
+export function RsvpSheet(props: RsvpSheetProps);
+
+// compose/CardSheet.tsx: props unchanged (the form helpers CloseX, PlusIcon, MinusIcon, fieldStyle, FieldLabel, Counter, AddButton, RemoveButton, Switch too)
+export const CONTENT_BLOCKED_LINE: string;
+export type CardPost = { posting: boolean; field: string | null; clearField: () => void; post: (body: CreateCardBody) => Promise<void> };
+export function useCardPost(args: { roomId: string; failure: string; onPosted: (message: ChatMessage) => void; onReload: () => void; onClose: () => void }): CardPost;
+export type CardSheetProps = { title: string; roomLine: string; orgId?: string | null; night: boolean; cta: string; ctaDisabled: boolean; posting: boolean; onSubmit: () => void; onClose: () => void; returnFocusTo?: React.RefObject<HTMLElement | null>; ctaGap?: number; children: ReactNode };
+export function CardSheet(props: CardSheetProps);
+
+// compose/CardTray.tsx: one new optional prop (anchorRef), as 6.3 pins it
+export type CardTrayKind = "poll" | "signup" | "event";
+export type CardTrayProps = { roomKind: RoomKind; roomName: string; clubName: string; open: boolean; onClose: () => void; onPick: (kind: CardTrayKind) => void; anchorRef?: React.RefObject<HTMLButtonElement | null> };
+export function trayCaption(roomKind: RoomKind, roomName: string): string;   // not edited
+export function CardTray(props: CardTrayProps);
+
+// cards/EventCardView.tsx: props unchanged; after a successful RSVP write it also calls emitCalendarChanged() (from @/components/LeftNav), on both surfaces
+```
+How it behaves:
+- **`BoardView`.** Both surfaces: Remove and Report now reach text posts and replies (the handlers go to `BoardPost`); a removed REPLY bumps the folds' `refreshToken` and re-reads its post for the server's `reply_count`. Desktop only: the line `Announcements from <club>'s officers. Everyone in the club sees them.` above the posts (only once `room.org.name` is known), `ReportSheet variant="modal"`, and `<style>{HOVER_ACTIONS_CSS}</style>` once.
+- **`BoardPost`.** Both surfaces: a "..." (`aria-label="More"`) on a TEXT post's byline and on each reply row that is not the viewer's own, opening Report and (for `can_moderate`) Remove. Desktop only: a CARD post is wrapped in `HoverActions` (React, Reply = open the fold with the reply field focused, Report, Remove), always with `isMine={false}`, inside a slot with `className="vibe-hover-list"`.
+- **`CardSheet`, `RsvpSheet`.** Desktop: the same content in `DesktopDialog` (440 with `busy` while posting and the CTA in the footer; 360 titled `Your RSVP`), both with `ownsHistory={false}` (each already holds its own `useLayerHistory` entry). No vaul root is reachable on desktop. Phone: today's nested drawers.
+- **`CardTray`.** Desktop: `DesktopPopover` (`anchor` = the "+", `label` = the caption, width 320, `align="start"`), no scrim, background `t.surface`. Phone: today's in-flow block and scrim.
+
+Deviations from the contract:
+1. **A card post on the desktop Board has the hover toolbar** (6.3's BoardPost row names only the "..."). Reason: `CardBubble`'s press never arms on desktop, so a card post with no reactions had no control to add the first one.
+2. **The byline "..." is on text posts only, on both surfaces** (`post.kind === "text"`): a card post's Report and Remove are in the hover toolbar's More on desktop and in the long-press picker on the phone, so nothing is offered twice.
+3. Side effect of 1, desktop only: `HoverActions` caps its row at 552px, so a card post on the Board is at most 552px wide; a text post runs the article's full width.
+4. `BoardView` renders `HOVER_ACTIONS_CSS` itself on desktop; the toolbar row's spoken name on the Board is `Message from <name>`.
+5. **Phone only, part of 2.5 row 10 (d):** a reply row's "..." is a 44x44 target (it was 28x28). When at least one visible reply carries one, the Replies group uses gap 22 and padding `11px 0 3px 10px` (it was gap 6, `0 0 0 10px`), so one-line replies sit 44px apart and no target overlaps another. A fold holding only the viewer's own replies keeps gap 6. Desktop reply rows keep the 28px box and gap 6.
+6. `CardTray` reads the "+" node through `useSyncExternalStore` on the ref instead of the contract's literal `anchorRef?.current ?? null` (the lint rule against reading a ref while rendering); same node.
+7. A card post refused with `room_posters_only` also re-reads the room (integration edit 2).
+8. `emitCalendarChanged()` runs on the phone too after an RSVP from an event card (it dispatches a window event nobody on the phone listens to).
+
+### W3-3-bridge: the dm bridge
+
+Files: `public/html/messages.html`, `public/html/_miniMessenger.js`, `public/html/_sharePicker.js` (one row), `src/components/desktop/messages/LegacyThreadPane.tsx` (new).
+
+```ts
+// dm/LegacyThreadPane.tsx ("use client")
+export const LegacyThreadPane = forwardRef<LegacyThreadPaneHandle, LegacyThreadPaneProps>(function LegacyThreadPane({ threadId, night, onEvent }, ref));
+// LegacyThreadPaneProps  = { threadId: string | null; night: boolean; onEvent: (event: DmPageEvent) => void }      (contracts.ts, unchanged)
+// LegacyThreadPaneHandle = { jump(messageId): void; pinsChanged(): void; setPanel(open): void; focus(): void }    (contracts.ts, unchanged)
+```
+`LegacyThreadPane`, as built:
+- Its root is `position: absolute; inset: 0`: the shell must mount it inside a `position: relative` box that has the pane's size. Hidden (`threadId === null`) is `visibility: hidden; pointer-events: none`.
+- The frame's `src` is `paneSrc()`, frozen at mount. Commands wait in a queue until `ready`; while not ready an `open` replaces whatever waited and a `close` empties the queue.
+- `threadId` a string -> `open` and `iframe.contentWindow.focus()`; null -> `close`, and the frame is blurred if it held the focus.
+- No `ready` within 8 s of mount or of Retry: `LoadFailed` with `Couldn't open this chat.` and Retry over the frame (Retry remounts the frame with a new key and queues an `open` for the current chat). A late `ready` clears the line and flushes the queue.
+- **Every valid event is handed to `onEvent`, `ready` included.** A `ready` with no `open` waiting (the page loaded again by itself) makes the pane send `open` for the current chat again.
+- `onEvent` is kept in a ref: an inline arrow from the shell does not re-bind the window's listener.
+
+The page (`messages.html`), pane mode only unless said. Names: `IS_PANE` (`IS_EMBEDDED &&` the `vibe-pane` class, set by the second head script on line 5 from `?pane=1`), `__paneSay(type, extra)`, `__dmLoadList(opts)` (`opts.fromTimer`), and `__paneListStale`, `__paneListLoaded`, `__paneCloseOverlays`, `__paneHideChat`, `__paneLost`, `__paneClosed`, `__paneNewFromOthers`, `__paneReadAgain`, `__paneOpening`, `__paneOpened`, `__panePinsAllowed`, `__panePinSig`, `__panePinsLoad`, `__panePinsPaint`, `__panePinToggle`, `__paneFocusNote`, `__paneRowOf`, `__paneFocusBack`, `__paneOpen`, `__paneCloseChat`, `__paneJump`, `__panePanelState`. State on `__realDM`: `paneWanted`, `panePins` (a Set, or null), `panePinsFor`, `panePinsOff`, `panePinBusy`, `paneListSeq`, `paneListApplied`. Markup: `#cPinsBtn` (inline `display:none`, shown by the one `!important` pane rule, hidden by `data-off`), `data-mid` on `.msg-row`, `tabindex="0"` on `.dm-bubble-wrap`, `button[data-pin-msg]` in the pill.
+- What it says and hears is `dm-bridge.ts`' twelve events and five commands, field for field (read on both sides by the integrator). In pane mode the list read is `GET /api/me/threads?scope=chats`; the pinned ids come from `GET /api/me/threads/<id>/message-pins`; the pin button calls `PUT` / `DELETE /api/me/threads/<id>/messages/<mid>/pin`.
+- `opened.kind` is `"group"` when the thread record is a group, else `"dm"`. `open-failed.message` is always `Couldn't open this chat.` `closed` and `open-failed` carry the `channelId` they are about.
+- Esc in the page: its own overlay closes first, then the composer loses focus, then `escape`. A handled Esc is skipped by `e.defaultPrevented`.
+
+Deviations from the contract:
+1. **`_miniMessenger.js` is changed by 14 lines, not one**: `state.postLine` printed as the quiet line (2.5 row 6 for the profile page's chat bubble). Its refused send needs no new code: the 2-second poll's thread read now carries `post_line` and paints the composer.
+2. Runs outside pane mode too (5.2 item 10): the thread record's `postLine` and its print in `__dmPaintComposer`; `room_posters_only` in `__DM_CHAT_REFUSALS` and in `__dmSend`'s refused-send catch (it sets `canPost` false and uses the server's sentence until the next read); the `/read` POST's `.then` that calls `__paneSay` (which returns at once outside pane mode).
+3. Pane mode only, beyond 5.2's sixteen items: the first paint waits up to 300 ms for the pinned ids; list loads are numbered and a stale answer is dropped; a text bubble stack's inline `max-width` is `min(70%, 520px)` (the inline `70%` would beat 5.1's stylesheet rule); keyboard focus is put back on the same message after the rows are rebuilt, and the composer is focused on open, both ONLY while `document.hasFocus()` (so a late paint never takes the keyboard from a shell dialog or closes a shell popover).
+4. Pane mode only: the Community Guidelines link in a removed-message notice opens in a new tab (`target="_blank" rel="noopener"`); a group-photo upload reopens the chat only if it is still the active one, and switching chats cancels an open photo cropper.
+5. `_sharePicker.js` gained the `room_posters_only` row (outside the batch entry; see above).
+6. No test was added for the page's focus guards (the batch owns no test file).
+
+### W3-3-campus: Campus > Chat leaves the desktop
+
+Files: `src/app/campus/page.tsx`, `src/app/campus/CampusSwitch.tsx`, `src/app/campus/campus-home.tsx` (75 changed lines).
+
+```ts
+// src/app/campus/page.tsx
+export default async function CampusPage({ searchParams }: { searchParams: Promise<{ school_verified?: string; tab?: string | string[]; channel?: string | string[] }> });
+// src/app/campus/CampusSwitch.tsx
+export function CampusSwitch({ showSchoolVerifiedBanner, desktopChat = false }: { showSchoolVerifiedBanner: boolean; desktopChat?: boolean });
+// src/app/campus/campus-home.tsx
+export function CampusHome({ showSchoolVerifiedBanner, desktopChat = false }: { showSchoolVerifiedBanner: boolean; desktopChat?: boolean });
+// module-private: stripManageParam(); CampusTopBar gains hideChat: boolean; CampusTabs gains hideChat?: boolean
+```
+How it behaves:
+- `page.tsx`: `enforceCampusAccess("/campus")` (the bare path, as pinned), then `chatDesktopFor(userId)`. With the switch on and (`tab === "chat"` or a non-empty trimmed `channel`): `redirect("/messages" + (channel ? "?channel=" + encodeURIComponent(channel) : ""))`; `org=` is dropped. `desktopChat` goes to `CampusSwitch`, which hands it ONLY to `CampusHome`.
+- `CampusHome` with the switch on: no Chat pill; an initial `tab=chat` becomes `feed`.
+- **The `?manage=<handle>` door** (switch on only): read once on mount. When the clubs load it is consumed: a handle that matches one of my clubs (case-insensitive) selects it and opens the settings modal over whatever tab shows; no match does nothing. Either way `manage` is removed from the address with `history.replaceState` (the other parameters stay). A match wins over `?org=`.
+- The old composer's quiet line prints `roomRules.viewer.post_line` when present (both switch states; no server sends one until a room is restricted).
+
+Deviations from the contract:
+1. **`?manage=` is stripped from the address once used** (section 7 only says "read once on mount"). Without it Back, a refresh or a remount opened the settings again. The strip is a small helper beside `stripWelcomeParam`.
+2. `tab` and `channel` are typed `string | string[]` and read through a `first()` helper; `channel` is trimmed.
+3. `CampusSwitch`'s `desktopChat` is optional with a default of false (the contract gives the default only for `CampusHome`).
+4. Until the clubs load (or if that load fails), `manage` stays in the address; a Retry that succeeds opens the modal once.
+
+### Seams read on both sides
+
+- `RoomComposer` -> `CardTray`: `anchorRef={plusRef}` (`useRef<HTMLButtonElement | null>`) against `anchorRef?: React.RefObject<HTMLButtonElement | null>`. Matched. The history entry of the tray on desktop: fixed (integration edit 3).
+- `RoomThread`, `BoardView`, `BoardPost` -> `HoverActions`: the props, `HOVER_ACTIONS_CSS` rendered once per list, `vibe-hover-list` on the rows' container. Matched.
+- `RoomThread`, `BoardView` -> `ReportSheet variant="modal"`: the stable `onClose`. `BoardView` fixed (integration edit 1).
+- `RoomComposer`'s refused send and `CardSheet`'s refused card: now the same rule for `room_posters_only` (integration edit 2).
+- `CardSheet`, `RsvpSheet` -> `DesktopDialog` (`ownsHistory={false}`, each holds its own entry); `CardTray` -> `DesktopPopover`. Matched against `contracts.ts`.
+- `LegacyThreadPane` -> `contracts.ts` (props, handle) and `dm-bridge.ts` (`paneSrc`, `parsePageEvent`, `shellMessage`, `fromFrame`). Matched. The page's sixteen `__paneSay` calls and its five command branches against `DmPageEvent` / `DmShellCommand`: names and fields matched.
+- The page -> wave 2's routes (`message-pins`, `messages/<id>/pin`, `threads?scope=chats`). URLs and methods matched. Not run.
+- `page.tsx` -> `enforceCampusAccess`'s `{ userId }` and `chatDesktopFor`; `CampusSwitch` -> `CampusHome`. Matched.
+- `helpers.ts` -> `roomDisplayName` (`@/lib/chat/room-names`, pure, so `node --test` still loads the file). Matched.
+- The sentence `Only some people can post here.` is the same in `REFUSAL_SENTENCES`, the page, the mini messenger and the share picker.
+
+### What the next waves must know
+
+**Wave 4**
+- **W3-4-shell, the Esc rule (3.5 rule 9). Three things the pieces do NOT do for you:**
+  1. Put the listener on `window`, bubble phase. In the App Router React's root is `document`, so `HoverActions`' and `DesktopDialog`'s `stopPropagation` (made from React handlers) stops the key before `window` but NOT before another listener on `document`. Also return when `e.defaultPrevented`.
+  2. Return while `desktopLayerOpen()`.
+  3. Return while `document.querySelector('[aria-modal="true"]')` finds something. Two layers of this wave close on Esc WITHOUT stopping it and without registering as a desktop layer: `RemoveConfirm` (`role="alertdialog" aria-modal="true"`) and the Report dialog (`ReportSheet variant="modal"`, `role="dialog" aria-modal="true"`, a `document` keydown listener). Without this check Esc cancels either one and also sends the shell home.
+- W3-4-shell, `onEvent`: give the switch a no-op default (`ready` is forwarded). Ignore `closed` and `open-failed` whose `channelId` is not the open thread (a message already posted can cross a click on another chat; a late `closed` for A must not throw the person out of B). A send produces `activity` + `list-changed` and an arrival produces `activity` + `read`: coalesce the `refreshKey` bumps if the list read is not already debounced.
+- W3-4-shell: mount `LegacyThreadPane` in a `position: relative` box of the pane's size (its root is absolutely positioned). It focuses the frame on every new `threadId`; call `handle.focus()` only for your own reasons.
+- W3-4-shell: `GET /api/me/threads` can answer 200 with a request missing from the list when its last-message read soft-fails (`threads/route.ts`, about line 688). `knownChat` false and the page's `lost` can therefore be false negatives; do not treat one "not in the list" as final without the page's `open-failed`.
+- W3-4-shell: provide `<ChatSurfaceContext.Provider value="desktop">` around everything from `club/`, `cards/`, `compose/`. Every desktop branch of this wave keys on it; without it the pieces render their phone form (and the nested vaul sheets throw with no drawer above them).
+- W3-4-phonepins: build on this wave's `MessageBubble.tsx` and `ReactionPicker.tsx`. `MessageBubble` now reads `useChatSurface()`; your `onPin` row belongs to the phone surface. `REACTION_EMOJIS` is exported; do not change the array (`reaction-emoji.test.ts`).
+- W3-4-phonepins, `ConversationView.tsx:339`: the refused-send check there still flips "cannot post" only for `board_officers_only` / `room_closed`. Add `room_posters_only` when you add the `post_line` line (the page and the club composer already have it).
+
+**Wave 5**
+- **W3-5-club, the header row and the chips.** `RoomChips`' desktop `<nav>` can shrink and wrap, but only inside a width it is given. In the header's row: no fixed height (the nav is `minHeight: 45` and may be two or three lines); the `+` and the panel toggle `flexShrink: 0`; the left block (mark, name, hat line) something like `flex: "0 1 auto"` with `minWidth: 0` and an ellipsis; the nav takes the rest. Chips are start-aligned inside the nav: pushing them right is the header's `justifyContent` or margin.
+- W3-5-club: pass an event chat's id as `activeRoomId` (on desktop the chip is then drawn selected). `RoomThread` and `BoardView` render the toolbar's CSS and mark their own lists: nothing extra to mount. Anyone ELSE who mounts `HoverActions` must render `<style>{HOVER_ACTIONS_CSS}</style>` once and put `vibe-hover-list` on the rows' container.
+- W3-5-club: `RemoveConfirm` is `position: fixed` in the tree (not portalled, z-index 1150), and `vibe-hover-list` is a size container. Give no ancestor of `RoomThread` / `BoardView` in the pane a `transform`, `filter`, `contain` or `container-type`, or the confirm is placed against that box instead of the window. Render nothing `position: fixed` inside a thread row.
+- W3-5-club: `RoomComposer` needs `poll` with `reload` (it calls it after a `room_posters_only` refusal); pass the hook's own object.
+- **W3-5-club / W3-5-panel, `Manage club`: the link is exactly `/campus?manage=<handle>`, a plain `<a href>`.** No `tab=`, no `channel=` beside it (either one triggers the server redirect back to `/messages` before the door is read). A sign-in or Terms detour loses `manage=` (the gate's path is the bare `/campus`, pinned).
+- W3-5-panel: `RsvpSheet` on desktop is already the 360px dialog; mount it as the phone does (`eventId`, `current`, `night`, `onClose`, `onChanged`). The sheet itself does NOT call `emitCalendarChanged()` (only the event CARD does): route its `onChanged` to your `onRsvpChanged`, where the shell emits (3.3), or the week band and My Calendar stay stale after an RSVP made in the panel.
+- W3-5-pins: the page hides `#cPinsBtn` with `data-off` in a pending request and when the pins read answered 404; the shell hears `pins-toggle` only when the button is shown.
+
+**The orchestrator and the planner** (`contract.md` is read-only for builders; none of this was applied to it)
+- 6.3, the BoardPost / BoardView rows: add that on desktop a card post is wrapped in `HoverActions`, that `BoardView` renders `HOVER_ACTIONS_CSS`, and that the byline "..." is for text posts only. 2.5 row 10 (d): add that the phone's reply fold spaces rows 44px apart when a reply carries a "...". Section 10: add the Board card's toolbar and its 552px width to parts C and H, the reply spacing to part G.
+- 6.3's owners line says the three card views are NOT edited; its table and section 8 give `cards/EventCardView.tsx` to W3-3-forms (one import, one call). Fix the owners line.
+- 4c.4: the refused-send rule is `refusedSend` in `helpers.ts`, and both a refused send and a refused card re-read the room after `room_posters_only`.
+- 6.4: the pill shows on keyboard focus (`:focus-visible`), not `:focus-within`; `label` and `HOVER_ACTIONS_CSS` are part of the file's interface.
+- 5.1: the bubble cap is written inline in pane mode (the stylesheet rule alone cannot beat the stack's inline `max-width:70%`). 5.4: `ready` is forwarded to `onEvent`.
+- Section 7: `?manage=` is stripped once used.
+- Section 8, W3-3-bridge: confirm the wider edit of `_miniMessenger.js` (or say to cut it back to the one row) and record `_sharePicker.js`'s row as the batch's.
+- **A test nobody owns yet**: a source-reading test (the style of `theme.test.ts`) that pins, in `messages.html`, `document.hasFocus()` inside `__paneFocusNote` and `__paneOpened`, and that a link in a message row carries `target="_blank"` in pane mode. Give it to a wave-4 batch.
+- **Open, no batch's file**: a double click on the hover menu's `Remove` or `Report` opens the confirm or the Report dialog and the second click lands on its scrim and closes it at once (nothing is removed or sent). The fix is in the two scrims (ignore a click with `e.detail > 1`): `RemoveConfirm` (pinned as not edited) and `ReportSheet.tsx` (no batch).
+- **Open, a gap in the design**: on a touch laptop or an iPad at 900px or wider the desktop surface has no long press, and the pill needs hover or the keyboard. Decide before launch whether such a device matters.
+- `public/html/_imageCropper.js` (not owned) disables its Cancel while saving, so a chat switch in that moment cannot close the cropper; the photo still saves to the right group and the pane stays on the new chat.
+- Still true: `src/proxy.ts`, `public/sw.js` and `_postViewer.js` are untouched; `node scripts/check-pwa.mjs` against `next dev` is the orchestrator's walk item.
+
+### Walk (DEFERRED: nobody opened a browser or started a server in wave 3)
+
+Phone, 375px, `chat_v2` on (2.5 row 10; section 10 part G):
+1. The chips row is unchanged (45px, hairline, 12px sides, sideways scroll), with the megaphone on Board and the lock on a private room; an extra room's name reads as words on the chip, in the placeholder, in the "+" tray's caption and on the three card sheets.
+2. The "+" tray and its three sheets still slide up; the RSVP sheet; the long-press picker on a message and on a card (a card post has no byline "...").
+3. A Board text post's "..." and a reply's "...": five one-line replies from other people sit 44px apart, each "..." is easy to hit, the first does not fire when pressing the replies toggle nor the last when pressing Send reply; a fold with only my own replies keeps the tight rhythm; the jump when someone else's reply arrives; a two-line reply; the menu's flip at the foot of the list.
+4. An officer sets an extra room to `Only officers` while a member has it open; the member sends: the toast `Only some people can post here.`, then within about a second the tile `Only officers post here.` The same from a card sheet (poll, sign-up, event). With the network off for the re-read: `This chat is closed.` until the next full read.
+
+Desktop (after wave 5 mounts the club; section 10 parts C and H):
+5. The hover pill: where it sits on a first-of-run row from someone else and on a narrow pane; the 150 ms hide; the emoji row's and the menu's flip near the thread's top; whether the sticky top fade paints over it; text selection and a slow click on a message and on a card; Light and Night.
+6. The toolbar by keyboard: Tab to a row, Enter, Left / Right, Esc stops at the row and never closes the chat. The same on a Board card post.
+7. Report from the hover menu: type in the details box for more than 20 s while messages arrive: the caret stays (thread AND Board). Esc and Back each close the dialog alone; focus lands in it; Tab stays inside.
+8. Remove confirm and Report dialog: Esc closes them and NOT the chat (needs wave 4's Esc rule as written above).
+9. At 1024px, a club with Lounge, Board, Officers, two event chats and five extra rooms: the chips wrap inside the header, every room can be clicked, none runs under the `+` or the panel toggle.
+10. The "+" popover: opens upward from the "+", does not move when the thread scrolls under it, no scrim, Esc / outside press / Back each close it with ONE Back step, a second Back leaves the chat; focus returns to the "+". The three card dialogs and the RSVP dialog: focus return, Back, Esc, `Posting…` blocks closing.
+11. The Board: the Announcements line; a card post at most 552px wide beside full-width text posts, no sideways scrollbar; the first card under the line opens its emoji row downward.
+
+The dm bridge (section 10 part D, all of it), plus:
+12. Open a dm, click a bubble, press New in the shell and type while a message arrives in the open dm: the field keeps the keyboard, no popover closes. Click a name in the slim list and at once open the month popover: it stays open when the messages land. Opening a chat still puts the cursor in the composer, including on a deep link while the frame boots.
+13. Pin by keyboard (Tab to a message, Enter on Pin, focus returns to the same message); the 300 ms hold on open; the pinned-row flash in Light and Night; one cursor at 900 and 1024.
+14. As the author of a moderator-removed message, Community Guidelines opens a new tab and the pane stays. Group A, change photo, cropper open, click chat B: the cropper closes; during an upload the pane stays on B.
+15. As a plain member, open an officers-only extra room from the profile page's chat bubble: the quiet line is the room's own sentence.
+16. `node scripts/check-pwa.mjs` against `next dev`.
+
+Campus (section 10 part F):
+17. Switch on: `/campus?manage=sae` opens the settings modal and the address becomes `/campus`; close it, open a profile, Back: no modal; refresh: no modal. `/campus?manage=<not my club>`: nothing opens, `manage` leaves the address. `/campus?manage=sae&tab=events`: the modal over Events, `tab=events` kept. Back from `/campus` after Manage club returns to `/messages`.
+18. Switch on: `/campus?tab=chat` and the club page's rooms link land on `/messages`; Back returns to the page before. The top bar with four pills. A pending campus tour starts once.
+19. Switch off: Campus > Chat by eye as before; `/campus?manage=sae` does nothing and keeps the parameter.
