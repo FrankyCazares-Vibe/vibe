@@ -22,6 +22,8 @@ export function MessageBubble({
   listScrolledAtRef,
   parentIsMine = false,
   onReply,
+  onPin,
+  pinLabel,
   onReport,
   onRemove,
 }: {
@@ -55,6 +57,12 @@ export function MessageBubble({
   parentIsMine?: boolean;
   /** "↩ Reply" in the long-press picker. */
   onReply?: () => void;
+  /** "Pin message" / "Unpin message" in the same picker, between Reply and
+   *  Report (wave-3 desktop contract 4d.6): only the flag-on phone
+   *  conversation passes it, in a dm or a group. A pass-through. */
+  onPin?: () => void;
+  /** That row's words: `Pin message` or `Unpin message`. */
+  pinLabel?: string;
   /** "⚑ Report" in the same picker. Never passed for the viewer's own
    *  message: the route answers that with a 400 the student never reads as a
    *  sentence. */
@@ -795,6 +803,16 @@ export function MessageBubble({
                   }
                 : undefined
             }
+            // Same temp_ guard: a row still sending has no id to pin.
+            onPin={
+              onPin && !message.id.startsWith("temp_")
+                ? () => {
+                    setPickerOpen(false);
+                    onPin();
+                  }
+                : undefined
+            }
+            pinLabel={pinLabel}
             // Same temp_ guard: a row still sending has no id to report.
             onReport={
               onReport && !message.id.startsWith("temp_")

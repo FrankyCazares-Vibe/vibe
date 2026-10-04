@@ -39,6 +39,8 @@ export function ReactionPicker({
   existing,
   onPick,
   onReply,
+  onPin,
+  pinLabel,
   onReport,
   onRemove,
   onClose,
@@ -49,6 +51,13 @@ export function ReactionPicker({
   onPick: (emoji: string) => void;
   /** Adds "↩ Reply", on the emoji row's far side from the bubble. */
   onReply?: () => void;
+  /** Adds "Pin message" / "Unpin message", between Reply and Report: a pin
+   *  for everyone in a dm or a group (wave-3 desktop contract 4d.6). Only the
+   *  flag-on phone conversation passes it; absent on a row still sending and
+   *  in a pending request. Not "Pin to top", which pins the chat. */
+  onPin?: () => void;
+  /** The pin row's words, whichever state the message is in. */
+  pinLabel?: string;
   /** Adds "Report", under Reply. Absent on the viewer's own message and on
    *  one still sending. */
   onReport?: () => void;
@@ -129,7 +138,7 @@ export function ReactionPicker({
         // A pill for the emoji row alone; a card once Reply (or Report)
         // joins it. They get their own rows because beside the emojis the
         // picker ran past a phone's width and scrolled the list sideways.
-        borderRadius: onReply || onReport || onRemove ? 20 : 999,
+        borderRadius: onReply || onPin || onReport || onRemove ? 20 : 999,
         background: darkMode
           ? "rgba(20,16,28,0.92)"
           : "rgba(255,255,255,0.96)",
@@ -179,7 +188,7 @@ export function ReactionPicker({
           );
         })}
       </div>
-      {onReply || onReport || onRemove ? (
+      {onReply || onPin || onReport || onRemove ? (
         <>
           <div
             aria-hidden
@@ -202,6 +211,27 @@ export function ReactionPicker({
             >
               <span aria-hidden>↩</span>
               Reply
+            </button>
+          ) : null}
+          {onPin ? (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onPin();
+              }}
+              style={pickerRowStyle(darkMode, false)}
+            >
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden>
+                <path
+                  d="M5.5 2h5l-.75 4.25L12 8.5v1.25H4V8.5l2.25-2.25L5.5 2zM8 9.75V14"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+              {pinLabel ?? "Pin message"}
             </button>
           ) : null}
           {onReport ? (
@@ -237,7 +267,7 @@ export function ReactionPicker({
   );
 }
 
-/** Reply and Report, so the two rows in the long-press picker can't drift. */
+/** Reply, the pin row, Report and Remove, so the rows in the long-press picker can't drift. */
 function pickerRowStyle(darkMode: boolean, danger: boolean): React.CSSProperties {
   return {
     display: "flex",

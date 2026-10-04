@@ -21,6 +21,7 @@ export function ConversationActionSheet({
   onMuted,
   onClose,
   onOpenGroupSettings,
+  onOpenPinned,
   onCleared,
   onLeftOrDeleted,
 }: {
@@ -37,6 +38,12 @@ export function ConversationActionSheet({
   onMuted: (mutedUntil: string | null) => void;
   onClose: () => void;
   onOpenGroupSettings: () => void;
+  /** Adds the row `Pinned messages` under `Pin to top` (wave-3 desktop
+   *  contract 4d.6): the messages pinned for everyone in a dm or a group.
+   *  Only the flag-on phone conversation passes it. With it, the chat-level
+   *  row's other state reads `Unpin from top`, so it can't be taken for
+   *  unpinning a message; without it that row stays `Unpin`. */
+  onOpenPinned?: () => void;
   onCleared: () => void;
   onLeftOrDeleted: () => void;
 }) {
@@ -276,10 +283,13 @@ export function ConversationActionSheet({
               <SheetRow label="Group info" onClick={onOpenGroupSettings} />
             ) : null}
             <SheetRow
-              label={pinned ? "Unpin" : "Pin to top"}
+              label={pinned ? (onOpenPinned ? "Unpin from top" : "Unpin") : "Pin to top"}
               onClick={() => void togglePin()}
               disabled={busy}
             />
+            {onOpenPinned ? (
+              <SheetRow label="Pinned messages" onClick={onOpenPinned} />
+            ) : null}
             {muted ? (
               <SheetRow
                 label="Unmute"

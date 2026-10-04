@@ -8,6 +8,7 @@ import { asLoadFailure, LoadFailed, type LoadFailure } from "@/components/feedba
 import { PushAsk } from "@/components/push/PushAsk";
 import { ReportSheet, type ReportTargetRef } from "@/components/safety/ReportSheet";
 import { REFUSAL_SENTENCES, type RoomKind, type ThreadMessagesResponse } from "@/lib/chat/types";
+import { useMessagePins } from "@/lib/chat/use-message-pins";
 import { vibeRequest } from "@/lib/feedback/request";
 import { toast } from "@/lib/feedback/toast";
 
@@ -15,6 +16,7 @@ import { ConversationActionSheet } from "./ConversationActionSheet";
 import { entryCanPost, quotedBody, threadAvatar, threadTitle } from "./format";
 import { GroupSettingsView } from "./GroupSettingsView";
 import { MessageBubble } from "./MessageBubble";
+import { PinnedSheet } from "./PinnedSheet";
 import { toastSendFailure } from "./send-failure";
 import { vaulOverlayStyle, visuallyHiddenStyle } from "./sheet-styles";
 import { useNightTheme } from "./theme";
@@ -52,6 +54,7 @@ export function ConversationView({
   onClose,
   onThreadsChanged,
   backdropCss,
+  messagePins = false,
 }: {
   threadId: string;
   thread: ThreadEntry | null;
@@ -64,6 +67,12 @@ export function ConversationView({
    *  bar flip to dark-glass treatments so the wallpaper reads as the
    *  feature instead of clashing with cream chrome. */
   backdropCss?: string | null;
+  /** Pinned messages (wave-3 desktop contract 4d.6): `Pin message` /
+   *  `Unpin message` in the long-press picker and `Pinned messages` in the
+   *  "..." sheet, in a dm or a group. ONLY the flag-on shell
+   *  (`MessagesMobileV2`) passes it; without it this view asks no pin
+   *  route and draws nothing new. */
+  messagePins?: boolean;
 }) {
   // The dark-glass chrome and bubbles: over a dark org backdrop, or on
   // Night's near-black paper when there is none. Light with no backdrop
@@ -84,6 +93,10 @@ export function ConversationView({
   // leaves both as they were before club chat.
   const [roomKind, setRoomKind] = useState<RoomKind | null>(thread?.room_kind ?? null);
   const [canPost, setCanPost] = useState<boolean | null>(entryCanPost(thread));
+  // The room's own "who posts here" sentence (`viewer.post_line`), sent only
+  // for an extra room whose rule leaves the viewer out: the quiet line then,
+  // in place of "This chat is closed."
+  const [postLine, setPostLine] = useState<string | null>(null);
   // One message, reported from the long-press picker. A single message is a
   // `message` target; the whole chat is handled by the ⋯ sheet.
   const [reportMessage, setReportMessage] = useState<ReportTargetRef | null>(null);
@@ -100,6 +113,8 @@ export function ConversationView({
   const [showPushAsk, setShowPushAsk] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [groupSettingsOpen, setGroupSettingsOpen] = useState(false);
+  // The `Pinned messages` sheet (only ever opened with `messagePins`).
+  const [pinnedOpen, setPinnedOpen] = useState(false);
   const [actionFeedback, setActionFeedback] = useState<string | null>(null);
   // Local mirror of pinned_at + muted_until so the menu reflects taps
   // before the thread list re-syncs. Seeded from `thread` prop.
@@ -125,6 +140,8 @@ export function ConversationView({
     setShowPushAsk(false);
     setRoomKind(thread?.room_kind ?? null);
     setCanPost(entryCanPost(thread));
+    setPostLine(null);
+    setPinnedOpen(false);
   }
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
@@ -177,6 +194,11 @@ export function ConversationView({
         // the list entry said.
         const viewer = r.data.viewer;
         setCanPost((prev) => (viewer ? viewer.can_post !== false : (prev ?? true)));
+        // The room's own sentence, when its rule leaves the viewer out.
+        if (viewer) {
+          const line = viewer.post_line;
+          setPostLine(typeof line === "string" && line.trim() ? line : null);
+        }
         if (r.data.room?.kind) setRoomKind(r.data.room.kind);
         return;
       }
@@ -235,6 +257,37 @@ export function ConversationView({
   // One-to-one DMs only: CampusMobile reuses this view for club channels,
   // and neither those nor group chats get the push ask.
   const isDm = thread?.type === "dm";
+
+  // Pinned messages (4d.6): the flag-on shell's dms and groups only, never a
+  // club's room. In a pending request nothing is read and nothing is drawn.
+  // With `messagePins` absent the hook is off: no request, no control.
+  const pinsOn = messagePins && (thread?.type === "dm" || thread?.type === "group") && !roomKind;
+  const pins = useMessagePins(threadId, { enabled: pinsOn && !isRequest });
+  // The sheet may be up while this chat has pins for this person at all...
+  const pinsHere = pinsOn && !isRequest && pins.available;
+  // ...and a pin CONTROL shows only once the list has answered (the hook's
+  // rule: `available` alone is also true before the first answer, and on a
+  // database without the table a press would only toast).
+  const pinControls = pinsHere && pins.pins !== null;
+  // `Pinned messages` alone is also reachable after a FIRST read that failed
+  // (a weak signal, a 503): the sheet holds `LoadFailed` with Retry, and the
+  // phone has no timer that would ask again. A database without the table
+  // answers 404, which is `available` false, never `failure`: still hidden.
+  const pinsSheetRow = pinsHere && (pins.pins !== null || pins.failure !== null);
+
+  // A tap on a pin whose message is on screen: the sheet closes and the list
+  // scrolls it to the middle. The rows carry `data-mid` only with `messagePins`.
+  const jumpToMessage = useCallback((messageId: string) => {
+    setPinnedOpen(false);
+    const list = scrollRef.current;
+    if (!list) return;
+    const row = Array.from(list.querySelectorAll<HTMLElement>("[data-mid]")).find(
+      (el) => el.dataset.mid === messageId,
+    );
+    if (!row) return;
+    const top = row.getBoundingClientRect().top - list.getBoundingClientRect().top;
+    list.scrollTop += top - Math.max(0, (list.clientHeight - row.offsetHeight) / 2);
+  }, []);
 
   // Re-runs the load: Retry, and a send that couldn't be painted onto the
   // list (none loaded yet, or no row in the server's answer).
@@ -334,8 +387,15 @@ export function ConversationView({
           setMessages((prev) => (prev ? prev.filter((m) => m.id !== tempId) : prev));
           setDraft(text);
           // The room stopped taking the viewer's posts after it was opened
-          // (no longer an officer, or the event chat closed): the quiet
-          // line replaces the composer, as on the next open.
+          // (no longer an officer, the event chat closed, or the room's
+          // who-can-post rule changed): the quiet line replaces the
+          // composer, as on the next open. This view reads the room once,
+          // so after `room_posters_only` the line is the refusal's own
+          // sentence unless the room's (`post_line`) is already known.
+          if (r.code === "room_posters_only") {
+            setCanPost(false);
+            setPostLine((cur) => cur ?? REFUSAL_SENTENCES.room_posters_only);
+          }
           if (r.code === "board_officers_only" || r.code === "room_closed") setCanPost(false);
           return;
         }
@@ -816,7 +876,7 @@ export function ConversationView({
               // single peer in the header so they skip this row.
               const isMultiParty = thread?.type !== "dm";
               const showSender = isMultiParty && !isMine && showGap;
-              return (
+              const bubble = (
                 <MessageBubble
                   key={m.id}
                   message={m}
@@ -831,6 +891,17 @@ export function ConversationView({
                   parentIsMine={!!meId && m.parent_preview?.user_id === meId}
                   // No composer to reply in when the viewer can't post here.
                   onReply={canPost ? () => startReply(m) : undefined}
+                  // Pin or unpin for everyone in the chat (4d.6): only with
+                  // `messagePins`, in a dm or a group, once the pin list has
+                  // answered, and never in a pending request.
+                  onPin={
+                    pinControls
+                      ? () => void (pins.isPinned(m.id) ? pins.unpin(m.id) : pins.pin(m.id))
+                      : undefined
+                  }
+                  pinLabel={
+                    pinControls ? (pins.isPinned(m.id) ? "Unpin message" : "Pin message") : undefined
+                  }
                   // Never on their own message, and never before the thread
                   // has told us who they are.
                   onReport={
@@ -848,6 +919,16 @@ export function ConversationView({
                       : undefined
                   }
                 />
+              );
+              // With `messagePins` each row names its message, so a tap in
+              // the Pinned sheet can find it. The prop never changes under
+              // a mounted view, so no bubble is remounted by this.
+              return messagePins ? (
+                <div key={m.id} data-mid={m.id}>
+                  {bubble}
+                </div>
+              ) : (
+                bubble
               );
             })}
           </div>
@@ -1078,8 +1159,10 @@ export function ConversationView({
       ) : null}
 
       {/* Input bar. Club chat v1: in a room the viewer can't post in (a
-          Board for anyone but its officers, an event chat that has closed)
-          a quiet line takes its place. Tokens on the page's own paper; over
+          Board for anyone but its officers, an event chat that has closed,
+          an extra room whose who-can-post rule leaves them out) a quiet
+          line takes its place: the room's own sentence when the server
+          sent one (`viewer.post_line`). Tokens on the page's own paper; over
           a club's wallpaper, the dark glass the composer wears there. Empty
           while it isn't known yet, so no composer flashes in a Board. */}
       {canPost !== true ? (
@@ -1109,7 +1192,7 @@ export function ConversationView({
             ? null
             : roomKind === "board"
               ? REFUSAL_SENTENCES.board_officers_only
-              : REFUSAL_SENTENCES.room_closed}
+              : postLine || REFUSAL_SENTENCES.room_closed}
         </div>
       ) : (
       <form
@@ -1285,8 +1368,27 @@ export function ConversationView({
             setMenuOpen(false);
             setGroupSettingsOpen(true);
           }}
+          // `Pinned messages`, and with it `Unpin from top` on the chat's
+          // own row: where a pin control may show (4d.6), and after a failed
+          // first read so its Retry can be reached (`pinsSheetRow`).
+          onOpenPinned={
+            pinsSheetRow
+              ? () => {
+                  setMenuOpen(false);
+                  // The list on hand is as old as this chat's opening (no
+                  // timer on the phone): read it again, so a pin the other
+                  // person made meanwhile is there. One GET per open; a
+                  // later read that fails is silent and the list stays.
+                  pins.reload();
+                  setPinnedOpen(true);
+                }
+              : undefined
+          }
           onCleared={() => {
             setMessages([]);
+            // Clearing hides the older pins for this person too: the list
+            // is read again (nothing happens without `messagePins`).
+            if (pinControls) pins.reload();
             setMenuOpen(false);
           }}
           onLeftOrDeleted={() => {
@@ -1310,6 +1412,19 @@ export function ConversationView({
           nested
           target={reportMessage}
           onClose={() => setReportMessage(null)}
+        />
+      ) : null}
+
+      {/* The pinned messages of this dm or group (only with `messagePins`).
+          Nested for the same reason as the Report sheet above. A tap on a
+          pin the list holds closes the sheet and scrolls to it. */}
+      {pinnedOpen && pinsHere ? (
+        <PinnedSheet
+          pins={pins}
+          night={night}
+          isLoaded={(id) => shown.some((m) => m.id === id)}
+          onJump={jumpToMessage}
+          onClose={() => setPinnedOpen(false)}
         />
       ) : null}
 
