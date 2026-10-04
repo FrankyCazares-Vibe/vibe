@@ -462,16 +462,9 @@ export type SpaceRoom = {
   /**
    * `channels.is_private`: Officers, event chats and private extra rooms
    * (wave-3 contract 4.2).
-   *
-   * `locked` and `post_policy` are pinned REQUIRED (wave-3 contract 4c.3).
-   * They are optional only until W3-2-roomreads fills them at the three
-   * places a `SpaceRoom` is built (`space/route.ts`, `orderSpaceRooms`'
-   * final map in `reads.ts`, `sroom` in `reads.test.ts`): that same change
-   * drops both `?` and this paragraph, so the compiler holds all three.
-   * No screen may read them as optional (`?? "everyone"`, `=== true`).
    */
-  locked?: boolean;
-  post_policy?: PostPolicy;
+  locked: boolean;
+  post_policy: PostPolicy;
 };
 
 /** `GET /api/orgs/[slug]/space`. */
@@ -514,7 +507,12 @@ export type PinnedMessage = {
   text: string;
   /** The whole content, trimmed; "" when there is none. The panel opens it in place when the page cannot jump. */
   full_text: string;
-  /** The message's author (not who pinned); null when the account is gone. */
+  /**
+   * The message's author (not who pinned); null when the VIEWER cannot read
+   * that profile (a suspended or banned account, as the thread sends
+   * `users: null` for the same message) or the authors' read failed. The
+   * pin is still live: a screen draws it without a name.
+   */
   author: Person | null;
   media_kind: "image" | "video" | null;
   has_post: boolean;

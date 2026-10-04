@@ -46,7 +46,10 @@ registerHooks({
 });
 
 const specifier = "./message-read.ts";
-const { describeRoom, readChatMessages, toChatMessages } = (await import(specifier)) as typeof import("./message-read");
+const { describeRoom, readChatMessages, readThreadRoom, toChatMessages, viewerInRoom } = (await import(specifier)) as typeof import("./message-read");
+// The same rooms.ts that message-read.ts loads ("./rooms"): one memory of a missing `post_policy` column.
+const roomsModule = "./rooms.ts";
+const { forgetPostPolicyColumnMissing, loadRoom, postPolicyColumnMissing } = (await import(roomsModule)) as typeof import("./rooms");
 const stubModule = "./stub.ts";
 const { asStub } = (await import(stubModule)) as typeof import("./stub");
 const rulesModule = "./room-rules.ts";
@@ -391,4 +394,106 @@ test("describeRoom hands the block set down: a blocked person going is left out 
   const asked = cookie.log.filter((l) => l.table === "users").flatMap((l) => arg(l.calls, "in", "id") as string[]);
   assert.ok(!asked.includes(going[1]));
   assert.ok(service.log.some((l) => l.table === "channel_members"));
+});
+
+// ── Wave 3: who can post in an extra room (wave-3-desktop/contract.md 4c.3) ──
+
+const OFFICERS_LINE = "Only officers post here.";
+const LISTED_LINE = "Only officers and people they picked post here.";
+const extraRoom = (post_policy?: Room["post_policy"]): Room => ({ id: CHANNEL, kind: "room", name: "exec-only", org_id: ORG, event: null, ...(post_policy ? { post_policy } : {}) });
+
+test("viewerInRoom: post_line only for an extra room whose rule the viewer fails; the key is absent everywhere else", () => {
+  assert.equal(viewerInRoom(LOUNGE, null, true), null, "no role: the route answers 503");
+  // Every room of before the column: the four keys, as they were.
+  assert.deepEqual(viewerInRoom(LOUNGE, "member", true), { role: "member", can_post: true, can_reply: false, can_moderate: false });
+  assert.deepEqual(viewerInRoom(BOARD, "member", false), { role: "member", can_post: false, can_reply: true, can_moderate: false });
+  assert.deepEqual(viewerInRoom(BOARD, "owner", true), { role: "owner", can_post: true, can_reply: true, can_moderate: true });
+  const closedEvent: Room = { id: CHANNEL, kind: "event", name: "Formal", org_id: ORG, event: { id: uuid(1, "f"), title: "Formal", starts_at: at(1), ends_at: at(2) } };
+  assert.deepEqual(viewerInRoom(closedEvent, "member", false), { role: "member", can_post: false, can_reply: false, can_moderate: false });
+  // An extra room the viewer cannot post in, but not by a rule: a Room written by hand (no post_policy), and `everyone`.
+  assert.deepEqual(viewerInRoom(extraRoom(), "member", false), { role: "member", can_post: false, can_reply: false, can_moderate: false });
+  assert.deepEqual(viewerInRoom(extraRoom("everyone"), "member", false), { role: "member", can_post: false, can_reply: false, can_moderate: false });
+  // The rule keeps the viewer out: the sentence.
+  assert.deepEqual(viewerInRoom(extraRoom("officers"), "member", false), { role: "member", can_post: false, can_reply: false, can_moderate: false, post_line: OFFICERS_LINE });
+  assert.deepEqual(viewerInRoom(extraRoom("officers"), "mod", false), { role: "mod", can_post: false, can_reply: false, can_moderate: true, post_line: OFFICERS_LINE });
+  assert.deepEqual(viewerInRoom(extraRoom("listed"), "member", false), { role: "member", can_post: false, can_reply: false, can_moderate: false, post_line: LISTED_LINE });
+  // The rule lets the viewer in (an officer, or someone on the list): no line.
+  for (const viewer of [viewerInRoom(extraRoom("officers"), "admin", true), viewerInRoom(extraRoom("listed"), "member", true), viewerInRoom(extraRoom("listed"), "owner", true)]) {
+    assert.ok(viewer);
+    assert.equal("post_line" in viewer, false);
+    assert.equal(viewer.can_post, true);
+  }
+  // Only `room` carries a rule: a value on another kind (the database refuses it) is never printed.
+  assert.equal("post_line" in viewerInRoom({ ...LOUNGE, post_policy: "officers" }, "member", false)!, false);
+  assert.equal("post_line" in viewerInRoom({ ...BOARD, post_policy: "listed" }, "member", false)!, false);
+});
+
+test("readThreadRoom: the database's no in an `officers` room reaches the viewer as can_post false with the sentence", async () => {
+  installService((table, calls) => (table === "org_members" ? { data: [{ role: "member" }] } : serviceAnswers(table, calls)));
+  const refused = (table: string) => (table === "rpc:can_post_org_channel" ? { data: false } : undefined);
+  const read = await readThreadRoom(cookieClient([], refused).client as unknown as Client, extraRoom("officers"), VIEWER);
+  assert.ok(read);
+  assert.deepEqual(read.viewer, { role: "member", can_post: false, can_reply: false, can_moderate: false, post_line: OFFICERS_LINE });
+  assert.equal(read.room.kind, "room");
+  const allowed = await readThreadRoom(cookieClient([]).client as unknown as Client, extraRoom("officers"), VIEWER);
+  assert.ok(allowed);
+  assert.deepEqual(allowed.viewer, { role: "member", can_post: true, can_reply: false, can_moderate: false });
+});
+
+// ── Wave 3: loadRoom and a database without `channels.post_policy` (4.2, 4c.3) ──
+
+const ROOM_SELECT = "id, kind, name, org_id, event_id, post_policy";
+const ROOM_SELECT_BEFORE = "id, kind, name, org_id, event_id";
+const selectsOf = (log: Logged[]) => log.filter((l) => l.table === "channels").map((l) => String(l.calls.find((c) => c[0] === "select")?.[1]));
+const channelRow = (over: Record<string, unknown> = {}) => ({ id: CHANNEL, kind: "room", name: "exec-only", org_id: ORG, event_id: null, ...over });
+
+test("loadRoom: the select names post_policy and the room always carries one (`everyone` for anything else the column holds)", async () => {
+  forgetPostPolicyColumnMissing();
+  for (const [stored, expected] of [["officers", "officers"], ["listed", "listed"], ["everyone", "everyone"], ["mods", "everyone"], [null, "everyone"]] as const) {
+    const service = installService((table) => (table === "channels" ? { data: [channelRow({ post_policy: stored })] } : {}));
+    assert.deepEqual(await loadRoom(CHANNEL), { id: CHANNEL, kind: "room", name: "exec-only", org_id: ORG, event: null, post_policy: expected });
+    assert.deepEqual(selectsOf(service.log), [ROOM_SELECT]);
+    assert.equal(arg(service.log[0].calls, "eq", "id"), CHANNEL);
+  }
+  installService((table) => (table === "channels" ? { data: [channelRow({ kind: "lounge", name: "Lounge", post_policy: "everyone" })] } : {}));
+  assert.deepEqual(await loadRoom(CHANNEL), { ...LOUNGE, post_policy: "everyone" });
+  assert.equal(postPolicyColumnMissing(), false);
+});
+
+test("loadRoom: a missing post_policy column is never \"the read failed\" — one retry with today's select, then remembered", async () => {
+  forgetPostPolicyColumnMissing();
+  const missing = { code: "42703", message: "column channels.post_policy does not exist" };
+  const withoutColumn = (table: string, calls: Call[]): Answer => {
+    if (table !== "channels") return {};
+    return String(calls.find((c) => c[0] === "select")?.[1]).includes("post_policy") ? { error: missing } : { data: [channelRow()] };
+  };
+  const service = installService(withoutColumn);
+  const expected = { id: CHANNEL, kind: "room", name: "exec-only", org_id: ORG, event: null, post_policy: "everyone" };
+  assert.deepEqual(await loadRoom(CHANNEL), expected, "a room, not null (null here is 503 on every club room)");
+  assert.deepEqual(selectsOf(service.log), [ROOM_SELECT, ROOM_SELECT_BEFORE]);
+  assert.equal(postPolicyColumnMissing(), true);
+  // The next read goes straight to today's select: one read, not two.
+  assert.deepEqual(await loadRoom(CHANNEL), expected);
+  assert.deepEqual(selectsOf(service.log), [ROOM_SELECT, ROOM_SELECT_BEFORE, ROOM_SELECT_BEFORE]);
+  // Five minutes on (or a new instance) it asks for the column again.
+  forgetPostPolicyColumnMissing();
+  assert.deepEqual(await loadRoom(CHANNEL), expected);
+  assert.deepEqual(selectsOf(service.log).slice(3), [ROOM_SELECT, ROOM_SELECT_BEFORE]);
+});
+
+test("loadRoom: a database without channels.kind fails both selects (null, as today); any other failure is not asked again", async () => {
+  forgetPostPolicyColumnMissing();
+  const noKind = installService(() => ({ error: { code: "42703", message: "column channels.kind does not exist" } }));
+  assert.equal(await loadRoom(CHANNEL), null);
+  assert.deepEqual(selectsOf(noKind.log), [ROOM_SELECT, ROOM_SELECT_BEFORE]);
+  forgetPostPolicyColumnMissing();
+  const broken = installService(() => ({ error: { code: "57014", message: "canceling statement" } }));
+  assert.equal(await loadRoom(CHANNEL), null);
+  assert.deepEqual(selectsOf(broken.log), [ROOM_SELECT]);
+  assert.equal(postPolicyColumnMissing(), false, "a failure that is not a missing schema is not remembered as one");
+  // A dm (no club, no kind) is still not a room.
+  const dm = installService(() => ({ data: [{ id: CHANNEL, kind: null, name: null, org_id: null, event_id: null, post_policy: "everyone" }] }));
+  assert.equal(await loadRoom(CHANNEL), null);
+  assert.deepEqual(selectsOf(dm.log), [ROOM_SELECT]);
+  forgetPostPolicyColumnMissing();
 });

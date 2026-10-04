@@ -47,7 +47,7 @@ import { createSupabaseServiceClient, isSupabaseServiceConfigured } from "@/lib/
 
 import { blockedIdsFor } from "./blocks";
 import { hydrateCards, type CardRow } from "./cards/hydrate";
-import { OFFICER_REMOVED_REASON, canModerate, isClubRole } from "./room-rules";
+import { OFFICER_REMOVED_REASON, canModerate, isClubRole, postRuleLine } from "./room-rules";
 import { roomState } from "./room-state";
 import { canPostAnswer, clubRole, loadRoom } from "./rooms";
 import { isMissingChatSchema, warnMissingChatSchemaOnce } from "./schema";
@@ -1173,15 +1173,27 @@ export async function describeRoom(
  * failed or someone who left a moment ago: the route answers 503
  * `try_again`, never `role: null`, which section 6.0 keeps for a dm or a
  * group.
+ *
+ * `post_line` (wave-3 contract 4c.3) is the room's rule in words, set only
+ * for a viewer the database refused in an extra room whose `post_policy` is
+ * not `everyone`; the key is absent in every other case. A `Room` written by
+ * hand has no `post_policy`: absent reads `everyone`, as `postRefusal` reads
+ * it.
  */
 export function viewerInRoom(room: Room, role: ClubRole | null, mayPost: boolean): ViewerInRoom | null {
   if (role === null) return null;
-  return {
+  const viewer: ViewerInRoom = {
     role,
     can_post: mayPost,
     can_reply: room.kind === "board",
     can_moderate: canModerate(role),
   };
+  const policy = room.post_policy ?? "everyone";
+  if (!mayPost && room.kind === "room" && policy !== "everyone") {
+    const line = postRuleLine(policy);
+    if (line) viewer.post_line = line;
+  }
+  return viewer;
 }
 
 /**

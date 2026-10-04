@@ -5,12 +5,20 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { eventRefsFor, type EventRow } from "@/lib/chat/event-refs";
 import { chatV2For } from "@/lib/chat/flag-server";
 import { readChatMessages } from "@/lib/chat/message-read";
-import { lastShown, orderSpaceRooms, readSince, refOfRoom, spaceCanPost, type SpaceRoomWithPosition } from "@/lib/chat/reads";
-import { canModerate, isClubRole, isRoomKind } from "@/lib/chat/room-rules";
+import {
+  lastShown,
+  orderSpaceRooms,
+  readSince,
+  recentShown,
+  refOfRoom,
+  spaceCanPost,
+  type SpaceRoomWithPosition,
+} from "@/lib/chat/reads";
+import { canModerate, isClubRole, isPostPolicy, isRoomKind } from "@/lib/chat/room-rules";
 import { roomState } from "@/lib/chat/room-state";
-import { loadRoom } from "@/lib/chat/rooms";
+import { loadRoom, notePostPolicyColumnMissing, postPolicyColumnMissing } from "@/lib/chat/rooms";
 import { isMissingChatSchema, warnMissingChatSchemaOnce } from "@/lib/chat/schema";
-import { refusalBody, type ChatMessage, type EventRef, type SpaceResponse } from "@/lib/chat/types";
+import { refusalBody, type ChatMessage, type EventRef, type PostPolicy, type SpaceResponse } from "@/lib/chat/types";
 import { orgAssetProxyUrl } from "@/lib/org-asset-url";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
@@ -22,8 +30,27 @@ const TAG = "orgs/[slug]/space GET";
 /** What `eventRefsFor` needs of an event (5.5). */
 const EVENT_COLUMNS = "id, title, starts_at, ends_at, location, org_id";
 
-/** A row of the cookie `channels` read (7.2.3). */
-type ChannelRow = { id: string; kind: unknown; name: string | null; event_id: string | null; position: number | null };
+/**
+ * The rooms select (wave-3 contract 4.2), and the one from before
+ * `channels.post_policy`: the code ships before the column, so a database
+ * without it is read again with the second and every room is `everyone`.
+ */
+const ROOM_COLUMNS_WITH_POLICY = "id, kind, name, event_id, position, is_private, post_policy";
+const ROOM_COLUMNS = "id, kind, name, event_id, position, is_private";
+
+/** How many Board posts the desktop panel's Announcements shows (`?panel=1`). */
+const BOARD_RECENT_MAX = 3;
+
+/** A row of the cookie `channels` read (7.2.3); `post_policy` only when the select named it. */
+type ChannelRow = {
+  id: string;
+  kind: unknown;
+  name: string | null;
+  event_id: string | null;
+  position: number | null;
+  is_private: unknown;
+  post_policy?: unknown;
+};
 
 /** My `channel_members` row on a room, for the unread rule; no row → `unread: false`. */
 type MyRow = { channel_id: string; last_read_at: string | null; created_at: string };
@@ -81,6 +108,11 @@ async function unreadIn(service: SupabaseClient, channelId: string, viewerId: st
  * (handoffs/chat-redesign/wave-2-contracts.md 7.2): the club, the viewer,
  * the room chips, the Board's latest post, the next three events, and with
  * `?events=1` the club's not-ended events for the Share-an-event sheet.
+ *
+ * Wave 3 (handoffs/chat-redesign/wave-3-desktop/contract.md 4.2): each room
+ * carries `locked` and `post_policy`, `can_post` follows the room's rule,
+ * and with `?panel=1` the answer gains `board_recent`, the desktop panel's
+ * Announcements, cut from the Board page already read.
  *
  * The gate sweep is the channels list's, copied (`channels/route.ts:41-95`):
  * the org and the viewer's role load on the SERVICE client so a non-member
@@ -145,10 +177,24 @@ export async function GET(req: Request, { params }: Params) {
 
   // 1. The club ref and its member count (service role; a failed count → 0).
   // 3. The rooms (cookie): RLS leaves out Officers unless I may enter it and
-  //    event rooms I hold no row on unless I am an officer.
+  //    event rooms I hold no row on unless I am an officer. The select names
+  //    `post_policy` unless its absence is remembered; when it fails as
+  //    missing schema it is asked ONCE more without the column.
+  const readRooms = async (columns: string) => {
+    const res = await supabase.from("channels").select(columns).eq("org_id", orgId).eq("type", "org_channel");
+    return { data: res.data as unknown, error: res.error };
+  };
+  let hasPolicy = !postPolicyColumnMissing();
+  const readRoomsOnce = async () => {
+    const first = await readRooms(hasPolicy ? ROOM_COLUMNS_WITH_POLICY : ROOM_COLUMNS);
+    if (!first.error || !hasPolicy || !isMissingChatSchema(first.error)) return first;
+    notePostPolicyColumnMissing();
+    hasPolicy = false;
+    return readRooms(ROOM_COLUMNS);
+  };
   const [memberCountRes, channelsRes] = await Promise.all([
     service.from("org_members").select("user_id", { count: "exact", head: true }).eq("org_id", orgId),
-    supabase.from("channels").select("id, kind, name, event_id, position").eq("org_id", orgId).eq("type", "org_channel"),
+    readRoomsOnce(),
   ]);
   if (memberCountRes.error) {
     console.error(`[${TAG} member count]`, memberCountRes.error.code, memberCountRes.error.message);
@@ -175,11 +221,19 @@ export async function GET(req: Request, { params }: Params) {
   const roomIds = channels.map((row) => row.id);
   const eventIds = channels.map((row) => row.event_id).filter((id): id is string => typeof id === "string");
   const board = channels.find((row) => row.kind === "board") ?? null;
-  const wantsUpcoming = new URL(req.url).searchParams.get("events") === "1";
+  const query = new URL(req.url).searchParams;
+  const wantsUpcoming = query.get("events") === "1";
+  const wantsPanel = query.get("panel") === "1";
+  // Each room's post rule: the column's value, `everyone` on a database
+  // without it or for anything else it holds.
+  const policyOf = (row: ChannelRow): PostPolicy =>
+    hasPolicy && isPostPolicy(row.post_policy) ? row.post_policy : "everyone";
+  const anyListed = channels.some((row) => policyOf(row) === "listed");
 
   // My rows on those rooms (cookie), the events behind the event rooms, the
-  // next events, and the Board room: none depends on another.
-  const [myRowsRes, roomEvents, upNextRows, upcomingRows, boardRoom] = await Promise.all([
+  // next events, the Board room, and (only when some room's rule is
+  // `listed`) the rooms whose by-name list I am on: none depends on another.
+  const [myRowsRes, roomEvents, upNextRows, upcomingRows, boardRoom, listedRes] = await Promise.all([
     roomIds.length > 0
       ? supabase.from("channel_members").select("channel_id, last_read_at, created_at").in("channel_id", roomIds).eq("user_id", user.id)
       : Promise.resolve({ data: [] as MyRow[], error: null }),
@@ -187,12 +241,22 @@ export async function GET(req: Request, { params }: Params) {
     readUpcoming(service, orgId, 3, "up_next"),
     wantsUpcoming ? readUpcoming(service, orgId, 50, "upcoming") : Promise.resolve([] as EventRow[]),
     board ? loadRoom(board.id) : Promise.resolve(null),
+    anyListed
+      ? supabase.from("org_channel_members").select("channel_id").eq("user_id", user.id).in("channel_id", roomIds)
+      : Promise.resolve({ data: [] as { channel_id: string }[], error: null }),
   ]);
   if (myRowsRes.error) {
     console.error(`[${TAG} my rows]`, myRowsRes.error.code, myRowsRes.error.message);
   }
   const myRowByRoom = new Map<string, MyRow>();
   for (const row of (myRowsRes.data ?? []) as MyRow[]) myRowByRoom.set(row.channel_id, row);
+  // A failed list read answers the closed side for a `listed` room (logged):
+  // the thread read's `viewer.can_post` is the database's and wins on open.
+  if (listedRes.error) {
+    console.error(`[${TAG} listed rooms]`, listedRes.error.code, listedRes.error.message);
+  }
+  const listedRooms = new Set<string>();
+  for (const row of (listedRes.data ?? []) as { channel_id: string }[]) listedRooms.add(row.channel_id);
 
   // 4. The Board's latest post: the page read of the thread GET, limit 6,
   // oldest first; the last message that is not hidden. No Board (the
@@ -228,9 +292,12 @@ export async function GET(req: Request, { params }: Params) {
       : Promise.resolve(null),
   ]);
   if (refs === null) console.error(`[${TAG}] event refs could not be built; rooms' events, up_next and upcoming empty`);
+  // `board_recent` (`?panel=1`) is cut from the SAME page: no second read.
+  let boardRecent: ChatMessage[] = [];
   if (boardRead) {
     if (!boardRead.ok) return NextResponse.json(boardRead.body, { status: boardRead.status });
     boardLatest = lastShown(boardRead.messages);
+    boardRecent = recentShown(boardRead.messages, BOARD_RECENT_MAX);
   }
 
   // An event room's state and start: from its `EventRef`; when the refs
@@ -243,13 +310,16 @@ export async function GET(req: Request, { params }: Params) {
     const event = kind === "event" ? refOfRoom(row.event_id, refs) : null;
     const known = kind === "event" && row.event_id !== null ? (eventById.get(row.event_id) ?? null) : null;
     const state = event?.state ?? (known ? roomState(known.starts_at, known.ends_at, now) : null);
+    const policy = policyOf(row);
     return {
       id: row.id,
       kind,
       name: typeof row.name === "string" ? row.name : "",
       unread: unreadFlags[i],
-      can_post: spaceCanPost(kind, role, state),
+      can_post: spaceCanPost(kind, role, state, policy, listedRooms.has(row.id)),
       event,
+      locked: row.is_private === true,
+      post_policy: policy,
       position: typeof row.position === "number" ? row.position : null,
       state,
       starts_at: event?.starts_at ?? known?.starts_at ?? null,
@@ -267,5 +337,6 @@ export async function GET(req: Request, { params }: Params) {
     up_next: refsOf(upNextRows),
   };
   if (wantsUpcoming) body.upcoming = refsOf(upcomingRows);
+  if (wantsPanel) body.board_recent = boardRecent;
   return NextResponse.json(body);
 }
