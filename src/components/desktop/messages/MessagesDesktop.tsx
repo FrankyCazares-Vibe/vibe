@@ -495,7 +495,11 @@ export function MessagesDesktop({ initialHandle, initialChannelId }: MessagesDes
         : { id: org.id, handle: org.handle, name: org.name, logo_url: org.logo_url },
     );
   }, []);
-  const closePins = useCallback(() => setPinsOpen(false), []);
+  // The panel's hide button leaves with the panel: the keyboard goes back to the thread, not to `<body>`.
+  const closePins = useCallback(() => {
+    setPinsOpen(false);
+    paneRef.current?.focus();
+  }, []);
   const onJump = useCallback((messageId: string) => {
     // A second miss of the same message is a new answer for the panel.
     setMissedId(null);
