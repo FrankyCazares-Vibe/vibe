@@ -371,10 +371,16 @@ function LoginForm() {
           </div>
         ) : null}
 
-        {/* Sign-up open: today's line. Closed, or still asking (null): the
-            two ways in for someone without an account, a code they were
-            sent or the waitlist. */}
-        {signupOpen ? (
+        {/* Sign-up open: today's line. Closed: the two ways in for someone
+            without an account, a code they were sent or the waitlist. Still
+            asking (null): an empty line that holds the place. So an open
+            sign-up never shows the waitlist wording for a moment on every
+            load, and nobody is sent to a form that would refuse them. */}
+        {signupOpen === null ? (
+          <p className="vibe-auth-tail" aria-hidden="true">
+            &nbsp;
+          </p>
+        ) : signupOpen ? (
           <p className="vibe-auth-tail">
             New to Vibe?{" "}
             <Link href="/auth/signup" className="vibe-auth-link">

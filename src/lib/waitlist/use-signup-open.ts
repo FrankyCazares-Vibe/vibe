@@ -13,9 +13,10 @@ import { parseSignupOverride } from "./types";
  * hook, never this). The dev-only `?signup=open|closed` on the page's own
  * address wins outside production, for the local browser pass.
  *
- * null while it asks: callers show the closed wording until they know, so
- * nobody is sent to a sign-up form that would refuse them. An error also
- * reads as closed.
+ * null while it asks: until they know, callers show the closed wording (the
+ * email-link card, whose closed line has no waitlist in it) or nothing (the
+ * login page), so nobody is sent to a sign-up form that would refuse them.
+ * An error also reads as closed.
  */
 export function useSignupOpen(): boolean | null {
   const [open, setOpen] = useState<boolean | null>(null);
