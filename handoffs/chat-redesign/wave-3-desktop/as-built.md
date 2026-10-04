@@ -964,3 +964,269 @@ The phone's pins (part G, 375px, Night and Light):
 16. Two accounts in one dm: A pins; B, with the chat already open, opens `Pinned messages` and sees it. Three pins, double-tap `Unpin` on the first: only one goes; a slow second tap works; the same by keyboard / screen reader.
 17. The long-press picker with the extra row above and below the bubble; the sheet's inner scroll on iPhone; tap-to-jump's scroll position; Back closes only the sheet; drag-dismiss; a reload with the sheet open; the rows' spacing in a dm and a group with the `data-mid` wrapper.
 18. A switch-off phone (2.5 rows 6 and 7): the old who-can-post line (`viewer.post_line`) and a `room_posters_only` refusal; long-press shows no Pin; the "..." sheet has no Pinned row and still says `Unpin`.
+
+## Wave 5
+
+Integrated Sun Oct 4, 2026. Five batches: W3-5-club, W3-5-panel, W3-5-people, W3-5-rooms, W3-5-pins. The club and the panels. With this wave a person with `chat_desktop` on has the whole desktop Messages: a club opens to its header (mark, name, hat line, a chip for every room, the `+` and the panel toggle), the thread or the Board, the composer, and a right panel (the club's, or an event chat's own); `See all` opens the Members dialog; an owner or an admin has the Rooms dialog; a dm or a group has the Pinned and Shared panel. Not committed, not pushed, not deployed. No migration in this wave; nobody touched a database, local or production. This is the last build wave: what follows is the browser walk (contract section 10), which nobody has started.
+
+### The gate (run in the worktree after all five batches and the integrator's edits)
+
+| Check | Result |
+|---|---|
+| `npm run typecheck` | exit 0 |
+| `npm test` | 2,059 tests, 2,059 pass, 0 fail (2,027 after wave 4, plus the 32 of `rooms-dialog-rules.test.ts`, the one test file section 9 gives this wave) |
+| `npx eslint <the 9 files of the wave, MessagesDesktop.tsx and the members route>` | exit 0, no problem in any of the 11 files |
+| `npm run build` | exit 0 (`✓ Compiled successfully`); the worktree has no `.env.local` |
+
+Nothing here ran in a browser and no server was started. Only `rooms-dialog-rules.ts` has tests. Everything else of the wave is `.tsx` that `node --test` cannot load: `ClubPane`'s reads, timers and lost-room rules, the panel-storage rule, the people picker's Esc rule and `matches`, the Pinned panel's stale-miss rule are covered by typecheck, lint, build and reading only.
+
+### Files of the wave (11: 4 changed, 7 new)
+
+Changed by a batch: `src/components/desktop/messages/ClubPane.tsx` and `PinsPanel.tsx` (wave 4's placeholders replaced).
+New, all under `src/components/desktop/messages/`: `ClubPanel.tsx`, `EventPanel.tsx`, `MembersDialog.tsx`, `RoomPeople.tsx`, `RoomsDialog.tsx`, `rooms-dialog-rules.ts`, `rooms-dialog-rules.test.ts`.
+Changed by the integrator only, outside every batch's list (both listed under the edits below): `MessagesDesktop.tsx` (W3-4-shell's; one statement), `src/app/api/orgs/[slug]/channels/[channelId]/members/route.ts` (nobody's; a comment).
+
+Not edited (empty `git diff`): `contracts.ts`, `desktop-rules.ts` and its test, `DesktopDialog.tsx`, `LegacyThreadPane.tsx`, `use-desktop-open.ts`, every file under `src/components/mobile/` (`ClubSpace.tsx`, `EventChat.tsx`, `UpNext.tsx`, `EventAbout.tsx`, `BoardStrip.tsx`, `RoomChips.tsx`, `PinnedSheet.tsx` among them), `use-room-poll.ts`, `use-message-pins.ts`, `rooms.ts`, `room-names.ts`, the two `channels` route files, `public/html/*`, `supabase/*`.
+
+### Integration edits (seven; five on seams inside the wave, two outside it)
+
+Inside the wave:
+1. `ClubPane.tsx`, the header's panel toggle: `if (e.detail > 1) return;`. Asked by W3-5-panel. A double click on the panel's own `Hide this panel` hides the panel, the header widens, and the toggle (now `Show the club panel`) arrives under the pointer: the second click showed the panel again and stored `"1"`. A key press counts 0, so Enter and Space still work.
+2. `EventPanel.tsx`, the hide button: the same line. The mirror case in an event chat: a double click on the header's `Show the club panel` put the event panel's hide button under the pointer, and in `side` mode the second click hid it and stored `"0"`. (`ClubPanel`'s hide button already had the guard.)
+3. `ClubPane.tsx`, focus after a hide: `hidePanel` first moves focus to the header's toggle (`toggleRef`, a new prop of the file-private `ClubHeader`) when focus was inside the panel's box (`panelBoxRef`), so a keyboard `Hide this panel` no longer drops focus to `<body>`. Only when focus was in the panel: a mouse click in Safari (which does not focus a clicked button) must not pull focus out of the composer. Asked by W3-5-panel.
+4. `PinsPanel.tsx`, the stale miss: the `missedId` the panel MOUNTS with opens nothing. The shell clears `missedId` on the next jump and on a change of chat, not when the panel closes (wave 4, as built), so a pin that missed, then Hide, then the page's pin button again, mounted a new panel with that card already open to its whole text and `That message is further back in the chat.` before anything was clicked. Now `staleMissed` holds the mount-time id and `missed` (what the cards read) is null until the shell has moved the prop (a click on a quote clears it, then the page answers). Set while rendering, as the shell's own `seenKey`; no effect, no ref.
+5. Comments, so they say what the code does: `ClubPanel.tsx` (in `overlay` its nearest positioned ancestor is `ClubPane`'s 320px box, not the pane's; where focus goes after a hide) and `RoomPeople.tsx` (above `NO_ROSTER_LINE`: the Rooms dialog's roster read IS tried again after it failed, and the dialog says the failure itself under the list).
+
+Outside the wave's files (each flagged by a reviewer under "outside"; the orchestrator may revert either without touching anything else):
+6. `MessagesDesktop.tsx`, `closePins` (W3-4-shell's file): after `setPinsOpen(false)` it calls `paneRef.current?.focus()`. The Pinned panel's hide button unmounts with the panel; pressed by keyboard, focus fell to `<body>` of the shell. `closePins` is only the panel's own `onClose`; the other closes (`info-opened`, the page's toggle, a change of chat) come from inside the frame or move the chat, and are unchanged. Wave 3's note: "call `handle.focus()` only for your own reasons".
+7. `src/app/api/orgs/[slug]/channels/[channelId]/members/route.ts`, the POST's doc comment (owned by no batch; open since wave 2): it called a by-name row on a public room "harmless but not useful". With `post_policy = 'listed'` that row is what lets the person post. Comment only, four lines; no executed line changed.
+
+### W3-5-club: the club pane
+
+Files: `ClubPane.tsx` (replaces the placeholder), `EventPanel.tsx` (new).
+
+```ts
+// ClubPane.tsx ("use client"); the file's only export. ClubPaneProps is contracts.ts', unchanged.
+export function ClubPane({ orgHandle, roomId, roomKind, initialPage, night, contentWidth, onSwitchRoom, onLost, onOrg, onListsChanged, onRsvpChanged }: ClubPaneProps);
+// file-private: ClubHeader (props: t, night, now, orgHandle, space, roomId, panelOn, officer, onPick, onManageRooms, onTogglePanel, toggleRef),
+//   RoomView (props: roomId, kindHint, storedName, clubName, orgHandle, orgId, initialPage, night, now, panelOn, reloadToken, onReport, onOpenEventChat, onRsvp),
+//   type RoomReport = { roomId; kind: RoomKind | null; event; lost: boolean; refused: string | null },
+//   spaceFailure, readPanelPref, storePanelPref, PANEL_WIDTH = 320, PANEL_KEY = "vibe_chat_panel", SPACE_REREAD_MS (20 s), BOARD_SETTLE_MS = 1200
+
+// EventPanel.tsx ("use client"); EventPanelProps is contracts.ts', unchanged.
+export function EventPanel({ event, night, now, mode, onHide, onRsvp }: EventPanelProps);
+```
+How it behaves:
+- **Layout.** The root is the one flex item of the shell's pane box (`flex: 1; min-width: 0; min-height: 0; position: relative; display: flex`). In it: a column (header, then `LoadFailed` or the Board strip + `RoomView`), then the panel's 320px box: a flex item in `side`, `position: absolute; top: 0; right: 0; bottom: 0; z-index: 6` in `overlay`. One element in both modes, so a resize never remounts the panel. `ClubPanel` / `EventPanel` place themselves inside that box (in `overlay` they are absolute inside it and bring the page colour and the left hairline).
+- **The header** is one row: a wrapping row (the mark, the name as a link to `/orgs/<handle>`, the hat line; then `RoomChips`) and, OUTSIDE that row, a block with the `+` and the toggle, so the two buttons stay top right when the chips drop under the name.
+- **`panelOn`** (`panelMode(contentWidth, 320, pref, openedHere) !== "hidden"`) is the one boolean the hat line, `Manage club`, the Board strip and the event block read. `EventAbout` is the thread's header (`anchor="top"`) only for an event chat with `panelOn` false; else it is in `EventPanel`.
+- **The room's kind** is the thread read's, else the space's, else the prop. `RoomView` (keyed by `roomId`, the one `useRoomPoll` under `desktop/messages/`) tells the pane what it knows through `onReport`.
+- **Reads.** The space with `?panel=1`: on open, every 20 s while visible, on return to visible, on every `CALENDAR_CHANGED_EVENT`, 1.2 s after the Board is opened or left, when the Rooms dialog reports a change, and when the room's read is refused. The roster with `?visible=1`, once per club open, for the five faces (a failure leaves `faces` null and says nothing).
+- **Lost.** A LATER 403 / 404 from the space read -> `onLost(<the refusal's own sentence>)`. An event chat whose poll says `lostAccess` -> the toast `You left the event chat.`, `onListsChanged()`, a space read, `onSwitchRoom(<lounge id>, "lounge")`. Any other room the thread read refuses (first read or later) -> a space read, and when the space does not list the room either -> `onLost` (the first read's own sentence, else `That chat isn't available anymore.`).
+- **Dialogs** live in the pane: `RsvpSheet` (from the panels and from `EventAbout`), `MembersDialog`, `RoomsDialog`.
+
+Deviations from the contract:
+1. **An RSVP made in the dialog refreshes the space only through the shell.** The dialog's `onChanged` bumps the room's `reloadToken` and calls `onRsvpChanged()`; the space is re-read by the pane's own `CALENDAR_CHANGED_EVENT` listener (one path for the dialog and for an event card in the thread, one space read per RSVP). It works because the shell passes `onRsvpChanged={emitCalendarChanged}` (`MessagesDesktop.tsx`). **If the shell ever passes something else, the panel waits for the 20 s read.**
+2. **`vibe_chat_panel` is written `"0"` only by a hide in `side` mode.** Hiding an overlay ends this visit's open and stores nothing; a Show stores `"1"` in both modes. (S7 does not say when the key is written.) Side effect: a `"0"` stored on a wide window becomes `"1"` when the overlay is opened on a narrow one.
+3. `You left the event chat.` is once per time the room is open (the guard is cleared when `roomId` changes), not once per room for the pane's life: the same event chat can be joined, opened and left again in one visit.
+4. The header's toggle is drawn in both states (section 8 gives it both names and `aria-pressed`), so while a panel is shown in `side` there are two `Hide this panel` buttons on screen: the header's and the panel's own. In `overlay` the panel covers the header's.
+5. The lost-room rule is held back while the Rooms dialog is open: an officer who deletes the open room there is not thrown home mid-dialog; it runs when the dialog closes.
+6. `poll.reload()` after an RSVP goes through a `reloadToken` prop (the hook lives in the keyed child, the dialog in the pane). A FIRST read's refusal can also end in `onLost`, not only a later one.
+7. `EventPanel`'s chrome has the event's title as an `<h2>` beside the hide button (the contract says only "the hide button").
+8. While the space (or an event chat's first read) is out, the panel's place is an empty 320px box that takes no click. `RoomThread` and `RoomComposer` get `roomKind="room"` until a kind is known. `useRoomPoll` is given `line` (`Couldn't load the Board.` / `Couldn't load this event chat.`).
+
+### W3-5-panel: the club panel
+
+File: `ClubPanel.tsx` (new).
+
+```ts
+export function ClubPanel({ space, activeRoomKind, night, now, mode, faces, onHide, onOpenRoom, onRsvp, onSeeMembers, onManageRooms }: ClubPanelProps);   // contracts.ts', unchanged
+// file-private: PANEL_WIDTH = 320, plainClick(e), roomLink(roomId, open) -> { href, onClick }, firstClick(run) -> (e) => void,
+//   EventCard, EventRow, PostRow, Faces, facesLabel, PanelIcon, MegaphoneIcon, ChevronRight
+```
+How it behaves:
+- It never fetches and holds no state: everything is `space` (read with `?panel=1`) and `faces`. Top to bottom: `<club> events` + the hide button; the first `up_next` event as a flat card and the second as a row, or `No events coming up.`; `Announcements` (the megaphone, `See all`, up to three `board_recent` posts, or `emptyLine("board", club)`), not drawn while the Board is the open room; the faces, `<N> members`, `See all`; and, when `onManageRooms` is not null, `Manage club` (a plain link to `/campus?manage=<handle>`) beside `Manage rooms`.
+- An event's body and the Board's `See all` are `<a href="/messages?channel=<id>">` answered in place on a plain left click. The RSVP pill calls `onRsvp(event.id, event.viewer_status)`: the dialog is `ClubPane`'s.
+- The dot on the newest post is the Board room's own `unread`; seeing posts here marks nothing read.
+
+Deviations from the contract:
+1. **The first card's state line is `upNextLine(event, now)` in every state; `statePillText` is not used.** Live: `Live now` in coral, then `<place> · <time>` under the title (the approved picture). Not live: the time is the state line (secondary colour) and only the place is under the title, so the time prints once; with no place there is no line under the title. So "location · time" is one line only while live.
+2. The phone's coral `Soon` mark (inside 24 hours, `isSoon`) is NOT on the card: the contract's entry does not name it. The planner's call.
+3. **Every in-place control ignores the second click of a double click** (`e.detail > 1`): the links (`roomLink`) and, through `firstClick`, the hide button, the RSVP pill, each post, the Members `See all`, `Manage rooms`. `Manage club` is left to the browser.
+4. **Focus when the Board is opened from the panel**: `Announcements` unmounts with the pressed control, so focus is first put on the Members `<section>` (`tabIndex={-1}`, found by its `useId` id, the panel's coral `:focus-visible` ring). The contract asks for no focus handling here. Nothing moves focus on to the opened room: `RoomComposer` has no focus handle.
+
+### W3-5-people: the members dialog and the room people list
+
+Files: `MembersDialog.tsx`, `RoomPeople.tsx` (both new).
+
+```ts
+export function MembersDialog({ orgHandle, clubName, night, onClose }: MembersDialogProps);   // contracts.ts', unchanged
+export function RoomPeople(props: RoomPeopleProps);   // contracts.ts', unchanged; renders the file-private People keyed by `${orgHandle}/${roomId}`
+// file-private in RoomPeople.tsx: type Listed = Pick<RosterRow, "user_id" | "name" | "handle" | "avatar_url">, matches(person, query), Face, PersonLines, ListSkeleton
+// file-private in MembersDialog.tsx: matches(person, query), MemberRow
+```
+How it behaves:
+- **`MembersDialog`**: a `DesktopDialog` titled `Members of <club>`; ONE read, `GET /api/orgs/<handle>/members?visible=1`; a sticky search (`Search members`) over the rows on hand (every typed word in the name or the handle, a leading `@` dropped); a row is the mark, the name, `@handle`, the role word, and a plain `<a href="/profile/<handle>">` (a full navigation; a member with no handle is a plain row). A failure (the route's 503 when the block read fails included): `LoadFailed` with Retry.
+- **`RoomPeople`**: reads `GET /api/orgs/<handle>/channels/<roomId>/members` (`{ ok, members: [{ user_id, added_at, name, handle, avatar_url, school_verified }] }`), writes `POST` the same with `{ user_id }` and `DELETE .../members/<userId>`. Drawn: the by-name rows, less any held by a person whose roster role is in `skipRoles`. Offered under `Add someone`: `roster` rows not on the list and not in `skipRoles`, searched the same way. One write at a time; `onChanged()` after each write that went through (also after the dialog has closed); a refused write is a toast (`vibeRequest`) and nothing changes on screen; Remove and a picker row ignore the second click of a double click.
+- **Esc in the OPEN picker** never reaches the Rooms dialog: in the search with words typed it clears them; anywhere else in the picker (the empty search, a row, `Add someone`) it closes the picker and focus returns to `Add someone`. Esc on the list's Remove buttons, or with the picker closed, is the dialog's.
+
+Deviations from the contract:
+1. **Strings the contract has no words for** (6.5: "no builder writes a sentence of their own"; 4c.5 says only "one muted line"). In `RoomPeople.tsx`: `No one added yet.`; `The member list isn't loaded, so no one can be added right now.` (`roster === null`, which is BOTH loading and failed, so the line is true of both); `No one else to add.`; the picker row's word `Add`; the spoken name `Remove <name>`; `Couldn't load this room's people.`, `Couldn't add them to this room.`, `Couldn't remove them from this room.`; `No matches for "<q>"`. In `MembersDialog.tsx`: `Couldn't load the members.` and `No matches for "<q>"`.
+2. No test: section 9 names none and the two files are `.tsx`. The Esc rule, `matches` and the offered / shown filters are untested logic inside the components.
+
+### W3-5-rooms: the Rooms dialog
+
+Files: `RoomsDialog.tsx`, `rooms-dialog-rules.ts`, `rooms-dialog-rules.test.ts` (all new).
+
+```ts
+// RoomsDialog.tsx ("use client"); the only export. RoomsDialogProps is contracts.ts', unchanged.
+export function RoomsDialog({ orgHandle, clubName, night, onClose, onChanged }: RoomsDialogProps);
+// file-private: RoomEditor, Confirm, RoomLines, readRooms, wordStyle, LockIcon, MegaphoneIcon, Chevron
+
+// rooms-dialog-rules.ts (pure: no React, no DOM)
+export function roomsUrl(orgHandle: string): string;                    // /api/orgs/<handle>/channels
+export function roomUrl(orgHandle: string, roomId: string): string;     // .../channels/<id>
+export function rosterUrl(orgHandle: string): string;                   // /api/orgs/<handle>/members  (never `visible`)
+export type RoomRow = { id: string; name: string; topic: string | null; is_private: boolean; kind: RoomKind | null; post_policy: PostPolicy };
+export function answeredPolicy(data: unknown): PostPolicy | null;       // `channel.post_policy` of a create's or a save's answer
+export function toRoomRows(channels: unknown, answered?: ReadonlyMap<string, PostPolicy>): RoomRow[];
+export type RoomSection = "fixed" | "officers" | "extra";
+export function roomSection(room: Pick<RoomRow, "kind">): RoomSection;
+export function roomTitle(room: Pick<RoomRow, "kind" | "name">): string;
+export function roomMark(room: Pick<RoomRow, "kind" | "is_private">): "megaphone" | "lock" | null;
+export const FIXED_ROOM_LINE = "Every club has this room. It can't be renamed or removed.";
+export const PRIVATE_CONFIRM_LINE = "Make this room private? Members who are not officers or on the list lose it, and their unread marks and votes in it are cleared.";
+export const LISTED_PUBLIC_LINE = "Everyone in the club can read. Only officers and the people below can post.";
+export const NAME_TAKEN_LINE = "A room with that name already exists.";
+export const NAME_SHAPE_LINE = "Use at least two letters or numbers (a-z, 0-9), and start with one.";
+export const NAME_CORE_LINE = "Every club already has a Board, a Lounge and an Officers room. Pick another name.";
+export const TOPIC_MAX = 200;
+export const OFFICER_SKIP_ROLES: readonly string[];                     // ["owner", "admin"]
+export function deleteConfirmLine(room: Pick<RoomRow, "kind" | "name">): string;   // `Delete <name>? Its messages are deleted too.`
+export function savedAsLine(slug: string): string;                      // `Saved as <slug>`
+export function roomRuleLine(room: Pick<RoomRow, "kind" | "is_private" | "post_policy">): string;
+export type SeeOption = { isPrivate: boolean; label: string };
+export type PostOption = { policy: PostPolicy; label: string };
+export const SEE_OPTIONS: readonly SeeOption[];
+export function postOptions(isPrivate: boolean): PostOption[];          // three for a public room, two for a private one
+export function effectivePolicy(isPrivate: boolean, policy: PostPolicy): PostPolicy;   // `listed` on a private room is `everyone`
+export function peopleTitle(room: Pick<RoomRow, "kind" | "is_private" | "post_policy">): string | null;
+export function extraRoomCount(rooms: readonly Pick<RoomRow, "kind">[]): number;
+export function capLine(rooms: readonly Pick<RoomRow, "kind">[]): string | null;   // REFUSAL_SENTENCES.room_limit at 5
+export type RoomForm = { name: string; topic: string; isPrivate: boolean; policy: PostPolicy };
+export const NEW_ROOM_FORM: Readonly<RoomForm>;
+export function formOf(room: RoomRow): RoomForm;
+export type NameCheck = { ok: true; slug: string; renamed: boolean } | { ok: false; line: string | null };
+export function checkRoomName(input: string, room: Pick<RoomRow, "kind" | "name"> | null, others: readonly string[]): NameCheck;
+export type FormCheck = { ok: boolean; slug: string | null; nameLine: string | null; changed: boolean };
+export function checkForm(form: RoomForm, room: RoomRow | null, others: readonly string[]): FormCheck;
+export function needsPrivateConfirm(room: Pick<RoomRow, "is_private"> | null, nextPrivate: boolean): boolean;
+export type CreateRoomBody = { name: string; topic: string | null; is_private: boolean; post_policy: PostPolicy };
+export type SaveRoomBody = { name?: string; topic: string | null; is_private: boolean; post_policy?: PostPolicy };
+export function createBody(form: RoomForm, slug: string): CreateRoomBody;
+export function saveBody(form: RoomForm, room: RoomRow, slug: string): SaveRoomBody;
+export type WriteFailure = { status: number; code?: string | null; error: string | null; message: string; field?: string };
+export function writeFailureLine(failure: WriteFailure): string;
+export function refusedField(failure: WriteFailure): "name" | "topic" | null;
+```
+How it behaves:
+- A `DesktopDialog` titled `Rooms in <club>`, width 520, `busy` while one of its own three writes is out. The list (`GET channels`, read again after every write that went through): the Board and the Lounge with their line and `FIXED_ROOM_LINE`, nothing to press; Officers opens to its people list (`Also in this room`); an extra room opens to the form (Name, What it's for, Who can see it, Who can post), its people list while the SAVED room has one (`People who can see this room` when private, `People who can post` when public + `listed`), and Delete behind a confirm. One section open at a time. `New room` is the same form; at the cap the `room_limit` sentence takes the button's place.
+- A name is typed as words; `checkRoomName` makes the slug (`roomSlug`), shown as `Saved as <slug>`. Words that give the stored slug back are no rename (the stored name is kept as it is). `post_policy` is sent on a save only for a room whose kind reads `room`; `listed` is never sent for a private room.
+- A refused write shows its sentence under the form (`chatRefusalLine`, else `writeFailureLine`: the 409 `Channel name already exists` reads `A room with that name already exists.`) and marks its field; a refusal with an action (Sign in, Terms) is a toast with that link.
+- After every write that went through: `onChanged()` (`ClubPane` re-reads the space). `RoomPeople` is handed the dialog's `onChanged` directly.
+
+Deviations from the contract:
+1. **The roster is read once, and again only after a read that failed** (4c.5 says ONE roster read): by a Retry drawn under a people list, by the room list's own Retry, and when a room's section is opened. Still one call site; never re-read while a read is out or after one went through. When the read failed, a compact `LoadFailed` (`Couldn't load the members.` + Retry) sits right under `RoomPeople`'s own muted line: two lines about one cause, on purpose (one says the effect, one gives the way out), because `RoomPeopleProps.roster` cannot tell loading from failed.
+2. **The dialog remembers the rule its own writes were answered with** (`answeredPolicy`, by room id, for the dialog's life) and `toRoomRows` lays it under a list row that carries no `post_policy` and whose kind is `room`. Reason: wave 2's 5-minute "column missing" memory is not cleared by a write that proves the column is there, so the list read after a save could come back without the rule and the room read as `everyone`. Known limit: another officer's change to that room's rule is not seen until the list carries the column again (up to 5 minutes).
+3. A name is checked in the form before the request: the three core names (`NAME_CORE_LINE`), a clash judged on the WORDS shown (`roomDisplayName`), the slug's shape (`NAME_SHAPE_LINE`).
+4. `Confirm`'s two answers, a room's row and the New room `Cancel` ignore the second click of a double click. `New room`, the `Delete` opener and the form's submit do not need it (the control is gone or busy by then).
+5. **The builder's own strings, not in 4c.5 or 6.5**: the seven lines of `roomRuleLine`, `NAME_SHAPE_LINE`, `NAME_CORE_LINE`, the buttons `Create room`, `Save`, `Cancel`, `Delete`, `Make private`, the fallbacks `Couldn't load the rooms.`, `Couldn't create the room.`, `Couldn't save the room.`, `Couldn't delete the room.`, `Couldn't load the members.` The test pins the rule lines and `NAME_SHAPE_LINE` as written: reword there and in the rules together.
+
+### W3-5-pins: the Pinned and Shared panel
+
+File: `PinsPanel.tsx` (replaces the placeholder).
+
+```ts
+export function PinsPanel({ threadId, title, night, mode, refreshToken, missedId, onClose, onJump, onChanged }: PinsPanelProps);   // contracts.ts', unchanged
+// file-private: carried(pin), sharedUrl(threadId, before), PinCard, SharedTile, wordStyle
+```
+How it behaves:
+- `useMessagePins(threadId, { enabled: true, pollMs: 20000 })`; a move of `refreshToken` after the mount calls `reload()`. `Pinned`: quote cards, newest pin first (`text`, else `Photo` / `Video` / `Shared post` / `Attachment`; then `<author> · <rowTime>`, the time alone for an author the viewer cannot read); a click calls `onJump`; `Unpin` shows on hover and focus, ignores the second click of a double click, and calls `onChanged()` when the request has answered (even after the panel closed). A card opens in place to `full_text` when the page could not jump to it (with `That message is further back in the chat.`) or from `Show all` (`pinTextCut`).
+- `Shared`: its own read of `GET /api/me/threads/<id>/shared` on open, a two-column grid of `<a target="_blank">` tiles (a photo or a video -> the proxy URL; a post -> `/posts/<id>`), `Show more` with `before` = the last tile's `created_at` while `has_more`.
+- `available === false`: the one line `Pinned messages aren't available yet.`; the hide button stays (in `overlay` the panel covers the page's own pin button, so it is the only way out).
+- The rounded card draws its own hairline in both modes (wave 4's note); the root's `data-mode` carries `mode`.
+
+Deviations from the contract:
+1. **A failed first pins read shows `LoadFailed` with Retry inside the open panel** (wave 4 asked this batch to decide): the panel is opened by the page's own button and polls every 20 s, so no gate changed.
+2. Strings outside 4d.5: `Couldn't load shared photos, videos and posts.` (a failed Shared read or `Show more`), `Attachment` (the phone sheet's word), the spoken `Hide this panel` and `Pinned and shared with <title>`.
+3. Two focus-ring positions: inside (-2px) for the hide button, the quote cards, `Unpin`, `Show all`, `Show more`; outside (+2px) for the Shared tiles (the picture would paint over an inside ring) and for `LoadFailed`'s coral pill.
+4. The `missedId` the panel mounts with is ignored (integration edit 4).
+
+### Seams read on both sides
+
+- Shell -> `ClubPane` (`MessagesDesktop.tsx`): all eleven props against `ClubPaneProps`, matched. `onRsvpChanged={emitCalendarChanged}` is what W3-5-club deviation 1 rests on. `key={open.orgHandle}`; `RoomView` is keyed by `roomId` and takes `initialPage` as given.
+- `ClubPane` -> `ClubPanel` against `ClubPanelProps`: matched. `onOpenRoom={onSwitchRoom}` (`RoomKind | null` accepts `RoomKind`); `onRsvp(eventId, current)` -> the pane's `RsvpSheet`; `onManageRooms` is null unless the role is in `BOARD_POSTER_ROLES` (owner, admin), the same test as the header's `+` and `Manage club`. `faces` is at most five `Person`s mapped as 3.3 says.
+- `ClubPane` -> `EventPanel` against `EventPanelProps`: matched; `event` is the open room's own read (`ThreadRoom["event"]`). Both panels are placed in the same 320px box and place themselves the same way in both modes.
+- `ClubPane` -> `MembersDialog`, `RoomsDialog`: matched (`orgHandle`, `clubName` = `space.org.name`, `night`, `onClose`; `onChanged` -> a space read). Both mount only once the space has answered.
+- `ClubPane` -> the phone's pieces (`RoomChips`, `BoardStrip`, `BoardView`, `RoomThread`, `RoomComposer`, `EventAbout`, `RsvpSheet`, `useRoomPoll` with `line`): by typecheck and by reading their signatures; none edited.
+- `RoomsDialog` -> `RoomPeople` against `RoomPeopleProps`: matched; the three titles are 4c.5's (`peopleTitle`); `roster` is the unfiltered read or null; `skipRoles` = `["owner", "admin"]`.
+- `RoomsDialog` -> the room routes (wave 2): `GET` answers `{ ok, channels }`; `POST` 201 `{ ok, channel: { ..., post_policy } }`; `PATCH` `{ ok, channel }` with `post_policy` when the body named it; the name clash is 409 with `error: "Channel name already exists"` and no code (matched by `writeFailureLine` on status and words); `room_locked`, `room_limit` and `try_again` come through `chatRefusalLine`; `content_blocked` is not one of its codes, so it shows the line `vibeRequest` mapped and marks its `field` (`refusedField`).
+- `MembersDialog` / `ClubPane` -> `GET /api/orgs/<handle>/members?visible=1` -> `RosterResponse`; `RoomPeople` -> the room's members route (row shape read from the route file): matched.
+- Shell -> `PinsPanel` against `PinsPanelProps`; `PinsPanel` -> `useMessagePins` (`pins`, `available`, `failure`, `unpin`, `reload`), `pinTextCut`, `SharedResponse` (`items`, `has_more`): matched.
+- The double click across a re-layout: `ClubPanel` (every in-place control), the header toggle and `EventPanel`'s hide (integration edits 1 and 2), `RoomsDialog`, `RoomPeople`, `PinsPanel`'s `Unpin`. NOT covered, because the handler belongs to a file this build may not edit and carries no event: `BoardStrip`'s `onOpen`, `RoomChips`' `onPick`, `EventAbout`'s `onRsvp`, `LoadFailed`'s Retry (walk items 3 and 4).
+- Calm, over the nine files: no hex and no `rgb(` literal except `rgba(var(--scrim-rgb), a)` and the CSS variables `--coral`, `--danger-ink`, `--error-ink`; no `position: fixed`, no `vaul`; `boxShadow` only as a 1px hairline ring (the club's mark, a Shared tile, the play mark), never a glow; no `pushState` / `replaceState`; no `can_moderate`; no `/pin` call in `ClubPane`; one `useRoomPoll(` under `desktop/messages/`.
+
+### What comes next must know
+
+Wave 5 is the last build wave. Next is the walk (section 10), then the commit. `contract.md` is read-only for builders; none of this was applied to it.
+
+**Decisions waiting for the planner or Franky** (each is built one way today and is one small change to reverse):
+- **An officer in an event chat with the panel shown has no `Manage club` on screen.** By the contract's letter "a panel on screen" hides the member count and `Manage club` from the hat line, but `EventPanel` shows neither. The `+` still opens Rooms. Decide whether the hat line should hide them only while the CLUB panel is on screen.
+- Two `Hide this panel` buttons in `side` mode (W3-5-club deviation 4): keep the header toggle in both states (as built, as section 8 words it), or draw it only while the panel is hidden.
+- The lost-room hold while the Rooms dialog is open (W3-5-club deviation 5).
+- The coral `Soon` mark on the panel's first card (W3-5-panel deviation 2).
+- **The words nobody signed off**: W3-5-people deviation 1, W3-5-rooms deviation 5, W3-5-pins deviation 2. Add them to 6.5 or reword them (the rooms test pins seven rule lines and `NAME_SHAPE_LINE`). 4c.5's "ONE roster read" should read "one roster read, made again only after it failed".
+- `RoomPeopleProps.roster` (pinned in 3.3) is null for loading AND failed. If the two lines under a failed roster read like noise on the walk, give the prop a way to say which, and let `RoomPeople` draw a skeleton while loading and nothing while the dialog shows the failure.
+
+**Known gaps, none fixed here** (each needs a file outside the wave, or a decision):
+- `src/lib/chat/room-names.ts` (wave 2): `roomSlug` trims the dashes BEFORE the cut to 31, as 4c.3 words it, so a long name whose 31st character falls on a word break is stored with a dash at its end (thirty a's + ` bbbbb` -> `aaa...a-`, shown `Saved as ...-`). Trim again after the cut, with a row in `room-names.test.ts`.
+- `src/lib/chat/rooms.ts` and the two `channels` routes (wave 2): the 5-minute "no `post_policy` column" memory is not cleared by a create or a save that wrote the column. `forgetPostPolicyColumnMissing()` after such a write would fix it for every screen; the Rooms dialog covers only itself (W3-5-rooms deviation 2).
+- `channels/[channelId]/members/route.ts`: POST answers a person who has left the club with 400 `User must join the org first` and no `code`, so the screen can only toast `Couldn't add them to this room.` and the stale roster row stays offered.
+- `RoomPeople`'s add and remove do not raise the Rooms dialog's `busy` (the pinned props have no way to): the dialog can be closed, or a room saved or deleted, while a people write is out. `RoomPeople` copes (it still calls `onChanged()` after unmount).
+- `ClubPane`'s space reads carry no sequence guard, as on the phone: the 20 s tick, the visibility read and the on-demand reads can overlap, and an older answer can land after a newer one (a stale RSVP pill or chip for up to 20 s). A started-counter in the read would close it.
+- `MessagesDesktop.tsx`: `jump-missed` sets `missedId` without checking the open chat (the page's event carries no `channelId`); harmless unless the same message id were pinned in the next chat.
+- `src/components/feedback/LoadFailed.tsx`: Retry acts on both clicks of a double click, and the pill has no focus style of its own (a host that gives buttons an inside coral ring hides it on the coral pill; `PinsPanel` works around it).
+- `carried(pin)` exists twice, word for word (`PinnedSheet.tsx`, `PinsPanel.tsx`): it belongs in `src/lib/chat/pin-rules.ts` with a test.
+- **Tests nobody owns** (each needs a file of wave 1): the panel-storage rule as a pure helper in `desktop-rules.ts` (`panelPrefOnHide(mode): "0" | null`; a Show always stores `"1"`); the Pinned panel's stale-miss rule; the picker's Esc rule and `matches`. On top of wave 4's list.
+- C14: a typed name loses its capitals and punctuation for good (`IU Alumni 2026!` is shown everywhere as `Iu alumni 2026`, `Café` as `Caf`); the dialog shows only the slug under the field, never the words the chip will read.
+- Still open from earlier waves: everything under "The orchestrator and the planner" of waves 2 to 4.
+
+### Walk (DEFERRED: nobody opened a browser or started a server in wave 5)
+
+Section 10 parts C, C2, E and H whole, and the Light repeats of C and E; nothing in them was run. On top of them:
+
+The club pane (part C, 1440 and 1024, Night and Light):
+1. One club visit: event chat A -> `Not going` (the toast, the Lounge, history intact) -> RSVP Going from the club panel -> open A's chip -> `Not going` again: the toast shows again.
+2. At 1440, Lounge open, the panel at the side: press Going on an event card in the thread: the panel's card and count change at once and the event chat's chip appears, without waiting 20 s. An RSVP made in the RSVP dialog costs ONE space read (network tab), not two.
+3. **Double clicks on the pane** (integration edits 1 and 2): the panel's `Hide this panel` (club panel and event panel), the header's `Show the club panel` in the Lounge and in an event chat: one action each, the stored choice is the first click's. Then the ones NOT guarded: the header's `Hide this panel` in `side` mode (the header widens by 320px: does a chip land under the pointer and switch the room?); the Board strip (does the second click land on a Board post's control?); the panel's first event card (the event panel takes its place: does the second click land on its RSVP button and open the dialog?).
+4. Keyboard: Enter on the panel's `Hide this panel` (club and event): focus is on the header's toggle, which now reads `Show the club panel`; Enter again shows the panel. A MOUSE click on the hide button while typing in the composer (Safari): the caret stays in the composer. Enter on an Announcements post or its `See all`: the Board opens, focus is on the Members row (coral ring, `Members` region), the next Tab lands on its `See all`; a mouse click on a post shows no ring there. Hold Enter on a post: the Board opens once.
+5. Panel storage: at about 1100px `Show the club panel` (overlay), then hide it from the panel's button: `localStorage.vibe_chat_panel` is not `"0"`; widen to 1440 or reload wide: the panel is shown. At 1440, hide and reload: still hidden.
+6. At 1024 and 900 the overlay panel lies over the header's right 320px (the chips, the `+`, the toggle): the chips cannot be clicked while it is open; the panel's own button is the way out. Look at whether that is acceptable.
+7. The header with many chips at 1440 and 1024 (the chips drop under the name; the `+` and the toggle stay top right). The hat line in every state; in an event chat with the panel shown an officer sees no `Manage club` (the planner's call above).
+8. `EventPanel` in Light and Night: `EventAbout`'s going avatars are ringed in `t.page` on a `t.surface` card; the hero and pill literals (3.2). The panel's first card: not live -> `<time>` on the state line, the title, the place alone (no line with no place); live -> `Live now` in coral, the title, `<place> · <time>`; no `Soon` anywhere.
+9. The 1.2 s Board settle: open the Board, go back to the Lounge: the panel's dot and the Board chip's dot are gone without waiting 20 s.
+10. As avery, delete the OPEN room in the Rooms dialog: the dialog stays; on closing it the pane goes home with `That chat isn't available anymore.` Leave a club in another tab: within 20 s the pane goes home with the refusal's sentence. `RemoveConfirm` is placed against the window (no transformed ancestor in the pane).
+
+The Members and Rooms dialogs (parts C and C2):
+11. Members: the sticky search over scrolling rows; the edge-to-edge rows; Safari's native search field and its clear button; focus returns to `See all`; Back after a full navigation to a profile from the open dialog; a blocked person is missing; the 503 shows `LoadFailed` with Retry.
+12. The picker's Esc, in a browser: in the search with words typed (clears; picker and dialog stay); on the empty search, on a row, on `Add someone` with the picker open (the picker closes, focus on `Add someone`, the Rooms dialog and the form's unsaved edits stay); on a Remove button or with the picker closed (the Rooms dialog closes).
+13. With the roster route failing (offline, or a 500): open Manage rooms -> Officers: the muted line plus `Couldn't load the members. Try again.` with Retry; Retry brings `Add someone`; closing and reopening a section retries by itself; the room list's Retry retries the roster too. A double click on that Retry (`LoadFailed` has no guard). Do the two lines read as noise?
+14. Double-click `Make private`, the question's `Cancel`, the delete question's `Cancel` and `Delete`, a room's row, the New room `Cancel`: one action each. Esc inside a question leaves the dialog open. Focus after a create (the new row), after a delete (`New room`, or the body at the cap) and after the two Cancels. The radio snapping back to public while the private question is up, by mouse and by arrow keys.
+15. On the local stack right after the post-policy column appears, without restarting the dev server: save `Only officers` on an extra room: its row reads `Every member sees it. Only officers post.` and Save goes off; save `Officers and people you pick`: `People who can post` appears; then save a second room: the first keeps its line.
+16. A name in non-Latin letters and `_ab`: `NAME_SHAPE_LINE` under the field, the field marked, Create off. Thirty a's and a word: the trailing dash (known gap). The 86vh scroll with eight rooms, an open section and the roster failure box. A refusal's toast shows above the dialog.
+
+Pinned and Shared (parts E and H):
+17. A pin older than the loaded 50: click it (the card opens with the "further back" line), hide the panel, open it again: the card is CLOSED; click it again: it opens again (integration edit 4). The same pin missed twice without closing still re-opens.
+18. Enter on the panel's `Hide this panel`: the keyboard is back in the thread (integration edit 6), and the next Esc follows rule 9 from inside the frame; the page's pin button reads not pressed.
+19. Tab through Shared with photos, a video and a post: a coral ring just outside each tile's corners, whole on all four sides (first row under the heading, last row at the bottom, the panel's edges). Retry after a failed pins read, a failed Shared read and a failed `Show more`, and Sign in on a 401: a ring with a 2px gap around the coral pill. The inside rings on the hide button, each quote, `Unpin`, `Show all`, `Show more`. Night and Light.
+20. Unpin by keyboard keeps focus in the list; a double click on `Unpin` removes one pin; `Show more` pages without doubles; side at 1440 and overlay at 1024; `Pinned messages aren't available yet.` on a database without the table (the hide button still closes it).
