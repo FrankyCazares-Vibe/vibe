@@ -25,7 +25,7 @@ import Link from "next/link";
 
 import { vibeRequest } from "@/lib/feedback/request";
 
-export type AdminTab = "reports" | "clubs" | "users" | "log";
+export type AdminTab = "reports" | "clubs" | "users" | "waitlist" | "log";
 
 export const COLORS = {
   bg: "#0F0D17",
@@ -62,6 +62,13 @@ const TABS: Array<{ key: AdminTab; label: string; title: string; blurb: string }
     title: "Users",
     blurb:
       "Look someone up by handle, name or email address. Search stays on this page — it never goes in the address bar.",
+  },
+  {
+    key: "waitlist",
+    label: "Waitlist",
+    title: "Waitlist",
+    blurb:
+      "Who asked to join, and who gets a code next. Pick up to 25 confirmed people at a time and send them access codes; add club officers by hand. Addresses stay masked.",
   },
   {
     key: "log",

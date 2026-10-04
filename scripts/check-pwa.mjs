@@ -74,7 +74,7 @@ const BADGE = { src: "/icons/badge-mono-96.png", size: 96 };
 
 // Paths the proxy must skip, and paths it must still see (critic-w1 item 3).
 // The last two pin "exact root file": a nested or longer name is not ours.
-const PROXY_SKIPS = ["/sw.js", "/offline.html", "/manifest.webmanifest", "/icons/icon-192.png"];
+const PROXY_SKIPS = ["/sw.js", "/offline.html", "/manifest.webmanifest", "/icons/icon-192.png", "/landing/still-orgs-480.avif", "/landing-media/vibe-demo-780.mp4"];
 const PROXY_RUNS = [
   "/", "/campus", "/api/me", "/html/profile.html", "/html/_sw.js",
   "/account/suspended", "/offline", "/foo/sw.js", "/sw.jsx",

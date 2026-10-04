@@ -28,6 +28,8 @@ import {
  *   fresh cream one in <head>: the head watcher and the pathname effect
  *   repaint it from the attribute. They only touch the meta and never
  *   re-read the preference, so they can't undo a Settings tap.
+ * - The landing ("/") is always Night: syncThemeColorMeta paints its meta
+ *   dark in either theme (NIGHT_ONLY_PATHS in theme.ts).
  */
 export function ThemeSync(): null {
   const pathname = usePathname();

@@ -40,6 +40,14 @@ yarn-error.log*
 # vercel
 .vercel
 
+# The landing's demo film ("A day on Vibe"): a LOCAL copy only. It shows the
+# founders' own photos with real people in them, and this repo is public, so
+# it is never committed. Every build reads it from Vercel Blob
+# (src/lib/landing/demo-media.ts); NEXT_PUBLIC_DEMO_MEDIA_BASE=/landing-media/
+# reads this copy instead. The stills in public/landing/ are photo-free and
+# are committed.
+/public/landing-media/
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts

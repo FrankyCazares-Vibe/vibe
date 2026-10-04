@@ -18,6 +18,7 @@ import { clearPendingSignup } from "@/lib/auth/pending-signup";
 import { getPostLoginDestination } from "@/lib/auth/post-login";
 import { leaveDeviceClean } from "@/lib/pwa/leave-device-clean";
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser";
+import { useSignupOpen } from "@/lib/waitlist/use-signup-open";
 
 /** Outcomes where a fresh email or the typed code is the way forward. */
 const OFFERS_RECOVERY = new Set<EmailLinkProblem>([
@@ -219,8 +220,14 @@ export function ConfirmRecovery({
   );
 }
 
-/** After "Not you? Sign out": no account here any more, so point at their own. */
+/**
+ * After "Not you? Sign out": no account here any more, so point at their own.
+ * Sign in leads: whoever opened a confirmation link already has an account.
+ * Sign-up is a quiet second line, and while sign-up is closed (or still
+ * being asked) it speaks to someone holding an access code.
+ */
 function SignedOutCard(): JSX.Element {
+  const signupOpen = useSignupOpen();
   return (
     <div className="vibe-auth-card">
       <CardHead title={SIGNED_OUT_COPY.title} />
@@ -228,22 +235,33 @@ function SignedOutCard(): JSX.Element {
         {SIGNED_OUT_COPY.body}
       </p>
       <div className="vibe-auth-form">
-        <Link href="/auth/signup" className="vibe-auth-submit">
-          Sign up
+        <Link href="/auth/login" className="vibe-auth-submit">
+          Sign in
           <span aria-hidden style={{ marginLeft: 8 }}>
             →
           </span>
         </Link>
       </div>
       <p className="vibe-auth-tail">
-        Already have an account?{" "}
-        <Link
-          href="/auth/login"
-          className="vibe-auth-link vibe-auth-link--tap"
-          style={{ whiteSpace: "nowrap" }}
-        >
-          Sign in
-        </Link>
+        {signupOpen ? (
+          <>
+            New to Vibe?{" "}
+            <Link
+              href="/auth/signup"
+              className="vibe-auth-link vibe-auth-link--tap"
+              style={{ whiteSpace: "nowrap" }}
+            >
+              Sign up
+            </Link>
+          </>
+        ) : (
+          <Link
+            href="/auth/signup"
+            style={{ color: "inherit", textDecoration: "underline", textUnderlineOffset: 3 }}
+          >
+            Got an access code? Create your account
+          </Link>
+        )}
       </p>
     </div>
   );

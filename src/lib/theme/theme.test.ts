@@ -206,6 +206,18 @@ test("syncThemeColorMeta writes only a meta that differs; currentTheme reads <ht
   syncThemeColorMeta("dark"); // no document: a no-op, no throw
 });
 
+test("syncThemeColorMeta keeps a Night-only page's chrome dark (the landing, S72)", () => {
+  withFakeClient(false, ({ meta }) => {
+    const fakeWindow = (globalThis as unknown as { window: Record<string, unknown> }).window;
+    fakeWindow.location = { pathname: "/" };
+    applyTheme("light");
+    assert.equal(meta.content, "#0C0B0B", "/ stays dark in Light");
+    fakeWindow.location = { pathname: "/campus" };
+    syncThemeColorMeta(currentTheme());
+    assert.equal(meta.content, "#FAF7F2", "every other page follows the theme");
+  });
+});
+
 test("applyTheme without a document only resolves", () => {
   assert.equal(applyTheme("dark"), "dark");
   assert.equal(applyTheme("system"), "light", "no matchMedia on the server → light");

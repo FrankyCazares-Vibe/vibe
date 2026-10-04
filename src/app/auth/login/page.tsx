@@ -11,6 +11,7 @@ import { getPostLoginDestination } from "@/lib/auth/post-login";
 import { sanitizeLoginNextParam } from "@/lib/auth/login-next";
 import { readPendingSignupEmail } from "@/lib/auth/pending-signup";
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser";
+import { useSignupOpen } from "@/lib/waitlist/use-signup-open";
 
 const NOT_CONFIRMED =
   "Confirm your email first — we sent a link when you signed up.";
@@ -68,6 +69,7 @@ function pathOf(next: string | null): string | null {
 
 function LoginForm() {
   const searchParams = useSearchParams();
+  const signupOpen = useSignupOpen();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -369,12 +371,34 @@ function LoginForm() {
           </div>
         ) : null}
 
-        <p className="vibe-auth-tail">
-          New to vibe?{" "}
-          <Link href="/auth/signup" className="vibe-auth-link">
-            Create an account
-          </Link>
-        </p>
+        {/* Sign-up open: today's line. Closed, or still asking (null): the
+            two ways in for someone without an account, a code they were
+            sent or the waitlist. */}
+        {signupOpen ? (
+          <p className="vibe-auth-tail">
+            New to Vibe?{" "}
+            <Link href="/auth/signup" className="vibe-auth-link">
+              Create an account
+            </Link>
+          </p>
+        ) : (
+          <>
+            <p className="vibe-auth-tail">
+              New to Vibe?{" "}
+              <Link href="/waitlist" className="vibe-auth-link">
+                Join the waitlist
+              </Link>
+            </p>
+            <p className="vibe-auth-tail" style={{ marginTop: 8 }}>
+              <Link
+                href="/auth/signup"
+                style={{ color: "inherit", textDecoration: "underline", textUnderlineOffset: 3 }}
+              >
+                Got an access code? Create your account
+              </Link>
+            </p>
+          </>
+        )}
       </div>
     </div>
   );

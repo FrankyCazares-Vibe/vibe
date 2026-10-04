@@ -69,11 +69,14 @@ const RESEND_422 =
 
 test("the kinds match the DB CHECK and the label is fixed", () => {
   // 'moderation_alert' joined them when the report queue started emailing the
-  // admins; the database CHECK was widened in the same migration.
+  // admins; the database CHECK was widened in the same migration. The two
+  // waitlist kinds came with 20261003100000_waitlist.sql.
   assert.deepEqual([...EMAIL_SEND_KINDS], [
     "school_verification",
     "password_reset",
     "moderation_alert",
+    "waitlist_confirm",
+    "waitlist_invite",
   ]);
   assert.equal(HASH_LABEL, "email-send-v1|");
 });

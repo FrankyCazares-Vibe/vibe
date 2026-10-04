@@ -35,11 +35,18 @@ import { RETIRED_IU_DOMAINS, SYSTEM_DOMAINS } from "../auth/school-email-domains
  * `moderation_alert` is the "New report on Vibe" email to the platform admins
  * (src/lib/moderation/alerts.ts). It logs like any other: a keyed hash and a
  * coarse domain, never an address, and never a word of what was reported.
+ *
+ * `waitlist_confirm` ("Confirm your spot") and `waitlist_invite` ("Your Vibe
+ * access code") are the waitlist's two emails (20261003100000_waitlist.sql
+ * widened the CHECK). They also feed the waitlist's daily email budget, which
+ * is counted from these rows (src/lib/waitlist/store.ts).
  */
 export const EMAIL_SEND_KINDS = [
   "school_verification",
   "password_reset",
   "moderation_alert",
+  "waitlist_confirm",
+  "waitlist_invite",
 ] as const;
 export type EmailSendKind = (typeof EMAIL_SEND_KINDS)[number];
 

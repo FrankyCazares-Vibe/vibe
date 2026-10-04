@@ -153,7 +153,13 @@ export type ModerationAction =
   | "user_lift"
   // A photo taken down / put back (S67 wave B, B1; migration 20260929100000).
   | "image_remove"
-  | "image_restore";
+  | "image_restore"
+  // The waitlist (migration 20261003100000; target type 'waitlist', target id
+  // the waitlist row's id, and never an address in `meta`).
+  | "waitlist_invite"
+  | "waitlist_add"
+  | "waitlist_remove"
+  | "waitlist_reveal";
 
 export type ModerationLogEntry = {
   actorId: string;

@@ -109,6 +109,40 @@ test("tokens and handles in one link are both redacted", () => {
   );
 });
 
+test("a waitlist access code is redacted in a link, an encoded next= and a JSON body", () => {
+  assert.equal(
+    redactAuthTokens("https://www.connectvibe.app/auth/signup?access_code=VIBE-7KQ2-M9XD&src=mail"),
+    "https://www.connectvibe.app/auth/signup?access_code=[redacted]&src=mail",
+  );
+  assert.equal(
+    redactAuthTokens("/auth/login?next=%2Fauth%2Fsignup%3Faccess_code%3DVIBE-7KQ2-M9XD"),
+    "/auth/login?next=%2Fauth%2Fsignup%3Faccess_code%3D[redacted]",
+  );
+  // The waitlist's manage link (?token=) was already covered; still is.
+  assert.equal(
+    redactAuthTokens("/waitlist/confirm?token=abcDEF_123-xyz&leave=1"),
+    "/waitlist/confirm?token=[redacted]&leave=1",
+  );
+  // Only the exact key: a different name that ends in "code" is untouched.
+  assert.equal(redactAuthTokens("/x?zip_code=46202"), "/x?zip_code=46202");
+
+  const event = {
+    request: {
+      url: "https://www.connectvibe.app/auth/signup?access_code=VIBE-7KQ2-M9XD",
+      data: '{"email":"x","options":{"data":{"access_code":"VIBE-7KQ2-M9XD"}}}',
+    },
+  } as unknown as AnyEvent;
+  const out = scrubAuthTokensFromEvent(event) as unknown as { request: { url: string; data: string } };
+  assert.equal(out.request.url, "https://www.connectvibe.app/auth/signup?access_code=[redacted]");
+  assert.equal(out.request.data, '{"email":"x","options":{"data":{"access_code":"[redacted]"}}}');
+
+  const obj = { request: { data: { access_code: "VIBE-7KQ2-M9XD", name: "Sam" } } } as unknown as AnyEvent;
+  assert.deepEqual(
+    (scrubAuthTokensFromEvent(obj) as unknown as { request: { data: unknown } }).request.data,
+    { access_code: "[redacted]", name: "Sam" },
+  );
+});
+
 test("the event scrub reaches urls, breadcrumbs and bodies but not frames", () => {
   const frame = "https://www.connectvibe.app/_next/static/chunks/app/profile/page-3f2a1b9c.js";
   const event = {

@@ -12,3 +12,7 @@ otto_mockups/
 # leading slash: a bare "mobile/" would also drop src/components/mobile/, the
 # whole phone UI.
 /mobile/
+# The landing's demo film, local copy (gitignored too): it shows real people's
+# photos. A `vercel` CLI deploy from this Mac would otherwise publish it at
+# /landing-media/. Every build reads it from Vercel Blob (src/lib/landing/demo-media.ts).
+/public/landing-media/

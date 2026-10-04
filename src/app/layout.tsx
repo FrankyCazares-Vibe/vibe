@@ -92,6 +92,11 @@ export default function RootLayout({
             applyTheme repaints it after mount. The four static pages paste
             this same string; theme.test.ts fails per file when it drifts. */}
         <script dangerouslySetInnerHTML={{ __html: THEME_BOOT_SCRIPT }} />
+        {/* The font stylesheet blocks the first paint. React already puts a
+            preload for it at the top of <head>, which opens that connection;
+            the font files come from gstatic, fetched in CORS mode, so that is
+            the connection worth opening early. */}
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link
           href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,400;0,700;0,800;0,900;1,400&family=DM+Sans:wght@300;400;500;600;700;800&display=swap"
           rel="stylesheet"

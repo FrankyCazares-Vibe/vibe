@@ -13,6 +13,7 @@ import {
   isSupabaseServiceConfigured,
 } from "@/lib/supabase/service";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { forgetWaitlistForUser } from "@/lib/waitlist/store";
 
 type DeleteBody = { confirm_handle?: unknown };
 
@@ -134,6 +135,16 @@ export async function DELETE(req: Request) {
   // The public.users row + all FK-cascaded content (posts, connections,
   // reactions, reposts, channel memberships, etc.) drop with it.
   const admin = createSupabaseServiceClient();
+
+  // The waitlist row this account's access code redeemed (school address,
+  // name, answers) goes too. The database trigger waitlist_forget_user
+  // deletes the row anyway; this also forgets its send-log addresses, whose
+  // key only the server holds. Best effort: never blocks the deletion.
+  try {
+    await forgetWaitlistForUser(admin, user.id);
+  } catch (e) {
+    console.error("[me.DELETE waitlist]", e instanceof Error ? e.message : "failed");
+  }
   const { error: deleteErr } = await admin.auth.admin.deleteUser(user.id);
   if (deleteErr) {
     console.error("[me.DELETE auth.admin.deleteUser]", { purged, error: deleteErr });

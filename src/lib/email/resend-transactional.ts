@@ -2,6 +2,15 @@ import "server-only";
 import { createResendClient } from "@/lib/resend";
 import { getSiteUrl } from "@/lib/auth/site-url";
 import { sendLogged } from "@/lib/email/send-log";
+import { maskEmail } from "@/lib/waitlist/admin-view";
+import {
+  WAITLIST_REPLY_TO,
+  waitlistConfirmContent,
+  waitlistDeliveryMode,
+  waitlistDevLogLine,
+  waitlistInviteContent,
+  type WaitlistEmailContent,
+} from "@/lib/waitlist/email-content";
 
 function getFrom(): string {
   const from = process.env.RESEND_FROM?.trim();
@@ -49,14 +58,24 @@ function escapeAttr(value: string): string {
     .replace(/>/g, "&gt;");
 }
 
-/** Every interpolated value is fixed copy, digits, or a URL this server built. */
+/**
+ * Every interpolated value is fixed copy, digits, a waitlist access code, a
+ * URL this server built, or (waitlist invite intro only) a typed name that
+ * went through `escapeHtml` in src/lib/waitlist/email-content.ts.
+ */
 function brandedEmailHtml(e: BrandedEmail): string {
+  // A waitlist access code (VIBE-7KQ2-M9XD, 14 characters) is twice as long
+  // as a digit code: a smaller face keeps it on one line on a 375 px phone.
+  const long = (e.code?.value.length ?? 0) > 10;
+  const codeStyle = long
+    ? "padding:12px 18px;font-size:24px;line-height:30px;letter-spacing:3px;white-space:nowrap"
+    : "padding:12px 20px;font-size:30px;line-height:36px;letter-spacing:6px";
   const code = e.code
     ? `
             <p style="margin:0 0 10px;font-size:11px;line-height:16px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:${ACCENT};">${e.code.label}</p>
             <table role="presentation" cellpadding="0" cellspacing="0" border="0">
               <tr>
-                <td class="vibe-code" bgcolor="#FFEEE8" style="background:#FFEEE8;border:1px solid #FFD6C8;border-radius:12px;padding:12px 20px;font-family:${MONO};font-size:30px;line-height:36px;font-weight:700;letter-spacing:6px;color:${CHARCOAL};">${e.code.value}</td>
+                <td class="vibe-code${long ? " vibe-code-long" : ""}" bgcolor="#FFEEE8" style="background:#FFEEE8;border:1px solid #FFD6C8;border-radius:12px;${codeStyle};font-family:${MONO};font-weight:700;color:${CHARCOAL};">${e.code.value}</td>
               </tr>
             </table>
             <p style="margin:10px 0 26px;font-size:13px;line-height:20px;color:${MUTED};">${e.code.note}</p>`
@@ -97,6 +116,7 @@ function brandedEmailHtml(e: BrandedEmail): string {
     .vibe-card { padding: 30px 22px 26px !important; border-radius: 20px !important; }
     .vibe-headline { font-size: 28px !important; line-height: 32px !important; }
     .vibe-code { font-size: 26px !important; letter-spacing: 4px !important; padding: 12px 16px !important; }
+    .vibe-code-long { font-size: 20px !important; letter-spacing: 2px !important; padding: 12px 14px !important; }
   }
 </style>
 </head>
@@ -252,4 +272,90 @@ export async function sendSchoolVerificationEmail(
   if (!outcome.ok) {
     throw new Error(outcome.errorMessage || outcome.errorCode);
   }
+}
+
+// ---------------------------------------------------------------------------
+// The waitlist's two emails (src/lib/waitlist/email-content.ts has the words)
+// ---------------------------------------------------------------------------
+
+/**
+ * One waitlist email. Without a Resend key or From address outside
+ * production, nothing is sent and nothing is logged to `email_sends`: one
+ * `[waitlist-email:dev]` line in the dev-server log carries the link (and the
+ * code) instead, so the flow can be finished by hand. In production without
+ * them the send throws like the senders above (logged as `exception`).
+ * Replies go to hello@. Throws when the send fails.
+ */
+async function sendWaitlistEmail(
+  kind: "waitlist_confirm" | "waitlist_invite",
+  to: string,
+  content: WaitlistEmailContent,
+  devLine: string,
+): Promise<void> {
+  const mode = waitlistDeliveryMode({
+    nodeEnv: process.env.NODE_ENV,
+    resendKey: process.env.RESEND_API_KEY,
+    resendFrom: process.env.RESEND_FROM,
+  });
+  if (mode === "dev-log") {
+    console.info(devLine);
+    return;
+  }
+  const outcome = await sendLogged(kind, to, null, () =>
+    createResendClient().emails.send({
+      from: getFrom(),
+      to: [to],
+      replyTo: WAITLIST_REPLY_TO,
+      subject: content.subject,
+      html: brandedEmailHtml({
+        title: content.subject,
+        preheader: content.preheader,
+        headline: content.headline,
+        intro: content.intro,
+        code: content.code,
+        button: content.button,
+        notes: content.notes,
+      }),
+      text: content.text,
+    }),
+  );
+  if (!outcome.ok) {
+    throw new Error(outcome.errorMessage || outcome.errorCode);
+  }
+}
+
+/** "Confirm your spot on the Vibe waitlist": the form's one email. Works 7 days. */
+export async function sendWaitlistConfirmEmail(
+  to: string,
+  confirmUrl: string,
+  leaveUrl: string,
+): Promise<void> {
+  const content = waitlistConfirmContent({ confirmUrl, leaveUrl, site: getSiteUrl() });
+  const devLine = waitlistDevLogLine({ kind: "waitlist_confirm", maskedTo: maskEmail(to), url: confirmUrl });
+  await sendWaitlistEmail("waitlist_confirm", to, content, devLine);
+}
+
+/**
+ * "Your Vibe access code": the code box with the day it stops working
+ * (`expiresAt`, from waitlist_issue_code), a "Create your account" button to
+ * `/auth/signup?access_code=…`, and a "Take me off the list" link
+ * (`manageUrl`, the newest `?token=` link with `leave=1`).
+ */
+export async function sendWaitlistInviteEmail(
+  to: string,
+  name: string,
+  code: string,
+  expiresAt: string,
+  signupUrl: string,
+  manageUrl: string,
+): Promise<void> {
+  const content = waitlistInviteContent({ name, code, expiresAt, signupUrl, leaveUrl: manageUrl, site: getSiteUrl() });
+  const devLine = waitlistDevLogLine({
+    kind: "waitlist_invite",
+    maskedTo: maskEmail(to),
+    url: signupUrl,
+    code: content.code?.value,
+    leaveUrl: manageUrl,
+  });
+  await sendWaitlistEmail("waitlist_invite", to, content, devLine);
 }
