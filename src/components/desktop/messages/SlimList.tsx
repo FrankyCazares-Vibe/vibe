@@ -11,8 +11,9 @@ import type { SlimRow } from "./desktop-rules";
  * The slim list of desktop Messages (handoffs/chat-redesign/wave-3-desktop/
  * contract.md 3.2, H3, H14, section 8 W3-4-lists; the board's steps 1 to 5):
  * the 232px column of names beside an open chat. The `Messages` control goes
- * back to the full list; under it, the pinned and unread chats and the open
- * one, 44px each: a 26px mark, the name on one line, the dot.
+ * back to the full list; under it, the pinned and unread chats, the open one
+ * and the most recent others up to `SLIM_TARGET` rows, 44px each: a 26px
+ * mark, the name on one line, the dot.
  *
  * It decides nothing: `rows` are `slimRows(...)` (which rows, their order,
  * the dot, the spoken name, the address). Rows are links, so Cmd / Ctrl /

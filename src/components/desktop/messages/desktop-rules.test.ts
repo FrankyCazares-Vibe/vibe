@@ -102,7 +102,7 @@ test("knownChat: a thread, a request, a Board id, a Lounge id; anything else is 
   assert.deepEqual(rules.knownChat("board-Salsa Club", null, null, clubs), { kind: "club", orgHandle: "salsa-club", roomKind: "board" });
 });
 
-test("slimRows: the order is mergeHomeRows'; pinned rows and unread rows stay, quiet ones go", () => {
+test("slimRows: the order is mergeHomeRows'; pinned and unread rows are kept and recent ones fill the list, quietly", () => {
   const clubs = [
     club({ name: "Salsa Club", last_activity_at: iso(local(2026, 9, 8, 20, 41)), lounge: { room_id: "l-salsa", latest: null, unread_count: 3 } }),
     club({ name: "Pre-Med Society", last_activity_at: null }),
@@ -116,17 +116,75 @@ test("slimRows: the order is mergeHomeRows'; pinned rows and unread rows stay, q
     thread({ id: "t4", last_message: null, unread: true }),
   ];
   const all = rules.slimRows(clubs, threads, [], null, NOW);
-  assert.deepEqual(keys(all), ["thread:t1", "club:org-Jag Robotics", "club:org-Salsa Club", "thread:t2", "club:org-Film Society", "thread:t4"]);
-  // The same order as the home's list, with the quiet rows taken out.
+  // Eight chats and a target of eight: every row shows, in the home list's own order.
   const merged = home.mergeHomeRows(clubs, threads).map((r) => (r.kind === "club" ? `club:${r.club.org.id}` : `thread:${r.thread.id}`));
-  assert.deepEqual(keys(all), merged.filter((k) => keys(all).includes(k)));
   assert.equal(merged.length, 8);
+  assert.equal(rules.SLIM_TARGET, 8);
+  assert.deepEqual(keys(all), merged);
   assert.ok(all.every((r) => r.open === false));
-  // Nothing to keep, nothing open: no rows.
-  assert.deepEqual(rules.slimRows([club({ name: "Quiet" })], [thread({ id: "q" })], [], null, NOW), []);
+  // The two rows that are neither pinned nor unread are recent fills: no dot.
+  const dots = Object.fromEntries(all.map((r) => [r.key, r.dot]));
+  assert.equal(dots["thread:t3"], null);
+  assert.equal(dots["club:org-Pre-Med Society"], null);
+  assert.equal(dots["thread:t2"], "coral");
+  assert.equal(dots["club:org-Salsa Club"], "ring");
+  // Nothing pinned, nothing unread, nothing open: the recent chats alone.
+  assert.deepEqual(keys(rules.slimRows([club({ name: "Quiet" })], [thread({ id: "q" })], [], null, NOW)).sort(), ["club:org-Quiet", "thread:q"]);
+  assert.deepEqual(rules.slimRows([], [], [], null, NOW), []);
 });
 
-test("slimRows: a muted unread chat is dropped unless it is pinned or open; a mute that has passed does not count", () => {
+test("slimRows: recent chats fill the list to SLIM_TARGET, in the home list's order, and never push a kept row out", () => {
+  const quiet = (n: number, from = 1) => Array.from({ length: n }, (_, i) => thread({ id: `q${from + i}`, last_message: at(12, 59 - (from + i)) }));
+  const home8 = (rows: SlimRow[]) => keys(rows);
+  const order = (clubs: InboxClub[], threads: ThreadEntry[]) =>
+    home.mergeHomeRows(clubs, threads).map((r) => (r.kind === "club" ? `club:${r.club.org.id}` : `thread:${r.thread.id}`));
+
+  // Twenty chats, two pinned and three unread: those five, then the three newest others; home order throughout.
+  const many = [
+    thread({ id: "p1", last_message: at(9, 0), pinned_at: iso(local(2026, 9, 3)) }),
+    thread({ id: "p2", last_message: at(8, 0), pinned_at: iso(local(2026, 9, 2)) }),
+    thread({ id: "u1", last_message: at(20, 0), unread: true }),
+    thread({ id: "u2", last_message: at(11, 30), unread: true }),
+    thread({ id: "u3", last_message: at(7, 0), unread: true }),
+    ...quiet(15),
+  ];
+  const twenty = rules.slimRows([], many, [], null, NOW);
+  assert.equal(twenty.length, 8);
+  const merged = order([], many);
+  assert.deepEqual(home8(twenty), merged.filter((k) => home8(twenty).includes(k)));
+  for (const k of ["thread:p1", "thread:p2", "thread:u1", "thread:u2", "thread:u3"]) assert.ok(home8(twenty).includes(k), k);
+  const fills = home8(twenty).filter((k) => k.startsWith("thread:q"));
+  assert.deepEqual(fills, merged.filter((k) => k.startsWith("thread:q")).slice(0, 3));
+  assert.ok(twenty.filter((r) => r.key.startsWith("thread:q")).every((r) => r.dot === null));
+
+  // Ten unread: all ten stay, and no recent row is added.
+  const tenUnread = [...Array.from({ length: 10 }, (_, i) => thread({ id: `n${i}`, last_message: at(10, i), unread: true })), ...quiet(4)];
+  const ten = rules.slimRows([], tenUnread, [], null, NOW);
+  assert.equal(ten.length, 10);
+  assert.ok(ten.every((r) => r.key.startsWith("thread:n")));
+
+  // The open chat far down the list is kept, counts once, and leaves seven fills.
+  const far = quiet(20);
+  const openFar: OpenChat = { kind: "dm", threadId: "q20", name: "Maya R.", avatarUrl: null, group: false };
+  const withOpen = rules.slimRows([], far, [], openFar, NOW);
+  assert.equal(withOpen.length, 8);
+  assert.equal(withOpen.filter((r) => r.open).length, 1);
+  assert.equal(withOpen.find((r) => r.open)?.key, "thread:q20");
+  assert.deepEqual(home8(withOpen).slice(0, 7), order([], far).slice(0, 7));
+
+  // An open chat that is in neither list is put first and counts toward the eight.
+  const unlisted: OpenChat = { kind: "dm", threadId: "new-9", name: "Priya", avatarUrl: null, group: false };
+  const supplied = rules.slimRows([], far, [], unlisted, NOW);
+  assert.equal(supplied.length, 8);
+  assert.equal(supplied[0].key, "thread:new-9");
+  assert.deepEqual(home8(supplied).slice(1), order([], far).slice(0, 7));
+
+  // A message request is not in the home list, so it is never a recent row.
+  const requests = [thread({ id: "r1", is_request: true, last_message: at(21, 0) })];
+  assert.ok(!home8(rules.slimRows([], quiet(3), requests, null, NOW)).includes("thread:r1"));
+});
+
+test("slimRows: a muted unread chat is not kept unless it is pinned or open (as a recent row it has no dot); a mute that has passed does not count", () => {
   const clubs = [
     club({ name: "Muted", lounge: { room_id: "l-m", latest: null, unread_count: 4 }, muted_until: LATER }),
     club({ name: "Muted Pinned", board: { room_id: "b-mp", latest: null, unread: true }, muted_until: LATER, pinned_at: iso(local(2026, 9, 2)) }),
@@ -137,12 +195,26 @@ test("slimRows: a muted unread chat is dropped unless it is pinned or open; a mu
     thread({ id: "m2", unread: true, muted_until: LATER, pinned_at: iso(local(2026, 9, 1)) }),
     thread({ id: "m3", unread: true, muted_until: EARLIER }),
   ];
-  assert.deepEqual(keys(rules.slimRows(clubs, threads, [], null, NOW)), ["club:org-Muted Pinned", "thread:m2", "club:org-Was Muted", "thread:m3"]);
-  // Open: the muted, unpinned ones come back, each in its own place.
+  // Six chats, under the target: all six show, but the two muted, unpinned ones only as quiet recent rows.
+  const all = rules.slimRows(clubs, threads, [], null, NOW);
+  assert.deepEqual(keys(all), ["club:org-Muted Pinned", "thread:m2", "club:org-Muted", "club:org-Was Muted", "thread:m1", "thread:m3"]);
+  const dots = Object.fromEntries(all.map((r) => [r.key, r.dot]));
+  assert.equal(dots["club:org-Muted"], null);
+  assert.equal(dots["thread:m1"], null);
+  assert.equal(dots["club:org-Muted Pinned"], "coral");
+  assert.equal(dots["thread:m2"], "coral");
+  assert.equal(dots["club:org-Was Muted"], "ring");
+  assert.equal(dots["thread:m3"], "coral");
+  // With the list already full of kept rows, a muted unread chat is not shown at all.
+  const full = Array.from({ length: 8 }, (_, i) => thread({ id: `k${i}`, last_message: at(22, i), unread: true }));
+  const crowded = keys(rules.slimRows(clubs, [...full, ...threads], [], null, NOW));
+  assert.ok(!crowded.includes("club:org-Muted") && !crowded.includes("thread:m1"));
+  assert.ok(crowded.includes("club:org-Muted Pinned") && crowded.includes("thread:m2"));
+  // Open: a muted, unpinned chat is kept, in its own place, even when the list is full.
   const openThread: OpenChat = { kind: "dm", threadId: "m1", name: "Maya R.", avatarUrl: null, group: false };
-  assert.deepEqual(keys(rules.slimRows(clubs, threads, [], openThread, NOW)), ["club:org-Muted Pinned", "thread:m2", "club:org-Was Muted", "thread:m1", "thread:m3"]);
+  assert.ok(keys(rules.slimRows(clubs, [...full, ...threads], [], openThread, NOW)).includes("thread:m1"));
   const openClub: OpenChat = { kind: "club", orgId: "org-Muted", orgHandle: "muted", name: "Muted", logoUrl: null, roomId: "l-m" };
-  assert.deepEqual(keys(rules.slimRows(clubs, threads, [], openClub, NOW)), ["club:org-Muted Pinned", "thread:m2", "club:org-Muted", "club:org-Was Muted", "thread:m3"]);
+  assert.ok(keys(rules.slimRows(clubs, [...full, ...threads], [], openClub, NOW)).includes("club:org-Muted"));
 });
 
 test("slimRows: coral for an unread Board post or an unread chat, the ring for new Lounge messages only; a club row's target is ClubRow's", () => {
@@ -228,10 +300,11 @@ test("slimRows: the open row has no dot, and the open club's row targets the roo
 
   const onThread = rules.slimRows(clubs, threads, [], { kind: "dm", threadId: "t1", name: "Maya R.", avatarUrl: null, group: false }, NOW);
   assert.deepEqual(onThread.map((r) => [r.key, r.open, r.dot]), [["club:org-Salsa Club", false, "coral"], ["thread:t1", true, null]]);
-  // A quiet chat is listed while it is open, and only then.
+  // A quiet chat is the open row while it is open, and a recent row (not open, no dot) when it is not.
   const quiet = [thread({ id: "q1" })];
-  assert.deepEqual(keys(rules.slimRows([], quiet, [], { kind: "dm", threadId: "q1", name: "Maya R.", avatarUrl: null, group: false }, NOW)), ["thread:q1"]);
-  assert.deepEqual(rules.slimRows([], quiet, [], null, NOW), []);
+  const whileOpen = rules.slimRows([], quiet, [], { kind: "dm", threadId: "q1", name: "Maya R.", avatarUrl: null, group: false }, NOW);
+  assert.deepEqual(whileOpen.map((r) => [r.key, r.open, r.dot]), [["thread:q1", true, null]]);
+  assert.deepEqual(rules.slimRows([], quiet, [], null, NOW).map((r) => [r.key, r.open, r.dot]), [["thread:q1", false, null]]);
 });
 
 test("slimRows: an open chat in neither list gets one row built from `open`, put first", () => {
