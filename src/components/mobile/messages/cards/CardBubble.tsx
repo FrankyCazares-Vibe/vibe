@@ -8,6 +8,7 @@ import { personColor } from "../avatar";
 import { initialsOf } from "../format";
 import { ReactionPicker } from "../ReactionPicker";
 import { visuallyHiddenStyle } from "../sheet-styles";
+import { useChatSurface } from "../surface";
 import { FONT, palette } from "../v2-tokens";
 import { cardAuthorName, cardWord, type CardWord } from "./card-rules";
 import { EventCardView } from "./EventCardView";
@@ -35,6 +36,11 @@ import { SignupCardView } from "./SignupCardView";
  * `card === null` on a card kind (a stale cached answer; 9.1's 503 keeps a
  * fresh read from producing one) shows `message.content`, the stored
  * fallback text (cards/fallback.ts), as a plain bubble.
+ *
+ * Desktop surface (wave-3 desktop contract 6.3): the press does not arm (a
+ * slow click on a vote is a click; the room's hover toolbar holds React,
+ * Reply, Report and Remove), text can be selected and right-click keeps the
+ * browser's menu. The card stays 292px.
  */
 
 export type CardBubbleProps = {
@@ -149,6 +155,7 @@ function ReactionChips({ reactions, night, onToggle }: { reactions: ChatMessage[
 
 export function CardBubble({ message, roomId, room, isMine, night, onCard, onRefresh, onOpenEventChat, onRemove, onReport, onToggleReaction, onReply, layout = "bubble" }: CardBubbleProps) {
   const t = palette(night);
+  const desktop = useChatSurface() === "desktop";
   const [pickerOpen, setPickerOpen] = useState(false);
   // The one polite region per card (11.8 "Announcements"). `n` counts the
   // answers: the span's text ends in a zero-width space on every other one,
@@ -202,7 +209,9 @@ export function CardBubble({ message, roomId, room, isMine, night, onCard, onRef
     const dy = y - pressStart.current.y;
     if (dx * dx + dy * dy > 100) clearLongPress();
   };
-  const pressHandlers = {
+  // The phone's gesture only: on the desktop surface nothing is armed and
+  // the context menu is the browser's.
+  const pressHandlers = desktop ? {} : {
     onPointerDown: (e: React.PointerEvent) => {
       // Only the first finger's primary press arms it; a second finger
       // (a pinch) cancels one that is pending.
@@ -264,6 +273,10 @@ export function CardBubble({ message, roomId, room, isMine, night, onCard, onRef
   // card (past the avatar). Mine: right-aligned. A post: full width, left.
   const theirs = !isMine && !post;
   const chips = message.reactions ?? [];
+  // The press-in look and the no-selection rule belong to the phone's hold.
+  const pressLook: React.CSSProperties = desktop
+    ? {}
+    : { cursor: "pointer", WebkitTouchCallout: "none", WebkitUserSelect: "none", userSelect: "none", transition: "transform 120ms ease", transform: pickerOpen ? "scale(0.97)" : "scale(1)" };
 
   return (
     <div style={{ display: "flex", flexDirection: "column", alignItems: theirs || post ? "flex-start" : "flex-end", maxWidth: "100%", fontFamily: FONT }}>
@@ -314,12 +327,7 @@ export function CardBubble({ message, roomId, room, isMine, night, onCard, onRef
             color: t.ink,
             // A closed poll or sign-up: the whole card at 70 %, no taps (11.8).
             opacity: closed ? 0.7 : 1,
-            cursor: "pointer",
-            WebkitTouchCallout: "none",
-            WebkitUserSelect: "none",
-            userSelect: "none",
-            transition: "transform 120ms ease",
-            transform: pickerOpen ? "scale(0.97)" : "scale(1)",
+            ...pressLook,
           }}
         >
           {body}

@@ -171,6 +171,20 @@ function stripWelcomeParam() {
   }
 }
 
+// Same for `?manage=<handle>` once the door has been used: left in the
+// address, Back, a refresh or a remount would open the settings again.
+function stripManageParam() {
+  if (typeof window === "undefined") return;
+  try {
+    const url = new URL(window.location.href);
+    if (!url.searchParams.has("manage")) return;
+    url.searchParams.delete("manage");
+    window.history.replaceState({}, "", url.pathname + url.search + url.hash);
+  } catch {
+    /* never block render on param strip */
+  }
+}
+
 const CAMPUS_TAB_KEYS: ReadonlyArray<CampusTab> = [
   "feed",
   "events",
@@ -447,8 +461,16 @@ function campusLoadFailure(r: VibeResult<unknown>, line: string): LoadFailure {
 
 export function CampusHome({
   showSchoolVerifiedBanner,
+  desktopChat = false,
 }: {
   showSchoolVerifiedBanner: boolean;
+  /**
+   * The `chat_desktop` switch (from the server, page.tsx). On: club chat
+   * lives on /messages, so there is no Chat pill here, the tab can never be
+   * "chat" (no rails, no dark backdrop, no 100dvh lock, no hidden Otto orb),
+   * and `?manage=<handle>` opens that club's settings. Off: today's page.
+   */
+  desktopChat?: boolean;
 }) {
   const [orgs, setOrgs] = useState<Org[] | null>(null); // null = loading
   // Set when loading your orgs fails; the Chat tab shows it with Retry.
@@ -484,7 +506,10 @@ export function CampusHome({
         /* localStorage may be unavailable */
       }
     }
-    return parseInitialTab(searchParams.get("tab"));
+    const asked = parseInitialTab(searchParams.get("tab"));
+    // The server page already sends `?tab=chat` to /messages for these
+    // people; this keeps the tab off "chat" whatever the address says.
+    return desktopChat && asked === "chat" ? "feed" : asked;
   });
 
   // ?tab=chat&org=<handle>&channel=<id> deep link from /orgs/[handle]
@@ -496,6 +521,12 @@ export function CampusHome({
   );
   const pendingDeepLinkChannelIdRef = useRef<string | null>(
     searchParams.get("channel"),
+  );
+  // ?manage=<handle>: the door from desktop Messages' "Manage club" to this
+  // club's settings modal, which still lives here. Read once, like ?org=,
+  // and only with the `chat_desktop` switch; consumed when the clubs load.
+  const pendingManageHandleRef = useRef<string | null>(
+    desktopChat ? searchParams.get("manage") : null,
   );
   // Seeded from `?tag=` (hashtag links on /posts/[id] and in the post
   // viewer point at /campus?tab=feed&tag=<t>). Read once, like ?tab=.
@@ -665,6 +696,23 @@ export function CampusHome({
       const list = r.data.orgs;
       setOrgsLoadErr(null);
       setOrgs(list);
+      // ?manage=<handle>: select that club and open its settings over the
+      // tab that is showing (the modal mounts outside the tab body). One
+      // shot; a handle that is not one of my clubs does nothing. Either way
+      // the param leaves the address, so the door never opens twice.
+      const manageHandle = pendingManageHandleRef.current;
+      if (manageHandle) {
+        pendingManageHandleRef.current = null;
+        stripManageParam();
+        const manageMatch = list.find(
+          (o) => o.handle.toLowerCase() === manageHandle.toLowerCase(),
+        );
+        if (manageMatch) {
+          setActiveOrgId(manageMatch.id);
+          setShowSettings(true);
+          return;
+        }
+      }
       // If we arrived from /orgs/<handle> → Chat tab with a
       // pending org handle, prefer that org over the default
       // first-in-list so the requested channel's org is what
@@ -923,6 +971,7 @@ export function CampusHome({
           active={shownTab}
           onTabChange={setTab}
           hideMap={mapHidden}
+          hideChat={desktopChat}
           onOpenCampuses={() => setBrowseOpen(true)}
         />
         {needsCampusPick ? <PickCampusStrip /> : null}
@@ -5121,12 +5170,15 @@ function CampusTopBar({
   active,
   onTabChange,
   hideMap,
+  hideChat,
   onOpenCampuses,
 }: {
   active: CampusTab;
   onTabChange: (tab: CampusTab) => void;
   /** Visiting a campus that isn't open: no Map pill (see CampusTabs). */
   hideMap: boolean;
+  /** The `chat_desktop` switch is on: no Chat pill (see CampusTabs). */
+  hideChat: boolean;
   onOpenCampuses: () => void;
 }) {
   const { campus, known, isVisiting, title, sharedSub, statsLine } = useCampusHeader();
@@ -5390,7 +5442,13 @@ function CampusTopBar({
             />
           </>
         ) : null}
-        <CampusTabs active={active} onChange={onTabChange} hideMap={hideMap} palette={right} />
+        <CampusTabs
+          active={active}
+          onChange={onTabChange}
+          hideMap={hideMap}
+          hideChat={hideChat}
+          palette={right}
+        />
       </div>
     </header>
   );
@@ -6154,16 +6212,20 @@ function CampusTabs({
   active,
   onChange,
   hideMap = false,
+  hideChat = false,
   palette,
 }: {
   active: CampusTab;
   onChange: (tab: CampusTab) => void;
-  /** Visiting a campus that isn't open (C5): no Map pill. Chat always stays. */
+  /** Visiting a campus that isn't open (C5): no Map pill. Chat stays for it. */
   hideMap?: boolean;
+  /** The `chat_desktop` switch is on: no Chat pill, club chat is on /messages. */
+  hideChat?: boolean;
   /** The top bar zone the pills sit in (CampusTopBar's right zone). */
   palette: SchoolZonePalette;
 }) {
-  const tabs = hideMap ? TABS.filter((t) => t.key !== "map") : TABS;
+  const mapTabs = hideMap ? TABS.filter((t) => t.key !== "map") : TABS;
+  const tabs = hideChat ? mapTabs.filter((t) => t.key !== "chat") : mapTabs;
   // The pills live in the top bar's right zone (S68). #campus-tabs stays the
   // tour's target. Hover and focus come from TOPBAR_CSS (.vibe-topbar-tab).
   return (
@@ -16732,7 +16794,8 @@ function ChannelChat({
         ) : null}
         {/* Club chat v1: in a room the viewer can't post in (a Board for
             anyone but its officers, an event chat that has closed) a quiet
-            line takes the composer's place, on the same glass. */}
+            line takes the composer's place, on the same glass. An extra room
+            with a who-can-post rule sends its own sentence, `post_line`. */}
         {!canPost ? (
           <div
             role="note"
@@ -16753,7 +16816,7 @@ function ChannelChat({
           >
             {(roomRules?.room?.kind ?? roomKind) === "board"
               ? REFUSAL_SENTENCES.board_officers_only
-              : REFUSAL_SENTENCES.room_closed}
+              : roomRules?.viewer?.post_line || REFUSAL_SENTENCES.room_closed}
           </div>
         ) : (
         <div

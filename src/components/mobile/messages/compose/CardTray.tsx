@@ -1,7 +1,11 @@
 "use client";
 
+import { useSyncExternalStore } from "react";
+
+import { DesktopPopover } from "@/components/desktop/messages/DesktopDialog";
 import type { RoomKind } from "@/lib/chat/types";
 
+import { useChatSurface } from "../surface";
 import { useNightTheme } from "../theme";
 import { FONT, SERIF, palette } from "../v2-tokens";
 
@@ -16,6 +20,12 @@ import { FONT, SERIF, palette } from "../v2-tokens";
  * gives its composer a z-index above the scrim's (the mockup: scrim 1, tray
  * and footer 2). A row opens its sheet and closes the tray; the scrim or the
  * "+" (now an X) closes it. The room shows it only when `viewer.can_post`.
+ *
+ * On the desktop surface (wave-3 contract 6.3, 1.3 K5) the same caption and
+ * the same three rows sit in a `DesktopPopover` anchored to the "+"
+ * (`anchorRef`), 320 wide: in flow they would be three 72px rows stretched
+ * across the whole pane with the thread dimmed behind them. No scrim there.
+ * The phone surface is the block described above, unchanged.
  */
 
 export type CardTrayKind = "poll" | "signup" | "event";
@@ -27,6 +37,8 @@ export type CardTrayProps = {
   open: boolean;
   onClose: () => void;
   onPick: (kind: CardTrayKind) => void;
+  /** The composer's "+": the desktop popover's anchor, and where its focus goes back. Only `RoomComposer` passes it. */
+  anchorRef?: React.RefObject<HTMLButtonElement | null>;
 };
 
 /** `Add to the Lounge` / `Add to the Board` / `Add to the event chat` / `Add to <room name>` (1.2). */
@@ -76,21 +88,129 @@ function RowIcon({ kind }: { kind: CardTrayKind }) {
   );
 }
 
-export function CardTray({ roomKind, roomName, open, onClose, onPick }: CardTrayProps) {
+/** The "+" never changes while the tray is open: a store with nothing to subscribe to. */
+const noChange = () => () => {};
+
+/**
+ * The desktop tray's box: `DesktopPopover` with `anchor` = the node behind
+ * `anchorRef` (contract 6.3's `anchorRef?.current ?? null`). It is mounted
+ * only while the tray is open, so the "+" is on screen by then. The node is
+ * read as a snapshot, not in the render's own body (a ref is not read while
+ * rendering; the lint rule `react-hooks/refs`), the way `theme.ts` reads the
+ * page's theme.
+ */
+function DesktopTray({ anchorRef, label, onClose, children }: { anchorRef: CardTrayProps["anchorRef"]; label: string; onClose: () => void; children: React.ReactNode }) {
+  const anchor = useSyncExternalStore(
+    noChange,
+    () => anchorRef?.current ?? null,
+    () => null,
+  );
+  return (
+    <DesktopPopover anchor={anchor} label={label} onClose={onClose} width={320} align="start">
+      <div style={{ boxSizing: "border-box", padding: 8, display: "flex", flexDirection: "column", gap: 8 }}>{children}</div>
+    </DesktopPopover>
+  );
+}
+
+export function CardTray({ roomKind, roomName, open, onClose, onPick, anchorRef }: CardTrayProps) {
   const night = useNightTheme();
+  const surface = useChatSurface();
   const t = palette(night);
   if (!open) return null;
 
   const caption = trayCaption(roomKind, roomName);
+  // A tint that is white on Night's paper and ink on Light's (`--scrim-rgb`).
+  const rowBg = "rgba(var(--scrim-rgb),0.04)";
+  const rowBorder = "1px solid rgba(var(--scrim-rgb),0.07)";
+  const discBg = "rgba(var(--scrim-rgb),0.07)";
+
+  // The caption and the three rows: the same nodes on both surfaces.
+  const captionRow = (
+    <div
+      style={{
+        height: 20,
+        boxSizing: "border-box",
+        padding: "0 6px",
+        display: "flex",
+        alignItems: "center",
+        fontSize: 12,
+        fontWeight: 700,
+        color: t.muted,
+      }}
+    >
+      {caption}
+    </div>
+  );
+  const rows = ROWS.map((row) => (
+    <button
+      key={row.kind}
+      type="button"
+      onClick={() => onPick(row.kind)}
+      style={{
+        minHeight: 72,
+        width: "100%",
+        boxSizing: "border-box",
+        padding: "0 10px 0 12px",
+        borderRadius: 14,
+        border: rowBorder,
+        background: rowBg,
+        color: t.ink,
+        display: "flex",
+        alignItems: "center",
+        gap: 12,
+        textAlign: "left",
+        cursor: "pointer",
+        WebkitTapHighlightColor: "transparent",
+        fontFamily: FONT,
+      }}
+    >
+      <span
+        aria-hidden
+        style={{
+          width: 44,
+          height: 44,
+          flexShrink: 0,
+          borderRadius: 999,
+          background: discBg,
+          color: t.ink,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        <RowIcon kind={row.kind} />
+      </span>
+      <span style={{ flexGrow: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 2 }}>
+        <span style={{ fontFamily: SERIF, fontWeight: 700, fontSize: 17, lineHeight: 1.2, letterSpacing: -0.2 }}>
+          {row.title}
+        </span>
+        <span style={{ fontSize: 13, lineHeight: 1.3, color: t.secondary }}>{row.line}</span>
+      </span>
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={t.muted} strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden style={{ flexShrink: 0 }}>
+        <path d="M9 5l7 7-7 7" />
+      </svg>
+    </button>
+  ));
+
+  // The desktop surface: a popover on the "+", opening upward (the composer
+  // is at the foot of the pane, so `DesktopPopover` finds no room under it).
+  // No scrim and no tail; the popover's own surface (`t.surface`), border
+  // and shadow; Esc, a press outside and Back close it, and focus goes back
+  // to the "+" (all `DesktopPopover`'s).
+  if (surface === "desktop") {
+    return (
+      <DesktopTray anchorRef={anchorRef} label={caption} onClose={onClose}>
+        {captionRow}
+        {rows}
+      </DesktopTray>
+    );
+  }
+
   // The raised surface: the mockup's `#1C1A1A` in Night; Light is not drawn
   // (MK:8), so the app's paper and hairline stand in.
   const trayBg = night ? "#1C1A1A" : t.surface;
   const trayBorder = `1px solid ${t.fieldBorder}`;
   const trayShadow = night ? "0 -10px 30px rgba(0,0,0,0.55)" : "0 -10px 30px rgba(20,20,22,0.18)";
-  // A tint that is white on Night's paper and ink on Light's (`--scrim-rgb`).
-  const rowBg = "rgba(var(--scrim-rgb),0.04)";
-  const rowBorder = "1px solid rgba(var(--scrim-rgb),0.07)";
-  const discBg = "rgba(var(--scrim-rgb),0.07)";
 
   return (
     <>
@@ -127,70 +247,8 @@ export function CardTray({ roomKind, roomName, open, onClose, onPick }: CardTray
           color: t.ink,
         }}
       >
-        <div
-          style={{
-            height: 20,
-            boxSizing: "border-box",
-            padding: "0 6px",
-            display: "flex",
-            alignItems: "center",
-            fontSize: 12,
-            fontWeight: 700,
-            color: t.muted,
-          }}
-        >
-          {caption}
-        </div>
-        {ROWS.map((row) => (
-          <button
-            key={row.kind}
-            type="button"
-            onClick={() => onPick(row.kind)}
-            style={{
-              minHeight: 72,
-              width: "100%",
-              boxSizing: "border-box",
-              padding: "0 10px 0 12px",
-              borderRadius: 14,
-              border: rowBorder,
-              background: rowBg,
-              color: t.ink,
-              display: "flex",
-              alignItems: "center",
-              gap: 12,
-              textAlign: "left",
-              cursor: "pointer",
-              WebkitTapHighlightColor: "transparent",
-              fontFamily: FONT,
-            }}
-          >
-            <span
-              aria-hidden
-              style={{
-                width: 44,
-                height: 44,
-                flexShrink: 0,
-                borderRadius: 999,
-                background: discBg,
-                color: t.ink,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              <RowIcon kind={row.kind} />
-            </span>
-            <span style={{ flexGrow: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 2 }}>
-              <span style={{ fontFamily: SERIF, fontWeight: 700, fontSize: 17, lineHeight: 1.2, letterSpacing: -0.2 }}>
-                {row.title}
-              </span>
-              <span style={{ fontSize: 13, lineHeight: 1.3, color: t.secondary }}>{row.line}</span>
-            </span>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={t.muted} strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden style={{ flexShrink: 0 }}>
-              <path d="M9 5l7 7-7 7" />
-            </svg>
-          </button>
-        ))}
+        {captionRow}
+        {rows}
         <span
           aria-hidden
           style={{

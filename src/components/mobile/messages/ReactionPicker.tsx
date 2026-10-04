@@ -4,7 +4,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import { type MessageReaction } from "./types";
 
-const REACTION_EMOJIS = ["❤️", "👍", "👎", "😂", "🔥", "😮", "😢"] as const;
+export const REACTION_EMOJIS = ["❤️", "👍", "👎", "😂", "🔥", "😮", "😢"] as const;
 
 // Eats the click that ends one press, so the tap that closes the
 // reaction picker doesn't also open whatever is under the finger. It

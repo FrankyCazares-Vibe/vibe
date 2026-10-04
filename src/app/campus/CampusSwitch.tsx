@@ -13,11 +13,17 @@ import { CampusHome } from "./campus-home";
  * Mobile   → MobileShell + CampusMobile (iOS-native rebuild with the
  *            cream banner, swipeable Feed / Events / Orgs tabs, and
  *            an FAB that opens the existing post/clip composers).
+ *
+ * `desktopChat` is the `chat_desktop` switch, worked out on the server
+ * (page.tsx). Only CampusHome reads it: with it on, the desktop Campus has
+ * no Chat tab. The phone is decided by `chat_v2` alone, inside CampusMobile.
  */
 export function CampusSwitch({
   showSchoolVerifiedBanner,
+  desktopChat = false,
 }: {
   showSchoolVerifiedBanner: boolean;
+  desktopChat?: boolean;
 }) {
   const isMobile = useIsMobile();
   if (isMobile) {
@@ -27,5 +33,7 @@ export function CampusSwitch({
       </MobileShell>
     );
   }
-  return <CampusHome showSchoolVerifiedBanner={showSchoolVerifiedBanner} />;
+  return (
+    <CampusHome showSchoolVerifiedBanner={showSchoolVerifiedBanner} desktopChat={desktopChat} />
+  );
 }

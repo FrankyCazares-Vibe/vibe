@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Drawer } from "vaul";
 
+import { DesktopDialog } from "@/components/desktop/messages/DesktopDialog";
 import type { ChatMessage, CreateCardBody, CreateCardResponse } from "@/lib/chat/types";
 import { useHideTabBar } from "@/lib/chat/use-hide-tabbar";
 import { useLayerHistory } from "@/lib/chat/use-layer-history";
@@ -12,6 +13,7 @@ import { toast } from "@/lib/feedback/toast";
 import { clubGradient } from "../avatar";
 import { toastSendFailure } from "../send-failure";
 import { vaulContentStyle, vaulHandleStyle, vaulOverlayStyle } from "../sheet-styles";
+import { useChatSurface } from "../surface";
 import { FONT, palette, SERIF } from "../v2-tokens";
 
 /**
@@ -39,13 +41,24 @@ import { FONT, palette, SERIF } from "../v2-tokens";
  * outlined; `board_officers_only` / `room_closed` / `not_found` → the
  * sentence and the sheet closes; `try_again` (503, from anywhere in the
  * POST) → the sentence, the sheet closes (`onClose`, the hook's own) and
- * the room's `reload()` (the row may exist; never a re-submit, N8); a 201 →
+ * the room's `reload()` (the row may exist; never a re-submit, N8);
+ * `room_posters_only` (wave-3 contract 4c.4) → the same as `try_again`: the
+ * reload brings the room's `post_line` to the composer at once; a 201 →
  * `onPosted(message)`. Any other failure (401, 403 "Not a member", 429, a
  * 5xx, the network) shows its mapped line and the sheet stays. While a
  * POST is in flight the sheet ignores the X, the scrim and the drag: a
  * sheet closed mid-request could be followed by a second one posting a
  * second card (S3-SECURITY-1). Back is the same: while posting, the history
  * steps forward onto the sheet's entry again and the sheet stays (`canPop`).
+ *
+ * On the desktop surface (wave-3 contract 6.3) `CardSheet` draws the same
+ * title, room line, children and CTA in a `DesktopDialog` (440 wide, `busy`
+ * while posting): no vaul root (there is no drawer above it on a laptop, and
+ * a `Drawer.NestedRoot` without one throws), the CTA in the dialog's footer,
+ * so it stays on screen while a long poll scrolls. The history entry, the
+ * posting guard and the focus return to the "+" are the ones above; the
+ * three sheets that mount it do not know which form they are in. The phone
+ * surface is the drawer described above, unchanged.
  */
 
 /** 1.2's exact toast line for a 422 `content_blocked` (the server's own `error`). */
@@ -108,6 +121,11 @@ export function useCardPost(args: {
         doneRef.current = true;
         onClose();
         return;
+      // `room_posters_only`: the room's who-can-post rule changed under the
+      // open sheet. The room is read again at once, as after a refused send
+      // (`refusedSend`, club/helpers.ts): only that read brings the
+      // `post_line` the composer under this sheet should turn into.
+      case "room_posters_only":
       case "try_again":
         toastSendFailure(r);
         doneRef.current = true;
@@ -144,6 +162,7 @@ export type CardSheetProps = {
 
 export function CardSheet({ title, roomLine, orgId, night, cta, ctaDisabled, posting, onSubmit, onClose, returnFocusTo, ctaGap = 14, children }: CardSheetProps) {
   useHideTabBar();
+  const surface = useChatSurface();
   const t = palette(night);
   const disabled = ctaDisabled || posting;
   // No close while the POST is in flight (S3-SECURITY-1).
@@ -162,6 +181,55 @@ export function CardSheet({ title, roomLine, orgId, night, cta, ctaDisabled, pos
       if (el) window.setTimeout(() => el.focus(), 0);
     };
   }, [returnFocusTo]);
+
+  if (surface === "desktop") {
+    return (
+      <DesktopDialog
+        title={title}
+        onClose={close}
+        width={440}
+        busy={posting}
+        ownsHistory={false}
+        footer={
+          <button
+            type="button"
+            aria-disabled={disabled || undefined}
+            onClick={() => {
+              if (!disabled) onSubmit();
+            }}
+            style={{
+              height: 40,
+              minWidth: 132,
+              boxSizing: "border-box",
+              padding: "0 20px",
+              borderRadius: 999,
+              border: "none",
+              background: disabled ? "rgba(var(--scrim-rgb),0.07)" : t.coralButton.bg,
+              color: disabled ? t.muted : t.coralButton.ink,
+              fontFamily: "inherit",
+              fontSize: 14.5,
+              fontWeight: 800,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              cursor: disabled ? "default" : "pointer",
+            }}
+          >
+            {posting ? "Posting…" : cta}
+          </button>
+        }
+      >
+        {/* A column, as the sheet's body is: the three sheets' blocks stack and stretch the same way. */}
+        <div style={{ display: "flex", flexDirection: "column" }}>
+          <span style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12.5, fontWeight: 600, color: t.muted, whiteSpace: "nowrap", overflow: "hidden" }}>
+            {orgId ? <span aria-hidden style={{ width: 14, height: 14, flexShrink: 0, borderRadius: 999, background: clubGradient(orgId) }} /> : null}
+            <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{roomLine}</span>
+          </span>
+          {children}
+        </div>
+      </DesktopDialog>
+    );
+  }
 
   return (
     <Drawer.NestedRoot

@@ -7,6 +7,7 @@ import { RemovedContentCard } from "@/components/safety/ReportSheet";
 
 import { initialsOf, quotedBody } from "./format";
 import { ReactionPicker } from "./ReactionPicker";
+import { useChatSurface } from "./surface";
 import { type MessageRow } from "./types";
 
 export function MessageBubble({
@@ -72,6 +73,13 @@ export function MessageBubble({
       .map((p) => p[0]?.toUpperCase() ?? "")
       .join("") || "?";
 
+  // Desktop Messages (wave-3 desktop contract 6.3) is the only tree that
+  // provides "desktop"; every phone screen, switch on or off, reads "phone"
+  // and nothing below changes for it. On the desktop surface the actions
+  // live in the room's hover toolbar (club/HoverActions.tsx), so the press
+  // does not arm, the ⋯ is not drawn, text can be selected, the browser's
+  // own menu opens, and a text bubble stops at 520px.
+  const desktop = useChatSurface() === "desktop";
   const [pickerOpen, setPickerOpen] = useState(false);
   const longPressTimer = useRef<number | null>(null);
   const longPressFired = useRef(false);
@@ -127,8 +135,10 @@ export function MessageBubble({
   // The same long-press gesture on the text bubble, the photo, the
   // shared-post card and the notice tiles, so the reaction picker opens
   // from any of them. Not on the video: its native controls need every
-  // touch, and holding the scrubber opened the picker.
-  const pressHandlers = {
+  // touch, and holding the scrubber opened the picker. None of it on the
+  // desktop surface: a slow click or a selection drag is not a hold, and
+  // right-click keeps the browser's menu.
+  const pressHandlers = desktop ? {} : {
     onPointerDown: (e: React.PointerEvent) => {
       // Only the first finger's primary press arms it. A second finger
       // means a pinch, so it cancels one that's pending.
@@ -194,7 +204,9 @@ export function MessageBubble({
 
   // Every piece of the message shares this: no iOS callout or
   // selection, and the same press-in scale while the picker is open.
-  const pressStyle: React.CSSProperties = {
+  // Nothing on the desktop surface, where text is selectable and the
+  // picker never opens.
+  const pressStyle: React.CSSProperties = desktop ? {} : {
     cursor: "pointer",
     WebkitTouchCallout: "none",
     WebkitUserSelect: "none",
@@ -251,7 +263,7 @@ export function MessageBubble({
       {...pressHandlers}
       style={{
         display: "inline-block",
-        maxWidth: "100%",
+        maxWidth: desktop ? "min(520px, 100%)" : "100%",
         padding: "8px 14px",
         borderRadius: 18,
         background: bubbleBg,
@@ -562,7 +574,9 @@ export function MessageBubble({
   // asks of a thumb. It shows on someone else's message only — which is
   // exactly where the picker has a Report to offer (never on the viewer's
   // own, never on a row still sending, both already decided by `onReport`).
-  const showMore = !!onReport && !message.id.startsWith("temp_");
+  // Not on the desktop surface: the hover toolbar has its own ⋯ ("More"),
+  // and two would be the same control twice.
+  const showMore = !desktop && !!onReport && !message.id.startsWith("temp_");
   const moreButton = showMore ? (
     <button
       type="button"

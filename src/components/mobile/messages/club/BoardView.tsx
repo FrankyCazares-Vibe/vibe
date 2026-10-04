@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { LoadFailed } from "@/components/feedback/LoadFailed";
 import { RemovedContentCard, ReportSheet, type ReportTargetRef } from "@/components/safety/ReportSheet";
@@ -10,9 +10,11 @@ import { ROOM_FULL_READ_EVERY, ROOM_POLL_MS, type RoomPoll } from "@/lib/chat/us
 import { vibeRequest } from "@/lib/feedback/request";
 
 import { toastSendFailure } from "../send-failure";
+import { useChatSurface } from "../surface";
 import { FONT, palette } from "../v2-tokens";
 import { BoardPost } from "./BoardPost";
 import { isEmptyRoom } from "./helpers";
+import { HOVER_ACTIONS_CSS } from "./HoverActions";
 import { toggleReactionOn } from "./reactions";
 import { RemoveConfirm } from "./RoomThread";
 
@@ -34,6 +36,15 @@ import { RemoveConfirm } from "./RoomThread";
  * skeleton (three post-shaped blocks), `Nothing on the Board yet.`,
  * `LoadFailed` (`Couldn't load the Board.`, the hook's `line` set by the
  * space).
+ *
+ * Wave 3 (handoffs/chat-redesign/wave-3-desktop/contract.md 4c.4, 6.3):
+ * `Remove` and `Report` reach text posts and replies too (the "..." of
+ * `BoardPost`; the owed 17.2 L3), through the one confirm and the one report
+ * sheet here; a removed reply makes the open folds read again. On the
+ * desktop surface only: one line above the posts says whose announcements
+ * these are, the report opens as the modal, not as a nested sheet, and the
+ * hover toolbar's CSS is rendered once for the card posts (`BoardPost` wraps
+ * a card in `HoverActions` there: the long press does not arm on a laptop).
  */
 export type BoardViewProps = {
   poll: RoomPoll;
@@ -70,14 +81,20 @@ function BoardSkeleton({ night }: { night: boolean }) {
 
 export function BoardView({ poll, roomId, night, now, onOpenEventChat, scrollToken, paused = false }: BoardViewProps) {
   const t = palette(night);
+  const surface = useChatSurface();
   const { messages, room, viewer, viewerId, failure } = poll;
   const [refreshToken, setRefreshToken] = useState(0);
   const [removeTarget, setRemoveTarget] = useState<ChatMessage | null>(null);
   const [removing, setRemoving] = useState(false);
   const [reportMessage, setReportMessage] = useState<ReportTargetRef | null>(null);
+  // ONE handler for the life of the Board, as in `RoomThread`: the desktop
+  // dialog (`ReportSheet variant="modal"`) takes focus again whenever its
+  // `onClose` changes, and the Board renders again on every poll, which would
+  // pull the caret out of the details box mid-sentence.
+  const closeReport = useCallback(() => setReportMessage(null), []);
   // The Report sheet's own history entry (S71 amendment 3, A): Back closes it
   // alone. The remove confirm takes its own inside `RemoveConfirm`.
-  useLayerHistory(reportMessage !== null, () => setReportMessage(null));
+  useLayerHistory(reportMessage !== null, closeReport);
   const scrollRef = useRef<HTMLElement | null>(null);
 
   // The every-5th-tick re-read of the open folds (11.4): the same period as
@@ -110,8 +127,24 @@ export function BoardView({ poll, roomId, night, now, onOpenEventChat, scrollTok
       toastSendFailure(r);
       return;
     }
-    poll.remove(target.id);
+    if (target.thread_root_id === null) {
+      poll.remove(target.id);
+      return;
+    }
+    // A reply is not in the hook's rows (top-level only): the open folds
+    // read again now, and its post is re-read for the server's `reply_count`.
+    setRefreshToken((n) => n + 1);
+    const root = messages?.find((m) => m.id === target.thread_root_id);
+    if (root) void poll.refreshOne(root.created_at);
   };
+
+  const reportRef = (m: ChatMessage): ReportTargetRef => ({
+    type: "message",
+    id: m.id,
+    authorId: m.users?.id ?? m.user_id,
+    authorName: m.users?.name || (m.users?.handle ? `@${m.users.handle}` : null),
+    noun: "message",
+  });
 
   if (failure) {
     return (
@@ -132,6 +165,12 @@ export function BoardView({ poll, roomId, night, now, onOpenEventChat, scrollTok
         aria-label="Board posts, newest first"
         style={{ flexGrow: 1, minHeight: 0, overflowY: "auto", overscrollBehavior: "contain", WebkitOverflowScrolling: "touch", boxSizing: "border-box", padding: "8px 12px 8px", display: "flex", flexDirection: "column", gap: 8, fontFamily: FONT }}
       >
+        {surface === "desktop" ? <style>{HOVER_ACTIONS_CSS}</style> : null}
+        {surface === "desktop" && room?.org.name ? (
+          <p style={{ flexShrink: 0, margin: 0, padding: "2px 4px 0", color: t.muted, fontSize: 12.5, fontWeight: 600, lineHeight: 1.4 }}>
+            {`Announcements from ${room.org.name}'s officers. Everyone in the club sees them.`}
+          </p>
+        ) : null}
         {empty ? (
           <div style={{ padding: "48px 18px", textAlign: "center", color: t.secondary, fontSize: 13.5, lineHeight: 1.5 }}>Nothing on the Board yet.</div>
         ) : (
@@ -162,11 +201,9 @@ export function BoardView({ poll, roomId, night, now, onOpenEventChat, scrollTok
                 onRefresh={(createdAt) => void poll.refreshOne(createdAt)}
                 onOpenEventChat={onOpenEventChat}
                 onRemove={canRemove ? () => setRemoveTarget(post) : undefined}
-                onReport={
-                  canReport
-                    ? () => setReportMessage({ type: "message", id: post.id, authorId: post.users?.id ?? post.user_id, authorName: post.users?.name || (post.users?.handle ? `@${post.users.handle}` : null), noun: "message" })
-                    : undefined
-                }
+                onReport={canReport ? () => setReportMessage(reportRef(post)) : undefined}
+                onRemoveReply={viewer?.can_moderate && !temp ? setRemoveTarget : undefined}
+                onReportReply={viewerId && !temp ? (reply) => setReportMessage(reportRef(reply)) : undefined}
                 onReplied={() => void poll.refreshOne(post.created_at)}
                 onMissing={() => poll.remove(post.id)}
                 onToggleReaction={(emoji) => void toggleReactionOn(poll, roomId, post, emoji)}
@@ -185,7 +222,14 @@ export function BoardView({ poll, roomId, night, now, onOpenEventChat, scrollTok
         ) : null}
       </section>
       {removeTarget ? <RemoveConfirm night={night} busy={removing} onConfirm={() => void confirmRemove()} onCancel={() => setRemoveTarget(null)} /> : null}
-      {reportMessage ? <ReportSheet variant="sheet" nested target={reportMessage} onClose={() => setReportMessage(null)} /> : null}
+      {reportMessage ? (
+        // The desktop pane has no drawer above it: the modal form there (a nested vaul sheet without a parent drawer throws).
+        surface === "desktop" ? (
+          <ReportSheet variant="modal" target={reportMessage} onClose={closeReport} />
+        ) : (
+          <ReportSheet variant="sheet" nested target={reportMessage} onClose={closeReport} />
+        )
+      ) : null}
     </>
   );
 }
