@@ -52,7 +52,9 @@ S73 started from `2026-10-03-session-72-landing-demo-waitlist.md`. Franky asked 
 **Not walked:** a real phone (the long-press Pin, the rebuilt month sheet, the lock and megaphone on chips); keyboard-only use; a group chat; the Members dialog; the New dialog's group rule; sending in a read-only room; two browsers at once; 1280px.
 
 **Open for Franky:**
-- The slim list shows only pinned and unread chats plus the open one, so with real data it is often two or three names. Recommended: add the most recent chats (up to about eight). Not answered.
+- DONE after the walk (Franky: "yes do it all"): the slim list now also shows the most recent chats, up to eight rows (`SLIM_TARGET` in `desktop-rules.ts`; pinned, unread and open rows are never dropped for a recent one). Commit `836c20e` on `chat-desktop`, pushed; 2,060 tests. Made by hand in the main session, not through the wave runner.
+- A 46-second clip of the built page was sent to Franky: `~/vibe-demo-video/desktop-messages-walk-2026-10-04.mp4` (outside the repo; recorder `wave-3-desktop/walk/clip.mjs` if copied from the scratchpad).
+- **Production is NOT started.** Franky's "yes do it all" covered the two database files, but the app's safety check refused the read-only pre-check on production (and then two further actions), so the session stopped. Needed from Franky, in his own words in chat: an OK to read production for the pre-check (the queries are in each migration's header), then one "go" for the three steps in contract 4b.3 (merge `chat-desktop` into main, the pins file, the who-can-post file).
 - Old pinned messages cannot be jumped to on a laptop (the old thread holds the newest 50). Recommended: ship with it.
 - No unread mark for the Officers room or private rooms, phone or laptop. Recommended: fix right after launch (one small database change).
 - Founders and SAE get small phone changes with the first deploy (room names as words, the lock, the megaphone, "..." on Board posts, the month sheet rebuilt): ten minutes on a real phone before desktop is turned on.
