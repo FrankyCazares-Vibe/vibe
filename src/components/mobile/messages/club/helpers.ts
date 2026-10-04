@@ -4,12 +4,14 @@
  * assembled from the payloads, the role word, the event chip's state word,
  * the date separators rule and the state pill's text.
  *
- * PURE: no React, no DOM. The imports are `when.ts` (1.4) and types, so
+ * PURE: no React, no DOM. The imports are `when.ts` (1.4), `room-names.ts`
+ * (wave-3 desktop contract 4c.3; itself import-free) and types, so
  * `node --test` loads it (helpers.test.ts, through the repo's resolve hook
  * for the "@/" alias). Every string here is 1.2's, word for word; nothing
  * is invented, and every function that reads a clock takes `now`.
  */
 
+import { roomDisplayName } from "@/lib/chat/room-names";
 import type { ClubRole, EventRef, RoomKind, RoomState, SpaceRoom } from "@/lib/chat/types";
 import { eventTime, eventTimeShort, isSoon, moreDays, rowTime } from "@/lib/chat/when";
 
@@ -74,7 +76,11 @@ export function chipStateWord(event: EventTimes, now: Date): string {
   return eventTimeShort(event.starts_at, now);
 }
 
-/** The chip's visible text: `Lounge`, `Board`, `Officers`, the event's title, a room's name. */
+/**
+ * The chip's visible text: `Lounge`, `Board`, `Officers`, the event's title,
+ * an extra room's name as words (`exec-only` reads `Exec only`; wave-3
+ * desktop contract 4c.3, C14: the stored name stays a slug).
+ */
 export function chipLabel(room: Pick<SpaceRoom, "kind" | "name" | "event">): string {
   switch (room.kind) {
     case "lounge":
@@ -86,12 +92,16 @@ export function chipLabel(room: Pick<SpaceRoom, "kind" | "name" | "event">): str
     case "event":
       return room.event?.title || room.name;
     default:
-      return room.name;
+      return roomDisplayName(room.name);
   }
 }
 
-/** The chip's `aria-label` (1.2); null when the visible text is the label. */
-export function chipAriaLabel(room: Pick<SpaceRoom, "kind" | "name" | "unread" | "event">, now: Date): string | null {
+/**
+ * The chip's `aria-label` (1.2); null when the visible text is the label.
+ * An extra room only some members see (`locked`, the chip's lock) says so
+ * (wave-3 desktop contract 4c.3).
+ */
+export function chipAriaLabel(room: Pick<SpaceRoom, "kind" | "name" | "unread" | "event"> & { locked?: boolean }, now: Date): string | null {
   switch (room.kind) {
     case "board":
       return room.unread ? "Board, 1 unread post" : "Board";
@@ -99,6 +109,8 @@ export function chipAriaLabel(room: Pick<SpaceRoom, "kind" | "name" | "unread" |
       return "Officers, only officers see this room";
     case "event":
       return room.event ? `${chipLabel(room)}, event chat, ${chipStateWord(room.event, now)}` : null;
+    case "room":
+      return room.locked ? `${chipLabel(room)}, only some members see this room` : null;
     default:
       return null;
   }
@@ -273,6 +285,20 @@ export function composerPlaceholder(kind: RoomKind, roomName: string): string {
 /** The send button's `aria-label`: `Post to the Board` on the Board, else `Send`. */
 export function sendLabel(kind: RoomKind): string {
   return kind === "board" ? "Post to the Board" : "Send";
+}
+
+/**
+ * What a refused send does to the composer, by the refusal's `code` (11.5;
+ * wave-3 desktop contract 4c.4). `tile`: the composer turns into the quiet
+ * tile until the next full read hands a new `viewer`. `reread`: that read is
+ * asked for at once, because the `viewer` on screen cannot say why: after
+ * `room_posters_only` it still holds `can_post: true` and no `post_line`, so
+ * the tile would read `This chat is closed.` on a room that is open. Every
+ * other code (and none) leaves the composer as it is.
+ */
+export function refusedSend(code: string | null | undefined): { tile: boolean; reread: boolean } {
+  const reread = code === "room_posters_only";
+  return { tile: reread || code === "board_officers_only" || code === "room_closed", reread };
 }
 
 /** The empty room's line: `Say hi to <club>.` · `Nothing on the Board yet.` · `Say hi to everyone going.` */

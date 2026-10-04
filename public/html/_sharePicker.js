@@ -299,6 +299,7 @@
   const CHAT_REFUSALS = {
     board_officers_only: "Only officers post here.",
     room_closed: "This chat is closed.",
+    room_posters_only: "Only some people can post here.",
     club_media_off: "Photos and videos are off in club chats for now.",
     board_post_missing: "That post is no longer there.",
     try_again: "Try again in a moment.",

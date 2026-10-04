@@ -100,8 +100,10 @@ export async function GET(_req: Request, { params }: Params) {
  * Validation:
  *  - The target user must already be a member of the org. Granting access
  *    to a non-member is meaningless (they wouldn't pass `is_org_member`).
- *  - The channel must belong to the org and ideally be private (granting
- *    access to a public channel is harmless but not useful).
+ *  - The channel must belong to the org. On a private room the row lets the
+ *    person in; on a public extra room whose `post_policy` is `listed` it
+ *    lets them POST (wave-3-desktop contract 4c.2); on any other public room
+ *    it changes nothing.
  */
 export async function POST(req: Request, { params }: Params) {
   const { slug, channelId } = await params;

@@ -50,8 +50,8 @@ function opts(room: Room | null, role: ClubRole | null, field = "closes_at") {
   };
 }
 
-test("the four statuses of the send refusals match messages/route.ts", () => {
-  assert.deepEqual(POST_REFUSAL_STATUS, { board_officers_only: 403, board_post_missing: 409, thread_root_not_allowed: 400, room_closed: 403 });
+test("the five statuses of the send refusals match messages/route.ts", () => {
+  assert.deepEqual(POST_REFUSAL_STATUS, { board_officers_only: 403, board_post_missing: 409, thread_root_not_allowed: 400, room_closed: 403, room_posters_only: 403 });
 });
 
 test("P0C21: postRefusal(room, null, role) with its status; the role is read for it alone", async () => {
@@ -66,6 +66,19 @@ test("P0C21: postRefusal(room, null, role) with its status; the role is read for
   assert.deepEqual(await rpcRefusal({ code: "P0C21" }, closed.opts), { status: 403, body: { ok: false, error: "This chat is closed.", code: "room_closed" } });
   const noRoom = opts(null, null);
   assert.deepEqual(await rpcRefusal({ code: "P0C21" }, noRoom.opts), { status: 403, body: { ok: false, error: "This chat is closed.", code: "room_closed" } });
+});
+
+test("P0C21 in an extra room only officers post in: 403 room_posters_only (wave-3 contract 4.2)", async () => {
+  const OFFICERS_ONLY: Room = { ...BOARD, kind: "room", name: "exec-only", post_policy: "officers" };
+  const member = opts(OFFICERS_ONLY, "member");
+  assert.deepEqual(await rpcRefusal({ code: "P0C21", message: "chat-cards: not allowed to post here" }, member.opts), {
+    status: 403, body: { ok: false, error: "Only some people can post here.", code: "room_posters_only" },
+  });
+  assert.equal(member.asked(), 1);
+  const listed = opts({ ...OFFICERS_ONLY, post_policy: "listed" }, "member");
+  assert.deepEqual(await rpcRefusal({ code: "P0C21" }, listed.opts), { status: 403, body: { ok: false, error: "Only some people can post here.", code: "room_posters_only" } });
+  const open = opts({ ...OFFICERS_ONLY, post_policy: "everyone" }, "member");
+  assert.deepEqual(await rpcRefusal({ code: "P0C21" }, open.opts), { status: 403, body: { ok: false, error: "This chat is closed.", code: "room_closed" } });
 });
 
 test("P0C22: 400 invalid_card with the field the route names", async () => {

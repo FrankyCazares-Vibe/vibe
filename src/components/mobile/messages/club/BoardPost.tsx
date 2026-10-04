@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import { asLoadFailure, LoadFailed, type LoadFailure } from "@/components/feedback/LoadFailed";
 import { RemovedContentCard } from "@/components/safety/ReportSheet";
@@ -13,8 +13,10 @@ import { personColor } from "../avatar";
 import { CardBubble } from "../cards/CardBubble";
 import { initialsOf } from "../format";
 import { toastSendFailure } from "../send-failure";
+import { useChatSurface } from "../surface";
 import { FONT, palette } from "../v2-tokens";
 import { authorName, postAriaLabel, repliesToggleLabel, repliesToggleText, roleWord } from "./helpers";
+import { HoverActions } from "./HoverActions";
 
 /**
  * One Board post with its folded replies (handoffs/chat-redesign/wave-2-contracts.md
@@ -43,6 +45,18 @@ import { authorName, postAriaLabel, repliesToggleLabel, repliesToggleText, roleW
  * Board's handlers: an emoji → `onToggleReaction` (the chips under the card
  * follow), `Reply` → the fold opens with the reply field focused (a Board
  * reply is never a quote; INT-ADJUDICATE-2).
+ *
+ * A text post's byline and each reply row end in a "..." (`MoreMenu`, below;
+ * wave-3 contract 6.3, the owed 17.2 L3) for `Report` and `Remove`, on the
+ * phone and on the desktop: the post's through `onReport` / `onRemove`, a
+ * reply's through `onReportReply` / `onRemoveReply`. The Board view owns the
+ * confirm, the report sheet and the request.
+ *
+ * A card post has ONE door of its own instead, never a byline "..." as well:
+ * the long press on the phone, and on the desktop surface (where that press
+ * never arms) the hover toolbar the thread's rows have (`HoverActions`,
+ * wave-3 contract 6.4): React, Reply, and `More` with the same `Report` and
+ * `Remove`. The Board view renders the toolbar's CSS once.
  */
 export type BoardPostProps = {
   post: ChatMessage;
@@ -59,6 +73,10 @@ export type BoardPostProps = {
   onOpenEventChat: (roomId: string) => void;
   onRemove?: () => void;
   onReport?: () => void;
+  /** `Remove` on one reply of this post: passed only to an officer or a mod; never offered on the viewer's own reply. */
+  onRemoveReply?: (reply: ChatMessage) => void;
+  /** `Report` on one reply of this post; never offered on the viewer's own reply. */
+  onReportReply?: (reply: ChatMessage) => void;
   /** An emoji picked on a card post (its picker or its chips): today's reaction flow (reactions.ts). */
   onToggleReaction?: (emoji: string) => void;
   /** A reply went in: the list re-reads the post (its server `reply_count`). */
@@ -114,8 +132,159 @@ function BellOff() {
   );
 }
 
-export function BoardPost({ post, roomId, room, viewer, viewerId, night, now, refreshToken, onCard, onRefresh, onOpenEventChat, onRemove, onReport, onToggleReaction, onReplied, onMissing }: BoardPostProps) {
+const MORE_ITEM_CSS = `
+.vibe-board-more-item { background: transparent; }
+.vibe-board-more-item:hover, .vibe-board-more-item:focus-visible { background: rgba(var(--scrim-rgb), 0.06); }
+`;
+
+/**
+ * The three places of a "..." (`MoreMenu`): the button's own box, the
+ * negative margins that keep its row as tall as it was and reach into the
+ * post's 12px gutter (the dots end 2px inside the post's text edge on all
+ * three), and the menu's right edge (the post's text edge).
+ *
+ * `byline`: 44 in the 28px byline. `replyPointer`: 28 in a 22px reply row on
+ * the desktop surface, where the rows are 28px apart and a pointer is exact.
+ * `replyTouch`: a reply row on the phone, a full 44px target (wave-2
+ * contract 11.0) centred on the reply's first line; it reaches 11px above
+ * and below its 22px row, so the fold spaces those rows 44px apart
+ * (`REPLY_TOUCH_GAP`) and keeps the same 11px clear of the toggle above and
+ * of the reply field below: no two targets share a pixel.
+ */
+const MORE_AT = {
+  byline: { box: 44, margin: "-8px -12px -8px -10px", menuRight: 12 },
+  replyTouch: { box: 44, margin: "-11px -12px -11px -8px", menuRight: 12 },
+  replyPointer: { box: 28, margin: "-3px -4px -3px -4px", menuRight: 4 },
+} as const;
+/** The phone's gap between reply rows once one of them carries a "...": a 22px row plus this is the 44px box's pitch. */
+const REPLY_TOUCH_GAP = 22;
+/** The same fold's padding: 11px above the first row; 3px under the last, which with the reply field's 8px margin is 11 again. */
+const REPLY_TOUCH_PADDING = "11px 0 3px 10px";
+
+/**
+ * The "..." of a text post's byline and of a reply row (wave-3 contract 6.3,
+ * 2.5 row 10 (d); the owed 17.2 L3): until now `Report` and `Remove` were
+ * reachable only from a card post's long press. A button named `More` and a
+ * small menu under it with the actions it was given (`Report`: never on the
+ * viewer's own; `Remove`: an officer or a mod, never on their own; the
+ * caller decides and passes a handler or not). Nothing is drawn with no
+ * handler.
+ *
+ * `at` is where it sits (`MORE_AT`, above). The menu is in flow of the post
+ * (absolute under the button), not a portal: it works the same inside the
+ * phone's drawer and the desktop pane.
+ *
+ * Keys: Enter or Space opens it and focus lands on the first item; Up and
+ * Down move; Esc or Tab closes it (Esc gives focus back to the button and is
+ * stopped, so on the desktop it never also closes the chat). A press outside
+ * closes it. A picked action closes the menu first and returns focus to the
+ * button, so the confirm or the report sheet it opens hands focus back there.
+ */
+function MoreMenu({ night, at, onReport, onRemove }: { night: boolean; at: keyof typeof MORE_AT; onReport?: () => void; onRemove?: () => void }) {
   const t = palette(night);
+  const { box, margin, menuRight } = MORE_AT[at];
+  const [open, setOpen] = useState(false);
+  const wrapRef = useRef<HTMLSpanElement | null>(null);
+  const buttonRef = useRef<HTMLButtonElement | null>(null);
+  const menuRef = useRef<HTMLDivElement | null>(null);
+
+  // Under the button unless the Board's scroller cannot show it there (the
+  // last reply of the last post), then above it. Written to the node before
+  // paint; the menu is mounted anew at every open, so nothing is to undo.
+  useLayoutEffect(() => {
+    const menu = menuRef.current;
+    if (!open || !menu) return;
+    let list = menu.parentElement;
+    while (list && !/auto|scroll/.test(getComputedStyle(list).overflowY)) list = list.parentElement;
+    const floor = list ? list.getBoundingClientRect().bottom : window.innerHeight;
+    if (menu.getBoundingClientRect().bottom > floor) {
+      menu.style.top = "auto";
+      menu.style.bottom = "100%";
+    }
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    menuRef.current?.querySelector<HTMLElement>('[role="menuitem"]')?.focus({ preventScroll: true });
+    const onPress = (e: PointerEvent) => {
+      if (e.target instanceof Node && wrapRef.current?.contains(e.target)) return;
+      setOpen(false);
+    };
+    document.addEventListener("pointerdown", onPress, true);
+    return () => document.removeEventListener("pointerdown", onPress, true);
+  }, [open]);
+
+  if (!onReport && !onRemove) return null;
+
+  const run = (action: () => void) => {
+    setOpen(false);
+    buttonRef.current?.focus();
+    action();
+  };
+  const onMenuKey = (e: React.KeyboardEvent) => {
+    if (e.key === "Escape") {
+      e.stopPropagation();
+      setOpen(false);
+      buttonRef.current?.focus();
+      return;
+    }
+    if (e.key === "Tab") {
+      setOpen(false);
+      return;
+    }
+    if (e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
+    e.preventDefault();
+    const items = Array.from(menuRef.current?.querySelectorAll<HTMLElement>('[role="menuitem"]') ?? []);
+    const at = items.indexOf(document.activeElement as HTMLElement);
+    items[(at + (e.key === "ArrowDown" ? 1 : items.length - 1)) % items.length]?.focus();
+  };
+  const item: React.CSSProperties = { height: 40, width: "100%", boxSizing: "border-box", padding: "0 12px", border: "none", borderRadius: 8, color: t.ink, fontFamily: "inherit", fontSize: 14, fontWeight: 600, textAlign: "left", cursor: "pointer", WebkitTapHighlightColor: "transparent" };
+
+  return (
+    <span ref={wrapRef} style={{ position: "relative", flexShrink: 0, display: "flex", margin }}>
+      <button
+        ref={buttonRef}
+        type="button"
+        aria-label="More"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        onClick={() => setOpen((o) => !o)}
+        style={{ width: box, height: box, padding: 0, border: "none", borderRadius: 999, background: "transparent", color: t.muted, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", WebkitTapHighlightColor: "transparent" }}
+      >
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+          <circle cx="5" cy="12" r="1.9" />
+          <circle cx="12" cy="12" r="1.9" />
+          <circle cx="19" cy="12" r="1.9" />
+        </svg>
+      </button>
+      {open ? <style>{MORE_ITEM_CSS}</style> : null}
+      {open ? (
+        <div
+          ref={menuRef}
+          role="menu"
+          aria-label="More"
+          onKeyDown={onMenuKey}
+          style={{ position: "absolute", zIndex: 5, top: "100%", right: menuRight, minWidth: 148, boxSizing: "border-box", padding: 4, borderRadius: 12, border: `1px solid ${t.fieldBorder}`, background: t.surface, boxShadow: "var(--card-shadow)", display: "flex", flexDirection: "column", whiteSpace: "nowrap" }}
+        >
+          {onReport ? (
+            <button type="button" role="menuitem" className="vibe-board-more-item" onClick={() => run(onReport)} style={item}>
+              Report
+            </button>
+          ) : null}
+          {onRemove ? (
+            <button type="button" role="menuitem" className="vibe-board-more-item" onClick={() => run(onRemove)} style={item}>
+              Remove
+            </button>
+          ) : null}
+        </div>
+      ) : null}
+    </span>
+  );
+}
+
+export function BoardPost({ post, roomId, room, viewer, viewerId, night, now, refreshToken, onCard, onRefresh, onOpenEventChat, onRemove, onReport, onRemoveReply, onReportReply, onToggleReaction, onReplied, onMissing }: BoardPostProps) {
+  const t = palette(night);
+  const surface = useChatSurface();
   const [open, setOpen] = useState(false);
   const [replies, setReplies] = useState<Replies>({ rows: null, failure: null });
   const [retryToken, setRetryToken] = useState(0);
@@ -184,6 +353,45 @@ export function BoardPost({ post, roomId, room, viewer, viewerId, night, now, re
   };
 
   const visibleReplies = (replies.rows ?? []).filter((m) => !m.hidden);
+  const desktop = surface === "desktop";
+  // The byline's "..." (owed L3): on a text post, where nothing else names
+  // Report or Remove. A card post has its own door (the long press, or the
+  // hover toolbar below), so never both.
+  const bylineMore = post.kind === "text";
+  // `Reply` on a card post, from the phone's picker or the desktop's toolbar:
+  // the fold opens with the reply field focused.
+  const replyFromCard = canReply
+    ? () => {
+        setOpen(true);
+        setFocusReply((n) => n + 1);
+      }
+    : undefined;
+  // A reply's "...": never on the viewer's own reply; Remove only for an
+  // officer or a mod (the Board view passes it only then).
+  const replyMore = (m: ChatMessage) => viewerId !== null && m.user_id !== viewerId && m.removed === null && (!!onReportReply || (!!onRemoveReply && !!viewer?.can_moderate));
+  // The phone's fold once a row carries a "...": every row 44px apart, so
+  // the 44px targets never touch (`MORE_AT.replyTouch`). A fold with none
+  // (the viewer's own replies only) and the desktop keep the 28px rhythm.
+  const touchRows = !desktop && visibleReplies.some(replyMore);
+  const card =
+    post.kind !== "text" ? (
+      <CardBubble
+        message={post}
+        roomId={roomId}
+        room={room}
+        viewerId={viewerId ?? ""}
+        isMine={isMine}
+        night={night}
+        layout="post"
+        onCard={onCard}
+        onRefresh={onRefresh}
+        onOpenEventChat={onOpenEventChat}
+        onRemove={onRemove}
+        onReport={onReport}
+        onToggleReaction={onToggleReaction}
+        onReply={replyFromCard}
+      />
+    ) : null;
 
   return (
     <article
@@ -207,32 +415,28 @@ export function BoardPost({ post, roomId, room, viewer, viewerId, night, now, re
         <span style={{ fontSize: 13.5, fontWeight: 700, lineHeight: "18px", overflow: "hidden", textOverflow: "ellipsis" }}>{isMine && !post.users ? "You" : name}</span>
         {role ? <span style={{ fontSize: 12, fontWeight: 600, lineHeight: "18px", color: t.muted }}>{role}</span> : null}
         <span style={{ marginLeft: "auto", flexShrink: 0, fontSize: 12, fontWeight: 600, lineHeight: "18px", color: t.muted }}>{rowTime(post.created_at, now)}</span>
+        {bylineMore ? <MoreMenu night={night} at="byline" onReport={onReport} onRemove={onRemove} /> : null}
       </div>
-      {post.kind !== "text" ? (
-        <div style={{ marginTop: 8 }}>
-          <CardBubble
-            message={post}
-            roomId={roomId}
-            room={room}
-            viewerId={viewerId ?? ""}
-            isMine={isMine}
-            night={night}
-            layout="post"
-            onCard={onCard}
-            onRefresh={onRefresh}
-            onOpenEventChat={onOpenEventChat}
-            onRemove={onRemove}
-            onReport={onReport}
-            onToggleReaction={onToggleReaction}
-            onReply={
-              canReply
-                ? () => {
-                    setOpen(true);
-                    setFocusReply((n) => n + 1);
-                  }
-                : undefined
-            }
-          />
+      {card ? (
+        // Desktop: the card's slot is the hover toolbar's size container (`vibe-hover-list`, HoverActions.tsx), so the pill stays inside the post.
+        <div className={desktop ? "vibe-hover-list" : undefined} style={{ marginTop: 8 }}>
+          {desktop ? (
+            // A post is full width and left on both sides of the room, so the toolbar is always at the far (right) corner: never `isMine`.
+            // A post still sending gets no handler, so no toolbar (the wrapper stays, bare).
+            <HoverActions
+              night={night}
+              isMine={false}
+              label={`Message from ${name}`}
+              onReact={temp ? undefined : onToggleReaction}
+              onReply={replyFromCard}
+              onReport={temp ? undefined : onReport}
+              onRemove={temp ? undefined : onRemove}
+            >
+              {card}
+            </HoverActions>
+          ) : (
+            card
+          )}
         </div>
       ) : (
         <p style={{ margin: "6px 0 0", fontSize: 15, fontWeight: 500, lineHeight: 1.35, textWrap: "pretty", whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>{post.content}</p>
@@ -265,21 +469,32 @@ export function BoardPost({ post, roomId, room, viewer, viewerId, night, now, re
               ))}
             </div>
           ) : visibleReplies.length > 0 ? (
-            <div role="group" aria-label="Replies" style={{ boxSizing: "border-box", paddingLeft: 10, display: "flex", flexDirection: "column", gap: 6 }}>
-              {visibleReplies.map((m) =>
-                m.removed !== null ? (
-                  <div key={m.id} style={{ alignSelf: "flex-end", maxWidth: "min(300px, 86%)" }}>
-                    <RemovedContentCard kind="message" compact by={m.removed.by} removedAt={m.removed.at} removedReason={m.removed.reason} />
-                  </div>
-                ) : (
+            <div role="group" aria-label="Replies" style={{ boxSizing: "border-box", padding: touchRows ? REPLY_TOUCH_PADDING : "0 0 0 10px", display: "flex", flexDirection: "column", gap: touchRows ? REPLY_TOUCH_GAP : 6 }}>
+              {visibleReplies.map((m) => {
+                if (m.removed !== null) {
+                  return (
+                    <div key={m.id} style={{ alignSelf: "flex-end", maxWidth: "min(300px, 86%)" }}>
+                      <RemovedContentCard kind="message" compact by={m.removed.by} removedAt={m.removed.at} removedReason={m.removed.reason} />
+                    </div>
+                  );
+                }
+                return (
                   <div key={m.id} style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
                     <Avatar person={m.users} fallbackId={m.user_id} size={22} fontSize={8.5} />
-                    <p style={{ margin: 0, paddingTop: 2, fontSize: 13, lineHeight: "18px", color: t.secondary, overflowWrap: "anywhere" }}>
+                    <p style={{ flexGrow: 1, minWidth: 0, margin: 0, paddingTop: 2, fontSize: 13, lineHeight: "18px", color: t.secondary, overflowWrap: "anywhere" }}>
                       <span style={{ fontWeight: 700, color: t.ink }}>{viewerId !== null && m.user_id === viewerId && !m.users ? "You" : authorName(m.users)}</span> {m.content}
                     </p>
+                    {replyMore(m) ? (
+                      <MoreMenu
+                        night={night}
+                        at={desktop ? "replyPointer" : "replyTouch"}
+                        onReport={onReportReply ? () => onReportReply(m) : undefined}
+                        onRemove={onRemoveReply && viewer?.can_moderate ? () => onRemoveReply(m) : undefined}
+                      />
+                    ) : null}
                   </div>
-                ),
-              )}
+                );
+              })}
             </div>
           ) : null}
           {canReply ? (

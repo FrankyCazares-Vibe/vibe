@@ -133,6 +133,7 @@
   const CHAT_REFUSALS = {
     board_officers_only: "Only officers post here.",
     room_closed: "This chat is closed.",
+    room_posters_only: "Only some people can post here.",
     club_media_off: "Photos and videos are off in club chats for now.",
     board_post_missing: "That post is no longer there.",
     try_again: "Try again in a moment.",
@@ -299,6 +300,9 @@
     // leaves the composer as it always was.
     roomKind: null,
     canPost: true,
+    // The room's own who-can-post sentence, when the thread read sends one
+    // (viewer.post_line): it is the quiet line then.
+    postLine: "",
     listPollTimer: null,
     chatPollTimer: null,
     bgPollTimer: null,
@@ -552,6 +556,7 @@
     const name = (t && t.name) || peer.name || "Chat";
     state.roomKind = (t && t.room_kind) || null;
     state.canPost = !(t && t.can_post === false);
+    state.postLine = "";
     state.peerInfo = {
       name,
       avatar_url: !isGroup ? peer.avatar_url : null,
@@ -645,7 +650,10 @@
       // Club chat v1. No `viewer` or `room` in the answer: keep what the
       // list entry said. Only for the chat still on screen.
       if (state.activeChannel === cid) {
-        if (j.viewer) state.canPost = j.viewer.can_post !== false;
+        if (j.viewer) {
+          state.canPost = j.viewer.can_post !== false;
+          state.postLine = typeof j.viewer.post_line === "string" ? j.viewer.post_line : "";
+        }
         if (j.room && j.room.kind) state.roomKind = j.room.kind;
         paintComposer();
       }
@@ -871,9 +879,9 @@
       state.replyTo = null;
       renderReplyPill();
     }
-    quiet.textContent = state.roomKind === "board"
+    quiet.textContent = state.postLine || (state.roomKind === "board"
       ? CHAT_REFUSALS.board_officers_only
-      : CHAT_REFUSALS.room_closed;
+      : CHAT_REFUSALS.room_closed);
   }
   function autoSize() {
     const t = document.getElementById("vmmInput");

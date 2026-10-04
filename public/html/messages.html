@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <script>(function(){try{var k="vibe_theme",p=null;try{p=localStorage.getItem(k)}catch(e){}if(p!=="light"&&p!=="dark"&&p!=="system")p="system";if(p==="system")p=window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light";document.documentElement.dataset.theme=p}catch(e){}})();</script>
-
+<script>try{if(/[?&]pane=1(&|$)/.test(location.search))document.documentElement.classList.add('vibe-pane')}catch(e){}</script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link rel="icon" href="/icon.png" type="image/png" sizes="192x192">
@@ -28,6 +28,52 @@
    the React sidebar is provided by the parent. Suppress our own. */
 body.vibe-embedded .left-nav { display: none !important; }
 body.vibe-embedded .shell { grid-template-columns: 300px 1fr !important; }
+/* Pane mode (desktop Messages, wave-3 contract 5.1): the React shell shows
+   this page thread-only in one iframe whose URL carries ?pane=1, and the
+   second head script puts vibe-pane on <html> before first paint. Every rule
+   below starts html.vibe-pane, so a page opened without ?pane=1 matches none
+   of them. Each !important here beats a rule that carries one: the grid on
+   the line above, and the cursor rules at the foot of this sheet (a frame is
+   narrower than 760px on most laptops, where that media block would bring
+   the native arrow back beside the shell's coral cursor). */
+html.vibe-pane .left-nav, html.vibe-pane .thread-col { display:none !important; }
+html.vibe-pane .shell { grid-template-columns:1fr !important; }
+html.vibe-pane .convo { background:var(--cream); }
+html.vibe-pane #emptyState > * { display:none; }
+html.vibe-pane .msg-row > div:not(.msg-av):not(.mv) { max-width:min(70%, 520px); }
+@media (max-width:760px) and (pointer:fine) {
+  html.vibe-pane *, html.vibe-pane *::before, html.vibe-pane *::after { cursor:none !important; }
+  html.vibe-pane input, html.vibe-pane textarea, html.vibe-pane [contenteditable="true"] { cursor:text !important; }
+}
+html.vibe-pane #cPinsBtn:not([data-off]) { display:flex !important; }
+/* The header button while the shell's Pinned and Shared panel is open. */
+html.vibe-pane #cPinsBtn[aria-pressed="true"] { background:var(--paper); color:var(--accent); box-shadow:var(--shadow); }
+/* Pin / Unpin in the hover pill: the pill's own ink and wash come from
+   .dm-act-report, which the button also carries; coral once pinned. */
+html.vibe-pane .dm-act-pin { width:24px; height:24px; padding:0; justify-content:center; border-radius:999px; }
+html.vibe-pane .dm-act-pin[data-on] { color:var(--accent); }
+/* By keyboard: a message is one Tab stop, and its pill shows while the
+   message or a button in it holds keyboard focus (the script adds
+   show-actions on focus too; these two rules keep it up through the hover
+   timer). A mouse click on a bubble is not :focus-visible, so it pins no
+   pill open. */
+html.vibe-pane .dm-bubble-wrap:focus { outline:none; }
+html.vibe-pane .dm-bubble-wrap:focus-visible { outline:2px solid var(--accent); outline-offset:3px; border-radius:14px; }
+html.vibe-pane .dm-bubble-wrap:focus-visible > .dm-actions { display:inline-flex; }
+html.vibe-pane .dm-bubble-wrap:has(:focus-visible) > .dm-actions { display:inline-flex; }
+html.vibe-pane .dm-actions button:focus-visible, html.vibe-pane .c-btn:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+/* The row a pinned quote jumped to: a coral wash that fades in and out. Its
+   colour is one variable, so Light and Night both read; a browser without
+   color-mix keeps the page's own coral wash. */
+html.vibe-pane { --pane-flash:var(--coral-wash-2); }
+@supports (color:color-mix(in srgb, red 50%, blue)) {
+  html.vibe-pane { --pane-flash:color-mix(in srgb, var(--accent) 18%, transparent); }
+}
+html.vibe-pane .msg-row { border-radius:10px; transition:transform .2s cubic-bezier(0.22, 1, 0.36, 1), background-color .4s ease, box-shadow .4s ease; }
+html.vibe-pane .msg-row.pane-flash { background-color:var(--pane-flash); box-shadow:0 0 0 6px var(--pane-flash); }
+@media (prefers-reduced-motion:reduce) {
+  html.vibe-pane .msg-row { transition:none; }
+}
 
 /* Otto's corner ring + side panel use z-index 9990–9999, which sits over
    the chat header / close affordances on this page (especially in
@@ -1078,6 +1124,7 @@ input,textarea,[contenteditable="true"]{cursor:text!important;}
         <div class="c-actions">
           <button class="c-btn" onclick="window.__vibeTopNav('/profile')"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="7" cy="5" r="3" stroke="currentColor" stroke-width="1.3"/><path d="M1 13c0-3.314 2.686-5 6-5s6 1.686 6 5" stroke="currentColor" stroke-width="1.3" fill="none" stroke-linecap="round"/></svg></button>
           <button class="c-btn" onclick="__dmPanelOpen()"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="7" cy="2.5" r="1.2" fill="currentColor"/><circle cx="7" cy="7" r="1.2" fill="currentColor"/><circle cx="7" cy="11.5" r="1.2" fill="currentColor"/></svg></button>
+          <button class="c-btn" id="cPinsBtn" style="display:none" aria-label="Pinned and shared" aria-pressed="false"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="1.5" y="2.5" width="11" height="9" rx="2" stroke="currentColor" stroke-width="1.3"/><path d="M8.8 2.5v9" stroke="currentColor" stroke-width="1.3"/></svg></button>
         </div>
       </div>
       <aside class="c-panel" id="cPanel">
@@ -1118,6 +1165,19 @@ input,textarea,[contenteditable="true"]{cursor:text!important;}
 const cur=document.getElementById('cursor'),ring=document.getElementById('cursorRing');
 const HS='a,button,.nav-item,.t-item,.req-banner,.t-tab,.c-btn,.mv,.btn-acc,.btn-dec,.start-btn';
 const IS_EMBEDDED = (function(){ try { return window.self !== window.top; } catch(e) { return true; } })();
+// Pane mode (desktop Messages, wave-3 contract 5): the React shell shows this
+// page thread-only in one iframe and drives it with postMessage. The class is
+// set by the second head script from ?pane=1, and only the shell builds that
+// URL. Every pane path in this file returns at once unless IS_PANE, so a page
+// opened without the flag sends nothing and hears nothing.
+const IS_PANE = IS_EMBEDDED && document.documentElement.classList.contains('vibe-pane');
+// page -> shell. The names are DmPageEvent's in
+// src/components/desktop/messages/dm-bridge.ts, written by hand here (this
+// file cannot import it): a change there is a change here and a bump of v.
+function __paneSay(type, extra) {
+  if (!IS_PANE) return;
+  try { window.parent.postMessage(Object.assign({ source: 'vibe-dm', v: 1, type: type }, extra || {}), location.origin); } catch (e) {}
+}
 if (IS_EMBEDDED) {
   if (cur) cur.style.display='none';
   if (ring) ring.style.display='none';
@@ -1255,6 +1315,27 @@ function __dmInstallActionsHover() {
     }
     queueHide();
   });
+  // Pane mode, by keyboard (contract 4d.5): the pill also shows while the
+  // message or a button in it holds keyboard focus, so Tab reaches a message
+  // and then its pin button. A mouse click on a bubble is not :focus-visible
+  // and opens nothing.
+  if (!IS_PANE) return;
+  area.addEventListener('focusin', (e) => {
+    const t = e.target;
+    const wrap = t && t.closest ? t.closest('.dm-bubble-wrap') : null;
+    if (!wrap) return;
+    let byKeys = true;
+    try { byKeys = t.matches(':focus-visible'); } catch (_) { /* no :focus-visible: show */ }
+    if (byKeys) show(wrap);
+  });
+  area.addEventListener('focusout', (e) => {
+    const t = e.target;
+    const wrap = t && t.closest ? t.closest('.dm-bubble-wrap') : null;
+    if (!wrap || openWrap !== wrap) return;
+    const next = e.relatedTarget;
+    if (next && next.nodeType === 1 && wrap.contains(next)) return;
+    queueHide();
+  });
 }
 
 // One delegated click listener for the reaction chips. Each chip carries its
@@ -1301,7 +1382,8 @@ function renderMsgs(msgs,d){
       ? m.reactions.map((r) => r.emoji + ':' + r.count + (r.viewer_reacted ? '*' : '')).join('|')
       : '';
     return (m.id || ('__noid' + Math.random())) + '#' + rs;
-  }).join(',') + (d && d.canPost === false ? ';no-post' : ''); // Reply comes and goes with it
+  }).join(',') + (d && d.canPost === false ? ';no-post' : '') // Reply comes and goes with it
+    + (IS_PANE ? ';pins:' + __panePinSig(d) : ''); // pane mode: so does each row's Pin / Unpin
   const sigChanged = sig !== a.dataset.sig;
 
   const wasAtBottom = isThreadSwitch ||
@@ -1358,16 +1440,34 @@ function renderMsgs(msgs,d){
   // message most worth reporting was the only one that couldn't be, and Block
   // was the whole menu. The picker itself stays off them: none of those rows
   // paints reaction chips, so an emoji tapped there would vanish.
+  // Pane mode only (contract 5.2 item 9, 4d.5); each of these is '' anywhere
+  // else, so the markup outside pane mode is what it was. midAttr: the row's
+  // message id, for the shell's jump. wrapAttr: a message is one Tab stop.
+  // pinBtnFor: Pin / Unpin for everyone in a dm or a group, on every row that
+  // has an id, shown only once this chat's pinned ids have loaded and never
+  // in a pending request (__panePinsAllowed). The id rides in a data-
+  // attribute and one listener on #msgsArea handles the click, as the
+  // reaction chips do.
+  const midAttr = (m) => (IS_PANE && m && m.id ? ` data-mid="${__dmEsc(m.id)}"` : '');
+  const wrapAttr = IS_PANE ? ' tabindex="0"' : '';
+  const pinsOn = IS_PANE && __panePinsAllowed(d);
+  const pinBtnFor = (m) => {
+    if (!pinsOn || !m || !m.id || m.removedAt) return '';
+    const on = __realDM.panePins.has(String(m.id));
+    const label = on ? 'Unpin message' : 'Pin message';
+    return `<button type="button" class="dm-act-report dm-act-pin" data-pin-msg="${__dmEsc(m.id)}"${on ? ' data-on="1"' : ''} aria-label="${label}" title="${label}"><svg width="13" height="13" viewBox="0 0 13 13" fill="none" aria-hidden="true"><path d="M4.4 1.6h4.2l-.5 3.3 1.7 1.9v.9H3.2v-.9l1.7-1.9-.5-3.3zM6.5 7.7v3.7" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>`;
+  };
   const reportPillFor = (m) => {
-    const btn = reportBtnFor(m);
+    const btn = pinBtnFor(m) + reportBtnFor(m);
     return btn ? `<div class="dm-actions">${btn}</div>` : '';
   };
   // Wrap a non-bubble stack so the delegated hover in __dmInstallActionsHover
   // (which keys on .dm-bubble-wrap) can reveal the pill beside it. Own
-  // messages get no pill and keep exactly the markup they had.
+  // messages get no pill and keep exactly the markup they had (in pane mode
+  // they get a pill holding only Pin / Unpin).
   const withReportPill = (m, inner) => {
     const pill = reportPillFor(m);
-    return pill ? `<div class="dm-bubble-wrap">${inner}${pill}</div>` : inner;
+    return pill ? `<div class="dm-bubble-wrap"${wrapAttr}>${inner}${pill}</div>` : inner;
   };
   // Build the inline action pill (5 reactions + reply + report) for a message.
   // Each emoji that the viewer has already reacted with gets the `on`
@@ -1397,7 +1497,7 @@ function renderMsgs(msgs,d){
     const replyBtn = d && d.canPost === false
       ? ''
       : `<button type="button" class="dm-act-reply" onclick="event.stopPropagation();__dmStartReply('${__dmEsc(m.id)}')" aria-label="Reply">↩ Reply</button>`;
-    return `<div class="dm-actions">${buttons}<span class="dm-act-sep"></span>${replyBtn}${reportBtnFor(m)}${deleteBtn}</div>`;
+    return `<div class="dm-actions">${buttons}<span class="dm-act-sep"></span>${replyBtn}${pinBtnFor(m)}${reportBtnFor(m)}${deleteBtn}</div>`;
   };
   // The author's own notice on a message a moderator took down. Built from an
   // OPTIONAL field: GET /api/me/threads/[id]/messages selects an explicit
@@ -1408,11 +1508,12 @@ function renderMsgs(msgs,d){
     const line = why ? 'Only you can see it. Reason: ' + __dmEsc(why) : 'Only you can see it.';
     // Same two ways out as the React card (RemovedContentCard) and the other
     // two static twins: the address, and the page that says what happens after
-    // a report and how to appeal.
+    // a report and how to appeal. In pane mode the page opens in a new tab,
+    // as a shared post does: the frame never navigates itself (item 11).
     return '<div class="msg-row mine"><div class="dm-removed">' +
       '<div class="dm-removed-t">Removed by Vibe moderators</div>' +
       '<div class="dm-removed-d">' + line + ' Questions: help@connectvibe.app. ' +
-      '<a href="/legal/community" style="color:inherit;text-decoration:underline">Community Guidelines</a></div>' +
+      '<a href="/legal/community"' + (IS_PANE ? ' target="_blank" rel="noopener"' : '') + ' style="color:inherit;text-decoration:underline">Community Guidelines</a></div>' +
       '</div></div>';
   };
   // Reaction chips below the bubble. The emoji is another member's stored
@@ -1453,7 +1554,7 @@ function renderMsgs(msgs,d){
         ? `<div class="bubble">${__dmFormatBody(m.t)}<div class="btime">${m.ts}</div></div>`
         : `<div class="btime" style="font-size:10px;color:var(--muted);text-align:${mine?'right':'left'};">${m.ts}</div>`;
       const mediaStack = `<div style="display:flex;flex-direction:column;align-items:${mine?'flex-end':'flex-start'};gap:4px;">${mediaInner}${captionBubble}</div>`;
-      h += `<div class="msg-row${mine?' mine':''}${gc}">${!mine?avForMsg(m, showAv):''}${withReportPill(m, mediaStack)}</div>`;
+      h += `<div class="msg-row${mine?' mine':''}${gc}"${midAttr(m)}>${!mine?avForMsg(m, showAv):''}${withReportPill(m, mediaStack)}</div>`;
     } else if (m.attachment) {
       const a = m.attachment;
       let cardInner;
@@ -1481,8 +1582,14 @@ function renderMsgs(msgs,d){
         }
         cardInner = `<div class="msg-attach-poster">${posterImg}${playOverlay}</div><div class="msg-attach-body"><div class="msg-attach-label">${labelText}</div>${bodyText}${authorBlock}</div>`;
       }
+      // Pane mode (contract 5.2 item 11): a shared post opens in a new tab
+      // and the post viewer is never opened. The viewer pushes a history
+      // entry inside the frame (_postViewer.js), and the shell's own Back
+      // would pop that one instead of its own.
       const cardOnclick = a.unavailable
         ? ''
+        : IS_PANE
+        ? ` onclick="window.open('/posts/${__dmEsc(encodeURIComponent(a.id))}','_blank','noopener')"`
         : ` onclick="if(window.openPostViewer)window.openPostViewer('${__dmEsc(a.id)}')"`;
       // Caption (sender's text) appears above the card so it reads as
       // "here's my note → here's the thing." Tightly stacked with no gap
@@ -1491,7 +1598,7 @@ function renderMsgs(msgs,d){
         ? `<div class="msg-attach-caption">${__dmFormatBody(m.t)}</div>`
         : '';
       const stack = `<div class="msg-attach-stack">${captionBlock}<div class="msg-attach"${cardOnclick}>${cardInner}</div><div class="btime" style="font-size:10px;color:var(--muted);text-align:${mine?'right':'left'};margin-top:2px;">${m.ts}</div></div>`;
-      h += `<div class="msg-row${mine?' mine':''}${gc}">${!mine?avForMsg(m, showAv):''}${withReportPill(m, stack)}</div>`;
+      h += `<div class="msg-row${mine?' mine':''}${gc}"${midAttr(m)}>${!mine?avForMsg(m, showAv):''}${withReportPill(m, stack)}</div>`;
     } else {
       // Profile-share message? Render a rich card (banner + avatar +
       // name + role) instead of a raw URL bubble. The card is fetched
@@ -1506,7 +1613,7 @@ function renderMsgs(msgs,d){
           ? `<div class="msg-attach-caption">${__dmFormatBody(profShare.prefix)}</div>`
           : '';
         const stack = `<div class="msg-attach-stack">${captionBlock}${card}<div class="btime" style="font-size:10px;color:var(--muted);text-align:${mine?'right':'left'};margin-top:2px;">${m.ts}</div></div>`;
-        h += `<div class="msg-row${mine?' mine':''}${gc}">${!mine?avForMsg(m, showAv):''}${withReportPill(m, stack)}</div>`;
+        h += `<div class="msg-row${mine?' mine':''}${gc}"${midAttr(m)}>${!mine?avForMsg(m, showAv):''}${withReportPill(m, stack)}</div>`;
       } else {
         const stub = quoteStubFor(m);
         // Long messages (>60 chars or multi-line) get the picker stacked
@@ -1517,9 +1624,11 @@ function renderMsgs(msgs,d){
         // the row's right edge (iMessage drag-reveal). The picker is
         // inside .dm-bubble-wrap (now position:relative) so it can float
         // absolutely beside the bubble without forcing it to re-wrap.
-        const wrap = `<div class="dm-bubble-wrap"><div class="bubble">${__dmFormatBody(m.t)}</div>${actionsFor(m)}</div>`;
-        const stack = `<div style="display:flex;flex-direction:column;align-items:${mine?'flex-end':'flex-start'};max-width:70%;min-width:0;">${stub}${wrap}${chipsFor(m)}</div>`;
-        h+=`<div class="msg-row${mine?' mine':''}${gc}${longCls}">${!mine?avForMsg(m, showAv):''}${stack}<div class="btime">${m.ts}</div></div>`;
+        const wrap = `<div class="dm-bubble-wrap"${wrapAttr}><div class="bubble">${__dmFormatBody(m.t)}</div>${actionsFor(m)}</div>`;
+        // Pane mode: the 520px cap of the pane's CSS, written here too. This
+        // stack's own inline max-width would beat the stylesheet's rule.
+        const stack = `<div style="display:flex;flex-direction:column;align-items:${mine?'flex-end':'flex-start'};max-width:${IS_PANE?'min(70%, 520px)':'70%'};min-width:0;">${stub}${wrap}${chipsFor(m)}</div>`;
+        h+=`<div class="msg-row${mine?' mine':''}${gc}${longCls}"${midAttr(m)}>${!mine?avForMsg(m, showAv):''}${stack}<div class="btime">${m.ts}</div></div>`;
       }
     }
     h += removedFor(m);
@@ -1573,8 +1682,12 @@ function renderMsgs(msgs,d){
     bubblesEl = a.querySelector(':scope > .msgs-bubbles');
   } else {
     if (sigChanged) {
+      // Pane mode: rebuilding the rows drops keyboard focus (a pin made by
+      // keyboard, a message arriving); it goes back to the same message.
+      const keep = IS_PANE ? __paneFocusNote(bubblesEl) : null;
       bubblesEl.innerHTML = h;
       a.dataset.sig = sig;
+      if (keep) __paneFocusBack(bubblesEl, keep);
     }
     if (footerEl.innerHTML !== footerH) footerEl.innerHTML = footerH;
   }
@@ -2051,6 +2164,9 @@ function __dmThreadRecord(thread, isRequest) {
     // (__dmLoadMessages), so a list entry without them keeps what it said.
     roomKind: thread.room_kind || (prev && prev.roomKind) || null,
     canPost: typeof thread.can_post === 'boolean' ? thread.can_post : !(prev && prev.canPost === false),
+    // The thread read's "who can post" sentence (__dmLoadMessages), kept
+    // across a list refresh like the two above. '' until a server sends one.
+    postLine: (prev && prev.postLine) || '',
   };
 }
 
@@ -2282,12 +2398,17 @@ function __dmSetEmptyState(title, body) {
   p.textContent = body || es.dataset.defBody;
 }
 
-async function __dmLoadList() {
+async function __dmLoadList(opts) {
   // Quiet: this runs on the 30s list poll as well as on open, so the line
   // belongs in the list itself, not a toast. A refresh that fails keeps
   // the rows already on screen.
   const line = "Couldn't load your messages.";
-  const r = await window.vibeRequest('/api/me/threads', { failure: line, quiet: true });
+  // Pane mode (contract 5.2 item 3): the list is data only (names, members,
+  // roles for the header and Chat info), and it holds dms and groups alone,
+  // so a club room's id can never open in this thread. Each load is numbered:
+  // an answer older than a later request is dropped (__paneListStale).
+  const paneSeq = IS_PANE ? (__realDM.paneListSeq = (__realDM.paneListSeq || 0) + 1) : 0;
+  const r = await window.vibeRequest(IS_PANE ? '/api/me/threads?scope=chats' : '/api/me/threads', { failure: line, quiet: true });
   // An expired session or a missing consent record is not a connection
   // problem: send the user where they can fix it instead of showing the
   // retry state below, whose Retry could never succeed.
@@ -2301,7 +2422,9 @@ async function __dmLoadList() {
   }
   // A 2xx without the array is a failure too, not an empty inbox.
   if (r.ok && Array.isArray(r.data.threads)) {
+    if (IS_PANE && __paneListStale(paneSeq)) return r.data;
     __dmRenderList(r.data.threads, r.data.requests || []);
+    if (IS_PANE) __paneListLoaded(opts);
     return r.data;
   }
   console.error('[dm.loadList]', r.status, r.error);
@@ -2326,6 +2449,7 @@ async function __dmLoadList() {
 const __DM_CHAT_REFUSALS = {
   board_officers_only: 'Only officers post here.',
   room_closed: 'This chat is closed.',
+  room_posters_only: 'Only some people can post here.',
   club_media_off: 'Photos and videos are off in club chats for now.',
   board_post_missing: 'That post is no longer there.',
   try_again: 'Try again in a moment.',
@@ -2340,6 +2464,9 @@ function __dmChatRefusalLine(body) {
 // post in (a Board for anyone but its officers, an event chat that has
 // closed) the quiet line stands in for it, and a club's room has no attach
 // button. A dm, a group and a server without the chat schema: as before.
+// A room where only some people post sends its own sentence with the thread
+// read (viewer.post_line); when there is one it is the line, so that room
+// never reads "This chat is closed."
 function __dmPaintComposer(d) {
   const comp = document.getElementById('compBox');
   const quiet = document.getElementById('compQuiet');
@@ -2348,7 +2475,7 @@ function __dmPaintComposer(d) {
   const clubRoom = !!(d && d.roomKind);
   comp.classList.toggle('no-post', !canPost);
   comp.classList.toggle('club-room', clubRoom);
-  quiet.textContent = canPost ? '' : (d.roomKind === 'board'
+  quiet.textContent = canPost ? '' : (typeof d.postLine === 'string' && d.postLine) || (d.roomKind === 'board'
     ? __DM_CHAT_REFUSALS.board_officers_only
     : __DM_CHAT_REFUSALS.room_closed);
   // A photo picked in another chat doesn't follow the student into a club's.
@@ -2375,6 +2502,15 @@ async function __dmLoadMessages(channelId, opts) {
   // A 2xx without the array is a failure too, not an empty thread.
   if (!r.ok || !Array.isArray(r.data.messages)) {
     console.error('[dm.loadMessages]', r.status, r.error);
+    // Pane mode (contract 5.2 item 13): the open chat's read began to answer
+    // 403 or 404 (removed from the group, the chat is gone). The shell goes
+    // home; the empty state below would be a blank pane. A Terms 403 is not
+    // a lost chat.
+    if (IS_PANE && active === channelId && !r.ok
+        && (r.status === 404 || (r.status === 403 && r.code !== 'terms_required'))) {
+      __paneLost(channelId);
+      return;
+    }
     // What #msgsArea is showing decides this, not whether the channel ever
     // loaded: reopening a thread during an outage would otherwise leave the
     // previous thread's bubbles — and their reply/react buttons, which
@@ -2400,6 +2536,13 @@ async function __dmLoadMessages(channelId, opts) {
       }
     }
     return;
+  }
+  // Pane mode, on open: the first paint waits, 300 ms at most, for the chat's
+  // pinned ids (__dmOpenChannel hands the read in), so the rows are built
+  // once with their Pin / Unpin instead of twice (a second build remounts
+  // every photo and video).
+  if (IS_PANE && opts && opts.paneHold) {
+    try { await Promise.race([opts.paneHold, new Promise((done) => setTimeout(done, 300))]); } catch (_) { /* the rows paint without pins */ }
   }
   __realDM.msgsLoadedByChannel[channelId] = true;
   try {
@@ -2476,17 +2619,26 @@ async function __dmLoadMessages(channelId, opts) {
     });
     __realDM.peerLastReadByChannel[channelId] = j.peer_last_read_at || null;
     __realDM.peerTypingByChannel[channelId] = j.peer_typing || [];
+    // Pane mode (contract 5.2 item 5): did this poll bring a new message from
+    // someone else? Asked before the cache below is replaced.
+    const paneArrived = IS_PANE && fromPoll && __paneNewFromOthers(__realDM.T[channelId], msgs);
     if (__realDM.T[channelId]) __realDM.T[channelId].msgs = msgs;
     // Club chat v1. No `viewer` or `room` in the answer: keep what the list
     // entry said.
     if (__realDM.T[channelId]) {
       if (j.viewer) __realDM.T[channelId].canPost = j.viewer.can_post !== false;
+      // The "who can post" sentence of a room where only some people post
+      // (__dmPaintComposer prints it). Absent from every other answer.
+      if (j.viewer) __realDM.T[channelId].postLine = typeof j.viewer.post_line === 'string' ? j.viewer.post_line : '';
       if (j.room && j.room.kind) __realDM.T[channelId].roomKind = j.room.kind;
       if (active === channelId) __dmPaintComposer(__realDM.T[channelId]);
     }
     if (active === channelId && __realDM.T[channelId]) {
       renderMsgs(msgs, __realDM.T[channelId]);
     }
+    // Pane mode: the chat is on screen, so the arrival is read. Never while
+    // the tab is hidden. Keeps the shell's list from lighting the open row.
+    if (paneArrived && active === channelId && !document.hidden) __paneReadAgain(channelId);
   } catch (e) { console.error('[dm.loadMessages]', e); }
 }
 
@@ -2569,8 +2721,19 @@ async function __dmOpenChannel(channelId) {
   if (inp) inp.placeholder = 'Message ' + (d.n.split(' ')[0] || '') + '…';
   __dmPaintComposer(d);
 
-  await __dmLoadMessages(channelId);
-  fetch('/api/me/threads/' + encodeURIComponent(channelId) + '/read', { method:'POST', credentials:'include' }).catch(()=>{});
+  // Pane mode (contract 5.2 items 4 and 16): the two header buttons get their
+  // names, the pin controls start hidden for this chat, and its pinned ids
+  // are read beside its messages.
+  const panePins = IS_PANE ? __paneOpening(channelId, d, profileBtn) : null;
+  await __dmLoadMessages(channelId, panePins ? { paneHold: panePins } : undefined);
+  // Pane mode: the shell asked for another chat meanwhile (or this one was
+  // lost). That open owns the timer below; this one marks nothing read.
+  if (IS_PANE && active !== channelId) return;
+  // The shell clears the row's dot on `read` (said in pane mode only).
+  fetch('/api/me/threads/' + encodeURIComponent(channelId) + '/read', { method:'POST', credentials:'include' })
+    .then((r) => { if (r && r.ok) __paneSay('read', { channelId: channelId }); })
+    .catch(()=>{});
+  if (IS_PANE) __paneOpened(channelId);
 
   if (__realDM.pollTimer) clearInterval(__realDM.pollTimer);
   __realDM.pollTimer = setInterval(() => {
@@ -2650,6 +2813,10 @@ async function __dmSend(text) {
     // accidentally still threaded.
     __realDM.replyTo = null;
     if (typeof __dmRenderReplyPill === 'function') __dmRenderReplyPill();
+    // Pane mode: the shell moves the row up and refreshes its preview. A
+    // reply to a message request accepted it (above), so Pin shows from now.
+    __paneSay('activity', { channelId: channelId, reason: 'sent' });
+    if (IS_PANE) __panePinsPaint();
     __dmLoadList();
     return true;
   } catch (e) {
@@ -2659,9 +2826,13 @@ async function __dmSend(text) {
       window.vibeToast(e.chatLine, { tone: 'error' });
       // The room stopped taking the viewer's posts after it was opened: the
       // quiet line replaces the composer, as on the next open.
+      // A room where only some people post refuses with its own code; the
+      // line is the server's sentence until the next read brings the room's
+      // own (viewer.post_line), never "This chat is closed."
       const d = __realDM.T[channelId];
-      if (d && (e.chatCode === 'board_officers_only' || e.chatCode === 'room_closed')) {
+      if (d && (e.chatCode === 'board_officers_only' || e.chatCode === 'room_closed' || e.chatCode === 'room_posters_only')) {
         d.canPost = false;
+        if (e.chatCode === 'room_posters_only' && !d.postLine) d.postLine = e.chatLine;
         if (active === channelId) __dmPaintComposer(d);
       }
       return false;
@@ -2766,6 +2937,8 @@ async function __dmAccept() {
   if (!r.ok) return;
   if (__realDM.T[channelId]) __realDM.T[channelId].isRequest = false;
   if (active === channelId) document.getElementById('reqBar').classList.remove('show');
+  // Pane mode: an accepted chat can be pinned in.
+  if (IS_PANE && active === channelId) __panePinsPaint();
   __dmLoadList();
 }
 
@@ -2784,6 +2957,7 @@ async function __dmDecline() {
     document.getElementById('reqBar').classList.remove('show');
     document.getElementById('cContent').style.display = 'none';
     document.getElementById('emptyState').style.display = 'flex';
+    __paneClosed('declined'); // pane mode: the shell goes home
     active = null;
   }
   __dmLoadList();
@@ -2978,6 +3152,8 @@ function __dmPanelOpen() {
   if (!active) return;
   __dmPanelRender();
   document.getElementById('cPanel')?.classList.add('show');
+  // Pane mode: one right panel at a time. The shell closes Pinned and Shared.
+  __paneSay('info-opened');
 }
 function __dmPanelClose() {
   document.getElementById('cPanel')?.classList.remove('show');
@@ -3102,7 +3278,7 @@ function __dmPanelRender() {
     const nameArg = JSON.stringify(d.n || '').replace(/"/g, '&quot;');
     safetyActions =
       '<button class="cp-action" onclick="__dmReport(\'user\',' + peerArg + ')">Report ' + __dmEsc(d.n) + '</button>' +
-      '<button class="cp-action danger" onclick="window.vibeBlock(' + peerArg + ',' + nameArg + ', () => { __dmPanelClose(); active = null; if (typeof __dmLoadList === \'function\') __dmLoadList(); document.getElementById(\'cContent\').style.display=\'none\'; document.getElementById(\'emptyState\').style.display=\'flex\'; })">Block ' + __dmEsc(d.n) + '</button>';
+      '<button class="cp-action danger" onclick="window.vibeBlock(' + peerArg + ',' + nameArg + ', () => { __paneClosed(\'blocked\'); __dmPanelClose(); active = null; if (typeof __dmLoadList === \'function\') __dmLoadList(); document.getElementById(\'cContent\').style.display=\'none\'; document.getElementById(\'emptyState\').style.display=\'flex\'; })">Block ' + __dmEsc(d.n) + '</button>';
   }
 
   const leaveAction = d.isGroup && !clubRoom
@@ -3347,6 +3523,7 @@ async function __dmDeleteCurrent() {
     if (!j.ok) throw new Error(j.error || 'hide failed');
     delete __realDM.T[channelId];
     delete __realDM.peerLastReadByChannel[channelId];
+    __paneClosed('deleted'); // pane mode: the shell goes home
     active = null;
     __dmPanelClose();
     document.getElementById('cContent').style.display = 'none';
@@ -3372,6 +3549,7 @@ async function __dmPanelLeave() {
     const j = await r.json();
     if (!j.ok) throw new Error(j.error || 'leave failed');
     delete __realDM.T[channelId];
+    __paneClosed('left'); // pane mode: the shell goes home
     active = null;
     __dmPanelClose();
     document.getElementById('cContent').style.display = 'none';
@@ -3557,8 +3735,11 @@ async function __dmPanelPhotoChosen(ev) {
     if (!patchJson.ok) throw new Error(patchJson.error || 'save failed');
     await __dmLoadList();
     __dmPanelRender();
-    // Refresh the chat header avatar with the new photo too.
-    if (__realDM.T[channelId]) {
+    // Refresh the chat header avatar with the new photo too. In pane mode
+    // only while that chat is still the open one: the shell's list stays
+    // clickable during the upload, and reopening here would paint this
+    // chat's header over the one the person moved to.
+    if (__realDM.T[channelId] && (!IS_PANE || active === channelId)) {
       __dmOpenChannel(channelId);
     }
   } catch (e) {
@@ -3582,6 +3763,342 @@ async function __dmEnsureFromHandle(handle, failure) {
   if (!r.ok) { console.error('[dm.ensureFromHandle]', r.status, r.error); return r; }
   if (!r.data.channel_id) return { ok: false, status: r.status, code: null, error: null, message: line + ' Try again.' };
   return { ok: true, channelId: r.data.channel_id };
+}
+
+// ══ PANE MODE (desktop Messages, wave-3 contract 5.2) ═════════════════════
+// From here to init. Every function returns at once unless IS_PANE, and the
+// listeners at the end are bound only in pane mode. The state lives on
+// __realDM, set here so the object above is what it was:
+//   paneWanted     the channel id of the shell's last `open` (null after `close`)
+//   panePins       the open chat's pinned message ids: a Set, null until its read answers
+//   panePinsFor    the chat those ids belong to
+//   panePinsOff    the pin routes answered 404 (no table yet, or the flag is off)
+//   panePinBusy    a Pin / Unpin is waiting on the server
+//   paneListSeq, paneListApplied   the list loads' numbers (__paneListStale)
+if (IS_PANE) {
+  __realDM.paneWanted = null;
+  __realDM.panePins = null;
+  __realDM.panePinsFor = null;
+  __realDM.panePinsOff = false;
+  __realDM.panePinBusy = false;
+  __realDM.paneListSeq = 0;
+  __realDM.paneListApplied = 0;
+}
+
+// A list answer is dropped when a later request's answer is already in: a
+// slow old read must not put back a list without the chat just opened.
+function __paneListStale(seq) {
+  if (seq <= __realDM.paneListApplied) return true;
+  __realDM.paneListApplied = seq;
+  return false;
+}
+
+// After a good list load (items 3 and 13): the open chat missing from the
+// list is a lost chat, and any load but the timer's is a change the shell
+// refetches its own lists on.
+function __paneListLoaded(opts) {
+  if (!IS_PANE) return;
+  if (active && !__realDM.T[active]) __paneLost(active);
+  if (!(opts && opts.fromTimer === true)) __paneSay('list-changed');
+}
+
+// Whatever the page has open over the thread: Chat info, the @mention
+// picker, the report / mute / block sheet, "Add people", the group-photo
+// cropper, a hover pill. `open` and `close` run it first, so a switch from
+// the shell's list never leaves one over the next chat (item 11).
+function __paneCloseOverlays() {
+  if (!IS_PANE) return;
+  __dmPanelClose();
+  // The cropper has no close of its own to call: its Cancel resolves null.
+  const vc = document.querySelector('.vc-back .vc-cancel');
+  if (vc) vc.click();
+  if (typeof window.vibeMentionPickerClose === 'function') window.vibeMentionPickerClose();
+  if (typeof window.__vsaCloseSheet === 'function') window.__vsaCloseSheet();
+  const compose = document.getElementById('composeOverlay');
+  if (compose && compose.classList.contains('show')) __dmComposeClose();
+  document.querySelectorAll('#msgsArea .dm-bubble-wrap.show-actions').forEach((el) => el.classList.remove('show-actions'));
+}
+
+// No chat on screen: nothing active, no 2-second timer, the thread hidden.
+// (The empty state under it draws nothing in pane mode; the shell has its own.)
+function __paneHideChat() {
+  if (!IS_PANE) return;
+  active = null;
+  if (__realDM.pollTimer) { clearInterval(__realDM.pollTimer); __realDM.pollTimer = null; }
+  __paneCloseOverlays();
+  const cc = document.getElementById('cContent');
+  if (cc) cc.style.display = 'none';
+  const es = document.getElementById('emptyState');
+  if (es) es.style.display = 'flex';
+}
+
+// The open chat is gone and it was not the viewer's doing (item 13). Said
+// once: `active` is null afterwards. Only the chat the shell is showing
+// sends it home; one it has already left just closes here.
+function __paneLost(channelId) {
+  if (!IS_PANE || !channelId || active !== channelId) return;
+  __paneHideChat();
+  if (__realDM.paneWanted !== channelId) return;
+  __realDM.paneWanted = null;
+  __paneSay('closed', { channelId: channelId, reason: 'lost' });
+}
+
+// The viewer closed the open chat from this page: declined, blocked, deleted
+// or left (item 7). Called BEFORE the caller clears `active`.
+function __paneClosed(reason) {
+  if (!IS_PANE || !active) return;
+  const channelId = active;
+  if (__realDM.pollTimer) { clearInterval(__realDM.pollTimer); __realDM.pollTimer = null; }
+  if (__realDM.paneWanted !== channelId) return;
+  __realDM.paneWanted = null;
+  __paneSay('closed', { channelId: channelId, reason: reason });
+}
+
+// Item 5: is the newest message of this poll one from someone else that the
+// thread did not hold before? `d` is the thread record before the new
+// messages replace its cache; the list is oldest first.
+function __paneNewFromOthers(d, msgs) {
+  const newest = msgs.length ? msgs[msgs.length - 1] : null;
+  if (!d || !newest || !newest.id || newest.m === 1) return false;
+  return !(Array.isArray(d.msgs) && d.msgs.some((m) => m.id === newest.id));
+}
+function __paneReadAgain(channelId) {
+  if (!IS_PANE) return;
+  fetch('/api/me/threads/' + encodeURIComponent(channelId) + '/read', { method:'POST', credentials:'include' })
+    .then((r) => { if (r && r.ok) __paneSay('read', { channelId: channelId }); })
+    .catch(()=>{});
+  __paneSay('activity', { channelId: channelId, reason: 'received' });
+}
+
+// __dmOpenChannel, before its messages load (items 4 and 16). Names the two
+// header buttons (the old page's markup has none), hides the pin controls
+// until this chat's pinned ids are in, and starts that read. Returns the
+// read, which the first paint waits on for a moment (__dmLoadMessages).
+function __paneOpening(channelId, d, profileBtn) {
+  if (!IS_PANE) return null;
+  // The first button opens the other person's profile in a dm. In a group
+  // it is hidden and does nothing (__dmOpenChannel, above); it still gets a
+  // name, so it is never an unnamed button.
+  if (profileBtn) {
+    profileBtn.setAttribute('aria-label', !d.isGroup && d.peerHandle ? 'Open ' + d.n + "'s profile" : 'Open profile');
+  }
+  const infoBtn = document.querySelectorAll('#cContent .c-actions .c-btn')[1];
+  if (infoBtn) infoBtn.setAttribute('aria-label', 'Chat info');
+  const pinsBtn = document.getElementById('cPinsBtn');
+  if (pinsBtn) {
+    pinsBtn.setAttribute('data-off', '');
+    // Another chat: the shell's panel closed with the old one.
+    if (__realDM.panePinsFor !== channelId) pinsBtn.setAttribute('aria-pressed', 'false');
+  }
+  __realDM.panePins = null;
+  __realDM.panePinsFor = channelId;
+  __realDM.panePinsOff = false;
+  return __panePinsLoad(channelId);
+}
+
+// __dmOpenChannel, once the chat is on screen: tell the shell, and put the
+// keyboard in the composer (the shell focused the frame; nothing on this
+// page focused the box). Not when the person has gone back to the shell
+// while the messages loaded: a focus() here would take the keyboard from
+// its dialog and close its popover.
+function __paneOpened(channelId) {
+  if (!IS_PANE) return;
+  const d = __realDM.T[channelId];
+  __paneSay('opened', { channelId: channelId, kind: d && d.isGroup ? 'group' : 'dm', isRequest: !!(d && d.isRequest) });
+  const inp = document.getElementById('msgIn');
+  if (inp && document.hasFocus()) { try { inp.focus({ preventScroll: true }); } catch (_) { inp.focus(); } }
+}
+
+// ── Pinned messages (item 9; contract 4d). A pin is for everyone in the
+// chat; "Pin chat" in Chat info is the other pin (this chat, at the top of
+// my own list). No pin control shows before this chat's ids have loaded,
+// in a pending request, or when the routes answer 404.
+function __panePinsAllowed(d) {
+  return IS_PANE && !!d && !d.isRequest && !__realDM.panePinsOff
+    && !!__realDM.panePins && __realDM.panePinsFor === active;
+}
+// The pins' part of renderMsgs' signature: the pill flips with it.
+function __panePinSig(d) {
+  return __panePinsAllowed(d) ? Array.from(__realDM.panePins).sort().join('|') : 'off';
+}
+async function __panePinsLoad(channelId, noRetry) {
+  if (!IS_PANE || !channelId) return;
+  // Quiet: a failed read only keeps the pin controls hidden.
+  const r = await window.vibeRequest(
+    '/api/me/threads/' + encodeURIComponent(channelId) + '/message-pins',
+    { failure: "Couldn't load pinned messages.", quiet: true }
+  );
+  if (active !== channelId || __realDM.panePinsFor !== channelId) return;
+  if (r.ok && Array.isArray(r.data.pins)) {
+    __realDM.panePins = new Set(r.data.pins.map((p) => String((p && p.message_id) || '')).filter(Boolean));
+    __realDM.panePinsOff = false;
+  } else if (!r.ok && (r.status === 404 || r.code === 'pins_chats_only')) {
+    __realDM.panePins = null;
+    __realDM.panePinsOff = true;
+  } else if (!noRetry && !__realDM.panePins) {
+    // Nothing loaded and not a "no": one more try, so a dropped read does
+    // not leave this chat without its pin button until it is reopened.
+    setTimeout(() => {
+      if (active === channelId && !__realDM.panePins && !__realDM.panePinsOff) __panePinsLoad(channelId, true);
+    }, 5000);
+  }
+  __panePinsPaint();
+}
+// The header button's data-off, and the rows again if they are this chat's
+// (renderMsgs rebuilds them only when the signature moved).
+function __panePinsPaint() {
+  if (!IS_PANE) return;
+  const d = active ? __realDM.T[active] : null;
+  const btn = document.getElementById('cPinsBtn');
+  if (btn) {
+    if (__panePinsAllowed(d)) btn.removeAttribute('data-off');
+    else btn.setAttribute('data-off', '');
+  }
+  const a = document.getElementById('msgsArea');
+  if (d && a && a.dataset.channel === String(active) && Array.isArray(d.msgs)) renderMsgs(d.msgs, d);
+}
+// Pin or unpin one message. Confirm, then paint (as __dmDeleteMessage): a
+// refusal toasts the server's sentence through vibeRequest and the ids are
+// read again, so the pill never claims a pin the server did not take.
+async function __panePinToggle(messageId) {
+  const channelId = active;
+  if (!IS_PANE || !channelId || !messageId || __realDM.panePinBusy) return;
+  if (!__panePinsAllowed(__realDM.T[channelId])) return;
+  const pinned = __realDM.panePins.has(messageId);
+  __realDM.panePinBusy = true;
+  const r = await window.vibeRequest(
+    '/api/me/threads/' + encodeURIComponent(channelId) +
+    '/messages/' + encodeURIComponent(messageId) + '/pin',
+    { method: pinned ? 'DELETE' : 'PUT', failure: pinned ? "Couldn't unpin that message." : "Couldn't pin that message." }
+  );
+  __realDM.panePinBusy = false;
+  if (!r.ok) { __panePinsLoad(channelId, true); return; }
+  if (active === channelId && __realDM.panePinsFor === channelId && __realDM.panePins) {
+    if (r.data.pinned === false) __realDM.panePins.delete(messageId);
+    else __realDM.panePins.add(messageId);
+    __panePinsPaint();
+  }
+  __paneSay('pins-changed', { channelId: channelId });
+}
+// renderMsgs, around a rebuild of the rows: which message held keyboard
+// focus (and whether its pin button did), and the same place afterwards.
+// Only while this frame IS the focused document: activeElement stays on the
+// last bubble after the person has moved to the shell, and a focus() here
+// would pull the keyboard out of the shell's dialog or popover.
+function __paneFocusNote(root) {
+  if (!document.hasFocus()) return null;
+  const el = document.activeElement;
+  const row = el && root.contains(el) && el.closest ? el.closest('.msg-row[data-mid]') : null;
+  if (!row) return null;
+  return { mid: row.getAttribute('data-mid'), pin: el.hasAttribute('data-pin-msg') };
+}
+function __paneRowOf(messageId) {
+  let found = null;
+  document.querySelectorAll('#msgsArea .msg-row[data-mid]').forEach((row) => {
+    if (!found && row.getAttribute('data-mid') === messageId) found = row;
+  });
+  return found;
+}
+function __paneFocusBack(root, note) {
+  const row = __paneRowOf(note.mid);
+  const el = row && ((note.pin && row.querySelector('button[data-pin-msg]')) || row.querySelector('.dm-bubble-wrap'));
+  if (el) { try { el.focus({ preventScroll: true }); } catch (_) { el.focus(); } }
+}
+
+// ── shell -> page: the five commands (item 2; DmShellCommand in dm-bridge.ts).
+// open: the last one wins (item 14). An id this page's list does not hold
+// gets ONE list reload, and the retry is dropped if the shell has asked for
+// another chat by the time the reload is back.
+function __paneOpen(id) {
+  if (!IS_PANE || typeof id !== 'string' || !id) return;
+  __realDM.paneWanted = id;
+  __paneCloseOverlays();
+  if (!__realDM.enabled) return; // init has not finished: its last lines open it
+  if (__realDM.T[id]) { openT(id); return; }
+  // Not the previous chat under the new row's highlight while the list loads.
+  __paneHideChat();
+  __dmLoadList().then(() => {
+    if (__realDM.paneWanted !== id) return;
+    if (__realDM.T[id]) { openT(id); return; }
+    __realDM.paneWanted = null;
+    __paneSay('open-failed', { channelId: id, message: "Couldn't open this chat." });
+  });
+}
+// close: the shell went home or opened a club. Stops the 2-second timer,
+// which follows the browser tab and not this frame's own visibility.
+function __paneCloseChat() {
+  if (!IS_PANE) return;
+  __realDM.paneWanted = null;
+  __paneHideChat();
+  __realDM.panePins = null;
+  __realDM.panePinsFor = null;
+  const btn = document.getElementById('cPinsBtn');
+  if (btn) { btn.setAttribute('data-off', ''); btn.setAttribute('aria-pressed', 'false'); }
+}
+// jump: a pinned quote was clicked in the shell's panel. Only the newest 50
+// messages are on this page; an older one answers jump-missed and the panel
+// opens the quote in place.
+function __paneJump(messageId) {
+  if (!IS_PANE || typeof messageId !== 'string' || !messageId) return;
+  const a = document.getElementById('msgsArea');
+  const row = active && a ? __paneRowOf(messageId) : null;
+  if (!row) { __paneSay('jump-missed', { messageId: messageId }); return; }
+  // Scrolled by hand inside the thread: scrollIntoView may also move the
+  // shell's own boxes around the frame.
+  const calm = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+  const top = a.scrollTop + (row.getBoundingClientRect().top - a.getBoundingClientRect().top)
+    - (a.clientHeight - row.offsetHeight) / 2;
+  a.scrollTo({ top: Math.max(0, top), behavior: calm ? 'auto' : 'smooth' });
+  row.classList.add('pane-flash');
+  setTimeout(() => { row.classList.remove('pane-flash'); }, 1600);
+}
+// panel-state: the header button shows pressed while the shell's Pinned and
+// Shared panel is open, and that panel opening closes Chat info (item 15).
+function __panePanelState(open) {
+  if (!IS_PANE) return;
+  if (open) __dmPanelClose();
+  const btn = document.getElementById('cPinsBtn');
+  if (btn) btn.setAttribute('aria-pressed', open ? 'true' : 'false');
+}
+
+if (IS_PANE) {
+  window.addEventListener('message', (e) => {
+    if (!(IS_PANE && e.origin === location.origin && e.source === window.parent && e.data && e.data.source === 'vibe-shell' && e.data.v === 1)) return;
+    const c = e.data;
+    if (c.type === 'open') __paneOpen(c.channelId);
+    else if (c.type === 'close') __paneCloseChat();
+    else if (c.type === 'jump') __paneJump(c.messageId);
+    else if (c.type === 'pins-changed') { if (active && c.channelId === active) __panePinsLoad(active, true); }
+    else if (c.type === 'panel-state') __panePanelState(c.open === true);
+  });
+
+  // Esc (item 12; the page had no Esc handler). The report sheet and the
+  // @mention picker take their own Esc first (one stops it, the other marks
+  // it handled). Then: a layer of this page closes; else the composer lets
+  // go of the keyboard; else the shell hears `escape` and goes home.
+  document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape' || e.defaultPrevented) return;
+    const compose = document.getElementById('composeOverlay');
+    if (compose && compose.classList.contains('show')) { __dmComposeClose(); return; }
+    const panel = document.getElementById('cPanel');
+    if (panel && panel.classList.contains('show')) { __dmPanelClose(); return; }
+    if (document.querySelector('.vc-back')) return; // the photo cropper: its own Cancel closes it
+    const inp = document.getElementById('msgIn');
+    if (inp && document.activeElement === inp) { inp.blur(); return; }
+    __paneSay('escape');
+  });
+
+  // Pin / Unpin in a pill, and the header's button (item 9).
+  const paneArea = document.getElementById('msgsArea');
+  if (paneArea) paneArea.addEventListener('click', (e) => {
+    const btn = e.target && e.target.closest ? e.target.closest('button[data-pin-msg]') : null;
+    if (!btn || !paneArea.contains(btn)) return;
+    __panePinToggle(btn.getAttribute('data-pin-msg') || '');
+  });
+  const panePinsBtn = document.getElementById('cPinsBtn');
+  if (panePinsBtn) panePinsBtn.addEventListener('click', () => {
+    if (active) __paneSay('pins-toggle', { channelId: active });
+  });
 }
 
 (async function initMessagesPage(){
@@ -3619,8 +4136,10 @@ async function __dmEnsureFromHandle(handle, failure) {
   __realDM.meId = user.id || null;
 
   // Connection ids for the Connections tab, alongside the list (not awaited).
-  __dmLoadConnections();
-  await __dmLoadList();
+  // Pane mode has no Connections tab (up to 20 requests saved), and its first
+  // list load is no change for the shell to hear about.
+  if (!IS_PANE) __dmLoadConnections();
+  await __dmLoadList(IS_PANE ? { fromTimer: true } : undefined);
 
   const params = new URLSearchParams(location.search);
   const toHandle = params.get('to');
@@ -3631,7 +4150,8 @@ async function __dmEnsureFromHandle(handle, failure) {
       openT(res.channelId);
       // When iframed under /messages?to=<h>, clean the parent URL.
       // Standalone (no iframe), top.location === self.location.
-      try {
+      // Never in pane mode: the shell owns the address.
+      if (!IS_PANE) try {
         const top = (window.top && window.top !== window.self) ? window.top : window;
         const u = new URL(top.location.href);
         u.searchParams.delete('to');
@@ -3660,7 +4180,7 @@ async function __dmEnsureFromHandle(handle, failure) {
   }
   if (!toHandle && channelParam && __realDM.T && __realDM.T[channelParam]) {
     openT(channelParam);
-    try {
+    if (!IS_PANE) try {
       const top = (window.top && window.top !== window.self) ? window.top : window;
       const u = new URL(top.location.href);
       u.searchParams.delete('channel');
@@ -3670,6 +4190,10 @@ async function __dmEnsureFromHandle(handle, failure) {
 
   __realDM.listTimer = setInterval(() => {
     if (document.hidden) return;
+    // Pane mode: the list is only the open chat's data, so it rests while no
+    // chat is open (the frame stays mounted at the shell's home) and a timer
+    // load is not a change for the shell to hear about.
+    if (IS_PANE) { if (active) __dmLoadList({ fromTimer: true }); return; }
     __dmLoadList();
   }, __realDM.LIST_POLL_MS);
 
@@ -3685,6 +4209,11 @@ async function __dmEnsureFromHandle(handle, failure) {
     }
   }
   _wireChatMention();
+
+  // Pane mode: a chat the shell asked for before this point opens now, and
+  // the last thing init says is `ready`: the list is in, send `open`.
+  if (IS_PANE && __realDM.paneWanted && !active) __paneOpen(__realDM.paneWanted);
+  __paneSay('ready');
 })();
 // ══ END MESSAGES INIT ════════════════════════════════════════════════════
 

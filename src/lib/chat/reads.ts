@@ -10,7 +10,7 @@
  */
 
 import { BOARD_POSTER_ROLES } from "./room-rules";
-import type { ClubRole, EventRef, InboxClub, MessageKind, Preview, RoomKind, RoomState, SpaceRoom } from "./types";
+import type { ClubRole, EventRef, InboxClub, MessageKind, PostPolicy, Preview, RoomKind, RoomState, SpaceRoom } from "./types";
 
 // ── Previews (7.1.4) ─────────────────────────────────────────────────────────
 
@@ -171,10 +171,26 @@ export function orderInboxClubs(clubs: InboxClub[]): InboxClub[] {
  * `event` → the room's state is not `closed`; else true. A TypeScript rule as
  * the thread list's (`threads/route.ts:789-803`); the thread GET's
  * `viewer.can_post` is the database's answer and wins on the screen.
+ *
+ * An extra room (`room`) also follows its `post_policy` (wave-3 contract
+ * 4c.2, 4c.3): `officers` → owner or admin; `listed` → they, or a viewer on
+ * the room's by-name list (`listed`); `everyone` → true. Every other kind
+ * ignores both arguments, and their defaults are the rule before the column.
  */
-export function spaceCanPost(kind: RoomKind, role: ClubRole | null, state: RoomState | null): boolean {
-  if (kind === "board") return role !== null && BOARD_POSTER_ROLES.includes(role);
+export function spaceCanPost(
+  kind: RoomKind,
+  role: ClubRole | null,
+  state: RoomState | null,
+  policy: PostPolicy = "everyone",
+  listed = false,
+): boolean {
+  const officer = role !== null && BOARD_POSTER_ROLES.includes(role);
+  if (kind === "board") return officer;
   if (kind === "event") return state !== "closed";
+  if (kind === "room") {
+    if (policy === "officers") return officer;
+    if (policy === "listed") return officer || listed;
+  }
   return true;
 }
 
@@ -215,7 +231,16 @@ export function orderSpaceRooms(rooms: SpaceRoomWithPosition[]): SpaceRoom[] {
     }
     return a.name.localeCompare(b.name);
   });
-  return kept.map(({ id, kind, name, unread, can_post, event }) => ({ id, kind, name, unread, can_post, event }));
+  return kept.map(({ id, kind, name, unread, can_post, event, locked, post_policy }) => ({
+    id,
+    kind,
+    name,
+    unread,
+    can_post,
+    event,
+    locked,
+    post_policy,
+  }));
 }
 
 /**
@@ -228,6 +253,19 @@ export function lastShown<T extends { hidden: boolean; removed: unknown }>(messa
     if (!messages[i].hidden && messages[i].removed === null) return messages[i];
   }
   return null;
+}
+
+/**
+ * `board_recent` (wave-3 contract 4.2): of an oldest-first page, the last
+ * `max` messages that `lastShown` would show, NEWEST first. Its first entry
+ * is `lastShown`'s answer; none → `[]`.
+ */
+export function recentShown<T extends { hidden: boolean; removed: unknown }>(messages: T[], max: number): T[] {
+  const recent: T[] = [];
+  for (let i = messages.length - 1; i >= 0 && recent.length < max; i -= 1) {
+    if (!messages[i].hidden && messages[i].removed === null) recent.push(messages[i]);
+  }
+  return recent;
 }
 
 /** The `EventRef` of each room of a list, by the room's event id; null where the ref is missing. */

@@ -15,7 +15,7 @@
  * the two lists below.
  */
 
-import type { ClubRole, PostRefusalCode, Room, RoomKind } from "./types";
+import type { ClubRole, PostPolicy, PostRefusalCode, Room, RoomKind } from "./types";
 
 /** Who may write a new post on a Board. */
 export const BOARD_POSTER_ROLES: readonly ClubRole[] = Object.freeze(["owner", "admin"]);
@@ -30,6 +30,16 @@ export const ROOM_MODERATOR_ROLES: readonly ClubRole[] = Object.freeze(["owner",
  */
 export const OFFICER_REMOVED_REASON = "Removed by a club officer.";
 
+/**
+ * How many extra rooms (`kind = 'room'`) one club may hold
+ * (handoffs/chat-redesign/wave-3-desktop/contract.md 4.2, 4c.3). The fixed
+ * rooms and event chats are not counted.
+ */
+export const EXTRA_ROOM_CAP = 5;
+
+/** `channels.post_policy`: who writes a new message in an extra room. */
+export const POST_POLICIES = Object.freeze(["everyone", "officers", "listed"] as const);
+
 const ROOM_KINDS: readonly RoomKind[] = Object.freeze(["board", "lounge", "officers", "event", "room"]);
 const CLUB_ROLES: readonly ClubRole[] = Object.freeze(["owner", "admin", "mod", "member"]);
 
@@ -41,6 +51,22 @@ export function isRoomKind(value: unknown): value is RoomKind {
 /** An `org_members.role` value read from the database. */
 export function isClubRole(value: unknown): value is ClubRole {
   return typeof value === "string" && (CLUB_ROLES as readonly string[]).includes(value);
+}
+
+/** A `channels.post_policy` value read from the database or sent in a body. */
+export function isPostPolicy(value: unknown): value is PostPolicy {
+  return typeof value === "string" && (POST_POLICIES as readonly string[]).includes(value);
+}
+
+/**
+ * The line a room shows in place of the composer to someone who may read but
+ * not post there (wave-3 contract 4c.3). Null for `everyone`: nobody is kept
+ * out by the rule. "Officers" is owner and admin, as on a Board.
+ */
+export function postRuleLine(policy: PostPolicy): string | null {
+  if (policy === "officers") return "Only officers post here.";
+  if (policy === "listed") return "Only officers and people they picked post here.";
+  return null;
 }
 
 /** Owner, admin or mod. Null (not a member, or a dm / group) and anything unknown: no. */
@@ -103,6 +129,7 @@ export function clubRoomLabel(clubName: string, kind: RoomKind, roomName: string
  * | Board, a root: the post is gone, removed, a reply itself, or in another room | `board_post_missing` |
  * | Board, no root, the sender is not owner / admin  | `board_officers_only`     |
  * | event chat, no root: past its window             | `room_closed`             |
+ * | extra room, no root, its `post_policy` is not `everyone` (wave 3, 4c.3) | `room_posters_only` |
  * | anything else the database refused               | `room_closed`             |
  *
  * The last row is every case the contract's table does not name: the sender
@@ -122,5 +149,6 @@ export function postRefusal(
     return officer ? "room_closed" : "board_officers_only";
   }
   if (hasRoot) return "thread_root_not_allowed";
+  if (room && kind === "room" && (room.post_policy ?? "everyone") !== "everyone") return "room_posters_only";
   return "room_closed";
 }

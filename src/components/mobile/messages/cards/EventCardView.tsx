@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 
+import { emitCalendarChanged } from "@/components/LeftNav";
 import type { EventCard, ThreadRoom } from "@/lib/chat/types";
 import { eventWhen, eventWhenSpoken } from "@/lib/chat/when";
 import { vibeRequest } from "@/lib/feedback/request";
@@ -34,8 +35,10 @@ import { Chevron, ClubDisc, CoralDisc, PillSpinner, Ring } from "./card-parts";
  * room (14.41), `<N> going`, and `Open event chat` when `room_id` is set.
  *
  * A pill → `PUT /api/events/<id>/rsvp { status }` (the pressed one →
- * `DELETE`), then `onRefresh(created_at)` re-reads this one message; the
- * refusal toast goes through `toastSendFailure`. `event === null` → the
+ * `DELETE`), then `onRefresh(created_at)` re-reads this one message and
+ * `emitCalendarChanged()` tells whoever shows the viewer's plans (the
+ * desktop's My Calendar and week band; wave-3 contract 6.3) to read again;
+ * the refusal toast goes through `toastSendFailure`. `event === null` → the
  * title from the fallback text, `This event was cancelled.`, no buttons.
  * `state === "closed"` → the pills are hidden, `Open event chat` stays.
  */
@@ -79,6 +82,7 @@ export function EventCardView({ card, content, room, createdAt, author, isMine, 
       return;
     }
     onRefresh(createdAt);
+    emitCalendarChanged();
     onAnnounce(announceRsvp(remove ? null : status));
   };
 

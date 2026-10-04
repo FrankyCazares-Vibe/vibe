@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 
+import { roomDisplayName } from "@/lib/chat/room-names";
 import type { ChatMessage, RoomKind, ViewerInRoom } from "@/lib/chat/types";
 import { useLayerHistory } from "@/lib/chat/use-layer-history";
 import type { RoomPoll } from "@/lib/chat/use-room-poll";
@@ -11,8 +12,9 @@ import { CardTray, type CardTrayKind } from "../compose/CardTray";
 import { ComposeSheets } from "../compose/ComposeSheets";
 import { quotedBody } from "../format";
 import { toastSendFailure } from "../send-failure";
+import { useChatSurface } from "../surface";
 import { FONT, palette } from "../v2-tokens";
-import { composerPlaceholder, sendLabel } from "./helpers";
+import { composerPlaceholder, refusedSend, sendLabel } from "./helpers";
 
 /**
  * The composer of a club room (handoffs/chat-redesign/wave-2-contracts.md
@@ -23,28 +25,43 @@ import { composerPlaceholder, sendLabel } from "./helpers";
  * - While `viewer` is null NOTHING is drawn in the composer's place (no
  *   composer flashes in a Board; SCREENS-L9).
  * - `viewer.can_post === false` → the quiet tile: the Board's member sentence
- *   `Only officers post on the Board. You can reply to any post.` (14.16) or
- *   `This chat is closed.` (= `REFUSAL_SENTENCES.room_closed`).
+ *   `Only officers post on the Board. You can reply to any post.` (14.16);
+ *   else the server's own line when it sent one (`viewer.post_line`: an extra
+ *   room whose who-can-post rule leaves this viewer reading only; wave-3
+ *   desktop contract 4c.4); else `This chat is closed.`
+ *   (= `REFUSAL_SENTENCES.room_closed`).
  * - The "+" only when `can_post`: it opens W2-S3's `CardTray` in flow above
  *   the row, and a pick mounts `ComposeSheets` (`onPosted` → `append`,
  *   `onReload` → `reload`, the "+" as `returnFocusTo`).
  * - Sending (11.5): `POST …/messages { content, parent_message_id? }` with an
  *   optimistic `temp_` row appended to the hook's oldest-first state
  *   (`append`), replaced by the answer (`replace`), removed on failure with
- *   the toast (`remove`); `board_officers_only` / `room_closed` → the quiet
- *   tile until the next full read hands a new `viewer` (the refusal is
- *   remembered against the `viewer` object's identity, so no effect resets it).
+ *   the toast (`remove`); `board_officers_only` / `room_closed` /
+ *   `room_posters_only` → the quiet tile until the next full read hands a new
+ *   `viewer` (the refusal is remembered against the `viewer` object's
+ *   identity, so no effect resets it). After `room_posters_only` that read is
+ *   asked for at once (`refusedSend`, helpers.ts): only it brings the
+ *   `post_line` the tile should say.
  * - The officer's `Everyone in <club> sees this` line above the row on the
  *   Board (`officerLine`); the reply pill (a quote) above the row when the
  *   thread picked a message to reply to.
  *
  * - History (S71 amendment 3, A): the tray has its own entry while it is open
- *   (`useLayerHistory`), and each sheet takes its own inside `CardSheet`, so
+ *   (`useLayerHistory`; on the desktop surface the popover's own, not a
+ *   second one from here), and each sheet takes its own inside `CardSheet`, so
  *   Back closes the tray or the sheet and nothing under it. A pick closes the
  *   tray and opens the sheet in one commit; the stack orders the two.
  *
  * The tray's scrim is absolute over the room column: the room mounts this
  * inside a `position: relative` box; the footer sits at z-index 2 over it.
+ *
+ * - The room's name as words (wave-3 desktop contract 4c.3, C14): an extra
+ *   room's and the Officers room's stored name is a slug (`exec-only`); the
+ *   ONE line `shownName` turns it into `Exec only` for the placeholder, the
+ *   tray's caption and the three sheets' room line, on both surfaces. An
+ *   event chat's name is the event's title and is never rewritten.
+ * - The "+" is handed to the tray as `anchorRef` (6.3): on the desktop
+ *   surface the tray is a popover that opens from it; the phone ignores it.
  */
 
 export type ReplyTarget = {
@@ -167,19 +184,22 @@ export function RoomComposer({
 
   const canPost = viewer !== null && viewer.can_post && refusedViewer !== viewer;
   // The tray's own history entry, only while it is drawn (it is not once the
-  // composer turns into the closed tile).
-  useLayerHistory(trayOpen && canPost, () => setTrayOpen(false));
+  // composer turns into the closed tile). On the desktop surface the tray is
+  // a `DesktopPopover`, which holds its own entry: a second one here would
+  // make one layer two entries (wave-3 desktop contract 6.1).
+  const desktop = useChatSurface() === "desktop";
+  useLayerHistory(trayOpen && canPost && !desktop, () => setTrayOpen(false));
 
   if (viewer === null) return null;
   if (!canPost) {
-    return roomKind === "board" ? (
-      <ClosedTile night={night} board text="Only officers post on the Board. You can reply to any post." />
-    ) : (
-      <ClosedTile night={night} text="This chat is closed." />
-    );
+    if (roomKind === "board") return <ClosedTile night={night} board text="Only officers post on the Board. You can reply to any post." />;
+    // The server's sentence for a room this viewer may read but not post in (4c.4); the lock is the tile's default mark.
+    if (viewer.post_line) return <ClosedTile night={night} text={viewer.post_line} />;
+    return <ClosedTile night={night} text="This chat is closed." />;
   }
 
-  const placeholder = composerPlaceholder(roomKind, roomName);
+  const shownName = roomKind === "room" || roomKind === "officers" ? roomDisplayName(roomName) : roomName;
+  const placeholder = composerPlaceholder(roomKind, shownName);
   const text = draft.trim();
   const canSend = text.length > 0 && !sending;
 
@@ -223,7 +243,11 @@ export function RoomComposer({
       toastSendFailure(r);
       poll.remove(tempId);
       setDraft(text);
-      if (r.code === "board_officers_only" || r.code === "room_closed") setRefusedViewer(viewer);
+      const refused = refusedSend(r.code);
+      if (refused.tile) setRefusedViewer(viewer);
+      // `room_posters_only`: the remembered `viewer` has no `post_line`, so
+      // the true line (`Only officers post here.`) is read now, not in 20 s.
+      if (refused.reread) void poll.reload();
       return;
     }
     const sent = r.data.message;
@@ -253,8 +277,9 @@ export function RoomComposer({
     <>
       <CardTray
         roomKind={roomKind}
-        roomName={roomName}
+        roomName={shownName}
         clubName={clubName}
+        anchorRef={plusRef}
         open={trayOpen}
         onClose={() => setTrayOpen(false)}
         onPick={(kind) => {
@@ -314,10 +339,11 @@ export function RoomComposer({
               background: trayOpen ? t.activeChip.bg : t.surface,
               color: trayOpen ? t.activeChip.ink : t.ink,
               transition: "transform 160ms ease, background 160ms ease, color 160ms ease",
-              transform: trayOpen ? "rotate(45deg)" : "none",
+              // Desktop: the turn is the icon's, not the button's. The popover is placed by the "+"'s measured box, and a turned 44px box measures about 62px: the popover would move on its next placement.
+              transform: trayOpen && !desktop ? "rotate(45deg)" : "none",
             }}
           >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" aria-hidden="true" style={desktop ? { transition: "transform 160ms ease", transform: trayOpen ? "rotate(45deg)" : "none" } : undefined}><path d="M12 5v14M5 12h14" /></svg>
           </button>
           <label style={{ flexGrow: 1, minWidth: 0, height: 44, boxSizing: "border-box", padding: "0 16px", display: "flex", alignItems: "center", borderRadius: 999, border: `1px solid ${t.fieldBorder}`, background: t.surface }}>
             <input
@@ -346,7 +372,7 @@ export function RoomComposer({
         kind={sheet}
         roomId={roomId}
         roomKind={roomKind}
-        roomName={roomName}
+        roomName={shownName}
         clubName={clubName}
         orgHandle={orgHandle}
         orgId={orgId}

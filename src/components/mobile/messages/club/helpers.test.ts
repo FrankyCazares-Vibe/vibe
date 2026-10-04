@@ -95,8 +95,30 @@ test("chipLabel / chipAriaLabel", () => {
   };
   assert.equal(h.chipLabel(event), "Fall Formal");
   assert.equal(h.chipAriaLabel(event, NOW), "Fall Formal, event chat, tonight");
+  // An extra room (wave-3 desktop contract 4c.3): the visible text is the
+  // label unless only some members see it; `locked` absent reads as open.
   assert.equal(h.chipAriaLabel({ kind: "room", name: "Alumni", unread: false, event: null }, NOW), null);
+  assert.equal(h.chipAriaLabel({ kind: "room", name: "Alumni", unread: false, event: null, locked: false }, NOW), null);
+  assert.equal(h.chipAriaLabel({ kind: "room", name: "Alumni", unread: false, event: null, locked: true }, NOW), "Alumni, only some members see this room");
+  assert.equal(h.chipAriaLabel({ kind: "room", name: "exec-only", unread: true, event: null, locked: true }, NOW), "Exec only, only some members see this room");
+  // `locked` changes no other kind's label: the Lounge has none, the Officers room keeps its own, an event chat its state word.
+  assert.equal(h.chipAriaLabel({ kind: "lounge", name: "Lounge", unread: false, event: null, locked: true }, NOW), null);
+  assert.equal(h.chipAriaLabel({ kind: "officers", name: "Officers", unread: false, event: null, locked: true }, NOW), "Officers, only officers see this room");
+  assert.equal(h.chipAriaLabel({ ...event, locked: true }, NOW), "Fall Formal, event chat, tonight");
   assert.equal(h.chipLabel({ kind: "lounge", name: "Lounge", event: null }), "Lounge");
+});
+
+test("chipLabel: an extra room's stored name reads as words, nothing else is rewritten", () => {
+  assert.equal(h.chipLabel({ kind: "room", name: "exec-only", event: null }), "Exec only");
+  assert.equal(h.chipLabel({ kind: "room", name: "rush_chairs", event: null }), "Rush chairs");
+  assert.equal(h.chipLabel({ kind: "room", name: "Alumni", event: null }), "Alumni");
+  // The three core rooms keep their fixed words whatever is stored.
+  assert.equal(h.chipLabel({ kind: "board", name: "board", event: null }), "Board");
+  assert.equal(h.chipLabel({ kind: "officers", name: "officers", event: null }), "Officers");
+  // An event's title is shown as written (never through the room-name rule).
+  assert.equal(h.chipLabel({ kind: "event", name: "fall-formal", event: null }), "fall-formal");
+  const titled = { id: "e2", title: "Kick-off: day_one", starts_at: iso(local(2026, 9, 13, 19, 0)), ends_at: iso(local(2026, 9, 13, 21, 0)), state: "soon" as const, location: "", room_id: "r2", viewer_status: null, going_count: 0, maybe_count: 0 };
+  assert.equal(h.chipLabel({ kind: "event", name: "x", event: titled }), "Kick-off: day_one");
 });
 
 test("upNextLine / upNextAriaLabel / eventTimeSpoken", () => {
@@ -178,4 +200,16 @@ test("composer placeholders, send label, empty lines, the Board strip label, emp
   assert.equal(h.isEmptyRoom([{ hidden: true }, { hidden: false }]), false);
   assert.equal(h.authorName(null), "Someone");
   assert.equal(h.authorName({ name: "", handle: "maya" }), "maya");
+});
+
+test("refusedSend: which refusals turn the composer into the tile, and the one that reads the room again at once", () => {
+  assert.deepEqual(h.refusedSend("board_officers_only"), { tile: true, reread: false });
+  assert.deepEqual(h.refusedSend("room_closed"), { tile: true, reread: false });
+  // The viewer on screen still says `can_post` and has no `post_line`: only a full read brings the sentence.
+  assert.deepEqual(h.refusedSend("room_posters_only"), { tile: true, reread: true });
+  // Any other refusal, or none, leaves the composer where it is.
+  assert.deepEqual(h.refusedSend("rate_limited"), { tile: false, reread: false });
+  assert.deepEqual(h.refusedSend("content_blocked"), { tile: false, reread: false });
+  assert.deepEqual(h.refusedSend(null), { tile: false, reread: false });
+  assert.deepEqual(h.refusedSend(undefined), { tile: false, reread: false });
 });

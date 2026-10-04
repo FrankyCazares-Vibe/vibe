@@ -8,7 +8,9 @@
  *
  * THE DATABASE IS THE WALL. `can_post_org_channel`, `can_view_org_channel`
  * and the policies decide; nothing here repeats a rule in TypeScript. These
- * four only ask and carry the answer.
+ * four only ask and carry the answer. (The three `postPolicyColumn...`
+ * functions above `loadRoom` decide nothing either: they remember that a
+ * column is not in this database yet, wave-3 contract 4.2.)
  *
  * NOTHING HERE THROWS. A read that fails is logged (once per cause per server
  * instance) and answers the closed side: no room, may not post, reads
@@ -32,7 +34,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseServiceClient, isSupabaseServiceConfigured } from "@/lib/supabase/service";
 
-import { isClubRole, isRoomKind } from "./room-rules";
+import { isClubRole, isPostPolicy, isRoomKind } from "./room-rules";
 import { isMissingChatSchema, warnMissingChatSchemaOnce } from "./schema";
 import type { ClubRole, Room } from "./types";
 
@@ -101,11 +103,51 @@ function serviceClient(tag: string): SupabaseClient | null {
   }
 }
 
+// ── `channels.post_policy` may not be in this database yet ──────────────────
+// handoffs/chat-redesign/wave-3-desktop/contract.md 1.3 K11, 4.2. The code
+// ships before the column: until it is applied, a select that names
+// `post_policy` fails and is asked again without it. A room is read every 4
+// seconds, so the failure is remembered: for 5 minutes per server instance
+// every read that names the column goes straight to its fallback select.
+// The room routes (`api/orgs/[slug]/channels`) and the space read ask the
+// same three functions.
+
+/** How long one "no `post_policy` column" is remembered. */
+const POST_POLICY_MEMORY_MS = 5 * 60 * 1000;
+
+/** When a select naming `post_policy` last failed as missing schema; null: never, or forgotten. */
+let postPolicyMissingAt: number | null = null;
+
+/** True for 5 minutes after the last note: skip the select that names `post_policy`. */
+export function postPolicyColumnMissing(now: number = Date.now()): boolean {
+  return postPolicyMissingAt !== null && now - postPolicyMissingAt < POST_POLICY_MEMORY_MS;
+}
+
+/** Called when a select naming `post_policy` fails `isMissingChatSchema`. */
+export function notePostPolicyColumnMissing(now: number = Date.now()): void {
+  postPolicyMissingAt = now;
+}
+
+/** Tests only: clears the module-level memory. */
+export function forgetPostPolicyColumnMissing(): void {
+  postPolicyMissingAt = null;
+}
+
+/** What `loadRoom` reads of a room; `ROOM_COLUMNS` is the select from before the column. */
+const ROOM_COLUMNS = "id, kind, name, org_id, event_id";
+const ROOM_COLUMNS_WITH_POLICY = "id, kind, name, org_id, event_id, post_policy";
+
 /**
  * The room behind a channel id, read with the service role: its kind, name,
  * club and, for an event's chat, the event. Null for a dm, a group, an id
  * that names nothing, or a database without `channels.kind`. A read that
  * fails also answers null (logged once).
+ *
+ * `post_policy` is always set: the column's value, or `everyone` when the
+ * column is not in this database yet or holds anything else. A missing
+ * column is never "the read failed" (that would be 503 on every club room):
+ * the select is asked once more without it, and the absence is remembered
+ * (`postPolicyColumnMissing`).
  *
  * An event's chat always comes with its event: when the event cannot be read
  * the answer is null, never a room with `event: null`. The two dates are the
@@ -133,18 +175,26 @@ export async function loadRoom(channelId: string): Promise<Room | null> {
   const service = serviceClient(tag);
   if (!service) return null;
   try {
-    const { data, error } = await service
-      .from("channels")
-      .select("id, kind, name, org_id, event_id")
-      .eq("id", channelId)
-      .maybeSingle();
+    const readRow = async (columns: string) => {
+      const res = await service.from("channels").select(columns).eq("id", channelId).maybeSingle();
+      return { data: res.data as unknown, error: res.error };
+    };
+    const namedPolicy = !postPolicyColumnMissing();
+    let { data, error } = await readRow(namedPolicy ? ROOM_COLUMNS_WITH_POLICY : ROOM_COLUMNS);
+    // A select that named the column and failed as missing schema is asked
+    // ONCE more, as before the column. If that fails the same way, it is
+    // `channels.kind` that is missing: today's answer below.
+    if (error && namedPolicy && isMissingChatSchema(error)) {
+      notePostPolicyColumnMissing();
+      ({ data, error } = await readRow(ROOM_COLUMNS));
+    }
     if (error) {
       if (isMissingChatSchema(error)) warnMissingChatSchemaOnce(tag);
       else logFailureOnce(tag, errorSummary(error));
       return null;
     }
     if (!data) return null;
-    const row = data as { id: unknown; kind: unknown; name: unknown; org_id: unknown; event_id: unknown };
+    const row = data as { id: unknown; kind: unknown; name: unknown; org_id: unknown; event_id: unknown; post_policy?: unknown };
     // A dm or a group has no club and no kind; neither is a room.
     if (!isId(row.id) || !isId(row.org_id) || !isRoomKind(row.kind)) return null;
     const room: Room = {
@@ -153,6 +203,7 @@ export async function loadRoom(channelId: string): Promise<Room | null> {
       name: typeof row.name === "string" ? row.name : "",
       org_id: row.org_id,
       event: null,
+      post_policy: isPostPolicy(row.post_policy) ? row.post_policy : "everyone",
     };
     if (room.kind !== "event") return room;
 

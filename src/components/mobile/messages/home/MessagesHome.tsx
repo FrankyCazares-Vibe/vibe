@@ -74,7 +74,7 @@ export type MessagesHomeProps = {
 type WeekSlot = { entries: WeekEntry[] | null; failure: LoadFailure | null };
 
 /** The three reads and their schedule (11.1). */
-function useHomeData(refreshKey: number, onThreads: MessagesHomeProps["onThreads"]) {
+export function useHomeData(refreshKey: number, onThreads: MessagesHomeProps["onThreads"]) {
   const [threads, setThreads] = useState<ThreadEntry[] | null>(null);
   const [requests, setRequests] = useState<ThreadEntry[] | null>(null);
   const [threadsErr, setThreadsErr] = useState<LoadFailure | null>(null);
@@ -298,6 +298,7 @@ function useHomeData(refreshKey: number, onThreads: MessagesHomeProps["onThreads
     retryWeek,
   };
 }
+export type HomeData = ReturnType<typeof useHomeData>; // what the desktop shell holds from its ONE call (wave-3 contract H2)
 
 /**
  * The list's skeleton: `ListSkeleton`'s shape (discs + bars in the 11.0
@@ -305,7 +306,7 @@ function useHomeData(refreshKey: number, onThreads: MessagesHomeProps["onThreads
  * the person row it resolves into (`ListSkeleton`'s 50px disc makes 74px
  * rows and a visible jump on resolve; VIS-S1-6).
  */
-function HomeSkeleton() {
+export function HomeSkeleton() {
   return (
     <ul aria-hidden="true" style={{ listStyle: "none", padding: 0, margin: 0 }}>
       {[0, 1, 2, 3, 4].map((i) => (
@@ -321,8 +322,8 @@ function HomeSkeleton() {
   );
 }
 
-const FILTER_LABEL: Record<HomeFilter, string> = { all: "All", chats: "Chats", clubs: "Clubs", requests: "Requests" };
-const LIST_LABEL: Record<HomeFilter, string> = { all: "All chats, pinned first", chats: "Chats", clubs: "Clubs", requests: "Requests" };
+export const FILTER_LABEL: Record<HomeFilter, string> = { all: "All", chats: "Chats", clubs: "Clubs", requests: "Requests" };
+export const LIST_LABEL: Record<HomeFilter, string> = { all: "All chats, pinned first", chats: "Chats", clubs: "Clubs", requests: "Requests" };
 
 export function MessagesHome({ filter, onFilter, refreshKey, onThreads, onOpenClub, onOpenThread, onOpenRoom, onCompose }: MessagesHomeProps) {
   const night = useNightTheme();

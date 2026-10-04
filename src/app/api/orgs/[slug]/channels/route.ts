@@ -1,10 +1,13 @@
 import { NextResponse } from "next/server";
 
+import { EXTRA_ROOM_CAP, isPostPolicy } from "@/lib/chat/room-rules";
+import { notePostPolicyColumnMissing, postPolicyColumnMissing } from "@/lib/chat/rooms";
 import { isMissingChatSchema, warnMissingChatSchemaOnce } from "@/lib/chat/schema";
-import { refusalBody } from "@/lib/chat/types";
+import { refusalBody, type PostPolicy } from "@/lib/chat/types";
 import { isCoreRoomName, loadClubOfficer } from "@/lib/club-routes/officer-guard";
 import { contentBlockedResponse, requireCanPublish } from "@/lib/moderation/access";
 import { checkText } from "@/lib/moderation/text-filter";
+import { rateLimit, tooManyRequests } from "@/lib/rate-limit";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 
@@ -13,12 +16,26 @@ const CHANNEL_NAME_RE = /^[a-z0-9][a-z0-9_-]{1,30}$/;
 /** What the list sent before chat rooms, and still sends on a database without `channels.kind`. */
 const LIST_COLUMNS = "id, name, topic, is_private, pinned, position, created_at, parent_channel_id";
 
+/** What a created room answers with; `post_policy` joins it only when the body asked for a rule. */
+const CREATED_COLUMNS = "id, name, topic, is_private, pinned, position, created_at";
+
+/** Ten create requests per person per ten minutes: this write path had no limit at all. */
+const ROOM_CREATE_LIMIT = { limit: 10, windowSec: 600 };
+
+/**
+ * The list's three reads, newest database first (wave-3 contract 4.2):
+ * `policy` names `kind` and `post_policy`, `kind` is the list from before
+ * `post_policy`, `bare` the one from before chat rooms.
+ */
+type ListStep = "policy" | "kind" | "bare";
+
 type Params = { params: Promise<{ slug: string }> };
 type CreateBody = {
   name?: unknown;
   topic?: unknown;
   is_private?: unknown;
   position?: unknown;
+  post_policy?: unknown;
 };
 
 /**
@@ -37,6 +54,15 @@ type CreateBody = {
  * `kind`, and an event's chat (`kind = 'event'`) is left out: this is the old
  * list, and event chats are reached from their event. On a database without
  * `channels.kind` the answer is the one from before (section 3.10).
+ *
+ * Who can post, wave 3 (wave-3-desktop/contract.md 4.2): every row also
+ * carries its `post_policy`. Production has `kind` before it has
+ * `post_policy`, so the read has THREE steps, not two: with both columns;
+ * then, where `post_policy` is missing, the list from before it (rows keep
+ * their `kind`, event chats stay out, no row has `post_policy`); and only
+ * where `kind` is missing too, the bare list. That `post_policy` is missing
+ * is remembered for five minutes (`postPolicyColumnMissing`), so the first
+ * step is not asked and failed on every read until the column is applied.
  */
 export async function GET(_req: Request, { params }: Params) {
   const { slug } = await params;
@@ -95,23 +121,32 @@ export async function GET(_req: Request, { params }: Params) {
   }
 
   const orgId = org.id as string;
-  async function readChannels(withKind: boolean) {
-    const base = supabase
-      .from("channels")
-      .select(withKind ? `${LIST_COLUMNS}, kind` : LIST_COLUMNS)
-      .eq("org_id", orgId);
+  async function readChannels(step: ListStep) {
+    const columns =
+      step === "policy" ? `${LIST_COLUMNS}, kind, post_policy` : step === "kind" ? `${LIST_COLUMNS}, kind` : LIST_COLUMNS;
+    const base = supabase.from("channels").select(columns).eq("org_id", orgId);
     // Written as "no kind, or a kind that is not event": a plain `neq` would
     // also drop a row whose kind is null.
-    const rooms = withKind ? base.or("kind.is.null,kind.neq.event") : base;
+    const rooms = step === "bare" ? base : base.or("kind.is.null,kind.neq.event");
     return rooms
       .order("pinned", { ascending: false })
       .order("position", { ascending: true })
       .order("created_at", { ascending: true });
   }
-  let { data, error } = await readChannels(true);
+  // Step 1 is skipped while this instance remembers the column is missing.
+  const policyKnownMissing = postPolicyColumnMissing();
+  let { data, error } = await readChannels(policyKnownMissing ? "kind" : "policy");
+  if (!policyKnownMissing && error && isMissingChatSchema(error)) {
+    // Step 2: the list from before `post_policy`, kind and event filter kept.
+    notePostPolicyColumnMissing();
+    const older = await readChannels("kind");
+    data = older.data;
+    error = older.error;
+  }
   if (error && isMissingChatSchema(error)) {
+    // Step 3: `kind` is missing too.
     warnMissingChatSchemaOnce("orgs/[slug]/channels GET");
-    const bare = await readChannels(false);
+    const bare = await readChannels("bare");
     data = bare.data;
     error = bare.error;
   }
@@ -142,8 +177,24 @@ export async function GET(_req: Request, { params }: Params) {
  * Chat rooms, wave 1 (wave-1-contracts.md section 8): what this route makes
  * is always an extra room (`kind: 'room'`). `board`, `lounge` and `officers`
  * (any case) are the names of the three rooms every club already has: 409
- * `room_locked`. No cap on the number of rooms in v1. On a database without
- * `channels.kind` it does what it did before (section 3.10).
+ * `room_locked`. On a database without `channels.kind` it does what it did
+ * before (section 3.10).
+ *
+ * Who can post, wave 3 (wave-3-desktop/contract.md 4.2, decision R3):
+ *   - Body gains `post_policy?` (`everyone`, the default, `officers`,
+ *     `listed`). The column is written, and read back, ONLY when the body
+ *     asked for something other than `everyone`: every other create is the
+ *     insert from before, so it runs on a database without the column. A
+ *     rule asked of such a database answers 503 `try_again`: never a room
+ *     that silently lets everyone post, never the bare insert.
+ *   - A club holds at most `EXTRA_ROOM_CAP` extra rooms: one more answers
+ *     409 `room_limit`. Rooms over the cap that already exist are kept. The
+ *     count is skipped where `kind` cannot be read (nothing says which rows
+ *     are extra rooms there).
+ *   - A rate limit per person, before every other gate.
+ * Both the cap and the limit bind old desktop's Campus > Chat too (2.5 row 9).
+ * The gates, in order: rate limit, publish gate, body, name rule, officer
+ * guard, cap.
  */
 export async function POST(req: Request, { params }: Params) {
   const { slug } = await params;
@@ -152,6 +203,9 @@ export async function POST(req: Request, { params }: Params) {
   if (!user) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
+
+  const rl = await rateLimit(`room-create:${user.id}`, ROOM_CREATE_LIMIT);
+  if (!rl.allowed) return tooManyRequests(rl);
 
   const publishGate = await requireCanPublish(user.id);
   if (publishGate) return publishGate;
@@ -171,6 +225,12 @@ export async function POST(req: Request, { params }: Params) {
   const topic = typeof body.topic === "string" ? body.topic.trim().slice(0, 200) : null;
   const isPrivate = body.is_private === true;
   const position = typeof body.position === "number" ? body.position : 100;
+  // Absent is `everyone`; anything else must be one of the three rules.
+  if (body.post_policy !== undefined && !isPostPolicy(body.post_policy)) {
+    return NextResponse.json({ ok: false, error: "Invalid post_policy" }, { status: 400 });
+  }
+  const postPolicy: PostPolicy = isPostPolicy(body.post_policy) ? body.post_policy : "everyone";
+  const withPolicy = postPolicy !== "everyone";
 
   if (!CHANNEL_NAME_RE.test(name)) {
     return NextResponse.json(
@@ -224,6 +284,24 @@ export async function POST(req: Request, { params }: Params) {
     return NextResponse.json({ ok: false, error: "Channel name already exists" }, { status: 409 });
   }
 
+  // The cap, last before the write. Only where `kind` can be read: without
+  // it nothing says which of the club's rows are extra rooms.
+  if (hasRoomKinds) {
+    const { count, error: countErr } = await service
+      .from("channels")
+      .select("id", { count: "exact", head: true })
+      .eq("org_id", org.id)
+      .eq("kind", "room");
+    if (countErr || count === null) {
+      // Unknown how many rooms the club has: never write on a guess.
+      console.error("[orgs/[slug]/channels POST room count]", countErr);
+      return NextResponse.json({ ok: false, error: "Failed to create channel" }, { status: 500 });
+    }
+    if (count >= EXTRA_ROOM_CAP) {
+      return NextResponse.json(refusalBody("room_limit"), { status: 409 });
+    }
+  }
+
   async function insertRoom(withKind: boolean) {
     return service
       .from("channels")
@@ -235,11 +313,18 @@ export async function POST(req: Request, { params }: Params) {
         is_private: isPrivate,
         position,
         ...(withKind ? { kind: "room" } : {}),
+        ...(withPolicy ? { post_policy: postPolicy } : {}),
       })
-      .select("id, name, topic, is_private, pinned, position, created_at")
+      .select(withPolicy ? `${CREATED_COLUMNS}, post_policy` : CREATED_COLUMNS)
       .single();
   }
   let { data: created, error } = await insertRoom(hasRoomKinds);
+  if (withPolicy && error && isMissingChatSchema(error)) {
+    // The rule cannot be stored here. Making the room without it would let
+    // everyone post in a room the officer asked to restrict: no second insert.
+    console.warn("[orgs/[slug]/channels POST] post_policy asked of a database without the column: 503, nothing written");
+    return NextResponse.json(refusalBody("try_again"), { status: 503 });
+  }
   if (hasRoomKinds && error && isMissingChatSchema(error)) {
     warnMissingChatSchemaOnce("orgs/[slug]/channels POST");
     const bare = await insertRoom(false);
@@ -250,5 +335,8 @@ export async function POST(req: Request, { params }: Params) {
     console.error("[orgs/[slug]/channels POST]", error);
     return NextResponse.json({ ok: false, error: "Failed to create channel" }, { status: 500 });
   }
-  return NextResponse.json({ ok: true, channel: created }, { status: 201 });
+  // `post_policy` is in every answer; `everyone` where it was not selected.
+  const row = created as unknown as Record<string, unknown>;
+  const savedPolicy: PostPolicy = isPostPolicy(row.post_policy) ? row.post_policy : postPolicy;
+  return NextResponse.json({ ok: true, channel: { ...row, post_policy: savedPolicy } }, { status: 201 });
 }

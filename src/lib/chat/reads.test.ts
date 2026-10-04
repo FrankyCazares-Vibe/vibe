@@ -45,6 +45,7 @@ const {
   orderInboxClubs,
   orderSpaceRooms,
   readSince,
+  recentShown,
   refOfRoom,
   spaceCanPost,
   toPreview,
@@ -158,11 +159,38 @@ test("spaceCanPost: board by role, event by state, others always", () => {
   assert.equal(spaceCanPost("officers", "owner", null), true);
 });
 
+test("spaceCanPost: an extra room by its post_policy (wave 3, 4c.2); every other kind ignores the policy", () => {
+  // No policy given: the rule before the column, everyone who sees it posts.
+  assert.equal(spaceCanPost("room", "member", null), true);
+  assert.equal(spaceCanPost("room", "member", null, "everyone"), true);
+  assert.equal(spaceCanPost("room", "member", null, "everyone", true), true);
+  // officers: owner and admin; a mod is not an officer here; the room's list changes nothing.
+  assert.equal(spaceCanPost("room", "member", null, "officers"), false);
+  assert.equal(spaceCanPost("room", "member", null, "officers", true), false);
+  assert.equal(spaceCanPost("room", "mod", null, "officers"), false);
+  assert.equal(spaceCanPost("room", "admin", null, "officers"), true);
+  assert.equal(spaceCanPost("room", "owner", null, "officers"), true);
+  assert.equal(spaceCanPost("room", null, null, "officers"), false);
+  // listed: owner, admin, and anyone on the room's list.
+  assert.equal(spaceCanPost("room", "member", null, "listed"), false);
+  assert.equal(spaceCanPost("room", "member", null, "listed", true), true);
+  assert.equal(spaceCanPost("room", "mod", null, "listed", false), false);
+  assert.equal(spaceCanPost("room", "admin", null, "listed"), true);
+  assert.equal(spaceCanPost("room", "owner", null, "listed", false), true);
+  // The fixed rooms and event chats keep their own rule whatever is passed.
+  assert.equal(spaceCanPost("lounge", "member", null, "officers"), true);
+  assert.equal(spaceCanPost("officers", "member", null, "officers"), true);
+  assert.equal(spaceCanPost("board", "member", null, "listed", true), false);
+  assert.equal(spaceCanPost("board", "admin", null, "officers"), true);
+  assert.equal(spaceCanPost("event", "member", "live", "officers"), true);
+  assert.equal(spaceCanPost("event", "owner", "closed", "everyone", true), false);
+});
+
 function ref(id: string, starts_at: string, state: EventRef["state"]): EventRef {
   return { id, title: id, starts_at, ends_at: starts_at, location: "", state, room_id: null, viewer_status: null, going_count: 0, maybe_count: 0 };
 }
 function sroom(over: Partial<SpaceRoomWithPosition> & { kind: SpaceRoomWithPosition["kind"] }): SpaceRoomWithPosition {
-  return { id: over.kind, name: over.kind, unread: false, can_post: true, event: null, position: null, state: null, starts_at: null, ...over };
+  return { id: over.kind, name: over.kind, unread: false, can_post: true, event: null, locked: false, post_policy: "everyone", position: null, state: null, starts_at: null, ...over };
 }
 /** An event room as the route fills it: `state` and `starts_at` from the ref, or from the event row when the ref is missing. */
 function eroom(id: string, name: string, event: EventRef | null, state: SpaceRoomWithPosition["state"], starts_at: string | null): SpaceRoomWithPosition {
@@ -192,6 +220,24 @@ test("orderSpaceRooms: lounge, board, officers, open event rooms by starts_at, r
   assert.equal(ordered[4].event, null);
 });
 
+test("orderSpaceRooms keeps locked and post_policy; a room's keys are exactly the eight of SpaceRoom", () => {
+  const ordered = orderSpaceRooms([
+    sroom({ kind: "room", id: "r-listed", name: "b", post_policy: "listed", can_post: false }),
+    sroom({ kind: "room", id: "r-private", name: "a", locked: true, post_policy: "officers" }),
+    sroom({ kind: "officers", id: "o", locked: true }),
+    sroom({ kind: "lounge", id: "l" }),
+  ]);
+  assert.deepEqual(ordered.map((r) => [r.id, r.locked, r.post_policy]), [
+    ["l", false, "everyone"],
+    ["o", true, "everyone"],
+    ["r-private", true, "officers"],
+    ["r-listed", false, "listed"],
+  ]);
+  for (const room of ordered) {
+    assert.deepEqual(Object.keys(room).sort(), ["can_post", "event", "id", "kind", "locked", "name", "post_policy", "unread"]);
+  }
+});
+
 test("lastShown: the last non-hidden, non-removed of an oldest-first page; refOfRoom", () => {
   assert.equal(lastShown([{ id: 1, hidden: false, removed: null }, { id: 2, hidden: false, removed: null }, { id: 3, hidden: true, removed: null }])?.id, 2);
   // 7.2.4: the viewer's own removed row (RLS shows it to its author) is never `board_latest` (INT-ADJUDICATE-9).
@@ -204,4 +250,23 @@ test("lastShown: the last non-hidden, non-removed of an oldest-first page; refOf
   assert.equal(refOfRoom("x", refs), null);
   assert.equal(refOfRoom(null, refs), null);
   assert.equal(refOfRoom("e", null), null);
+});
+
+test("recentShown: the last `max` shown messages of an oldest-first page, newest first (board_recent)", () => {
+  const removed = { by: "officer", at: T1, reason: null };
+  const page = [
+    { id: 1, hidden: false, removed: null },
+    { id: 2, hidden: false, removed: null },
+    { id: 3, hidden: true, removed: null },
+    { id: 4, hidden: false, removed: null },
+    { id: 5, hidden: false, removed },
+    { id: 6, hidden: false, removed: null },
+  ];
+  assert.deepEqual(recentShown(page, 3).map((m) => m.id), [6, 4, 2], "a stub and a removed row take no place");
+  assert.equal(recentShown(page, 3)[0], lastShown(page), "its first entry is board_latest");
+  assert.deepEqual(recentShown(page, 10).map((m) => m.id), [6, 4, 2, 1]);
+  assert.deepEqual(recentShown(page.slice(0, 2), 3).map((m) => m.id), [2, 1]);
+  assert.deepEqual(recentShown([{ hidden: true, removed: null }, { hidden: false, removed }], 3), []);
+  assert.deepEqual(recentShown([], 3), []);
+  assert.deepEqual(recentShown(page, 0), []);
 });

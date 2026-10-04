@@ -553,6 +553,7 @@ function MessagesMobileV2({ initialHandle, initialChannelId }: { initialHandle?:
           key={open.threadId}
           threadId={open.threadId}
           thread={openThreadEntry}
+          messagePins
           onThreadsChanged={() => setRefreshKey((k) => k + 1)}
           onClose={closeLayer}
         />

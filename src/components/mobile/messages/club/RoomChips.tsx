@@ -2,6 +2,7 @@
 
 import type { SpaceRoom } from "@/lib/chat/types";
 
+import { useChatSurface } from "../surface";
 import { FONT, palette } from "../v2-tokens";
 import { chipAriaLabel, chipLabel } from "./helpers";
 
@@ -23,11 +24,21 @@ import { chipAriaLabel, chipLabel } from "./helpers";
  * `1 unread post` (S71 amendment 3, C; audit F05): the space read is 20 s
  * behind the thread, so a post I am looking at would light the dot on the
  * chip I am on until the next space read.
+ *
+ * Wave 3 (handoffs/chat-redesign/wave-3-desktop/contract.md 4c.4, 6.3).
+ * BOTH surfaces: the lock on the Officers chip and on every private room
+ * that is not an event chat (`room.locked`), and the megaphone before the
+ * word `Board` (C9: the Board reads as announcements). DESKTOP surface only
+ * (`useChatSurface()`): an event chat opens in place like any room, so its
+ * chip is drawn selected while it is the open room; the row wraps instead of
+ * scrolling sideways, so every room is reachable with a mouse; and the
+ * `<nav>` draws no top border and no side padding, because `ClubPane` places
+ * the chips inside the club header's row.
  */
 export type RoomChipsProps = {
   clubName: string;
   rooms: SpaceRoom[];
-  /** The open room's id (never an event room's). */
+  /** The open room's id (on the phone never an event room's; on desktop it may be one). */
   activeRoomId: string | null;
   night: boolean;
   now: Date;
@@ -52,33 +63,52 @@ function CalendarIcon() {
   );
 }
 
+/** The Board's mark: `BoardStrip`'s megaphone path at the chip icons' 12px, in the chip's own ink. */
+function MegaphoneIcon() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ flexShrink: 0 }}>
+      <path d="M3 10.5v3a1 1 0 0 0 1 1h2.5L12 19V5L6.5 9.5H4a1 1 0 0 0-1 1z" />
+      <path d="M16 9a4.5 4.5 0 0 1 0 6" />
+      <path d="M18.5 6.5a8 8 0 0 1 0 11" />
+    </svg>
+  );
+}
+
 export function RoomChips({ clubName, rooms, activeRoomId, night, now, onPick }: RoomChipsProps) {
   const t = palette(night);
+  const desktop = useChatSurface() === "desktop";
   const inactiveBorder = `1px solid ${t.chipBorder}`;
+  // Desktop: inside the club header's row, so no hairline and no side padding
+  // of its own, and the chips wrap (no sideways scroll). Phone: the 45px row
+  // under the header as before, scrolling sideways when the chips do not fit.
+  // The wrap needs a width to wrap in: as an item of the header's row the
+  // `<nav>` must be allowed to get narrower than its one-line width
+  // (`flexShrink: 1`, `minWidth: 0`), or the chips run off the row instead.
+  const row: React.CSSProperties = desktop
+    ? { flexShrink: 1, minWidth: 0, height: "auto", minHeight: 45, padding: 0, borderTop: "none", flexWrap: "wrap" }
+    : { flexShrink: 0, height: 45, padding: "0 12px", borderTop: `1px solid ${t.hairline}`, overflowX: "auto", overflowY: "hidden", scrollbarWidth: "none" };
   return (
     <nav
       aria-label={`Rooms in ${clubName}`}
       style={{
-        flexShrink: 0,
-        height: 45,
         boxSizing: "border-box",
-        padding: "0 12px",
         display: "flex",
         alignItems: "center",
         gap: 5,
-        borderTop: `1px solid ${t.hairline}`,
-        overflowX: "auto",
-        overflowY: "hidden",
-        scrollbarWidth: "none",
         fontFamily: FONT,
+        ...row,
       }}
     >
       {rooms.map((room) => {
-        const active = room.kind !== "event" && room.id === activeRoomId;
+        // On the phone an event chip never becomes the active chip (it opens
+        // the event chat layer); on desktop the event chat is the open room.
+        const active = (desktop || room.kind !== "event") && room.id === activeRoomId;
         // The open room is read by being on screen: no dot, no "unread" word.
         const unread = room.unread && !active;
         const label = chipAriaLabel(unread === room.unread ? room : { ...room, unread }, now);
-        const icon = room.kind === "officers" ? <LockIcon /> : room.kind === "event" ? <CalendarIcon /> : null;
+        // The lock: the Officers room, and any private room that is not an event chat (4c.4).
+        const locked = room.kind === "officers" || (room.locked && room.kind !== "event");
+        const icon = locked ? <LockIcon /> : room.kind === "event" ? <CalendarIcon /> : room.kind === "board" ? <MegaphoneIcon /> : null;
         const dot = room.kind === "board" && unread;
         return (
           <button
@@ -105,7 +135,8 @@ export function RoomChips({ clubName, rooms, activeRoomId, night, now, onPick }:
               style={{
                 height: 30,
                 boxSizing: "border-box",
-                padding: icon ? "0 11px 0 9px" : dot ? "0 9px 0 11px" : "0 11px",
+                // 9px on a side that holds a mark (the icon on the left, the dot on the right), else 11px.
+                padding: `0 ${dot ? 9 : 11}px 0 ${icon ? 9 : 11}px`,
                 borderRadius: 999,
                 border: active ? "1px solid transparent" : inactiveBorder,
                 background: active ? t.activeChip.bg : "transparent",

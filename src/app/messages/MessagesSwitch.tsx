@@ -1,9 +1,27 @@
 "use client";
 
+import dynamic from "next/dynamic";
+
 import { CampusAppShell } from "@/components/campus-app-shell";
 import { MessagesMobile } from "@/components/mobile/MessagesMobile";
 import { MobileShell } from "@/components/mobile/MobileShell";
+import { useClientReady } from "@/lib/use-client-ready";
 import { useIsMobile } from "@/lib/use-is-mobile";
+
+/** The stage before the client is known, and while the desktop shell's code loads: the page colour, nothing on it. */
+function EmptyStage() {
+  return <div style={{ minHeight: "100vh", background: "var(--cream)" }} />;
+}
+
+/**
+ * The desktop shell, client-only. `ssr: false` keeps its code off phones and
+ * off laptops without the switch; it is NOT what keeps a phone from mounting
+ * it. That is `useClientReady` below.
+ */
+const MessagesDesktop = dynamic(
+  () => import("@/components/desktop/messages/MessagesDesktop").then((mod) => mod.MessagesDesktop),
+  { ssr: false, loading: () => <EmptyStage /> },
+);
 
 /**
  * Viewport-based fork for /messages.
@@ -15,15 +33,38 @@ import { useIsMobile } from "@/lib/use-is-mobile";
  * The ?to=<handle> query param is threaded through both branches so a
  * link like /messages?to=alex opens the right conversation regardless
  * of viewport.
+ *
+ * `desktopChat` is the `chat_desktop` switch for this person, worked out on
+ * the server (page.tsx). Off, which is the default: everything above, and
+ * nothing else. On: a laptop gets CampusAppShell + MessagesDesktop instead of
+ * the iframe, and a phone gets what it gets today.
+ *
+ * With it on, nothing is chosen until the client is known. `useIsMobile`
+ * says "desktop" on the server and all through hydration, so a phone would
+ * mount the desktop shell for one frame on every hard load and run its mount
+ * effects (its reads, its history writes) before its own. Until
+ * `useClientReady`, the page is the app shell around an empty stage.
  */
 export function MessagesSwitch({
   initialHandle,
   initialChannelId,
+  desktopChat = false,
 }: {
   initialHandle?: string;
   initialChannelId?: string;
+  desktopChat?: boolean;
 }) {
   const isMobile = useIsMobile();
+  // Read on every render (a hook cannot sit behind the prop); used only with the switch on.
+  const ready = useClientReady();
+
+  if (desktopChat && !ready) {
+    return (
+      <CampusAppShell>
+        <EmptyStage />
+      </CampusAppShell>
+    );
+  }
 
   if (isMobile) {
     return (
@@ -33,6 +74,14 @@ export function MessagesSwitch({
           initialChannelId={initialChannelId}
         />
       </MobileShell>
+    );
+  }
+
+  if (desktopChat) {
+    return (
+      <CampusAppShell>
+        <MessagesDesktop initialHandle={initialHandle} initialChannelId={initialChannelId} />
+      </CampusAppShell>
     );
   }
 

@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 
+import { isPostPolicy } from "@/lib/chat/room-rules";
+import { isMissingChatSchema } from "@/lib/chat/schema";
 import { refusalBody } from "@/lib/chat/types";
 import { isCoreRoomKind, isCoreRoomName, loadClubOfficer } from "@/lib/club-routes/officer-guard";
 import { contentBlockedResponse, requireNotRestricted } from "@/lib/moderation/access";
@@ -10,6 +12,9 @@ const CHANNEL_NAME_RE = /^[a-z0-9][a-z0-9_-]{1,30}$/;
 const MIN_POSITION = 0;
 const MAX_POSITION = 10000;
 
+/** What an edited room answers with; `post_policy` joins it only when the body changed the rule. */
+const UPDATED_COLUMNS = "id, name, topic, is_private, pinned, position, created_at, parent_channel_id";
+
 type Params = { params: Promise<{ slug: string; channelId: string }> };
 type PatchBody = {
   name?: unknown;
@@ -17,6 +22,7 @@ type PatchBody = {
   is_private?: unknown;
   position?: unknown;
   pinned?: unknown;
+  post_policy?: unknown;
 };
 
 /**
@@ -66,6 +72,19 @@ function roomLocked() {
  *     refused, 409 `room_locked`.
  *   - kind unreadable (a database without `channels.kind`): what this route
  *     did before, its own row purge included (section 3.10).
+ *
+ * Who can post, wave 3 (wave-3-desktop/contract.md 4.2): body gains
+ * `post_policy?` (`everyone`, `officers`, `listed`). Only an extra room
+ * (`kind = 'room'`) has such a rule: on any other room the field is refused,
+ * 409 `room_locked`, whatever its value (the Board, the Lounge and the
+ * Officers room keep their own rules). A value outside the three is 400. On
+ * a database without the column a rule (`officers`, `listed`) answers 503
+ * `try_again`, not 500: it cannot be stored, and nothing else is written.
+ * `everyone` there is what the missing column already means, so the rest of
+ * the body is saved by the update from before, once (a screen that sends the
+ * field on every save can still rename the room), and the answer carries
+ * `post_policy: "everyone"`. A body without `post_policy` runs the code from
+ * before, unchanged.
  */
 export async function PATCH(req: Request, { params }: Params) {
   const { slug, channelId } = await params;
@@ -101,6 +120,13 @@ export async function PATCH(req: Request, { params }: Params) {
   if (renamed && kind !== null && (coreRoom || isCoreRoomName(sentName))) return roomLocked();
   if (coreRoom && typeof body.is_private === "boolean" && body.is_private !== guard.channel.is_private) {
     return roomLocked();
+  }
+  // Who can post is an extra room's rule only. Where `kind` cannot be read
+  // (null) the column is not there either: refused the same way.
+  const sentPolicy = body.post_policy !== undefined;
+  if (sentPolicy && kind !== "room") return roomLocked();
+  if (sentPolicy && !isPostPolicy(body.post_policy)) {
+    return NextResponse.json({ ok: false, error: "Invalid post_policy" }, { status: 400 });
   }
 
   // A core room's name can only arrive here unchanged: not written.
@@ -164,17 +190,46 @@ export async function PATCH(req: Request, { params }: Params) {
   if (typeof body.pinned === "boolean") {
     patch.pinned = body.pinned;
   }
+  // Checked above: present means an extra room and one of the three rules.
+  if (sentPolicy) {
+    patch.post_policy = body.post_policy;
+  }
 
   if (Object.keys(patch).length === 0) {
     return NextResponse.json({ ok: false, error: "Nothing to update" }, { status: 400 });
   }
 
-  const { data: updated, error } = await guard.service
+  const first = await guard.service
     .from("channels")
     .update(patch)
     .eq("id", channelId)
-    .select("id, name, topic, is_private, pinned, position, created_at, parent_channel_id")
+    .select(sentPolicy ? `${UPDATED_COLUMNS}, post_policy` : UPDATED_COLUMNS)
     .single();
+  let updated: unknown = first.data;
+  let error = first.error;
+  // True when `everyone` was asked of a database without the column.
+  let everyoneByDefault = false;
+  if (sentPolicy && error && isMissingChatSchema(error)) {
+    if (body.post_policy !== "everyone") {
+      // The column is not in this database yet: the rule cannot be stored, and
+      // nothing else in the body was written either (one statement).
+      console.warn("[orgs/[slug]/channels/[channelId] PATCH] post_policy asked of a database without the column: 503, nothing written");
+      return NextResponse.json(refusalBody("try_again"), { status: 503 });
+    }
+    // `everyone` is what a missing column already means: nothing to store.
+    // The rest of the body is written by the update from before, ONCE (a
+    // second failure is the 500 below); a body that held only the rule
+    // writes nothing and reads the room back.
+    const rest = { ...patch };
+    delete rest.post_policy;
+    const again =
+      Object.keys(rest).length > 0
+        ? await guard.service.from("channels").update(rest).eq("id", channelId).select(UPDATED_COLUMNS).single()
+        : await guard.service.from("channels").select(UPDATED_COLUMNS).eq("id", channelId).single();
+    updated = again.data;
+    error = again.error;
+    everyoneByDefault = true;
+  }
   if (error || !updated) {
     console.error("[orgs/[slug]/channels/[channelId] PATCH]", error);
     return NextResponse.json({ ok: false, error: "Failed to update channel" }, { status: 500 });
@@ -198,7 +253,9 @@ export async function PATCH(req: Request, { params }: Params) {
       console.error("[orgs/[slug]/channels/[channelId] PATCH purge-members]", purgeErr);
     }
   }
-  return NextResponse.json({ ok: true, channel: updated });
+  // The rule is in the answer whenever the body named it, as after a create.
+  const channel = everyoneByDefault ? { ...(updated as object), post_policy: "everyone" } : updated;
+  return NextResponse.json({ ok: true, channel });
 }
 
 /**

@@ -17,6 +17,12 @@
  * each resolves to a small data: module that answers from `globalThis`.
  * Everything else (`reads`, `stub`, `blocks`, `room-rules`, `schema`,
  * `org-asset-url`) is the real code.
+ *
+ * ONE PART OF `rooms.ts` IS REAL: the memory of a missing `post_policy`
+ * column (wave-3 contract 4.2). The stub of "@/lib/chat/rooms" fakes
+ * `loadRoom` and re-exports the three memory functions from the file itself,
+ * so the route and this test share one memory. `install` forgets it, so no
+ * case inherits another's.
  */
 
 import assert from "node:assert/strict";
@@ -32,6 +38,8 @@ const { registerHooks } = nodeModule as unknown as {
 if (typeof registerHooks !== "function") throw new Error("reads-routes.test.ts needs Node >= 22.15 (module.registerHooks)");
 const SRC_ROOT = new URL("../../", import.meta.url);
 const dataModule = (code: string) => `data:text/javascript,${encodeURIComponent(code)}`;
+/** The real rooms.ts, by its absolute URL: a data: module resolves nothing relative. */
+const ROOMS_URL = new URL("lib/chat/rooms.ts", SRC_ROOT).href;
 const STUBS: Record<string, string> = {
   "server-only": dataModule(""),
   "next/server": dataModule(
@@ -48,7 +56,10 @@ const STUBS: Record<string, string> = {
   "@/lib/chat/event-refs": dataModule(
     "export async function eventRefsFor(events, viewerId, opts) { return globalThis.__vibeEventRefsFor(events, viewerId, opts); }",
   ),
-  "@/lib/chat/rooms": dataModule("export async function loadRoom(id) { return globalThis.__vibeLoadRoom(id); }"),
+  "@/lib/chat/rooms": dataModule(
+    "export async function loadRoom(id) { return globalThis.__vibeLoadRoom(id); }\n" +
+      `export { postPolicyColumnMissing, notePostPolicyColumnMissing, forgetPostPolicyColumnMissing } from ${JSON.stringify(ROOMS_URL)};`,
+  ),
   "@/lib/chat/message-read": dataModule(
     "export async function readChatMessages(client, channelId, opts, known) { return globalThis.__vibeReadChatMessages(client, channelId, opts, known); }",
   ),
@@ -74,6 +85,9 @@ const calendarSpecifier = "../../app/api/me/calendar/route.ts";
 const inbox = (await import(inboxSpecifier)) as { GET: Handler };
 const space = (await import(spaceSpecifier)) as { GET: Handler };
 const calendar = (await import(calendarSpecifier)) as { GET: Handler };
+const { forgetPostPolicyColumnMissing, notePostPolicyColumnMissing, postPolicyColumnMissing } = (await import(
+  ROOMS_URL
+)) as typeof import("./rooms");
 type EventRef = import("./types").EventRef;
 type EventRow = import("./event-refs").EventRow;
 type InboxClub = import("./types").InboxClub;
@@ -169,8 +183,9 @@ async function plainRefs(events: EventRow[]): Promise<Map<string, EventRef>> {
 
 const g = globalThis as unknown as Record<string, unknown>;
 
-/** Install the fakes; returns the two logs. */
+/** Install the fakes and forget a missing `post_policy` column; returns the two logs. */
 function install(world: World) {
+  forgetPostPolicyColumnMissing();
   const cookieAnswer = world.cookie ?? (() => ({ data: [] }));
   const rpcAnswer = world.rpc ?? (() => ({ error: MISSING_FN }));
   const cookie = fakeClient(
@@ -560,16 +575,33 @@ test("inbox, per room: any other error from the function falls back to today's s
 // ── GET /api/orgs/[slug]/space (7.2) ────────────────────────────────────────
 
 const SP = { lounge: "sp-lounge", board: "sp-board", officers: "sp-officers", open: "sp-ev-open", closed: "sp-ev-closed", zeta: "sp-zeta", alpha: "sp-alpha" };
-const spaceChannels = () => [
-  { id: SP.zeta, kind: "room", name: "zeta", event_id: null, position: 1 },
-  { id: SP.closed, kind: "event", name: "Old formal", event_id: "ev-closed", position: 0 },
-  { id: SP.board, kind: "board", name: "Board", event_id: null, position: 0 },
-  { id: SP.open, kind: "event", name: "Fall formal", event_id: "ev-open", position: 0 },
-  { id: "sp-nokind", kind: null, name: "old", event_id: null, position: 0 },
-  { id: SP.officers, kind: "officers", name: "Officers", event_id: null, position: 0 },
-  { id: SP.alpha, kind: "room", name: "alpha", event_id: null, position: 0 },
-  { id: SP.lounge, kind: "lounge", name: "Lounge", event_id: null, position: 0 },
+/** Officers and the event chats are private; `alpha` is a private extra room, `zeta` a public one. Every rule is `everyone`. */
+const spaceChannels = (): Record<string, unknown>[] => [
+  { id: SP.zeta, kind: "room", name: "zeta", event_id: null, position: 1, is_private: false, post_policy: "everyone" },
+  { id: SP.closed, kind: "event", name: "Old formal", event_id: "ev-closed", position: 0, is_private: true, post_policy: "everyone" },
+  { id: SP.board, kind: "board", name: "Board", event_id: null, position: 0, is_private: false, post_policy: "everyone" },
+  { id: SP.open, kind: "event", name: "Fall formal", event_id: "ev-open", position: 0, is_private: true, post_policy: "everyone" },
+  { id: "sp-nokind", kind: null, name: "old", event_id: null, position: 0, is_private: false, post_policy: "everyone" },
+  { id: SP.officers, kind: "officers", name: "Officers", event_id: null, position: 0, is_private: true, post_policy: "everyone" },
+  { id: SP.alpha, kind: "room", name: "alpha", event_id: null, position: 0, is_private: true, post_policy: "everyone" },
+  { id: SP.lounge, kind: "lounge", name: "Lounge", event_id: null, position: 0, is_private: false, post_policy: "everyone" },
 ];
+/** The select the space route makes first (wave-3 contract 4.2), and the one from before `channels.post_policy`. */
+const ROOMS_SELECT = "id, kind, name, event_id, position, is_private, post_policy";
+const ROOMS_SELECT_BEFORE = "id, kind, name, event_id, position, is_private";
+const MISSING_POLICY = { code: "42703", message: "column channels.post_policy does not exist" };
+/** The rows as the database would send them for this select: no `post_policy` key unless the select named it. */
+const selected = (rows: Record<string, unknown>[], calls: Call[]) =>
+  selectOf(calls).includes("post_policy")
+    ? rows
+    : rows.map((row) => {
+        const rest = { ...row };
+        delete rest.post_policy;
+        return rest;
+      });
+/** `spaceChannels()` with the two extra rooms' rules set: `zeta` public, `alpha` private. */
+const policyChannels = (zeta: string, alpha: string) =>
+  spaceChannels().map((row) => (row.id === SP.zeta ? { ...row, post_policy: zeta } : row.id === SP.alpha ? { ...row, post_policy: alpha } : row));
 const spaceEvent = (id: string, day: number) => ({ id, title: id, starts_at: T(day), ends_at: T(day, 12), location: null, org_id: ORG1 });
 const spaceOrg = (hidden_at: string | null = null) => ({ id: ORG1, handle: "salsa", name: "Salsa", logo_url: "orgs/x/logo.png", banner_url: "https://cdn/banner.png", verified: true, hidden_at });
 
@@ -588,8 +620,8 @@ const spaceService = (role: string | null = "member"): Answerer => (table, calls
   }
   return { data: [] };
 };
-const spaceCookie: Answerer = (table) => {
-  if (table === "channels") return { data: spaceChannels() };
+const spaceCookie: Answerer = (table, calls) => {
+  if (table === "channels") return { data: selected(spaceChannels(), calls) };
   if (table === "channel_members") {
     return { data: [
       { channel_id: SP.lounge, last_read_at: T(2), created_at: T(1) },
@@ -642,10 +674,15 @@ test("space: the sweep — 401, 404 with the flag off, load_failed, not_found, m
 });
 
 test("space: the rooms read — a database without A answers 404; another failure 500", async () => {
-  spaceWorld({ cookie: (t) => (t === "channels" ? { error: MISSING_KIND } : { data: [] }) });
+  // Without A both selects fail as missing schema: the one naming post_policy, then the one before it. Only then 404.
+  const withoutA = spaceWorld({ cookie: (t) => (t === "channels" ? { error: MISSING_KIND } : { data: [] }) });
   assert.deepEqual(await space.GET(req(), ctx()), { status: 404, body: { ok: false, error: "That's not there anymore.", code: "not_found" } });
-  spaceWorld({ cookie: (t) => (t === "channels" ? { error: { code: "XX000", message: "boom" } } : { data: [] }) });
+  assert.deepEqual(reads(withoutA.cookieLog, "channels").map((r) => selectOf(r.calls)), [ROOMS_SELECT, ROOMS_SELECT_BEFORE]);
+  // A failure that is not a missing schema is not asked again, and is not remembered as a missing column.
+  const broken = spaceWorld({ cookie: (t) => (t === "channels" ? { error: { code: "XX000", message: "boom" } } : { data: [] }) });
   assert.deepEqual(await space.GET(req(), ctx()), { status: 500, body: { ok: false, error: "Request failed" } });
+  assert.equal(reads(broken.cookieLog, "channels").length, 1);
+  assert.equal(postPolicyColumnMissing(), false);
 });
 
 test("space: the happy path, field by field (7.2.1-7.2.5), and ?events=1 (7.2.6)", async () => {
@@ -671,20 +708,33 @@ test("space: the happy path, field by field (7.2.1-7.2.5), and ?events=1 (7.2.6)
   assert.equal(body.rooms[3].event?.id, "ev-open");
   assert.equal(body.rooms[3].event?.state, "live");
   assert.equal(body.rooms[0].event, null);
-  assert.deepEqual(Object.keys(body.rooms[0]).sort(), ["can_post", "event", "id", "kind", "name", "unread"]);
+  for (const room of body.rooms) {
+    assert.deepEqual(Object.keys(room).sort(), ["can_post", "event", "id", "kind", "locked", "name", "post_policy", "unread"]);
+  }
+  assert.deepEqual(body.rooms.map((r) => [r.id, r.locked, r.post_policy]), [
+    [SP.lounge, false, "everyone"],
+    [SP.board, false, "everyone"],
+    [SP.officers, true, "everyone"],
+    [SP.open, true, "everyone"],
+    [SP.alpha, true, "everyone"],
+    [SP.zeta, false, "everyone"],
+  ], "locked is is_private: Officers, the event chat and the private extra room");
   assert.equal(body.board_latest?.id, "p2", "the last non-hidden, non-removed of the oldest-first page");
   assert.deepEqual(body.up_next.map((e) => e.id), ["ev-open", "ev-x", "ev-y"]);
   assert.equal("upcoming" in body, false);
+  assert.equal("board_recent" in body, false, "only with ?panel=1");
   assert.deepEqual(reading, [[SP.board, { limit: 6 }, {
     viewerId: VIEWER,
     access: { ok: true, isOrgChannel: true, orgId: ORG1, accepted_at: null, cleared_at: null, kind: "board", eventId: null },
     room: BOARD_ROOM,
   }]]);
 
+  assert.equal(reads(cookieLog, "channels").length, 1, "the column is there: one rooms read");
   const channels = reads(cookieLog, "channels")[0].calls;
-  assert.equal(selectOf(channels), "id, kind, name, event_id, position");
+  assert.equal(selectOf(channels), "id, kind, name, event_id, position, is_private, post_policy");
   assert.equal(arg(channels, "eq", "org_id"), ORG1);
   assert.equal(arg(channels, "eq", "type"), "org_channel");
+  assert.equal(reads(cookieLog, "org_channel_members").length, 0, "no room is `listed`: the by-name list is not read");
   const mine = reads(cookieLog, "channel_members")[0].calls;
   assert.deepEqual(arg(mine, "in", "channel_id"), [SP.zeta, SP.closed, SP.board, SP.open, SP.officers, SP.alpha, SP.lounge]);
   assert.equal(arg(mine, "eq", "user_id"), VIEWER);
@@ -737,7 +787,154 @@ test("space: no Board → board_latest null (200); the Board room unreadable →
   assert.equal((owner.body.rooms as SpaceRoom[])[1].can_post, true);
 });
 
-// ── GET /api/me/calendar — the three fields (7.3) ───────────────────────────
+// ── GET /api/orgs/[slug]/space, wave 3 (wave-3-desktop/contract.md 4.2) ─────
+
+const roomsOf = (res: { body: Record<string, unknown> }) => res.body.rooms as SpaceRoom[];
+/** `spaceService("member")` for a world asked more than once: the role read is told by its select, not by its turn. */
+const steadyService: Answerer = (table, calls, nth) =>
+  table === "org_members" ? (selectOf(calls) === "role" ? { data: [{ role: "member" }] } : { count: 42 }) : spaceService()(table, calls, nth);
+const FIVE_MINUTES = 5 * 60 * 1000;
+
+test("space: a database without post_policy — the select fails once, the retry answers every room `everyone`, and the NEXT request makes one select", async () => {
+  const { cookieLog } = spaceWorld({
+    cookie: (t, c, n) => (t === "channels" && selectOf(c).includes("post_policy") ? { error: MISSING_POLICY } : spaceCookie(t, c, n)),
+    service: steadyService,
+  });
+  assert.equal(postPolicyColumnMissing(), false, "install forgot it");
+  const first = await space.GET(req(), ctx());
+  assert.equal(first.status, 200, "a missing column is never a 404 or a failed read");
+  assert.deepEqual(reads(cookieLog, "channels").map((r) => selectOf(r.calls)), [ROOMS_SELECT, ROOMS_SELECT_BEFORE]);
+  for (const call of reads(cookieLog, "channels")) {
+    assert.equal(arg(call.calls, "eq", "org_id"), ORG1);
+    assert.equal(arg(call.calls, "eq", "type"), "org_channel");
+  }
+  assert.deepEqual(roomsOf(first).map((r) => [r.id, r.locked, r.post_policy, r.can_post]), [
+    [SP.lounge, false, "everyone", true],
+    [SP.board, false, "everyone", false],
+    [SP.officers, true, "everyone", true],
+    [SP.open, true, "everyone", true],
+    [SP.alpha, true, "everyone", true],
+    [SP.zeta, false, "everyone", true],
+  ], "locked still comes from is_private; the rule is today's");
+  for (const room of roomsOf(first)) {
+    assert.deepEqual(Object.keys(room).sort(), ["can_post", "event", "id", "kind", "locked", "name", "post_policy", "unread"]);
+  }
+  assert.equal(postPolicyColumnMissing(), true, "the route noted it");
+
+  // The same world, not installed again: the memory holds, so ONE select, the one from before the column.
+  const second = await space.GET(req(), ctx());
+  assert.equal(second.status, 200);
+  assert.deepEqual(reads(cookieLog, "channels").map((r) => selectOf(r.calls)), [ROOMS_SELECT, ROOMS_SELECT_BEFORE, ROOMS_SELECT_BEFORE]);
+  assert.deepEqual(roomsOf(second).map((r) => r.post_policy), ["everyone", "everyone", "everyone", "everyone", "everyone", "everyone"]);
+
+  // Once the memory is gone the select names the column again.
+  forgetPostPolicyColumnMissing();
+  assert.equal((await space.GET(req(), ctx())).status, 200);
+  assert.deepEqual(reads(cookieLog, "channels").slice(3).map((r) => selectOf(r.calls)), [ROOMS_SELECT, ROOMS_SELECT_BEFORE]);
+});
+
+test("the memory of a missing post_policy column lasts 5 minutes from the LAST note", () => {
+  forgetPostPolicyColumnMissing();
+  const t0 = Date.parse("2026-10-04T12:00:00Z");
+  assert.equal(postPolicyColumnMissing(t0), false, "nothing noted");
+  notePostPolicyColumnMissing(t0);
+  assert.equal(postPolicyColumnMissing(t0), true);
+  assert.equal(postPolicyColumnMissing(t0 + FIVE_MINUTES - 1), true);
+  assert.equal(postPolicyColumnMissing(t0 + FIVE_MINUTES), false, "over at 5 minutes");
+  notePostPolicyColumnMissing(t0 + 4 * 60 * 1000);
+  assert.equal(postPolicyColumnMissing(t0 + FIVE_MINUTES + 1), true, "a later note starts the 5 minutes again");
+  assert.equal(postPolicyColumnMissing(t0 + 9 * 60 * 1000), false);
+  notePostPolicyColumnMissing();
+  assert.equal(postPolicyColumnMissing(), true, "both default to the clock");
+  forgetPostPolicyColumnMissing();
+  assert.equal(postPolicyColumnMissing(), false);
+});
+
+test("space: can_post follows an extra room's post_policy; the by-name list is ONE cookie read, made only for `listed`", async () => {
+  const extras = (res: { body: Record<string, unknown> }) =>
+    roomsOf(res).filter((r) => r.kind === "room").map((r) => [r.id, r.locked, r.post_policy, r.can_post]);
+  const cookieWith = (zeta: string, alpha: string, list: Answer): Answerer => (t, c, n) =>
+    t === "channels" ? { data: selected(policyChannels(zeta, alpha), c) } : t === "org_channel_members" ? list : spaceCookie(t, c, n);
+
+  // A member, zeta public + `listed`, alpha private + `officers`: not on zeta's list.
+  const offList = spaceWorld({ cookie: cookieWith("listed", "officers", { data: [] }) });
+  assert.deepEqual(extras(await space.GET(req(), ctx())), [[SP.alpha, true, "officers", false], [SP.zeta, false, "listed", false]]);
+  const listReads = reads(offList.cookieLog, "org_channel_members");
+  assert.equal(listReads.length, 1);
+  assert.equal(selectOf(listReads[0].calls), "channel_id");
+  assert.equal(arg(listReads[0].calls, "eq", "user_id"), VIEWER);
+  assert.deepEqual(arg(listReads[0].calls, "in", "channel_id"), [SP.zeta, SP.closed, SP.board, SP.open, SP.officers, SP.alpha, SP.lounge]);
+
+  // On both lists: `listed` lets them post, `officers` still does not.
+  spaceWorld({ cookie: cookieWith("listed", "officers", { data: [{ channel_id: SP.zeta }, { channel_id: SP.alpha }] }) });
+  assert.deepEqual(extras(await space.GET(req(), ctx())), [[SP.alpha, true, "officers", false], [SP.zeta, false, "listed", true]]);
+
+  // An admin posts under both rules, on no list.
+  spaceWorld({ cookie: cookieWith("listed", "officers", { data: [] }), service: spaceService("admin") });
+  assert.deepEqual(extras(await space.GET(req(), ctx())), [[SP.alpha, true, "officers", true], [SP.zeta, false, "listed", true]]);
+  // A mod is not an officer.
+  spaceWorld({ cookie: cookieWith("officers", "everyone", { data: [] }), service: spaceService("mod") });
+  assert.deepEqual(extras(await space.GET(req(), ctx())), [[SP.alpha, true, "everyone", true], [SP.zeta, false, "officers", false]]);
+
+  // No `listed` room: the list is never read. A failed list read: the closed side, still 200.
+  const noListed = spaceWorld({ cookie: cookieWith("officers", "officers", { error: { code: "XX000", message: "boom" } }) });
+  assert.equal((await space.GET(req(), ctx())).status, 200);
+  assert.equal(reads(noListed.cookieLog, "org_channel_members").length, 0);
+  spaceWorld({ cookie: cookieWith("listed", "everyone", { error: { code: "XX000", message: "boom" } }) });
+  const listFailed = await space.GET(req(), ctx());
+  assert.equal(listFailed.status, 200);
+  assert.deepEqual(extras(listFailed), [[SP.alpha, true, "everyone", true], [SP.zeta, false, "listed", false]]);
+
+  // A value the column cannot hold reads `everyone`.
+  spaceWorld({ cookie: cookieWith("mods", "", { data: [] }) });
+  assert.deepEqual(extras(await space.GET(req(), ctx())), [[SP.alpha, true, "everyone", true], [SP.zeta, false, "everyone", true]]);
+});
+
+test("space: board_recent only with ?panel=1 — at most 3, newest first, cut from the one Board page read with { limit: 6 }", async () => {
+  const msg = (id: string, over: Record<string, unknown> = {}) => ({ id, hidden: false, removed: null, ...over });
+  const removed = { by: "officer", at: "2026-10-05T00:00:00.000Z", reason: null };
+  const sixPosts = async () => ({
+    ok: true,
+    messages: [msg("p1"), msg("p2"), msg("p3"), msg("p4", { hidden: true }), msg("p5"), msg("p6", { removed })],
+    room: BOARD_ROOM,
+    viewerRole: "member",
+  });
+  const asked: unknown[] = [];
+  const counted = (page: () => Promise<unknown>) => async (_client: unknown, channelId: string, opts: unknown) => {
+    asked.push([channelId, opts]);
+    return page();
+  };
+  const recent = (res: { body: Record<string, unknown> }) => (res.body as unknown as SpaceResponse).board_recent?.map((m) => m.id);
+
+  spaceWorld({ read: counted(sixPosts) });
+  const panel = await space.GET(req("http://localhost/api/orgs/salsa/space?panel=1"), ctx());
+  assert.equal(panel.status, 200);
+  assert.deepEqual(recent(panel), ["p5", "p3", "p2"], "the stub and the removed post take no place; newest first");
+  assert.equal(panel.body.board_latest && (panel.body.board_latest as { id: string }).id, "p5", "board_latest is its first entry");
+  assert.equal("upcoming" in panel.body, false);
+  assert.deepEqual(asked, [[SP.board, { limit: 6 }]], "ONE Board read, the limit unchanged");
+
+  // Without the parameter (or with another value) the key is absent, as `upcoming` is without ?events=1.
+  spaceWorld({ read: counted(sixPosts), service: steadyService });
+  assert.equal("board_recent" in (await space.GET(req("http://localhost/api/orgs/salsa/space"), ctx())).body, false);
+  assert.equal("board_recent" in (await space.GET(req("http://localhost/api/orgs/salsa/space?panel=0"), ctx())).body, false);
+  assert.equal("board_recent" in (await space.GET(req("http://localhost/api/orgs/salsa/space?events=1"), ctx())).body, false);
+  assert.deepEqual(asked.slice(1), [[SP.board, { limit: 6 }], [SP.board, { limit: 6 }], [SP.board, { limit: 6 }]]);
+
+  // Fewer than three shown posts; both parameters together; a club with no Board.
+  spaceWorld();
+  const both = await space.GET(req("http://localhost/api/orgs/salsa/space?events=1&panel=1"), ctx());
+  assert.deepEqual(recent(both), ["p2", "p1"]);
+  assert.equal((both.body as unknown as SpaceResponse).upcoming?.length, 4);
+  spaceWorld({ cookie: (t, c, n) => (t === "channels" ? { data: selected(spaceChannels().filter((r) => r.kind !== "board"), c) } : spaceCookie(t, c, n)) });
+  const noBoard = await space.GET(req("http://localhost/api/orgs/salsa/space?panel=1"), ctx());
+  assert.equal(noBoard.status, 200);
+  assert.deepEqual(noBoard.body.board_recent, []);
+
+  // The flag off: still 404, with or without the parameter.
+  spaceWorld({ flag: false });
+  assert.deepEqual(await space.GET(req("http://localhost/api/orgs/salsa/space?panel=1"), ctx()), { status: 404, body: { ok: false, error: "That's not there anymore.", code: "not_found" } });
+});
 
 const rsvpRow = (id: string, org_id: string | null, status = "going") => ({
   status,

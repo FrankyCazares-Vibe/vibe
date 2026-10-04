@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import { LoadFailed } from "@/components/feedback/LoadFailed";
 import { RemovedContentCard, ReportSheet, type ReportTargetRef } from "@/components/safety/ReportSheet";
@@ -12,9 +12,11 @@ import { vibeRequest } from "@/lib/feedback/request";
 import { CardBubble } from "../cards/CardBubble";
 import { MessageBubble } from "../MessageBubble";
 import { toastSendFailure } from "../send-failure";
+import { useChatSurface } from "../surface";
 import type { MessageRow } from "../types";
 import { FONT, palette } from "../v2-tokens";
-import { emptyLine, isEmptyRoom, separatorIds, sepLabel } from "./helpers";
+import { authorName, emptyLine, isEmptyRoom, separatorIds, sepLabel } from "./helpers";
+import { HOVER_ACTIONS_CSS, HoverActions } from "./HoverActions";
 import { toggleReactionOn } from "./reactions";
 import type { ReplyTarget } from "./RoomComposer";
 
@@ -48,6 +50,14 @@ import type { ReplyTarget } from "./RoomComposer";
  * `Earlier messages` (44px, quiet) above the first row while the last earlier
  * page was full (SCREENS-L7). Empty (no rows, or only stubs): `Say hi to
  * <club>.` / `Say hi to everyone going.` (or the officer's `ClubEmpty`).
+ *
+ * Desktop surface (handoffs/chat-redesign/wave-3-desktop/contract.md 6.3,
+ * 6.4; `useChatSurface()`): each row is wrapped in `HoverActions`, the hover
+ * toolbar that holds React, Reply, Report and Remove (the same per-row
+ * handlers the bubbles get; the bubbles' own press does not arm there), and
+ * the Report sheet is the centred dialog (`variant="modal"`, not nested: no
+ * drawer is under it). On the phone `HoverActions` is never mounted and
+ * nothing below changes.
  */
 
 export type RoomThreadProps = {
@@ -206,6 +216,7 @@ export function RemoveConfirm({ night, busy, onConfirm, onCancel }: { night: boo
 
 export function RoomThread({ poll, roomId, roomKind, clubName, night, now, anchor, header, onReply, onOpenEventChat, scrollToken, emptyBlock }: RoomThreadProps) {
   const t = palette(night);
+  const desktop = useChatSurface() === "desktop";
   const { messages, room, viewer, viewerId, failure } = poll;
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const listScrolledAtRef = useRef(Number.NEGATIVE_INFINITY);
@@ -213,8 +224,13 @@ export function RoomThread({ poll, roomId, roomKind, clubName, night, now, ancho
   const [removeTarget, setRemoveTarget] = useState<ChatMessage | null>(null);
   const [removing, setRemoving] = useState(false);
   const [reportMessage, setReportMessage] = useState<ReportTargetRef | null>(null);
+  // ONE handler for the life of the thread: the desktop dialog (`ReportSheet
+  // variant="modal"`) takes focus again whenever its `onClose` changes, and
+  // this component renders again on every full read (20 s) and every new row,
+  // which would pull the caret out of the details box mid-sentence.
+  const closeReport = useCallback(() => setReportMessage(null), []);
   // The Report sheet's own history entry (S71 amendment 3, A): Back closes it alone.
-  useLayerHistory(reportMessage !== null, () => setReportMessage(null));
+  useLayerHistory(reportMessage !== null, closeReport);
 
   const lastId = messages && messages.length > 0 ? messages[messages.length - 1].id : null;
   const firstId = messages && messages.length > 0 ? messages[0].id : null;
@@ -315,9 +331,11 @@ export function RoomThread({ poll, roomId, roomKind, clubName, night, now, ancho
       >
         {/* One column at least as tall as the box: the header (when given), the fade, the rows. The fade sits under the header until that has scrolled away, then sticks to the top. */}
         <div style={{ minHeight: "100%", display: "flex", flexDirection: "column" }}>
+          {desktop ? <style>{HOVER_ACTIONS_CSS}</style> : null}
           {header}
           <div aria-hidden="true" style={{ flexShrink: 0, position: "sticky", zIndex: 2, top: 0, height: 14, marginBottom: -14, pointerEvents: "none", background: `linear-gradient(180deg, ${t.page} 0%, rgba(0,0,0,0) 100%)` }} />
-          <div style={{ flexGrow: 1, boxSizing: "border-box", padding: "8px 12px 8px", display: "flex", flexDirection: "column", justifyContent: anchor === "bottom" ? "flex-end" : "flex-start", gap: 6 }}>
+          {/* Desktop: the column is the hover toolbar's size container (`vibe-hover-list`, HoverActions.tsx). */}
+          <div className={desktop ? "vibe-hover-list" : undefined} style={{ flexGrow: 1, boxSizing: "border-box", padding: "8px 12px 8px", display: "flex", flexDirection: "column", justifyContent: anchor === "bottom" ? "flex-end" : "flex-start", gap: 6 }}>
             {poll.hasEarlier ? (
               <button
                 type="button"
@@ -403,10 +421,27 @@ export function RoomThread({ poll, roomId, roomKind, clubName, night, now, ancho
                     />
                   );
                 }
+                // Desktop: the hover toolbar around the row. A removed-content card and a row
+                // still sending get no handler, so no toolbar (the wrapper stays, bare).
+                const acts = !temp && m.removed === null;
                 return (
                   <div key={m.id} style={{ display: "flex", flexDirection: "column" }}>
                     {sep}
-                    {row}
+                    {desktop ? (
+                      <HoverActions
+                        night={night}
+                        isMine={isMine}
+                        label={`Message from ${authorName(m.users)}`}
+                        onReact={acts ? (emoji) => void toggleReaction(m, emoji) : undefined}
+                        onReply={acts && canReply ? () => onReply(replyTargetOf(m, isMine)) : undefined}
+                        onReport={acts ? report : undefined}
+                        onRemove={acts ? remove : undefined}
+                      >
+                        {row}
+                      </HoverActions>
+                    ) : (
+                      row
+                    )}
                   </div>
                 );
               })
@@ -415,7 +450,13 @@ export function RoomThread({ poll, roomId, roomKind, clubName, night, now, ancho
         </div>
       </div>
       {removeTarget ? <RemoveConfirm night={night} busy={removing} onConfirm={() => void confirmRemove()} onCancel={() => setRemoveTarget(null)} /> : null}
-      {reportMessage ? <ReportSheet variant="sheet" nested target={reportMessage} onClose={() => setReportMessage(null)} /> : null}
+      {reportMessage ? (
+        desktop ? (
+          <ReportSheet variant="modal" target={reportMessage} onClose={closeReport} />
+        ) : (
+          <ReportSheet variant="sheet" nested target={reportMessage} onClose={closeReport} />
+        )
+      ) : null}
     </>
   );
 }

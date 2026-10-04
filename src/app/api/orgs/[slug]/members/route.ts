@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 
+import { blockedIdsFor } from "@/lib/chat/blocks";
+import { refusalBody } from "@/lib/chat/types";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 
@@ -37,8 +39,17 @@ type Params = { params: Promise<{ slug: string }> };
  * on a visible org. A roster is the members' list of each other, and nothing
  * in /admin asks for one — so this route costs the extra `is_platform_admin`
  * read only on the hidden-and-not-a-member path, and grants nothing new.
+ *
+ * `?visible=1` (wave-3-desktop/contract.md 4.2, decision K4): the same list
+ * without the people in a block with the viewer, either way: the read the
+ * club thread and an event's "going" already apply. The faces row and the
+ * Members dialog of desktop Messages ask for it. When the block read fails
+ * the answer is 503 `try_again`, never the unfiltered list. WITHOUT the
+ * parameter the answer is the whole roster, as before: Campus settings and
+ * the Rooms dialog list every member (an officer deciding who may enter a
+ * room must see them all). The row shape is the same either way.
  */
-export async function GET(_req: Request, { params }: Params) {
+export async function GET(req: Request, { params }: Params) {
   const { slug } = await params;
   const supabase = await createSupabaseServerClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -120,6 +131,15 @@ export async function GET(_req: Request, { params }: Params) {
     if (ra !== rb) return ra - rb;
     return (a.joined_at || "").localeCompare(b.joined_at || "");
   });
+
+  if (new URL(req.url).searchParams.get("visible") === "1") {
+    // The viewer's own pairs, on their cookie client (`blocks_select_either`).
+    const blocked = await blockedIdsFor(supabase, user.id);
+    if (!blocked) {
+      return NextResponse.json(refusalBody("try_again"), { status: 503 });
+    }
+    return NextResponse.json({ ok: true, members: rows.filter((row) => !blocked.has(row.user_id)) });
+  }
 
   return NextResponse.json({ ok: true, members: rows });
 }

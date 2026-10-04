@@ -3,12 +3,14 @@
 import { useState } from "react";
 import { Drawer } from "vaul";
 
+import { DesktopDialog } from "@/components/desktop/messages/DesktopDialog";
 import type { EventRef } from "@/lib/chat/types";
 import { useHideTabBar } from "@/lib/chat/use-hide-tabbar";
 import { useLayerHistory } from "@/lib/chat/use-layer-history";
 import { vibeRequest } from "@/lib/feedback/request";
 
 import { vaulContentStyle, vaulHandleStyle, vaulOverlayStyle, visuallyHiddenStyle } from "../sheet-styles";
+import { useChatSurface } from "../surface";
 import { FONT, palette } from "../v2-tokens";
 
 /**
@@ -26,6 +28,11 @@ import { FONT, palette } from "../v2-tokens";
  * (vaul's trap) and returns to the pill on close (vaul's own restore).
  * Its own history entry while open (`useLayerHistory`; S71 amendment 3, A):
  * Back closes the sheet and leaves the event chat open under it.
+ *
+ * On the desktop surface (wave-3 contract 6.3) the same three rows sit in a
+ * `DesktopDialog` (360 wide, titled `Your RSVP`), opened from the club's and
+ * the event's right panel: no vaul root, the same requests, the same one
+ * history entry. The phone surface is the sheet above, unchanged.
  */
 export type RsvpSheetProps = {
   eventId: string;
@@ -46,6 +53,7 @@ const ROWS: { choice: Choice; text: string; line: string | null }[] = [
 export function RsvpSheet({ eventId, current, night, onClose, onChanged }: RsvpSheetProps) {
   useHideTabBar();
   useLayerHistory(true, onClose);
+  const surface = useChatSurface();
   const t = palette(night);
   const [busy, setBusy] = useState<Choice | null>(null);
 
@@ -62,6 +70,51 @@ export function RsvpSheet({ eventId, current, night, onClose, onChanged }: RsvpS
     onChanged();
     onClose();
   };
+
+  // The desktop form (wave-3 contract 6.3): the same three rows in a centred
+  // dialog. No vaul root: there is no drawer above it on a laptop, and a
+  // `Drawer.NestedRoot` without one throws. The history entry is the one
+  // taken above, so the dialog takes none.
+  if (surface === "desktop") {
+    return (
+      <DesktopDialog title="Your RSVP" onClose={onClose} width={360} ownsHistory={false}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {ROWS.map((row) => {
+            const active = (current ?? "no") === row.choice;
+            return (
+              <button
+                key={row.choice}
+                type="button"
+                aria-pressed={active}
+                aria-disabled={busy !== null}
+                onClick={() => void pick(row.choice)}
+                style={{
+                  minHeight: row.line ? 60 : 52,
+                  boxSizing: "border-box",
+                  padding: "8px 14px",
+                  borderRadius: 16,
+                  border: `1px solid ${active ? t.pickedOption.border : t.hairline}`,
+                  background: active ? t.pickedOption.bar : "rgba(var(--scrim-rgb),0.04)",
+                  color: t.ink,
+                  fontFamily: "inherit",
+                  textAlign: "left",
+                  display: "flex",
+                  flexDirection: "column",
+                  justifyContent: "center",
+                  gap: 2,
+                  cursor: busy !== null ? "default" : "pointer",
+                  opacity: busy && busy !== row.choice ? 0.6 : 1,
+                }}
+              >
+                <span style={{ fontSize: 15, fontWeight: 700 }}>{row.text}</span>
+                {row.line ? <span style={{ fontSize: 12, fontWeight: 500, color: t.secondary }}>{row.line}</span> : null}
+              </button>
+            );
+          })}
+        </div>
+      </DesktopDialog>
+    );
+  }
 
   return (
     <Drawer.NestedRoot
