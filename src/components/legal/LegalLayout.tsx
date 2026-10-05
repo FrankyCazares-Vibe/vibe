@@ -139,18 +139,59 @@ const H2_STYLE: CSSProperties = {
   margin: "32px 0 10px",
 };
 
-// A list with its markers back and a little air between items. The app's CSS
-// reset strips list markers, so a bare <ul> or <ol> shows neither bullets nor
-// numbers; the one-column grid is only there for the row gap.
-function markedList(listStyleType: "disc" | "decimal"): CSSProperties {
-  return {
-    margin: "0 0 12px",
-    paddingLeft: 22,
-    listStyleType,
-    display: "grid",
-    gridTemplateColumns: "minmax(0, 1fr)",
-    rowGap: 6,
-  };
+// What an inline style cannot say: a rule for a narrow screen, and spacing
+// that depends on what an element sits inside. Everything else in this file
+// stays inline. The classes carry the app's `vibe-` prefix. Only the pieces
+// that need the sheet render it (LegalStyles), so a legal page that uses none
+// of them is served exactly as before.
+//
+// Marked lists. The app's CSS reset strips list markers, so a bare <ul> or
+// <ol> shows neither bullets nor numbers; these put them back. The items are
+// in plain block flow so that their margins collapse: the gap around an item
+// is 6px whether it holds a line of text, a paragraph or a nested list, and
+// nothing adds up at the end of an item. LegalP sets its own margin inline,
+// which is why the paragraph rule needs its !important. A bulleted list
+// inside a bulleted list gets hollow bullets.
+//
+// Tables. Two columns from 480px up. Under that each row stacks: the left
+// cell as a bold line, the right cell under it, so a long cell gets the full
+// width of a phone and nothing scrolls sideways.
+const LEGAL_CSS = `
+.vibe-legal-list { margin: 0 0 12px; padding-left: 22px; }
+ul.vibe-legal-list { list-style-type: disc; }
+ol.vibe-legal-list { list-style-type: decimal; }
+ul.vibe-legal-list ul.vibe-legal-list { list-style-type: circle; }
+.vibe-legal-list > li + li { margin-top: 6px; }
+.vibe-legal-list > li > .vibe-legal-list { margin: 6px 0; }
+.vibe-legal-list > li > p { margin: 6px 0 !important; }
+
+.vibe-legal-table th, .vibe-legal-table td { padding: 10px 12px; min-width: 136px; text-align: left; vertical-align: top; }
+.vibe-legal-table th:first-child, .vibe-legal-table td:first-child { min-width: 124px; }
+.vibe-legal-table th { font-weight: 700; color: var(--charcoal); }
+.vibe-legal-table thead tr { background: var(--row-hover); }
+.vibe-legal-table td { border-top: 1px solid var(--hairline); }
+@media (max-width: 479.98px) {
+  .vibe-legal-table, .vibe-legal-table thead, .vibe-legal-table tbody,
+  .vibe-legal-table tr, .vibe-legal-table th, .vibe-legal-table td { display: block; }
+  .vibe-legal-table tr { padding: 10px 12px; }
+  .vibe-legal-table tbody tr { border-top: 1px solid var(--hairline); }
+  .vibe-legal-table th, .vibe-legal-table td { padding: 0; min-width: 0; border-top: 0; }
+  .vibe-legal-table th + th { font-weight: 400; color: inherit; }
+  .vibe-legal-table td:first-child { margin-bottom: 2px; font-weight: 700; color: var(--charcoal); }
+}
+`;
+
+const LIST_CLASS = "vibe-legal-list";
+const TABLE_CLASS = "vibe-legal-table";
+
+// React lifts a <style> that has `href` and `precedence` into <head> and
+// keeps one copy however many lists and tables a page holds.
+function LegalStyles() {
+  return (
+    <style href="vibe-legal" precedence="vibe-legal">
+      {LEGAL_CSS}
+    </style>
+  );
 }
 
 /** `id` makes the heading a link target (`/legal/privacy#section-3`). Without
@@ -202,7 +243,12 @@ export function LegalP({ children }: { children: ReactNode }) {
 }
 
 /** `bullets` shows the bullet points. It is opt-in so the pages written
- *  before it keep rendering as they do today (no markers: see markedList). */
+ *  before it keep rendering as they do today (no markers: see LEGAL_CSS).
+ *
+ *  With `bullets`, an `<li>` can hold more than one line of text. Write the
+ *  item's first words straight in the `<li>`, then any `<LegalP>`,
+ *  `<LegalUL bullets>` or `<LegalOL>` after them: they stay indented under
+ *  the item and the list sets their spacing. */
 export function LegalUL({
   children,
   bullets = false,
@@ -210,16 +256,27 @@ export function LegalUL({
   children: ReactNode;
   bullets?: boolean;
 }) {
-  const style = bullets
-    ? markedList("disc")
-    : { margin: "0 0 12px", paddingLeft: 22 };
-  return <ul style={style}>{children}</ul>;
+  if (!bullets) {
+    return <ul style={{ margin: "0 0 12px", paddingLeft: 22 }}>{children}</ul>;
+  }
+  return (
+    <>
+      <LegalStyles />
+      <ul className={LIST_CLASS}>{children}</ul>
+    </>
+  );
 }
 
 /** A numbered list. The numbers always show: steps get referred to by number
- *  ("if step 1 or 2 fails"). */
+ *  ("if step 1 or 2 fails"). An `<li>` can hold a paragraph or a nested list
+ *  after its first words, the same way as in `<LegalUL bullets>`. */
 export function LegalOL({ children }: { children: ReactNode }) {
-  return <ol style={markedList("decimal")}>{children}</ol>;
+  return (
+    <>
+      <LegalStyles />
+      <ol className={LIST_CLASS}>{children}</ol>
+    </>
+  );
 }
 
 const CALLOUT_PAD_TOP = 18;
@@ -258,6 +315,75 @@ export function LegalCallout({
         {title}
       </h2>
       {children}
+    </section>
+  );
+}
+
+/** "Start here": a plain block (no box) for the reader who came with one
+ *  question. It draws its own h2, then one ruled row per item: the question
+ *  on the left and where the answer is on the right, or under the question
+ *  when a phone has no room beside it. `note` is one closing paragraph under
+ *  the rows ("Two words to know"). `id` goes on the heading. */
+export function LegalStartHere({
+  title,
+  id,
+  items,
+  note,
+}: {
+  title: ReactNode;
+  id?: string;
+  items: { question: ReactNode; answer: ReactNode }[];
+  note?: ReactNode;
+}) {
+  return (
+    <section style={{ margin: "28px 0 24px" }}>
+      <h2
+        id={id}
+        style={{
+          ...H2_STYLE,
+          margin: "0 0 10px",
+          scrollMarginTop: id ? ANCHOR_OFFSET : undefined,
+        }}
+      >
+        {title}
+      </h2>
+      <ul
+        style={{
+          margin: 0,
+          padding: 0,
+          listStyle: "none",
+          borderBottom: "1px solid var(--hairline)",
+        }}
+      >
+        {items.map((item, index) => (
+          <li
+            key={index}
+            style={{
+              display: "flex",
+              flexWrap: "wrap",
+              alignItems: "baseline",
+              gap: "0 20px",
+              padding: "8px 0",
+              borderTop: "1px solid var(--hairline)",
+            }}
+          >
+            <span>{item.question}</span>
+            {/* The auto margin keeps the answers in one column down the
+                right edge, on the question's line or on the line under it. */}
+            <span
+              style={{
+                marginLeft: "auto",
+                fontWeight: 600,
+                color: "var(--ink-2)",
+                whiteSpace: "nowrap",
+              }}
+            >
+              {item.answer}
+            </span>
+          </li>
+        ))}
+      </ul>
+      {note ? <p style={{ margin: "14px 0 0" }}>{note}</p> : null}
     </section>
   );
 }
@@ -316,16 +442,14 @@ export function LegalToc({
   );
 }
 
-const TABLE_CELL: CSSProperties = {
-  padding: "10px 12px",
-  textAlign: "left",
-  verticalAlign: "top",
-};
-
 /** A small table: `head` is the header row, `rows` the body, first column
- *  first. The box scrolls sideways by itself when a phone cannot fit the
- *  columns' minimum widths, so the page never does. tabIndex lets a keyboard
- *  scroll the box. */
+ *  first. A cell is text or any node (a link, a `<strong>`).
+ *
+ *  From 480px up it is a table with columns. Under 480px each row stacks: the
+ *  first cell as a bold line, the other cells under it, and the header row
+ *  the same way, so it reads as the key to the rows below. Nothing scrolls
+ *  sideways on a phone, however long a cell is. The cells' look is in
+ *  LEGAL_CSS, because it changes with the width. */
 export function LegalTable({
   head,
   rows,
@@ -333,13 +457,14 @@ export function LegalTable({
   head: ReactNode[];
   rows: ReactNode[][];
 }) {
-  // Border-box widths (the app's reset), so the padding is inside them. Sized
-  // so the Privacy Policy's two-column tables fit a 375px phone without
-  // scrolling, the one with an email address in its first column included.
-  const minWidth = (column: number) => (column === 0 ? 124 : 136);
+  // A two-column table always fits from 480px up (its columns need 124px and
+  // 136px, padding included). A wider one may not, so its box scrolls
+  // sideways by itself and takes keyboard focus so that the arrow keys can
+  // scroll it.
+  const mayScroll = head.length > 2;
   return (
     <div
-      tabIndex={0}
+      tabIndex={mayScroll ? 0 : undefined}
       style={{
         margin: "0 0 14px",
         overflowX: "auto",
@@ -349,7 +474,13 @@ export function LegalTable({
         borderRadius: 12,
       }}
     >
+      <LegalStyles />
+      {/* The roles say what the tags already say. They are spelled out
+          because a stacked row is `display: block`, and some browsers stop
+          announcing a table as one once its parts are blocks. */}
       <table
+        role="table"
+        className={TABLE_CLASS}
         style={{
           width: "100%",
           borderCollapse: "collapse",
@@ -357,37 +488,20 @@ export function LegalTable({
           lineHeight: 1.55,
         }}
       >
-        <thead>
-          <tr>
+        <thead role="rowgroup">
+          <tr role="row">
             {head.map((cell, column) => (
-              <th
-                key={column}
-                scope="col"
-                style={{
-                  ...TABLE_CELL,
-                  minWidth: minWidth(column),
-                  fontWeight: 700,
-                  color: "var(--charcoal)",
-                  background: "var(--row-hover)",
-                }}
-              >
+              <th key={column} role="columnheader" scope="col">
                 {cell}
               </th>
             ))}
           </tr>
         </thead>
-        <tbody>
+        <tbody role="rowgroup">
           {rows.map((row, index) => (
-            <tr key={index}>
+            <tr key={index} role="row">
               {row.map((cell, column) => (
-                <td
-                  key={column}
-                  style={{
-                    ...TABLE_CELL,
-                    minWidth: minWidth(column),
-                    borderTop: "1px solid var(--hairline)",
-                  }}
-                >
+                <td key={column} role="cell">
                   {cell}
                 </td>
               ))}
