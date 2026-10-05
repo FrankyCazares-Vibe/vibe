@@ -106,6 +106,7 @@ The small Messages window that opens over the desktop profile page. He sent a sc
 - Old desktop Campus > Chat shows a poll as "Poll:" and an empty bubble (already owed before Oct 15).
 - "Only you can see it" on removed content (four places): the Vibe team can too. Club lines that say "IU students only". The ban notice and Vibe+ page carry em dashes.
 - The plain-text part of the waitlist emails has no privacy link.
+- **Nothing reloads a tab that is already open when a new build goes out** (checked Oct 5 after Franky asked that everybody have the newest version). Everything else was confirmed: both domains and the vercel.app address serve the newest build, iPhone, Android and laptop get the same files, no page or script is cached past a reload, the service worker keeps only the offline page, and both chat switches are `*`. A person with Vibe left open (or the home-screen app resumed from memory) runs the older code until the next page load. Offered to Franky: a small check on tab focus that reloads when it is safe (never while someone is typing).
 - Committed handoffs hold some email addresses that may be real (a checker counted, did not open): look before the repo is ever shared.
 
 ## 7. Local environment
