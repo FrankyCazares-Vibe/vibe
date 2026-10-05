@@ -7,7 +7,7 @@ S74 started from `2026-10-04-session-73-privacy-v2-desktop-messages.md`. Franky 
 ## START HERE: session 75
 
 1. **Ask Franky** how his live test went (section 4, first row) and whether the Vercel Cron "Run" answered 200.
-2. **Desktop Messages is on** (Franky confirmed, section 5). Ask whether the allowlist is his id or `*`, and whether he did the real-phone look at the small chat changes.
+2. **Desktop Messages is on** for the three founders (Franky confirmed, section 5). Ask whether he did the real-phone look at the small chat changes.
 3. **Fix the mini messenger** (Franky's ask, Oct 5, with a screenshot): section 5b. Ask him first what he wants it to be.
 4. **Privacy follow-ups**, in the order of `handoffs/legal-2026-10-04-privacy-v3/page-and-code-changes.md` (parts 2 and 3). First: tell the existing accounts, open one live Sentry report, the "verify your campus" gap (row 26), the hand-kept promises in `decisions.md` part D.
 5. **Give James** `handoffs/legal-2026-10-04-privacy-v3/for-the-lawyer.md` (the lawyer's questions).
@@ -75,7 +75,7 @@ Every production read followed the counts-only rule (structure, fingerprints, co
 - **The hover-menu fix is on main** (second push of Oct 5): with a narrow chat column the menu on a short message was squeezed into a ball; it is one row now. An independent reviewer compared the page every laptop uses today with the live one at 13 sizes: identical at 1280 and wider, better when narrow or on touch, worse nowhere.
 - **Left on branch `desktop-hover-menu` (local, commit `daa980e`), not merged:** moving the first message's menu under its bubble so it is not hidden by the chat header. The reviewer found it catches a pointer travelling down the chat, so a press could react to, pin or delete the wrong message. Its fix (wait about 150 ms before moving the menu) is written in `handoffs/s74-release/hover-menu-review.md`. Until then the first message on screen keeps its menu half under the header, as on the old page today.
 - Known with the switch on, small: under 1140 wide with the Pinned and Shared panel open, some menu buttons sit under the panel (close the panel).
-- **Oct 5, about 3:20 pm: Franky added `CHAT_DESKTOP_ENABLED` and `CHAT_DESKTOP_ALLOWLIST` on Vercel Production.** The session pushed two empty commits to redeploy (`1d0a5c2`, `c52bccf`; a value only reaches a new deploy). **Franky confirmed the same afternoon: the new desktop Messages shows for him on the live site.** (The session cannot sign in there and did not see it itself.) Whether the allowlist holds only his id or `*` is his to say; widening it to `*` gives it to everyone who has the new chat (the founders and SAE) and needs a redeploy.
+- **Oct 5, about 3:20 pm: Franky added `CHAT_DESKTOP_ENABLED` and `CHAT_DESKTOP_ALLOWLIST` on Vercel Production.** The session pushed two empty commits to redeploy (`1d0a5c2`, `c52bccf`; a value only reaches a new deploy). **Franky confirmed the same afternoon: the new desktop Messages shows for him on the live site.** (The session cannot sign in there and did not see it itself.) Read from Vercel the same afternoon: `CHAT_DESKTOP_ALLOWLIST` is `*`, `CHAT_V2_ALLOWLIST` holds the three founders' ids and `CHAT_V2_CLUBS` holds SAE. SAE had one member on production that day, so **3 of 21 accounts have the new chat (phone and desktop): the founders.** Everyone else has the old chat until Oct 26.
 - **How it is switched on (for the record), Franky:** ten minutes on a real phone with the small chat changes (S73 handoff, section 2), then `CHAT_DESKTOP_ENABLED` = `true` and `CHAT_DESKTOP_ALLOWLIST` = the founders' ids (or `*` = everyone who has the new chat) on Vercel Production, then Redeploy.
 
 ## 5b. The mini messenger (Franky, Oct 5: "we need to fix the mini messenger view")
@@ -115,4 +115,5 @@ The small Messages window that opens over the desktop profile page. He sent a sc
 - **The read-only database connector's role cannot call `signup_is_open()`** (permission denied, harmless). Read the setting row.
 - **Turbopack refuses a symlinked `node_modules`.** For a clean build of an exact commit, clone it: `cp -cR`.
 - **The keep-awake helper (`caffeinate` in the background) is cut at two hours.** Stay in the turn while jobs run, or ask the app to keep the Mac awake.
+- **The Vercel connector works when called without the team slug** (project id `prj_1MXN7zjFs3kWIAX1fZ7VP6fq7ae9`); the old 403 came from the slug. Read plain settings only, never the secret ones. `CRON_SECRET` and `SCHOOL_EMAIL_VERIFY_SECRET` are both there.
 - **A session that may not create accounts on the live site can still prove the gate:** call `auth_hooks.hook_waitlist_gate` directly with a made-up address and read its decision.
