@@ -65,3 +65,12 @@ Not done by the session: a real sign-up attempt on production (the session does 
 | 12:29 | `chat-v2-after-deploy.sql`, counts only (read-only connector) | 0 findings; 5 clubs, 22 club rooms checked |
 
 All ten database files are on production. Desktop Messages is still OFF (`CHAT_DESKTOP_*` not set on Vercel).
+
+## October 5, afternoon: second push
+
+| Time (EDT) | Step | Answer |
+|---|---|---|
+| ~15:10 | `git push origin main` 50b60d2..f72dc1f (the one-row hover menu in Messages, the empty stage in desktop Messages, two docs commits) | Vercel Production deploy 6867724446: success. Gate on the code commit: typecheck 0, 2,174 of 2,174 tests, build exit 0. |
+| ~15:12 | live site | landing still "Join the waitlist" x5; `/waitlist`, `/auth/login`, `/legal/privacy` 200; cron 401 without the secret. The Messages page itself cannot be fetched signed out (it redirects to sign-in), so the served file was not read; the deploy is of the pushed commit. |
+
+No database change in this push. `signup_open` is still false; the hook is still on.
