@@ -14,8 +14,14 @@ import {
   schoolSystemForEmail,
 } from "../auth/school-email-domains";
 
-/** Which wording of the form's notice the person agreed to (`waitlist.notice_version`). */
-export const WAITLIST_NOTICE_VERSION = "2026-10-03";
+/**
+ * Which wording of the form's notice the person saw (`waitlist.notice_version`,
+ * free text up to 40 characters). Raise it to the day the words change, in the
+ * same commit as the notice or the tick text in src/app/waitlist/waitlist-form.tsx.
+ * "2026-10-03" was the first wording; "2026-10-05" goes with Privacy Policy
+ * section 11 as published that day.
+ */
+export const WAITLIST_NOTICE_VERSION = "2026-10-05";
 
 export const WAITLIST_LIMITS = {
   name: 80,
@@ -163,7 +169,7 @@ export function parseWaitlistForm(raw: unknown): WaitlistFormResult {
   if (classYear === undefined) return { ok: false, field: "classYear", error: "Pick your year." };
 
   if (r.consentAge !== true) {
-    return { ok: false, field: "consentAge", error: "Tick this to confirm you're 18 or older and a current student." };
+    return { ok: false, field: "consentAge", error: "Tick this to confirm you're 18 or older and have an IU or Purdue email address." };
   }
   if (r.consentInvite !== true) {
     return {

@@ -8529,7 +8529,7 @@ function renderStudentBadge(userObj, isOwn) {
   const verification = userObj?.studentVerification;
   if (verification?.status === 'verified' && verification.school) {
     slot.classList.add('visible');
-    slot.innerHTML = `<span class="sb-cap">🎓</span><span>Student · <span class="sb-school">${verification.school.replace(/[<>]/g,'')}</span></span>`;
+    slot.innerHTML = `<span class="sb-cap">🎓</span><span>Verified · <span class="sb-school">${verification.school.replace(/[<>]/g,'')}</span></span>`;
     return;
   }
   if (isOwn) {
@@ -8540,7 +8540,7 @@ function renderStudentBadge(userObj, isOwn) {
       cta = document.createElement('button');
       cta.id = 'verifyStudentCta';
       cta.className = 'student-verify-cta';
-      cta.innerHTML = '<span style="font-size:13px;line-height:1;">🎓</span> Verify your student status';
+      cta.innerHTML = '<span style="font-size:13px;line-height:1;">🎓</span> Verify your school email';
       cta.onclick = () => { window.location.href = '/auth/school-email'; };
       slot.parentNode.appendChild(cta);
     }

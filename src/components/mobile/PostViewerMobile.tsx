@@ -490,7 +490,7 @@ export function PostViewerMobile({
     if (
       typeof window !== "undefined" &&
       !window.confirm(
-        `Block ${who}?\n\nThey won't be able to message you, see your posts, or find you in search. You also won't see their content.`,
+        `Block ${who}?\n\nThey won't be able to message you or find you in search, and while they are signed in they can't see your posts. You also won't see their content.`,
       )
     )
       return;

@@ -218,7 +218,7 @@ export function ConversationActionSheet({
     if (
       typeof window !== "undefined" &&
       !window.confirm(
-        `Block @${peer.handle ?? "user"}? They won't be able to see your profile or message you.`,
+        `Block @${peer.handle ?? "user"}? They won't be able to message you or find you in search, and while they are signed in they can't see your posts.`,
       )
     )
       return;

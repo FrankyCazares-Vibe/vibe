@@ -286,8 +286,8 @@ function BlockedUsersCard() {
           lineHeight: 1.5,
         }}
       >
-        Blocked users can&apos;t see your posts, message you, or react to
-        anything you post. Unblock anyone here.
+        While they are signed in, blocked users can&apos;t see your posts or
+        message you. Unblock anyone here.
       </p>
 
       {users === null && loadErr ? (
@@ -1252,7 +1252,8 @@ function SignOutCard() {
           lineHeight: 1.5,
         }}
       >
-        End your session on this browser. You can sign back in any time.
+        End your session on every device. Another device can stay signed in
+        for about an hour more. You can sign back in any time.
       </p>
       <button
         type="button"
@@ -1363,7 +1364,7 @@ function DangerZone({ handle }: { handle: string | null }) {
           lineHeight: 1.5,
         }}
       >
-        Permanently removes your profile, posts, comments, reactions,
+        Permanently deletes your profile, posts, comments, reactions,
         connections, RSVPs, messages, and chat reactions. This can&apos;t be undone.
       </p>
 

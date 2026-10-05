@@ -648,8 +648,8 @@ export default async function PlusPage({
 
             <Section title="What Vibe+ unlocks">
               <p style={{ margin: "0 0 10px", color: "var(--ink-2)", fontSize: 14 }}>
-                Three things the database already keeps private from everyone,
-                including from us on the free tier:
+                Three things the database already keeps private from every
+                account on the free tier:
               </p>
               <List
                 items={[
@@ -709,7 +709,7 @@ export default async function PlusPage({
                     does not make you invisible to the exact feature you are
                     paying to use.
                   </>,
-                  <>No anonymous posting, and no seeing who blocked you.</>,
+                  <>No anonymous posting, and no list of who blocked you.</>,
                   <>
                     Nothing that makes a paying student harder to hold accountable
                     to everyone else.

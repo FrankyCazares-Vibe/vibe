@@ -5894,7 +5894,7 @@ function ProfileSafetySheet({
     if (busy) return;
     if (
       !window.confirm(
-        `Block ${name}?\n\nThey won't be able to message you, see your posts, or find you in search. You also won't see their content.`,
+        `Block ${name}?\n\nThey won't be able to message you or find you in search, and while they are signed in they can't see your posts. You also won't see their content.`,
       )
     )
       return;
@@ -6482,7 +6482,7 @@ function VerifiedBadge({ school }: { school?: string | null }) {
         color: "#990000",
       }}
     >
-      🎓 <strong style={{ color: "#1C1C1E", fontWeight: 700 }}>{school ?? "Student"}</strong>
+      🎓 <strong style={{ color: "#1C1C1E", fontWeight: 700 }}>{school ?? "Verified"}</strong>
     </span>
   );
 }

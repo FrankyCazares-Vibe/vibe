@@ -47,7 +47,13 @@ type BrandedEmail = {
   code?: { label: string; value: string; note: string };
   button?: { href: string; label: string; lead?: string };
   notes: string[];
+  /** Where the footer's "Privacy policy" link lands. Fixed copy only. Default: the top of the policy. */
+  privacyHref?: string;
 };
+
+const PRIVACY_URL = "https://www.connectvibe.app/legal/privacy";
+/** Section 11, the waitlist's own notice: a person with no account lands on their part. */
+const WAITLIST_PRIVACY_URL = `${PRIVACY_URL}#waitlist`;
 
 /** Attribute-safe: the server-built URLs carry raw `&` between params. */
 function escapeAttr(value: string): string {
@@ -143,7 +149,7 @@ function brandedEmailHtml(e: BrandedEmail): string {
         <tr>
           <td align="center" style="padding:20px 12px 0;font-family:${SANS};font-size:12px;line-height:18px;color:${MUTED};">
             <span style="font-family:${SERIF};font-weight:800;color:${CHARCOAL};">vibe<span style="color:${ACCENT};">.</span></span> &middot; Indianapolis<br>
-            <a href="https://www.connectvibe.app/legal/privacy" style="color:${MUTED};">Privacy policy</a>
+            <a href="${escapeAttr(e.privacyHref ?? PRIVACY_URL)}" style="color:${MUTED};">Privacy policy</a>
           </td>
         </tr>
       </table>
@@ -315,6 +321,7 @@ async function sendWaitlistEmail(
         code: content.code,
         button: content.button,
         notes: content.notes,
+        privacyHref: WAITLIST_PRIVACY_URL,
       }),
       text: content.text,
     }),

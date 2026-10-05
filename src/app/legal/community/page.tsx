@@ -28,17 +28,15 @@ export default function CommunityGuidelinesPage() {
     <LegalLayout
       eyebrow="Safety"
       title="Community Guidelines"
-      effectiveDate="September 28, 2026"
+      effectiveDate="October 5, 2026"
     >
       <LegalP>
-        Vibe is a campus app. Everyone here verified a school email, which
-        means the person on the other end of a post, a comment or a message is
-        a real student at a real school. These guidelines are how we keep it
-        that way. They sit alongside the{" "}
+        Vibe is a campus app. Everyone who posts here verified a school email
+        address. These guidelines sit alongside the{" "}
         <Link href="/legal/terms" style={ACCENT_LINK}>
           Terms of Service
-        </Link>{" "}
-        — the Terms are the contract, this page is the plain-English version
+        </Link>
+        . The Terms are the contract. This page is the plain-English version
         of what we expect.
       </LegalP>
 
@@ -50,8 +48,11 @@ export default function CommunityGuidelinesPage() {
         stuff you actually care about, to people who are actually near you.
       </LegalP>
       <LegalP>
-        You get to decide how much of yourself is on here. Counts are public;
-        who did what is yours. Nothing on this page changes that.
+        Counts are public. The{" "}
+        <Link href="/legal/privacy#section-5" style={ACCENT_LINK}>
+          Privacy Policy
+        </Link>{" "}
+        says who can see who did what.
       </LegalP>
 
       <LegalH2>What isn&apos;t allowed</LegalH2>

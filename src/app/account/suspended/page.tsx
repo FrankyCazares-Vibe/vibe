@@ -325,7 +325,7 @@ export default async function SuspendedPage() {
               for the rest of the month — if you see another charge after this,
               write to the address below and we&apos;ll sort it. Nothing of
               yours is deleted: you can sign in and read this page whenever you
-              want, and delete everything yourself below.
+              want, and delete your account yourself below.
             </>
           ) : (
             <>

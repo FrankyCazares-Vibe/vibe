@@ -64,7 +64,7 @@ export const ONB_COPY = freezeDeep({
     switchCodeLabel: "8-digit code",
     switchVerify: "Verify",
     switchVerifying: "Verifying…",
-    switchDone: "You're verified as a Purdue student.",
+    switchDone: "Your Purdue email is verified.",
     switchCancel: "Never mind",
     continue: "Continue →",
     saving: "Saving…",

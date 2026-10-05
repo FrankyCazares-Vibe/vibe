@@ -28,10 +28,11 @@ export default function WaitlistLayout({ children }: { children: React.ReactNode
       <main className="vwl-main">{children}</main>
       <footer className="vln-footer">
         <span>© CONNECTVIBE. LLC</span>
-        {/* The landing's footer links, in its order. */}
+        {/* The landing's footer links, in its order. Privacy lands on the
+            waitlist's own section (section 11), like the form's notice. */}
         <nav aria-label="Legal and support">
           <Link href="/legal/terms">Terms</Link>
-          <Link href="/legal/privacy">Privacy</Link>
+          <Link href="/legal/privacy#waitlist">Privacy</Link>
           <Link href="/legal/community">Guidelines</Link>
           <Link href="/support">Support</Link>
         </nav>

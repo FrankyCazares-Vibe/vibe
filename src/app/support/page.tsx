@@ -44,7 +44,7 @@ function HelpEmail() {
 
 export default function SupportPage() {
   return (
-    <LegalLayout eyebrow="Help" title="Support" effectiveDate="September 28, 2026">
+    <LegalLayout eyebrow="Help" title="Support" effectiveDate="October 5, 2026">
       <LegalP>
         Vibe is run by <strong>CONNECTVIBE. LLC</strong>, an Indiana limited
         liability company. The fastest way to reach a person is email:{" "}
@@ -133,9 +133,11 @@ export default function SupportPage() {
         <li>After you report someone, the report sheet offers to block them too.</li>
       </LegalUL>
       <LegalP>
-        Someone you block can&apos;t message you, see your posts or find you in
-        search, and you stop seeing theirs. They aren&apos;t told. To undo it,
-        go to <strong>Settings → Blocked users</strong>.
+        Someone you block can&apos;t message you or find you in search, and
+        while they are signed in they can&apos;t see your posts. You stop
+        seeing theirs. They aren&apos;t told, but if they open your profile
+        while signed in, Vibe says this account has restricted them. To undo
+        it, go to <strong>Settings → Blocked users</strong>.
       </LegalP>
 
       <LegalH2>Trouble signing in</LegalH2>

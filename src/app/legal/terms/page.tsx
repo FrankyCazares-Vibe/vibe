@@ -19,6 +19,22 @@ export default function TermsPage() {
       title="Terms of Service"
       effectiveDate="May 7, 2026"
     >
+      {/* Privacy Policy v3, row 8. Stays until the new Terms replace this
+          page: the acceptance line, "backups" and "continued use" below are
+          the old wording, and the Privacy Policy (sections 8 and 13) says
+          otherwise. */}
+      <LegalP>
+        <strong>New Terms arrive in October.</strong> Until then, where these
+        Terms and the{" "}
+        <Link
+          href="/legal/privacy"
+          style={{ color: "#FF5C35", fontWeight: 700, textDecoration: "none" }}
+        >
+          Privacy Policy
+        </Link>{" "}
+        describe your information differently, the Privacy Policy is the
+        accurate one.
+      </LegalP>
       <LegalP>
         These Terms of Service (&ldquo;Terms&rdquo;) govern your use of Vibe
         (the &ldquo;Service&rdquo;), operated by the Vibe team

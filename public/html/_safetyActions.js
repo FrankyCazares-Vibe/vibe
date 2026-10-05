@@ -153,7 +153,7 @@
   window.vibeBlock = function (targetId, displayName, onAfter) {
     if (!targetId) return;
     const name = displayName || "this person";
-    if (!confirm("Block " + name + "?\n\nThey won't be able to message you, see your posts, or find you in search. You also won't see their content.")) return;
+    if (!confirm("Block " + name + "?\n\nThey won't be able to message you or find you in search, and while they are signed in they can't see your posts. You also won't see their content.")) return;
     fetch("/api/me/block", {
       method: "POST",
       credentials: "include",

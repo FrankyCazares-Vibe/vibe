@@ -24,17 +24,16 @@ export default function ChildSafetyPage() {
     <LegalLayout
       eyebrow="Safety"
       title="Child Safety Standards"
-      effectiveDate="September 27, 2026"
+      effectiveDate="October 5, 2026"
     >
       <LegalP>
         Vibe is a social app for university students. You need a verified
-        school email to be here, and the{" "}
+        school email to post, comment, message or join a club, and the{" "}
         <Link href="/legal/terms" style={ACCENT_LINK}>
           Terms of Service
         </Link>{" "}
-        require you to be 18 or older and enrolled at a U.S.-accredited
-        college or university. Vibe is not built for children and is not
-        marketed to them.
+        require you to be 18 or older and to verify an IU or Purdue email
+        address. Vibe is not built for children and is not marketed to them.
       </LegalP>
       <LegalP>
         This page is our published standard against child sexual abuse and
@@ -142,10 +141,11 @@ export default function ChildSafetyPage() {
           help@connectvibe.app
         </a>{" "}
         and we&apos;ll look into it. If the person is under 18, we ban the
-        account — it can no longer post, comment, message or react, and if a
+        account. It can no longer post, comment, message or react, and if a
         school email was verified on it, that email can&apos;t be verified on a
-        new one — and we take its content down. You don&apos;t need proof: a
-        reason to think so is enough.
+        new one. We take its content down and then delete the account, within
+        7 days where we can. You don&apos;t need proof: a reason to think so is
+        enough.
       </LegalP>
 
       <LegalH2>If a child is in immediate danger</LegalH2>

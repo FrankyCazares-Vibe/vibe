@@ -65,7 +65,9 @@ function fails(patch: Record<string, unknown>) {
 }
 
 test("constants", () => {
-  assert.equal(WAITLIST_NOTICE_VERSION, "2026-10-03");
+  assert.equal(WAITLIST_NOTICE_VERSION, "2026-10-05");
+  // `waitlist.notice_version` is text with CHECK (char_length <= 40).
+  assert.ok(WAITLIST_NOTICE_VERSION.length <= 40);
   assert.deepEqual(
     { ...WAITLIST_LIMITS },
     { name: 80, major: 80, clubs: 200, officerClub: 80, wish: 280, source: 40, email: 254 },

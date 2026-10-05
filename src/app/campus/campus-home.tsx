@@ -12331,7 +12331,7 @@ function OrgsTabBody({ onCreateOrg }: { onCreateOrg: () => void }) {
               {communityOrgs.length > 0 ? (
                 <DiscoverGroup
                   title="Student communities"
-                  hint="Groups created by verified students. Anyone can follow them."
+                  hint="Groups created by people on Vibe. Anyone can follow them."
                   orgs={communityOrgs}
                   {...groupProps}
                   titleStyle={{ color: "#FF5C35" }}
