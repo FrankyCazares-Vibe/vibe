@@ -2,12 +2,12 @@
 
 S74 started from `2026-10-04-session-73-privacy-v2-desktop-messages.md`. Franky asked for the new landing page and the Messages feature on main, then for "the best privacy policy you can right now without any of my input". He chose: close sign-up and turn the waitlist on, no backups, only he has direct access, mail forwards to his Gmail, the counts-only rule for AI tools, publish now with the lawyer reading in parallel, and "go when green".
 
-**Live since Monday Oct 5, 12:24 EDT: main = `50b60d2`.** Sign-up is closed, the waitlist is open, the access-code check is on. Desktop Messages is on main but still switched OFF.
+**Live since Monday Oct 5, 12:24 EDT (release `50b60d2`; the hover-menu fix followed the same afternoon).** Sign-up is closed, the waitlist is open, the access-code check is on. Desktop Messages is on main but still switched OFF.
 
 ## START HERE: session 75
 
 1. **Ask Franky** how his live test went (section 4, first row) and whether the Vercel Cron "Run" answered 200.
-2. **Desktop Messages** is one small step from on: the hover-menu fix (section 5) needs a review and a merge, then Franky's ten minutes on a real phone, then his two Vercel values and a redeploy.
+2. **Desktop Messages** waits only on Franky: ten minutes on a real phone, then his two Vercel values and a redeploy (section 5).
 3. **Privacy follow-ups**, in the order of `handoffs/legal-2026-10-04-privacy-v3/page-and-code-changes.md` (parts 2 and 3). First: tell the existing accounts, open one live Sentry report, the "verify your campus" gap (row 26), the hand-kept promises in `decisions.md` part D.
 4. **Give James** `handoffs/legal-2026-10-04-privacy-v3/for-the-lawyer.md` (the lawyer's questions).
 5. **Still dated:** Terms review answers (Tue Oct 6), Android build (Fri Oct 9), old-screen chat fixes and both sentinels before Thu Oct 15, store submission Fri Oct 16 (the review note in section 4), new chat for everyone Mon Oct 26.
@@ -71,8 +71,10 @@ Every production read followed the counts-only rule (structure, fingerprints, co
 ## 5. Desktop Messages: what is left
 
 - Both database files are on production. The code is on main behind `chat_desktop`.
-- **One fix is not on main:** with the switch on, the hover menu on a short message was squeezed into a ball when the chat column is narrow. A fix exists in the release worktree (`public/html/messages.html`, `MessagesDesktop.tsx`), but its first version was found to draw the menu behind the next message, and the repair has not been reviewed. `messages.html` is also the page every laptop uses today, so it was kept out of the release. Next: review it, merge, push.
-- Then Franky: the phone walk, `CHAT_DESKTOP_ENABLED` = `true` and `CHAT_DESKTOP_ALLOWLIST` = the founders' ids (or `*` = everyone who has the new chat) on Vercel Production, Redeploy.
+- **The hover-menu fix is on main** (second push of Oct 5): with a narrow chat column the menu on a short message was squeezed into a ball; it is one row now. An independent reviewer compared the page every laptop uses today with the live one at 13 sizes: identical at 1280 and wider, better when narrow or on touch, worse nowhere.
+- **Left on branch `desktop-hover-menu` (local, commit `daa980e`), not merged:** moving the first message's menu under its bubble so it is not hidden by the chat header. The reviewer found it catches a pointer travelling down the chat, so a press could react to, pin or delete the wrong message. Its fix (wait about 150 ms before moving the menu) is written in `handoffs/s74-release/hover-menu-review.md`. Until then the first message on screen keeps its menu half under the header, as on the old page today.
+- Known with the switch on, small: under 1140 wide with the Pinned and Shared panel open, some menu buttons sit under the panel (close the panel).
+- **To switch it on, Franky:** ten minutes on a real phone with the small chat changes (S73 handoff, section 2), then `CHAT_DESKTOP_ENABLED` = `true` and `CHAT_DESKTOP_ALLOWLIST` = the founders' ids (or `*` = everyone who has the new chat) on Vercel Production, then Redeploy.
 
 ## 6. Found and not fixed (small, none blocks)
 
