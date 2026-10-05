@@ -47,7 +47,12 @@ import { WaitlistAdd } from "./waitlist-add";
 import { WaitlistFilterBar } from "./waitlist-filters";
 import { WaitlistRowCard } from "./waitlist-rows";
 
-type Said = { tone: "good" | "error" | "info"; text: string };
+/**
+ * The two lines that ask for something are marked, so each can go once it is
+ * answered: `needsBatch` on "Name the batch first", `overBudget` on the
+ * email-budget line.
+ */
+type Said = { tone: "good" | "error" | "info"; text: string; needsBatch?: true; overBudget?: true };
 
 /**
  * The last day of an entry a code can go out and still get its full 14
@@ -143,6 +148,12 @@ export function WaitlistClient() {
   const budget = list?.budget ?? null;
   const left = budget ? Math.max(0, budget.cap - budget.used) : 0;
 
+  // An ask is forgotten, not just hidden, once it no longer applies: "Name
+  // the batch first" with nobody picked (Clear, an untick, a Remove or a
+  // Refresh can empty the pick), the email-budget line once the pick fits
+  // what is left. So neither comes back until Send is pressed again.
+  if ((said?.needsBatch && selected.size === 0) || (said?.overBudget && selected.size <= left)) setSaid(null);
+
   const toggle = (id: string) =>
     setSelected((prev) => {
       const next = new Set(prev);
@@ -151,14 +162,26 @@ export function WaitlistClient() {
       return next;
     });
 
+  // "Name the batch first" also goes once the batch is touched; any other
+  // line (a send's result, the email budget) stays through a batch change.
+  const dropBatchAsk = () => setSaid((s) => (s?.needsBatch ? null : s));
+
   async function sendCodes() {
     if (sending || selected.size === 0) return;
     if (!batch) {
-      setSaid({ tone: "error", text: `Name the batch first: pick a word and a number from 1 to ${WAITLIST_BATCH_MAX_NUMBER}, like wave-1.` });
+      setSaid({
+        tone: "error",
+        text: `Name the batch first: pick a word and a number from 1 to ${WAITLIST_BATCH_MAX_NUMBER}, like wave-1.`,
+        needsBatch: true,
+      });
       return;
     }
     if (budget && selected.size > left) {
-      setSaid({ tone: "error", text: `Only ${plural(left, "email", "emails")} left today. Pick fewer people, or send the rest tomorrow.` });
+      setSaid({
+        tone: "error",
+        text: `Only ${plural(left, "email", "emails")} left today. Pick fewer people, or send the rest tomorrow.`,
+        overBudget: true,
+      });
       return;
     }
     setSending(true);
@@ -222,7 +245,14 @@ export function WaitlistClient() {
             <div className="adm-fields">
               <label style={{ flex: 1, minWidth: 130 }}>
                 <span style={labelStyle}>Batch</span>
-                <select value={batchWord} onChange={(e) => setBatchWord(e.target.value)} style={inputStyle}>
+                <select
+                  value={batchWord}
+                  onChange={(e) => {
+                    setBatchWord(e.target.value);
+                    dropBatchAsk();
+                  }}
+                  style={inputStyle}
+                >
                   {WAITLIST_BATCH_PREFIXES.map((w) => (
                     <option key={w} value={w} className="adm-option">{w}</option>
                   ))}
@@ -236,7 +266,10 @@ export function WaitlistClient() {
                   min={1}
                   max={WAITLIST_BATCH_MAX_NUMBER}
                   value={batchNumber}
-                  onChange={(e) => setBatchNumber(e.target.value)}
+                  onChange={(e) => {
+                    setBatchNumber(e.target.value);
+                    dropBatchAsk();
+                  }}
                   placeholder="1"
                   autoComplete="off"
                   style={inputStyle}

@@ -382,11 +382,10 @@ const CSS = `
    as the desk is mounted; !important because the installed-app rules in
    globals.css outrank a plain html/body selector. */
 html, body { background-color: #0F0D17 !important; }
-/* The restriction reason <select>'s list is the browser's own popup, which
-   follows the page's color-scheme: white in Light (dark ink, as before) and
-   dark in Night, where that ink vanished. */
-.adm-option { color: #111; }
-:root[data-theme="dark"] .adm-option { color: ${COLORS.text}; background-color: ${COLORS.bg}; }
+/* A <select>'s list is the browser's own popup, which follows its
+   color-scheme: dark in both themes, like the rest of the desk (the wrapper
+   sets it), so the ink is light in both. */
+.adm-option { color: ${COLORS.text}; background-color: ${COLORS.bg}; }
 .adm-wrap { padding: 32px 24px; }
 .adm-inner { max-width: 1100px; margin: 0 auto; }
 .adm-card {
@@ -431,6 +430,9 @@ export function AdminShell({
           "radial-gradient(120% 80% at 0% 0%, rgba(40,30,60,0.55) 0%, rgba(40,30,60,0) 60%), " +
           "linear-gradient(180deg, #0F0D17 0%, #14111E 50%, #0F0D17 100%)",
         color: COLORS.text,
+        // The desk is dark in both themes, so the browser's own controls
+        // (checkboxes, number steppers, select lists) are drawn dark too.
+        colorScheme: "dark",
         fontFamily: "DM Sans, sans-serif",
       }}
     >

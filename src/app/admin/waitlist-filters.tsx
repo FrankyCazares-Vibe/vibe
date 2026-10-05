@@ -96,7 +96,9 @@ export function WaitlistFilterBar({
         <Text label="Club" value={filters.club} onChange={(v) => set("club", v)} />
         <Text label="Search" value={filters.text} onChange={(v) => set("text", v)} />
       </div>
-      <div className="adm-actions">
+      {/* Side by side, the labels sit further apart than a box sits from its
+          own words, so "Runs a club" doesn't read as the next box's label. */}
+      <div className="adm-actions" style={{ columnGap: 24 }}>
         <label style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 13, color: COLORS.text }}>
           <input
             type="checkbox"
