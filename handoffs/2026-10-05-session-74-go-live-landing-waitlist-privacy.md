@@ -7,7 +7,7 @@ S74 started from `2026-10-04-session-73-privacy-v2-desktop-messages.md`. Franky 
 ## START HERE: session 75
 
 1. **Ask Franky** how his live test went (section 4, first row) and whether the Vercel Cron "Run" answered 200.
-2. **Desktop Messages is on** for the three founders (Franky confirmed, section 5). Ask whether he did the real-phone look at the small chat changes.
+2. **The new chat is on for EVERYONE since Oct 5, 5:45 pm** (Franky: "i want you to allow everybody to have it"), phone and desktop (section 5). Ask whether he did the real-phone look, and decide the officer exception before the Oct 16 store submission (section 5, last line).
 3. **Fix the mini messenger** (Franky's ask, Oct 5, with a screenshot): section 5b. Ask him first what he wants it to be.
 4. **Privacy follow-ups**, in the order of `handoffs/legal-2026-10-04-privacy-v3/page-and-code-changes.md` (parts 2 and 3). First: tell the existing accounts, open one live Sentry report, the "verify your campus" gap (row 26), the hand-kept promises in `decisions.md` part D.
 5. **Give James** `handoffs/legal-2026-10-04-privacy-v3/for-the-lawyer.md` (the lawyer's questions).
@@ -77,6 +77,13 @@ Every production read followed the counts-only rule (structure, fingerprints, co
 - Known with the switch on, small: under 1140 wide with the Pinned and Shared panel open, some menu buttons sit under the panel (close the panel).
 - **Oct 5, about 3:20 pm: Franky added `CHAT_DESKTOP_ENABLED` and `CHAT_DESKTOP_ALLOWLIST` on Vercel Production.** The session pushed two empty commits to redeploy (`1d0a5c2`, `c52bccf`; a value only reaches a new deploy). **Franky confirmed the same afternoon: the new desktop Messages shows for him on the live site.** (The session cannot sign in there and did not see it itself.) Read from Vercel the same afternoon: `CHAT_DESKTOP_ALLOWLIST` is `*`, `CHAT_V2_ALLOWLIST` holds the three founders' ids and `CHAT_V2_CLUBS` holds SAE. SAE had one member on production that day, so **3 of 21 accounts have the new chat (phone and desktop): the founders.** Everyone else has the old chat until Oct 26.
 - **How it is switched on (for the record), Franky:** ten minutes on a real phone with the small chat changes (S73 handoff, section 2), then `CHAT_DESKTOP_ENABLED` = `true` and `CHAT_DESKTOP_ALLOWLIST` = the founders' ids (or `*` = everyone who has the new chat) on Vercel Production, then Redeploy.
+
+- **Oct 5, 5:45 pm: everyone has the new chat.** Franky asked for it; the session set `CHAT_V2_ALLOWLIST` to `*` through the Vercel connector (before: the three founders' ids, kept in the variable's comment) and pushed main `cae3995` to deploy it. With `CHAT_DESKTOP_ALLOWLIST` already `*`, all 21 accounts now get the new Messages on phone and laptop, and Campus has no Chat on desktop for anyone. To go back: put the three ids back and redeploy.
+  - Checked first: the one thing that had to exist before `*` (contract 17.2 L3, Report and Remove on text Board posts and replies) shipped with the desktop wave.
+  - The Privacy Policy changed in the same deploy: section 5e no longer says the new rooms and pins are "being switched on for a few clubs and accounts at a time" (page = text, 1,084 of 1,084).
+  - The old-screen chat fixes that were owed before Oct 15 (M2 to M5, M8, I3) no longer reach anyone, except what the mini messenger and the direct-message thread still share with the old page.
+  - Not seen by the session: any account's signed-in screen. Nobody has walked the new phone chat on a real phone yet; 18 accounts now have it.
+  - **Decide before Oct 16** (contract 17.2 L7): with the new chat on, a blocked pair still sees three traces of each other in a club (an owner's or admin's Board post, unread counts, reply and vote counts). The store reviewer's account now has the new chat.
 
 ## 5b. The mini messenger (Franky, Oct 5: "we need to fix the mini messenger view")
 

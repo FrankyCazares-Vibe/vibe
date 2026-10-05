@@ -74,3 +74,16 @@ All ten database files are on production. Desktop Messages is still OFF (`CHAT_D
 | ~15:12 | live site | landing still "Join the waitlist" x5; `/waitlist`, `/auth/login`, `/legal/privacy` 200; cron 401 without the secret. The Messages page itself cannot be fetched signed out (it redirects to sign-in), so the served file was not read; the deploy is of the pushed commit. |
 
 No database change in this push. `signup_open` is still false; the hook is still on.
+
+## October 5, later pushes and one Vercel value
+
+| Time (EDT) | Step | Answer |
+|---|---|---|
+| 15:17 | push f72dc1f..f17145e (share picture: "self" in coral) | deploy 6867827966 success; the live picture is byte-identical to the one checked locally |
+| ~15:20 | Franky added `CHAT_DESKTOP_ENABLED` = `true` and `CHAT_DESKTOP_ALLOWLIST` = `*` on Vercel Production | he confirmed the new desktop Messages shows |
+| 15:26, 15:31 | two empty commits to redeploy (`1d0a5c2`, `c52bccf`) | deploys 6867988831 and 6868058168 success |
+| ~17:40 | Vercel values read through the connector (plain settings only) | `CHAT_V2_ENABLED` true; `CHAT_V2_ALLOWLIST` = the three founders' ids; `CHAT_V2_CLUBS` = SAE; count read: 3 of 21 accounts had the new chat |
+| ~17:42 | **`CHAT_V2_ALLOWLIST` set to `*`** by the session, at Franky's instruction | re-read: `*`, Production |
+| 17:45 | push c52bccf..cae3995 (the policy's section 5e, docs) | deploy 6870047521 success; live policy no longer says "a few clubs and accounts" |
+
+No database change in any of these.
