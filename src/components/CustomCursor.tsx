@@ -104,9 +104,11 @@ export function CustomCursor() {
 
     const HOVER_SEL =
       "a, button, input, select, textarea, label, [role='button'], [role='tab'], [data-cursor-hover]";
+    // Set either way: a pressed button that goes away under the pointer
+    // sends no mouseout, so the next mouseover has to clear the hover look.
     function onOver(e: MouseEvent) {
       const t = e.target as Element | null;
-      if (t && t.closest?.(HOVER_SEL)) setHover(true);
+      setHover(Boolean(t && t.closest?.(HOVER_SEL)));
     }
     function onOut(e: MouseEvent) {
       const t = e.target as Element | null;

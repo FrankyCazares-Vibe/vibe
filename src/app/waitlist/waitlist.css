@@ -43,8 +43,13 @@ select.vwl-input option { color: var(--cream); background: #1A1817; }
 .vwl-actions .vln-btn-ghost { border: 1px solid rgba(255, 255, 255, 0.16); }
 .vwl-quiet { font-size: 14px; color: var(--muted); }
 button.vwl-quiet { padding: 0; min-height: 44px; border: 0; background: none; font-family: inherit; color: rgba(246, 241, 234, 0.85); text-decoration: underline; text-decoration-color: rgba(246, 241, 234, 0.3); text-underline-offset: 3px; cursor: pointer; }
-.vwl-more { display: grid; gap: 4px; margin-top: 22px; padding-top: 16px; border-top: 1px solid rgba(255, 255, 255, 0.09); }
+.vwl-more { display: grid; gap: 12px; margin-top: 22px; padding-top: 16px; border-top: 1px solid rgba(255, 255, 255, 0.09); }
 .vln-panel .vwl-more p { margin: 0; font-size: 14px; line-height: 1.5; color: var(--muted); }
+/* Room for a thumb: each quiet link is 45px tall to tap, and with the 12px
+   gap the two meet without overlapping. The room is not on the link itself,
+   so the keyboard ring stays around the words. */
+.vwl-more a.vwl-quiet { display: inline-block; position: relative; margin: 6px 0; }
+.vwl-more a.vwl-quiet::after { content: ""; position: absolute; inset: -12px 0; }
 .vwl-root :is(input, select, button):focus-visible { outline: 2px solid var(--cream); outline-offset: 2px; }
 .vwl-root .vwl-input:focus-visible { outline: none; }
 .vwl-root .vln-footer { max-width: 600px; margin: 0 auto; box-sizing: border-box; border-top: 0; }

@@ -39,7 +39,9 @@
 
 .vln-btn { display: inline-flex; align-items: center; justify-content: center; height: 48px; padding: 0 24px; border-radius: 999px; background: var(--coral); color: #160A06; font-size: 15px; font-weight: 700; text-decoration: none; transition: transform 0.2s ease, box-shadow 0.2s ease; }
 .vln-btn:hover { transform: translateY(-1px); box-shadow: 0 10px 30px rgba(255, 92, 53, 0.35); }
-.vln-btn-sm { height: 36px; padding: 0 16px; font-size: 13.5px; }
+/* 36px to look at, 44px to tap: 4px more above and below, nothing drawn. */
+.vln-btn-sm { position: relative; height: 36px; padding: 0 16px; font-size: 13.5px; }
+.vln-btn-sm::after { content: ""; position: absolute; inset: -4px 0; }
 .vln-btn-ghost { background: rgba(255, 255, 255, 0.04); color: var(--cream); border: 1px solid rgba(255, 255, 255, 0.16); }
 .vln-btn-ghost:hover { box-shadow: none; background: rgba(255, 255, 255, 0.08); }
 .vln-root a:focus-visible, .vln-light:focus-visible { outline: 2px solid var(--cream); outline-offset: 3px; }

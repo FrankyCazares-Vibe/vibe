@@ -383,7 +383,7 @@ function LoginForm() {
         ) : signupOpen ? (
           <p className="vibe-auth-tail">
             New to Vibe?{" "}
-            <Link href="/auth/signup" className="vibe-auth-link">
+            <Link href="/auth/signup" className="vibe-auth-link vibe-auth-link--tap">
               Create an account
             </Link>
           </p>
@@ -391,14 +391,18 @@ function LoginForm() {
           <>
             <p className="vibe-auth-tail">
               New to Vibe?{" "}
-              <Link href="/waitlist" className="vibe-auth-link">
+              <Link href="/waitlist" className="vibe-auth-link vibe-auth-link--tap">
                 Join the waitlist
               </Link>
             </p>
-            <p className="vibe-auth-tail" style={{ marginTop: 8 }}>
+            {/* 28px, not the tail's 24: the two links' tap areas (47 and 50px)
+                then meet without overlapping. The link is a box so that, where
+                the line wraps, every word of it gets the tall area. */}
+            <p className="vibe-auth-tail" style={{ marginTop: 28 }}>
               <Link
                 href="/auth/signup"
-                style={{ color: "inherit", textDecoration: "underline", textUnderlineOffset: 3 }}
+                className="vibe-auth-link--tap"
+                style={{ display: "inline-block", color: "inherit", textDecoration: "underline", textUnderlineOffset: 3 }}
               >
                 Got an access code? Create your account
               </Link>

@@ -310,7 +310,7 @@ export function HomeLanding({ signupOpen }: { signupOpen: boolean }) {
             <h2>Step inside.</h2>
             {signupOpen ? (
               <>
-                <p>Sign up with your school email. It’s free, and only people who have one can join.</p>
+                <p>Sign up free. You confirm your school email on the way in, and only people who have one can join.</p>
                 <a href={doorCta.href} data-warp-trigger className="vln-btn">{doorCta.label}</a>
               </>
             ) : (

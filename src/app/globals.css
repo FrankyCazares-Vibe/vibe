@@ -602,13 +602,19 @@
 
 .vibe-auth-page {
   position: relative;
-  min-height: 100vh;
+  /* The window less the frame src/app/auth/layout.tsx puts around it (24px
+     and the safe area, top and bottom): a card that fits does not scroll. */
+  min-height: calc(100vh - 48px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 40px 20px;
   font-family: "DM Sans", sans-serif;
   overflow: hidden;
+}
+/* /account/suspended wears the class outside /auth: no frame to take off. */
+body > .vibe-auth-page {
+  min-height: 100vh;
 }
 .vibe-auth-page::before {
   content: "";
@@ -1202,6 +1208,11 @@ a.vibe-auth-secondary {
   .vibe-auth-page {
     padding: 24px 14px;
   }
+  /* Room for the back pill: in a short window the card came up under it.
+     Not inside the store apps, where the pill is hidden (end of file). */
+  html:not(.vibe-app) .vibe-auth-page:has(> .vibe-auth-back) {
+    padding-top: 48px;
+  }
   .vibe-auth-back {
     top: 16px;
     left: 16px;
@@ -1225,12 +1236,36 @@ a.vibe-auth-secondary {
     letter-spacing: -0.5px;
   }
 }
+/* 541 to 720 wide the bigger pill is still over the card's corner (wider
+   than that it sits beside the card): the same room. */
+@media (min-width: 541px) and (max-width: 720px) {
+  html:not(.vibe-app) .vibe-auth-page:has(> .vibe-auth-back) {
+    padding-top: 66px;
+  }
+}
 
 @media (max-width: 460px) {
+  /* Each chip as wide as its words, not a third of the row: at 375 and 390
+     a third cut "Account" and the "iu.edu" tag. Tighter gaps make the room. */
   .vibe-auth-steps {
     flex-wrap: nowrap;
+    gap: 4px;
+    padding: 12px 10px;
+  }
+  .vibe-auth-step {
+    flex: 1 1 auto;
+    padding: 6px;
+  }
+  .vibe-auth-step-divider {
+    width: 10px;
   }
   .vibe-auth-step-meta {
+    display: none;
+  }
+}
+/* A 320px phone: the words only fit without the two dashes. */
+@media (max-width: 340px) {
+  .vibe-auth-step-divider {
     display: none;
   }
 }
@@ -1239,7 +1274,9 @@ a.vibe-auth-secondary {
 /* Custom cursor (dot + trailing ring) — shown on every shelled page       */
 /* ====================================================================== */
 
-@media (pointer: fine) {
+/* Only where the dot and ring show (see the hide rule below): under 900px
+   they are hidden, so the native arrow has to stay. */
+@media (pointer: fine) and (min-width: 900px) {
   body.vibe-cursor-active,
   body.vibe-cursor-active * {
     cursor: none !important;
