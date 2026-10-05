@@ -27,14 +27,6 @@ const AUTH_PARAM_RE = new RegExp(
   "gi",
 );
 
-/** `"token": "…"` in a captured JSON request body. */
-const AUTH_JSON_RE = new RegExp(
-  `("(?:${AUTH_PARAM_KEYS})"\\s*:\\s*)"(?:[^"\\\\]|\\\\.)*"`,
-  "gi",
-);
-
-const AUTH_KEY_SET = new Set(AUTH_PARAM_KEYS.split("|"));
-
 const REDACTED = "[redacted]";
 
 /**
@@ -87,9 +79,6 @@ const HANDLE_PARAM_RE = new RegExp(
   "gi",
 );
 
-/** `"handle": "…"` in a captured JSON request body (PATCH /api/me/handle). */
-const HANDLE_JSON_RE = /("handle"\s*:\s*)"(?:[^"\\]|\\.)*"/gi;
-
 /**
  * Replaces the handle in `/profile/<handle>` and `/api/users/<handle>` with
  * `:handle`, and the value of a `handle=` / `user=` link parameter with
@@ -107,13 +96,118 @@ export function redactHandles(s: string): string {
     .replace(HANDLE_PARAM_RE, `$1${REDACTED}`);
 }
 
+/**
+ * Every filter operator the database client can write after `column=`
+ * (@supabase/postgrest-js PostgrestFilterBuilder): `id=eq.<value>`,
+ * `email=ilike.<value>`, `id=in.(<a>,<b>)` and the rest.
+ */
+const DB_FILTER_OPS =
+  "eq|neq|gt|gte|lt|lte|like|ilike|match|imatch|in|is|isdistinct|" +
+  "fts|plfts|phfts|wfts|cs|cd|ov|sl|sr|nxl|nxr|adj";
+
+/**
+ * `column=eq.<value>` after `?` or `&`. Also `not.` in front (`id=not.in.(…)`)
+ * and a bracket after the operator (`like(any).`, `fts(english).`), which
+ * reaches a web address as `%28…%29`. The column can be on a joined table
+ * (`creator.campus_id`) or a JSON path (`meta->>org_id`). The value runs to
+ * the next delimiter.
+ */
+const DB_FILTER_RE = new RegExp(
+  `([?&][^&#=?\\s"']{1,80}=(?:not\\.)?(?:${DB_FILTER_OPS})` +
+    `(?:(?:\\(|%28)[a-z_]{1,40}(?:\\)|%29))?\\.)[^&#\\s"']+`,
+  "gi",
+);
+
+/** `or=(a.eq.<x>,b.eq.<y>)` and `and=(…)`, alone, negated or on a joined table. */
+const DB_LOGIC_RE = /([?&](?:[a-z0-9_]{1,80}\.)?(?:not\.)?(?:or|and)=)[^&#\s"']+/gi;
+
+/**
+ * The path of a call to the sign-in system or to file storage, plain or
+ * encoded: `/auth/v1/admin/users/<account ID>`,
+ * `/storage/v1/object/profiles/<account ID>/<file>`. The app's own pages live
+ * under /auth/login and the like, never /auth/v1.
+ */
+const DB_ID_PATH_RE = new RegExp(
+  `${SLASH}(?:auth|storage)${SLASH}v1${SLASH}[^?#&\\s"'<>]+`,
+  "gi",
+);
+
+const UUID_RE = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi;
+
+/**
+ * Takes the values out of the address of a database call:
+ * `users?email=eq.<address>` becomes `users?email=eq.[redacted]`, a whole
+ * `or=(…)` becomes `or=[redacted]`, and an ID in the path of a sign-in or
+ * storage call becomes `:id`. Table, column and operator stay, so the report
+ * still says which call it was. Pure: same input, same output.
+ *
+ * Why: the kit lists every call the server makes while it handles a request,
+ * with its full address (the trail of an error report, the spans of a speed
+ * report). Those addresses hold account IDs, and at a few steps an email
+ * address.
+ */
+export function redactDbCallValues(s: string): string {
+  return s
+    .replace(DB_FILTER_RE, `$1${REDACTED}`)
+    .replace(DB_LOGIC_RE, `$1${REDACTED}`)
+    .replace(DB_ID_PATH_RE, (path: string) => path.replace(UUID_RE, ":id"));
+}
+
 /** Every string scrubber, in order. */
 function scrubString(s: string): string {
-  return redactHandles(redactAuthTokens(s));
+  return redactDbCallValues(redactHandles(redactAuthTokens(s)));
+}
+
+/**
+ * Keys the kit fills with a query string or fragment whose leading `?` / `#`
+ * is cut off (span data `http.query`, `http.fragment`), so the first
+ * `key=value` has nothing to anchor on.
+ */
+const BARE_QUERY_KEYS = new Set([
+  "http.query",
+  "http.fragment",
+  "url.query",
+  "url.fragment",
+  "query_string",
+]);
+
+function scrubKeyedString(key: string, s: string): string {
+  if (!BARE_QUERY_KEYS.has(key) || /^[?&#]/.test(s)) return scrubString(s);
+  return scrubString(`&${s}`).slice(1);
+}
+
+/**
+ * Span and trail keys that are a copy of something the request record held:
+ * the body (`http.request.body.data`), a request header or cookie
+ * (`http.request.header.<name>`, `http.request.header.cookie.<name>`), a
+ * cookie the server set (`http.response.header.set_cookie…`) and the caller's
+ * IP address. Only the browser's name (`user_agent`) stays.
+ */
+function isRequestCopyKey(key: string): boolean {
+  if (key.startsWith("http.request.header.")) {
+    return key !== "http.request.header.user_agent";
+  }
+  return (
+    key === "http.request.body.data" ||
+    key === "http.client_ip" ||
+    key === "user.ip_address" ||
+    key.startsWith("http.response.header.set_cookie")
+  );
+}
+
+function isPlainRecord(value: unknown): value is Record<string, unknown> {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) return false;
+  const proto = Object.getPrototypeOf(value) as unknown;
+  return proto === Object.prototype || proto === null;
 }
 
 const MAX_SCRUB_DEPTH = 12;
 
+/**
+ * Walks plain data in place: scrubs every string and drops every key that is
+ * a copy of the request record. Each value is tried alone, so one that cannot
+ * be read or written is left as it was and the rest is still scrubbed.
+ */
 function scrubValue(value: unknown, depth: number, seen: WeakSet<object>): unknown {
   if (typeof value === "string") return scrubString(value);
   if (value === null || typeof value !== "object" || depth > MAX_SCRUB_DEPTH) {
@@ -123,68 +217,126 @@ function scrubValue(value: unknown, depth: number, seen: WeakSet<object>): unkno
   seen.add(value);
   if (Array.isArray(value)) {
     for (let i = 0; i < value.length; i++) {
-      value[i] = scrubValue(value[i], depth + 1, seen);
+      try {
+        value[i] = scrubValue(value[i], depth + 1, seen);
+      } catch {
+        // Left as it was; the walk goes on.
+      }
     }
     return value;
   }
   // Events are plain data by now; leave anything class-shaped alone.
-  const proto = Object.getPrototypeOf(value) as unknown;
-  if (proto !== Object.prototype && proto !== null) return value;
-  const record = value as Record<string, unknown>;
-  for (const key of Object.keys(record)) {
-    record[key] = scrubValue(record[key], depth + 1, seen);
+  if (!isPlainRecord(value)) return value;
+  for (const key of Object.keys(value)) {
+    try {
+      if (isRequestCopyKey(key)) {
+        delete value[key];
+        continue;
+      }
+      const item = value[key];
+      value[key] =
+        typeof item === "string"
+          ? scrubKeyedString(key, item)
+          : scrubValue(item, depth + 1, seen);
+    } catch {
+      // Left as it was; the walk goes on.
+    }
   }
   return value;
 }
 
+/** What stays of the request record. `headers` is cut down to the browser's name. */
+const REQUEST_KEEP = new Set(["url", "method", "headers"]);
+
 /**
- * Strips auth tokens from everything an event carries: request URL, headers
- * and body, transaction name, breadcrumbs (fetch/navigation url, from, to,
- * message), trace context and span data, span descriptions, messages and
- * stack frames (an inline script's frame is the page URL, query included).
+ * Cuts the request record down to the address, the method and the
+ * `user-agent` header (the browser's name). Gone: the body (`data`), the
+ * cookies, every other header, `query_string` (pairs with no `?` or `&` to
+ * anchor on; `url` keeps the query, redacted) and anything else the kit adds.
  *
- * Why: the browser SDK records `location.href` with its query and hash, and
- * server spans record the request target. An unspent
+ * Why: on the server the kit copies the body of the request (up to 10,000
+ * bytes: the message, post or form a person was sending), every cookie (the
+ * sign-in cookie among them) and every header (`authorization`, Vercel's
+ * `x-vercel-ip-*` rough location, `x-vercel-proxied-for`) onto each error and
+ * speed report. `sendDefaultPii: false` does not stop that.
+ */
+function stripRequestRecord(event: Record<string, unknown>): void {
+  const request = event.request;
+  if (request === undefined || request === null) return;
+  if (!isPlainRecord(request)) {
+    delete event.request;
+    return;
+  }
+  for (const key of Object.keys(request)) {
+    if (!REQUEST_KEEP.has(key)) delete request[key];
+  }
+  const kept: Record<string, string> = {};
+  if (isPlainRecord(request.headers)) {
+    for (const [name, value] of Object.entries(request.headers)) {
+      if (name.toLowerCase() === "user-agent" && typeof value === "string") {
+        kept[name] = value;
+      }
+    }
+  }
+  if (Object.keys(kept).length > 0) request.headers = kept;
+  else delete request.headers;
+}
+
+/**
+ * Cleans an error or speed report before it leaves. Both `beforeSend` and
+ * `beforeSendTransaction` call it. First the request record is cut down
+ * (stripRequestRecord): no body, no cookies, no header but the browser's
+ * name. Then one pass over the whole event does two things:
+ *
+ * - Every copy the kit keeps of those is dropped (isRequestCopyKey), from the
+ *   trace context, from each span and from the trail.
+ * - Every string is scrubbed (scrubString): the request URL, the transaction
+ *   name, the trail (fetch and navigation url, from, to, message, query),
+ *   trace and span data, span descriptions, messages and stack frames (an
+ *   inline script's frame is the page URL, query included).
+ *
+ * Why the strings: the browser SDK records `location.href` with its query
+ * and hash, and server spans record the request target. An unspent
  * `/auth/update-password?token_hash=…` in Sentry is a password reset for
- * anyone who can read the event.
+ * anyone who can read the event. The same pass takes handles out
+ * (redactHandles), so an event never names the student whose profile was
+ * open, and the values out of the server's database calls
+ * (redactDbCallValues).
  *
- * The same pass takes handles out (redactHandles), so an event never names
- * the student whose profile was open.
+ * The report is always sent: this never returns null and never throws. A
+ * step that fails is skipped (for the request record, the whole record is
+ * dropped instead), and the event goes out with the rest of the cleaning
+ * done.
  */
 export function scrubAuthTokensFromEvent<
   T extends SentryErrorEvent | SentryTransactionEvent,
 >(
   event: T,
 ): T {
-  const request = event.request;
-  if (request) {
-    // Key/value pairs with no `?` or `&` to anchor on; the URL above it
-    // keeps the query, redacted.
-    delete request.query_string;
-    if (typeof request.data === "string") {
-      const json = request.data
-        .replace(AUTH_JSON_RE, `$1"${REDACTED}"`)
-        .replace(HANDLE_JSON_RE, `$1"${REDACTED}"`);
-      // The leading `&` anchors a form body's first `key=value`.
-      request.data = scrubString(`&${json}`).slice(1);
-    } else if (
-      request.data !== null &&
-      typeof request.data === "object" &&
-      !Array.isArray(request.data)
-    ) {
-      const body = request.data as Record<string, unknown>;
-      for (const key of Object.keys(body)) {
-        const lower = key.toLowerCase();
-        if (AUTH_KEY_SET.has(lower) || lower === "handle") body[key] = REDACTED;
+  try {
+    if (event === null || typeof event !== "object") return event;
+    const record = event as unknown as Record<string, unknown>;
+    try {
+      stripRequestRecord(record);
+    } catch {
+      try {
+        delete record.request;
+      } catch {
+        // Nothing left to try; the report still goes.
       }
     }
-  }
-  const seen = new WeakSet<object>();
-  const record = event as unknown as Record<string, unknown>;
-  for (const key of Object.keys(record)) {
-    // SDK internals, dropped before the envelope is built.
-    if (key === "sdkProcessingMetadata") continue;
-    record[key] = scrubValue(record[key], 1, seen);
+    const seen = new WeakSet<object>();
+    for (const key of Object.keys(record)) {
+      // SDK internals, dropped before the envelope is built.
+      if (key === "sdkProcessingMetadata") continue;
+      try {
+        record[key] = scrubValue(record[key], 1, seen);
+      } catch {
+        // Left as it was; the other keys are still scrubbed.
+      }
+    }
+  } catch {
+    // A bug here must not cost the report.
   }
   return event;
 }
@@ -201,6 +353,11 @@ export function getSentryInitOptions(): BrowserOptions {
       "development",
     tracesSampleRate: process.env.NODE_ENV === "development" ? 1 : 0.1,
     sendDefaultPii: false,
+    // Both hooks run the same scrub. A span sent on its own passes neither.
+    // Today that is only the browser's INP measurement: the tapped element and
+    // the page's route name, no request and no database call. Span streaming
+    // (`traceLifecycle: "stream"`, off) would send every span that way, so it
+    // needs a `beforeSendSpan` that does the same before anyone turns it on.
     beforeSend: (event) => scrubAuthTokensFromEvent(event),
     beforeSendTransaction: (event) => scrubAuthTokensFromEvent(event),
   };
