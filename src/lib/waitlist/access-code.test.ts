@@ -27,7 +27,9 @@ const {
   GATE_PROBE_METADATA_KEY,
   formatAccessCode,
   generateAccessCode,
+  isUnfinishedAccessCode,
   normalizeAccessCode,
+  readTypedAccessCode,
 } = (await import(specifier)) as typeof import("./access-code");
 
 const FORMAT_RE = /^VIBE-[0-9ABCDEFGHJKMNPQRSTVWXYZ]{4}-[0-9ABCDEFGHJKMNPQRSTVWXYZ]{4}$/;
@@ -103,6 +105,57 @@ test("normalizeAccessCode: the shared vectors", () => {
 test("normalizeAccessCode never throws on odd input", () => {
   for (const odd of [undefined, null, 42, {}, "🙂🙂🙂🙂🙂🙂🙂🙂"] as unknown[]) {
     assert.equal(normalizeAccessCode(odd as string), null);
+  }
+});
+
+// The page's own rule (not in the SQL): half a code is not a code.
+const UNFINISHED = ["VIBE-7KQ2", "vibe-7kq2", "VIBE7KQ2", " vibe 7kq2 ", "VIBE", "VIBE-", "vibe-7", "VIBE-7KQ2-M9X"];
+
+test("readTypedAccessCode: a code cut short is unfinished, not a code", () => {
+  for (const input of UNFINISHED) {
+    assert.equal(isUnfinishedAccessCode(input), true, JSON.stringify(input));
+    assert.equal(readTypedAccessCode(input), null, JSON.stringify(input));
+  }
+  // The defect: the 8 characters of VIBE-7KQ2 pass the plain normaliser (and
+  // the database's), the I read as 1.
+  assert.equal(normalizeAccessCode("VIBE-7KQ2"), "V1BE7KQ2");
+});
+
+test("readTypedAccessCode: every full code still reads, as normalizeAccessCode reads it", () => {
+  for (const [input, want] of VECTORS) {
+    assert.equal(readTypedAccessCode(input), want, JSON.stringify(input));
+    if (want !== null) assert.equal(isUnfinishedAccessCode(input), false, JSON.stringify(input));
+  }
+  const loose: [string, string][] = [
+    ["vibe7kq2m9xd", "7KQ2M9XD"],
+    ["VIBE 7KQ2 M9XD", "7KQ2M9XD"],
+    ["7KQ2M9XD", "7KQ2M9XD"],
+    ["vibe-7kq2-m9xo", "7KQ2M9X0"],
+    ["vibe-ilo0-0000", "11000000"],
+    // A code whose own 8 characters start V1BE: in full, or with the digit.
+    ["VIBE-V1BE-7KQ2", "V1BE7KQ2"],
+    ["vibe-vibe-7kq2", "V1BE7KQ2"],
+    ["V1BE-7KQ2", "V1BE7KQ2"],
+    ["vlbe7kq2", "V1BE7KQ2"],
+  ];
+  for (const [input, want] of loose) {
+    assert.equal(isUnfinishedAccessCode(input), false, JSON.stringify(input));
+    assert.equal(readTypedAccessCode(input), want, JSON.stringify(input));
+  }
+  for (let i = 0; i < 200; i++) {
+    const code = generateAccessCode();
+    for (const typed of [code, code.toLowerCase(), code.replace(/-/g, ""), code.toLowerCase().replace(/-/g, " "), code.slice(5)]) {
+      // `generateAccessCode` never writes the letter I, so even a code that
+      // starts V1BE comes back when typed without its prefix.
+      assert.equal(readTypedAccessCode(typed), normalizeAccessCode(code), typed);
+    }
+  }
+});
+
+test("isUnfinishedAccessCode and readTypedAccessCode never throw on odd input", () => {
+  for (const odd of [undefined, null, 42, {}, "", "🙂🙂🙂🙂", "vıbe-7kq2"] as unknown[]) {
+    assert.equal(isUnfinishedAccessCode(odd as string), false);
+    assert.equal(readTypedAccessCode(odd as string), null);
   }
 });
 

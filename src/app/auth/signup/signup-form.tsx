@@ -44,7 +44,7 @@ import {
   ACCESS_CODE_URL_PARAM,
   formatAccessCode,
   GATE_PROBE_METADATA_KEY,
-  normalizeAccessCode,
+  readTypedAccessCode,
 } from "@/lib/waitlist/access-code";
 import { parseGateRefusal, WAITLIST_PATH } from "@/lib/waitlist/types";
 import { gateRefusalCopy } from "@/lib/waitlist/view";
@@ -188,9 +188,14 @@ export function SignupForm({
   }, []);
 
   // After a refusal about the code, the cursor goes to the code (it is
-  // rendered by then, even if it only just appeared).
+  // rendered by then, even if it only just appeared), and to its end: a
+  // field the link filled would otherwise take the missing half in front.
+  // A cursor already in the field stays where the person put it.
   useEffect(() => {
-    if (focusCode) codeInput.current?.focus();
+    const el = codeInput.current;
+    if (!focusCode || !el || document.activeElement === el) return;
+    el.focus();
+    el.setSelectionRange(el.value.length, el.value.length);
   }, [focusCode]);
 
   const schoolEmailTyped = isSchoolEmail(email.trim());
@@ -198,7 +203,7 @@ export function SignupForm({
   // over with another address would only meet "already used". Say so instead
   // of offering it (a founder sends a new code; the database allows that
   // while the first account is unconfirmed).
-  const codeTied = codeShown && normalizeAccessCode(accessCode.trim()) !== null;
+  const codeTied = codeShown && readTypedAccessCode(accessCode.trim()) !== null;
   const rateLimitedUntil = pending?.rateLimitedUntil ?? null;
   // In the installed app the code is the way in: typing it signs in THIS
   // app. On an iPhone the email's Confirm link opens Safari, which keeps its
@@ -262,12 +267,13 @@ export function SignupForm({
       return;
     }
     // A light check only: the hook decides. Typing is forgiving (case,
-    // spaces, hyphens, O for 0); anything that still isn't a code is caught
-    // here rather than spent on a round trip.
+    // spaces, hyphens, O for 0); anything that still isn't a code (half of
+    // one included) is caught here rather than spent on a round trip. With
+    // sign-up open the field is hidden and nobody needs a code, so a link's
+    // code that doesn't read is left out, not asked about.
     const typedCode = accessCode.trim();
-    const code = typedCode ? normalizeAccessCode(typedCode) : null;
-    if (typedCode && !code) {
-      setCodeShown(true);
+    const code = typedCode ? readTypedAccessCode(typedCode) : null;
+    if (typedCode && !code && codeShown) {
       setError(CODE_SHAPE);
       setFocusCode((n) => n + 1);
       return;
@@ -620,7 +626,7 @@ export function SignupForm({
             </p>
           ) : null}
 
-          {error ? <p className="vibe-auth-error">{error}</p> : null}
+          {error ? <p role="alert" className="vibe-auth-error">{error}</p> : null}
           {maybeExisting ? (
             <div
               role="status"

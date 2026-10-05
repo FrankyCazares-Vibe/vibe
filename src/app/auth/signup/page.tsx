@@ -1,4 +1,4 @@
-import { formatAccessCode, normalizeAccessCode } from "@/lib/waitlist/access-code";
+import { formatAccessCode, readTypedAccessCode } from "@/lib/waitlist/access-code";
 import { isSignupOpen } from "@/lib/waitlist/signup-open";
 import { parseSignupOverride } from "@/lib/waitlist/types";
 
@@ -36,8 +36,9 @@ export default async function SignupPage({ searchParams }: Props) {
   const signupOpen = await isSignupOpen(override);
 
   const raw = first(params.access_code)?.trim() ?? "";
-  const normalized = raw ? normalizeAccessCode(raw) : null;
-  // A code that doesn't read as one is still shown, so the page can say why.
+  const normalized = raw ? readTypedAccessCode(raw) : null;
+  // A code that doesn't read as one (a link cut short: `VIBE-7KQ2`) is still
+  // shown, as it came, so the page can say why.
   const initialAccessCode = normalized ? formatAccessCode(normalized) : raw.slice(0, 32);
 
   return (

@@ -84,6 +84,33 @@ export function normalizeAccessCode(input: string): string | null {
   return CODE_RE.test(v) ? v : null;
 }
 
+/**
+ * A code cut short: text that starts with the letters VIBE and has fewer
+ * than 12 letters and digits, like `VIBE-7KQ2` from a link that lost its
+ * end. Counted the way {@link normalizeAccessCode} counts (ASCII letters and
+ * digits only, any case).
+ */
+export function isUnfinishedAccessCode(input: string): boolean {
+  if (typeof input !== "string") return false;
+  const v = input.replace(/[^0-9A-Za-z]/g, "").toUpperCase();
+  return v.startsWith(ACCESS_CODE_PREFIX) && v.length < ACCESS_CODE_LENGTH + ACCESS_CODE_PREFIX.length;
+}
+
+/**
+ * What the sign-up page makes of a typed or linked code: the 8 characters,
+ * or null. {@link normalizeAccessCode} plus one rule the page alone has (the
+ * database does not): an unfinished code is not a code. Without it the 8
+ * characters of `VIBE-7KQ2` read as a whole code, the I as a 1 (`V1BE7KQ2`),
+ * and the person is shown, and sends, a code they never had.
+ *
+ * The one full code this turns away is one whose own 8 characters start
+ * V1BE, typed with the letter I and without the prefix. Typed in full
+ * (`VIBE-VIBE-7KQ2`) or with the digit (`V1BE-7KQ2`) it still reads.
+ */
+export function readTypedAccessCode(input: string): string | null {
+  return isUnfinishedAccessCode(input) ? null : normalizeAccessCode(input);
+}
+
 /** `7KQ2M9XD` to `VIBE-7KQ2-M9XD`. Takes the output of {@link normalizeAccessCode}. */
 export function formatAccessCode(normalized: string): string {
   return `${ACCESS_CODE_PREFIX}-${normalized.slice(0, 4)}-${normalized.slice(4, 8)}`;
