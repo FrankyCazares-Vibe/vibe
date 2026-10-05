@@ -249,10 +249,10 @@ Vibe+ is not on sale yet. We can give it to an account ourselves, and any accoun
 
 ### 5e. Who can see my messages?
 
-Vibe has direct chats, group chats and club rooms. The new club rooms and pinned messages are being switched on for a few clubs and accounts at a time, so you may not have them yet.
+Vibe has direct chats, group chats and club rooms.
 
 - **Direct and group chats.** Everyone in the chat sees every message, photo, video, shared post and reaction. They also see who is in the chat, when the other side last read it and who is typing. Someone added later can read the whole history. A direct message from someone you are not connected with arrives as a request. (Connected means you follow each other.) The sender can see when you read it. In a group chat, a person you are connected with can add you with no request first. The others in that chat may be people you are not connected with.
-- **Pinned messages.** In a direct or group chat, anyone who has accepted the chat can pin a message, yours included, for everyone in it, and can unpin it. Everyone in the chat who has pinned messages switched on sees them, including someone added later. Seeing, pinning and unpinning all need that switch. A person who does not have it yet cannot see a pin or unpin it, even on their own message. Vibe stores who pinned a message and when. People in the chat can see when a message was pinned, not who pinned it. The panel that shows pinned messages also has a "Shared" list: the photos, videos and posts shared in the chat. Club rooms have no pinned messages.
+- **Pinned messages.** In a direct or group chat, anyone who has accepted the chat can pin a message, yours included, for everyone in it, and can unpin it. Everyone in the chat sees the pinned messages, including someone added later. Vibe stores who pinned a message and when. People in the chat can see when a message was pinned, not who pinned it. The panel that shows pinned messages also has a "Shared" list: the photos, videos and posts shared in the chat. Club rooms have no pinned messages.
 - **Blocks.** A block stops new messages both ways, and a direct chat disappears from both inboxes. No message or chat is deleted. The block does delete the follows between the two of you, and unblocking does not bring them back. In a shared group chat, old messages stay visible and neither of you can send or pin while the block lasts.
 
 **Club rooms.** Each club has these rooms:

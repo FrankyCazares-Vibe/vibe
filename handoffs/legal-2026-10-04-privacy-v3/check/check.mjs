@@ -17,14 +17,15 @@ import { parseMd } from "./parse-md.mjs";
 import { fileFor, loadSources, sectionLabel } from "./sources.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
-const SCRATCH = join(HERE, "..", "..", "..");
+// This copy lives in the repo at handoffs/legal-2026-10-04-privacy-v3/check/.
+const REPO = join(HERE, "..", "..", "..");
 const arg = (name, fallback) => {
   const i = process.argv.indexOf("--" + name);
   return i > 0 ? process.argv[i + 1] : fallback;
 };
 const URL_ = arg("url", "http://localhost:3105/legal/privacy");
-const MD = arg("md", join(SCRATCH, "privacy-v3", "privacy-policy-final.md"));
-const SRC = arg("src", join(SCRATCH, "release", "src", "app", "legal", "privacy"));
+const MD = arg("md", join(HERE, "..", "privacy-policy-final.md"));
+const SRC = arg("src", join(REPO, "src", "app", "legal", "privacy"));
 const WIDTH = Number(arg("width", 1280));
 const has = (name) => process.argv.includes("--" + name);
 // The page's "Start here" answers have no full stop ("Section 5", not "Section 5.").

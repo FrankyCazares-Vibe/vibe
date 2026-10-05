@@ -9,9 +9,7 @@ export function Section5e() {
     <>
       <SubH3 n="5e" />
       <LegalP>
-        Vibe has direct chats, group chats and club rooms. The new club rooms
-        and pinned messages are being switched on for a few clubs and accounts
-        at a time, so you may not have them yet.
+        Vibe has direct chats, group chats and club rooms.
       </LegalP>
       <LegalUL bullets>
         <li>
@@ -28,11 +26,9 @@ export function Section5e() {
         <li>
           <strong>Pinned messages.</strong> In a direct or group chat, anyone
           who has accepted the chat can pin a message, yours included, for
-          everyone in it, and can unpin it. Everyone in the chat who has pinned
-          messages switched on sees them, including someone added later. Seeing,
-          pinning and unpinning all need that switch. A person who does not have
-          it yet cannot see a pin or unpin it, even on their own message. Vibe
-          stores who pinned a message and when. People in the chat can see when
+          everyone in it, and can unpin it. Everyone in the chat sees the pinned
+          messages, including someone added later. Vibe stores who pinned a
+          message and when. People in the chat can see when
           a message was pinned, not who pinned it. The panel that shows pinned
           messages also has a &ldquo;Shared&rdquo; list: the photos, videos and
           posts shared in the chat. Club rooms have no pinned messages.
