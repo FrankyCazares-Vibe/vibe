@@ -114,12 +114,16 @@ function layerUp(): boolean {
 
 type ClubOrg = Parameters<ClubPaneProps["onOrg"]>[0];
 
-/** The home's right side (3.2). */
-function EmptyStage({ t }: { t: Palette }) {
+/** Under this `contentWidth` the list (520) leaves the home's right side narrower than its headline on one line at full size (279, and 24 of padding each side). */
+const STAGE_TIGHT_BELOW = 848;
+
+/** The home's right side (3.2). Tight: a narrow window leaves it about 180 wide, so the words are set smaller; both lines always wrap evenly. Until the first measure (`contentWidth` 0) the words are held back, so a narrow window never draws them once at full size. */
+function EmptyStage({ t, contentWidth }: { t: Palette; contentWidth: number }) {
+  const tight = contentWidth < STAGE_TIGHT_BELOW;
   return (
-    <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 8, padding: 24, textAlign: "center" }}>
-      <h2 style={{ margin: 0, fontFamily: SERIF, fontSize: 22, fontWeight: 700, letterSpacing: "-0.3px", color: t.ink }}>Pick up where you left off.</h2>
-      <p style={{ margin: 0, fontSize: 14, fontWeight: 500, color: t.muted }}>Choose a chat or a club from your list.</p>
+    <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 8, padding: tight ? 16 : 24, textAlign: "center", visibility: contentWidth > 0 ? "visible" : "hidden" }}>
+      <h2 style={{ margin: 0, fontFamily: SERIF, fontSize: tight ? 18 : 22, fontWeight: 700, letterSpacing: "-0.3px", color: t.ink, textWrap: "balance" }}>Pick up where you left off.</h2>
+      <p style={{ margin: 0, fontSize: tight ? 13 : 14, fontWeight: 500, color: t.muted, textWrap: "balance" }}>Choose a chat or a club from your list.</p>
     </div>
   );
 }
@@ -524,7 +528,7 @@ export function MessagesDesktop({ initialHandle, initialChannelId }: MessagesDes
           )}
           {/* The pane: one box for the page's life, so the frame in it is never remounted. */}
           <div style={{ flex: 1, minWidth: 0, minHeight: 0, position: "relative" }}>
-            {home ? <EmptyStage t={t} /> : null}
+            {home ? <EmptyStage t={t} contentWidth={contentWidth} /> : null}
             {open.kind === "resolving" ? <PaneSkeleton t={t} /> : null}
             {open.kind === "club" ? (
               // The club fills the pane: `ClubPane`'s root is the one item of this row (its own right panel is inside it).

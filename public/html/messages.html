@@ -1005,8 +1005,12 @@ input,textarea,[contenteditable="true"]{cursor:text!important;}
   /* white-space:nowrap on the pill makes max-width inert — the row can't
      break, so it overflows instead of fitting. Let it wrap onto a second
      line: five emoji + Reply + Report is a few pixels from the edge of a
-     375px screen, and a wider font would push the last button off it. */
-  .dm-actions { max-width:calc(100vw - 32px);flex-wrap:wrap;white-space:normal; }
+     375px screen, and a wider font would push the last button off it.
+     width:max-content, because the pill is absolute and anchored to one
+     edge of its bubble: left to size itself it shrinks to the bubble's
+     width, and a short message's pill wraps into a ball. max-width still
+     wraps it where the row would not fit. */
+  .dm-actions { width:max-content;max-width:calc(100vw - 32px);flex-wrap:wrap;white-space:normal; }
   .dm-removed { max-width:100%; }
 }
 </style>
