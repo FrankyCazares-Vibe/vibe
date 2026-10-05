@@ -70,12 +70,17 @@ async function loadFonts(): Promise<FontSpec> {
   }
 }
 
-/** "campus" in coral, its full stop in cream: one flex item per word. */
-function Word({ text, coral }: { text: string; coral?: boolean }) {
+/**
+ * "campus" in coral, its full stop in cream: one flex item per word. `lead`
+ * is a cream start of the same word ("Your" + "self"), so the third beat
+ * reads like the first two: Your, then the coral word.
+ */
+function Word({ text, coral, lead }: { text: string; coral?: boolean; lead?: string }) {
   const stop = text.endsWith(".");
   const body = stop ? text.slice(0, -1) : text;
   return (
     <div style={{ display: "flex" }}>
+      {lead ? <span>{lead}</span> : null}
       <span style={{ color: coral ? CORAL : CREAM }}>{body}</span>
       {stop ? <span>.</span> : null}
     </div>
@@ -147,7 +152,7 @@ export async function renderShareCard(): Promise<ImageResponse> {
           <Word text="campus." coral />
           <Word text="Your" />
           <Word text="people." coral />
-          <Word text="Yourself." />
+          <Word lead="Your" text="self." coral />
         </div>
         <div
           style={{
