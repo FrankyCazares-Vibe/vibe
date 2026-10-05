@@ -2,12 +2,12 @@
 
 S74 started from `2026-10-04-session-73-privacy-v2-desktop-messages.md`. Franky asked for the new landing page and the Messages feature on main, then for "the best privacy policy you can right now without any of my input". He chose: close sign-up and turn the waitlist on, no backups, only he has direct access, mail forwards to his Gmail, the counts-only rule for AI tools, publish now with the lawyer reading in parallel, and "go when green".
 
-**Live since Monday Oct 5, 12:24 EDT (release `50b60d2`; the hover-menu fix followed the same afternoon).** Sign-up is closed, the waitlist is open, the access-code check is on. Desktop Messages is on main but still switched OFF.
+**Live since Monday Oct 5, 12:24 EDT (release `50b60d2`; the hover-menu fix followed the same afternoon).** Sign-up is closed, the waitlist is open, the access-code check is on. Desktop Messages was switched ON by Franky that afternoon and he confirmed it shows.
 
 ## START HERE: session 75
 
 1. **Ask Franky** how his live test went (section 4, first row) and whether the Vercel Cron "Run" answered 200.
-2. **Desktop Messages** waits only on Franky: ten minutes on a real phone, then his two Vercel values and a redeploy (section 5).
+2. **Desktop Messages is on** (Franky confirmed, section 5). Ask whether the allowlist is his id or `*`, and whether he did the real-phone look at the small chat changes.
 3. **Fix the mini messenger** (Franky's ask, Oct 5, with a screenshot): section 5b. Ask him first what he wants it to be.
 4. **Privacy follow-ups**, in the order of `handoffs/legal-2026-10-04-privacy-v3/page-and-code-changes.md` (parts 2 and 3). First: tell the existing accounts, open one live Sentry report, the "verify your campus" gap (row 26), the hand-kept promises in `decisions.md` part D.
 5. **Give James** `handoffs/legal-2026-10-04-privacy-v3/for-the-lawyer.md` (the lawyer's questions).
@@ -75,7 +75,7 @@ Every production read followed the counts-only rule (structure, fingerprints, co
 - **The hover-menu fix is on main** (second push of Oct 5): with a narrow chat column the menu on a short message was squeezed into a ball; it is one row now. An independent reviewer compared the page every laptop uses today with the live one at 13 sizes: identical at 1280 and wider, better when narrow or on touch, worse nowhere.
 - **Left on branch `desktop-hover-menu` (local, commit `daa980e`), not merged:** moving the first message's menu under its bubble so it is not hidden by the chat header. The reviewer found it catches a pointer travelling down the chat, so a press could react to, pin or delete the wrong message. Its fix (wait about 150 ms before moving the menu) is written in `handoffs/s74-release/hover-menu-review.md`. Until then the first message on screen keeps its menu half under the header, as on the old page today.
 - Known with the switch on, small: under 1140 wide with the Pinned and Shared panel open, some menu buttons sit under the panel (close the panel).
-- **Oct 5, about 3:20 pm: Franky added `CHAT_DESKTOP_ENABLED` and `CHAT_DESKTOP_ALLOWLIST` on Vercel Production.** The session pushed two empty commits to redeploy (`1d0a5c2`, `c52bccf`; a value only reaches a new deploy). The session cannot sign in on the live site, so it has NOT seen the new page there: ask Franky what he sees. If it is still the old page: the value must be exactly `true`, ticked for Production, the id must be the signed-in account (his is in the memory notes) or `*`, and the window 900px or wider.
+- **Oct 5, about 3:20 pm: Franky added `CHAT_DESKTOP_ENABLED` and `CHAT_DESKTOP_ALLOWLIST` on Vercel Production.** The session pushed two empty commits to redeploy (`1d0a5c2`, `c52bccf`; a value only reaches a new deploy). **Franky confirmed the same afternoon: the new desktop Messages shows for him on the live site.** (The session cannot sign in there and did not see it itself.) Whether the allowlist holds only his id or `*` is his to say; widening it to `*` gives it to everyone who has the new chat (the founders and SAE) and needs a redeploy.
 - **How it is switched on (for the record), Franky:** ten minutes on a real phone with the small chat changes (S73 handoff, section 2), then `CHAT_DESKTOP_ENABLED` = `true` and `CHAT_DESKTOP_ALLOWLIST` = the founders' ids (or `*` = everyone who has the new chat) on Vercel Production, then Redeploy.
 
 ## 5b. The mini messenger (Franky, Oct 5: "we need to fix the mini messenger view")
