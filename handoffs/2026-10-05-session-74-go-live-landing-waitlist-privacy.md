@@ -73,6 +73,8 @@ Done and off this list: `CRON_SECRET` and `SCHOOL_EMAIL_VERIFY_SECRET` exist on 
 
 ## 5. The new chat: on for everyone
 
+**Franky's rule from Oct 5: "no need to delay features for people when we are still building."** A finished, reviewed feature goes to every account in the same deploy. A switch is an off button set to everyone, not a stage. Still off for their own reasons: open sign-up (the waitlist test), billing, notifications.
+
 - **Phone and desktop, all 21 accounts, since 5:45 pm.** Franky confirmed the desktop layout shows for him. The session cannot sign in on the live site and saw no account's screen.
 - Campus has no Chat on desktop any more; old chat links open Messages.
 - Checked before opening it: Report and Remove on text Board posts and replies (the one thing that had to exist first) shipped with the desktop work.
