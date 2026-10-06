@@ -99,6 +99,17 @@ The small Messages window that opens over the desktop profile page. He sent a sc
 - **Choices to put to him** (recommendation first): (1) make it a small version of the new inbox (one row per club, the same order, unread and pinned, opens the chat in `/messages`); (2) keep it as it is and only fix the rows; (3) remove it on desktop now that Messages is one click away.
 - With `chat_desktop` on, "Open" should land on the new `/messages`; check that it does, and that opening a club room from here goes to `/messages?channel=<id>`.
 
+## 5c. Open tabs now move to the newest build (Oct 5, 9:54 pm, main `7fc4cb4`)
+
+Franky asked that everybody have the newest version on phone and desktop, then said yes to closing the one gap: a tab left open kept the old code.
+
+- **What it does:** when a person comes back to a tab (at most once every two minutes) the page asks `GET /api/version` and reloads once if a newer build is live. It never reloads in the middle of something: typed text, a changed pick-list or switch, a chosen file or an open file picker, an open sheet or dialog, a save in flight, a video playing, or anything marked `data-holds-reload`. A tap, key or scroll before the answer arrives cancels it. Never on `/auth`, `/onboarding`, `/waitlist`; off inside the store apps; nothing where there is no build id (local dev).
+- **Where:** `src/lib/build/` (rules + 51 tests), `src/components/build/BuildRefresh.tsx` (mounted in the root layout), `src/app/api/version/route.ts`, `public/html/_buildRefresh.js` (the static desktop profile's own copy: a new rule on one side must be added to the other by hand), `next.config.ts` (the build id = Vercel's deployment id).
+- **How it was checked:** built, attacked by two independent reviewers, repaired twice. The first review found it could lose unsaved phone profile edits; the second found an open file picker was not counted. Both fixed. 2,225 tests pass.
+- **Live:** `/api/version` answers a `dpl_` id with no-store; the page's own files carry the same id (so nobody reloads on the build they already have); a live page left alone did not reload.
+- **Not seen yet:** a real reload after a deploy (the first build it can help with is the NEXT one: tabs open before 9:54 pm have no watcher), a real phone, Safari, the home-screen app. **After the next deploy, leave a tab open and come back to it two minutes later: it should reload once.** If tabs ever reload on every return, revert `7fc4cb4`.
+- **Small things left:** a control that saves in place holds the reload until the next page load; four desktop club dialogs and the Otto tour on React pages are not marked as dialogs; `scripts`-free rollback is a revert.
+
 ## 6. Found and not fixed (small, none blocks)
 
 - Phone feed: the Feed / Events / Orgs / Map chips have no background when the feed scrolls under them; a post card is a button holding buttons (a console error). Old, `CampusMobile.tsx`.
