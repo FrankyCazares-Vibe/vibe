@@ -1,138 +1,128 @@
-# Session 74 (Oct 4-5): the new landing page, the waitlist and Privacy Policy v3 are LIVE
+# Session 74 (Oct 4-5): everything is LIVE. Landing page, waitlist, Privacy Policy v3, the new chat for everyone
 
-S74 started from `2026-10-04-session-73-privacy-v2-desktop-messages.md`. Franky asked for the new landing page and the Messages feature on main, then for "the best privacy policy you can right now without any of my input". He chose: close sign-up and turn the waitlist on, no backups, only he has direct access, mail forwards to his Gmail, the counts-only rule for AI tools, publish now with the lawyer reading in parallel, and "go when green".
+S74 started from `2026-10-04-session-73-privacy-v2-desktop-messages.md`. Franky asked for the new landing page and Messages on main, then for "the best privacy policy you can right now without any of my input", then through Oct 5 for: the share picture fixed, the new chat for everybody, and everybody on the newest version of the site.
 
-**Live since Monday Oct 5, 12:24 EDT (release `50b60d2`; the hover-menu fix followed the same afternoon).** Sign-up is closed, the waitlist is open, the access-code check is on. Desktop Messages was switched ON by Franky that afternoon and he confirmed it shows.
+**State at the end of Oct 5 (main `7fc4cb4` live, plus docs commits):**
+- Sign-up is CLOSED. The waitlist is open and the access-code check is on.
+- The new chat is ON FOR EVERYONE, phone and desktop (21 accounts).
+- Privacy Policy v3 is published, effective October 5, 2026.
+- An open tab now moves itself to the newest build when the person comes back to it.
 
 ## START HERE: session 75
 
-1. **Ask Franky** how his live test went (section 4, first row) and whether the Vercel Cron "Run" answered 200.
-2. **The new chat is on for EVERYONE since Oct 5, 5:45 pm** (Franky: "i want you to allow everybody to have it"), phone and desktop (section 5). Ask whether he did the real-phone look, and decide the officer exception before the Oct 16 store submission (section 5, last line).
-3. **Fix the mini messenger** (Franky's ask, Oct 5, with a screenshot): section 5b. Ask him first what he wants it to be.
-4. **Privacy follow-ups**, in the order of `handoffs/legal-2026-10-04-privacy-v3/page-and-code-changes.md` (parts 2 and 3). First: tell the existing accounts, open one live Sentry report, the "verify your campus" gap (row 26), the hand-kept promises in `decisions.md` part D.
-5. **Give James** `handoffs/legal-2026-10-04-privacy-v3/for-the-lawyer.md` (the lawyer's questions).
-6. **Still dated:** Terms review answers (Tue Oct 6), Android build (Fri Oct 9), old-screen chat fixes and both sentinels before Thu Oct 15, store submission Fri Oct 16 (the review note in section 4), new chat for everyone Mon Oct 26.
+1. **Ask Franky three things:** how the live sign-up test went (section 4); whether Vercel Cron "Run" answered 200; whether a tab he left open reloaded by itself after a deploy (section 7).
+2. **Fix the mini messenger** (his ask, Oct 5). Ask him first which of the three choices he wants (section 6).
+3. **Before the Oct 16 store submission:** decide the blocked-pair traces in clubs (section 5, last line), the store review note, the providers' data-processing terms.
+4. **Privacy follow-ups** in the order of `handoffs/legal-2026-10-04-privacy-v3/page-and-code-changes.md` parts 2 and 3. First: tell the existing accounts, read one live Sentry report, the "verify your campus" gap (row 26; a task chip is raised).
+5. **Give James** `handoffs/legal-2026-10-04-privacy-v3/for-the-lawyer.md`.
+6. **Still dated:** Terms review answers (Tue Oct 6), Android build (Fri Oct 9), both sentinels before Thu Oct 15, store submission Fri Oct 16. "New chat for everyone, Oct 26" is done three weeks early, and the old-screen chat fixes owed before Oct 15 no longer reach anyone.
 
-## 1. What went live
+## 1. What went live, in order (all Oct 5, EDT)
 
-- **The new landing page** ("campus at night", the panels, "A day on Vibe" with the 30-second film from Vercel Blob).
-- **The waitlist:** `/waitlist`, the confirm and leave links, Admin > Waitlist, access codes at sign-up, the daily clean-up (`/api/cron/waitlist-purge`).
-- **Privacy Policy v3**, effective October 5, 2026 (section 3).
-- **Desktop Messages code**, behind `chat_desktop` (off), with its two database files applied. Founders and SAE got the small phone chat changes from S73 with this deploy.
-- **A fix that rides along:** bug reports to Sentry no longer carry what a person was sending, their sign-in cookie or a rough location (`src/lib/sentry-config.ts`, 34 tests, checked against the installed kit).
-- **Walk fixes:** the mouse pointer is back in windows under 900px, phone tap areas, half an access code gets a helpful message, Admin > Waitlist small things.
+| Time | Commit | What |
+|---|---|---|
+| 12:24 | `50b60d2` | The release: new landing page with the 30-second film, the waitlist and access codes, Privacy Policy v3, desktop Messages code (off), Sentry reports no longer carry message text or the sign-in cookie, the walk fixes |
+| 1:56 pm | `c3b9d6a` | Hover menu on a short message is one row, not a ball |
+| 3:15 pm | `f17145e` | Share picture: "Your" white, "self" coral |
+| 3:24, 3:29 pm | `1d0a5c2`, `c52bccf` | Empty commits to redeploy after Franky set the desktop Messages values |
+| 5:43 pm | `cae3995` | Policy section 5e (the new chat is for everyone), deployed with `CHAT_V2_ALLOWLIST=*` |
+| 8:26 pm | `40e04de` | Another session's docs commit (brand kit pointer) |
+| 9:51 pm | `7fc4cb4` | Open tabs follow the newest build |
 
-Gate on the exact commit: typecheck clean, 2,174 of 2,174 tests, build passes, waitlist end-to-end script passes, the policy page equals the text (1,087 of 1,087 sentences).
+Gate on the release and on each code commit after it: typecheck clean, all tests (2,174 at the release, 2,225 now), build passes. The release also passed the waitlist end-to-end script and a browser walk on phone and desktop.
 
-## 2. What was done to production (full log: `handoffs/s74-release/prod-log.md`)
+## 2. Production: what was changed and how to undo it (full log: `handoffs/s74-release/prod-log.md`)
 
-| What | Result |
-|---|---|
-| Ten database files, `20261003100000` to `20261004110000`, each with its row | All answered `[]`. 107 rows, newest `20261004110000`. File 4 (code scrub on the auth tables) was accepted. |
-| `waitlist_email_viewers` | Franky's account id only |
-| Push `c71e9a4..50b60d2` | Vercel Production deploy success, 12:24 |
-| Sign-up hook | ON: `pg-functions://postgres/auth_hooks/hook_waitlist_gate` |
-| `signup_open` | **false** since 12:25 |
-| Gate, called directly with a made-up address | open: allow. Closed: no code = `access_code_required` (403), unknown code = `access_code_invalid`. No account was made. |
-| Chat check after deploy (counts only) | 0 findings; 5 clubs, 22 rooms |
+| What | State | Undo |
+|---|---|---|
+| Ten database files, `20261003100000` to `20261004110000` | All applied and recorded (107 rows). After-deploy chat check: 0 findings. | Each file's header has its rollback. Not needed for any switch below. |
+| `signup_open` | **false** since 12:25 | `update public.app_settings set value = 'true'::jsonb, updated_at = now() where key = 'signup_open';` Buttons follow within a minute. |
+| Sign-up hook | ON (`auth_hooks.hook_waitlist_gate`) | Supabase > Authentication > Hooks. Open, the hook lets everyone through, so it can stay on. |
+| `waitlist_email_viewers` | Franky's account id only | |
+| `CHAT_DESKTOP_ENABLED`, `CHAT_DESKTOP_ALLOWLIST` (Vercel) | `true`, `*` (set by Franky) | Remove `CHAT_DESKTOP_ENABLED`, redeploy |
+| `CHAT_V2_ALLOWLIST` (Vercel) | `*` (set by the session at Franky's ask) | Put the three founders' ids back (they are in the variable's comment), redeploy |
 
-**To reopen sign-up fast:** `update public.app_settings set value = 'true'::jsonb, updated_at = now() where key = 'signup_open';` (buttons follow within a minute). The hook can stay on; open, it lets everyone through. Rollback order if sign-up ever breaks: switch to true, hook off, promote the previous deploy.
-
-Every production read followed the counts-only rule (structure, fingerprints, counts, settings).
+If sign-up ever breaks: switch to true, then hook off, then promote the previous deploy. Every production read followed the counts-only rule. The session never created an account on the live site: the gate was proven by calling it directly with a made-up address (no code = refused with 403, unknown code = refused).
 
 ## 3. Privacy Policy v3
 
-- **Where:** the page is `src/app/legal/privacy/*`; the text is `handoffs/legal-2026-10-04-privacy-v3/privacy-policy-final.md` (about 12,700 words, 15 sections as questions, a ten-line short version, "Start here"). Section 11 is the waitlist notice (`/legal/privacy#waitlist`).
-- **How it was made:** six assessors using the legal, design and marketing skills, a writer, three rounds of five checkers, a last repair with its own checker. `decisions.md` has every decision and why; `verify/` has the checkers' reports.
-- **Check that page = text:** `node handoffs/legal-2026-10-04-privacy-v3/check/check.mjs` (needs a dev server; see its header).
-- **Decided without Franky** (all in `decisions.md`): six cases for reading messages (the sixth: a fault that cannot be fixed any other way); a search warrant asked for before message content is handed over; a break-in notice within 30 days; an under-18 account banned then deleted within 7 days; requests answered in 30 days; emailed requests acted on only after the person answers our reply; no postal address published; Anthropic and Claude named, with the counts-only rule dated October 4.
-- **Other pages brought in line:** delete-account, the waitlist form's notice (version `2026-10-05`), Terms (one line: the policy is the accurate one until the new Terms), Community, Child Safety, Support, Vibe+, Settings, six block dialogs. **The desktop profile badge now reads "Verified · school", not "Student · school".**
-- **Left as it is, and said honestly in the policy:** the "verify your campus" step tells a signed-in person whether a school email is in use or banned (row 26); no backups; no access log; comments have no delete button.
+- **Where:** the page is `src/app/legal/privacy/*`; the text is `handoffs/legal-2026-10-04-privacy-v3/privacy-policy-final.md` (about 12,700 words, 15 sections as questions, a ten-line short version). Section 11 is the waitlist notice (`/legal/privacy#waitlist`). `decisions.md` has every decision and why; `verify/` has the checkers' reports.
+- **Page = text check:** `node handoffs/legal-2026-10-04-privacy-v3/check/check.mjs` with a dev server running (1,084 of 1,084 sentences today).
+- **The rule from now on:** a change to what the app collects, shows or deletes needs the policy changed the same day. It happened once already (section 5e, when the chat went to everyone).
+- **Decided without Franky, at his ask:** six cases for reading messages; a search warrant asked for before message content is handed over; a break-in notice within 30 days; an under-18 account banned then deleted within 7 days; requests answered in 30 days and only after the person answers our reply; no postal address; Anthropic and Claude named, with the counts-only rule dated October 4.
+- **Other pages brought in line:** delete-account, the waitlist form's notice, Terms (one line), Community, Child Safety, Support, Vibe+, Settings, six block dialogs. The desktop profile badge reads "Verified · school", not "Student · school".
+- **Admitted in the policy, not fixed:** the "verify your campus" step tells a signed-in person whether a school email is in use (row 26); no backups; no access log; comments have no delete button.
 
-**Franky's hands, privacy:**
-1. Two-step sign-in on Supabase, Vercel, Cloudflare, Resend, Sentry, GitHub and the Gmail account.
-2. His Claude account: is "help improve Claude" off? The policy says "not yet confirmed" in three places; item 7a of the change list has the replacement sentence.
-3. A test email to hello@ and help@ from an outside address; check `SCHOOL_EMAIL_VERIFY_SECRET` exists on Vercel.
-4. Tell the 21 existing accounts a new policy is live (the old policy promised notice). Claude can draft it.
-5. Open one server error and one speed report in Sentry and read what they hold (item 9). The policy says "we have not yet opened a live report".
-6. Before Oct 16: the data-processing terms of the providers (item 10), a written yes from each person in the film (item 5).
-
-## 4. Franky's hands, go-live
+## 4. Franky's hands
 
 | What | How |
 |---|---|
-| **Live test** | Signed out, in a private window: "Create your account" with no code must be refused in plain words. Then with James or Rylan (a school email that has no account): join the waitlist, confirm from the email, see the row in Admin > Waitlist, send a code in batch `test-1`, sign up with it. Remove the test entry after. |
-| **Cron** | Vercel > Settings > Cron Jobs > `/api/cron/waitlist-purge` > Run. 200 = good. 401 = `CRON_SECRET` did not reach this deploy: Redeploy. |
-| **One look in Light** | Admin > Waitlist > the Batch list, and Admin > Reports > Suspend > the reason list: the open list should be readable (no tool could photograph it). |
-| **Real phones** | The landing page and `/waitlist` on an iPhone and an Android phone; the five small chat changes in SAE (S73 handoff, section 2). |
+| **Live sign-up test** | Private window, signed out: "Create your account" with no code must be refused. Then with James or Rylan's school email: join the waitlist, confirm, send a code in Admin > Waitlist (batch `test-1`), sign up with it, remove the test entry. |
+| **Cron** | Vercel > Settings > Cron Jobs > `/api/cron/waitlist-purge` > Run. 200 = good. (`CRON_SECRET` is set; checked.) |
+| **Real phones** | The landing page, `/waitlist` and the new chat on an iPhone and an Android phone. Nobody has walked the new chat on a real phone and 21 accounts now have it. |
+| **Two-step sign-in** | Supabase, Vercel, Cloudflare, Resend, Sentry, GitHub and the Gmail account. The policy tells the world one person holds everything. |
+| **Claude account** | Is "help improve Claude" off? The policy says "not yet confirmed" in three places. |
+| **Mail** | A test email to hello@ and help@ from an outside address. |
+| **Tell the 21 accounts** | The old policy promised notice of a new one. Claude can draft it. |
+| **Sentry** | Open one server error and one speed report and read what they hold. |
+| **One look in Light** | Admin > Waitlist > the Batch list: the open list should be readable. |
+| **Before Oct 16** | Store review note ("Vibe is opening in waves; new visitors join a waitlist; please sign in with the review account"); providers' data-processing terms; a written yes from each person in the film. |
 | **Resend** | 100 emails a day on the free plan: invite in waves of about 25 until upgraded. |
-| **Store review note** (before Oct 16) | "Vibe is opening in waves; new visitors join a waitlist; please sign in with the review account." |
-| **Sign-up rate limit** | Supabase > Authentication > Rate limits: look once. Do NOT switch CAPTCHA on. |
 
-## 5. Desktop Messages: what is left
+Done and off this list: `CRON_SECRET` and `SCHOOL_EMAIL_VERIFY_SECRET` exist on Vercel; the desktop Messages values.
 
-- Both database files are on production. The code is on main behind `chat_desktop`.
-- **The hover-menu fix is on main** (second push of Oct 5): with a narrow chat column the menu on a short message was squeezed into a ball; it is one row now. An independent reviewer compared the page every laptop uses today with the live one at 13 sizes: identical at 1280 and wider, better when narrow or on touch, worse nowhere.
-- **Left on branch `desktop-hover-menu` (local, commit `daa980e`), not merged:** moving the first message's menu under its bubble so it is not hidden by the chat header. The reviewer found it catches a pointer travelling down the chat, so a press could react to, pin or delete the wrong message. Its fix (wait about 150 ms before moving the menu) is written in `handoffs/s74-release/hover-menu-review.md`. Until then the first message on screen keeps its menu half under the header, as on the old page today.
-- Known with the switch on, small: under 1140 wide with the Pinned and Shared panel open, some menu buttons sit under the panel (close the panel).
-- **Oct 5, about 3:20 pm: Franky added `CHAT_DESKTOP_ENABLED` and `CHAT_DESKTOP_ALLOWLIST` on Vercel Production.** The session pushed two empty commits to redeploy (`1d0a5c2`, `c52bccf`; a value only reaches a new deploy). **Franky confirmed the same afternoon: the new desktop Messages shows for him on the live site.** (The session cannot sign in there and did not see it itself.) Read from Vercel the same afternoon: `CHAT_DESKTOP_ALLOWLIST` is `*`, `CHAT_V2_ALLOWLIST` holds the three founders' ids and `CHAT_V2_CLUBS` holds SAE. SAE had one member on production that day, so **3 of 21 accounts have the new chat (phone and desktop): the founders.** Everyone else has the old chat until Oct 26.
-- **How it is switched on (for the record), Franky:** ten minutes on a real phone with the small chat changes (S73 handoff, section 2), then `CHAT_DESKTOP_ENABLED` = `true` and `CHAT_DESKTOP_ALLOWLIST` = the founders' ids (or `*` = everyone who has the new chat) on Vercel Production, then Redeploy.
+## 5. The new chat: on for everyone
 
-- **Oct 5, 5:45 pm: everyone has the new chat.** Franky asked for it; the session set `CHAT_V2_ALLOWLIST` to `*` through the Vercel connector (before: the three founders' ids, kept in the variable's comment) and pushed main `cae3995` to deploy it. With `CHAT_DESKTOP_ALLOWLIST` already `*`, all 21 accounts now get the new Messages on phone and laptop, and Campus has no Chat on desktop for anyone. To go back: put the three ids back and redeploy.
-  - Checked first: the one thing that had to exist before `*` (contract 17.2 L3, Report and Remove on text Board posts and replies) shipped with the desktop wave.
-  - The Privacy Policy changed in the same deploy: section 5e no longer says the new rooms and pins are "being switched on for a few clubs and accounts at a time" (page = text, 1,084 of 1,084).
-  - The old-screen chat fixes that were owed before Oct 15 (M2 to M5, M8, I3) no longer reach anyone, except what the mini messenger and the direct-message thread still share with the old page.
-  - Not seen by the session: any account's signed-in screen. Nobody has walked the new phone chat on a real phone yet; 18 accounts now have it.
-  - **Decide before Oct 16** (contract 17.2 L7): with the new chat on, a blocked pair still sees three traces of each other in a club (an owner's or admin's Board post, unread counts, reply and vote counts). The store reviewer's account now has the new chat.
+- **Phone and desktop, all 21 accounts, since 5:45 pm.** Franky confirmed the desktop layout shows for him. The session cannot sign in on the live site and saw no account's screen.
+- Campus has no Chat on desktop any more; old chat links open Messages.
+- Checked before opening it: Report and Remove on text Board posts and replies (the one thing that had to exist first) shipped with the desktop work.
+- **Known, small:** the first message on screen keeps its hover menu half under the chat header; under 1140 wide with the Pinned and Shared panel open, some menu buttons sit under the panel; no unread mark for the Officers room or private rooms.
+- **Not merged, local branch `desktop-hover-menu` (`daa980e`):** moving that first menu under its bubble. A reviewer found it catches a pointer travelling down the chat (a press could hit the wrong message). The fix is in `handoffs/s74-release/hover-menu-review.md`.
+- **Decide before Oct 16:** in a club, two people who blocked each other still see three traces of one another (an owner's or admin's Board post, unread counts, reply and vote counts). The store reviewer's account has the new chat now.
 
-## 5b. The mini messenger (Franky, Oct 5: "we need to fix the mini messenger view")
+## 6. The mini messenger (Franky, Oct 5: "we need to fix the mini messenger view")
 
-The small Messages window that opens over the desktop profile page. He sent a screenshot and asked for it to go in the handoff; he did not say what the fix should be, so **ask him before building**.
+The small Messages window over the desktop profile page: `public/html/_miniMessenger.js`, loaded by `profile.html` and `_profilePreview.js`. The redesign never touched it. He did not say what the fix should be: **ask before building.**
 
-- **Where it lives:** `public/html/_miniMessenger.js` (1,063 lines), loaded by `public/html/profile.html` and `public/html/_profilePreview.js`. It reads the same `/api/me/threads` addresses as the old Messages page and was not touched by the chat redesign.
-- **What the screenshot shows** (the session's reading, not his words):
-  - It still has the old look and the old list: every club room is its own row ("SAE · Board", "SAE · Lounge", the same for a second club), where the new Messages shows one row per club with its rooms inside.
-  - A hidden test club's rooms are in the list, with a person's photo where a club logo should be.
-  - Dates switch from "1m" and "6d" to "9/12/2026"; the new Messages uses short words.
-  - No "Your week", no unread marks, no pinned chats: nothing of the new inbox.
-  - A long Board post runs to the edge as the preview line.
-- **Choices to put to him** (recommendation first): (1) make it a small version of the new inbox (one row per club, the same order, unread and pinned, opens the chat in `/messages`); (2) keep it as it is and only fix the rows; (3) remove it on desktop now that Messages is one click away.
-- With `chat_desktop` on, "Open" should land on the new `/messages`; check that it does, and that opening a club room from here goes to `/messages?channel=<id>`.
+- From his screenshot (the session's reading): each club room is still its own row ("SAE · Board", "SAE · Lounge"); a hidden test club's rooms show, with a person's photo where a logo should be; dates switch between "6d" and "9/12/2026"; no Your week, unread marks or pinned chats.
+- **Choices, recommendation first:** (1) a small version of the new inbox that opens chats in `/messages`; (2) keep it and only fix the rows; (3) remove it on desktop.
+- Check too that its "Open" lands on the new `/messages` and a club room goes to `/messages?channel=<id>`.
 
-## 5c. Open tabs now move to the newest build (Oct 5, 9:54 pm, main `7fc4cb4`)
+## 7. Open tabs follow the newest build (`7fc4cb4`)
 
-Franky asked that everybody have the newest version on phone and desktop, then said yes to closing the one gap: a tab left open kept the old code.
+Franky asked that everybody have the newest version on phone and desktop. Everything already did (one build on every address and device, nothing cached past a reload) except a tab left open.
 
-- **What it does:** when a person comes back to a tab (at most once every two minutes) the page asks `GET /api/version` and reloads once if a newer build is live. It never reloads in the middle of something: typed text, a changed pick-list or switch, a chosen file or an open file picker, an open sheet or dialog, a save in flight, a video playing, or anything marked `data-holds-reload`. A tap, key or scroll before the answer arrives cancels it. Never on `/auth`, `/onboarding`, `/waitlist`; off inside the store apps; nothing where there is no build id (local dev).
-- **Where:** `src/lib/build/` (rules + 51 tests), `src/components/build/BuildRefresh.tsx` (mounted in the root layout), `src/app/api/version/route.ts`, `public/html/_buildRefresh.js` (the static desktop profile's own copy: a new rule on one side must be added to the other by hand), `next.config.ts` (the build id = Vercel's deployment id).
-- **How it was checked:** built, attacked by two independent reviewers, repaired twice. The first review found it could lose unsaved phone profile edits; the second found an open file picker was not counted. Both fixed. 2,225 tests pass.
-- **Live:** `/api/version` answers a `dpl_` id with no-store; the page's own files carry the same id (so nobody reloads on the build they already have); a live page left alone did not reload.
-- **Not seen yet:** a real reload after a deploy (the first build it can help with is the NEXT one: tabs open before 9:54 pm have no watcher), a real phone, Safari, the home-screen app. **After the next deploy, leave a tab open and come back to it two minutes later: it should reload once.** If tabs ever reload on every return, revert `7fc4cb4`.
-- **Small things left:** a control that saves in place holds the reload until the next page load; four desktop club dialogs and the Otto tour on React pages are not marked as dialogs; `scripts`-free rollback is a revert.
+- **What it does:** when a person comes back to a tab (at most once every two minutes) the page asks `GET /api/version` and reloads once if a newer build is live. Never in the middle of something: typed text, a changed pick-list or switch, a chosen file or open file picker, an open sheet or dialog, a save in flight, a video playing, or anything marked `data-holds-reload`. A tap, key or scroll before the answer arrives cancels it. Never on `/auth`, `/onboarding`, `/waitlist`; off inside the store apps.
+- **Where:** `src/lib/build/` (rules, 51 tests), `src/components/build/BuildRefresh.tsx` (root layout), `src/app/api/version/route.ts`, `next.config.ts` (build id = Vercel's deployment id), and `public/html/_buildRefresh.js`, a hand-copied twin for the static desktop profile: a rule added on one side must be added on the other.
+- **How it was checked:** two independent reviewers attacked it and each found one real problem (unsaved phone profile edits could be lost; an open file picker was not counted). Both fixed.
+- **Seen live:** `/api/version` answers a `dpl_` id; the page's own files carry the same id, so nobody reloads on the build they already have; a page left open did not reload.
+- **Not seen yet:** a real reload after a deploy (tabs open before 9:51 pm have no watcher, so the first build it helps with is the next one), a real phone, Safari, the home-screen app. If tabs ever reload on every return, revert `7fc4cb4`.
+- **For new work:** an editor whose unsaved state is not typed text or a labelled dialog should carry `data-holds-reload` while dirty. Every deploy now refreshes people's open tabs, so avoid pushes that only redeploy.
 
-## 6. Found and not fixed (small, none blocks)
+## 8. Found and not fixed (small, none blocks)
 
-- Phone feed: the Feed / Events / Orgs / Map chips have no background when the feed scrolls under them; a post card is a button holding buttons (a console error). Old, `CampusMobile.tsx`.
-- `/profile` on desktop shows a piece of the cursor ring until the mouse moves (`public/html/profile.html`).
-- Old desktop Campus > Chat shows a poll as "Poll:" and an empty bubble (already owed before Oct 15).
-- "Only you can see it" on removed content (four places): the Vibe team can too. Club lines that say "IU students only". The ban notice and Vibe+ page carry em dashes.
+- Phone feed: the Feed / Events / Orgs / Map chips have no background when posts scroll under them; a post card is a button holding buttons. A task chip is raised.
+- `/profile` on desktop shows a piece of the cursor ring until the mouse moves.
+- "Only you can see it" on removed content (the Vibe team can too); club lines that say "IU students only"; em dashes on the ban notice and Vibe+ page.
 - The plain-text part of the waitlist emails has no privacy link.
-- **Nothing reloads a tab that is already open when a new build goes out** (checked Oct 5 after Franky asked that everybody have the newest version). Everything else was confirmed: both domains and the vercel.app address serve the newest build, iPhone, Android and laptop get the same files, no page or script is cached past a reload, the service worker keeps only the offline page, and both chat switches are `*`. A person with Vibe left open (or the home-screen app resumed from memory) runs the older code until the next page load. Offered to Franky: a small check on tab focus that reloads when it is safe (never while someone is typing).
-- Committed handoffs hold some email addresses that may be real (a checker counted, did not open): look before the repo is ever shared.
+- The new-build check: a control that saves in place holds the reload until the next page load; four desktop club dialogs and the Otto tour are not marked as dialogs.
+- Committed handoffs hold some email addresses that may be real (counted, not opened): look before the repo is ever shared.
 
-## 7. Local environment
+## 9. Local environment
 
-- Worktrees in the S74 scratchpad (`/private/tmp/claude-501/-Users-franciscocazares-vibe/95993665-.../scratchpad/`): `release` (branch `release-s74` = main, plus the uncommitted hover-menu fix; preview config `vibe-release`, port 3105) and `release-gate` (a clean copy of `50b60d2`).
+- **Local branches worth knowing:** `desktop-hover-menu` (section 5), `release-s74` and `build-refresh` (both already on main). A worktree `.claude/worktrees/great-sammet-5b4b03` and an untracked `.agents/` folder belong to other sessions.
+- **Scratch worktrees** under `/private/tmp/claude-501/-Users-franciscocazares-vibe/95993665-.../scratchpad/`: `release` (dev server config `vibe-release`, port 3105) and `release-gate` (a clean clone for builds). They may not survive a restart; nothing in them is unsaved.
 - The local database has all ten files; local `signup_open` is true; the local hook is on through `config.toml`.
 - The film, the photos and the walk stills stay outside the repo.
 
-## 8. Gotchas learned in S74
+## 10. Gotchas learned in S74
 
-- **The weekly usage limit stopped everything at noon on Oct 4** (about 12M subagent tokens that day) and cost a day. Cap check-and-repair loops at two rounds, use a lighter model for pure transcription, and look at the working tree after a kill: two agents had finished on disk without reporting.
-- **A visual checker that reads hundreds of full-page stills dies at its own context limit, twice.** Measure with scripts and look at a few stills.
-- **zsh:** `"$REL:supabase/..."` is read as a modifier (`:s`). Write `"${REL}:supabase/..."`.
-- **The read-only database connector's role cannot call `signup_is_open()`** (permission denied, harmless). Read the setting row.
-- **Turbopack refuses a symlinked `node_modules`.** For a clean build of an exact commit, clone it: `cp -cR`.
-- **The keep-awake helper (`caffeinate` in the background) is cut at two hours.** Stay in the turn while jobs run, or ask the app to keep the Mac awake.
-- **The Vercel connector works when called without the team slug** (project id `prj_1MXN7zjFs3kWIAX1fZ7VP6fq7ae9`); the old 403 came from the slug. Read plain settings only, never the secret ones. `CRON_SECRET` and `SCHOOL_EMAIL_VERIFY_SECRET` are both there.
-- **A session that may not create accounts on the live site can still prove the gate:** call `auth_hooks.hook_waitlist_gate` directly with a made-up address and read its decision.
+- **The weekly usage limit stopped everything at noon on Oct 4** and cost a day. Cap check-and-repair loops at two rounds, use a lighter model for pure transcription, and look at the working tree after a kill: two agents had finished on disk without reporting.
+- **A visual checker that reads hundreds of full-page stills dies at its own context limit.** Measure with scripts and look at a few stills.
+- **The Vercel connector works when called without the team slug** (project id `prj_1MXN7zjFs3kWIAX1fZ7VP6fq7ae9`); the old 403 came from the slug. Read plain settings only. A changed value only reaches a new deploy.
+- **A reviewer earns its place twice:** both reviews of the new-build check found a way to lose someone's work that the builder's own checks had passed.
+- **zsh:** `"$REL:supabase/..."` is read as a modifier. Write `"${REL}:supabase/..."`.
+- **The read-only database connector's role cannot call `signup_is_open()`** (harmless). Read the setting row.
+- **Turbopack refuses a symlinked `node_modules`.** For a clean build of an exact commit, clone it with `cp -cR`.
+- **The background keep-awake helper is cut at two hours.** Stay in the turn while jobs run, or ask the app to keep the Mac awake.
+- **The Browser pane's tab reads as hidden**, so "come back to the tab" cannot be triggered there.
