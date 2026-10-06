@@ -1,5 +1,11 @@
 # Vibe brand kit
 
+> **This is the September 2026 kit and it shows the old look** (cream, light only, the starfield landing page).
+> The current brand lives in `vibe-marketing/brand/` on Franky's Mac: Night first, the coral bloom, the "vibe."
+> wordmark, colors in `tokens.css`, rules in `brand-guide.md`. That folder is its own repo and is not in this
+> one. The logo, icons and Otto pictures here are still right and are copied there; design from that folder,
+> not this one.
+
 This is the mood board. Open `index.html` in a browser to flip through it.
 
 The live HTML Otto mockups still live in `otto_mockups/` (local, gitignored).
