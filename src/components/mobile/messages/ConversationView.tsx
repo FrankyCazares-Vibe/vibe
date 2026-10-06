@@ -55,6 +55,7 @@ export function ConversationView({
   onThreadsChanged,
   backdropCss,
   messagePins = false,
+  survivesReload = false,
 }: {
   threadId: string;
   thread: ThreadEntry | null;
@@ -73,6 +74,13 @@ export function ConversationView({
    *  (`MessagesMobileV2`) passes it; without it this view asks no pin
    *  route and draws nothing new. */
   messagePins?: boolean;
+  /** This view is named by the address (`/messages?channel=<id>`), so a
+   *  reload opens it again: BuildRefresh may then reload with it open
+   *  instead of holding back as it does for a sheet
+   *  (src/lib/build/page-snapshot.ts). ONLY `MessagesMobileV2` passes it,
+   *  where that reload was walked; the other two callers hold it back
+   *  like any other drawer. */
+  survivesReload?: boolean;
 }) {
   // The dark-glass chrome and bubbles: over a dark org backdrop, or on
   // Night's near-black paper when there is none. Light with no backdrop
@@ -646,6 +654,7 @@ export function ConversationView({
             outline: "none",
           }}
           aria-describedby={undefined}
+          data-survives-reload={survivesReload || undefined}
         >
           <Drawer.Title style={visuallyHiddenStyle}>{title}</Drawer.Title>
           {/* Top bar */}

@@ -18,8 +18,21 @@ if (publicKey.ignoredSecretInAnonSlot) {
   );
 }
 
+// This build's own id, for the "is a newer build live?" check on an open tab
+// (src/lib/build/build-refresh.ts). Vercel gives every deployment one, an
+// empty redeploy of the same commit included, and sets it while building as
+// well as at run time, so it is copied here into the browser files and the
+// server files of the same build. A commit hash would not do: a changed
+// setting goes live by redeploying the same commit. Not set outside Vercel,
+// and then the check does nothing (to try it locally, put
+// NEXT_PUBLIC_BUILD_ID in .env.development.local).
+const buildId = process.env.VERCEL_DEPLOYMENT_ID?.trim();
+
 const nextConfig: NextConfig = {
-  env: publicKey.key ? { NEXT_PUBLIC_SUPABASE_ANON_KEY: publicKey.key } : {},
+  env: {
+    ...(publicKey.key ? { NEXT_PUBLIC_SUPABASE_ANON_KEY: publicKey.key } : {}),
+    ...(buildId ? { NEXT_PUBLIC_BUILD_ID: buildId } : {}),
+  },
   experimental: {
     // Next 16.3 turns Turbopack's build cache on by default and Vercel
     // restores .next/cache between builds. In S65 that shipped a production

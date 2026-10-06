@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { JetBrains_Mono } from "next/font/google";
 
+import { BuildRefresh } from "@/components/build/BuildRefresh";
 import { CustomCursor } from "@/components/CustomCursor";
 import { ToastHost } from "@/components/feedback/ToastHost";
 import { NativeBridge } from "@/components/native/NativeBridge";
@@ -126,6 +127,11 @@ export default function RootLayout({
             client, so this layout never reads headers() (that would make
             every route dynamic). */}
         <NativeBridge />
+        {/* Keeps an open tab on the newest build: when the person comes back
+            to it, asks /api/version and reloads if another build is live,
+            never while they are in the middle of something. Renders nothing
+            and does nothing where the build has no id (local dev). */}
+        <BuildRefresh />
       </body>
     </html>
   );

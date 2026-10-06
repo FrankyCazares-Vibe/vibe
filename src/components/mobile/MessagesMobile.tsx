@@ -554,6 +554,7 @@ function MessagesMobileV2({ initialHandle, initialChannelId }: { initialHandle?:
           threadId={open.threadId}
           thread={openThreadEntry}
           messagePins
+          survivesReload
           onThreadsChanged={() => setRefreshKey((k) => k + 1)}
           onClose={closeLayer}
         />

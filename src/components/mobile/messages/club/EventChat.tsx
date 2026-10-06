@@ -123,6 +123,9 @@ export function EventChat({ orgHandle, club, roomId, initialPage, boardLatest, b
         <Drawer.Content
           style={{ position: "fixed", top: 0, right: 0, bottom: 0, width: "100%", background: t.page, color: t.ink, display: "flex", flexDirection: "column", zIndex: 1102, outline: "none", fontFamily: FONT }}
           aria-describedby={undefined}
+          // Named by the address like the club space under it, so a reload
+          // opens it again (src/lib/build/page-snapshot.ts).
+          data-survives-reload
         >
           <Drawer.Title style={visuallyHiddenStyle}>Event chat</Drawer.Title>
           <header style={{ flexShrink: 0, boxSizing: "border-box", height: "calc(52px + env(safe-area-inset-top, 0px))", padding: "calc(env(safe-area-inset-top, 0px) + 4px) 10px 0 10px", display: "flex", alignItems: "center", gap: 8 }}>

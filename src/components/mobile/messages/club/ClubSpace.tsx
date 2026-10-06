@@ -427,6 +427,10 @@ export function ClubSpace({ orgHandle, initialRoomId, initialRoomKind, initialPa
         <Drawer.Content
           style={{ position: "fixed", top: 0, right: 0, bottom: 0, width: "100%", background: t.page, color: t.ink, display: "flex", flexDirection: "column", zIndex: 1100, outline: "none", fontFamily: FONT }}
           aria-describedby={undefined}
+          // A whole screen named by the address (`/messages?channel=<id>`):
+          // a reload opens it again, so BuildRefresh does not count it as
+          // an open sheet (src/lib/build/page-snapshot.ts).
+          data-survives-reload
         >
           <Drawer.Title style={visuallyHiddenStyle}>{org ? org.name : "Club space"}</Drawer.Title>
           <ClubHeader night={night} onClose={onClose} orgHandle={orgHandle} space={space.data} />

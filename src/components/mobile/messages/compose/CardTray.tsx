@@ -229,6 +229,9 @@ export function CardTray({ roomKind, roomName, open, onClose, onPick, anchorRef 
       />
       <nav
         aria-label={caption}
+        // Open and not a dialog: tells BuildRefresh not to reload the page
+        // under it (src/lib/build/page-snapshot.ts).
+        data-holds-reload
         style={{
           flexShrink: 0,
           position: "relative",

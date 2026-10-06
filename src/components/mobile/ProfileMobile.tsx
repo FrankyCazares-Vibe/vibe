@@ -1520,8 +1520,20 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
     ? majorsForCampus(effectiveDraft.campus || null, ownCampus.schoolSystem)
     : null;
 
+  // Unsaved work BuildRefresh cannot see for itself (a tapped chip is a
+  // button, not a form control): something changed in edit mode (`draft`
+  // stays null until the first change), or a save or an upload on its way.
+  // While true, a newer build does not reload this page
+  // (src/lib/build/page-snapshot.ts). Edit mode with nothing changed is not
+  // held: the reload only closes it.
+  const holdsReload =
+    (editMode && draft !== null) || savingEdit || uploadingKind !== null || barSavesPending > 0;
+
   return (
-    <div style={{ minHeight: "100dvh", background: "var(--cream)", color: "var(--charcoal)" }}>
+    <div
+      style={{ minHeight: "100dvh", background: "var(--cream)", color: "var(--charcoal)" }}
+      data-holds-reload={holdsReload || undefined}
+    >
       {/* Cover — full bleed, sits under the status bar (env() pads it).
           Tappable in edit mode to upload a new banner image. */}
       <div

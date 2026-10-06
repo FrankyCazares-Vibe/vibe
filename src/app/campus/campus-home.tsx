@@ -6943,6 +6943,13 @@ function FeedComposer({
 
   const hasContent = !!text.trim() || !!imageFile || !!videoFile;
 
+  // Empties the file input. Without it the input kept the file after
+  // "Remove photo" or a cancelled crop: picking the same file again did
+  // nothing, and BuildRefresh read the tab as still holding a picked file.
+  const clearPicked = () => {
+    if (attachInputRef.current) attachInputRef.current.value = "";
+  };
+
   const reset = () => {
     setText("");
     setImageFile(null);
@@ -7128,7 +7135,10 @@ function FeedComposer({
   }, [previewUrl]);
 
   return (
-    <div style={glass}>
+    // A post in the making, or one being sent: BuildRefresh does not reload
+    // the page under it (src/lib/build/page-snapshot.ts). A staged video
+    // shows only its name, so nothing else on the page would say so.
+    <div style={glass} data-holds-reload={hasContent || busy || undefined}>
       <div
         style={{
           display: "flex",
@@ -7169,7 +7179,10 @@ function FeedComposer({
           >
             <button
               type="button"
-              onClick={() => setImageFile(null)}
+              onClick={() => {
+                setImageFile(null);
+                clearPicked();
+              }}
               style={composerRemoveButton}
               aria-label="Remove photo"
             >
@@ -7209,6 +7222,7 @@ function FeedComposer({
               onClick={() => {
                 setVideoFile(null);
                 setVideoMeta(null);
+                clearPicked();
               }}
               style={composerRemoveButton}
               aria-label="Remove video"
@@ -7310,7 +7324,10 @@ function FeedComposer({
           ]}
           outputMaxSize={1600}
           title="Adjust photo"
-          onCancel={() => setPendingImage(null)}
+          onCancel={() => {
+            setPendingImage(null);
+            clearPicked();
+          }}
           onConfirm={onCroppedImage}
         />
       ) : null}
