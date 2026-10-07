@@ -32,3 +32,19 @@ The small Messages window over the desktop profile now shows the real inbox, not
 ## Next
 
 S74's list from item 3: the blocked-pair traces, the store review note and the providers' terms before Oct 16; the privacy follow-ups; James's lawyer file; Android build Fri Oct 9; both sentinels before Oct 15.
+
+## Later on Oct 7: the blocked-pair traces, decided (Franky said yes to the recommendation)
+
+Two people in one club who blocked each other used to leave three traces. Decided:
+
+| Trace | Decision | State |
+|---|---|---|
+| A blocked owner's or admin's Board post still shows | **Keep**: members need club announcements. Say so in the store review note. | Unchanged |
+| Unread counts included the blocked person's messages | **Fix** | Shipped, `f10758f` |
+| Reply and vote counts include theirs | **Leave**: a bare number names nobody. | Unchanged |
+
+**The fix:** `/api/me/inbox` (the Lounge number, the Board dot) and `/api/orgs/[slug]/space` (each room's dot) leave out authors blocked either way; a blocked current owner or admin still counts on the Board, where their post still shows. The rule is `unreadLeftOut` in `src/lib/chat/reads.ts` (tested). Checked on the local database: a member with 16 unread Lounge messages blocked the owner (9 of them) and the number became 7; the Board dot stayed. 2,226 tests pass. The Privacy Policy says nothing about unread counts, so no policy change.
+
+**For the store review note (draft line):** "Blocking hides a person's messages and replies everywhere, including club chats. One exception: a club's official announcements, posted by its owner or admins on the club's Board, stay visible to every member."
+
+**Not covered:** the old thread list (`/api/me/threads` without `scope=chats`) for an account with the new chat switched off; nobody is in that state.
