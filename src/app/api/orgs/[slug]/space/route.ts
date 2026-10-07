@@ -2,19 +2,22 @@ import { NextResponse } from "next/server";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { blockedIdsFor } from "@/lib/chat/blocks";
 import { eventRefsFor, type EventRow } from "@/lib/chat/event-refs";
 import { chatV2For } from "@/lib/chat/flag-server";
 import { readChatMessages } from "@/lib/chat/message-read";
 import {
   lastShown,
+  notInList,
   orderSpaceRooms,
   readSince,
   recentShown,
   refOfRoom,
   spaceCanPost,
+  unreadLeftOut,
   type SpaceRoomWithPosition,
 } from "@/lib/chat/reads";
-import { canModerate, isClubRole, isPostPolicy, isRoomKind } from "@/lib/chat/room-rules";
+import { BOARD_POSTER_ROLES, canModerate, isClubRole, isPostPolicy, isRoomKind } from "@/lib/chat/room-rules";
 import { roomState } from "@/lib/chat/room-state";
 import { loadRoom, notePostPolicyColumnMissing, postPolicyColumnMissing } from "@/lib/chat/rooms";
 import { isMissingChatSchema, warnMissingChatSchemaOnce } from "@/lib/chat/schema";
@@ -87,8 +90,8 @@ async function readEventsById(service: SupabaseClient, ids: string[]): Promise<E
 }
 
 /** The unread head count of 7.1.5 `> 0`; a failed count → false, logged. */
-async function unreadIn(service: SupabaseClient, channelId: string, viewerId: string, since: string): Promise<boolean> {
-  const { count, error } = await service
+async function unreadIn(service: SupabaseClient, channelId: string, viewerId: string, since: string, leftOut: readonly string[]): Promise<boolean> {
+  let query = service
     .from("messages")
     .select("id", { count: "exact", head: true })
     .eq("channel_id", channelId)
@@ -96,6 +99,9 @@ async function unreadIn(service: SupabaseClient, channelId: string, viewerId: st
     .is("removed_at", null)
     .neq("user_id", viewerId)
     .gt("created_at", since);
+  // Never a message the viewer cannot see (`unreadLeftOut`).
+  if (leftOut.length > 0) query = query.not("user_id", "in", notInList(leftOut));
+  const { count, error } = await query;
   if (error) {
     console.error(`[${TAG} unread]`, error.code, error.message);
     return false;
@@ -268,13 +274,31 @@ export async function GET(req: Request, { params }: Params) {
     return NextResponse.json(refusalBody("try_again"), { status: 503 });
   }
 
+  // Who the unread counts leave out: everyone blocked either way, but for
+  // the club's current owners / admins on the Board (their posts still
+  // show). A failed read leaves nobody out, logged: today's count.
+  const blocked = (await blockedIdsFor(supabase, user.id)) ?? new Set<string>();
+  const blockedOfficers = new Set<string>();
+  if (blocked.size > 0) {
+    const { data, error } = await service
+      .from("org_members")
+      .select("user_id, role")
+      .eq("org_id", orgId)
+      .in("user_id", Array.from(blocked))
+      .in("role", [...BOARD_POSTER_ROLES]);
+    if (error) console.error(`[${TAG} officer roles]`, error.code, error.message);
+    for (const row of (data ?? []) as { user_id: string }[]) blockedOfficers.add(row.user_id);
+  }
+
   // The unread counts (service role), the event refs (one call, counts on),
   // and the Board page.
   const [unreadFlags, refs, boardRead] = await Promise.all([
     Promise.all(
       channels.map((row) => {
         const mine = myRowByRoom.get(row.id);
-        return mine ? unreadIn(service, row.id, user.id, readSince(mine)) : Promise.resolve(false);
+        return mine
+          ? unreadIn(service, row.id, user.id, readSince(mine), unreadLeftOut(blocked, typeof row.kind === "string" ? row.kind : null, blockedOfficers))
+          : Promise.resolve(false);
       }),
     ),
     eventRefsFor([...roomEvents, ...upNextRows, ...upcomingRows], user.id),

@@ -273,3 +273,24 @@ export function refOfRoom(eventId: string | null, refs: ReadonlyMap<string, Even
   if (eventId === null || refs === null) return null;
   return refs.get(eventId) ?? null;
 }
+
+/**
+ * The authors an unread count leaves out: everyone blocked either way, so a
+ * message the viewer cannot see never lights a dot or a number. On the Board
+ * a blocked CURRENT owner / admin stays in (`isHiddenFrom`'s officer
+ * exception: their top-level post still shows, so it still counts).
+ * `officers` are the blocked people who hold that role in the room's club.
+ */
+export function unreadLeftOut(blocked: ReadonlySet<string>, roomKind: string | null, officers: ReadonlySet<string>): string[] {
+  const out: string[] = [];
+  for (const id of blocked) {
+    if (roomKind === "board" && officers.has(id)) continue;
+    out.push(id);
+  }
+  return out;
+}
+
+/** The `not in` list PostgREST reads: `(a,b)`. The ids are uuids from the database. */
+export function notInList(ids: readonly string[]): string {
+  return `(${ids.join(",")})`;
+}

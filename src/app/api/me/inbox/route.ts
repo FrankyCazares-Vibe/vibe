@@ -11,12 +11,14 @@ import {
   groupClubRooms,
   latestShownPerRoom,
   newestOf,
+  notInList,
   orderInboxClubs,
   readSince,
+  unreadLeftOut,
   type MembershipRow,
   type PreviewRow,
 } from "@/lib/chat/reads";
-import { isClubRole } from "@/lib/chat/room-rules";
+import { BOARD_POSTER_ROLES, isClubRole } from "@/lib/chat/room-rules";
 import { isMissingChatSchema, warnMissingChatSchemaOnce } from "@/lib/chat/schema";
 import { isHiddenFrom } from "@/lib/chat/stub";
 import { refusalBody, type ClubRole, type InboxClub, type InboxResponse, type OrgRef, type Room } from "@/lib/chat/types";
@@ -193,15 +195,15 @@ export async function GET() {
 
   // The Board's officer exception (8.2, 8.3): a top-level Board row by a
   // blocked author who is a CURRENT owner / admin of the club still shows.
-  // One service-role `org_members` read for the blocked authors met, if any;
-  // a failed read keeps their rows hidden.
+  // One service-role `org_members` read for everyone blocked, if any (the
+  // unread counts below ask the same of authors no preview row shows); a
+  // failed read keeps their rows hidden and out of the counts.
   const officerRole = new Map<string, ClubRole>();
-  const blockedBoardAuthors = Array.from(new Set(boardRows.filter((row) => blocked.has(row.user_id)).map((row) => row.user_id)));
-  if (blockedBoardAuthors.length > 0 && service) {
+  if (blocked.size > 0 && service) {
     const { data, error } = await service
       .from("org_members")
       .select("org_id, user_id, role")
-      .in("user_id", blockedBoardAuthors)
+      .in("user_id", Array.from(blocked))
       .in("org_id", orgIds);
     if (error) console.error(`[${TAG} officer roles]`, error.code, error.message);
     for (const row of (data ?? []) as { org_id: string; user_id: string; role: unknown }[]) {
@@ -218,9 +220,19 @@ export async function GET() {
 
   // 5. Unread (service role, counts): top-level, not removed, by others,
   // newer than my last_read_at (a null one reads as my row's created_at).
-  const unreadCount = async (channelId: string, since: string): Promise<number> => {
+  // Never a message the viewer cannot see: an author blocked either way is
+  // left out, but for a current owner / admin on their club's Board.
+  const officersOf = (orgId: string): Set<string> => {
+    const ids = new Set<string>();
+    for (const id of blocked) {
+      const role = officerRole.get(`${orgId}:${id}`);
+      if (role && BOARD_POSTER_ROLES.includes(role)) ids.add(id);
+    }
+    return ids;
+  };
+  const unreadCount = async (channelId: string, since: string, kind: "board" | "lounge", orgId: string): Promise<number> => {
     if (!service) return 0;
-    const { count, error } = await service
+    let query = service
       .from("messages")
       .select("id", { count: "exact", head: true })
       .eq("channel_id", channelId)
@@ -228,6 +240,9 @@ export async function GET() {
       .is("removed_at", null)
       .neq("user_id", user.id)
       .gt("created_at", since);
+    const leftOut = unreadLeftOut(blocked, kind, officersOf(orgId));
+    if (leftOut.length > 0) query = query.not("user_id", "in", notInList(leftOut));
+    const { count, error } = await query;
     if (error) {
       console.error(`[${TAG} unread]`, error.code, error.message);
       return 0;
@@ -288,8 +303,8 @@ export async function GET() {
 
   // Steps 5, 6 and 7 do not depend on each other.
   const [boardUnread, loungeUnread, events, eventActivity] = await Promise.all([
-    Promise.all(clubs.map((club) => unreadCount(club.board.channel_id, readSince(club.board)))),
-    Promise.all(clubs.map((club) => unreadCount(club.lounge.channel_id, readSince(club.lounge)))),
+    Promise.all(clubs.map((club) => unreadCount(club.board.channel_id, readSince(club.board), "board", club.orgId))),
+    Promise.all(clubs.map((club) => unreadCount(club.lounge.channel_id, readSince(club.lounge), "lounge", club.orgId))),
     readEvents(),
     readEventActivity(),
   ]);

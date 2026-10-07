@@ -42,6 +42,7 @@ const {
   latestShownPerRoom,
   messageKindOf,
   newestOf,
+  notInList,
   orderInboxClubs,
   orderSpaceRooms,
   readSince,
@@ -49,6 +50,7 @@ const {
   refOfRoom,
   spaceCanPost,
   toPreview,
+  unreadLeftOut,
 } = (await import(specifier)) as typeof import("./reads");
 type MembershipRow = import("./reads").MembershipRow;
 type PreviewRow = import("./reads").PreviewRow;
@@ -269,4 +271,14 @@ test("recentShown: the last `max` shown messages of an oldest-first page, newest
   assert.deepEqual(recentShown([{ hidden: true, removed: null }, { hidden: false, removed }], 3), []);
   assert.deepEqual(recentShown([], 3), []);
   assert.deepEqual(recentShown(page, 0), []);
+});
+
+test("unreadLeftOut: everyone blocked is left out of a count, but a blocked officer on the Board", () => {
+  const blocked = new Set(["a", "b"]);
+  const officers = new Set(["b"]);
+  assert.deepEqual(unreadLeftOut(blocked, "lounge", officers), ["a", "b"]);
+  assert.deepEqual(unreadLeftOut(blocked, "event", officers), ["a", "b"]);
+  assert.deepEqual(unreadLeftOut(blocked, "board", officers), ["a"]);
+  assert.deepEqual(unreadLeftOut(new Set(), "board", officers), []);
+  assert.equal(notInList(["a", "b"]), "(a,b)");
 });
