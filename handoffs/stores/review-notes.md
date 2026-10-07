@@ -76,7 +76,6 @@ App Store Connect / Play Console. The seed script reads them from your shell, ne
 >
 > **Native features in this build** (list only what ships in {{build number}}):
 > - {{e.g. The tab bar at the bottom (Campus, Messages, Otto, Profile) is native.}}
-> - {{e.g. Push notifications: after sign-in, allow notifications; a like or message opens the right screen.}}
 > - {{e.g. Tap Share on any post, profile or event to open the iOS share sheet / Android share menu.}}
 > - {{e.g. Adding a photo to a post opens the system photo picker or camera.}}
 > - {{e.g. Turn on airplane mode to see the offline screen.}}
@@ -109,8 +108,9 @@ App Store Connect / Play Console. The seed script reads them from your shell, ne
 > https://www.connectvibe.app/legal/delete-account. If you delete the demo account we re-create it
 > before the next submission.
 >
-> **Not in this build:** {{keep what is true: paid plans (Vibe+) are not on sale and nothing in the
-> app takes payment · push notifications are off}}.
+> **Not in this build:** push notifications are off and the app does not ask for permission to send
+> them; they come in a later update. {{keep if still true: Paid plans (Vibe+) are not on sale and
+> nothing in the app takes payment.}}
 >
 > Support: https://www.connectvibe.app/support · help@connectvibe.app
 > Privacy: https://www.connectvibe.app/legal/privacy · Terms: https://www.connectvibe.app/legal/terms
