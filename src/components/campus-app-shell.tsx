@@ -3,6 +3,7 @@
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 
+import { MiniMessenger } from "@/components/desktop/messages/MiniMessenger";
 import LeftNav from "@/components/LeftNav";
 import { MobileTabBar } from "@/components/mobile/MobileTabBar";
 import { OttoCorner } from "@/components/network/OttoCorner";
@@ -45,6 +46,8 @@ export function CampusAppShell({ children, sidebar }: Props) {
       {sidebar ? <div className="vibe-right-rail">{sidebar}</div> : null}
       <MobileTabBar />
       {showOttoCorner ? <OttoCorner /> : null}
+      {/* The small Messages window: laptops with the new chat, never on /messages. */}
+      <MiniMessenger />
     </div>
   );
 }

@@ -18,9 +18,13 @@
 //   window.closeMiniMessenger()
 //
 // With the new chat (`chat_v2` from /api/me/features) the panel is the new
-// inbox: it frames /messages/mini, the phone's Messages home itself (Your
+// Messages: it frames /messages?mini=1, the phone's Messages itself (Your
 // week, one row per club, unread marks, pinned first), and a tap opens the
-// chat in /messages in the whole tab. Nothing below the "List view" line
+// chat IN the panel, with its composer. The page in the frame sends the
+// whole tab anywhere that is not Messages (src/components/desktop/messages/
+// MiniFrame.tsx). The shelled pages (the feed, Network, Otto) have the same
+// window as a React component: src/components/desktop/messages/
+// MiniMessenger.tsx. Nothing below the "List view" line
 // runs then. Without `chat_v2` (the switch off, or the answer not learned)
 // the panel is the old list and chat, unchanged.
 //
@@ -431,12 +435,17 @@
       bindHandlers();
     }
     if (await hasNewChat()) {
-      // A chat with one person opens in Messages itself, not in the panel.
-      if (handle) { location.assign("/messages?to=" + encodeURIComponent(handle)); return; }
       state.open = true;
       panel.classList.add("show");
       document.documentElement.classList.add("vmm-open");
-      showInboxView();
+      // With a handle: the frame's page opens (or starts) that chat itself.
+      if (handle) {
+        removeFrame();
+        showInboxView();
+        document.getElementById("vmmFrame").src = MINI_SRC + "&to=" + encodeURIComponent(handle);
+      } else {
+        showInboxView();
+      }
       return;
     }
     state.open = true;
@@ -489,20 +498,45 @@
   // ── The new inbox (chat_v2) ────────────────────────────────────────────
   // The frame lives only while the panel is open: its page reads the lists
   // every 30 s while "visible", and a frame inside a hidden panel still is.
-  const MINI_PATH = "/messages/mini";
+  const MINI_SRC = "/messages?mini=1";
+  const MINI_PATH = "/messages";
   function removeFrame() {
     const f = document.getElementById("vmmFrame");
     if (f) f.remove();
     document.documentElement.classList.remove("vmm-over-frame");
+    panel.removeAttribute("data-holds-reload");
+  }
+  // "Open": the chat on screen in the panel, in Messages itself.
+  function openInMessages() {
+    let url = MINI_PATH;
+    try {
+      const f = document.getElementById("vmmFrame");
+      const q = new URLSearchParams(f.contentWindow.location.search);
+      if (q.get("channel")) url += "?channel=" + encodeURIComponent(q.get("channel"));
+    } catch (_) { /* the plain address */ }
+    location.assign(url);
   }
   function showInboxView() {
     state.view = "inbox";
     state.activeChannel = null;
     document.getElementById("vmmHdr").innerHTML = `
       <div class="vmm-hdr-title">Messages</div>
-      <a class="vmm-hdr-link" href="/messages">Open</a>
+      <button class="vmm-hdr-back" type="button" id="vmmNew" aria-label="New message" title="New message">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h8"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7.5 18.5 3 20l1.5-4.5z"/></svg>
+      </button>
+      <a class="vmm-hdr-link" id="vmmOpen" href="/messages">Open</a>
       <button class="vmm-hdr-x" type="button" aria-label="Close" onclick="window.closeMiniMessenger()">×</button>
     `;
+    document.getElementById("vmmOpen").addEventListener("click", (e) => {
+      if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+      e.preventDefault();
+      openInMessages();
+    });
+    // The pencil is out here, the compose sheet in the frame's page.
+    document.getElementById("vmmNew").addEventListener("click", () => {
+      const f = document.getElementById("vmmFrame");
+      try { f.contentWindow.postMessage({ source: "vibe-mini", type: "compose" }, location.origin); } catch (_) {}
+    });
     ["vmmSearch", "vmmList", "vmmMsgs", "vmmComp", "vmmQuiet"].forEach((id) => {
       document.getElementById(id).style.display = "none";
     });
@@ -511,9 +545,12 @@
     frame.id = "vmmFrame";
     frame.className = "vmm-frame";
     frame.title = "Messages";
-    frame.src = MINI_PATH;
-    // The page left the inbox (a sign-in or Terms redirect): that belongs to
-    // the whole tab, not to a 420px frame.
+    frame.src = MINI_SRC;
+    // A draft typed in the frame is not this page's typed text: the
+    // new-build check (_buildRefresh.js) is told the panel is in use.
+    panel.setAttribute("data-holds-reload", "");
+    // The page left Messages by a full load (a sign-in or Terms redirect):
+    // that belongs to the whole tab, not to a 420px frame.
     frame.addEventListener("load", () => {
       try {
         const at = frame.contentWindow.location;

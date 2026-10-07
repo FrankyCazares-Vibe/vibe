@@ -21,6 +21,8 @@ import { ClubSpace } from "./messages/club/ClubSpace";
 import { ComposeOverlay } from "./messages/ComposeOverlay";
 import { ConversationView } from "./messages/ConversationView";
 import { type HomeFilter, homeUrl, parseHomeFilter } from "./messages/home/home-rules";
+import { MINI_SOURCE } from "@/components/desktop/messages/MiniFrame";
+
 import { MessagesHome } from "./messages/home/MessagesHome";
 import { useNightTheme } from "./messages/theme";
 import { EmptyState, ListSkeleton, TabPill, ThreadRow } from "./messages/ThreadList";
@@ -61,15 +63,18 @@ const LIST_RESYNC_MS = 30_000;
 export function MessagesMobile({
   initialHandle,
   initialChannelId,
+  mini = false,
 }: {
   initialHandle?: string;
   initialChannelId?: string;
+  /** The small Messages window over a desktop page (MiniFrame): the home has no header; the window's own pencil opens compose. */
+  mini?: boolean;
 }) {
   // The one hook before the fork; each branch is its own component with its
   // own hooks, so no list mounts under another (2.1).
   const chatV2 = useChatV2();
   if (chatV2 === null) return <FlagPending />;
-  if (chatV2) return <MessagesMobileV2 initialHandle={initialHandle} initialChannelId={initialChannelId} />;
+  if (chatV2) return <MessagesMobileV2 initialHandle={initialHandle} initialChannelId={initialChannelId} mini={mini} />;
   return <MessagesMobileV1 initialHandle={initialHandle} initialChannelId={initialChannelId} />;
 }
 
@@ -210,11 +215,23 @@ const BACK_FALLBACK_MS = 600;
  * - A header Back whose `history.back()` brings no `popstate` (nothing was
  *   behind the entry) closes in place after BACK_FALLBACK_MS.
  */
-function MessagesMobileV2({ initialHandle, initialChannelId }: { initialHandle?: string; initialChannelId?: string }) {
+function MessagesMobileV2({ initialHandle, initialChannelId, mini = false }: { initialHandle?: string; initialChannelId?: string; mini?: boolean }) {
   const searchParams = useSearchParams();
   const [filter, setFilterState] = useState<HomeFilter>(() => parseHomeFilter(searchParams.get("tab")));
   const [open, setOpen] = useState<OpenView | null>(null);
   const [composeOpen, setComposeOpen] = useState(false);
+  // The small window's pencil sits in the window's own title bar, outside
+  // this frame: it asks for compose with a message (MINI_SOURCE).
+  useEffect(() => {
+    if (!mini) return;
+    const onMessage = (e: MessageEvent) => {
+      if (e.origin !== window.location.origin) return;
+      const data = e.data as { source?: unknown; type?: unknown } | null;
+      if (data && data.source === MINI_SOURCE && data.type === "compose") setComposeOpen(true);
+    };
+    window.addEventListener("message", onMessage);
+    return () => window.removeEventListener("message", onMessage);
+  }, [mini]);
   // Bumped after a view closes: the home reads its lists again (11.10).
   const [refreshKey, setRefreshKey] = useState(0);
   const [lists, setLists] = useState<{ threads: ThreadEntry[] | null; requests: ThreadEntry[] | null }>({ threads: null, requests: null });
@@ -524,6 +541,7 @@ function MessagesMobileV2({ initialHandle, initialChannelId }: { initialHandle?:
   return (
     <>
       <MessagesHome
+        mini={mini}
         filter={filter}
         onFilter={setFilter}
         refreshKey={refreshKey}

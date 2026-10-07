@@ -13,6 +13,7 @@ type Props = {
     to?: string | string[];
     channel?: string | string[];
     tab?: string | string[];
+    mini?: string | string[];
   }>;
 };
 
@@ -29,6 +30,9 @@ function first(value: string | string[] | undefined): string | undefined {
  *   - ?to=<handle>      opens / creates a DM with that user
  *   - ?channel=<id>     opens the conversation view on that channel
  *   - ?tab=<filter>     the phone's inbox filter (read on the client)
+ *   - ?mini=1           the small Messages window (a frame over a desktop
+ *                       page): the phone's Messages with no shell around it.
+ *                       Never part of the address the gate comes back to.
  *
  * The gate is told the WHOLE address, so a sign-in or Terms redirect comes
  * back to the chat that was asked for. It used to be a bare `/messages`, and
@@ -39,7 +43,7 @@ function first(value: string | string[] | undefined): string | undefined {
  * switch while it asked.
  */
 export default async function MessagesPage({ searchParams }: Props) {
-  const { to, channel, tab } = await searchParams;
+  const { to, channel, tab, mini } = await searchParams;
   const handleRaw = first(to);
   const channelRaw = first(channel);
   const tabRaw = first(tab);
@@ -61,6 +65,7 @@ export default async function MessagesPage({ searchParams }: Props) {
       initialHandle={initialHandle}
       initialChannelId={initialChannelId}
       desktopChat={desktopChat}
+      mini={first(mini) === "1"}
     />
   );
 }

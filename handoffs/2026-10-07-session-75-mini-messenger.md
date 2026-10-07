@@ -48,3 +48,17 @@ Two people in one club who blocked each other used to leave three traces. Decide
 **For the store review note (draft line):** "Blocking hides a person's messages and replies everywhere, including club chats. One exception: a club's official announcements, posted by its owner or admins on the club's Board, stay visible to every member."
 
 **Not covered:** the old thread list (`/api/me/threads` without `scope=chats`) for an account with the new chat switched off; nobody is in that state.
+
+## Evening of Oct 7: the mini messenger, second pass (Franky: "it shouldnt directly send you to the messages tab, it should allow you to send messages from when youre in your own profile, on feed, etc")
+
+The first pass opened every chat in `/messages`. He wants to read and answer in the small window, and to have the window on the feed and the other pages too.
+
+- **Chats open in the window.** The frame is now `/messages?mini=1`: the phone's whole Messages (`MessagesMobile` with `mini`), inbox and chat views with their composers, no shell and no tab bar. `/messages/mini` and `MiniInbox.tsx` are gone. `MessagesSwitch` also treats any framed `/messages` as mini, because opening a chat rewrites the frame's address without `mini`.
+- **Only Messages stays in the frame.** `src/components/desktop/messages/MiniFrame.tsx` sends the whole tab for any link or router push that leaves `/messages` (a profile, a club page, an event).
+- **On the feed, Network, Otto, Settings:** `src/components/desktop/messages/MiniMessenger.tsx`, mounted in `CampusAppShell`: a `Messages` button at the bottom right, left of Otto, with the unread number; laptops with `chat_v2` only, never on `/messages`. The static profile keeps `public/html/_miniMessenger.js`. The two are twins: change one, change the other.
+- **Window title bar:** a pencil (new message, sent to the frame as `{ source: "vibe-mini", type: "compose" }`), `Open` (the chat on screen, in full Messages), close.
+- The window carries `data-holds-reload` while open, so the new-build check never reloads a page under a draft typed in the frame.
+
+**Checked locally at 1280 as Blake:** the button on the feed, the inbox, a person's chat (sent a message, it arrived, the inbox preview updated), a club's Lounge, Back inside the window, the club's page arrow taking the whole tab, and the same on the static profile. 2,226 tests pass.
+
+**Known:** each chat opened in the window adds an entry to the tab's history, and closing the window does not take it out, so the browser's Back can need an extra press afterwards. Not seen on the live site signed in, in Safari, or in Light for this pass.

@@ -3,6 +3,7 @@
 import dynamic from "next/dynamic";
 
 import { CampusAppShell } from "@/components/campus-app-shell";
+import { MiniFrame } from "@/components/desktop/messages/MiniFrame";
 import { MessagesMobile } from "@/components/mobile/MessagesMobile";
 import { MobileShell } from "@/components/mobile/MobileShell";
 import { useClientReady } from "@/lib/use-client-ready";
@@ -49,14 +50,31 @@ export function MessagesSwitch({
   initialHandle,
   initialChannelId,
   desktopChat = false,
+  mini = false,
 }: {
   initialHandle?: string;
   initialChannelId?: string;
   desktopChat?: boolean;
+  /** `?mini=1`: this page is the small Messages window's frame. */
+  mini?: boolean;
 }) {
   const isMobile = useIsMobile();
   // Read on every render (a hook cannot sit behind the prop); used only with the switch on.
   const ready = useClientReady();
+
+  // The small Messages window (public/html/_miniMessenger.js and
+  // MiniMessenger.tsx frame this page): the phone's Messages, no shell, no
+  // tab bar. Opening a chat rewrites the frame's address to
+  // `/messages?channel=<id>`, without `mini`, so a reload inside the frame
+  // (a new build) is told apart by being framed at all.
+  const framed = ready && typeof window !== "undefined" && window.self !== window.top;
+  if (mini || framed) {
+    return (
+      <MiniFrame>
+        <MessagesMobile mini initialHandle={initialHandle} initialChannelId={initialChannelId} />
+      </MiniFrame>
+    );
+  }
 
   if (desktopChat && !ready) {
     return (
