@@ -17,6 +17,13 @@
 //     find-or-create a 1:1 dm and jump straight to that chat
 //   window.closeMiniMessenger()
 //
+// With the new chat (`chat_v2` from /api/me/features) the panel is the new
+// inbox: it frames /messages/mini, the phone's Messages home itself (Your
+// week, one row per club, unread marks, pinned first), and a tap opens the
+// chat in /messages in the whole tab. Nothing below the "List view" line
+// runs then. Without `chat_v2` (the switch off, or the answer not learned)
+// the panel is the old list and chat, unchanged.
+//
 // Self-injects on DOMContentLoaded. Skips itself on /messages (and inside the /messages iframe) to avoid stacking.
 // ══════════════════════════════════════════════════════════════════════════
 (function vibeMiniMessengerInit() {
@@ -250,6 +257,11 @@
     .vmm-typing-dot:nth-child(2){animation-delay:.16s;}
     .vmm-typing-dot:nth-child(3){animation-delay:.32s;}
     @keyframes vmmBounce{0%,80%,100%{transform:translateY(0);opacity:.5;}40%{transform:translateY(-2px);opacity:1;}}
+    /* The new inbox, framed. The frame's page paints its own background. */
+    .vmm-frame{flex:1;min-height:0;width:100%;border:none;display:block;background:var(--cream, #FAF7F2);color-scheme:normal;}
+    /* The pointer is inside the frame, which draws its own cursor: the
+       page's dot and ring would sit frozen on the frame's edge. */
+    html.vmm-over-frame #cursor,html.vmm-over-frame #cursorRing{opacity:0 !important;}
     .vmm-loading{padding:24px;text-align:center;color:var(--ink-muted, #8A8580);font-size:12px;}
   `;
   document.head.appendChild(style);
@@ -279,7 +291,7 @@
   // ── State (declared before any function that touches it is invoked) ───
   const state = {
     open: false,
-    view: "list", // 'list' | 'chat'
+    view: "list", // 'list' | 'chat' | 'inbox' (the framed new inbox)
     activeChannel: null,
     threads: [],
     filtered: [],
@@ -340,8 +352,43 @@
       if (!state.open) refreshBadge();
     }, state.BG_POLL_MS);
   }
+  // Does this person have the new chat? Asked once per page; a failed ask
+  // is asked again next time, and reads as "no" until then (the old panel).
+  let featuresAsk = null;
+  function hasNewChat() {
+    if (!featuresAsk) {
+      featuresAsk = fetch("/api/me/features", { credentials: "include" })
+        .then((r) => r.json())
+        .then((j) => {
+          if (!j || !j.ok) { featuresAsk = null; return false; }
+          return j.chat_v2 === true;
+        })
+        .catch(() => { featuresAsk = null; return false; });
+    }
+    return featuresAsk;
+  }
+  const mutedNow = (until, now) => !!until && new Date(until).getTime() > now;
+  // The new inbox's unread number: `allBadgeCount` in
+  // src/components/mobile/messages/home/home-rules.ts, by hand. Unread dms
+  // and groups + clubs with an unread Board post or new Lounge messages; a
+  // muted one is left out. null when either read failed (the dot stays).
+  async function newInboxUnread() {
+    const get = (url) => fetch(url, { credentials: "include", cache: "no-store" }).then((r) => r.json());
+    const [t, c] = await Promise.all([get("/api/me/threads?scope=chats"), get("/api/me/inbox")]);
+    if (!t || !t.ok || !Array.isArray(t.threads) || !c || !c.ok || !Array.isArray(c.clubs)) return null;
+    const now = Date.now();
+    const chats = t.threads.filter((x) => x.unread && !mutedNow(x.muted_until, now)).length;
+    const clubs = c.clubs.filter((x) =>
+      ((x.board && x.board.unread) || (x.lounge && x.lounge.unread_count > 0)) && !mutedNow(x.muted_until, now)).length;
+    return chats + clubs;
+  }
   async function refreshBadge() {
     try {
+      if (await hasNewChat()) {
+        const n = await newInboxUnread();
+        if (n !== null) paintBadge(n);
+        return;
+      }
       const r = await fetch("/api/me/threads", { credentials: "include" });
       const j = await r.json();
       if (!j || !j.ok) return;
@@ -383,6 +430,15 @@
       document.body.appendChild(panel);
       bindHandlers();
     }
+    if (await hasNewChat()) {
+      // A chat with one person opens in Messages itself, not in the panel.
+      if (handle) { location.assign("/messages?to=" + encodeURIComponent(handle)); return; }
+      state.open = true;
+      panel.classList.add("show");
+      document.documentElement.classList.add("vmm-open");
+      showInboxView();
+      return;
+    }
     state.open = true;
     panel.classList.add("show");
     document.documentElement.classList.add("vmm-open");
@@ -419,6 +475,7 @@
     if (state.listPollTimer) { clearInterval(state.listPollTimer); state.listPollTimer = null; }
     if (state.chatPollTimer) { clearInterval(state.chatPollTimer); state.chatPollTimer = null; }
     state.activeChannel = null;
+    removeFrame();
     refreshBadge();
   };
 
@@ -428,6 +485,45 @@
     if (state.open) window.closeMiniMessenger();
     else window.openMiniMessenger(handle);
   };
+
+  // ── The new inbox (chat_v2) ────────────────────────────────────────────
+  // The frame lives only while the panel is open: its page reads the lists
+  // every 30 s while "visible", and a frame inside a hidden panel still is.
+  const MINI_PATH = "/messages/mini";
+  function removeFrame() {
+    const f = document.getElementById("vmmFrame");
+    if (f) f.remove();
+    document.documentElement.classList.remove("vmm-over-frame");
+  }
+  function showInboxView() {
+    state.view = "inbox";
+    state.activeChannel = null;
+    document.getElementById("vmmHdr").innerHTML = `
+      <div class="vmm-hdr-title">Messages</div>
+      <a class="vmm-hdr-link" href="/messages">Open</a>
+      <button class="vmm-hdr-x" type="button" aria-label="Close" onclick="window.closeMiniMessenger()">×</button>
+    `;
+    ["vmmSearch", "vmmList", "vmmMsgs", "vmmComp", "vmmQuiet"].forEach((id) => {
+      document.getElementById(id).style.display = "none";
+    });
+    if (document.getElementById("vmmFrame")) return;
+    const frame = document.createElement("iframe");
+    frame.id = "vmmFrame";
+    frame.className = "vmm-frame";
+    frame.title = "Messages";
+    frame.src = MINI_PATH;
+    // The page left the inbox (a sign-in or Terms redirect): that belongs to
+    // the whole tab, not to a 420px frame.
+    frame.addEventListener("load", () => {
+      try {
+        const at = frame.contentWindow.location;
+        if (at.pathname !== MINI_PATH && at.href !== "about:blank") location.assign(at.href);
+      } catch (_) { /* another origin: leave it */ }
+    });
+    frame.addEventListener("mouseenter", () => document.documentElement.classList.add("vmm-over-frame"));
+    frame.addEventListener("mouseleave", () => document.documentElement.classList.remove("vmm-over-frame"));
+    panel.insertBefore(frame, document.getElementById("vmmList"));
+  }
 
   // ── List view ──────────────────────────────────────────────────────────
   function showListView() {

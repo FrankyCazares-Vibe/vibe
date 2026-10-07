@@ -68,6 +68,13 @@ export type MessagesHomeProps = {
   /** A week card: the room's id with the club's handle when the entry carries one. */
   onOpenRoom: (roomId: string, orgHandle: string | null) => void;
   onCompose: () => void;
+  /**
+   * The small Messages window over the desktop profile (`/messages/mini`,
+   * framed by public/html/_miniMessenger.js): the window has its own title
+   * bar and no tab bar under it, so the header is left out and the column
+   * fills the frame.
+   */
+  mini?: boolean;
 };
 
 /** One week of the cache: its cards (null until its first read answers) and that read's failure. */
@@ -325,7 +332,7 @@ export function HomeSkeleton() {
 export const FILTER_LABEL: Record<HomeFilter, string> = { all: "All", chats: "Chats", clubs: "Clubs", requests: "Requests" };
 export const LIST_LABEL: Record<HomeFilter, string> = { all: "All chats, pinned first", chats: "Chats", clubs: "Clubs", requests: "Requests" };
 
-export function MessagesHome({ filter, onFilter, refreshKey, onThreads, onOpenClub, onOpenThread, onOpenRoom, onCompose }: MessagesHomeProps) {
+export function MessagesHome({ filter, onFilter, refreshKey, onThreads, onOpenClub, onOpenThread, onOpenRoom, onCompose, mini = false }: MessagesHomeProps) {
   const night = useNightTheme();
   const t = palette(night);
   const d = useHomeData(refreshKey, onThreads);
@@ -428,7 +435,8 @@ export function MessagesHome({ filter, onFilter, refreshKey, onThreads, onOpenCl
   // The tab bar (64px + the safe area, fixed) is outside the column, so the
   // list area — and the no-clubs block centred in it — ends above it.
   return (
-    <main style={{ background: t.page, color: t.ink, minHeight: "calc(100dvh - 64px - env(safe-area-inset-bottom, 0px))", fontFamily: FONT, display: "flex", flexDirection: "column" }}>
+    <main style={{ background: t.page, color: t.ink, minHeight: mini ? "100dvh" : "calc(100dvh - 64px - env(safe-area-inset-bottom, 0px))", fontFamily: FONT, display: "flex", flexDirection: "column" }}>
+      {mini ? null : (
       <header
         style={{
           flexShrink: 0,
@@ -468,6 +476,7 @@ export function MessagesHome({ filter, onFilter, refreshKey, onThreads, onOpenCl
           </svg>
         </button>
       </header>
+      )}
 
       <YourWeek
         entries={d.week}
@@ -563,7 +572,7 @@ export function MessagesHome({ filter, onFilter, refreshKey, onThreads, onOpenCl
           position: "fixed",
           left: 0,
           right: 0,
-          bottom: "calc(64px + env(safe-area-inset-bottom, 0px))",
+          bottom: mini ? 0 : "calc(64px + env(safe-area-inset-bottom, 0px))",
           height: 36,
           pointerEvents: "none",
           zIndex: 5,
