@@ -1,11 +1,14 @@
 # Store review notes — template
 
+**Updated Oct 7, 2026** for what changed since Sept 24: sign-up is closed behind a waitlist, the new
+club chat is on for every account (the review accounts too), and the one exception to blocking.
+
 **Plain English.** This is what we paste into App Store Connect ("App Review Information") and Play
 Console ("App access" and the review notes) for every submission. It says how a reviewer signs in,
 which parts of Vibe are native, and where to try Report, Block and Delete account. Fill the
 `{{…}}` placeholders per build.
 
-**No credentials in this file, ever.** `handoffs/` is gitignored but mirrored into the Obsidian vault.
+**No credentials in this file, ever.** `handoffs/` is in git (a private repo) and mirrored into the Obsidian vault.
 The review emails and passwords live in the founders' password manager and are typed straight into
 App Store Connect / Play Console. The seed script reads them from your shell, never from a file.
 
@@ -35,8 +38,11 @@ App Store Connect / Play Console. The seed script reads them from your shell, ne
    Report opens.
 5. By hand, the parts the seed doesn't do:
    - account 2 sends account 1 a direct message, so "Report this message" can be tried;
-   - account 1 follows or joins a live club with an upcoming event (Rylan's clubs), so the Events
-     tab isn't empty.
+   - account 1 and account 2 both join a live club with an upcoming event (Rylan's clubs), so the
+     Events tab isn't empty and the club's Board and Lounge can be opened. An officer of that club
+     posts once on the Board and account 2 writes once in the Lounge, so Report can be tried there.
+   - Sign-up is closed (`signup_open` false). The seed creates the accounts with the service role,
+     so the waitlist gate doesn't stop it. Check that **Log in** still works for both.
 6. Tell the other founders the dates: reviewers sometimes file a real report, and it has to be acted
    on within 24 hours like any other.
 
@@ -60,6 +66,10 @@ App Store Connect / Play Console. The seed script reads them from your shell, ne
 > verify an @iu.edu or @purdue.edu school email before they can see the campus, so we have provided
 > a demo account that is already verified. Sign in with email and password; there is no code or 2FA.
 >
+> **Vibe is opening in waves.** Sign-up is closed for now: a new visitor joins a waitlist with their
+> school email and later receives an access code by email. "Create your account" without a code is
+> refused on purpose. Please use **Log in** with the demo account; it needs no code.
+>
 > A second demo account, "Vibe Review Friend" (@{{REVIEW_HANDLE_2, default vibe_review_pal}}), has
 > posted, commented on your post and follows you, so you can try reporting and blocking on real
 > content. Its sign-in, if you need it: {{typed here in the console only, never in this file}}.
@@ -78,13 +88,16 @@ App Store Connect / Play Console. The seed script reads them from your shell, ne
 >   sheet closes.
 > - Comment: open your own post, find the friend's comment and tap its report button
 >   (**Report this comment**).
-> - Message: open the chat with the friend, tap the small control on their message (or long-press
->   it) → **Report**.
+> - Message: open the chat with the friend, long-press their message → **Report**.
+> - Club chat: Messages → the demo club → **Lounge** (members' chat) or **Board** (announcements
+>   from the club's officers). Long-press a message or a Board post → **Report**.
 > - Event: tap **Report** on an event card. Profile: open the friend's profile → **⋯** → **Report**.
 >
 > **Block or mute:** on the friend's profile → **⋯** → **Block** or **Mute**. On a phone a post's
 > **⋯** menu also has **Block author**. Undo in Settings → **Blocked users**. A blocked person
-> can't message you and you stop seeing each other's posts.
+> can't message you and you stop seeing each other's posts. In a club you both belong to, their
+> messages and replies are hidden and no longer count as unread. One exception: a club's official
+> announcements, posted by its owner or admins on the club's Board, stay visible to every member.
 >
 > Every report is reviewed by our team and acted on within 24 hours. Posts and profiles also pass an
 > automatic text filter before they are published.
@@ -95,6 +108,9 @@ App Store Connect / Play Console. The seed script reads them from your shell, ne
 > "Verify your campus" screen.}} The same steps, and what is kept, are at
 > https://www.connectvibe.app/legal/delete-account. If you delete the demo account we re-create it
 > before the next submission.
+>
+> **Not in this build:** {{keep what is true: paid plans (Vibe+) are not on sale and nothing in the
+> app takes payment · push notifications are off}}.
 >
 > Support: https://www.connectvibe.app/support · help@connectvibe.app
 > Privacy: https://www.connectvibe.app/legal/privacy · Terms: https://www.connectvibe.app/legal/terms
