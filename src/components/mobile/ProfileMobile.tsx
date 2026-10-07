@@ -597,7 +597,7 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
     // told that view tracking failed, so this is quiet and the result is
     // discarded — the desktop tracker swallows its failure the same way.
     void vibeRequest("/api/profile-views", {
-      json: { handle: key, referrer: document.referrer || null },
+      json: { handle: key },
       cache: "no-store",
       failure: "Couldn't record this profile view.",
       quiet: true,

@@ -15,9 +15,11 @@ export function Section3d() {
           stays on your screen in the feed for about a second. The record holds
           who you are, what you viewed and the day. We keep one record per day
           for each profile or post. For a profile we also record the time of
-          your first look that day and the web address of the page you came
-          from (up to 80 characters). Nothing in Vibe reads that address. Your
-          own views and signed-out views are not recorded.
+          your first look that day. Until October 7, 2026 we also recorded the
+          web address of the page you came from (up to 80 characters). We no
+          longer record it, the addresses recorded before then are still
+          stored, and nothing in Vibe reads them. Your own views and
+          signed-out views are not recorded.
         </li>
         <li>
           <strong>Last active.</strong> While the Campus page is open, we store

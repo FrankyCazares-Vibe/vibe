@@ -1503,19 +1503,20 @@ function renderMsgs(msgs,d){
       : `<button type="button" class="dm-act-reply" onclick="event.stopPropagation();__dmStartReply('${__dmEsc(m.id)}')" aria-label="Reply">↩ Reply</button>`;
     return `<div class="dm-actions">${buttons}<span class="dm-act-sep"></span>${replyBtn}${pinBtnFor(m)}${reportBtnFor(m)}${deleteBtn}</div>`;
   };
-  // The author's own notice on a message a moderator took down. Built from an
-  // OPTIONAL field: GET /api/me/threads/[id]/messages selects an explicit
-  // column list without removed_at, so this renders nothing on today's deploy.
+  // The author's own notice on a message that was taken down. The same
+  // words as the React card (RemovedContentCard): an officer's removal says
+  // so and carries no reason.
   const removedFor = (m) => {
     if (!m || m.m !== 1 || !m.removedAt) return '';
-    const why = typeof m.removedReason === 'string' ? m.removedReason.trim() : '';
+    const officer = m.removedBy === 'officer';
+    const why = !officer && typeof m.removedReason === 'string' ? m.removedReason.trim() : '';
     const line = why ? 'Only you can see it. Reason: ' + __dmEsc(why) : 'Only you can see it.';
     // Same two ways out as the React card (RemovedContentCard) and the other
     // two static twins: the address, and the page that says what happens after
     // a report and how to appeal. In pane mode the page opens in a new tab,
     // as a shared post does: the frame never navigates itself (item 11).
     return '<div class="msg-row mine"><div class="dm-removed">' +
-      '<div class="dm-removed-t">Removed by Vibe moderators</div>' +
+      '<div class="dm-removed-t">' + (officer ? 'Removed by a club officer.' : 'Removed by Vibe moderators') + '</div>' +
       '<div class="dm-removed-d">' + line + ' Questions: help@connectvibe.app. ' +
       '<a href="/legal/community"' + (IS_PANE ? ' target="_blank" rel="noopener"' : '') + ' style="color:inherit;text-decoration:underline">Community Guidelines</a></div>' +
       '</div></div>';
@@ -2612,12 +2613,11 @@ async function __dmLoadMessages(channelId, opts) {
         reactions,
         parentMessageId: m.parent_message_id || null,
         parentPreview,
-        // Optional, and absent today: the messages route selects an explicit
-        // column list without removed_at / removed_reason. Carried here so the
-        // author's notice lights up the day that select gains them, instead of
-        // a taken-down message reading as an ordinary one.
-        removedAt: m.removed_at || null,
-        removedReason: typeof m.removed_reason === 'string' ? m.removed_reason : '',
+        // The sender's own taken-down message: the thread read sends
+        // `removed: { by, at, reason }` on it and on nothing else.
+        removedAt: (m.removed && m.removed.at) || null,
+        removedReason: m.removed && typeof m.removed.reason === 'string' ? m.removed.reason : '',
+        removedBy: m.removed && m.removed.by === 'officer' ? 'officer' : 'moderator',
         hidden: m.hidden === true,
       };
     });

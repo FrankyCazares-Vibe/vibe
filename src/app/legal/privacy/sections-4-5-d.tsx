@@ -70,10 +70,8 @@ export function Section5h() {
       <LegalP>
         <strong>Removed content.</strong> If the Vibe team removes your post or
         comment, you still see its text, marked as removed with the reason. A
-        message they remove also stays visible to you and to nobody else. On the
-        new club-room screens it is marked as removed. Everywhere else (a direct
-        or group chat, and a club room on the older screens) it is not marked
-        yet, so it can look to you as if it was still sent. A removed
+        message they remove also stays visible to you and to nobody else, marked
+        as removed. A removed
         post&apos;s photo is hidden from everyone, and the comments under it are
         hidden from everyone but their writers. Nobody else sees removed
         content, apart from the Vibe team.

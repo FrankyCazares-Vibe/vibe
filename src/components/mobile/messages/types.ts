@@ -122,14 +122,12 @@ export type MessageRow = {
   parent_preview?: ParentPreview | null;
   reactions?: MessageReaction[];
   /**
-   * A moderator took it down. OPTIONAL and never sent today:
-   * `/api/me/threads/[id]/messages` selects an explicit column list without
-   * `removed_at` or `removed_reason`, and that route is not this batch's. So
-   * the card below never renders, and a student's own removed message still
-   * sits in their thread looking sent.
+   * It was taken down, and the viewer is its sender (nobody else is served
+   * the row): who did it, when, and a moderator's reason. The thread read
+   * sends it (`removedInfo` in src/lib/chat/message-read.ts); null or absent
+   * on every other message.
    */
-  removed_at?: string | null;
-  removed_reason?: string | null;
+  removed?: { by: "officer" | "moderator"; at: string; reason: string | null } | null;
   /**
    * A stub: a message hidden from the viewer by a block in a club room
    * (wave-2 contract 8.1). The screens filter these out of the array before

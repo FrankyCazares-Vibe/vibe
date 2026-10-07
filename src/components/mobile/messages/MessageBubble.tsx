@@ -622,18 +622,18 @@ export function MessageBubble({
     </button>
   ) : null;
 
-  // A moderator took this message down. Only its sender is served the row at
-  // all, so this card is theirs. Unreachable today —
-  // `/api/me/threads/[id]/messages` does not select `removed_at`.
-  if (isMine && message.removed_at) {
+  // This message was taken down. Only its sender is served the row at all,
+  // so this card is theirs.
+  if (isMine && message.removed) {
     return (
       <div style={{ marginTop: topGap, display: "flex", justifyContent: "flex-end" }}>
         <div style={{ maxWidth: "min(300px, 86%)" }}>
           <RemovedContentCard
             kind="message"
             compact
-            removedAt={message.removed_at}
-            removedReason={message.removed_reason}
+            by={message.removed.by}
+            removedAt={message.removed.at}
+            removedReason={message.removed.reason}
           />
         </div>
       </div>

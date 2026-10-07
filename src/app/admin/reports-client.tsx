@@ -938,17 +938,13 @@ function ReportGroup({
                 placeholder="Say it the way you would say it to them."
                 style={{ ...inputStyle, resize: "vertical" }}
               />
-              {/* A post and a comment now carry the reason to their author:
-                  the feed, the post, the profile grid and the thread all send
-                  `removed_reason` back to the one person who can still see the
-                  row. A message doesn't — GET /api/me/threads/[id]/messages
-                  still selects a column list without it — and telling a
-                  moderator their words are being read when they aren't is
-                  exactly the promise this line must not make. */}
+              {/* A post, a comment and a message all carry the reason to
+                  their author: the one person who can still see the row
+                  reads it on the removed item. */}
               <div style={{ fontSize: 12, color: COLORS.faint, lineHeight: 1.5, marginTop: 5 }}>
                 It&apos;s stored with the takedown.{" "}
                 {t.type === "message"
-                  ? "The sender will be shown it once the removed-message notice ships."
+                  ? "The sender reads it on the removed message, and nobody else does."
                   : `The student reads it on the removed ${t.type === "comment" ? "comment" : "post"}, and nobody else does.`}
               </div>
               {t.type === "post" ? (

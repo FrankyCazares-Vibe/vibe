@@ -11578,7 +11578,7 @@ function showWelcomeBanner() {
       fetch('/api/profile-views', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ handle: handle, referrer: document.referrer || null }),
+        body: JSON.stringify({ handle: handle }),
         cache: 'no-store',
       }).catch(function(){});
     }

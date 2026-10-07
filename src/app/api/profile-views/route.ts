@@ -4,7 +4,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 /**
  * POST /api/profile-views — record that the signed-in user viewed a
- * profile. Body: `{ profile_user_id?: string, handle?: string, referrer?: string }`.
+ * profile. Body: `{ profile_user_id?: string, handle?: string }`.
  *
  * Per-viewer-per-day dedupe enforced by `record_profile_view` (SECURITY
  * DEFINER) — refreshing the same profile in a day is a no-op. Self-views
@@ -12,7 +12,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
  * a 401 so the client can fire-and-forget without branching on auth.
  */
 export async function POST(req: Request) {
-  let body: { profile_user_id?: unknown; handle?: unknown; referrer?: unknown };
+  let body: { profile_user_id?: unknown; handle?: unknown };
   try {
     body = (await req.json()) as typeof body;
   } catch {
@@ -46,12 +46,12 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, error: "Missing profile_user_id or handle" }, { status: 400 });
   }
 
-  const referrer =
-    typeof body.referrer === "string" ? body.referrer.slice(0, 80) : null;
-
+  // The page the viewer came from is no longer stored (Privacy Policy 3d,
+  // Oct 7 2026): nothing read it. A `referrer` an old tab still sends is
+  // dropped here.
   const { data, error } = await supabase.rpc("record_profile_view", {
     p_profile_user_id: profileId,
-    p_referrer: referrer,
+    p_referrer: null,
   });
   if (error) {
     console.error("[profile-views POST]", error);
