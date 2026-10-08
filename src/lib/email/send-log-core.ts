@@ -50,6 +50,8 @@ export const EMAIL_SEND_KINDS = [
   // The code sent to a personal address someone is adding to their account
   // (20261008130000 widened the CHECK).
   "personal_email_code",
+  // The yearly school check-in and its countdown notice (20261008140000).
+  "school_checkin",
 ] as const;
 export type EmailSendKind = (typeof EMAIL_SEND_KINDS)[number];
 

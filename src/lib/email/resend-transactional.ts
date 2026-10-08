@@ -297,6 +297,52 @@ export async function sendPersonalEmailCodeEmail(
 }
 
 /**
+ * The yearly school check-in (src/lib/auth/school-checkin.ts), to the school
+ * address an account signs in with. Two moments, one code:
+ *   "checkin"    a year has passed: still have this inbox?
+ *   "countdown"  14 days went by unanswered: the account is deleted on
+ *                `deadline` (a date in words) unless they answer or add a
+ *                personal email.
+ * The same small, link-free message as every code email. `code` is
+ * `checkinCode()` output: digits only. `deadline` is our own formatted date.
+ */
+export async function sendSchoolCheckinEmail(
+  to: string,
+  code: string,
+  moment: "checkin" | "countdown",
+  deadline: string | null,
+  userId: string | null = null,
+): Promise<void> {
+  if (!/^\d+$/.test(code)) {
+    throw new Error("School check-in code must be digits only.");
+  }
+  const line =
+    moment === "countdown"
+      ? `We asked whether you still have this school inbox and didn't hear back. Type this code in Vibe, or add a personal email in Settings, by ${deadline ?? "the date shown in Vibe"}. If you do neither, your Vibe account and everything in it will be deleted then.`
+      : "Once a year we check that you still have this school inbox. Open Vibe and type this code. Or add a personal email in Settings and we won't ask again.";
+  const subject = moment === "countdown" ? `Keep your Vibe account: your code is ${code}` : `${code} is your Vibe check-in code`;
+  const outcome = await sendLogged("school_checkin", to, userId, () =>
+    createResendClient().emails.send({
+      from: getFrom(),
+      to: [to],
+      subject,
+      html: codeOnlyEmailHtml(code, line),
+      text: [
+        `Your Vibe code is: ${code}`,
+        "",
+        line,
+        "",
+        "Never share this code. Vibe will never ask you for it.",
+        "Questions: help@connectvibe.app",
+      ].join("\n"),
+    }),
+  );
+  if (!outcome.ok) {
+    throw new Error(outcome.errorMessage || outcome.errorCode);
+  }
+}
+
+/**
  * The whole HTML of a code email: a few lines of system-font text. Nothing
  * is fetched and nothing can be tapped (the twin of
  * supabase/templates/confirmation.html). `code` is digits only (the caller

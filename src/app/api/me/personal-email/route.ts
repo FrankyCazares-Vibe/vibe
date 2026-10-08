@@ -163,6 +163,17 @@ export async function PUT(req: Request) {
     console.error(`[${TAG} PUT]`, error.code, error.message);
     return fail(500, "request_failed", "Request failed");
   }
+  // A personal email ends the yearly school check-in and any countdown for
+  // good (src/lib/auth/school-checkin.ts). Its own write: those columns are a
+  // later file (20261008140000), and the address above is already safe. The
+  // rule exempts the account either way; this only tidies the dates.
+  const cleared = await createSupabaseServiceClient()
+    .from("users")
+    .update({ school_checkin_sent_at: null, school_grace_ends_at: null })
+    .eq("id", user.id);
+  if (cleared.error && !isMissingColumnError(cleared.error, ["school_checkin_sent_at", "school_grace_ends_at"])) {
+    console.error(`[${TAG} PUT clear check-in]`, cleared.error.code);
+  }
   return json({ ok: true, personal_email: email });
 }
 

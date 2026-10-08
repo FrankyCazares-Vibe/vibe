@@ -319,3 +319,151 @@ export function PersonalEmailPrompt() {
     </section>
   );
 }
+
+type Checkin = { open: boolean; stage: string; deadline: string | null };
+
+const dateInWords = (iso: string) => new Date(iso).toLocaleDateString(undefined, { month: "long", day: "numeric", year: "numeric" });
+
+/**
+ * The yearly school check-in, on Campus (src/lib/auth/school-checkin.ts;
+ * /api/me/school-checkin). Shown while a check-in is waiting for its code:
+ * before the countdown it can be put off for the visit; once the countdown
+ * runs it stays, with the date the account would be deleted. Two ways out,
+ * both here: type the code from the school inbox, or add a personal email.
+ */
+function SchoolCheckinCard({ checkin, onDone }: { checkin: Checkin; onDone: () => void }) {
+  const isMobile = useIsMobile();
+  const [code, setCode] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [note, setNote] = useState<string | null>(null);
+  const [later, setLater] = useState(false);
+  const counting = !!checkin.deadline;
+  if (later && !counting) return null;
+
+  const answer = async () => {
+    if (busy) return;
+    setBusy(true);
+    setError(null);
+    const r = await vibeRequest("/api/me/school-checkin", { method: "POST", json: { code }, quiet: true, failure: "Couldn't check that code." });
+    setBusy(false);
+    if (r.ok) onDone();
+    else setError(r.message);
+  };
+  const again = async () => {
+    if (busy) return;
+    setBusy(true);
+    setError(null);
+    const r = await vibeRequest("/api/me/school-checkin", { method: "PUT", quiet: true, failure: "Couldn't send the code." });
+    setBusy(false);
+    if (r.ok) setNote("Sent again to your school email.");
+    else setError(r.message);
+  };
+
+  return (
+    <section
+      aria-label="School email check-in"
+      data-holds-reload=""
+      style={{
+        position: "fixed",
+        zIndex: 9980,
+        left: isMobile ? 12 : "auto",
+        right: isMobile ? 12 : 96,
+        bottom: isMobile ? "calc(76px + env(safe-area-inset-bottom, 0px))" : 24,
+        width: isMobile ? "auto" : 380,
+        maxHeight: "calc(100dvh - 120px)",
+        overflowY: "auto",
+        boxSizing: "border-box",
+        padding: 18,
+        borderRadius: 16,
+        border: counting ? "1px solid rgba(255,92,53,0.55)" : "1px solid var(--hairline)",
+        background: "var(--paper)",
+        boxShadow: "0 18px 48px rgba(0,0,0,.2), 0 2px 10px rgba(0,0,0,.08)",
+        display: "flex",
+        flexDirection: "column",
+        gap: 10,
+      }}
+    >
+      <h2 style={{ margin: 0, fontFamily: "Fraunces, serif", fontWeight: 800, fontSize: 18, letterSpacing: "-0.3px", color: "var(--charcoal)" }}>
+        {counting ? "Keep your account" : "Still have your school email?"}
+      </h2>
+      <p style={small}>
+        {counting ? (
+          <>
+            We emailed a code to your school email and didn&apos;t hear back. Type it here or add a personal email by{" "}
+            <strong style={{ color: "var(--charcoal)" }}>{dateInWords(checkin.deadline as string)}</strong>. If you do neither, your account and
+            everything in it is deleted then.
+          </>
+        ) : (
+          <>Once a year we check. We emailed a code to your school email: type it here. Or add a personal email below and we won&apos;t ask again.</>
+        )}
+      </p>
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          void answer();
+        }}
+        style={{ display: "flex", gap: 8 }}
+      >
+        <input
+          value={code}
+          onChange={(e) => setCode(e.target.value)}
+          inputMode="numeric"
+          autoComplete="one-time-code"
+          placeholder="8-digit code"
+          aria-label="8-digit code from your school email"
+          style={{ ...input, letterSpacing: "2px" }}
+        />
+        <button type="submit" disabled={busy} style={primary(busy)}>
+          {busy ? "Checking…" : "Confirm"}
+        </button>
+      </form>
+      <div style={{ display: "flex", gap: 14, flexWrap: "wrap" }}>
+        <button type="button" style={quiet} onClick={() => void again()} disabled={busy}>
+          Send the code again
+        </button>
+        {counting ? null : (
+          <button type="button" style={quiet} onClick={() => setLater(true)}>
+            Later
+          </button>
+        )}
+      </div>
+      {note ? <p style={small}>{note}</p> : null}
+      {error ? (
+        <p role="alert" style={{ ...small, color: "#C0392B" }}>
+          {error}
+        </p>
+      ) : null}
+      <p style={{ ...small, marginTop: 4 }}>
+        <strong style={{ color: "var(--charcoal)" }}>Can&apos;t open that inbox any more?</strong> Add a personal email instead:
+      </p>
+      <AddPersonalEmail onAdded={onDone} />
+    </section>
+  );
+}
+
+/**
+ * The one card Campus shows about the account's emails: the school check-in
+ * while one is open, otherwise the one-time "add a personal email" offer.
+ * Never both.
+ */
+export function CampusAccountCard() {
+  const [checkin, setCheckin] = useState<Checkin | null | "none">(null);
+  useEffect(() => {
+    let live = true;
+    void vibeRequest<{ open?: boolean; stage?: string; deadline?: string | null }>("/api/me/school-checkin", {
+      cache: "no-store",
+      quiet: true,
+      failure: "Couldn't load your account.",
+    }).then((r) => {
+      if (!live) return;
+      setCheckin(r.ok && r.data.open === true ? { open: true, stage: String(r.data.stage ?? ""), deadline: r.data.deadline ?? null } : "none");
+    });
+    return () => {
+      live = false;
+    };
+  }, []);
+  if (checkin === null) return null;
+  if (checkin === "none") return <PersonalEmailPrompt />;
+  return <SchoolCheckinCard checkin={checkin} onDone={() => setCheckin("none")} />;
+}

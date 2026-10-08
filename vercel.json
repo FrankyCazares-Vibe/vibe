@@ -4,6 +4,10 @@
     {
       "path": "/api/cron/waitlist-purge",
       "schedule": "17 8 * * *"
+    },
+    {
+      "path": "/api/cron/school-checkin",
+      "schedule": "47 14 * * *"
     }
   ]
 }

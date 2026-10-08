@@ -171,7 +171,7 @@ The apps are not in the stores yet. When they are, they will show the same Vibe 
 
 We use your information to run Vibe. That includes suggesting people and clubs to you, based on who you follow, your campus and your major. We use it to keep accounts secure, to review reports and act on them, to fix bugs, and to answer you. We also count things, so we can see in totals how Vibe is used.
 
-**Emails.** The automatic emails Vibe sends you are these six: to confirm your account, reset your password, verify your school email, confirm a personal email you add, confirm your waitlist spot and send your access code. A person on the Vibe team may also write to you. They may answer you, write about a report, your account or a club you run, or tell you something you need to know. Examples are a security problem or a change to this policy. Vibe sends no bulk marketing email and no email about activity on your account.
+**Emails.** The automatic emails Vibe sends you are these seven: to confirm your account, reset your password, verify your school email, confirm a personal email you add, check once a year that you still have your school inbox, confirm your waitlist spot and send your access code. A person on the Vibe team may also write to you. They may answer you, write about a report, your account or a club you run, or tell you something you need to know. Examples are a security problem or a change to this policy. Vibe sends no bulk marketing email and no email about activity on your account.
 
 **What we do not do.** We do not:
 
@@ -436,6 +436,8 @@ Vibe does not delete things just because they are old. They stay until you, a cl
 **Delete your account.** In Settings, under "Danger zone", type your handle to confirm. The account is deleted right away, with no waiting period and no undo. The same button is on the "verify your campus" screen and the suspended notice.
 
 If you cannot sign in, write to help@connectvibe.app or see connectvibe.app/legal/delete-account. We reply to your sign-in email and delete only after you answer that reply. If you can no longer read mail at that address, we ask for other proof that the account is yours (section 3g). The cofounder with direct access then deletes the account by hand: its files first, then its records.
+
+**The yearly school check-in.** A school closes your school inbox after you leave, and nothing tells us when. So if you sign in with a school email and have not added a personal email, once a year we email a code to your school email. If you type it into Vibe, nothing changes for another year. If you do not within 14 days, a 90-day countdown starts, and Vibe shows you its last day each time you open Campus. Typing the code or adding a personal email (section 3a) ends the countdown. If you do neither by that day, we delete your account and what is in it, as in the steps below. An account that signs in with a personal email, or has added one, is never checked.
 
 What happens, in order:
 

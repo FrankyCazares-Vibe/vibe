@@ -79,6 +79,8 @@ test("the kinds match the DB CHECK and the label is fixed", () => {
     "waitlist_invite",
     // 20261008130000_users_personal_email.sql.
     "personal_email_code",
+    // 20261008140000_school_checkin.sql.
+    "school_checkin",
   ]);
   assert.equal(HASH_LABEL, "email-send-v1|");
 });

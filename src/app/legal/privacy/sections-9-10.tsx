@@ -60,6 +60,19 @@ export function Sections9To10() {
         cofounder with direct access then deletes the account by hand: its
         files first, then its records.
       </LegalP>
+      <LegalP>
+        <strong>The yearly school check-in.</strong> A school closes your
+        school inbox after you leave, and nothing tells us when. So if you sign
+        in with a school email and have not added a personal email, once a year
+        we email a code to your school email. If you type it into Vibe, nothing
+        changes for another year. If you do not within 14 days, a 90-day
+        countdown starts, and Vibe shows you its last day each time you open
+        Campus. Typing the code or adding a personal email (
+        <Sec to="3a">section 3a</Sec>) ends the countdown. If you do neither by
+        that day, we delete your account and what is in it, as in the steps
+        below. An account that signs in with a personal email, or has added
+        one, is never checked.
+      </LegalP>
       <LegalP>What happens, in order:</LegalP>
       <LegalOL>
         <li>Vibe+, if you have it, is cancelled with no refund.</li>
