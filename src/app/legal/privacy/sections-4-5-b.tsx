@@ -34,7 +34,8 @@ export function Section5e() {
           posts shared in the chat. Club rooms have no pinned messages.
         </li>
         <li>
-          <strong>Blocks.</strong> A block stops new messages both ways, and a
+          <strong>Blocks.</strong> A block stops new messages and new reactions
+          both ways, and a
           direct chat disappears from both inboxes. No message or chat is
           deleted. The block does delete the follows between the two of you, and
           unblocking does not bring them back. In a shared group chat, old

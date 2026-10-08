@@ -625,6 +625,11 @@ export function SignupForm({
               Required — check the box above to create your account.
             </p>
           ) : null}
+          {/* Said where it is agreed to (Privacy Policy, short version item
+              6), not only inside the policy. */}
+          <p className="vibe-auth-consent-note" style={{ opacity: 0.8 }}>
+            Good to know: people can see that you viewed their profile or post.
+          </p>
 
           {error ? <p role="alert" className="vibe-auth-error">{error}</p> : null}
           {maybeExisting ? (

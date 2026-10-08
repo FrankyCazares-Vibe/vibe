@@ -77,3 +77,21 @@ A try, his words: he is not sure what he is picturing. Of three choices he picke
 **For Franky to judge:** Otto's panel dims and blurs the page behind it, so chatting there is not "on the side" of the feed the way the small window was; the panel is always dark, so in Light the Messages tab is a light inbox inside a dark panel; If the try is kept, those two are the follow-ups (he said he likes the direction). If not, the corner button is one commit back.
 
 **Light fixed (Oct 8, his yes):** the Messages frame is always Night, on the feed and on the profile, because Otto's panel is dark in both themes. `MiniFrame` renders `NIGHT_LOCK_SCRIPT` (sets `<html data-theme-lock="dark">` before the first paint) and `applyTheme` keeps a locked document Night (`src/lib/theme/theme.ts`). Seen locally with the page in Light: the frame's page is Night. Still open: the page behind dims while the panel is open.
+
+## Privacy follow-ups done in S75 (rows of `legal-2026-10-04-privacy-v3/page-and-code-changes.md` part 2)
+
+| Row | What | Policy change, same deploy |
+|---|---|---|
+| 56 | A sender sees their removed message marked, in direct and group chats (phone and desktop) | 5h: one sentence instead of three |
+| 50 | Profile views no longer send or store the page you came from | 3d: "Until October 7, 2026 we also recorded…". Old values still stored: clearing them is `update public.profile_views set referrer = null;` on production, NOT run (needs Franky's yes); then the sentence can go |
+| 36 | A block also stops new reactions on the blocked person's messages (taking one back is never refused) | 5e Blocks: "new messages and new reactions" |
+| 28 | Deleting an account also deletes a waitlist entry under its sign-in or school email, not only the one its code came from | Section 9: "your waitlist entry" |
+| 52 | Deleting an account takes its sign-in address off the no-code sign-up list | Section 9 bullet removed; section 11 says so; delete-account page in line |
+| 39 | Sign-up: "Good to know: people can see that you viewed their profile or post." under the checkbox | none |
+| 40 | Sign-in screen: Privacy Policy and Terms links | none |
+
+Checked: page = text 1,081 of 1,081; 2,230 tests (three new for rows 28 and 52, one for the Night lock); the reaction block walked locally (403 with a block, 200 without, take-back always 200). **Not walked end to end:** account deletion, because the local setup has no file storage and the route stops at the file step before the new lines; rows 28 and 52 rest on their unit tests.
+
+**Changes to the by-hand steps (part 3):** item 20 (deleting an account by email, by hand) now needs one more step, because only the Settings route does it: take the address off `signup_allowlist` and delete any waitlist entry under the account's addresses. The policy says "If we delete your account for you, we take it off by hand."
+
+**Looked at and left:** row 33 (a deleted message's file cannot be attached again) is not small: a deleted message leaves no record to check against. Row 29 (the email service's reference number) needs a database change for the account-deletion half. Rows 24, 51, 58, 21 to 23 are database changes on production: Franky's yes first.

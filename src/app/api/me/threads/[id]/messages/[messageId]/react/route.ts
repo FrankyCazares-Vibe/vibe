@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { blockedIdsFor } from "@/lib/chat/blocks";
 import { isAllowedReactionEmoji } from "@/lib/messages/reaction-emoji";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
@@ -51,6 +52,12 @@ function parseEmoji(body: Body): { ok: true; emoji: string } | { ok: false; res:
  * POST is a no-op. RLS gates message visibility — the policy on
  * `message_reactions` joins back through `messages` + `is_channel_member`
  * so users can only react to messages they can see.
+ *
+ * A block stops reactions too (Privacy Policy 5: "A block stops new messages
+ * both ways"): no new reaction on a message by someone blocked either way,
+ * in any chat. A reaction is a notice to its author, and in a club room the
+ * message itself is hidden from the viewer. Taking a reaction back (DELETE)
+ * is never refused.
  */
 export async function POST(req: Request, ctx: RouteCtx) {
   const { messageId } = await ctx.params;
@@ -68,6 +75,29 @@ export async function POST(req: Request, ctx: RouteCtx) {
   }
   const parsed = parseEmoji(body);
   if (!parsed.ok) return parsed.res;
+
+  // The author, as the viewer may read it (RLS): no row, nothing to react to.
+  const { data: message, error: readErr } = await auth.supabase
+    .from("messages")
+    .select("user_id")
+    .eq("id", messageId)
+    .maybeSingle();
+  if (readErr) {
+    console.error("[messages/:id/react POST read]", readErr.code, readErr.message);
+    return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
+  }
+  if (!message) {
+    return NextResponse.json({ ok: false, error: "That message is no longer there." }, { status: 404 });
+  }
+  const authorId = (message as { user_id: string }).user_id;
+  if (authorId !== auth.userId) {
+    const blocked = await blockedIdsFor(auth.supabase, auth.userId);
+    // Fails closed: a block set that could not be read reacts to nobody.
+    if (!blocked) return NextResponse.json({ ok: false, error: "Try again in a moment." }, { status: 503 });
+    if (blocked.has(authorId)) {
+      return NextResponse.json({ ok: false, error: "You can't react to this message.", code: "blocked" }, { status: 403 });
+    }
+  }
 
   const { error } = await auth.supabase
     .from("message_reactions")

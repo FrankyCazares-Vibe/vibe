@@ -13,7 +13,7 @@ import {
   isSupabaseServiceConfigured,
 } from "@/lib/supabase/service";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { forgetWaitlistForUser } from "@/lib/waitlist/store";
+import { forgetAllowlistAddress, forgetWaitlistForUser } from "@/lib/waitlist/store";
 
 type DeleteBody = { confirm_handle?: unknown };
 
@@ -136,14 +136,28 @@ export async function DELETE(req: Request) {
   // reactions, reposts, channel memberships, etc.) drop with it.
   const admin = createSupabaseServiceClient();
 
-  // The waitlist row this account's access code redeemed (school address,
-  // name, answers) goes too. The database trigger waitlist_forget_user
-  // deletes the row anyway; this also forgets its send-log addresses, whose
-  // key only the server holds. Best effort: never blocks the deletion.
+  // The account's waitlist entry (school address, name, answers) goes too:
+  // the row its access code redeemed, and any entry under its sign-in or
+  // school address. The database trigger waitlist_forget_user deletes the
+  // redeemed row anyway; this also forgets the send-log addresses, whose key
+  // only the server holds. And its sign-in address comes off the no-code
+  // sign-up list. Best effort: neither blocks the deletion.
+  let schoolEmail: string | null = null;
   try {
-    await forgetWaitlistForUser(admin, user.id);
+    const { data: own } = await admin.from("users").select("school_email").eq("id", user.id).maybeSingle();
+    schoolEmail = typeof own?.school_email === "string" ? own.school_email : null;
+  } catch (e) {
+    console.error("[me.DELETE school address]", e instanceof Error ? e.message : "failed");
+  }
+  try {
+    await forgetWaitlistForUser(admin, user.id, [user.email, schoolEmail]);
   } catch (e) {
     console.error("[me.DELETE waitlist]", e instanceof Error ? e.message : "failed");
+  }
+  try {
+    await forgetAllowlistAddress(admin, user.email);
+  } catch (e) {
+    console.error("[me.DELETE allowlist]", e instanceof Error ? e.message : "failed");
   }
   const { error: deleteErr } = await admin.auth.admin.deleteUser(user.id);
   if (deleteErr) {

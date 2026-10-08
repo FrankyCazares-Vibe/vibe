@@ -37,8 +37,8 @@ import {
 //     identity_key (src/lib/moderation/identity.ts); moderation_actions and
 //     billing_events carry no FK; email_sends keeps recipient_domain and
 //     provider_message_id and drops recipient_hash (it never had an address
-//     column); orgs.owner_id is ON DELETE SET NULL; signup_allowlist keeps
-//     its row; auth.audit_log_entries has no FK to auth.users.
+//     column); orgs.owner_id is ON DELETE SET NULL; the signup_allowlist
+//     row is deleted by DELETE /api/me; auth.audit_log_entries has no FK to auth.users.
 // No number of days anywhere: the evidence and report records have no end
 // date until the lawyer sets one, there are no database backups, and nobody
 // has confirmed how long Vercel, Sentry and Resend keep their logs.
@@ -215,8 +215,9 @@ export default function DeleteAccountPage() {
           sign-in log&quot; below).
         </li>
         <li>
-          <strong>Your waitlist entry,</strong> if your access code came from
-          one.
+          <strong>Your waitlist entry,</strong> if you have one, and your
+          address on the list of addresses that can sign up without an access
+          code, if it is there.
         </li>
         <li>
           <strong>Your files:</strong> the photos, videos and documents in your
@@ -332,14 +333,6 @@ export default function DeleteAccountPage() {
           happen. A few counts hold an IP address or part of one, and a few
           hold a scrambled code made from an email address. They stay until
           they are cleared, which can take weeks.
-        </li>
-        <li>
-          <strong>
-            The list of addresses that can sign up without an access code,
-          </strong>{" "}
-          if yours is on it. It holds the address, a reason, an optional short
-          note and the date. Write to <HelpEmail /> and we take your address
-          off it.
         </li>
         <li>
           <strong>Payments, once billing is on.</strong> Vibe+ is not on sale

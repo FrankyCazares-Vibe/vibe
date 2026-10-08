@@ -199,9 +199,9 @@ export function Section11Waitlist() {
       <LegalP>
         We keep a short list of addresses that can sign up without an access
         code. For each one the list holds the address, the reason, an optional
-        short note and the date. It keeps them even after the account is
-        deleted, until you ask us to take yours off (
-        <Sec to="9">section 9</Sec>).
+        short note and the date. Deleting your account in Settings takes your
+        address off the list. If we delete your account for you, we take it off
+        by hand.
       </LegalP>
 
       <LegalP>

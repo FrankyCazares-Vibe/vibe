@@ -11,6 +11,7 @@ import {
   DEFAULT_WAITLIST_DAILY_CAP,
   WAITLIST_ADMIN_COLUMNS,
   parseDailyCap,
+  waitlistEmailKey,
   type WaitlistAdminDbRow,
 } from "./admin-view";
 import { waitlistLeaveUrl, waitlistSignupUrl } from "./email-content";
@@ -318,17 +319,43 @@ export async function deleteWaitlistRow(service: SupabaseClient, id: string, ema
 }
 
 /**
- * An account is being deleted (DELETE /api/me): the waitlist row its code
- * redeemed goes, with its send-log addresses. The database trigger
- * waitlist_forget_user deletes the row anyway; this adds the send log,
- * whose key the database can't compute.
+ * An account is being deleted (DELETE /api/me): its waitlist entry goes,
+ * with its send-log addresses. That is the row its access code redeemed
+ * (the database trigger waitlist_forget_user deletes that one anyway; this
+ * adds the send log, whose key the database can't compute) AND any entry
+ * under one of the account's own `addresses` (its sign-in email, its school
+ * email): a person who joined the list with one address and signed up with
+ * a code sent to another, or who never used a code. Each address is matched
+ * with `.eq` on its `email_key`, never inside an `in.(…)` list.
  */
-export async function forgetWaitlistForUser(service: SupabaseClient, userId: string): Promise<void> {
+export async function forgetWaitlistForUser(service: SupabaseClient, userId: string, addresses: readonly (string | null | undefined)[] = []): Promise<void> {
+  const rows = new Map<string, string>();
   const { data, error } = await service.from("waitlist").select("id, email").eq("redeemed_user_id", userId);
   if (error) fail("forget user", error.message);
-  for (const row of (data ?? []) as { id: string; email: string }[]) {
-    await deleteWaitlistRow(service, row.id, row.email);
+  for (const row of (data ?? []) as { id: string; email: string }[]) rows.set(row.id, row.email);
+  const keys = new Set<string>();
+  for (const address of addresses) {
+    const key = typeof address === "string" && address ? waitlistEmailKey(address.trim().toLowerCase()) : null;
+    if (key) keys.add(key);
   }
+  for (const key of keys) {
+    const found = await service.from("waitlist").select("id, email").eq("email_key", key);
+    if (found.error) fail("forget user by address", found.error.message);
+    for (const row of (found.data ?? []) as { id: string; email: string }[]) rows.set(row.id, row.email);
+  }
+  for (const [id, email] of rows) await deleteWaitlistRow(service, id, email);
+}
+
+/**
+ * An account is being deleted: its sign-in address comes off the list of
+ * addresses that may sign up without an access code (`signup_allowlist`).
+ * The list held it for the account's sake; nothing else points at the row.
+ */
+export async function forgetAllowlistAddress(service: SupabaseClient, email: string | null | undefined): Promise<void> {
+  const address = typeof email === "string" ? email.trim().toLowerCase() : "";
+  if (!address) return;
+  const { error } = await service.from("signup_allowlist").delete().eq("email", address);
+  if (error) fail("forget allowlist", error.message);
 }
 
 const PURGE_PAGE = 1000;

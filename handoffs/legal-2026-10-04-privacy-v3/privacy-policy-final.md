@@ -253,7 +253,7 @@ Vibe has direct chats, group chats and club rooms.
 
 - **Direct and group chats.** Everyone in the chat sees every message, photo, video, shared post and reaction. They also see who is in the chat, when the other side last read it and who is typing. Someone added later can read the whole history. A direct message from someone you are not connected with arrives as a request. (Connected means you follow each other.) The sender can see when you read it. In a group chat, a person you are connected with can add you with no request first. The others in that chat may be people you are not connected with.
 - **Pinned messages.** In a direct or group chat, anyone who has accepted the chat can pin a message, yours included, for everyone in it, and can unpin it. Everyone in the chat sees the pinned messages, including someone added later. Vibe stores who pinned a message and when. People in the chat can see when a message was pinned, not who pinned it. The panel that shows pinned messages also has a "Shared" list: the photos, videos and posts shared in the chat. Club rooms have no pinned messages.
-- **Blocks.** A block stops new messages both ways, and a direct chat disappears from both inboxes. No message or chat is deleted. The block does delete the follows between the two of you, and unblocking does not bring them back. In a shared group chat, old messages stay visible and neither of you can send or pin while the block lasts.
+- **Blocks.** A block stops new messages and new reactions both ways, and a direct chat disappears from both inboxes. No message or chat is deleted. The block does delete the follows between the two of you, and unblocking does not bring them back. In a shared group chat, old messages stay visible and neither of you can send or pin while the block lasts.
 
 **Club rooms.** Each club has these rooms:
 
@@ -445,7 +445,7 @@ What happens, in order:
    - everything you posted, sent, liked, saved or voted on;
    - your follows, club memberships, RSVPs, blocks and mutes;
    - the records of what you viewed and of who viewed you;
-   - your notifications, and the waitlist entry your access code came from.
+   - your notifications, and your waitlist entry.
 
    One log is not tied to the account, so step 3 does not reach it. It can still hold your email address (see "The sign-in log" below).
 
@@ -470,7 +470,6 @@ If step 1 or 2 fails, the account is not deleted and you can try again. If step 
 - **Our email log,** without the scrambled code or your account ID. It keeps the reference number Resend gave each message.
 - **The sign-in log.** The sign-in system's log of sign-in activity (section 3d) sits in our database at Supabase. It can hold your email address and IP address. It is not tied to your account, and nothing in Vibe clears it today.
 - **Abuse counts,** until they are cleared.
-- **The list of addresses that can sign up without an access code** (section 11), if yours is on it. It holds the address, a reason, an optional short note and the date. Write to help@connectvibe.app and we take your address off it.
 - **Our list of payment events,** once billing is on.
 - **Anything a court order or the law makes us keep.** If we get a valid order to keep an account's records before you delete it, we copy and keep them.
 
@@ -560,7 +559,7 @@ The 40 days are the longest any entry stays, whether or not you confirmed, got a
 
 **When you sign up with an access code.** The email you sign up with is stored on your waitlist entry, linked to your new account, until the entry is deleted. Your account keeps a record of the access code you used and a wave note. The note holds your wave, how you got in (through the form or added by a cofounder), the day your access code was sent and the day you joined. Both are deleted with the account. Your waitlist answers are not copied into your profile.
 
-We keep a short list of addresses that can sign up without an access code. For each one the list holds the address, the reason, an optional short note and the date. It keeps them even after the account is deleted, until you ask us to take yours off (section 9).
+We keep a short list of addresses that can sign up without an access code. For each one the list holds the address, the reason, an optional short note and the date. Deleting your account in Settings takes your address off the list. If we delete your account for you, we take it off by hand.
 
 **Questions,** or want a copy of your entry? Write to hello@connectvibe.app from the address you joined with.
 

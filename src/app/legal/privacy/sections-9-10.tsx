@@ -78,8 +78,7 @@ export function Sections9To10() {
             <li>your follows, club memberships, RSVPs, blocks and mutes;</li>
             <li>the records of what you viewed and of who viewed you;</li>
             <li>
-              your notifications, and the waitlist entry your access code came
-              from.
+              your notifications, and your waitlist entry.
             </li>
           </LegalUL>
           <LegalP>
@@ -168,14 +167,6 @@ export function Sections9To10() {
         </li>
         <li>
           <strong>Abuse counts,</strong> until they are cleared.
-        </li>
-        <li>
-          <strong>
-            The list of addresses that can sign up without an access code
-          </strong>{" "}
-          (<Sec to="11">section 11</Sec>), if yours is on it. It holds the
-          address, a reason, an optional short note and the date. Write to{" "}
-          <Mail box="help" /> and we take your address off it.
         </li>
         <li>
           <strong>Our list of payment events,</strong> once billing is on.
