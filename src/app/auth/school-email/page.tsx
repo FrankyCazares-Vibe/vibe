@@ -529,7 +529,7 @@ function SchoolEmailInner() {
             </>
           ) : (
             <>
-              We&apos;ll email a code and link to <em>that</em> inbox.
+              We&apos;ll email an 8-digit code to <em>that</em> inbox.
             </>
           )}
         </p>
@@ -579,7 +579,8 @@ function SchoolEmailInner() {
                   </>
                 ) : (
                   <>
-                    We sent a code and link to <strong>{sentTo}</strong>.
+                    We sent an 8-digit code to <strong>{sentTo}</strong>. Type
+                    it below.
                   </>
                 )}
               </div>
@@ -648,8 +649,8 @@ function SchoolEmailInner() {
                 Safari line can't be pushed out by a send limit or failure. */}
             {linksOpenBrowser ? (
               <p className="vibe-auth-tip">
-                Links in the email open in your browser, not this app. Not there after a
-                minute? Check Junk, and your school Outlook&apos;s Quarantine.
+                Not there after a minute? Check Junk, and your school
+                Outlook&apos;s Quarantine. Then type the code here.
               </p>
             ) : (
               <p className="vibe-auth-tip">

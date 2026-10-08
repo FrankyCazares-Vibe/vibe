@@ -233,51 +233,50 @@ export async function sendSchoolVerificationEmail(
   if (!/^\d+$/.test(code)) {
     throw new Error("School verification code must be digits only.");
   }
-  const site = getSiteUrl();
+  // A code and nothing to tap, on purpose (S75): IU and Purdue student mail
+  // is Microsoft 365, which opens and scans every link in a message from a
+  // small sender before it delivers, and that is where the minutes went. So:
+  // no link, no button, no web font, no image, no footer link; the code in
+  // the subject. `verifyUrl` is no longer sent (the link route still answers
+  // older emails). Keep this message this small.
+  void verifyUrl;
   const outcome = await sendLogged("school_verification", to, userId, () =>
     createResendClient().emails.send({
       from: getFrom(),
       to: [to],
-      subject: "Verify your school email on Vibe",
-      html: brandedEmailHtml({
-        title: "Verify your school email on Vibe",
-        preheader: `Your Vibe code is ${code}. It works for 30 minutes.`,
-        headline: "Verify your school email",
-        intro: "Type this code on the Vibe page where you asked for this email.",
-        code: {
-          label: "Your verification code",
-          value: code,
-          note: "It works for 30 minutes. Never share it &mdash; Vibe will never ask you for it.",
-        },
-        button: {
-          lead: "Or tap below while you're signed in to Vibe on this device. The link works for 48 hours.",
-          href: verifyUrl,
-          label: "Verify school email",
-        },
-        notes: [
-          "Opened this in the Outlook app? Typing the code is the easiest way.",
-          "Didn't start this? You can ignore this email.",
-        ],
-      }),
+      subject: `${code} is your Vibe code`,
+      html: codeOnlyEmailHtml(code, "Type it on the Vibe page where you asked for this email. It works for 30 minutes."),
       text: [
-        `Your Vibe verification code: ${code}`,
+        `Your Vibe code is: ${code}`,
         "",
         "Type it on the Vibe page where you asked for this email. It works for 30 minutes.",
         "",
-        "Or tap Verify school email while you're signed in to Vibe on this device. The link works for 48 hours.",
-        `Verify school email: ${verifyUrl}`,
-        "",
-        "Never share this code. Vibe will never ask you for it.",
-        "",
-        "If you didn't start this, ignore this email.",
-        "",
-        site,
+        "Never share this code. Vibe will never ask you for it. If you didn't start this, ignore this email.",
+        "Questions: help@connectvibe.app",
       ].join("\n"),
     }),
   );
   if (!outcome.ok) {
     throw new Error(outcome.errorMessage || outcome.errorCode);
   }
+}
+
+/**
+ * The whole HTML of a code email: a few lines of system-font text. Nothing
+ * is fetched and nothing can be tapped (the twin of
+ * supabase/templates/confirmation.html). `code` is digits only (the caller
+ * checks); `line` is fixed copy.
+ */
+function codeOnlyEmailHtml(code: string, line: string): string {
+  return (
+    `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Your Vibe code</title></head>` +
+    `<body style="margin:0;padding:24px;background:#ffffff;font-family:-apple-system,'Segoe UI',Helvetica,Arial,sans-serif;font-size:16px;line-height:24px;color:#1c1c1e;">` +
+    `<p style="margin:0 0 16px;">Your Vibe code is:</p>` +
+    `<p style="margin:0 0 16px;font-family:ui-monospace,Menlo,Consolas,'Courier New',monospace;font-size:30px;line-height:36px;font-weight:700;letter-spacing:4px;">${code}</p>` +
+    `<p style="margin:0 0 16px;">${line}</p>` +
+    `<p style="margin:0;color:#5a564f;font-size:14px;line-height:21px;">Never share this code. Vibe will never ask you for it. If you didn't start this, ignore this email. Questions: help@connectvibe.app</p>` +
+    `</body></html>`
+  );
 }
 
 // ---------------------------------------------------------------------------

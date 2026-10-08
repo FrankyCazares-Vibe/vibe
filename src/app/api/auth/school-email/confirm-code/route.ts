@@ -21,9 +21,9 @@ const PER_USER_WINDOW_SEC = 900;
 const PER_IP_WINDOW_SEC = 3600;
 
 const TOO_MANY_TRIES =
-  "Too many tries. Wait 15 minutes, or tap the link in the email while signed in.";
+  "Too many tries. Wait 15 minutes, then ask for a new code.";
 const TOO_MANY_FROM_NETWORK =
-  "Lots of tries from this network. Try again later this hour, or tap the link in the email while you're signed in.";
+  "Lots of tries from this network. Try again later this hour.";
 const LIMITER_DOWN = "Couldn't check your code right now. Try again in a minute.";
 
 /**
