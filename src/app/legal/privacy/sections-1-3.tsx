@@ -80,8 +80,8 @@ export function Sections1To3() {
         confirm your sign-in email, verify a school email and set up a profile.
       </LegalP>
       <LegalP>
-        <strong>What &ldquo;verified&rdquo; means.</strong> We send a link and a
-        verification code to your school email and you use either one. That
+        <strong>What &ldquo;verified&rdquo; means.</strong> We send a
+        verification code to your school email and you type it into Vibe. That
         proves you could read mail at that address at that moment. It does not
         prove that you are enrolled, employed or admitted, or that you are who
         your profile says. A school email here means an address whose part after

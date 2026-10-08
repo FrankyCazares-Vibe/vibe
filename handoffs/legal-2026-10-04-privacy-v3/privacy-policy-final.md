@@ -65,7 +65,7 @@ When and why we read private messages is in section 5h.
 
 **Making an account.** Sign-up asks for an email address, a password and the checkbox. While we let people in one group at a time (a wave), it also asks for the access code we emailed you. You then confirm your sign-in email, verify a school email and set up a profile.
 
-**What "verified" means.** We send a link and a verification code to your school email and you use either one. That proves you could read mail at that address at that moment. It does not prove that you are enrolled, employed or admitted, or that you are who your profile says. A school email here means an address whose part after the @ is iu.edu or purdue.edu, or ends in .iu.edu or .purdue.edu. University staff and faculty have these addresses too. We do not contact the university. One school email is meant to verify one account. Your campus is your own choice, and we do not check it.
+**What "verified" means.** We send a verification code to your school email and you type it into Vibe. That proves you could read mail at that address at that moment. It does not prove that you are enrolled, employed or admitted, or that you are who your profile says. A school email here means an address whose part after the @ is iu.edu or purdue.edu, or ends in .iu.edu or .purdue.edu. University staff and faculty have these addresses too. We do not contact the university. One school email is meant to verify one account. Your campus is your own choice, and we do not check it.
 
 One exception: we can mark a test account that we run ourselves as verified by hand, such as the account an app store's reviewer signs in with. Those accounts are not students.
 
