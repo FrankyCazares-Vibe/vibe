@@ -77,7 +77,7 @@ One exception: we can mark a test account that we run ourselves as verified by h
 
 - **Sign-in email.** Shown to you in Settings. No other user is shown it. The one exception is your starter name, below.
 - **Password.** We never store the password itself. Supabase, the company that runs our sign-in, stores a scrambled version that cannot be read back.
-- **Starter name.** Until you choose a name, your display name is the part of your sign-in email before the @. Anyone who sees your name on Vibe can read it.
+- **Starter name.** If you made your account before October 8, 2026 and have not chosen a name, your display name is the part of your sign-in email before the @. Anyone who sees your name on Vibe can read it. An account made since then starts with the name "Member".
 - **School email.** Stored once you confirm it. No other user is shown it. Section 10 names one gap.
 - **Proof that you agreed** (section 13) and, if you joined with an access code, a record of it (section 11).
 
@@ -228,7 +228,7 @@ This means every account, verified or not, at every campus.
 - Totals of likes, views and saves on each post. The author gets a notification naming each liker. Vibe shows nobody else who liked, and shows nobody who saved.
 - Club events, with Going and Interested totals.
 - Search finds verified accounts that finished setting up, across both universities. The Map lists people by campus and major, and the members of a club that anyone can join.
-- For any account: when it was made, roughly when it was last active, when its handle last changed and its total profile views. No screen shows the department or school an account typed at set-up, but a signed-in account could still read it.
+- For any account: when it was made, when its handle last changed and its total profile views. No screen shows the department or school an account typed at set-up, but a signed-in account could still read it.
 
 ### 5c. Who can open my résumé?
 
@@ -571,7 +571,7 @@ We ask for no date of birth, so we rely on the checkbox and on what people tell 
 
 If we learn an account belongs to someone under 18, we ban it, which hides its profile, posts and comments at once. We then delete the account, which also deletes its messages from other people's chats. We aim to do that within 7 days, unless a report or the law needs something kept first. We keep the ban record and the scrambled codes in section 9, and anything the law requires us to keep. That school email cannot be verified again until the person is 18 and asks help@connectvibe.app. If we learn a waitlist entry belongs to someone under 18, we delete the entry.
 
-If you think someone under 18 is on Vibe, or you are their parent or guardian, write to help@connectvibe.app.
+If you think someone under 18 is on Vibe, report something of theirs and choose "This person is under 18", or write to help@connectvibe.app. If you are their parent or guardian, write to help@connectvibe.app.
 
 ## 13. How do I agree to this policy, and what happens when it changes?
 

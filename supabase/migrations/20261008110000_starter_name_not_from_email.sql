@@ -22,7 +22,11 @@
 -- front of its email keeps it until the person changes it; the count is in
 -- "BEFORE THE POLICY CHANGES" below.
 --
--- LIVE STATE: NOT READ for this file. Before applying, read on production
+-- APPLIED ON PRODUCTION 2026-10-08 (Franky's yes), through the Supabase
+-- connector's apply_migration with the body below minus begin/commit; the
+-- pre-flight read matched; recorded under this file's version. 7 accounts still carried an email-based name that day, so the policy keeps the exception for accounts made before October 8.
+--
+-- LIVE STATE (as written before applying): not read for this file. Before applying, read on production
 -- (a fingerprint, allowed by the counts-only rule):
 --   SELECT md5(pg_get_functiondef('public.handle_new_user()'::regprocedure));
 -- It must be 2841f3c5e2acba5f20c4009fa8204674 (the local database,

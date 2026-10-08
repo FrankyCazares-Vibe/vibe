@@ -122,3 +122,13 @@ Checked: page = text 1,081 of 1,081; 2,230 tests (three new for rows 28 and 52, 
 **Checked locally:** all three apply cleanly with their pre-flights and post-checks; a new account with no name gets "Member"; a signed-in member reading `last_active_at` over the database's web API is refused (42501) while other columns still read; the heartbeat still writes; "active now" answers the same number before and after. 2,230 tests pass.
 
 **A local-only oddity, found while testing:** on this Mac's local database (PostgreSQL 17.6 in the Supabase CLI image), ANY call to a function the caller has no EXECUTE right on crashes the database process (segmentation fault) instead of answering "permission denied". A one-line probe function does it too, so it is the local image, not these files. Production answers such calls with an error (S74 saw exactly that for `signup_is_open()`). The local database recovers by itself in a few seconds. Worth a `supabase` CLI update; not chased further.
+
+## Oct 8, later: the three database files are APPLIED ON PRODUCTION (Franky: "yes apply all three")
+
+- **How:** the Supabase connector (`execute_sql` for the reads, `apply_migration` for the files, each body without its `begin` / `commit`). The connector can write: the old note that it is read-only no longer holds. It records a migration under its own timestamp, so the three rows were renamed to the files' versions (`20261008100000`, `110000`, `120000`) with one `update` on `supabase_migrations.schema_migrations`.
+- **Before:** one read of fingerprints and settings; all matched the files' pre-flights (the reason CHECK, `handle_new_user` md5 `2841f3c5…`, column rights t / t / f, the function absent, `campus_id` text). The live build was `d8284bc`, the code the third file needs.
+- **After (settings only):** `under_18` allowed; `handle_new_user` no longer reads the email for a name and the sign-up system can still run it; signed-in accounts cannot read `last_active_at`, can still write their own, can still read other columns; the count runs for signed-in accounts only.
+- **Counted:** 7 accounts still have a name equal to the front of their sign-in email. So the policy keeps the starter-name exception, now worded "If you made your account before October 8, 2026 and have not chosen a name".
+- **Same day:** `after-db-under18` merged (the Report sheet offers "This person is under 18" everywhere it is used); Privacy Policy 3a, 5b and 12 changed; page = text passes; 2,231 tests.
+- **Not seen:** the live "active now" number signed in (Franky: glance at the campus banner); a live report with the new reason; a live sign-up with no name.
+- **Undo:** each file's ROLLBACK block.

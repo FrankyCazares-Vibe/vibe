@@ -79,8 +79,8 @@ export function Sections5aTo5d() {
           members of a club that anyone can join.
         </li>
         <li>
-          For any account: when it was made, roughly when it was last active,
-          when its handle last changed and its total profile views. No screen
+          For any account: when it was made, when its handle last changed and
+          its total profile views. No screen
           shows the department or school an account typed at set-up, but a
           signed-in account could still read it.
         </li>

@@ -118,9 +118,11 @@ export function Sections1To3() {
           version that cannot be read back.
         </li>
         <li>
-          <strong>Starter name.</strong> Until you choose a name, your display
-          name is the part of your sign-in email before the @. Anyone who sees
-          your name on Vibe can read it.
+          <strong>Starter name.</strong> If you made your account before
+          October 8, 2026 and have not chosen a name, your display name is the
+          part of your sign-in email before the @. Anyone who sees your name on
+          Vibe can read it. An account made since then starts with the name
+          &quot;Member&quot;.
         </li>
         <li>
           <strong>School email.</strong> Stored once you confirm it. No other

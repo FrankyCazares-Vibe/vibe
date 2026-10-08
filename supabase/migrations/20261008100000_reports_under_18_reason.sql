@@ -19,7 +19,11 @@
 -- DOES NOT: touch who may insert a report (POST /api/me/reports, service
 -- role, is still the only way in), or what happens to a reported account.
 --
--- LIVE STATE: NOT READ for this file. Before applying, read on production
+-- APPLIED ON PRODUCTION 2026-10-08 (Franky's yes), through the Supabase
+-- connector's apply_migration with the body below minus begin/commit; the
+-- pre-flight read matched; recorded under this file's version.
+--
+-- LIVE STATE (as written before applying): not read for this file. Before applying, read on production
 -- (a fingerprint, allowed by the counts-only rule):
 --   SELECT pg_get_constraintdef(oid) FROM pg_constraint
 --    WHERE conrelid = 'public.reports'::regclass AND conname = 'reports_reason_code_check';

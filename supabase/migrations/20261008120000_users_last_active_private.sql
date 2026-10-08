@@ -26,7 +26,11 @@
 -- DOES NOT: touch anon (it holds nothing on users), the service role, or
 -- who can read any other column.
 --
--- LIVE STATE: NOT READ for this file. Before applying, read on production
+-- APPLIED ON PRODUCTION 2026-10-08 (Franky's yes), through the Supabase
+-- connector's apply_migration with the body below minus begin/commit; the
+-- pre-flight read matched; recorded under this file's version.
+--
+-- LIVE STATE (as written before applying): not read for this file. Before applying, read on production
 -- (settings, allowed by the counts-only rule):
 --   SELECT has_column_privilege('authenticated','public.users','last_active_at','SELECT') AS col_select,
 --          has_column_privilege('authenticated','public.users','last_active_at','UPDATE') AS col_update,

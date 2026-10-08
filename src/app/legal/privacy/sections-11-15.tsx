@@ -36,8 +36,10 @@ export function Sections11To15() {
         someone under 18, we delete the entry.
       </LegalP>
       <LegalP>
-        If you think someone under 18 is on Vibe, or you are their parent or
-        guardian, write to <Mail box="help" />.
+        If you think someone under 18 is on Vibe, report something of theirs
+        and choose &quot;This person is under 18&quot;, or write to{" "}
+        <Mail box="help" />. If you are their parent or guardian, write to{" "}
+        <Mail box="help" />.
       </LegalP>
 
       <SectionH2 n={13} />
