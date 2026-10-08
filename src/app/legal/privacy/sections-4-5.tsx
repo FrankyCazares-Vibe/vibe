@@ -23,8 +23,9 @@ export function Sections4To5() {
       </LegalP>
       <LegalP>
         <strong>Emails.</strong> The automatic emails Vibe sends you are these
-        five: to confirm your account, reset your password, verify your school
-        email, confirm your waitlist spot and send your access code. A person on
+        six: to confirm your account, reset your password, verify your school
+        email, confirm a personal email you add, confirm your waitlist spot and
+        send your access code. A person on
         the Vibe team may also write to you. They may answer you, write about a
         report, your account or a club you run, or tell you something you need
         to know. Examples are a security problem or a change to this policy.
@@ -103,7 +104,7 @@ export function Sections4To5() {
             "Only you",
           ],
           [
-            "Your sign-in email and school email",
+            "Your sign-in email, school email and personal email",
             <>
               Only you, except your starter name (
               <Sec to="3a">section 3a</Sec>)

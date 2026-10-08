@@ -74,10 +74,14 @@ export function Sections1To3() {
         do not ask for a date of birth or check age any other way.
       </LegalP>
       <LegalP>
-        <strong>Making an account.</strong> Sign-up asks for an email address,
+        <strong>Making an account.</strong> Sign-up asks for your school email,
         a password and the checkbox. While we let people in one group at a time
-        (a wave), it also asks for the access code we emailed you. You then
-        confirm your sign-in email, verify a school email and set up a profile.
+        (a wave), it also asks for the access code we emailed you. We email a
+        code to your school email. Typing it confirms your account and verifies
+        your school email in one step, and you then set up a profile. Some
+        accounts sign in with a different email and verify a school email as a
+        separate step: accounts made before sign-up worked this way, and a few
+        that we add ourselves.
       </LegalP>
       <LegalP>
         <strong>What &ldquo;verified&rdquo; means.</strong> We send a
@@ -127,6 +131,13 @@ export function Sections1To3() {
         <li>
           <strong>School email.</strong> Stored once you confirm it. No other
           user is shown it. <Sec to="10">Section 10</Sec> names one gap.
+        </li>
+        <li>
+          <strong>Personal email.</strong> Optional. After sign-up you can add
+          a personal email, so that your account stays yours when your school
+          closes your school inbox. We email it a code first, and store it once
+          you type the code. It is shown to you in Settings, where you can
+          remove it. No other user is shown it.
         </li>
         <li>
           <strong>Proof that you agreed</strong> (<Sec to="13">section 13</Sec>)
