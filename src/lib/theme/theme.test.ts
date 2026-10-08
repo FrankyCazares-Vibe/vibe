@@ -170,6 +170,17 @@ type FakeClient = {
   listenerCount(): number;
 };
 
+test("applyTheme: a document locked to Night stays Night whatever the preference", () => {
+  withFakeClient(false, ({ html }) => {
+    html.dataset.themeLock = "dark";
+    assert.equal(applyTheme("light"), "dark");
+    assert.equal(html.dataset.theme, "dark");
+    assert.equal(applyTheme("system"), "dark");
+    delete html.dataset.themeLock;
+    assert.equal(applyTheme("light"), "light");
+  });
+});
+
 test("applyTheme: attribute, meta and the vibe:theme event", () => {
   withFakeClient(true, ({ html, meta, events }) => {
     assert.equal(applyTheme("system"), "dark");

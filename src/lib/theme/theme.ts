@@ -44,7 +44,8 @@ export const THEME_EVENT = "vibe:theme";
 
 /**
  * `<html data-theme-lock="dark">`: this document is Night whatever the
- * person's theme is. Set by NIGHT_LOCK_SCRIPT, read by `applyTheme`.
+ * person's theme is. Set by NIGHT_LOCK_SCRIPT, read by `applyTheme` (as
+ * `dataset.themeLock`).
  */
 export const THEME_LOCK_ATTR = "data-theme-lock";
 
@@ -134,7 +135,7 @@ export function applyTheme(pref: ThemePref): ResolvedTheme {
   // A document locked to Night (THEME_LOCK_ATTR) stays Night whatever the
   // preference says: the Messages frame inside Otto's panel, which is dark
   // in both themes.
-  const theme = document.documentElement.getAttribute(THEME_LOCK_ATTR) === "dark" ? "dark" : resolveTheme(pref, systemPrefersDark());
+  const theme = document.documentElement.dataset.themeLock === "dark" ? "dark" : resolveTheme(pref, systemPrefersDark());
   document.documentElement.dataset.theme = theme;
   syncThemeColorMeta(theme);
   window.dispatchEvent(
