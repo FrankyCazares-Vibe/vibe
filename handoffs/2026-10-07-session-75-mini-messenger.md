@@ -75,3 +75,5 @@ A try, his words: he is not sure what he is picturing. Of three choices he picke
 **Checked locally at 1280 as Blake:** two tabs, the inbox, a person's chat with its composer, at 380 wide. 2,226 tests pass.
 
 **For Franky to judge:** Otto's panel dims and blurs the page behind it, so chatting there is not "on the side" of the feed the way the small window was; the panel is always dark, so in Light the Messages tab is a light inbox inside a dark panel; If the try is kept, those two are the follow-ups (he said he likes the direction). If not, the corner button is one commit back.
+
+**Light fixed (Oct 8, his yes):** the Messages frame is always Night, on the feed and on the profile, because Otto's panel is dark in both themes. `MiniFrame` renders `NIGHT_LOCK_SCRIPT` (sets `<html data-theme-lock="dark">` before the first paint) and `applyTheme` keeps a locked document Night (`src/lib/theme/theme.ts`). Seen locally with the page in Light: the frame's page is Night. Still open: the page behind dims while the panel is open.

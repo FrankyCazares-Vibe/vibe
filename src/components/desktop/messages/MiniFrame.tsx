@@ -2,6 +2,8 @@
 
 import { useEffect, type ReactNode } from "react";
 
+import { applyTheme, NIGHT_LOCK_SCRIPT, readThemePref, THEME_LOCK_ATTR } from "@/lib/theme/theme";
+
 /**
  * The page inside the small Messages window (`/messages?mini=1`, framed by
  * public/html/_miniMessenger.js on the static profile and by
@@ -12,6 +14,11 @@ import { useEffect, type ReactNode } from "react";
  * Messages stays in the frame; everything else takes the whole tab. A link
  * or a screen change that leaves `/messages` (a profile, a club page, an
  * event, `Find clubs`) would otherwise load the site inside a 420px frame.
+ *
+ * Always Night: Otto's panel is dark in both themes, and a Light inbox
+ * inside it read as a mistake. The lock is set before the first paint
+ * (NIGHT_LOCK_SCRIPT) and again on mount, for a frame whose page was not
+ * rendered as mini on the server (a reload on `/messages?channel=<id>`).
  */
 
 /** The `source` of the messages the window and this frame send each other. */
@@ -45,6 +52,11 @@ function leaving(url: string | URL | null | undefined): string | null {
 }
 
 export function MiniFrame({ children }: { children: ReactNode }) {
+  useEffect(() => {
+    document.documentElement.setAttribute(THEME_LOCK_ATTR, "dark");
+    applyTheme(readThemePref());
+  }, []);
+
   useEffect(() => {
     // A plain left click on a link that leaves Messages: the whole tab goes,
     // before React or next/link sees the click.
@@ -83,5 +95,10 @@ export function MiniFrame({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  return <div style={{ minHeight: "100dvh", background: "var(--cream)" }}>{children}</div>;
+  return (
+    <div style={{ minHeight: "100dvh", background: "var(--cream)" }}>
+      <script suppressHydrationWarning dangerouslySetInnerHTML={{ __html: NIGHT_LOCK_SCRIPT }} />
+      {children}
+    </div>
+  );
 }

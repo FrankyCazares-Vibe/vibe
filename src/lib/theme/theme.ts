@@ -41,6 +41,21 @@ export const THEME_META_COLORS: Record<ResolvedTheme, string> = {
 /** Fired on `window` by `applyTheme`. NativeBridge (status bar) and any
  *  surface that can't read the attribute listen for it. */
 export const THEME_EVENT = "vibe:theme";
+
+/**
+ * `<html data-theme-lock="dark">`: this document is Night whatever the
+ * person's theme is. Set by NIGHT_LOCK_SCRIPT, read by `applyTheme`.
+ */
+export const THEME_LOCK_ATTR = "data-theme-lock";
+
+/**
+ * Locks the document to Night before it paints: for a page that is always
+ * shown inside a dark surface (the Messages frame in Otto's panel). Rendered
+ * inline at the top of that page, so it runs after the boot script and
+ * before the first paint; `applyTheme` keeps the lock afterwards.
+ */
+export const NIGHT_LOCK_SCRIPT =
+  "(function(){var d=document.documentElement;d.setAttribute('data-theme-lock','dark');d.dataset.theme='dark';})();";
 export type ThemeEventDetail = { pref: ThemePref; theme: ResolvedTheme };
 
 const DARK_QUERY = "(prefers-color-scheme: dark)";
@@ -115,8 +130,11 @@ export const THEME_BOOT_SCRIPT =
  * the Settings card writes `vibe_theme` and PATCHes the account itself.
  */
 export function applyTheme(pref: ThemePref): ResolvedTheme {
-  const theme = resolveTheme(pref, systemPrefersDark());
-  if (typeof document === "undefined" || typeof window === "undefined") return theme;
+  if (typeof document === "undefined" || typeof window === "undefined") return resolveTheme(pref, systemPrefersDark());
+  // A document locked to Night (THEME_LOCK_ATTR) stays Night whatever the
+  // preference says: the Messages frame inside Otto's panel, which is dark
+  // in both themes.
+  const theme = document.documentElement.getAttribute(THEME_LOCK_ATTR) === "dark" ? "dark" : resolveTheme(pref, systemPrefersDark());
   document.documentElement.dataset.theme = theme;
   syncThemeColorMeta(theme);
   window.dispatchEvent(

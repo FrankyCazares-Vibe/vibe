@@ -263,7 +263,7 @@
     .vmm-typing-dot:nth-child(3){animation-delay:.32s;}
     @keyframes vmmBounce{0%,80%,100%{transform:translateY(0);opacity:.5;}40%{transform:translateY(-2px);opacity:1;}}
     /* The new inbox, framed. The frame's page paints its own background. */
-    .vmm-frame{flex:1;min-height:0;width:100%;border:none;display:block;background:var(--cream, #FAF7F2);color-scheme:normal;}
+    .vmm-frame{flex:1;min-height:0;width:100%;border:none;display:block;background:#141416;color-scheme:normal;}
     /* Otto's panel, its two tabs (the pills of OttoSidePanel.tsx PanelTabs). */
     .vmm-tabs{flex-shrink:0;display:flex;align-items:center;gap:6px;padding:10px 18px;border-bottom:0.5px solid rgba(255,255,255,.06);font-family:'DM Sans',system-ui,sans-serif;}
     .vmm-tab{height:30px;padding:0 14px;border-radius:999px;border:1px solid rgba(255,255,255,.12);background:transparent;color:rgba(255,255,255,.72);font-family:inherit;font-size:13px;font-weight:700;display:inline-flex;align-items:center;gap:6px;cursor:none;}

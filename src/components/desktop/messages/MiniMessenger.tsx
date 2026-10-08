@@ -144,7 +144,7 @@ export const MiniMessagesFrame = forwardRef<MiniMessagesHandle, { style?: React.
       // The frame draws its own cursor: this page's would sit frozen on the
       // frame's edge. Its own "the pointer left the page" handler hides it.
       onMouseEnter={() => document.documentElement.dispatchEvent(new MouseEvent("mouseleave"))}
-      style={{ flex: 1, minHeight: 0, width: "100%", border: "none", display: "block", background: "var(--cream)", colorScheme: "normal", ...style }}
+      style={{ flex: 1, minHeight: 0, width: "100%", border: "none", display: "block", background: "#141416", colorScheme: "normal", ...style }}
     />
   );
 });
