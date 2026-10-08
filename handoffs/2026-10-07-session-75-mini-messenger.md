@@ -62,3 +62,16 @@ The first pass opened every chat in `/messages`. He wants to read and answer in 
 **Checked locally at 1280 as Blake:** the button on the feed, the inbox, a person's chat (sent a message, it arrived, the inbox preview updated), a club's Lounge, Back inside the window, the club's page arrow taking the whole tab, and the same on the static profile. 2,226 tests pass.
 
 **Known:** each chat opened in the window adds an entry to the tab's history, and closing the window does not take it out, so the browser's Back can need an extra press afterwards. Not seen on the live site signed in, in Safari, or in Light for this pass.
+
+## Oct 8: Messages as a tab of Otto's panel (Franky: "maybe we should make otto be the messages tab aswell in some way ... lets try the first one")
+
+A try, his words: he is not sure what he is picturing. Of three choices he picked the lightest: one corner, one button.
+
+- The separate `Messages` button on the shelled pages is gone. Otto's orb is the only button; **Otto's panel has two tabs, `Otto` and `Messages`** (`PanelTabs` in `src/components/network/OttoSidePanel.tsx`). The Messages tab is the same frame (`/messages?mini=1`), with the pencil and `Open` in the tab row. The panel opens on the tab it was left on.
+- **The orb's number is Otto's news plus unread chats**; the Messages tab carries the chat count.
+- `src/components/desktop/messages/MiniMessenger.tsx` is now the shared pieces: `useMiniMessages` (is it available, the unread number) and `MiniMessagesFrame`. Laptops with `chat_v2` only; a phone's Otto panel is unchanged.
+- The static desktop profile is NOT changed: it keeps its own small window from the top-bar Messages icon, and its Otto ring is Otto alone.
+
+**Checked locally at 1280 as Blake:** two tabs, the inbox, a person's chat with its composer, at 380 wide. 2,226 tests pass.
+
+**For Franky to judge:** Otto's panel dims and blurs the page behind it, so chatting there is not "on the side" of the feed the way the small window was; the panel is always dark, so in Light the Messages tab is a light inbox inside a dark panel; the profile page still works the old way. If the try is kept, those three are the follow-ups. If not, the corner button is one commit back.

@@ -2,6 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 
+import { useMiniMessages } from "@/components/desktop/messages/MiniMessenger";
+
 import { OttoSidePanel } from "./OttoSidePanel";
 
 /**
@@ -52,6 +54,9 @@ export function OttoCorner() {
   // notifs — likes, follows, comments — keep the idle viz.
   const [unreadMention, setUnreadMention] = useState(0);
   const [open, setOpen] = useState(false);
+  // Messages lives in the panel too (its second tab, laptops with the new
+  // chat): the orb's number is Otto's news plus the unread chats.
+  const chats = useMiniMessages(!open);
   const [toast, setToast] = useState<MentionToast | null>(null);
   // Last unread count + newest notif id seen. Persisted via refs so the
   // 30s interval closure always sees the latest values without rebinding.
@@ -191,7 +196,11 @@ export function OttoCorner() {
         if (unreadMention > 0) setUnreadMention(0);
       }}
       aria-label={
-        unread > 0 ? `Open Otto · ${unread} unread` : "Open Otto"
+        unread + chats.unread > 0
+          ? `Open Otto · ${unread} new${chats.unread > 0 ? `, ${chats.unread} unread ${chats.unread === 1 ? "chat" : "chats"}` : ""}`
+          : chats.available
+            ? "Open Otto and Messages"
+            : "Open Otto"
       }
       style={{
         position: "fixed",
@@ -251,7 +260,7 @@ export function OttoCorner() {
           you" signal: continuous pulse to draw the eye + a one-shot
           ripple ring whenever the count just ticked up. Keeps under
           20px so it never camps the orb. */}
-      {unread > 0 ? (
+      {unread + chats.unread > 0 ? (
         <>
           <style>{`
             @keyframes otto-badge-pulse {
@@ -309,7 +318,7 @@ export function OttoCorner() {
               zIndex: 2,
             }}
           >
-            {unread > 9 ? "9+" : unread}
+            {unread + chats.unread > 9 ? "9+" : unread + chats.unread}
           </span>
         </>
       ) : null}
@@ -504,7 +513,7 @@ export function OttoCorner() {
         )}
       </div>
     </button>
-    <OttoSidePanel open={open} onClose={() => setOpen(false)} />
+    <OttoSidePanel open={open} onClose={() => setOpen(false)} messages={chats} />
     {toast ? (
       <div
         role="alert"

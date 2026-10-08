@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import { MiniMessagesFrame, type MiniMessagesHandle } from "@/components/desktop/messages/MiniMessenger";
 import { asLoadFailure, LoadFailed, type LoadFailure } from "@/components/feedback/LoadFailed";
 import { vibeRequest } from "@/lib/feedback/request";
 import {
@@ -96,13 +97,26 @@ const METRICS_FAILURE = "Couldn't load your metrics.";
  *
  * Marks all notifications read on open (matches the legacy behaviour).
  */
+type PanelTab = "otto" | "messages";
+
 export function OttoSidePanel({
   open,
   onClose,
+  messages,
 }: {
   open: boolean;
   onClose: () => void;
+  /**
+   * Messages as the panel's second tab (`useMiniMessages`): laptops with the
+   * new chat. Absent or not available: the panel is Otto alone, as before.
+   */
+  messages?: { available: boolean; unread: number };
 }) {
+  // Kept while the panel is closed: it opens on the tab it was left on.
+  const [tab, setTab] = useState<PanelTab>("otto");
+  const frameRef = useRef<MiniMessagesHandle | null>(null);
+  const withMessages = messages?.available === true;
+  const showMessages = withMessages && tab === "messages";
   const [count, setCount] = useState<CountPayload | null>(null);
   const [list, setList] = useState<NotifRow[]>([]);
   const [filter, setFilter] = useState<Filter>("all");
@@ -280,11 +294,24 @@ export function OttoSidePanel({
         }}
       >
         <Header onClose={onClose} briefing={briefing} loading={loading} />
+        {withMessages ? (
+          <PanelTabs
+            tab={tab}
+            onTab={setTab}
+            unreadChats={messages?.unread ?? 0}
+            onCompose={() => frameRef.current?.compose()}
+            onOpenFull={() => frameRef.current?.openInMessages()}
+          />
+        ) : null}
+        {/* Mounted only while its tab shows: the frame's page keeps reading
+            the lists for as long as it exists. */}
+        {showMessages ? <MiniMessagesFrame ref={frameRef} /> : null}
         <div
           style={{
             flex: 1,
             overflowY: "auto",
             padding: "0 18px 18px",
+            display: showMessages ? "none" : undefined,
           }}
         >
           {/* Each section keeps whatever it already has: a failure only
@@ -332,7 +359,7 @@ export function OttoSidePanel({
             onRetry={() => void load("retry")}
           />
         </div>
-        <Footer />
+        {showMessages ? null : <Footer />}
       </aside>
       <style jsx global>{`
         @keyframes otto-backdrop-in {
@@ -445,6 +472,91 @@ function Header({
       >
         “{briefing}”
       </div>
+    </div>
+  );
+}
+
+/**
+ * The panel's two tabs, under the header: Otto's briefing and Messages. On
+ * the Messages tab the row also carries the frame's two controls: the pencil
+ * (a new message) and `Open` (the chat on screen, in full Messages).
+ */
+function PanelTabs({
+  tab,
+  onTab,
+  unreadChats,
+  onCompose,
+  onOpenFull,
+}: {
+  tab: PanelTab;
+  onTab: (tab: PanelTab) => void;
+  unreadChats: number;
+  onCompose: () => void;
+  onOpenFull: () => void;
+}) {
+  const pill = (active: boolean): React.CSSProperties => ({
+    height: 30,
+    padding: "0 14px",
+    borderRadius: 999,
+    border: active ? "1px solid transparent" : "1px solid rgba(255,255,255,0.12)",
+    background: active ? "#FAF7F2" : "transparent",
+    color: active ? "#141416" : "rgba(255,255,255,0.72)",
+    fontFamily: "inherit",
+    fontSize: 13,
+    fontWeight: 700,
+    display: "inline-flex",
+    alignItems: "center",
+    gap: 6,
+    cursor: "pointer",
+  });
+  return (
+    <div
+      role="tablist"
+      aria-label="Otto and Messages"
+      style={{ flexShrink: 0, display: "flex", alignItems: "center", gap: 6, padding: "10px 18px", borderBottom: "0.5px solid rgba(255,255,255,0.06)" }}
+    >
+      <button type="button" role="tab" aria-selected={tab === "otto"} onClick={() => onTab("otto")} style={pill(tab === "otto")}>
+        Otto
+      </button>
+      <button
+        type="button"
+        role="tab"
+        aria-selected={tab === "messages"}
+        aria-label={unreadChats > 0 ? `Messages, ${unreadChats} unread` : undefined}
+        onClick={() => onTab("messages")}
+        style={pill(tab === "messages")}
+      >
+        Messages
+        {unreadChats > 0 ? (
+          <span aria-hidden style={{ minWidth: 18, height: 18, boxSizing: "border-box", padding: "0 5px", borderRadius: 999, background: "#FF5C35", color: "#140806", fontSize: 11.5, fontWeight: 800, lineHeight: 1, display: "inline-flex", alignItems: "center", justifyContent: "center" }}>
+            {unreadChats > 99 ? "99+" : unreadChats}
+          </span>
+        ) : null}
+      </button>
+      {tab === "messages" ? (
+        <>
+          <span style={{ flex: 1 }} />
+          <button
+            type="button"
+            onClick={onCompose}
+            aria-label="New message"
+            title="New message"
+            style={{ width: 30, height: 30, borderRadius: 999, border: "1px solid rgba(255,255,255,0.10)", background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.8)", display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: "pointer", padding: 0 }}
+          >
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.1" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M12 20h8" />
+              <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7.5 18.5 3 20l1.5-4.5z" />
+            </svg>
+          </button>
+          <button
+            type="button"
+            onClick={onOpenFull}
+            style={{ height: 30, padding: "0 10px", borderRadius: 999, border: "none", background: "transparent", color: "#FF8A66", fontFamily: "inherit", fontSize: 12, fontWeight: 700, cursor: "pointer" }}
+          >
+            Open
+          </button>
+        </>
+      ) : null}
     </div>
   );
 }
