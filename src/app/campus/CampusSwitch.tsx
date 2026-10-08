@@ -2,6 +2,7 @@
 
 import { CampusMobile } from "@/components/mobile/CampusMobile";
 import { MobileShell } from "@/components/mobile/MobileShell";
+import { PersonalEmailPrompt } from "@/components/settings/PersonalEmail";
 import { useIsMobile } from "@/lib/use-is-mobile";
 
 import { CampusHome } from "./campus-home";
@@ -30,10 +31,15 @@ export function CampusSwitch({
     return (
       <MobileShell>
         <CampusMobile />
+        {/* School email first: the one-time "add a personal email" card. */}
+        <PersonalEmailPrompt />
       </MobileShell>
     );
   }
   return (
-    <CampusHome showSchoolVerifiedBanner={showSchoolVerifiedBanner} desktopChat={desktopChat} />
+    <>
+      <CampusHome showSchoolVerifiedBanner={showSchoolVerifiedBanner} desktopChat={desktopChat} />
+      <PersonalEmailPrompt />
+    </>
   );
 }

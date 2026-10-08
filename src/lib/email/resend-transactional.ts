@@ -262,6 +262,41 @@ export async function sendSchoolVerificationEmail(
 }
 
 /**
+ * The code for a personal address someone is adding to their account
+ * (school email first, S75). The same small, link-free message as the school
+ * code. `code` is `personalEmailCode()` output: digits only.
+ */
+export async function sendPersonalEmailCodeEmail(
+  to: string,
+  code: string,
+  userId: string | null = null,
+): Promise<void> {
+  if (!/^\d+$/.test(code)) {
+    throw new Error("Personal email code must be digits only.");
+  }
+  const line = "Type it in Vibe to add this address to your account. It works for 30 minutes.";
+  const outcome = await sendLogged("personal_email_code", to, userId, () =>
+    createResendClient().emails.send({
+      from: getFrom(),
+      to: [to],
+      subject: `${code} is your Vibe code`,
+      html: codeOnlyEmailHtml(code, line),
+      text: [
+        `Your Vibe code is: ${code}`,
+        "",
+        line,
+        "",
+        "Never share this code. Vibe will never ask you for it. If you didn't start this, ignore this email.",
+        "Questions: help@connectvibe.app",
+      ].join("\n"),
+    }),
+  );
+  if (!outcome.ok) {
+    throw new Error(outcome.errorMessage || outcome.errorCode);
+  }
+}
+
+/**
  * The whole HTML of a code email: a few lines of system-font text. Nothing
  * is fetched and nothing can be tapped (the twin of
  * supabase/templates/confirmation.html). `code` is digits only (the caller
