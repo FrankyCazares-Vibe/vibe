@@ -24,7 +24,11 @@
 -- DOES NOT: change sign-in. The account still signs in with its sign-in
 -- email. Deleting the account deletes the row and these with it.
 --
--- LIVE STATE: not read for this file. Before applying, read on production
+-- APPLIED ON PRODUCTION 2026-10-08 (Franky's yes), through the Supabase
+-- connector; the pre-flight read matched (f, 0, the five-kind CHECK); recorded
+-- under this file's version.
+--
+-- LIVE STATE (as written before applying): not read for this file. Before applying, read on production
 -- (settings, allowed by the counts-only rule):
 --   SELECT has_table_privilege('authenticated','public.users','SELECT') AS table_select,
 --          (SELECT count(*) FROM information_schema.columns
