@@ -549,7 +549,7 @@ function SchoolEmailInner() {
           <span className="vibe-auth-step-divider" />
           <div className="vibe-auth-step">
             <span className="vibe-auth-step-num">3</span>
-            <span className="vibe-auth-step-label">Otto</span>
+            <span className="vibe-auth-step-label">Profile</span>
           </div>
         </div>
 
