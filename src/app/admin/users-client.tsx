@@ -3,12 +3,13 @@
 /**
  * The users tab: find someone, see where they stand, suspend, ban or lift.
  *
- * THE SEARCH TEXT NEVER TOUCHES THE URL. `q` can be a student's email address —
- * GET /api/admin/users matches an address EXACTLY against `email` and
+ * THE SEARCH TEXT NEVER TOUCHES A URL. `q` can be a student's email address —
+ * /api/admin/users matches an address EXACTLY against `email` and
  * `school_email` — and the route deliberately never logs or echoes it. Putting
- * it in `?q=` would undo that on our side: browser history, the Referer header
- * and the deploy's request logs all keep it. So it lives in component state,
- * and only `?tab=` is in the address bar.
+ * it in `?q=`, of the page or of the request, would undo that on our side:
+ * browser history, the Referer header, the deploy's request logs and an error
+ * report all keep a web address. So it lives in component state, goes to the
+ * route in a POST body, and only `?tab=` is in the address bar.
  *
  * NO EMAIL COMES BACK, EITHER. You search by address and you get a handle: the
  * list route selects `id, handle, name, school_verified, created_at` and maps
@@ -26,7 +27,6 @@ import { restrictionReasonOptions } from "@/lib/moderation/reports";
 
 import {
   ActionButton,
-  adminGet,
   adminPost,
   Badge,
   COLORS,
@@ -79,9 +79,11 @@ export function UsersClient() {
 
   const load = useCallback(async (q: string, cur: string | null) => {
     setLoading(true);
-    const r = await adminGet<{ users?: UserRowData[]; next_cursor?: string | null }>(
-      `/api/admin/users?limit=25${q ? `&q=${encodeURIComponent(q)}` : ""}` +
-        (cur ? `&cursor=${encodeURIComponent(cur)}` : ""),
+    // In the BODY, never the request's web address: the host's request log
+    // and an error report keep an address, and `q` can be someone's email.
+    const r = await adminPost<{ users?: UserRowData[]; next_cursor?: string | null }>(
+      "/api/admin/users",
+      { limit: 25, ...(q ? { q } : {}), ...(cur ? { cursor: cur } : {}) },
       "Couldn't run that search."
     );
     if (r.ok) {

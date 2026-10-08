@@ -95,3 +95,14 @@ Checked: page = text 1,081 of 1,081; 2,230 tests (three new for rows 28 and 52, 
 **Changes to the by-hand steps (part 3):** item 20 (deleting an account by email, by hand) now needs one more step, because only the Settings route does it: take the address off `signup_allowlist` and delete any waitlist entry under the account's addresses. The policy says "If we delete your account for you, we take it off by hand."
 
 **Looked at and left:** row 33 (a deleted message's file cannot be attached again) is not small: a deleted message leaves no record to check against. Row 29 (the email service's reference number) needs a database change for the account-deletion half. Rows 24, 51, 58, 21 to 23 are database changes on production: Franky's yes first.
+
+**Second code-only pass (Oct 8):**
+
+| Row | Outcome |
+|---|---|
+| 35 | DONE. The admin student search sends what was typed in a POST body (`POST /api/admin/users`), never in a web address. Policy 3d: the "email address a cofounder types" sentence is cut. Walked locally as the seed admin: found by email, no address in any URL or on screen; a non-admin gets 403. |
+| 16 | Already done before S75: both post composers show `VIDEO_LOCATION_HINT` under a picked video. |
+| 38 | NOT code-only: the report reason list is a database CHECK (`reports_reason_code_check`). Needs a migration: Franky's yes. |
+| 20 | Left: taking back a join request means a new action in the shared, heavily tested join control (three views) plus the route. Medium, and no live club takes requests today (SAE is invite-only). |
+| 27 | Left on purpose: clearing the per-address count when an entry is deleted lets someone leave and rejoin to reset the 3-a-day limit on confirm emails to that address. The count's window is one day. Recommend cutting this row, not building it. |
+| 49 | Franky's call: dropping the browser's trail from error reports removes four policy sentences but leaves bug reports with no trail. The gentler form drops only the button taps. |

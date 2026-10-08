@@ -113,10 +113,8 @@ export function Section3d() {
             how long that is.
           </LegalP>
           <LegalP>
-            Some things still get through to a new report. One is an account ID
-            that is part of the web address of one of our own pages or of a
-            stored file. Another is the email address a cofounder types to look
-            an account up, which is part of that request&apos;s web address.
+            One thing still gets through to a new report: an account ID that is
+            part of the web address of one of our own pages or of a stored file.
           </LegalP>
         </li>
         <li>

@@ -131,7 +131,7 @@ Posts and club pages are public (section 5a), so a location inside one of those 
 
   That release is built to strip the first three from new reports, and to take the account IDs and email addresses out of the fourth. We have not yet opened a live report, from before the release or after it, to confirm what one holds. Reports made before the release keep what they hold until Sentry deletes them, and we have not confirmed how long that is.
 
-  Some things still get through to a new report. One is an account ID that is part of the web address of one of our own pages or of a stored file. Another is the email address a cofounder types to look an account up, which is part of that request's web address.
+  One thing still gets through to a new report: an account ID that is part of the web address of one of our own pages or of a stored file.
 - **Search words** are not stored in our database, but Vercel can log them as part of the web address.
 
 ### 3e. What does Vibe not collect?

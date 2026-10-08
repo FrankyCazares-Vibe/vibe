@@ -53,14 +53,40 @@ type UserRow = {
  *   400 invalid_cursor · 401 · 403 · 429 · 500 request_failed
  */
 export async function GET(req: Request) {
+  const url = new URL(req.url);
+  return search({
+    q: url.searchParams.get("q"),
+    cursor: url.searchParams.get("cursor"),
+    limit: url.searchParams.get("limit"),
+  });
+}
+
+/**
+ * POST /api/admin/users — the same search, with what was typed in the BODY
+ * (`{ q?, cursor?, limit? }`). The admin screen uses this one: `q` can be a
+ * student's email address, and a web address is kept by the host's request
+ * log and by an error report (Privacy Policy 3d), a body by neither. It
+ * reads only, like the GET.
+ */
+export async function POST(req: Request) {
+  let body: { q?: unknown; cursor?: unknown; limit?: unknown };
+  try {
+    body = (await req.json()) as typeof body;
+  } catch {
+    return adminFail(400, "invalid_json", "Invalid JSON");
+  }
+  const text = (value: unknown): string | null => (typeof value === "string" ? value : typeof value === "number" ? String(value) : null);
+  return search({ q: text(body?.q), cursor: text(body?.cursor), limit: text(body?.limit) });
+}
+
+async function search(asked: { q: string | null; cursor: string | null; limit: string | null }) {
   const gate = await requirePlatformAdmin();
   if (!gate.ok) return gate.response;
 
-  const url = new URL(req.url);
-  const q = (url.searchParams.get("q") || "").trim().slice(0, MAX_Q);
-  const decoded = decodeFollowCursor(url.searchParams.get("cursor"));
+  const q = (asked.q || "").trim().slice(0, MAX_Q);
+  const decoded = decodeFollowCursor(asked.cursor);
   if (!decoded.ok) return adminFail(400, "invalid_cursor", "Invalid cursor");
-  const limit = parseLimit(url.searchParams.get("limit"));
+  const limit = parseLimit(asked.limit);
 
   const rl = await rateLimit(`admin-users:${gate.userId}`, ADMIN_READ_LIMIT);
   if (!rl.allowed) return tooManyRequests(rl, "Slow down a moment.");
