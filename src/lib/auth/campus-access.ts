@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 
 import { DEFAULT_POST_LOGIN_PATH } from "@/lib/auth/email-confirm-redirect";
 import { isOttoOnboardingComplete } from "@/lib/auth/post-login";
+import { verifySchoolFromSignInEmail } from "@/lib/auth/school-sign-in";
 import { hasRecordedConsent, CONSENT_COLUMNS } from "@/lib/legal/terms";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
@@ -43,7 +44,8 @@ export async function enforceCampusAccess(currentPath: string): Promise<{ userId
   if (!hasRecordedConsent(row)) {
     redirect(`/auth/terms?next=${encodeURIComponent(currentPath)}`);
   }
-  if (!row?.school_verified) {
+  // School email first: a confirmed school sign-in email is the school check.
+  if (!row?.school_verified && !(await verifySchoolFromSignInEmail(user))) {
     redirect(`/auth/school-email?next=${encodeURIComponent(currentPath)}`);
   }
   if (!isOttoOnboardingComplete(row?.otto_answers)) {
@@ -79,7 +81,9 @@ export async function enforceSchoolEmailPage() {
   if (!hasRecordedConsent(row)) {
     redirect(`/auth/terms?next=${encodeURIComponent("/auth/school-email")}`);
   }
-  if (row?.school_verified) {
+  // School email first: a confirmed school sign-in email is the school check,
+  // so this screen is only ever shown to an account with a personal one.
+  if (row?.school_verified || (await verifySchoolFromSignInEmail(user))) {
     if (isOttoOnboardingComplete(row?.otto_answers)) {
       redirect(DEFAULT_POST_LOGIN_PATH);
     }

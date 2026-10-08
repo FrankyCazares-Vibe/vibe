@@ -250,9 +250,9 @@ function LoginForm() {
           Welcome back<span className="vibe-auth-dot">.</span>
         </h1>
         <p className="vibe-auth-sub">
-          Use your <strong>personal email</strong> — the one you actually check.
-          Your school <code className="vibe-auth-code">.edu</code> is verified
-          separately.
+          Sign in with <strong>the email you signed up with</strong>. For most
+          people that is their school{" "}
+          <code className="vibe-auth-code">.edu</code>.
         </p>
 
         {signedIn ? (
@@ -287,13 +287,13 @@ function LoginForm() {
         <form onSubmit={onSubmit} className="vibe-auth-form">
           <label className="vibe-auth-field">
             <span className="vibe-auth-label-row">
-              <span className="vibe-auth-label">Personal email</span>
+              <span className="vibe-auth-label">Email</span>
               <span className="vibe-auth-label-hint">the one you signed up with</span>
             </span>
             <input
               type="email"
               autoComplete="email"
-              placeholder="you@gmail.com"
+              placeholder="you@iu.edu"
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}

@@ -101,7 +101,8 @@ test("the invite email: the code box, the sign-up button, notes, a leave link", 
   assert.equal(m.button.label, "Create your account");
   assert.equal(m.button.href, signupUrl);
   assert.ok(m.intro.startsWith("Hi Sam, your spot"));
-  assert.ok(m.notes.some((n) => /personal email/.test(n) && /school email right after/.test(n)));
+  // School email first (S75): sign up with the school address; a personal one is added later.
+  assert.ok(m.notes.some((n) => /Sign up with your school email/.test(n) && /add a personal email once you're in/.test(n)));
   assert.ok(m.notes.some((n) => /just opens the page/.test(n)));
   assert.ok(!m.preheader.includes(CODE) && !/VIBE-/.test(m.preheader), "no code in the lock-screen preview");
   assert.ok(m.notes.some((n) => n.includes("Take me off the list")));
