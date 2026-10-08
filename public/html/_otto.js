@@ -48,6 +48,9 @@
       display: none;
     }
     #ottoCorner.has-unread .otto-notif { display: block; }
+    /* Unread chats light the same dot: Messages is a tab of this panel
+       (_miniMessenger.js adds .has-chats). */
+    #ottoCorner.has-chats .otto-notif { display: block; }
     /* Night (S68 wave 5): the dot's ring is the page colour, so it reads the
        host's --cream (near-black in Night on both host pages). Everything
        else Otto paints (the 52px shell, the slide-out panels, the ask bubble,
@@ -449,6 +452,9 @@
       panel.style.display = '';
     }
     renderPanelBody();
+    // Messages is a tab of this panel on pages that load _miniMessenger.js:
+    // it hears the panel open and close.
+    document.dispatchEvent(new CustomEvent('vibe:otto-panel', { detail: { open: true } }));
     // Pull real notifications + mark them read after the user has seen
     // them. A failure says so in the activity section itself instead of
     // leaving "loading…" or claiming nothing has happened yet.
@@ -972,7 +978,9 @@
     if (!panel) return;
     backdrop.style.display = 'none';
     panel.style.display = 'none';
+    document.dispatchEvent(new CustomEvent('vibe:otto-panel', { detail: { open: false } }));
   }
+  window.__ottoClosePanel = closeOttoPanel;
 
   // Esc closes the panel
   document.addEventListener('keydown', e => {

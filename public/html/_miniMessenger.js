@@ -17,14 +17,15 @@
 //     find-or-create a 1:1 dm and jump straight to that chat
 //   window.closeMiniMessenger()
 //
-// With the new chat (`chat_v2` from /api/me/features) the panel is the new
-// Messages: it frames /messages?mini=1, the phone's Messages itself (Your
-// week, one row per club, unread marks, pinned first), and a tap opens the
-// chat IN the panel, with its composer. The page in the frame sends the
-// whole tab anywhere that is not Messages (src/components/desktop/messages/
-// MiniFrame.tsx). The shelled pages (the feed, Network, Otto) have the same
-// window as a React component: src/components/desktop/messages/
-// MiniMessenger.tsx. Nothing below the "List view" line
+// With the new chat (`chat_v2` from /api/me/features) Messages is a TAB OF
+// OTTO'S PANEL (_otto.js, #ottoPanel), as on the shelled pages
+// (OttoSidePanel.tsx + MiniMessenger.tsx: change one, change the other). The
+// tab frames /messages?mini=1, the phone's Messages itself (Your week, one
+// row per club, unread marks, pinned first), and a tap opens the chat in the
+// panel, with its composer. The page in the frame sends the whole tab
+// anywhere that is not Messages (src/components/desktop/messages/
+// MiniFrame.tsx). The top-bar Messages icon opens Otto's panel on that tab;
+// unread chats light Otto's ring too. Nothing below the "List view" line
 // runs then. Without `chat_v2` (the switch off, or the answer not learned)
 // the panel is the old list and chat, unchanged.
 //
@@ -263,6 +264,14 @@
     @keyframes vmmBounce{0%,80%,100%{transform:translateY(0);opacity:.5;}40%{transform:translateY(-2px);opacity:1;}}
     /* The new inbox, framed. The frame's page paints its own background. */
     .vmm-frame{flex:1;min-height:0;width:100%;border:none;display:block;background:var(--cream, #FAF7F2);color-scheme:normal;}
+    /* Otto's panel, its two tabs (the pills of OttoSidePanel.tsx PanelTabs). */
+    .vmm-tabs{flex-shrink:0;display:flex;align-items:center;gap:6px;padding:10px 18px;border-bottom:0.5px solid rgba(255,255,255,.06);font-family:'DM Sans',system-ui,sans-serif;}
+    .vmm-tab{height:30px;padding:0 14px;border-radius:999px;border:1px solid rgba(255,255,255,.12);background:transparent;color:rgba(255,255,255,.72);font-family:inherit;font-size:13px;font-weight:700;display:inline-flex;align-items:center;gap:6px;cursor:none;}
+    .vmm-tab[aria-selected="true"]{border-color:transparent;background:#FAF7F2;color:#141416;}
+    .vmm-tab-n{min-width:18px;height:18px;box-sizing:border-box;padding:0 5px;border-radius:999px;background:#FF5C35;color:#140806;font-size:11.5px;font-weight:800;line-height:1;display:inline-flex;align-items:center;justify-content:center;}
+    .vmm-tab-new{width:30px;height:30px;border-radius:999px;border:1px solid rgba(255,255,255,.10);background:rgba(255,255,255,.06);color:rgba(255,255,255,.8);display:inline-flex;align-items:center;justify-content:center;cursor:none;padding:0;}
+    .vmm-tab-open{height:30px;padding:0 10px;border-radius:999px;border:none;background:transparent;color:#FF8A66;font-family:inherit;font-size:12px;font-weight:700;cursor:none;}
+    #ottoPanel.vmm-on-messages .otto-panel-body,#ottoPanel.vmm-on-messages .otto-panel-footer{display:none;}
     /* The pointer is inside the frame, which draws its own cursor: the
        page's dot and ring would sit frozen on the frame's edge. */
     html.vmm-over-frame #cursor,html.vmm-over-frame #cursorRing{opacity:0 !important;}
@@ -412,7 +421,15 @@
   // injecting a second button. Only buttons marked data-messages-badge:
   // the calendar, edit, settings and share icons are .nav-msg-btn too,
   // and a bare ".nav-msg-btn" put the unread dot on every one of them.
+  let unreadChats = 0;
   function paintBadge(n) {
+    unreadChats = n;
+    // Otto's ring carries unread chats too (Messages is a tab of its panel);
+    // only set by the new-chat path, so the old panel never lights it.
+    const ring = document.getElementById("ottoCorner");
+    if (ring) ring.classList.toggle("has-chats", ottoTabs && n > 0);
+    const count = document.getElementById("vmmTabCount");
+    if (count) { count.textContent = n > 99 ? "99+" : String(n); count.style.display = n > 0 ? "" : "none"; }
     const navBtns = document.querySelectorAll(".nav-msg-btn[data-messages-badge]");
     navBtns.forEach((b) => {
       if (n > 0) b.classList.add("has-unread");
@@ -435,17 +452,16 @@
       bindHandlers();
     }
     if (await hasNewChat()) {
-      state.open = true;
-      panel.classList.add("show");
-      document.documentElement.classList.add("vmm-open");
-      // With a handle: the frame's page opens (or starts) that chat itself.
-      if (handle) {
-        removeFrame();
-        showInboxView();
-        document.getElementById("vmmFrame").src = MINI_SRC + "&to=" + encodeURIComponent(handle);
-      } else {
-        showInboxView();
+      // Messages is a tab of Otto's panel. With a handle the frame's page
+      // opens (or starts) that chat itself.
+      if (typeof window.__ottoOpenPanel === "function") {
+        ottoTab = "messages";
+        pendingHandle = handle || null;
+        window.__ottoOpenPanel();
+        return;
       }
+      // No Otto on this page: Messages itself.
+      location.assign(handle ? "/messages?to=" + encodeURIComponent(handle) : "/messages");
       return;
     }
     state.open = true;
@@ -491,20 +507,32 @@
   // Toggle alias — useful for inline onclick="toggleMessenger()" handlers
   // that run before any host-page script has redefined toggleMessenger.
   window.toggleMessenger = function (handle) {
+    // Otto's panel open on the Messages tab: the icon closes it.
+    if (ottoOpen && ottoTab === "messages" && typeof window.__ottoClosePanel === "function") {
+      window.__ottoClosePanel();
+      return;
+    }
     if (state.open) window.closeMiniMessenger();
     else window.openMiniMessenger(handle);
   };
 
-  // ── The new inbox (chat_v2) ────────────────────────────────────────────
-  // The frame lives only while the panel is open: its page reads the lists
-  // every 30 s while "visible", and a frame inside a hidden panel still is.
+  // ── Messages as a tab of Otto's panel (chat_v2) ───────────────────────
+  // _otto.js says when its panel opens and closes ("vibe:otto-panel"). The
+  // tab row goes under the panel's header; on the Messages tab the body and
+  // the footer step aside for the frame. The frame lives only while its tab
+  // shows: its page reads the lists every 30 s while "visible", and a frame
+  // in a hidden panel still is.
   const MINI_SRC = "/messages?mini=1";
   const MINI_PATH = "/messages";
+  let ottoTabs = false;        // this person has the new chat: the tabs exist
+  let ottoOpen = false;
+  let ottoTab = "otto";        // kept while the panel is closed
+  let pendingHandle = null;    // a chat to open when the frame is made
+
   function removeFrame() {
     const f = document.getElementById("vmmFrame");
     if (f) f.remove();
     document.documentElement.classList.remove("vmm-over-frame");
-    panel.removeAttribute("data-holds-reload");
   }
   // "Open": the chat on screen in the panel, in Messages itself.
   function openInMessages() {
@@ -516,41 +544,18 @@
     } catch (_) { /* the plain address */ }
     location.assign(url);
   }
-  function showInboxView() {
-    state.view = "inbox";
-    state.activeChannel = null;
-    document.getElementById("vmmHdr").innerHTML = `
-      <div class="vmm-hdr-title">Messages</div>
-      <button class="vmm-hdr-back" type="button" id="vmmNew" aria-label="New message" title="New message">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h8"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7.5 18.5 3 20l1.5-4.5z"/></svg>
-      </button>
-      <a class="vmm-hdr-link" id="vmmOpen" href="/messages">Open</a>
-      <button class="vmm-hdr-x" type="button" aria-label="Close" onclick="window.closeMiniMessenger()">×</button>
-    `;
-    document.getElementById("vmmOpen").addEventListener("click", (e) => {
-      if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
-      e.preventDefault();
-      openInMessages();
-    });
-    // The pencil is out here, the compose sheet in the frame's page.
-    document.getElementById("vmmNew").addEventListener("click", () => {
-      const f = document.getElementById("vmmFrame");
-      try { f.contentWindow.postMessage({ source: "vibe-mini", type: "compose" }, location.origin); } catch (_) {}
-    });
-    ["vmmSearch", "vmmList", "vmmMsgs", "vmmComp", "vmmQuiet"].forEach((id) => {
-      document.getElementById(id).style.display = "none";
-    });
-    if (document.getElementById("vmmFrame")) return;
+  function makeFrame(ottoPanel) {
     const frame = document.createElement("iframe");
     frame.id = "vmmFrame";
     frame.className = "vmm-frame";
     frame.title = "Messages";
-    frame.src = MINI_SRC;
+    frame.src = pendingHandle ? MINI_SRC + "&to=" + encodeURIComponent(pendingHandle) : MINI_SRC;
+    pendingHandle = null;
     // A draft typed in the frame is not this page's typed text: the
-    // new-build check (_buildRefresh.js) is told the panel is in use.
-    panel.setAttribute("data-holds-reload", "");
+    // new-build check (_buildRefresh.js) is told the frame is in use.
+    frame.setAttribute("data-holds-reload", "");
     // The page left Messages by a full load (a sign-in or Terms redirect):
-    // that belongs to the whole tab, not to a 420px frame.
+    // that belongs to the whole tab, not to a 380px frame.
     frame.addEventListener("load", () => {
       try {
         const at = frame.contentWindow.location;
@@ -559,8 +564,60 @@
     });
     frame.addEventListener("mouseenter", () => document.documentElement.classList.add("vmm-over-frame"));
     frame.addEventListener("mouseleave", () => document.documentElement.classList.remove("vmm-over-frame"));
-    panel.insertBefore(frame, document.getElementById("vmmList"));
+    ottoPanel.insertBefore(frame, ottoPanel.querySelector(".otto-panel-body"));
   }
+  function paintOttoTabs() {
+    const ottoPanel = document.getElementById("ottoPanel");
+    if (!ottoPanel) return;
+    let row = document.getElementById("vmmTabs");
+    if (!row) {
+      row = document.createElement("div");
+      row.id = "vmmTabs";
+      row.className = "vmm-tabs";
+      row.setAttribute("role", "tablist");
+      row.setAttribute("aria-label", "Otto and Messages");
+      row.innerHTML = `
+        <button type="button" role="tab" class="vmm-tab" data-tab="otto">Otto</button>
+        <button type="button" role="tab" class="vmm-tab" data-tab="messages">Messages<span class="vmm-tab-n" id="vmmTabCount" aria-hidden="true" style="display:none"></span></button>
+        <span style="flex:1"></span>
+        <button type="button" class="vmm-tab-new" id="vmmNew" aria-label="New message" title="New message">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h8"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7.5 18.5 3 20l1.5-4.5z"/></svg>
+        </button>
+        <button type="button" class="vmm-tab-open" id="vmmOpen">Open</button>
+      `;
+      const header = ottoPanel.querySelector(".otto-panel-header");
+      header.insertAdjacentElement("afterend", row);
+      row.querySelectorAll(".vmm-tab").forEach((b) => b.addEventListener("click", () => { ottoTab = b.dataset.tab; paintOttoTabs(); }));
+      // The pencil is out here, the compose sheet in the frame's page.
+      row.querySelector("#vmmNew").addEventListener("click", () => {
+        const f = document.getElementById("vmmFrame");
+        try { f.contentWindow.postMessage({ source: "vibe-mini", type: "compose" }, location.origin); } catch (_) {}
+      });
+      row.querySelector("#vmmOpen").addEventListener("click", openInMessages);
+    }
+    const onMessages = ottoTab === "messages";
+    row.querySelectorAll(".vmm-tab").forEach((b) => b.setAttribute("aria-selected", String(b.dataset.tab === ottoTab)));
+    row.querySelector("#vmmNew").style.display = onMessages ? "" : "none";
+    row.querySelector("#vmmOpen").style.display = onMessages ? "" : "none";
+    ottoPanel.classList.toggle("vmm-on-messages", onMessages);
+    if (onMessages) {
+      if (pendingHandle) removeFrame();
+      if (!document.getElementById("vmmFrame")) makeFrame(ottoPanel);
+    } else {
+      removeFrame();
+    }
+    paintBadge(unreadChats);
+  }
+  document.addEventListener("vibe:otto-panel", async (e) => {
+    const opening = !!(e.detail && e.detail.open);
+    ottoOpen = opening;
+    if (!opening) { removeFrame(); refreshBadge(); return; }
+    if (!(await hasNewChat())) return;
+    ottoTabs = true;
+    if (ottoOpen) paintOttoTabs();
+  });
+  // The ring's dot needs the answer before the panel is ever opened.
+  hasNewChat().then((yes) => { if (yes) { ottoTabs = true; paintBadge(unreadChats); } });
 
   // ── List view ──────────────────────────────────────────────────────────
   function showListView() {
