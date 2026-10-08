@@ -160,3 +160,11 @@ Checked: page = text 1,081 of 1,081; 2,230 tests (three new for rows 28 and 52, 
 - **Walked locally:** sign-up, the code, onboarding; the Campus card; refusals (a school address, junk, a wrong code); the code typed, stored, shown in Settings, removed. The "send code" call itself was stood in for in the page (no real email was sent from this Mac); the code was worked out the way the server does. 2,235 tests on the branch; page = text passes.
 - **To go live (Franky's yes):** apply `20261008130000` on production (the connector, then rename its row), merge the branch, push. Either order is safe.
 - **Not built:** signing in with the personal email; moving the sign-in to it when the school inbox closes (by hand through help@ until then); the reminder in the final year; step 3's label on the sign-up form still says "Otto".
+
+## Oct 8, evening: SCHOOL EMAIL FIRST IS LIVE (Franky: "yes apply it and put it live")
+
+- `20261008130000_users_personal_email` applied on production through the connector (pre-flight read matched; after: two columns, private to every client role, the unique index, the email log's new kind; recorded under the file's version). Branch `school-email-first` merged (`63ac6a0`) and pushed; step 3 of the strip reads "Profile" (his ask).
+- **Seen live, signed out:** the sign-up page asks for the school email and its strip reads Account, Code, Profile; `/api/me/personal-email` answers 401; the Privacy Policy has the "Personal email" bullet. 2,235 tests; page = text passes.
+- **NOT seen live (needs a real person and a real inbox):** a sign-up with an access code and a school address through the code to onboarding; how long the code email takes to arrive at IU and at Purdue (the 30-second target); the Campus card and the Settings row sending a real code to a personal address. Franky's test, with James's or Rylan's school email, covers all three and is the S74 "live sign-up test" he still owed.
+- **If sign-up misbehaves:** `git revert -m 1 63ac6a0` and push puts the old form back; the database change can stay (nothing else reads it). The dashboard email (code-only) works with both forms.
+- **Still not built:** signing in with the personal email; moving the sign-in to it when a school inbox closes (by hand through help@); the final-year reminder; measuring delivery time in our own log.
