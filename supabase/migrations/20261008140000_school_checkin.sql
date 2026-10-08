@@ -26,7 +26,11 @@
 -- (/api/cron/school-checkin) does the work, and it deletes nothing unless
 -- SCHOOL_CHECKIN_DELETE_ENABLED is "true" in Vercel.
 --
--- LIVE STATE: not read for this file. Before applying, read on production
+-- APPLIED ON PRODUCTION 2026-10-08 (Franky: "build it now"), through the
+-- Supabase connector; the pre-flight read matched; recorded under this file's
+-- version. 0 accounts had a check-in open afterwards.
+--
+-- LIVE STATE (as written before applying): not read for this file. Before applying, read on production
 -- (settings, allowed by the counts-only rule):
 --   SELECT has_table_privilege('authenticated','public.users','SELECT') AS table_select,
 --          (SELECT count(*) FROM information_schema.columns
