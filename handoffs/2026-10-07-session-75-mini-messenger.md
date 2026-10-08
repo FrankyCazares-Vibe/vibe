@@ -132,3 +132,20 @@ Checked: page = text 1,081 of 1,081; 2,230 tests (three new for rows 28 and 52, 
 - **Same day:** `after-db-under18` merged (the Report sheet offers "This person is under 18" everywhere it is used); Privacy Policy 3a, 5b and 12 changed; page = text passes; 2,231 tests.
 - **Not seen:** the live "active now" number signed in (Franky: glance at the campus banner); a live report with the new reason; a live sign-up with no name.
 - **Undo:** each file's ROLLBACK block.
+
+## Oct 8: school email first (Franky), and the slow school emails
+
+**His words:** "people accidentally put school emails first instead of personal"; then: "just do school email, password > code, then profile setup > campus > add a personal email". And, in capitals: the school verification email takes about 20 minutes; he wants **30 seconds**.
+
+**Why it is slow (read from public mail records, Oct 8):** IU and Purdue student mail are both Microsoft 365. Our sender is Resend's shared pool, signed (DKIM in place), with our domain policy at its most lenient (`p=none`). Our emails were branded pages with a button link, the kind Microsoft holds while it scans the link. Not known: whether Microsoft defers us ("try again later", Resend retries) or accepts and then holds. **Franky's 2-minute check:** Resend > Emails > one sent to a school address > its timeline ("Delivery delayed" before "Delivered" = deferral = a better-placed sender is needed).
+
+**LIVE on main (`ce84149`):** the school verification email is a code and nothing to tap: a few lines of system-font text, the code in the subject, no link, no button, no web font, no image. The school-email screen no longer mentions a link. Not measured live yet: ask Franky to time one.
+
+**On local branch `school-email-first` (`fd357ee`), NOT pushed, NOT live:**
+- Sign-up asks for the school email (a hint, not a block, for any other address: the team's and the review accounts use other addresses), then the 8-digit code screen, then onboarding.
+- `src/lib/auth/school-sign-in.ts` `verifySchoolFromSignInEmail`: confirming the sign-up IS the school check. `enforceCampusAccess`, `enforceSchoolEmailPage` and `GET /api/me/onboarding-state` call it before sending anyone to the school-email screen.
+- `supabase/templates/confirmation.html` is the same code-only message (subject `{{ .Token }} is your Vibe code`); the old one is `confirmation.previous.html`. **Production's copy lives in the Supabase dashboard (Authentication > Emails > Confirm signup): paste the file and the subject there. That alone speeds up today's sign-up email too, and can be done any time.**
+- Sign-in page and the waitlist invite no longer say "personal email".
+- **Walked locally with email confirmation switched on** (config put back after): sign-up with a made-up `@iu.edu` address, the code screen, the email in the local mail catcher (1.5 KB, 0 links), the code typed, landed on `/onboarding` with `school_email` = sign-in email, verified, system `iu`, name "Member".
+
+**Still to build before it goes live:** (1) "add a personal email" after campus and in Settings: a private `users.personal_email` column (a production database change), a code email to that address, two routes; (2) the Privacy Policy and Terms wording (the sign-in email is now a school address; the personal one is optional); (3) later: signing in with either address, and moving the sign-in to the personal address when the school one closes. The four defaults he approved: existing accounts untouched; the no-code list stays for people without a school email; ask for the personal email once, remind in Settings and in the final year; a closed school inbox with no personal email is handled by hand through help@.
