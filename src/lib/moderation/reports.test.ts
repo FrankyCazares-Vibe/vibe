@@ -50,7 +50,7 @@ const {
 } = await import("./reports");
 
 // The codes the database's reports_reason_code_check allows after
-// 20260927140000_reports_intimate_image_reason.sql. If this list and the
+// 20261008100000_reports_under_18_reason.sql. If this list and the
 // code list drift, a picker offers a reason the insert refuses.
 const CHECK_CODES = [
   "spam",
@@ -58,6 +58,7 @@ const CHECK_CODES = [
   "sexual",
   "intimate_image",
   "child_safety",
+  "under_18",
   "hate",
   "self_harm",
   "other",
@@ -70,6 +71,12 @@ test("the reason list matches the database CHECK, one for one", () => {
 test("intimate_image is a real reason with its plain-English label", () => {
   assert.equal(isReportReasonCode("intimate_image"), true);
   assert.equal(reportReasonLabel("intimate_image"), "An intimate image shared without consent");
+});
+
+test("under_18 is a real reason with its plain-English label, and not a priority one", () => {
+  assert.equal(isReportReasonCode("under_18"), true);
+  assert.equal(reportReasonLabel("under_18"), "This person is under 18");
+  assert.equal(isPriorityReportReason("under_18"), false);
 });
 
 test("child_safety is a real reason with its plain-English label", () => {
