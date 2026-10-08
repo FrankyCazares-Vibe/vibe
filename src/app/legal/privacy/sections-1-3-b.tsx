@@ -66,9 +66,9 @@ export function Section3d() {
             point to you. It can include a club&apos;s handle, the ID (a random
             label) of a post or chat, or search words. It also carries a short
             trail of what happened just before it. The trail lists the pages you
-            opened, the buttons you tapped, the requests your browser made and
-            lines our own software logs. For a button it holds the label, never
-            what you typed.
+            opened, the requests your browser made and lines our own software
+            logs. Until October 8, 2026 it also listed the buttons you tapped,
+            by their labels and never what you typed.
           </LegalP>
           <LegalP>
             Until our release of October 5, 2026, an error report or a speed

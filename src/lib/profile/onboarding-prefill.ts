@@ -466,9 +466,17 @@ export function isTriggerDefaultHandle(handle: unknown): boolean {
  * the text before the first "@" (the whole address when there is none).
  * Exact match after trimming, since that is what the trigger writes; a name
  * the student typed differently is theirs.
+ *
+ * Also the trigger's last resort, "Member": the only starter name once
+ * 20261008110000 is applied (the email is no longer read for a name), and
+ * what an account with no email got before it.
  */
+export const TRIGGER_FALLBACK_NAME = "Member";
+
 export function isTriggerDefaultName(name: unknown, email: unknown): boolean {
-  if (typeof name !== "string" || typeof email !== "string") return false;
+  if (typeof name !== "string") return false;
+  if (name.trim() === TRIGGER_FALLBACK_NAME) return true;
+  if (typeof email !== "string") return false;
   const n = name.trim();
   const e = email.trim();
   if (!n || !e) return false;

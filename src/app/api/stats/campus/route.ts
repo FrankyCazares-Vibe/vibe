@@ -103,10 +103,24 @@ export async function GET(req: Request) {
   const wantSplit =
     !!communityIds && splitRaw !== null && !OFF_VALUES.has(splitRaw.trim().toLowerCase());
 
+  // "Active now" is a number from the database's own count
+  // (`users_active_count`, 20261008120000), so nobody's last-active time has
+  // to be readable to get it. Until that file is applied the function is
+  // missing (PGRST202) and the count is read the old way; after it, the old
+  // way is refused, and is never reached.
+  type CountRes = { count: number | null; error: { code?: string; message: string } | null };
+  const activeCount = async (ids: string[] | null): Promise<CountRes> => {
+    const { data, error } = await supabase.rpc("users_active_count", { p_campus_ids: ids });
+    if (!error) return { count: typeof data === "number" ? data : Number(data ?? 0), error: null };
+    if (error.code !== "PGRST202") return { count: null, error };
+    const old = await (ids ? community() : headCount()).gte("last_active_at", activeSince);
+    return { count: old.count, error: old.error };
+  };
+
   const [globalRes, communityRes, splitRes] = await Promise.all([
-    Promise.all([headCount(), headCount().gte("last_active_at", activeSince)]),
+    Promise.all([headCount(), activeCount(null)]),
     communityIds
-      ? Promise.all([community(), community().gte("last_active_at", activeSince)])
+      ? Promise.all([community(), activeCount(communityIds)])
       : Promise.resolve(null),
     wantSplit
       ? Promise.all(SCHOOL_SYSTEMS.map((s) => community().eq("school_system", s)))

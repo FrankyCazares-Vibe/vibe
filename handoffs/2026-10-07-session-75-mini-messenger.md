@@ -106,3 +106,19 @@ Checked: page = text 1,081 of 1,081; 2,230 tests (three new for rows 28 and 52, 
 | 20 | Left: taking back a join request means a new action in the shared, heavily tested join control (three views) plus the route. Medium, and no live club takes requests today (SAE is invite-only). |
 | 27 | Left on purpose: clearing the per-address count when an entry is deleted lets someone leave and rejoin to reset the 3-a-day limit on confirm emails to that address. The count's window is one day. Recommend cutting this row, not building it. |
 | 49 | Franky's call: dropping the browser's trail from error reports removes four policy sentences but leaves bug reports with no trail. The gentler form drops only the button taps. |
+
+## Oct 8: error-report trail, and three database changes PREPARED (not applied on production)
+
+**Row 49, the gentler form (Franky's pick), live:** error reports from the browser no longer record button taps (`Sentry.breadcrumbsIntegration({ dom: false })` in `src/instrumentation-client.ts`). The trail keeps pages, requests and our own log lines. Policy 3d says "Until October 8, 2026 it also listed the buttons you tapped". Not seen: a live report after the change (open one in Sentry and check the trail has no `ui.click` lines).
+
+**Three files in `supabase/migrations/`, applied on the LOCAL database only. Each needs Franky's yes, then the Management API recipe in its header, then its `schema_migrations` row.** Each header lists the one read to do on production first (a fingerprint or settings, allowed by the counts-only rule).
+
+| File | Row | What | Order | Policy, the same day |
+|---|---|---|---|---|
+| `20261008100000_reports_under_18_reason.sql` | 38 | `under_18` joins the report reasons | File FIRST, then merge local branch `after-db-under18` (the code that offers it) | Section 12 can name the Report sheet as well as the address |
+| `20261008110000_starter_name_not_from_email.sql` | 24 | A new account with no name starts as "Member", never the front of its sign-in email | Either order; onboarding on main already treats "Member" as "no name yet" | The three "starter name" exceptions go only when the count in the file's header is 0 |
+| `20261008120000_users_last_active_private.sql` | 23 | Signed-in accounts can no longer read anyone's last-active time; "active now" comes from `users_active_count(text[])` | CODE FIRST: `/api/stats/campus` on main asks the function and falls back while it is missing. It is live, so the file can go any time | Cut "roughly when it was last active" from 5b |
+
+**Checked locally:** all three apply cleanly with their pre-flights and post-checks; a new account with no name gets "Member"; a signed-in member reading `last_active_at` over the database's web API is refused (42501) while other columns still read; the heartbeat still writes; "active now" answers the same number before and after. 2,230 tests pass.
+
+**A local-only oddity, found while testing:** on this Mac's local database (PostgreSQL 17.6 in the Supabase CLI image), ANY call to a function the caller has no EXECUTE right on crashes the database process (segmentation fault) instead of answering "permission denied". A one-line probe function does it too, so it is the local image, not these files. Production answers such calls with an error (S74 saw exactly that for `signup_is_open()`). The local database recovers by itself in a few seconds. Worth a `supabase` CLI update; not chased further.
