@@ -247,7 +247,7 @@ otp_expiry = 3600
 # is pasted into the dashboard from this file; the version it replaced is
 # kept in confirmation.previous.html for rollback.
 [auth.email.template.confirmation]
-subject = "Confirm your Vibe account"
+subject = "{{ .Token }} is your Vibe code"
 content_path = "./supabase/templates/confirmation.html"
 
 # Uncomment to customize email template

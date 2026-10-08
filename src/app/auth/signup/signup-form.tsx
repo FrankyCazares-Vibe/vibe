@@ -35,9 +35,6 @@ import {
 } from "@/lib/legal/terms";
 import { openInBrowser } from "@/lib/native/bridge";
 import { appShellOnClient } from "@/lib/native/detect";
-import { useAppShell } from "@/lib/native/use-app-shell";
-import { isIosPlatform } from "@/lib/pwa/display-mode";
-import { useIsStandalone, usePlatform } from "@/lib/pwa/use-standalone";
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser";
 import {
   ACCESS_CODE_METADATA_KEY,
@@ -198,24 +195,17 @@ export function SignupForm({
     el.setSelectionRange(el.value.length, el.value.length);
   }, [focusCode]);
 
-  const schoolEmailTyped = isSchoolEmail(email.trim());
+  // School email first (S75): the tip is for an address that is complete
+  // and is NOT a school one. A hint, not a block: the Vibe team's own
+  // accounts and the store review accounts sign up with other addresses.
+  const typedEmail = email.trim();
+  const otherEmailTyped = /^[^@\s]+@[^@\s]+\.[^@\s]{2,}$/.test(typedEmail) && !isSchoolEmail(typedEmail);
   // While sign-up is closed, the account just made spent the code: starting
   // over with another address would only meet "already used". Say so instead
   // of offering it (a founder sends a new code; the database allows that
   // while the first account is unconfirmed).
   const codeTied = codeShown && readTypedAccessCode(accessCode.trim()) !== null;
   const rateLimitedUntil = pending?.rateLimitedUntil ?? null;
-  // In the installed app the code is the way in: typing it signs in THIS
-  // app. On an iPhone the email's Confirm link opens Safari, which keeps its
-  // own sign-in, so the app would still be signed out (plan R16). The store
-  // apps are the same on both platforms until their own links are verified
-  // (plan S3D): the Confirm link signs in Safari or Chrome, never the app
-  // (critic-s2s3.md item 9).
-  const standalone = useIsStandalone();
-  const platform = usePlatform();
-  const inApp = useAppShell() !== null;
-  const codeFirst = standalone || inApp;
-  const linksOpenBrowser = (standalone && isIosPlatform(platform)) || inApp;
 
   // "We just sent an email" points at the resend countdown below, so it goes
   // when that countdown ends. Checked against the deadline on return too:
@@ -390,21 +380,14 @@ export function SignupForm({
           <h1 className="vibe-auth-headline">
             Check your email<span className="vibe-auth-dot">.</span>
           </h1>
-          {codeFirst ? (
-            <p className="vibe-auth-sub" style={{ overflowWrap: "anywhere" }}>
-              We sent an 8-digit code to <strong>{pending.email}</strong> from
-              noreply@connectvibe.app. Type it below to confirm your account.
-              {linksOpenBrowser
-                ? " Links in the email open in your browser, not this app."
-                : null}
-            </p>
-          ) : (
-            <p className="vibe-auth-sub" style={{ overflowWrap: "anywhere" }}>
-              We sent a link to <strong>{pending.email}</strong> from
-              noreply@connectvibe.app. Tap Confirm in that email — any browser
-              or phone works. Or type the 8-digit code from the email here.
-            </p>
-          )}
+          {/* School email first (S75): the email is a code and nothing to
+              tap, for everyone, so a university's mail system has no link to
+              scan before it delivers. */}
+          <p className="vibe-auth-sub" style={{ overflowWrap: "anywhere" }}>
+            We sent an 8-digit code to <strong>{pending.email}</strong> from
+            noreply@connectvibe.app. Type it below to confirm your account.
+            School inboxes can take a minute: check Junk too.
+          </p>
 
           {/* No number here: the resend button below counts down live, and
               a second, static count would disagree with it. */}
@@ -474,9 +457,9 @@ export function SignupForm({
           Create your account<span className="vibe-auth-dot">.</span>
         </h1>
         <p className="vibe-auth-sub">
-          Use your <strong>personal email</strong> — the one you actually check.
-          Your school <code className="vibe-auth-code">.edu</code> is verified
-          separately in the next step.
+          Use your <strong>school email</strong>, the one ending in{" "}
+          <code className="vibe-auth-code">.edu</code>. We&apos;ll send it a
+          code to confirm you&apos;re a student.
         </p>
 
         <div className="vibe-auth-steps" aria-hidden>
@@ -487,14 +470,12 @@ export function SignupForm({
           <span className="vibe-auth-step-divider" />
           <div className="vibe-auth-step">
             <span className="vibe-auth-step-num">2</span>
-            <span className="vibe-auth-step-label">
-              <code className="vibe-auth-code">.edu</code>
-            </span>
+            <span className="vibe-auth-step-label">Code</span>
           </div>
           <span className="vibe-auth-step-divider" />
           <div className="vibe-auth-step">
             <span className="vibe-auth-step-num">3</span>
-            <span className="vibe-auth-step-label">Otto</span>
+            <span className="vibe-auth-step-label">Profile</span>
           </div>
         </div>
 
@@ -538,13 +519,13 @@ export function SignupForm({
 
           <label className="vibe-auth-field">
             <span className="vibe-auth-label-row">
-              <span className="vibe-auth-label">Personal email</span>
-              <span className="vibe-auth-label-hint">not your .edu</span>
+              <span className="vibe-auth-label">School email</span>
+              <span className="vibe-auth-label-hint">your .edu</span>
             </span>
             <input
               type="email"
               autoComplete="email"
-              placeholder="you@gmail.com"
+              placeholder="you@iu.edu"
               required
               value={email}
               onChange={(e) => {
@@ -552,21 +533,20 @@ export function SignupForm({
                 setMaybeExisting(false);
               }}
               aria-describedby={
-                schoolEmailTyped ? "signup-email-tip" : undefined
+                otherEmailTyped ? "signup-email-tip" : undefined
               }
               className="vibe-auth-input"
             />
           </label>
-          {/* A hint, not a block: the confirm page no longer lets IU's link
-              scanner burn the email, so an IU address still works. */}
-          {schoolEmailTyped ? (
+          {/* A hint, not a block (see otherEmailTyped). */}
+          {otherEmailTyped ? (
             <p
               id="signup-email-tip"
               className="vibe-auth-tip"
               style={{ marginTop: -8 }}
             >
-              Heads up: use a personal email here — you&apos;ll add your school
-              email in the next step.
+              Heads up: that isn&apos;t an IU or Purdue email. Use your school
+              email here — you can add a personal one once you&apos;re in.
             </p>
           ) : null}
 

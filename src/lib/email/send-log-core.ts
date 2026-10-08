@@ -47,6 +47,9 @@ export const EMAIL_SEND_KINDS = [
   "moderation_alert",
   "waitlist_confirm",
   "waitlist_invite",
+  // The code sent to a personal address someone is adding to their account
+  // (20261008130000 widened the CHECK).
+  "personal_email_code",
 ] as const;
 export type EmailSendKind = (typeof EMAIL_SEND_KINDS)[number];
 

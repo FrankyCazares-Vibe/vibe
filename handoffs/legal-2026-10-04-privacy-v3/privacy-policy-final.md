@@ -63,7 +63,7 @@ When and why we read private messages is in section 5h.
 
 **Age and agreement.** You must be 18 or older (section 12). Sign-up has one checkbox: "I'm 18 or older and I agree to the Terms of Service and Privacy Policy." Checking it is how you agree to this policy. We do not ask for a date of birth or check age any other way.
 
-**Making an account.** Sign-up asks for an email address, a password and the checkbox. While we let people in one group at a time (a wave), it also asks for the access code we emailed you. You then confirm your sign-in email, verify a school email and set up a profile.
+**Making an account.** Sign-up asks for your school email, a password and the checkbox. While we let people in one group at a time (a wave), it also asks for the access code we emailed you. We email a code to your school email. Typing it confirms your account and verifies your school email in one step, and you then set up a profile. Some accounts sign in with a different email and verify a school email as a separate step: accounts made before sign-up worked this way, and a few that we add ourselves.
 
 **What "verified" means.** We send a verification code to your school email and you type it into Vibe. That proves you could read mail at that address at that moment. It does not prove that you are enrolled, employed or admitted, or that you are who your profile says. A school email here means an address whose part after the @ is iu.edu or purdue.edu, or ends in .iu.edu or .purdue.edu. University staff and faculty have these addresses too. We do not contact the university. One school email is meant to verify one account. Your campus is your own choice, and we do not check it.
 
@@ -79,6 +79,7 @@ One exception: we can mark a test account that we run ourselves as verified by h
 - **Password.** We never store the password itself. Supabase, the company that runs our sign-in, stores a scrambled version that cannot be read back.
 - **Starter name.** If you made your account before October 8, 2026 and have not chosen a name, your display name is the part of your sign-in email before the @. Anyone who sees your name on Vibe can read it. An account made since then starts with the name "Member".
 - **School email.** Stored once you confirm it. No other user is shown it. Section 10 names one gap.
+- **Personal email.** Optional. After sign-up you can add a personal email, so that your account stays yours when your school closes your school inbox. We email it a code first, and store it once you type the code. It is shown to you in Settings, where you can remove it. No other user is shown it.
 - **Proof that you agreed** (section 13) and, if you joined with an access code, a record of it (section 11).
 
 ### 3b. What is on my profile?
@@ -170,7 +171,7 @@ The apps are not in the stores yet. When they are, they will show the same Vibe 
 
 We use your information to run Vibe. That includes suggesting people and clubs to you, based on who you follow, your campus and your major. We use it to keep accounts secure, to review reports and act on them, to fix bugs, and to answer you. We also count things, so we can see in totals how Vibe is used.
 
-**Emails.** The automatic emails Vibe sends you are these five: to confirm your account, reset your password, verify your school email, confirm your waitlist spot and send your access code. A person on the Vibe team may also write to you. They may answer you, write about a report, your account or a club you run, or tell you something you need to know. Examples are a security problem or a change to this policy. Vibe sends no bulk marketing email and no email about activity on your account.
+**Emails.** The automatic emails Vibe sends you are these six: to confirm your account, reset your password, verify your school email, confirm a personal email you add, confirm your waitlist spot and send your access code. A person on the Vibe team may also write to you. They may answer you, write about a report, your account or a club you run, or tell you something you need to know. Examples are a security problem or a change to this policy. Vibe sends no bulk marketing email and no email about activity on your account.
 
 **What we do not do.** We do not:
 
@@ -202,7 +203,7 @@ One paid feature lets a person see who looked at them. With Vibe+, they see the 
 | A club's member list | The club's members. For a club that anyone can join, also any signed-in account (on the Map) |
 | A club's follower list, and who RSVP'd to its events | The club's owner and admins. The people in an event's chat also see who is in it, and the first few who marked Going (up to 8) |
 | Drafts, saved posts, your mute list, your personal calendar | Only you |
-| Your sign-in email and school email | Only you, except your starter name (section 3a) |
+| Your sign-in email, school email and personal email | Only you, except your starter name (section 3a) |
 
 The Vibe team and the cofounder with direct access can see more than this table shows. Sections 1 and 5h say what.
 

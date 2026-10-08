@@ -187,7 +187,7 @@ export function waitlistInviteContent(input: {
   const name = String(input.name ?? "").trim();
   const ends = codeEndsText(input.expiresAt);
   const works = ends ? `Your code works once, until ${ends}.` : `Your code works once, for up to ${ACCESS_CODE_TTL_DAYS} days.`;
-  const any = "Use your personal email (the one you check) for the account; you'll verify your school email right after.";
+  const any = "Sign up with your school email. We'll send it a code to confirm it's yours, and you can add a personal email once you're in.";
   const spend = "The button just opens the page; your code only counts once your account is made.";
   const reply = "Questions, or the code stopped working? Reply to this email.";
   return {

@@ -11,6 +11,7 @@ import {
 } from "@/components/feedback/LoadFailed";
 import { AppearanceCard } from "@/components/settings/AppearanceCard";
 import { NotificationsCard } from "@/components/settings/NotificationsCard";
+import { PersonalEmailRow } from "@/components/settings/PersonalEmail";
 import type { NotificationPrefs } from "@/components/settings/notifications-card-view";
 import { vibeRequest } from "@/lib/feedback/request";
 import { clearDraft } from "@/lib/onboarding/draft";
@@ -486,6 +487,9 @@ function AccountCard({ profile }: { profile: Profile }) {
             )
           }
         />
+        {/* School email first (S75): the address that outlives a closed
+            school inbox. Renders nothing until the step exists. */}
+        <PersonalEmailRow labelStyle={ROW_LABEL} />
         {/* Campus deliberately isn't mirrored here — it's editable in the
             card directly below, and a read-only copy rendered from the
             server prop would go stale the moment the user changes it. */}
@@ -1645,6 +1649,17 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
   );
 }
 
+/** A row's label cell, shared with rows that draw themselves (PersonalEmailRow). */
+const ROW_LABEL: React.CSSProperties = {
+  fontFamily: "DM Sans, sans-serif",
+  fontSize: 12,
+  fontWeight: 700,
+  letterSpacing: "0.06em",
+  textTransform: "uppercase",
+  color: "var(--ink-muted)",
+  paddingTop: 4,
+};
+
 function Row({
   label,
   value,
@@ -1656,19 +1671,7 @@ function Row({
 }) {
   return (
     <>
-      <div
-        style={{
-          fontFamily: "DM Sans, sans-serif",
-          fontSize: 12,
-          fontWeight: 700,
-          letterSpacing: "0.06em",
-          textTransform: "uppercase",
-          color: "var(--ink-muted)",
-          paddingTop: 4,
-        }}
-      >
-        {label}
-      </div>
+      <div style={ROW_LABEL}>{label}</div>
       <div>
         <div
           style={{
