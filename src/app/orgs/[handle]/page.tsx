@@ -121,14 +121,22 @@ export async function generateMetadata({ params }: Params) {
     .select("name, description, is_public, hidden_at")
     .eq("handle", handle)
     .maybeSingle();
-  if (!org) return { title: "Not found · Vibe" };
+  // The preview tags are set here too: without them the root layout's
+  // explicit openGraph / twitter titles win the merge, and a shared club
+  // link unfurled as the generic site card (feature report 3, #15).
+  const generic = { title: "Vibe", description: "Vibe is the social app for students at IU and Purdue." };
+  if (!org) return { title: "Not found · Vibe", openGraph: generic, twitter: generic };
   // A hidden club's name must not reach the tab title or a link preview.
-  if (org.hidden_at) return { title: "Vibe" };
+  if (org.hidden_at) return { title: "Vibe", openGraph: generic, twitter: generic };
+  const title = `${org.name} · Vibe`;
+  const description =
+    org.description?.slice(0, 200) ||
+    (org.is_public ? "An org on Vibe." : "A private org on Vibe.");
   return {
-    title: `${org.name} · Vibe`,
-    description:
-      org.description?.slice(0, 200) ||
-      (org.is_public ? "An org on Vibe." : "A private org on Vibe."),
+    title,
+    description,
+    openGraph: { title: org.name, description, type: "profile" },
+    twitter: { card: "summary", title: org.name, description },
   };
 }
 

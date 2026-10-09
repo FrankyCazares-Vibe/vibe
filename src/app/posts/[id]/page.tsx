@@ -1,4 +1,4 @@
-import { notFound, redirect } from "next/navigation";
+import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 
 import { getActiveRestriction } from "@/lib/moderation/access";
@@ -9,6 +9,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 
 import { PostPageClient } from "./PostPageClient";
+import { SignedOutShell } from "./SignedOutShell";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -33,7 +34,14 @@ type Params = { params: Promise<{ id: string }> };
  * generic card below: no author, no text, no image. Public clubs' posts keep
  * their preview (product call 3). Every failure falls back to generic.
  */
-const GENERIC_POST_METADATA: Metadata = { title: "Post · Vibe" };
+// Its own preview tags too: without them the root layout's explicit
+// openGraph / twitter titles win the merge, and a generic card read
+// "Your campus. Your people. Yourself." (feature report 3, #5).
+const GENERIC_POST_METADATA: Metadata = {
+  title: "Post · Vibe",
+  openGraph: { title: "A post on Vibe", description: "Vibe is the social app for students at IU and Purdue." },
+  twitter: { card: "summary", title: "A post on Vibe", description: "Vibe is the social app for students at IU and Purdue." },
+};
 
 export async function generateMetadata({ params }: Params): Promise<Metadata> {
   const { id } = await params;
@@ -150,17 +158,18 @@ export default async function PostPage({ params }: Params) {
   // Auth gate FIRST (S67 security wave 2, A1). OG meta (generateMetadata)
   // renders without auth so share-link previews work for cold visitors, but
   // actually clicking through requires a logged-in session — the viewer
-  // fetches via /api/posts/[id] which is auth-only. Send unauthed users to
-  // login with this URL as `next` so they bounce back after signing in.
-  // Checked before the existence read so a signed-out visitor gets the same
-  // redirect for every id: a 404-vs-redirect split told strangers which post
-  // ids exist (removed ones included).
+  // fetches via /api/posts/[id] which is auth-only. A signed-out visitor gets
+  // a 200 shell that carries the preview tags and sends the browser to login
+  // with this URL as `next` (SignedOutShell): a 307 lost the tags to every
+  // link unfurler (feature report 3, #5). Still before the existence read, so
+  // every id answers the same way signed out: a 404-vs-200 split told
+  // strangers which post ids exist (removed ones included).
   const supabase = await createSupabaseServerClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) {
-    redirect(`/auth/login?next=${encodeURIComponent(`/posts/${id}`)}`);
+    return <SignedOutShell postId={id} />;
   }
 
   // Existence check on the server so we 404 cleanly instead of
