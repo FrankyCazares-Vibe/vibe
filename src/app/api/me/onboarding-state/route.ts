@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { isOttoOnboardingComplete } from "@/lib/auth/post-login";
-import { verifySchoolFromSignInEmail } from "@/lib/auth/school-sign-in";
+import { schoolSignInState, type SchoolSignInState } from "@/lib/auth/school-sign-in";
 import { isMissingColumnError } from "@/lib/db/missing-column";
 import { allowedCampusId, isSchoolSystem, type SchoolSystem } from "@/lib/iu/campuses";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -71,7 +71,8 @@ export async function GET() {
   // School email first: a confirmed school sign-in email is the school check.
   // Done here too, so the page after sign-in never routes through the
   // "verify your school email" screen for an account that needs no second proof.
-  const verifiedNow = !row?.school_verified && (await verifySchoolFromSignInEmail(user));
+  const signIn: SchoolSignInState = row?.school_verified ? "verified" : await schoolSignInState(user);
+  const verifiedNow = !row?.school_verified && signIn === "verified";
   if (verifiedNow) {
     // The write also stamped the school system: answer with the row as it is now.
     const again = await service.from("users").select(CAMPUS_COLUMNS).eq("id", user.id).maybeSingle();
@@ -85,6 +86,9 @@ export async function GET() {
     {
       ok: true,
       school_verified: Boolean(row?.school_verified) || verifiedNow,
+      // Why a school sign-in email did or did not verify (school-sign-in.ts):
+      // the school-email screen shows its "taken" state from this.
+      school_signin: signIn,
       otto_complete: isOttoOnboardingComplete(row?.otto_answers),
       school_system: system,
       campus_id: allowedCampusId(row?.campus_id, system),

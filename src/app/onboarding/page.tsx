@@ -1,5 +1,7 @@
 import { redirect } from "next/navigation";
 
+import { isSafeRelativePath } from "@/lib/auth/login-next";
+
 import { DEFAULT_POST_LOGIN_PATH } from "@/lib/auth/email-confirm-redirect";
 import { isOttoOnboardingComplete } from "@/lib/auth/post-login";
 import { isMissingColumnError } from "@/lib/db/missing-column";
@@ -58,6 +60,10 @@ export default async function OnboardingPage({
 }) {
   const params = await searchParams;
   const replay = params.replay === "1";
+  // Where the person was going before the gates (campus-access.ts hands it
+  // on): an already-onboarded account goes straight there (feature report 3, #8).
+  const nextRaw = typeof params.next === "string" ? params.next : undefined;
+  const next = isSafeRelativePath(nextRaw) ? nextRaw : null;
 
   const supabase = await createSupabaseServerClient();
   const {
@@ -92,10 +98,10 @@ export default async function OnboardingPage({
     );
   }
   if (row?.school_verified !== true) {
-    redirect("/auth/school-email");
+    redirect(next ? `/auth/school-email?next=${encodeURIComponent(next)}` : "/auth/school-email");
   }
   if (!replay && isOttoOnboardingComplete(row?.otto_answers)) {
-    redirect(DEFAULT_POST_LOGIN_PATH);
+    redirect(next ?? DEFAULT_POST_LOGIN_PATH);
   }
 
   const system: SchoolSystem | null = isSchoolSystem(row?.school_system)

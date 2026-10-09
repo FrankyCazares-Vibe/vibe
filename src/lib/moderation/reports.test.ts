@@ -204,3 +204,14 @@ test("a thing reported for sexual content AND child safety ranks as child safety
   ]);
   assert.deepEqual(keys, ["post:b", "post:a"]);
 });
+
+test("the static Report sheet (public/html/_safetyActions.js) offers the same reasons, in the same order, with the same labels", async () => {
+  // The desktop profile, post viewer and the old chat pane use the static
+  // sheet, which has no build step: it fell behind when under_18 was added
+  // (feature report 3, #2). This keeps the two lists one list.
+  const { readFileSync } = await import("node:fs");
+  const js = readFileSync(new URL("../../../public/html/_safetyActions.js", import.meta.url), "utf8");
+  const block = js.slice(js.indexOf("const REPORT_REASONS = ["), js.indexOf("];", js.indexOf("const REPORT_REASONS = [")));
+  const rows = [...block.matchAll(/code:\s*"([a-z0-9_]+)",\s*label:\s*"([^"]+)"/g)].map((m) => [m[1], m[2]]);
+  assert.deepEqual(rows, reportReasonOptions().map((o) => [o.code, o.label]));
+});

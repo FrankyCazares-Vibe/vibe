@@ -573,16 +573,18 @@ export function ConversationView({
           };
         });
       });
-      try {
-        await fetch(
-          `/api/me/threads/${encodeURIComponent(threadId)}/messages/${encodeURIComponent(messageId)}/react`,
-          {
-            method: willAdd ? "POST" : "DELETE",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ emoji }),
-          },
-        );
-      } catch {
+      // A refusal (the message removed, a block, a restriction) is a clean
+      // non-2xx: roll back on it as on a thrown fetch, and say why (feature
+      // report 3, #4). vibeRequest never throws.
+      const r = await vibeRequest(
+        `/api/me/threads/${encodeURIComponent(threadId)}/messages/${encodeURIComponent(messageId)}/react`,
+        {
+          method: willAdd ? "POST" : "DELETE",
+          json: { emoji },
+          failure: willAdd ? "Couldn't add your reaction." : "Couldn't remove your reaction.",
+        },
+      );
+      if (!r.ok) {
         // Roll back the optimistic update on failure.
         setMessages((prev) => {
           if (!prev) return prev;

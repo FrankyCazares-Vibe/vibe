@@ -216,3 +216,15 @@ Dashboard items for Franky, together: Supabase > Auth: Secure password change ON
 9. **Needs a signed-in walk (Franky, or a session after he signs in on the pane):** [#21] "active now" and the heartbeat after the Oct 8 revoke (counts: nobody's last-active has been written since Oct 6); [#20] Otto's Messages tab on a laptop; [#19] the campus map's club bubbles for a 20-member club; [#6] the small Messages window flashing the whole shell on reload; [#18] push: none of the six push variables exist on Vercel (parked until Apple accepts, but Settings > Notifications may be missing).
 
 Re-check after the fixes with the cheap pair: `lenses: ["recent-regression","live-smoke"]`.
+
+## Oct 9: first fix batch from the feature report (report-3 numbers in brackets)
+
+- **[#1] The sign-up lock has a way out.** `schoolSignInState()` (`src/lib/auth/school-sign-in.ts`) says WHY a school sign-in email did not verify; `/api/me/onboarding-state` carries it as `school_signin`; the school-email screen shows "This email is on another account" with a sign-in button (signs out, then `/auth/login?next=…`) and help@ instead of a form that would refuse the address. Walked locally with a duplicate of a seed account's verified school address: Terms → the card → the button. **Not done, Franky's call:** refusing the duplicate at sign-up itself (the gate hook, a database file, and a policy line about telling a signed-out person the address is taken), and the ONE stuck production account (created Sept, never signed in): delete it by hand, or leave it to find the new card.
+- **[#2]** the static Report sheet offers "This person is under 18"; a parity test now ties `_safetyActions.js` to `reports.ts`.
+- **[#8]** `next` is carried through the school-email screen (sign-in, the Terms bounce, onboarding) and `/onboarding` honours it when the account is already set up.
+- **[#9, #10]** login's not-confirmed line says "type the 8-digit code"; the Confirm-with-code card's label is "Email" with an @iu.edu placeholder.
+- **[#4]** a refused reaction rolls back and toasts, in direct chats and club rooms (`vibeRequest` instead of a bare fetch).
+- **[#13]** Unblock toasts when refused.
+- A date-sensitive chat test (`message-read.test.ts`, an event fixed on Oct 8) now places its event relative to the clock.
+
+Still open from the report: [#3] phone Message button / "Connected" unfollows; [#5, #15, #17] share previews and the bare 404; [#11, #12, #14] the other silent flip-backs; [#7, #16]; and the signed-in checks [#19, #20, #21, #6].

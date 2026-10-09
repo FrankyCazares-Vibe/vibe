@@ -28,26 +28,40 @@ import { isSupabaseServiceConfigured } from "@/lib/supabase/service";
  * inbox. `email_confirmed_at` is read from the session's user as the
  * sign-in system reports it, never from the request.
  */
-export async function verifySchoolFromSignInEmail(user: {
-  id: string;
-  email?: string | null;
-  email_confirmed_at?: string | null;
-}): Promise<boolean> {
+export async function verifySchoolFromSignInEmail(user: SignInUser): Promise<boolean> {
+  return (await schoolSignInState(user)) === "verified";
+}
+
+type SignInUser = { id: string; email?: string | null; email_confirmed_at?: string | null };
+
+/**
+ * Why the sign-in email did or did not verify the school:
+ *   verified     written now (or already)
+ *   taken        the address is another account's verified school email
+ *                (the one-address-per-account rule): the person has proven
+ *                the inbox, so the screen may say so and send them to sign in
+ *                to that account (feature report 3, #1)
+ *   unconfirmed  the sign-in system has not confirmed the address yet
+ *   not_school   a personal sign-in email: the school-email screen as before
+ *   failed       the server could not tell (logged); the screen as before
+ */
+export type SchoolSignInState = "verified" | "taken" | "unconfirmed" | "not_school" | "failed";
+
+export async function schoolSignInState(user: SignInUser): Promise<SchoolSignInState> {
   try {
-    if (!user.email || !user.email_confirmed_at) return false;
-    if (!isSchoolEmail(user.email)) return false;
+    if (!user.email || !isSchoolEmail(user.email)) return "not_school";
+    if (!user.email_confirmed_at) return "unconfirmed";
     const email = normalizeSchoolEmail(user.email);
-    if (!email) return false;
-    if (!isSupabaseServiceConfigured()) return false;
+    if (!email) return "not_school";
+    if (!isSupabaseServiceConfigured()) return "failed";
     const result = await applySchoolEmailVerification(user.id, email);
-    if (result.status !== 200 || !result.body.ok) {
-      // The status and code only: never the address.
-      console.error("[school-sign-in] not applied", result.status, result.body.code ?? "");
-      return false;
-    }
-    return true;
+    if (result.status === 200 && result.body.ok) return "verified";
+    if (result.status === 409 && result.body.code === "school_email_taken") return "taken";
+    // The status and code only: never the address.
+    console.error("[school-sign-in] not applied", result.status, result.body.code ?? "");
+    return "failed";
   } catch (err) {
     console.error("[school-sign-in]", err instanceof Error ? err.message : "failed");
-    return false;
+    return "failed";
   }
 }

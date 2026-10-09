@@ -260,13 +260,9 @@ function BlockedUsersCard() {
     if (unblocking) return;
     setUnblocking(u.id);
     try {
-      const res = await fetch("/api/me/block", {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ target_id: u.id }),
-      });
-      const data = await res.json();
-      if (res.ok && data?.ok) {
+      // A refusal toasts (feature report 3, #13); vibeRequest never throws.
+      const r = await vibeRequest("/api/me/block", { method: "DELETE", json: { target_id: u.id }, failure: "Couldn't unblock them." });
+      if (r.ok) {
         setUsers((prev) => (prev ?? []).filter((x) => x.id !== u.id));
       }
     } finally {

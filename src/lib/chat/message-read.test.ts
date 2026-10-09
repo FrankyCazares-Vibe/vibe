@@ -370,10 +370,15 @@ test("a failed hydrateCards answers 503; a database without migration B answers 
 
 // ── 8.3: the people going ───────────────────────────────────────────────────
 
+// describeRoom reads the real clock for the event state, so the event sits
+// a little ahead of now: "soon" on any day the test runs.
+const SOON_START = new Date(Date.now() + 2 * 3_600_000).toISOString();
+const SOON_END = new Date(Date.now() + 5 * 3_600_000).toISOString();
+
 test("describeRoom hands the block set down: a blocked person going is left out and the next room member takes their place", async () => {
   const EVENT = uuid(1, "f");
   const going = Array.from({ length: 10 }, (_, i) => uuid(200 + i, "a"));
-  const eventRoom: Room = { id: CHANNEL, kind: "event", name: "Fall Formal", org_id: ORG, event: { id: EVENT, title: "Fall Formal", starts_at: "2026-10-08T23:30:00+00:00", ends_at: "2026-10-09T03:00:00+00:00" } };
+  const eventRoom: Room = { id: CHANNEL, kind: "event", name: "Fall Formal", org_id: ORG, event: { id: EVENT, title: "Fall Formal", starts_at: SOON_START, ends_at: SOON_END } };
   const service = installService((table, calls) => {
     if (table === "events") return { data: [{ location: "Alumni Hall" }] };
     if (table === "rsvps") return { data: going.map((id) => ({ user_id: id, status: "going" })), count: 10 };

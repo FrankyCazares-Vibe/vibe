@@ -1,5 +1,6 @@
 import type { ChatMessage } from "@/lib/chat/types";
 import type { RoomPoll } from "@/lib/chat/use-room-poll";
+import { vibeRequest } from "@/lib/feedback/request";
 
 /**
  * Today's reaction flow (`ConversationView`'s `toggleReaction`), moved as
@@ -26,13 +27,12 @@ export async function toggleReactionOn(poll: Pick<RoomPoll, "replace">, roomId: 
   };
   const optimistic = apply(m, willAdd);
   poll.replace(m.id, optimistic);
-  try {
-    await fetch(`/api/me/threads/${encodeURIComponent(roomId)}/messages/${encodeURIComponent(m.id)}/react`, {
-      method: willAdd ? "POST" : "DELETE",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ emoji }),
-    });
-  } catch {
-    poll.replace(m.id, apply(optimistic, !willAdd));
-  }
+  // A refusal is a clean non-2xx: roll back on it too, and say why
+  // (feature report 3, #4). vibeRequest never throws.
+  const r = await vibeRequest(`/api/me/threads/${encodeURIComponent(roomId)}/messages/${encodeURIComponent(m.id)}/react`, {
+    method: willAdd ? "POST" : "DELETE",
+    json: { emoji },
+    failure: willAdd ? "Couldn't add your reaction." : "Couldn't remove your reaction.",
+  });
+  if (!r.ok) poll.replace(m.id, apply(optimistic, !willAdd));
 }

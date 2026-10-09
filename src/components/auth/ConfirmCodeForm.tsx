@@ -180,7 +180,7 @@ export function ConfirmCodeForm({
       {askForEmail ? (
         <label className="vibe-auth-field">
           <span className="vibe-auth-label-row">
-            <span className="vibe-auth-label">Personal email</span>
+            <span className="vibe-auth-label">Email</span>
             <span className="vibe-auth-label-hint">
               the one you signed up with
             </span>
@@ -192,7 +192,7 @@ export function ConfirmCodeForm({
             autoComplete="email"
             autoCapitalize="none"
             spellCheck={false}
-            placeholder="you@gmail.com"
+            placeholder="you@iu.edu"
             value={email}
             onChange={(e) => {
               setTouched(true);

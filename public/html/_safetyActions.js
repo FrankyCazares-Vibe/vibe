@@ -305,6 +305,7 @@
     { code: "sexual",     label: "Sexual content" },
     { code: "intimate_image", label: "An intimate image shared without consent" },
     { code: "child_safety", label: "Child sexual abuse or exploitation" },
+    { code: "under_18",   label: "This person is under 18" },
     { code: "hate",       label: "Hate or a slur" },
     { code: "self_harm",  label: "Self-harm" },
     { code: "other",      label: "Something else" },

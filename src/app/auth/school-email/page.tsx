@@ -5,7 +5,8 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useRef, useState } from "react";
 
 import { SuspendedActions, useOwnHandle } from "@/app/account/suspended/suspended-actions";
-import { SCHOOL_DOMAINS_HEADLINE_LABEL } from "@/lib/auth/school-email-domains";
+import { isSafeRelativePath } from "@/lib/auth/login-next";
+import { isSchoolEmail, SCHOOL_DOMAINS_HEADLINE_LABEL } from "@/lib/auth/school-email-domains";
 import { useAppShell } from "@/lib/native/use-app-shell";
 import { isIosPlatform } from "@/lib/pwa/display-mode";
 import { useIsStandalone, usePlatform } from "@/lib/pwa/use-standalone";
@@ -20,7 +21,6 @@ const SCHOOL_DOMAINS_LABEL = SCHOOL_DOMAINS_HEADLINE_LABEL;
 
 const CODE_LENGTH = 8;
 const RESEND_COOLDOWN_SEC = 60;
-const LOGIN_HREF = "/auth/login?next=/auth/school-email";
 // The onboarding server page forwards anyone already onboarded onward. Left
 // as a full page load (absolute URL) so that server page renders fresh.
 const ONBOARDING_PATH = "/onboarding";
@@ -166,6 +166,33 @@ function SchoolEmailInner() {
   const codeInFlight = useRef(false);
   const cooling = secondsLeft > 0;
   const justVerifiedAccount = searchParams.get("account_verified") === "1";
+  // The page the gate was sent from (`?next=`, campus-access.ts), carried
+  // through sign-in, the Terms bounce and onboarding, so passing this screen
+  // lands on the chat or post that was tapped (feature report 3, #8).
+  const nextRaw = searchParams.get("next");
+  const next = isSafeRelativePath(nextRaw) ? nextRaw : null;
+  const withNext = (path: string) => (next ? `${path}${path.includes("?") ? "&" : "?"}next=${encodeURIComponent(next)}` : path);
+  const loginHref = `/auth/login?next=${encodeURIComponent(withNext("/auth/school-email"))}`;
+  const onboardingPath = withNext(ONBOARDING_PATH);
+  // School email first: an account whose SIGN-IN email is a school address
+  // lands here only when that address did not verify it. The one case with
+  // nothing to type is "taken" (the address is another account's verified
+  // school email): then this screen says so instead of asking for a second
+  // school email it would refuse (feature report 3, #1).
+  const [signInTaken, setSignInTaken] = useState(false);
+  useEffect(() => {
+    if (!accountEmail || !isSchoolEmail(accountEmail)) return;
+    let live = true;
+    fetch("/api/me/onboarding-state", { credentials: "same-origin", cache: "no-store" })
+      .then((r) => r.json())
+      .then((j: { ok?: boolean; school_signin?: string }) => {
+        if (live && j?.ok && j.school_signin === "taken") setSignInTaken(true);
+      })
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, [accountEmail]);
   // In the installed app the code is the way in: it verifies whoever is
   // signed in HERE. On an iPhone the email's link opens Safari, which keeps
   // its own sign-in (it may ask the student to sign in again), and this page
@@ -252,7 +279,7 @@ function SchoolEmailInner() {
         void supabase.auth.getUser().then(({ data: { user: u2 } }) => {
           if (cancelled) return;
           if (u2) onSignedIn(u2.id, u2.email ?? null);
-          else router.replace(LOGIN_HREF);
+          else router.replace(loginHref);
         });
       }, 4000);
     })();
@@ -262,7 +289,7 @@ function SchoolEmailInner() {
       if (timeoutId !== undefined) clearTimeout(timeoutId);
       unsub?.();
     };
-  }, [router]);
+  }, [router, loginHref]);
 
   // Tick from the deadline, not by counting, so a tab that iOS paused while
   // the student was in Outlook shows the right number on return.
@@ -355,7 +382,7 @@ function SchoolEmailInner() {
         // Consent must be on record before verification (S53 A4); the
         // interstitial brings the user straight back here.
         leaving = true;
-        router.replace("/auth/terms?next=/auth/school-email");
+        router.replace(`/auth/terms?next=${encodeURIComponent(withNext("/auth/school-email"))}`);
         return;
       }
       if (res.status === 429) {
@@ -382,7 +409,7 @@ function SchoolEmailInner() {
         // /onboarding forwards anyone already onboarded on to their profile.
         leaving = true;
         forgetSent();
-        window.location.assign(new URL(ONBOARDING_PATH, window.location.origin).href);
+        window.location.assign(new URL(onboardingPath, window.location.origin).href);
         return;
       }
       const sent = typeof data.sentTo === "string" ? data.sentTo : address;
@@ -450,7 +477,7 @@ function SchoolEmailInner() {
       leaving = true;
       forgetSent();
       // Full navigation so the onboarding server page reads the fresh row.
-      window.location.assign(new URL(ONBOARDING_PATH, window.location.origin).href);
+      window.location.assign(new URL(onboardingPath, window.location.origin).href);
     } catch {
       setCodeError(OFFLINE);
     } finally {
@@ -480,6 +507,44 @@ function SchoolEmailInner() {
     return (
       <div className="vibe-auth-page">
         <p className="vibe-auth-loading">Loading…</p>
+      </div>
+    );
+  }
+
+  if (signInTaken) {
+    const signOutToLogin = async () => {
+      try {
+        await fetch("/api/auth/logout", { method: "POST", credentials: "same-origin" });
+      } catch {
+        // The login page asks again.
+      }
+      window.location.assign(loginHref);
+    };
+    return (
+      <div className="vibe-auth-page">
+        <div className="vibe-auth-card">
+          <div className="vibe-auth-brand" aria-hidden>
+            vibe<span className="vibe-auth-dot">.</span>
+          </div>
+          <h1 className="vibe-auth-headline">
+            This email is on another account<span className="vibe-auth-dot">.</span>
+          </h1>
+          <p className="vibe-auth-sub" style={{ overflowWrap: "anywhere" }}>
+            <strong>{accountEmail}</strong> is already the verified school email of another Vibe
+            account, so it can&apos;t be used to make a second one. Sign in to that account
+            instead: it uses the personal email it was made with.
+          </p>
+          <button type="button" className="vibe-auth-submit" onClick={() => void signOutToLogin()}>
+            Sign in to that account <span aria-hidden>&rarr;</span>
+          </button>
+          <p className="vibe-auth-tip" style={{ marginTop: 14 }}>
+            Can&apos;t remember which email that account uses, or it isn&apos;t yours? Write to{" "}
+            <a href="mailto:help@connectvibe.app" className="vibe-auth-link">
+              help@connectvibe.app
+            </a>{" "}
+            from your school email and we&apos;ll sort it out. This account has nothing in it yet.
+          </p>
+        </div>
       </div>
     );
   }
@@ -612,7 +677,7 @@ function SchoolEmailInner() {
               </p>
             ) : null}
             {signedOut ? (
-              <Link href={LOGIN_HREF} className="vibe-auth-secondary">
+              <Link href={loginHref} className="vibe-auth-secondary">
                 Sign in
               </Link>
             ) : null}
@@ -691,7 +756,7 @@ function SchoolEmailInner() {
               </p>
             ) : null}
             {signedOut ? (
-              <Link href={LOGIN_HREF} className="vibe-auth-secondary">
+              <Link href={loginHref} className="vibe-auth-secondary">
                 Sign in
               </Link>
             ) : null}

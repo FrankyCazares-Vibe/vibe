@@ -14,7 +14,7 @@ import { getSupabaseBrowserClient } from "@/lib/supabase/browser";
 import { useSignupOpen } from "@/lib/waitlist/use-signup-open";
 
 const NOT_CONFIRMED =
-  "Confirm your email first — we sent a link when you signed up.";
+  "Confirm your email first: type the 8-digit code from the email we sent when you signed up, or ask for a new one.";
 const WRONG_CREDENTIALS =
   "That email and password don't match. Use the email you signed up with.";
 const OFFLINE = "We couldn't reach Vibe. Check your connection and try again.";
