@@ -199,3 +199,20 @@ Checked: page = text 1,081 of 1,081; 2,230 tests (three new for rows 28 and 52, 
 9. **Needs a specialist:** a paid live pentest against a staging copy before the store submission and the campus launch (store work is parked until Apple accepts; the pentest is not).
 
 Dashboard items for Franky, together: Supabase > Auth: Secure password change ON; "password changed" + "email changed" emails ON; captcha / Attack protection ON after the code ships the box; emails per hour 40 → a few hundred; Sessions time-box 30 d + inactivity 7 d (Pro). The report's Appendix B says what was and was not checked.
+
+## Oct 8, night: the feature sentinel ran (`handoffs/2026-10-08-broken-features-report-3.md`)
+
+23 agents, 4.9M tokens, 85 min on Fable 5.1, **no signed-in session** (the gstack browser's CLI hangs on this Mac, even `--help`; Franky did not sign in on the pane). 32 raised, 21 live, **16 confirmed**, 4 need a signed-in check, 1 false positive dropped. The fix-order agent died on the usage limit; the Executive Summary carries the picture. **Nothing Blocking.** The numbers below are the report's Appendix A.
+
+**Pick-up list, in the order to fix:**
+1. **[#1] The sign-up lock (my S75 regression).** Someone whose school address is already verified on an OLDER account signs up again with that address, types the code, and every page sends them to "Verify your campus", which refuses the address as taken. **1 real account is stuck** (created Sept, never signed in). Fix: the school-email screen gets a clear "already verified on another account: sign in there" state instead of the form; refusing the duplicate at sign-up needs the gate hook changed (a database file) and a policy line: Franky's call. Unsticking the one row = deleting a never-used duplicate: Franky's yes.
+2. **[#2] Desktop Report sheet has no "This person is under 18"** (`public/html/_safetyActions.js` REPORT_REASONS, the static twin I did not update on Oct 8). One line + a parity test.
+3. **[#9, #10, #8] Loose ends of school email first:** login tells an unconfirmed account to find a link that no longer exists; the Confirm-with-code card still says "Personal email" with a Gmail placeholder; the school-email gate drops the `next` deep link it was given.
+4. **[#4] A refused reaction stays painted** (`ConversationView.tsx` and `club/reactions.ts` only roll back when fetch throws; the 403 I added for blocks is a clean non-2xx). Swap to `vibeRequest`, roll back on `!ok`.
+5. **[#3] Phone visitor profile: no Message button, and "Connected" unfollows on tap.** Add a Message action (`/messages?to=<handle>`), put unfollow behind a confirm.
+6. **[#5, #15, #17] Sharing:** a signed-out GET of `/posts/<id>` and `/orgs/<handle>` is a 307 to login, so iMessage/Discord preview the generic card; a dead share link is Next's bare 404. Serve a 200 shell with the OG tags + "Sign in to see this", and a branded not-found page.
+7. **[#11, #12, #13, #14] Silent flip-backs:** RSVP, Follow (phone), Unblock, the desktop Mute sheet show nothing when the server refuses.
+8. **[#7, #16] Small:** the chat's rich profile card reads fields the bootstrap never sends; public club/profile pages tell never-signed-in visitors "You've been signed out".
+9. **Needs a signed-in walk (Franky, or a session after he signs in on the pane):** [#21] "active now" and the heartbeat after the Oct 8 revoke (counts: nobody's last-active has been written since Oct 6); [#20] Otto's Messages tab on a laptop; [#19] the campus map's club bubbles for a 20-member club; [#6] the small Messages window flashing the whole shell on reload; [#18] push: none of the six push variables exist on Vercel (parked until Apple accepts, but Settings > Notifications may be missing).
+
+Re-check after the fixes with the cheap pair: `lenses: ["recent-regression","live-smoke"]`.
