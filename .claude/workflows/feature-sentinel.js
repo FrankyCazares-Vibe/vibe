@@ -22,7 +22,7 @@ const AUTHED = Boolean(args && args.authed)
 const ROE = `RULES OF ENGAGEMENT (follow exactly):
 - This is the OWNER'S OWN app. Repo is the current working directory; live site is ${SITE}.
 - DO NOT MODIFY ANY FILE and do not commit. You are diagnosing, not fixing. A fix belongs in the report as a recommendation.
-- You MAY run read-only shell (cat/sed/grep/find/git log/git diff/git show), read-only Supabase MCP SQL (ToolSearch select:mcp__supabase__execute_sql,mcp__supabase__list_tables) to inspect REAL DATA DISTRIBUTIONS, and \`npx tsc --noEmit\` / \`npx eslint\`.
+- You MAY run read-only shell (cat/sed/grep/find/git log/git diff/git show), read-only Supabase MCP SQL (ToolSearch select:mcp__supabase__execute_sql,mcp__supabase__list_tables) to inspect REAL DATA DISTRIBUTIONS AS COUNTS ONLY (the Privacy Policy, since Oct 4 2026, promises that AI-tool reads of the live database return counts, fingerprints and settings, never a person's record: count(*), exists, pg_get_*def, grants, policies, column lists; never select a row of users, messages, posts, waitlist or email_sends), and \`npx tsc --noEmit\` / \`npx eslint\`.
 - You MAY issue read-only HTTP GETs to ${SITE} and inspect response status, headers and body. Do NOT POST, do not submit forms, do not create or delete anything, do not flood (a few dozen requests total across the whole lens).
 - NEVER write to the production database. NEVER run a migration. Read-only SQL only.
 - ${AUTHED ? 'A signed-in browser session IS available — you may load authenticated pages in the browser and read console + network errors.' : 'No signed-in session is available. Live checks cover ANONYMOUS surfaces only; for anything behind login, reason from code + DB state and mark the finding as needing a live authenticated check.'}
@@ -34,7 +34,7 @@ IMPORTANT SHAPE OF THIS CODEBASE (breakage tends to hide in these seams):
 - SELF-FRAMING. The app iframes its own pages (app/messages/MessagesSwitch.tsx, app/onboarding/OnboardingSwitch.tsx, resume previews in both onboarding flows). Anything that affects framing breaks these.
 - STATIC PROTOTYPES ARE LIVE. public/html/*.html are real, shipped pages with inline JS (no build step, no type checking) that call /api/** and render real user data. They break silently and tsc will never tell you.
 - GRANTS ARE THE BOUNDARY. The Supabase anon key is in every browser, so column grants + RLS policies (supabase/migrations/**) gate data, not route handlers. A REVOKE can break a legitimate read as easily as it blocks an attacker.
-- SERVER GATES. src/lib/auth/campus-access.ts (enforceCampusAccess) and src/lib/legal/require-terms.ts gate pages and write routes; a gate that cannot be satisfied is a dead end.`
+- SERVER GATES. src/lib/auth/campus-access.ts (enforceCampusAccess) and src/lib/legal/require-terms.ts gate pages and write routes; a gate that cannot be satisfied is a dead end.${args && args.context ? '\nRECENT CHANGES, FROM THE RUNNER (aim at these first): ' + args.context : ''}`
 
 const FINDING_SCHEMA = {
   type: 'object',
