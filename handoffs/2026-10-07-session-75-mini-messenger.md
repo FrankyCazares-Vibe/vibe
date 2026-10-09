@@ -228,3 +228,4 @@ Re-check after the fixes with the cheap pair: `lenses: ["recent-regression","liv
 - A date-sensitive chat test (`message-read.test.ts`, an event fixed on Oct 8) now places its event relative to the clock.
 
 Still open from the report: [#3] phone Message button / "Connected" unfollows; [#5, #15, #17] share previews and the bare 404; [#11, #12, #14] the other silent flip-backs; [#7, #16]; and the signed-in checks [#19, #20, #21, #6].
+- **[#3] Phone profile (later on Oct 9):** connected → the button is **Message** (`/messages?to=<handle>`, the desktop's `state-message` twin) with "Connected ✓ · Unfollow" under it; any unfollow asks first (`window.confirm`, as the file's deletes do). Walked at 375 wide as blake on avery's profile: Message link, a declined confirm sends nothing. `ProfileMobile.tsx` has 7 pre-existing lint errors (not from this).

@@ -745,6 +745,9 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
   const toggleFollow = async () => {
     if (!isVisitor || !targetHandle || followBusy) return;
     const wasFollowing = followState === "following" || followState === "connected";
+    // Dropping a follow or a connection is never one silent tap (feature
+    // report 3, #3): the same confirm the file uses for a delete.
+    if (wasFollowing && typeof window !== "undefined" && !window.confirm(`Unfollow @${targetHandle}?`)) return;
     const next: FollowState = wasFollowing
       ? followState === "connected"
         ? "followed_by"
@@ -2232,6 +2235,7 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
               state={followState}
               busy={followBusy}
               onTap={toggleFollow}
+              handle={targetHandle}
             />
           </>
         ) : null}
@@ -5592,10 +5596,13 @@ function FollowButton({
   state,
   busy,
   onTap,
+  handle,
 }: {
   state: FollowState;
   busy: boolean;
   onTap: () => void;
+  /** The visited person's handle: the Message link needs it. */
+  handle?: string | null;
 }) {
   const isFollowing = state === "following" || state === "connected";
   const label =
@@ -5607,38 +5614,72 @@ function FollowButton({
           ? "Follow back"
           : "Connect";
   const filled = !isFollowing;
+  // Connected: the desktop profile's button becomes "Message" here
+  // (profile.html, state-message); the phone does the same, with the
+  // connection itself on a quiet line under it (feature report 3, #3).
+  const messageFirst = state === "connected" && !!handle;
+  const primaryFilled = filled || messageFirst;
+  const primary: React.CSSProperties = {
+    display: "block",
+    width: "100%",
+    boxSizing: "border-box",
+    textAlign: "center",
+    padding: "11px 16px",
+    borderRadius: 14,
+    background: primaryFilled
+      ? state === "followed_by"
+        ? "#FF5C35"
+        : "var(--charcoal)"
+      : "var(--paper-70)",
+    color: primaryFilled ? (state === "followed_by" ? "#fff" : "var(--paper)") : "var(--charcoal)",
+    border: primaryFilled
+      ? "1px solid rgba(0,0,0,0.06)"
+      : "1px solid rgba(var(--scrim-rgb),0.18)",
+    fontFamily: "DM Sans, sans-serif",
+    fontWeight: 700,
+    fontSize: 14,
+    marginBottom: messageFirst ? 8 : 22,
+    cursor: busy ? "default" : "pointer",
+    opacity: busy ? 0.65 : 1,
+    boxShadow: primaryFilled
+      ? "0 4px 14px rgba(0,0,0,0.12)"
+      : "inset 0 1px 0 rgba(255,255,255,0.6)",
+    textDecoration: "none",
+    WebkitTapHighlightColor: "transparent",
+  };
+  if (messageFirst) {
+    return (
+      <div style={{ marginBottom: 22 }}>
+        <Link href={`/messages?to=${encodeURIComponent(handle as string)}`} style={primary}>
+          Message
+        </Link>
+        <button
+          type="button"
+          onClick={onTap}
+          disabled={busy}
+          aria-label="Connected. Unfollow"
+          style={{
+            display: "block",
+            width: "100%",
+            background: "none",
+            border: "none",
+            padding: "4px 0",
+            fontFamily: "DM Sans, sans-serif",
+            fontSize: 12.5,
+            fontWeight: 600,
+            color: "var(--ink-muted)",
+            cursor: busy ? "default" : "pointer",
+            opacity: busy ? 0.65 : 1,
+            WebkitTapHighlightColor: "transparent",
+          }}
+        >
+          Connected ✓ · <span style={{ textDecoration: "underline", textUnderlineOffset: 3 }}>Unfollow</span>
+        </button>
+      </div>
+    );
+  }
   return (
-    <button
-      type="button"
-      onClick={onTap}
-      disabled={busy}
-      style={{
-        display: "block",
-        width: "100%",
-        textAlign: "center",
-        padding: "11px 16px",
-        borderRadius: 14,
-        background: filled
-          ? state === "followed_by"
-            ? "#FF5C35"
-            : "var(--charcoal)"
-          : "var(--paper-70)",
-        color: filled ? (state === "followed_by" ? "#fff" : "var(--paper)") : "var(--charcoal)",
-        border: filled
-          ? "1px solid rgba(0,0,0,0.06)"
-          : "1px solid rgba(var(--scrim-rgb),0.18)",
-        fontFamily: "DM Sans, sans-serif",
-        fontWeight: 700,
-        fontSize: 14,
-        marginBottom: 22,
-        cursor: busy ? "default" : "pointer",
-        opacity: busy ? 0.65 : 1,
-        boxShadow: filled
-          ? "0 4px 14px rgba(0,0,0,0.12)"
-          : "inset 0 1px 0 rgba(255,255,255,0.6)",
-        WebkitTapHighlightColor: "transparent",
-      }}
-    >
+    <button type="button" onClick={onTap} disabled={busy} style={primary}>
       {isFollowing ? `${label} ✓` : label}
     </button>
   );
