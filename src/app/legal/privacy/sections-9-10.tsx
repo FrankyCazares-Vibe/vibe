@@ -144,6 +144,11 @@ export function Sections9To10() {
               the photos and videos of a post, if the Vibe team removed it or if
               a report on it is open or was acted on;
             </li>
+            <li>
+              a photo or video you sent in a chat, if the Vibe team or a
+              club&apos;s owner, admin or mod removed that message or if a report
+              on it is open or was acted on;
+            </li>
             <li>a photo, cover or logo the Vibe team removed;</li>
             <li>
               your profile photo and cover, if a report about you was open.

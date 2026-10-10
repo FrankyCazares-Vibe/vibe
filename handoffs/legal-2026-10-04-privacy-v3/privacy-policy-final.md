@@ -463,6 +463,7 @@ If step 1 or 2 fails, the account is not deleted and you can try again. If step 
 - **The moderation log:** your old account ID, your handle at the time and, for a photo that was removed, the old photo's address.
 - **Evidence files.** These are:
   - the photos and videos of a post, if the Vibe team removed it or if a report on it is open or was acted on;
+  - a photo or video you sent in a chat, if the Vibe team or a club's owner, admin or mod removed that message or if a report on it is open or was acted on;
   - a photo, cover or logo the Vibe team removed;
   - your profile photo and cover, if a report about you was open.
 

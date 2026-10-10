@@ -122,7 +122,7 @@ export async function POST(req: Request) {
   // club (`org_id`), for the log row (see "A CLUB POST'S CLUB" above).
   const { data: row, error: readErr } = await service
     .from(table)
-    .select(type === "post" ? "id, user_id, removed_at, org_id" : "id, user_id, removed_at")
+    .select(type === "post" ? "id, user_id, removed_at, org_id" : type === "message" ? "id, user_id, removed_at, media_url" : "id, user_id, removed_at")
     .eq("id", id)
     .maybeSingle();
   if (readErr) {
@@ -181,6 +181,12 @@ export async function POST(req: Request) {
       reportId: closedIds[0] ?? null,
       reason,
       meta: {
+        // A removed message's file is evidence that must outlive the sender's
+        // account; the message row cascades away with it, so the log keeps
+        // the key and who sent it (storage-purge.ts reads these back).
+        ...(type === "message"
+          ? { author_id: existing.user_id, media_url: (row as { media_url?: string | null }).media_url ?? null }
+          : {}),
         changed,
         already_removed: alreadyRemoved,
         resolved_reports: resolvedReports,

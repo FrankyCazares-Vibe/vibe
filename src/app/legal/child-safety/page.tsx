@@ -121,7 +121,11 @@ export default function ChildSafetyPage() {
           We permanently ban the account. If a school email was verified on it,
           that email can&apos;t be verified on another account.
         </li>
-        <li>We keep the records the law requires us to keep.</li>
+        <li>
+          We keep the records the law requires us to keep, including the
+          photo or video itself once it is reported in the app or we have
+          taken it down, even if the account that sent it is deleted.
+        </li>
         <li>
           We escalate to law enforcement and to the National Center for Missing
           &amp; Exploited Children (NCMEC) where the law requires it or where

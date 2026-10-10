@@ -62,7 +62,7 @@ type TargetType = ReportTargetType;
 const MAX_REASON = 1000;
 
 /** A reported message's snapshot columns (chat contract 5.3), and the six of before the chat rooms migration. */
-const MESSAGE_SNAPSHOT_COLUMNS = "id,user_id,channel_id,content,media_url,created_at,kind,thread_root_id";
+const MESSAGE_SNAPSHOT_COLUMNS = "id,user_id,channel_id,content,media_url,attachment_id,attachment_kind,created_at,kind,thread_root_id";
 const MESSAGE_SNAPSHOT_COLUMNS_BEFORE_ROOMS = "id,user_id,channel_id,content,media_url,created_at";
 const LOG = "[reports.POST]";
 

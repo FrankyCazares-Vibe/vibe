@@ -118,6 +118,33 @@ export function postMediaKeyKind(
   return null;
 }
 
+// A copy of MESSAGE_MEDIA_KEY_RE in src/lib/r2.ts (that file pulls in the S3
+// SDK, and this module imports nothing): change both. A test reads r2.ts as
+// text and fails when they drift.
+const EVIDENCE_MESSAGE_KEY_RE = /^messages\/[0-9a-f-]{36}\/[^/]+$/;
+
+/**
+ * Account deletion: the chat files that are EVIDENCE and must survive it
+ * (security report 2026-10-08, #1; 18 U.S.C. 2258A keeps reported material
+ * 90 days). `rows` are the leaving student's messages a moderator removed,
+ * and the snapshots of reports about their messages (open or actioned; a
+ * dismissed report keeps nothing). A key counts when the row is theirs
+ * (`user_id`) and it is shaped `messages/<channel>/<file>`. Over-matching
+ * only keeps a file; it can never delete one.
+ */
+export function messageEvidenceKeys(
+  rows: ReadonlyArray<{ user_id: unknown; media_url: unknown }>,
+  uid: string,
+): string[] {
+  const keys = new Set<string>();
+  for (const row of rows) {
+    if (row.user_id !== uid) continue;
+    const key = typeof row.media_url === "string" ? row.media_url : "";
+    if (EVIDENCE_MESSAGE_KEY_RE.test(key)) keys.add(key);
+  }
+  return Array.from(keys);
+}
+
 /**
  * Account deletion: which chat files the leaving student's own messages may
  * take with them. A key counts only when it sits in the folder of the chat

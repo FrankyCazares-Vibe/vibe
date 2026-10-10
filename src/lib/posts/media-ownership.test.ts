@@ -20,6 +20,7 @@ const {
   isOwnClipKey,
   ownClipKeysToDelete,
   postMediaKeyKind,
+  messageEvidenceKeys,
   purgeableMessageMediaKeys,
 } = (await import(specifier)) as typeof import("./media-ownership");
 
@@ -163,4 +164,35 @@ test("purgeableMessageMediaKeys keeps own-chat keys nobody else references", () 
   assert.equal(out.skipped, 2);
   assert.equal(out.shared, 1);
   assert.deepEqual(purgeableMessageMediaKeys([]).keys, []);
+});
+
+test("messageEvidenceKeys: the leaving student's reported and removed chat files, own rows only, keys of the right shape only", () => {
+  const UID = "11111111-1111-4111-8111-111111111111";
+  const OTHER = "22222222-2222-4222-8222-222222222222";
+  const CH = "33333333-3333-4333-8333-333333333333";
+  const rows = [
+    { user_id: UID, media_url: `messages/${CH}/a.jpg` },
+    { user_id: UID, media_url: `messages/${CH}/a.jpg` }, // a report and a removal of the same message
+    { user_id: UID, media_url: `messages/${CH}/b.mp4` },
+    { user_id: OTHER, media_url: `messages/${CH}/theirs.jpg` }, // someone else's row never counts
+    { user_id: UID, media_url: `clips/${UID}/not-a-chat-file.mp4` },
+    { user_id: UID, media_url: "messages/not-a-channel/x.jpg" },
+    { user_id: UID, media_url: null },
+    { user_id: UID, media_url: 42 },
+  ];
+  assert.deepEqual(messageEvidenceKeys(rows, UID).sort(), [`messages/${CH}/a.jpg`, `messages/${CH}/b.mp4`]);
+  assert.deepEqual(messageEvidenceKeys([], UID), []);
+  assert.deepEqual(messageEvidenceKeys(rows, OTHER), [`messages/${CH}/theirs.jpg`]);
+});
+
+test("the evidence key shape is the same regex as src/lib/r2.ts MESSAGE_MEDIA_KEY_RE (copied, not imported)", async () => {
+  const { readFileSync } = await import("node:fs");
+  const r2 = readFileSync(new URL("../r2.ts", import.meta.url), "utf8");
+  const own = readFileSync(new URL("./media-ownership.ts", import.meta.url), "utf8");
+  const pick = (src: string, name: string) => {
+    const m = src.match(new RegExp(`${name} = (/.+?/);`));
+    assert.ok(m, `${name} not found`);
+    return m[1];
+  };
+  assert.equal(pick(own, "EVIDENCE_MESSAGE_KEY_RE"), pick(r2, "MESSAGE_MEDIA_KEY_RE"));
 });

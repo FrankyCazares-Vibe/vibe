@@ -5,7 +5,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { quarantineProfilesObjects } from "@/lib/moderation/media-quarantine-store";
 import { isUuid } from "@/lib/pgrest";
 import { evidenceToKeep, type PostMediaRow } from "@/lib/posts/delete-media";
-import { purgeableMessageMediaKeys } from "@/lib/posts/media-ownership";
+import { messageEvidenceKeys, purgeableMessageMediaKeys } from "@/lib/posts/media-ownership";
 import { RESUME_BUCKET } from "@/lib/profile/resume-doc-url";
 import {
   CLIP_KEY_PREFIX,
@@ -52,7 +52,12 @@ import { createSupabaseServiceClient } from "@/lib/supabase/service";
  *                        exact keys via `deleteR2Keys` (F4 in the A4 review),
  *                        only when each sits in its own message's chat
  *                        folder and no other member's message names it
- *                        (S67 security wave).
+ *                        (S67 security wave) — EXCEPT the files of the
+ *                        user's moderator-removed messages and of messages
+ *                        with an open or actioned report, which stay in
+ *                        place as evidence (security report 2026-10-08,
+ *                        #1: a sender could erase a reported intimate image
+ *                        by deleting their account).
  *
  * EVIDENCE FIRST (B2). Before the `profiles` sweep, the files that are
  * evidence are MOVED to quarantine (see loadEvidence): the photo / poster of
@@ -261,18 +266,22 @@ const EVIDENCE_PAGE = 1000;
 /**
  * What must survive this account deletion (B2, waveB-build.md call 3): the
  * media rows of the user's moderator-removed posts and of report snapshots
- * about their posts (open or actioned; a dismissed report keeps nothing), and
- * the current avatar/cover when a report about the user is open. Service
- * role; any read error THROWS (the deletion stops rather than risk erasing
- * evidence). Report snapshots carry the post's media columns
- * (me/reports POST_SNAPSHOT_COLUMNS), so a post deleted while a report was
- * open still has its video kept.
+ * about their posts (open or actioned; a dismissed report keeps nothing),
+ * the current avatar/cover when a report about the user is open, and (from
+ * the 2026-10-08 security report, #1) the chat files of the user's
+ * moderator-removed messages and of report snapshots about their messages.
+ * Service role; any read error THROWS (the deletion stops rather than risk
+ * erasing evidence). Report snapshots carry the target's media columns
+ * (me/reports POST_SNAPSHOT_COLUMNS / MESSAGE_SNAPSHOT_COLUMNS), so a post
+ * or message deleted while a report was open still has its file kept.
  */
 async function loadEvidence(
   uid: string,
-): Promise<{ postRows: PostMediaRow[]; profileRefs: unknown[] }> {
+): Promise<{ postRows: PostMediaRow[]; profileRefs: unknown[]; messageRows: MessageEvidenceRow[] }> {
   const db = createSupabaseServiceClient();
   const postRows: PostMediaRow[] = [];
+  const messageRows: MessageEvidenceRow[] = [];
+  const sharedPostIds = new Set<string>();
 
   let afterId: string | null = null;
   for (;;) {
@@ -320,6 +329,87 @@ async function loadEvidence(
     afterId = page[page.length - 1].id;
   }
 
+  // Chat files: the snapshots of reports about the user's messages ...
+  afterId = null;
+  for (;;) {
+    let query = db
+      .from("reports")
+      .select("id, target_snapshot")
+      .eq("target_type", "message")
+      .eq("target_owner_id", uid)
+      .in("status", ["open", "actioned"])
+      .order("id", { ascending: true })
+      .limit(EVIDENCE_PAGE);
+    if (afterId) query = query.gt("id", afterId);
+    const { data, error } = await query;
+    if (error) throw new Error(`message reports lookup: ${error.message}`);
+    const page = (data ?? []) as Array<{ id: string; target_snapshot: unknown }>;
+    for (const r of page) {
+      const snap = r.target_snapshot as Record<string, unknown> | null;
+      if (snap && typeof snap === "object") {
+        messageRows.push({ user_id: snap.user_id, media_url: snap.media_url });
+        // A reported message that SHARES one of the user's own video posts
+        // carries no media_url: the post it names is the evidence (review of
+        // 2026-10-10, #16).
+        if (typeof snap.attachment_id === "string") sharedPostIds.add(snap.attachment_id);
+      }
+    }
+    if (page.length < EVIDENCE_PAGE) break;
+    afterId = page[page.length - 1].id;
+  }
+  // ... and the user's messages a moderator (or a club officer) removed. The
+  // rows are still here: this runs before the auth user is deleted.
+  afterId = null;
+  for (;;) {
+    let query = db
+      .from("messages")
+      .select("id, user_id, media_url, attachment_id")
+      .eq("user_id", uid)
+      .not("removed_at", "is", null)
+      .or("media_url.not.is.null,attachment_id.not.is.null")
+      .order("id", { ascending: true })
+      .limit(EVIDENCE_PAGE);
+    if (afterId) query = query.gt("id", afterId);
+    const { data, error } = await query;
+    if (error) throw new Error(`removed messages lookup: ${error.message}`);
+    const page = (data ?? []) as Array<{ id: string; user_id: unknown; media_url: unknown; attachment_id: unknown }>;
+    for (const m of page) {
+      messageRows.push({ user_id: m.user_id, media_url: m.media_url });
+      if (typeof m.attachment_id === "string") sharedPostIds.add(m.attachment_id);
+    }
+    if (page.length < EVIDENCE_PAGE) break;
+    afterId = page[page.length - 1].id;
+  }
+  // ... and the keys the moderation log recorded when the Vibe team removed
+  // one of the user's messages (admin/content/remove writes `author_id` and
+  // `media_url` into its meta): the one record of a removed message's file
+  // that outlives the account (review of 2026-10-10, #13). Best effort on an
+  // old log that carries no such meta.
+  {
+    const { data, error } = await db
+      .from("moderation_actions")
+      .select("meta")
+      .eq("action", "message_remove")
+      .eq("meta->>author_id", uid)
+      .limit(EVIDENCE_PAGE);
+    if (error) throw new Error(`moderation log lookup: ${error.message}`);
+    for (const r of (data ?? []) as Array<{ meta: unknown }>) {
+      const meta = r.meta as Record<string, unknown> | null;
+      if (meta && typeof meta === "object") messageRows.push({ user_id: uid, media_url: meta.media_url });
+    }
+  }
+  // The posts those reported or removed messages shared: their files join the
+  // post evidence (evidenceToKeep keeps only the user's own files).
+  const sharedIds = Array.from(sharedPostIds);
+  for (let i = 0; i < sharedIds.length; i += SHARED_KEY_CHUNK) {
+    const { data, error } = await db
+      .from("posts")
+      .select("id, user_id, media_url, media_thumbnail_url")
+      .in("id", sharedIds.slice(i, i + SHARED_KEY_CHUNK));
+    if (error) throw new Error(`shared posts lookup: ${error.message}`);
+    postRows.push(...((data ?? []) as Array<PostMediaRow & { id: string }>));
+  }
+
   const { count, error: userReportErr } = await db
     .from("reports")
     .select("id", { count: "exact", head: true })
@@ -337,8 +427,11 @@ async function loadEvidence(
     if (error) throw new Error(`reported user images lookup: ${error.message}`);
     profileRefs.push(data?.avatar_url, data?.banner_url);
   }
-  return { postRows, profileRefs };
+  return { postRows, profileRefs, messageRows };
 }
+
+/** What the chat-evidence rule reads of a report snapshot or a removed message row. */
+type MessageEvidenceRow = { user_id: unknown; media_url: unknown };
 
 /**
  * Remove everything a user uploaded EXCEPT evidence: `profiles/<uid>/**`,
@@ -355,8 +448,9 @@ export async function purgeUserUploads(uid: string): Promise<PurgeResult> {
   if (!isUuid(uid)) {
     throw new Error("purgeUserUploads: uid must be a UUID");
   }
-  const { postRows, profileRefs } = await loadEvidence(uid);
+  const { postRows, profileRefs, messageRows } = await loadEvidence(uid);
   const evidence = evidenceToKeep(postRows, profileRefs, uid, getSupabaseUrl());
+  const chatEvidence = new Set(messageEvidenceKeys(messageRows, uid));
   if (evidence.profilesPaths.length > 0) {
     const moved = await quarantineProfilesObjects(
       createSupabaseServiceClient(),
@@ -372,10 +466,16 @@ export async function purgeUserUploads(uid: string): Promise<PurgeResult> {
     `${CLIP_KEY_PREFIX}${uid}/`,
     new Set(evidence.clipKeys),
   );
-  const messageMedia = await deleteR2Keys(await listUserMessageMediaKeys(uid));
-  if (evidence.profilesPaths.length > 0 || clips.kept > 0) {
+  // Chat files that are evidence stay where they are (the message rows that
+  // name them cascade away with the user; the report snapshots keep the keys).
+  const chatCandidates = await listUserMessageMediaKeys(uid);
+  const chatKeys = chatCandidates.filter((key) => !chatEvidence.has(key));
+  // What this sweep held back (a key only a snapshot names was never a candidate).
+  const chatKept = chatCandidates.length - chatKeys.length;
+  const messageMedia = await deleteR2Keys(chatKeys);
+  if (evidence.profilesPaths.length > 0 || clips.kept > 0 || chatKept > 0) {
     console.info(
-      `[purgeUserUploads] kept evidence: ${evidence.profilesPaths.length} photo(s) in quarantine, ${clips.kept} video file(s) in R2`,
+      `[purgeUserUploads] kept evidence: ${evidence.profilesPaths.length} photo(s) in quarantine, ${clips.kept} video file(s) in R2, ${chatKept} chat file(s) in R2`,
     );
   }
   return { profiles, resumes, quarantine: 0, clips: clips.deleted, messageMedia };
