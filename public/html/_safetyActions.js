@@ -252,16 +252,20 @@
             duration_hours: hours > 0 ? hours : null,
           }),
         })
-          .then((r) => r.json())
-          .then((j) => {
+          // A refusal, a bad body or no connection all say so in plain
+          // words (feature report 3, #14): a sheet that did nothing told the
+          // student nothing.
+          .then(async (r) => ({ status: r.status, j: await r.json().catch(() => null) }))
+          .then(({ status, j }) => {
             if (j && j.ok) {
               showToast(hours > 0 ? "Muted for " + (hours === 168 ? "7 days" : hours + "h") : "Muted");
               closeSheet();
               if (onAfter) onAfter({ muting: true, mute_until: j.until });
             } else {
-              showToast("Couldn't mute: " + ((j && j.error) || "unknown"));
+              showToast(status === 401 ? "You've been signed out. Sign in and try again." : "Couldn't mute them. Try again.");
             }
-          });
+          })
+          .catch(() => showToast("Couldn't mute them. Check your connection and try again."));
       });
     });
     const ub = document.getElementById("vsaUnmuteBtn");
@@ -279,16 +283,16 @@
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ target_id: targetId }),
     })
-      .then((r) => r.json())
-      .then((j) => {
+      .then(async (r) => ({ status: r.status, j: await r.json().catch(() => null) }))
+      .then(({ status, j }) => {
         if (j && j.ok) {
           showToast("Unmuted");
           if (onAfter) onAfter({ muting: false, mute_until: null });
         } else {
-          showToast("Couldn't unmute: " + ((j && j.error) || "unknown"));
+          showToast(status === 401 ? "You've been signed out. Sign in and try again." : "Couldn't unmute them. Try again.");
         }
       })
-      .catch((e) => { console.error("[vibeUnmute]", e); });
+      .catch(() => showToast("Couldn't unmute them. Check your connection and try again."));
   };
 
   // ── Report ─────────────────────────────────────────────────────────────

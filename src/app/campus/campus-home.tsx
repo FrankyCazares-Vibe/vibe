@@ -10053,22 +10053,22 @@ export function EventCard({
     if (next === "maybe" && prev !== "maybe") setInterested((c) => c + 1);
     setStatus(next);
     try {
-      const res = next
-        ? await fetch(`/api/events/${ev.id}/rsvp`, {
-            method: "PUT",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ status: next }),
-          })
-        : await fetch(`/api/events/${ev.id}/rsvp`, { method: "DELETE" });
-      if (!res.ok) {
-        // Away from home the route refuses an RSVP (403 `campus_visiting`).
-        // Say so in the words the card uses, never a generic failure.
-        const body = (await res.json().catch(() => null)) as { code?: unknown } | null;
-        if (res.status === 403 && body?.code === "campus_visiting") {
+      // Quiet, so the one refusal with its own words (away from home) is
+      // said the card's way; every other refusal (signed out, Terms, a
+      // limit, a server error) is said too, with the helper's line: a button
+      // that quietly flips back told the student nothing (feature report 3,
+      // #11). vibeRequest never throws.
+      const r = next
+        ? await vibeRequest(`/api/events/${ev.id}/rsvp`, { method: "PUT", json: { status: next }, quiet: true, failure: "Couldn't save your RSVP." })
+        : await vibeRequest(`/api/events/${ev.id}/rsvp`, { method: "DELETE", quiet: true, failure: "Couldn't change your RSVP." });
+      if (!r.ok) {
+        if (r.status === 403 && r.code === "campus_visiting") {
           setRefusedAway(true);
           toast({ message: `${VISITING_COPY.rsvpTitle}.`, tone: "error" });
+        } else {
+          toast({ message: r.message, tone: "error", action: r.action });
         }
-        throw new Error(`rsvp ${res.status}`);
+        throw new Error(`rsvp ${r.status}`);
       }
       onMutate();
       emitCalendarChanged();

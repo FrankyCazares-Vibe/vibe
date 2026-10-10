@@ -85,6 +85,10 @@ export function OrgEventsSection({
       if (r.ok && Array.isArray(r.data.events)) {
         setLoadErr(null);
         setEvents(r.data.events);
+      } else if (!r.ok && r.status === 401) {
+        // A visitor who was never signed in is asked to sign in, not told
+        // they were signed out (feature report 3, #16).
+        setLoadErr({ ...asLoadFailure(r, "Couldn't load events."), message: "Sign in to see this club's events." });
       } else {
         setLoadErr(asLoadFailure(r, "Couldn't load events."));
       }

@@ -703,7 +703,9 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
       } else {
         // Loaded rows stay (the pane only reads the error while
         // `reposts` is null); with none, the pane shows LoadFailed.
-        setRepostsErr(asLoadFailure(r, line));
+        // A visitor who was never signed in is asked to sign in, not told
+        // they were signed out (feature report 3, #16).
+        setRepostsErr(r.status === 401 ? { ...asLoadFailure(r, line), message: "Sign in to see reposts." } : asLoadFailure(r, line));
       }
     })();
     return () => {
@@ -758,23 +760,23 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
     setFollowBusy(true);
     setFollowState(next);
     try {
-      const r = await fetch("/api/me/follow", {
+      // Quiet so a signed-out tap still goes straight to sign-in; every other
+      // refusal is said (feature report 3, #12). vibeRequest never throws.
+      const r = await vibeRequest<{ ok?: boolean }>("/api/me/follow", {
         method: wasFollowing ? "DELETE" : "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ target_handle: targetHandle }),
+        json: { target_handle: targetHandle },
+        quiet: true,
+        failure: wasFollowing ? "Couldn't unfollow them." : "Couldn't follow them.",
       });
-      const j = await r.json().catch(() => ({}));
-      if (r.status === 401) {
+      if (!r.ok && r.status === 401) {
         window.location.href = `/auth/login?next=${encodeURIComponent(`/profile/${targetHandle}`)}`;
         return;
       }
-      if (!r.ok || !j?.ok) {
-        // Roll back.
+      if (!r.ok || r.data?.ok !== true) {
+        // Roll back, and say why.
         setFollowState(followState);
+        if (!r.ok) toast({ message: r.message, tone: "error", action: r.action });
       }
-    } catch {
-      setFollowState(followState);
     } finally {
       setFollowBusy(false);
     }

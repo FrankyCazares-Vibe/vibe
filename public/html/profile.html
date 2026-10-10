@@ -9904,7 +9904,10 @@ async function hydrateRepostsPaneFromAPI() {
       if (empty) empty.style.display = 'none';
       if (list) {
         list.style.display = '';
-        window.vibeLoadFailed(list, window.vibeLoadFailure(r, LINE), hydrateRepostsPaneFromAPI);
+        // Never signed in: ask them to, instead of "signed out" (feature report 3, #16).
+        const failure = window.vibeLoadFailure(r, LINE);
+        if (r.status === 401) failure.message = 'Sign in to see reposts.';
+        window.vibeLoadFailed(list, failure, hydrateRepostsPaneFromAPI);
       }
       return;
     }

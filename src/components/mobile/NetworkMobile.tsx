@@ -889,16 +889,14 @@ export function UserRow({
     setBusy(true);
     onStateChange(user.id, next);
     try {
-      const r = await fetch("/api/me/follow", {
+      // A refusal says why (the helper's toast) and the pill goes back; it
+      // used to flip back in silence (feature report 3, #12). Never throws.
+      const r = await vibeRequest<{ ok?: boolean }>("/api/me/follow", {
         method: isFollowing ? "DELETE" : "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ target_handle: user.handle }),
+        json: { target_handle: user.handle },
+        failure: isFollowing ? "Couldn't unfollow them." : "Couldn't follow them.",
       });
-      const j = await r.json().catch(() => ({}));
-      if (!r.ok || !j?.ok) onStateChange(user.id, state);
-    } catch {
-      onStateChange(user.id, state);
+      if (!r.ok || r.data?.ok !== true) onStateChange(user.id, state);
     } finally {
       setBusy(false);
     }
