@@ -52,8 +52,8 @@
     .vmp-av img{width:100%;height:100%;object-fit:cover;display:block;}
     .vmp-info{flex:1;min-width:0;}
     .vmp-name{font-size:13px;font-weight:600;color:var(--charcoal,#1C1C1E);}
-    .vmp-handle{font-size:11px;color:var(--ink-muted,#8A8580);}
-    .vmp-empty{padding:16px 14px;color:var(--ink-muted,#8A8580);font-size:12px;text-align:center;}
+    .vmp-handle{font-size:11px;color:var(--ink-muted, #6C6761);}
+    .vmp-empty{padding:16px 14px;color:var(--ink-muted, #6C6761);font-size:12px;text-align:center;}
     /* Night (S68 wave 5): the popover's own copy of the Night tokens it
        reads, scoped to it, so it paints Night on any host (messages.html has
        no --ink-muted / --hairline). Light sets nothing here: each var()

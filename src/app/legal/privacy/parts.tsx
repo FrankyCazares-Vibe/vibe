@@ -12,7 +12,7 @@ import { LegalH2, LegalH3 } from "@/components/legal/LegalLayout";
 // `break-word` lets one break rather than stick out of a narrow column, and
 // only when it would not fit on a line of its own.
 const ACCENT_LINK = {
-  color: "var(--coral)",
+  color: "var(--tag-ink)",
   fontWeight: 700,
   textDecoration: "none",
   overflowWrap: "break-word",

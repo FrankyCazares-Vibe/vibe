@@ -28,8 +28,12 @@ function getFrom(): string {
 const CREAM = "#FAF7F2";
 const CHARCOAL = "#1C1C1E";
 const BODY = "#5A564F";
-const MUTED = "#8A8580";
+// Text colours meet 4.5:1 on the white card and the cream page (contrast
+// pass, Oct 12 2026): the grey matches --ink-muted in globals.css, and small
+// coral words use ACCENT_INK. ACCENT stays for fills and the wordmark dot.
+const MUTED = "#6C6761";
 const ACCENT = "#FF5C35";
+const ACCENT_INK = "#B83A1A";
 const SERIF = "'Fraunces',Georgia,'Times New Roman',serif";
 const SANS = "'DM Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif";
 const MONO = "ui-monospace,'SF Mono',Menlo,Consolas,'Courier New',monospace";
@@ -78,7 +82,7 @@ function brandedEmailHtml(e: BrandedEmail): string {
     : "padding:12px 20px;font-size:30px;line-height:36px;letter-spacing:6px";
   const code = e.code
     ? `
-            <p style="margin:0 0 10px;font-size:11px;line-height:16px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:${ACCENT};">${e.code.label}</p>
+            <p style="margin:0 0 10px;font-size:11px;line-height:16px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:${ACCENT_INK};">${e.code.label}</p>
             <table role="presentation" cellpadding="0" cellspacing="0" border="0">
               <tr>
                 <td class="vibe-code${long ? " vibe-code-long" : ""}" bgcolor="#FFEEE8" style="background:#FFEEE8;border:1px solid #FFD6C8;border-radius:12px;${codeStyle};font-family:${MONO};font-weight:700;color:${CHARCOAL};">${e.code.value}</td>

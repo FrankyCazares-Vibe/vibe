@@ -39,7 +39,7 @@
       .vc-stage.grabbing { cursor: grabbing; }
       .vc-img { position: absolute; left: 0; top: 0; max-width: none; pointer-events: none; }
       .vc-zoom { display: flex; align-items: center; gap: 10px; }
-      .vc-zoom-label { font-size: 11px; font-weight: 700; color: var(--ink-muted, #8A8580);
+      .vc-zoom-label { font-size: 11px; font-weight: 700; color: var(--ink-muted, #6C6761);
         letter-spacing: 0.4px; text-transform: uppercase; }
       .vc-zoom-slider { flex: 1; accent-color: #FF5C35; }
       .vc-actions { display: flex; justify-content: flex-end; gap: 8px; }
@@ -198,7 +198,7 @@
             label.style.fontWeight = "700";
             const suffix = document.createElement("span");
             suffix.textContent = "visible area";
-            suffix.style.color = "var(--ink-muted, #8A8580)";
+            suffix.style.color = "var(--ink-muted, #6C6761)";
             row.appendChild(swatch);
             row.appendChild(label);
             row.appendChild(suffix);

@@ -95,7 +95,7 @@
   .vpv-avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
   .vpv-meta { flex: 1; min-width: 0; }
   .vpv-meta .vpv-name { font-weight: 700; font-size: 14px; line-height: 1.2; }
-  .vpv-meta .vpv-sub  { font-size: 12px; color: var(--ink-muted, #8A8580); margin-top: 2px; line-height: 1.2; }
+  .vpv-meta .vpv-sub  { font-size: 12px; color: var(--ink-muted, #6C6761); margin-top: 2px; line-height: 1.2; }
   .vpv-meta .vpv-sub strong { color: var(--charcoal, #1C1C1E); font-weight: 600; }
 
   .vpv-body {
@@ -117,7 +117,7 @@
     font-size: 13px; font-weight: 700; color: var(--charcoal, #1C1C1E);
   }
   .vpv-removed-d {
-    font-size: 12.5px; line-height: 1.5; color: var(--ink-muted, #8A8580); margin-top: 3px;
+    font-size: 12.5px; line-height: 1.5; color: var(--ink-muted, #6C6761); margin-top: 3px;
   }
   .vpv-comment .vpv-removed {
     margin: 6px 0 0; padding: 8px 11px;
@@ -188,7 +188,7 @@
   }
   .vpv-comments-empty {
     padding: 20px 0 18px;
-    text-align: center; color: var(--ink-muted, #8A8580); font-size: 13px;
+    text-align: center; color: var(--ink-muted, #6C6761); font-size: 13px;
   }
   .vpv-comment {
     display: flex; gap: 10px; padding: 10px 0;
@@ -197,12 +197,12 @@
   .vpv-comment .vpv-avatar { width: 30px; height: 30px; font-size: 11px; }
   .vpv-cw { flex: 1; min-width: 0; }
   .vpv-cw .vpv-cn { font-size: 13px; font-weight: 700; color: var(--charcoal, #1C1C1E); }
-  .vpv-cw .vpv-cn .vpv-ch { color: var(--ink-muted, #8A8580); font-weight: 500; margin-left: 6px; font-size: 12px; }
+  .vpv-cw .vpv-cn .vpv-ch { color: var(--ink-muted, #6C6761); font-weight: 500; margin-left: 6px; font-size: 12px; }
   .vpv-cw .vpv-ct { font-size: 13.5px; line-height: 1.45; color: var(--charcoal, #1C1C1E); margin-top: 2px; word-wrap: break-word; }
-  .vpv-cw .vpv-cd { font-size: 11px; color: var(--ink-muted, #8A8580); margin-top: 4px; }
+  .vpv-cw .vpv-cd { font-size: 11px; color: var(--ink-muted, #6C6761); margin-top: 4px; }
   .vpv-cmeta {
     display: flex; align-items: center; gap: 14px;
-    margin-top: 6px; font-size: 11px; color: var(--ink-muted, #8A8580);
+    margin-top: 6px; font-size: 11px; color: var(--ink-muted, #6C6761);
     font-family: 'DM Sans', system-ui, sans-serif;
   }
   .vpv-cact {
@@ -282,15 +282,15 @@
   }
   .vpv-aud-headtext { flex: 1; min-width: 0; }
   .vpv-aud-title { font-size: 15px; font-weight: 700; line-height: 1.2; }
-  .vpv-aud-sub { font-size: 12px; color: var(--ink-muted, #8A8580); margin-top: 3px; line-height: 1.2; }
+  .vpv-aud-sub { font-size: 12px; color: var(--ink-muted, #6C6761); margin-top: 3px; line-height: 1.2; }
   .vpv-aud-close {
     background: transparent; border: none; padding: 0 2px;
-    font-size: 20px; line-height: 1; color: var(--ink-muted, #8A8580); cursor: none;
+    font-size: 20px; line-height: 1; color: var(--ink-muted, #6C6761); cursor: none;
   }
   .vpv-aud-body { flex: 1; overflow-y: auto; padding: 4px 20px 18px; }
   .vpv-aud-day {
     font-size: 11px; font-weight: 700; letter-spacing: .06em;
-    text-transform: uppercase; color: var(--ink-muted, #8A8580); padding: 12px 0 4px;
+    text-transform: uppercase; color: var(--ink-muted, #6C6761); padding: 12px 0 4px;
   }
   .vpv-aud-row {
     display: flex; align-items: center; gap: 10px;
@@ -308,13 +308,13 @@
     font-size: 13.5px; font-weight: 700; line-height: 1.25;
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
-  .vpv-aud-h { color: var(--ink-muted, #8A8580); font-weight: 500; font-size: 12px; margin-left: 6px; }
+  .vpv-aud-h { color: var(--ink-muted, #6C6761); font-weight: 500; font-size: 12px; margin-left: 6px; }
   .vpv-aud-meta {
-    font-size: 11.5px; color: var(--ink-muted, #8A8580); margin-top: 2px;
+    font-size: 11.5px; color: var(--ink-muted, #6C6761); margin-top: 2px;
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
   .vpv-aud-empty, .vpv-aud-loading {
-    padding: 26px 0; text-align: center; color: var(--ink-muted, #8A8580); font-size: 13px;
+    padding: 26px 0; text-align: center; color: var(--ink-muted, #6C6761); font-size: 13px;
   }
   .vpv-aud-more {
     display: block; width: 100%; margin-top: 12px;
@@ -325,7 +325,7 @@
   }
   .vpv-aud-lock { padding: 28px 6px 12px; text-align: center; }
   .vpv-aud-lock-n { font-size: 34px; font-weight: 800; line-height: 1; }
-  .vpv-aud-lock-label { font-size: 13px; color: var(--ink-muted, #8A8580); margin-top: 6px; }
+  .vpv-aud-lock-label { font-size: 13px; color: var(--ink-muted, #6C6761); margin-top: 6px; }
   .vpv-aud-lock-line { font-size: 14px; font-weight: 600; margin-top: 16px; }
   .vpv-aud-cta {
     display: inline-block; margin-top: 14px;
@@ -349,7 +349,7 @@
     display: flex; align-items: center; justify-content: space-between;
     gap: 8px; margin-top: 8px;
   }
-  .vpv-edit-hint { font-size: 12px; color: var(--ink-muted, #8A8580); min-width: 0; }
+  .vpv-edit-hint { font-size: 12px; color: var(--ink-muted, #6C6761); min-width: 0; }
   .vpv-edit-actions { display: flex; gap: 6px; flex-shrink: 0; }
   .vpv-edit-btn {
     background: transparent; color: var(--charcoal, #1C1C1E); border: 1px solid rgba(var(--scrim-rgb, 28,28,30),.14);
@@ -390,7 +390,7 @@
     --vpv-danger: #FF7A6B; --vpv-removed-bg: rgba(255,122,107,0.08);
     --vpv-media-bg: #1F1D1C; --vpv-mention: #A590FF;
   }
-  html[data-theme="dark"] .vpv-overlay ::placeholder { color: var(--ink-muted, #8A8580); }
+  html[data-theme="dark"] .vpv-overlay ::placeholder { color: var(--ink-muted, #6C6761); }
   /* A near-black card on a near-black page (the iframe drops the dim) needs
      an edge: a hairline ring, drawn as a shadow so nothing moves. */
   html[data-theme="dark"] .vpv-card,
@@ -1206,7 +1206,7 @@
           </button>
           <button class="vpv-cact" onclick="__vpvOpenReply('${esc(c.id)}', '${esc(a.handle || "")}')">Reply</button>
           ${reportBtn}
-          <span style="margin-left:auto;color:var(--ink-muted, #8A8580)">${esc(relTime(c.created_at))}</span>
+          <span style="margin-left:auto;color:var(--ink-muted, #6C6761)">${esc(relTime(c.created_at))}</span>
         </div>
         ${removedHtml}
         <div class="vpv-creply-form" id="vpv-reply-${esc(c.id)}" style="display:none">

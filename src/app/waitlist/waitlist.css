@@ -14,7 +14,8 @@
 .vwl-label { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; font-size: 13.5px; font-weight: 600; color: var(--cream); }
 .vwl-label small { font-size: 12px; font-weight: 500; color: var(--muted); }
 .vwl-input { box-sizing: border-box; width: 100%; height: 48px; padding: 0 14px; border-radius: 8px; border: 1px solid rgba(255, 255, 255, 0.14); background: rgba(255, 255, 255, 0.04); color: var(--cream); font: 500 16px/1.2 "DM Sans", sans-serif; transition: border-color 0.2s ease, box-shadow 0.2s ease; }
-.vwl-input::placeholder { color: rgba(246, 241, 234, 0.38); }
+/* Example text at 55% cream, not 38%: 38% was 3.3:1 on the box, under the 4.5:1 small text needs. 55% is 5.2:1 here and stays over 4.5 on the coral corner too. opacity: Firefox fades example text to 54% of that unless told not to. */
+.vwl-input::placeholder { color: rgba(246, 241, 234, 0.55); opacity: 1; }
 .vwl-input:focus { outline: none; border-color: rgba(255, 92, 53, 0.8); box-shadow: 0 0 0 3px rgba(255, 92, 53, 0.2); }
 .vwl-input[aria-invalid="true"] { border-color: rgba(255, 138, 107, 0.9); }
 select.vwl-input { appearance: none; -webkit-appearance: none; padding-right: 40px; background-image: linear-gradient(45deg, transparent 50%, var(--muted) 50%), linear-gradient(135deg, var(--muted) 50%, transparent 50%); background-position: calc(100% - 21px) 50%, calc(100% - 16px) 50%; background-size: 5px 5px; background-repeat: no-repeat; }

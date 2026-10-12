@@ -828,7 +828,7 @@ const toggleStyle: React.CSSProperties = {
   border: 0,
   borderRadius: "0 12px 12px 0",
   background: "none",
-  color: "#ff5c35",
+  color: "var(--tag-ink)",
   fontFamily: "inherit",
   fontSize: 13,
   fontWeight: 600,

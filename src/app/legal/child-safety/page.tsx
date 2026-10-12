@@ -14,7 +14,7 @@ export const metadata = {
 };
 
 const ACCENT_LINK = {
-  color: "#FF5C35",
+  color: "var(--tag-ink)",
   fontWeight: 700,
   textDecoration: "none",
 } as const;

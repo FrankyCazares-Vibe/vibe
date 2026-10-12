@@ -59,24 +59,32 @@
   --cream: #FAF7F2;
   --charcoal: #1C1C1E;
   --ink-2: #5C5853;
-  --ink-muted: #8A8580;
+  /* Darkened Oct 12, 2026 (was #8A8580, 3.4:1 on cream): small grey text has
+     to reach 4.5:1 to be read in sunlight. 5.2 on cream, 5.6 on white, and
+     4.6 on its hardest spot, the orange glow right under a sign-in button.
+     The static desktop pages keep hand copies: change them together. */
+  --ink-muted: #6C6761;
   --paper: #FFFFFF;
   --hairline: rgba(28,28,30,0.08);
   --scrim-rgb: 28,28,30;
   --glass: rgba(255,253,248,0.78);
   --glass-border: rgba(255,255,255,0.70);
+  /* Coral is for fills, borders and the wordmark's dot. As words on a light
+     page it is only 2.9:1, so orange text reads --tag-ink (5.4:1 on cream). */
   --coral: #FF5C35;
   --tag-ink: #B83A1A;
   --tag-bg: rgba(255,92,53,0.10);
   --card-shadow: inset 0 1px 0 rgba(255,255,255,0.85), 0 4px 14px rgba(180,120,60,0.08);
   --feed-backdrop: radial-gradient(620px 520px at 100% 0%, rgba(255,92,53,0.30), rgba(255,92,53,0.06) 45%, transparent 70%), radial-gradient(520px 420px at 0% 100%, rgba(255,92,53,0.16), transparent 65%), #FAF7F2;
   /* Status inks (S67 wave 3): the error reds, the success green and the
-     coral-brown eyebrow, so they stay readable on Night paper. Light keeps
-     today's exact hex. */
+     coral-brown eyebrow, so they stay readable on Night paper. The reds keep
+     their first hex. The green and the eyebrow went darker on Oct 12, 2026
+     (#1A9E5B was 3.2:1 on cream, #C84A20 4.4:1) so both pass 4.5:1: the green
+     is 5.0 on cream, the eyebrow 5.4 and now the same ink as --tag-ink. */
   --danger-ink: #B83030;
   --error-ink: #C0392B;
-  --ok-ink: #1A9E5B;
-  --eyebrow-ink: #C84A20;
+  --ok-ink: #147A45;
+  --eyebrow-ink: #B83A1A;
   /* Translucent steps + deep inks hoisted from wave 3's per-file blocks
      (ProfileMobile, ReportSheet, CampusMobile, the search dropdown). Light
      values are today's literals exactly. */
@@ -114,7 +122,15 @@
   --cream-92: rgba(250,247,242,0.92);
   --ink-sub: #5A564F;
   --ink-2-alt: #5C5956;
-  --ink-faint: #A8A39C;
+  /* The example text inside a sign-in box. Was #A8A39C (2.5:1 on white);
+     5.2 on white since Oct 12, 2026, and 4.6 on the step strip. Read only in
+     this file. */
+  --ink-faint: #716C64;
+  /* The school-email step's gold, as words (the chip, the hint, the step
+     line). Was a raw #b48414 in both looks, 2.7 to 3.3:1 on the light card;
+     this is 5.3:1 on the card and 4.6 on its hardest spot, the gold chip
+     inside the gold step. */
+  --edu-ink: #84610E;
   --ink-info: #3D3A35;
   --ink-prose: #2A2620;
   --error-ink-2: #B42318;
@@ -190,7 +206,10 @@
   --cream-92: rgba(12,11,11,0.92);
   --ink-sub: #CFC8BE;
   --ink-2-alt: #CFC8BE;
-  --ink-faint: #7A746C;
+  /* Lifted Oct 12, 2026 from #7A746C (3.9:1 on Night paper) to 5.1:1. */
+  --ink-faint: #8C867E;
+  /* The gold these words always had on Night, unchanged. */
+  --edu-ink: #b48414;
   --ink-info: #E4DDD3;
   --ink-prose: #E4DDD3;
   --error-ink-2: #FF7A6B;
@@ -734,7 +753,10 @@ body > .vibe-auth-page {
   font-size: 12.5px;
   padding: 1px 7px;
   background: rgba(255, 92, 53, 0.12);
-  color: #ff5c35;
+  /* Words in orange read --tag-ink, not raw coral (2.5:1 on this chip in
+     Light): 4.7:1 here, and a shade lighter than coral on Night. The same
+     goes for every orange word on these cards below. */
+  color: var(--tag-ink);
   border-radius: 6px;
   border: 1px solid rgba(255, 92, 53, 0.2);
   vertical-align: 1px;
@@ -780,14 +802,14 @@ body > .vibe-auth-page {
 .vibe-auth-label-hint {
   font-size: 11px;
   font-weight: 500;
-  color: #ff5c35;
+  color: var(--tag-ink);
   letter-spacing: 0.04em;
   text-transform: lowercase;
 }
 .vibe-auth-label-link {
   font-size: 12px;
   font-weight: 600;
-  color: #ff5c35;
+  color: var(--tag-ink);
   text-decoration: none;
   letter-spacing: 0.01em;
   transition: opacity 200ms ease;
@@ -813,6 +835,9 @@ body > .vibe-auth-page {
 }
 .vibe-auth-input::placeholder {
   color: var(--ink-faint);
+  /* Firefox fades example text to 54% unless told not to, which would undo
+     the contrast --ink-faint was picked for. Other browsers already use 1. */
+  opacity: 1;
 }
 .vibe-auth-input:focus {
   outline: none;
@@ -875,7 +900,7 @@ body > .vibe-auth-page {
   color: var(--ink-muted);
 }
 .vibe-auth-link {
-  color: #ff5c35;
+  color: var(--tag-ink);
   text-decoration: none;
   font-weight: 600;
   border-bottom: 1px dashed rgba(255, 92, 53, 0.35);
@@ -951,7 +976,9 @@ body > .vibe-auth-page {
   font-size: 10px;
   font-weight: 700;
   background: rgba(var(--scrim-rgb), 0.08);
-  color: var(--ink-muted);
+  /* --ink-sub, not --ink-muted: on this grey circle the muted grey is only
+     4.2:1 in Light and 4.4 on Night; this is 5.5 and 7.8. */
+  color: var(--ink-sub);
   letter-spacing: 0;
 }
 .vibe-auth-step--active .vibe-auth-step-num {
@@ -983,10 +1010,10 @@ body > .vibe-auth-page {
   color: var(--ink-faint);
 }
 .vibe-auth-step--active .vibe-auth-step-meta {
-  color: #ff5c35;
+  color: var(--tag-ink);
 }
 .vibe-auth-step--active.vibe-auth-step--edu .vibe-auth-step-meta {
-  color: #b48414;
+  color: var(--edu-ink);
 }
 .vibe-auth-step-divider {
   width: 14px;
@@ -998,11 +1025,11 @@ body > .vibe-auth-page {
 /* —— Auth: .edu code-chip variant (gold/amber) —— */
 .vibe-auth-code--edu {
   background: rgba(245, 200, 66, 0.18);
-  color: #b48414;
+  color: var(--edu-ink);
   border-color: rgba(245, 200, 66, 0.42);
 }
 .vibe-auth-label-hint--edu {
-  color: #b48414;
+  color: var(--edu-ink);
 }
 
 /* —— Auth: consent row (18+ attestation + Terms / Privacy agreement) ——
@@ -1132,7 +1159,7 @@ a.vibe-auth-secondary {
 }
 .vibe-auth-secondary:hover:not(:disabled) {
   border-color: #ff5c35;
-  color: #ff5c35;
+  color: var(--tag-ink);
 }
 .vibe-auth-secondary:focus-visible {
   outline: 2px solid #ff5c35;
@@ -1174,7 +1201,7 @@ a.vibe-auth-secondary {
   font-family: "DM Sans", sans-serif;
   font-size: 13.5px;
   font-weight: 600;
-  color: #ff5c35;
+  color: var(--tag-ink);
   cursor: pointer;
   vertical-align: middle;
 }

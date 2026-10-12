@@ -168,9 +168,9 @@
     html.vmm-open #ottoCorner{transform:translateX(-372px) !important;transition:transform .26s cubic-bezier(.2,.8,.2,1);}
     .vmm-hdr{padding:12px 14px;border-bottom:1px solid rgba(var(--scrim-rgb, 28,28,30),.08);display:flex;align-items:center;gap:10px;flex-shrink:0;background:var(--paper, white);}
     .vmm-hdr-title{font-family:'Fraunces',serif;font-weight:800;font-size:15px;flex:1;color:var(--charcoal, #1C1C1E);}
-    .vmm-hdr-back{background:none;border:none;color:var(--ink-muted, #8A8580);cursor:pointer;padding:6px;display:flex;align-items:center;justify-content:center;border-radius:6px;}
+    .vmm-hdr-back{background:none;border:none;color:var(--ink-muted, #6C6761);cursor:pointer;padding:6px;display:flex;align-items:center;justify-content:center;border-radius:6px;}
     .vmm-hdr-back:hover{background:var(--cream, #FAF7F2);color:var(--charcoal, #1C1C1E);}
-    .vmm-hdr-x{background:none;border:none;color:var(--ink-muted, #8A8580);cursor:pointer;font-size:18px;line-height:1;padding:6px 8px;border-radius:6px;}
+    .vmm-hdr-x{background:none;border:none;color:var(--ink-muted, #6C6761);cursor:pointer;font-size:18px;line-height:1;padding:6px 8px;border-radius:6px;}
     .vmm-hdr-x:hover{background:var(--cream, #FAF7F2);color:var(--charcoal, #1C1C1E);}
     .vmm-hdr-link{font-size:11px;font-weight:600;color:#FF5C35;text-decoration:none;padding:4px 8px;border-radius:6px;}
     .vmm-hdr-link:hover{background:var(--cream, #FAF7F2);}
@@ -185,11 +185,11 @@
     .vmm-av img{width:100%;height:100%;object-fit:cover;display:block;}
     .vmm-info{flex:1;min-width:0;}
     .vmm-name{font-size:13.5px;font-weight:600;color:var(--charcoal, #1C1C1E);display:flex;align-items:center;gap:6px;}
-    .vmm-prev{font-size:11.5px;color:var(--ink-muted, #8A8580);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+    .vmm-prev{font-size:11.5px;color:var(--ink-muted, #6C6761);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
     .vmm-row.unread .vmm-prev{color:var(--charcoal, #1C1C1E);font-weight:600;}
-    .vmm-time{font-size:10.5px;color:var(--ink-muted, #8A8580);flex-shrink:0;align-self:flex-start;padding-top:2px;}
-    .vmm-empty{padding:32px 16px;text-align:center;color:var(--ink-muted, #8A8580);font-size:12.5px;}
-    .vmm-date-sep{text-align:center;font-family:'DM Sans',sans-serif;font-size:10.5px;color:var(--ink-muted,#8A8580);margin:10px 0 6px;letter-spacing:.2px;}
+    .vmm-time{font-size:10.5px;color:var(--ink-muted, #6C6761);flex-shrink:0;align-self:flex-start;padding-top:2px;}
+    .vmm-empty{padding:32px 16px;text-align:center;color:var(--ink-muted, #6C6761);font-size:12.5px;}
+    .vmm-date-sep{text-align:center;font-family:'DM Sans',sans-serif;font-size:10.5px;color:var(--ink-muted, #6C6761);margin:10px 0 6px;letter-spacing:.2px;}
     .vmm-msgs{flex:1;overflow-y:auto;padding:12px 14px;display:flex;flex-direction:column;gap:9px;background:var(--cream, #FAF7F2);}
     .vmm-msg{display:flex;gap:7px;align-items:flex-end;}
     .vmm-msg.mine{flex-direction:row-reverse;}
@@ -250,7 +250,7 @@
     .vmm-reply-pill-x{width:20px;height:20px;border-radius:999px;border:1px solid rgba(255,255,255,0.16);background:rgba(255,255,255,0.06);color:rgba(255,255,255,0.85);font-size:11px;line-height:1;cursor:none;}
     .vmm-comp{padding:10px 12px;border-top:1px solid rgba(var(--scrim-rgb, 28,28,30),.08);background:var(--paper, white);display:flex;gap:8px;align-items:flex-end;flex-shrink:0;}
     .vmm-comp textarea{flex:1;border:none;background:none;font-family:inherit;font-size:13.5px;color:var(--charcoal, #1C1C1E);resize:none;outline:none;line-height:1.45;min-height:22px;max-height:96px;padding:4px 0;}
-    .vmm-comp textarea::placeholder{color:var(--ink-muted, #8A8580);}
+    .vmm-comp textarea::placeholder{color:var(--ink-muted, #6C6761);}
     .vmm-send{background:#FF5C35;color:white;border:none;width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;transition:filter .15s,transform .15s;}
     .vmm-send:hover{filter:brightness(1.05);}
     .vmm-send:disabled{background:rgba(var(--scrim-rgb, 28,28,30),.12);cursor:not-allowed;}
@@ -258,7 +258,7 @@
        the viewer can't post in. The composer's own surface and tokens. */
     .vmm-quiet{padding:14px 16px;min-height:44px;box-sizing:border-box;border-top:1px solid rgba(var(--scrim-rgb, 28,28,30),.08);background:var(--paper, white);color:var(--ink-2, #5C5853);font-size:12.5px;font-weight:600;line-height:1.3;text-align:center;flex-shrink:0;}
     .vmm-typing{display:inline-flex;gap:4px;padding:8px 12px;background:var(--paper, white);border-radius:14px;border-bottom-left-radius:4px;align-items:center;align-self:flex-start;margin-top:4px;}
-    .vmm-typing-dot{width:5px;height:5px;border-radius:50%;background:var(--ink-muted, #8A8580);opacity:.7;animation:vmmBounce 1.2s infinite;}
+    .vmm-typing-dot{width:5px;height:5px;border-radius:50%;background:var(--ink-muted, #6C6761);opacity:.7;animation:vmmBounce 1.2s infinite;}
     .vmm-typing-dot:nth-child(2){animation-delay:.16s;}
     .vmm-typing-dot:nth-child(3){animation-delay:.32s;}
     @keyframes vmmBounce{0%,80%,100%{transform:translateY(0);opacity:.5;}40%{transform:translateY(-2px);opacity:1;}}
@@ -275,7 +275,7 @@
     /* The pointer is inside the frame, which draws its own cursor: the
        page's dot and ring would sit frozen on the frame's edge. */
     html.vmm-over-frame #cursor,html.vmm-over-frame #cursorRing{opacity:0 !important;}
-    .vmm-loading{padding:24px;text-align:center;color:var(--ink-muted, #8A8580);font-size:12px;}
+    .vmm-loading{padding:24px;text-align:center;color:var(--ink-muted, #6C6761);font-size:12px;}
   `;
   document.head.appendChild(style);
 

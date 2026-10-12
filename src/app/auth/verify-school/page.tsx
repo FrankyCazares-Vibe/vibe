@@ -460,7 +460,7 @@ export default function VerifySchoolPage() {
 }
 
 const linkStyle: CSSProperties = {
-  color: "#FF5C35",
+  color: "var(--tag-ink)",
   textDecoration: "none",
   fontSize: 16,
 };

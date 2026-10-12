@@ -60,13 +60,13 @@
     .vsa-card{width:min(420px,92vw);background:var(--paper,white);border-radius:16px;border:1px solid var(--hairline,rgba(28,28,30,.08));box-shadow:0 28px 80px rgba(0,0,0,.28),0 4px 16px rgba(0,0,0,.08);overflow:hidden;display:flex;flex-direction:column;font-family:'DM Sans',system-ui,sans-serif;}
     .vsa-hdr{padding:16px 20px 12px;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--hairline,rgba(28,28,30,.08));}
     .vsa-title{font-family:'Fraunces',serif;font-size:17px;font-weight:800;flex:1;color:var(--charcoal,#1C1C1E);}
-    .vsa-x{background:none;border:none;color:var(--ink-muted,#8A8580);cursor:pointer;font-size:18px;line-height:1;padding:4px 6px;}
+    .vsa-x{background:none;border:none;color:var(--ink-muted, #6C6761);cursor:pointer;font-size:18px;line-height:1;padding:4px 6px;}
     .vsa-body{padding:14px 20px 18px;}
     .vsa-row{display:flex;align-items:center;justify-content:space-between;padding:11px 14px;border-radius:10px;border:1px solid var(--hairline,rgba(28,28,30,.08));cursor:pointer;font-size:13.5px;font-weight:600;color:var(--charcoal,#1C1C1E);margin-bottom:8px;background:var(--paper,white);transition:background .12s,border-color .12s;}
     .vsa-row:hover{background:var(--cream,#FAF7F2);border-color:rgba(var(--scrim-rgb,28,28,30),.18);}
     .vsa-row.danger{color:var(--error-ink,#C0392B);}
     .vsa-row.selected{background:rgba(255,92,53,.06);border-color:#FF5C35;color:var(--charcoal,#1C1C1E);}
-    .vsa-row .vsa-row-sub{display:block;font-size:11px;color:var(--ink-muted,#8A8580);font-weight:500;margin-top:2px;}
+    .vsa-row .vsa-row-sub{display:block;font-size:11px;color:var(--ink-muted, #6C6761);font-weight:500;margin-top:2px;}
     .vsa-text{width:100%;border:1.5px solid var(--hairline,rgba(28,28,30,.08));border-radius:10px;padding:10px 12px;font-family:inherit;font-size:13px;outline:none;resize:vertical;min-height:80px;margin-top:8px;}
     .vsa-text:focus{border-color:rgba(var(--scrim-rgb,28,28,30),.2);}
     .vsa-foot{padding:14px 20px;display:flex;gap:10px;justify-content:flex-end;border-top:1px solid var(--hairline,rgba(28,28,30,.08));}
@@ -78,7 +78,7 @@
     .vsa-btn.primary:disabled{opacity:.45;cursor:not-allowed;}
     .vsa-btn.danger{background:#C0392B;color:white;}
     .vsa-btn.danger:hover{filter:brightness(1.05);}
-    .vsa-note{font-size:12.5px;color:var(--ink-muted,#8A8580);line-height:1.5;}
+    .vsa-note{font-size:12.5px;color:var(--ink-muted, #6C6761);line-height:1.5;}
     /* A refusal the shared copy table can't speak for (see vibeOpenReportSheet
        below): it belongs beside the button that was just pressed, not in a
        toast that slides away while the sheet is still open. */
@@ -95,7 +95,7 @@
     html[data-theme="dark"] .vsa-overlay,html[data-theme="dark"] #vsa-toast{--paper:#161515;--cream:#0C0B0B;--charcoal:#F6F1EA;--ink-muted:#9C958C;--hairline:rgba(255,255,255,0.09);--scrim-rgb:255,255,255;--error-ink:#FF7A6B;--on-ink:#0C0B0B;}
     html[data-theme="dark"] .vsa-card{color:var(--charcoal,#1C1C1E);}
     html[data-theme="dark"] .vsa-text{background:var(--paper,white);color:var(--charcoal,#1C1C1E);}
-    html[data-theme="dark"] .vsa-text::placeholder{color:var(--ink-muted,#8A8580);}
+    html[data-theme="dark"] .vsa-text::placeholder{color:var(--ink-muted, #6C6761);}
   `;
   document.head.appendChild(styleEl);
 

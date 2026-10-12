@@ -225,7 +225,7 @@
     }
     .msg-profile-meta {
       font-family: 'DM Sans', sans-serif; font-size: 11.5px;
-      color: var(--ink-muted, #8A8580); margin-top: 2px;
+      color: var(--ink-muted, #6C6761); margin-top: 2px;
       overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
     }
     /* Dark variant — used inside "mine" bubbles in messages.html so the

@@ -163,7 +163,7 @@ export default function ForgotPasswordPage() {
           </Link>
         </p>
         {/* The policy and the Terms, the same line the sign-in page ends on. */}
-        <p className="vibe-auth-tail" style={{ marginTop: 28, fontSize: 12.5, opacity: 0.75 }}>
+        <p className="vibe-auth-tail" style={{ marginTop: 28, fontSize: 12.5 }}>
           <Link href="/legal/privacy" className="vibe-auth-link--tap" style={{ color: "inherit", textDecoration: "underline", textUnderlineOffset: 3 }}>
             Privacy Policy
           </Link>
