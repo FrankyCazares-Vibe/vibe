@@ -3031,7 +3031,7 @@ function __dmComposeRenderSelected() {
   wrap.innerHTML = __realDM.composeSelected.map(u => {
     const initials = String(u.name || u.handle || '?').split(/\s+/).slice(0,2).map(s => s[0] || '').join('').toUpperCase();
     const av = u.avatar_url
-      ? '<img src="' + __dmEsc(u.avatar_url) + '" style="width:100%;height:100%;object-fit:cover;display:block;">'
+      ? '<img src="' + __dmEsc(u.avatar_url) + '" alt="" style="width:100%;height:100%;object-fit:cover;display:block;">'
       : __dmEsc(initials);
     return '<span class="compose-chip">' +
       '<span class="compose-chip-av" style="background:' + __dmAvBg(u.handle || u.id || u.name) + '">' + av + '</span>' +
@@ -3077,7 +3077,7 @@ function __dmComposeSearch(q) {
         const sub = [u.school, u.major, u.year ? 'Year ' + u.year : ''].filter(Boolean).join(' · ');
         const initials = String(name).split(/\s+/).slice(0,2).map(s => s[0] || '').join('').toUpperCase() || '?';
         const av = u.avatar_url
-          ? '<img src="' + __dmEsc(u.avatar_url) + '" style="width:100%;height:100%;object-fit:cover;border-radius:inherit;display:block;">'
+          ? '<img src="' + __dmEsc(u.avatar_url) + '" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:inherit;display:block;">'
           : __dmEsc(initials);
         const selected = isGroup && __realDM.composeSelected.some(s => s.id === u.id);
         const onClick = isGroup

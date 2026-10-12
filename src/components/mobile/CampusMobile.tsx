@@ -1506,6 +1506,12 @@ function FeedCard({
   const isVideo = post.media_kind === "video";
   const hasMedia = !!post.media_url || !!post.media_thumbnail_url;
   const thumb = post.media_thumbnail_url || (isVideo ? null : post.media_url);
+  // The photo is a CSS background, which has no alt of its own, so a screen
+  // reader gets a label built from names already on this card: the club's on
+  // a club post, the author's otherwise.
+  const mediaBy =
+    post.org?.name || author?.name || (author?.handle ? `@${author.handle}` : null);
+  const mediaLabel = `${isVideo ? "Video" : "Photo"}${mediaBy ? ` posted by ${mediaBy}` : ""}`;
 
   // Local engagement state, seeded from the feed payload. Heart +
   // double-tap-to-like + repost + save all flow through their own
@@ -1768,6 +1774,12 @@ function FeedCard({
 
       {hasMedia && thumb ? (
         <div
+          role="img"
+          aria-label={mediaLabel}
+          // Sentry names an element by its label when it times a tap or the
+          // largest thing painted, and this label holds a name (Privacy
+          // Policy 3d). With this it writes "PostMedia" and never reads it.
+          data-sentry-element="PostMedia"
           style={{
             marginTop: 10,
             position: "relative",

@@ -4039,7 +4039,7 @@ body.empty-profile-mode #profileEmpty { display: flex !important; }
       <div class="logo-upload-zone" id="workLogoZone">
         <div class="logo-upload-inner">
           <div id="workLogoPreview" style="display:none">
-            <img id="workLogoImg" style="width:48px;height:48px;border-radius:10px;object-fit:cover">
+            <img id="workLogoImg" alt="" style="width:48px;height:48px;border-radius:10px;object-fit:cover">
           </div>
           <div id="workLogoDefault">
             <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -4443,7 +4443,7 @@ async function handleAvatarUpload(input){
   // Add to preview strip
   const strip = document.getElementById('avatarPreviewStrip');
   const img = document.createElement('img');
-  img.src=url; img.className='avatar-preview-thumb';
+  img.src=url; img.alt=''; img.className='avatar-preview-thumb';
   img.onclick=()=>{ strip.querySelectorAll('img').forEach(i=>i.classList.remove('selected')); img.classList.add('selected'); _applyAvatarAndSave(url); };
   img.classList.add('selected');
   strip.querySelectorAll('img').forEach(i=>i.classList.remove('selected'));
@@ -4496,6 +4496,7 @@ function applyAvatarPhoto(url){
   let photo = avatarEl.querySelector('img.avatar-photo');
   if(!photo){
     photo = document.createElement('img');
+    photo.alt='';
     photo.className='avatar-photo';
     avatarEl.appendChild(photo);
   }
@@ -4807,6 +4808,7 @@ function applyLogoToWrap(wrap, url) {
   let img = wrap.querySelector('img.work-logo-img');
   if (!img) {
     img = document.createElement('img');
+    img.alt = '';
     img.className = 'work-logo-img';
     img.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:13px;';
     wrap.appendChild(img);
@@ -4839,6 +4841,7 @@ async function applyCurrentLogoFromInput(input) {
     // carries data-logo-url. Drop sibling inputs so the wrap is clean.
     wrap.querySelectorAll('.current-icon, .current-icon-img').forEach(el => el.remove());
     const img = document.createElement('img');
+    img.alt = '';
     img.className = 'current-icon current-icon-img';
     img.src = url;
     img.setAttribute('data-logo-url', url);
@@ -4912,7 +4915,7 @@ function saveWork(){
       <div class="work-logo-default work-diamond">${makeDiamondSVG(color)}</div>
       <div class="work-logo-upload-hint">Upload<br>logo</div>
       <input type="file" accept="image/*" onchange="applyLogoFromInput(this)" style="display:none">
-      ${pendingWorkLogo ? `<img class="work-logo-img" src="${pendingWorkLogo}" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:13px;">` : ''}
+      ${pendingWorkLogo ? `<img class="work-logo-img" src="${pendingWorkLogo}" alt="" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:13px;">` : ''}
     </div>
     <div class="work-info">
       <div class="work-title" data-edit="true" contenteditable="${editMode}">${title}</div>
@@ -6190,7 +6193,7 @@ function pinFromProfile(contentId, btn) {
   profilePinnedId = contentId;
   const me = _currentUserIdentity();
   const avMarkup = me.photo
-    ? `<img src="${me.photo}" style="width:100%;height:100%;object-fit:cover;border-radius:inherit;display:block;">`
+    ? `<img src="${me.photo}" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:inherit;display:block;">`
     : me.initials;
 
   // Pinned cards click through to the shared post viewer modal —
@@ -9836,7 +9839,10 @@ function _profileMapDbRow(row) {
     const poster = row.media_thumbnail_url ? ` poster="${_esc(row.media_thumbnail_url)}"` : '';
     mediaHTML = `<video src="${_esc(row.media_url)}"${poster} muted playsinline preload="metadata" style="display:block;width:100%;max-height:380px;border-radius:12px;margin-top:8px;background:#000;"></video>`;
   } else if (row.media_url) {
-    mediaHTML = `<img src="${_esc(row.media_url)}" alt="" style="display:block;width:100%;border-radius:12px;margin-top:8px;">`;
+    // These are the posts of the profile on screen, so the alt reuses the
+    // name printed in its header ('Photo' alone until that has painted).
+    const by = _currentUserIdentity().name;
+    mediaHTML = `<img src="${_esc(row.media_url)}" alt="${_esc(by ? 'Photo posted by ' + by : 'Photo')}" style="display:block;width:100%;border-radius:12px;margin-top:8px;">`;
   }
   return {
     id: row.id,
@@ -9989,6 +9995,11 @@ function _buildRepostCard(repost) {
       inner.appendChild(v);
     } else {
       const media = document.createElement('div');
+      // A background has no alt, so the photo gets a spoken label from the
+      // name in the head above. setAttribute takes plain text: no _esc here,
+      // it would be read out as "&amp;".
+      media.setAttribute('role', 'img');
+      media.setAttribute('aria-label', 'Photo posted by ' + displayName);
       media.style.cssText = 'border-radius:10px;overflow:hidden;padding-top:56%;background:url("' + _esc(post.media_url) + '") center/cover;border:1px solid rgba(var(--scrim-rgb),0.06);';
       inner.appendChild(media);
     }
@@ -10327,7 +10338,7 @@ function renderUserSections(user, opts) {
         // (it still queries .current-icon, just inside the wrap).
         const hasLogo = typeof c.logoUrl === 'string' && /^https?:\/\//i.test(c.logoUrl);
         const iconHtml = hasLogo
-          ? `<img class="current-icon current-icon-img" src="${_esc(c.logoUrl)}" data-logo-url="${_esc(c.logoUrl)}" style="width:20px;height:20px;border-radius:999px;object-fit:cover;display:inline-block;vertical-align:middle;">`
+          ? `<img class="current-icon current-icon-img" src="${_esc(c.logoUrl)}" data-logo-url="${_esc(c.logoUrl)}" alt="" style="width:20px;height:20px;border-radius:999px;object-fit:cover;display:inline-block;vertical-align:middle;">`
           : `<span class="current-icon">${_esc(c.icon || '📱')}</span>`;
         item.innerHTML = `${_DRAG_HANDLE_HTML}<span class="current-icon-wrap" onclick="triggerCurrentLogoUpload(this)">${iconHtml}<input type="file" accept="image/*" class="current-logo-input" onchange="applyCurrentLogoFromInput(this)" style="display:none"></span><span data-edit="true" contenteditable="${editMode}">${_esc(c.text)}</span><button class="current-delete" onclick="deleteCurrent(this)">&times;</button>`;
         list.appendChild(item);
@@ -10349,7 +10360,7 @@ function renderUserSections(user, opts) {
         item.className = 'work-item';
         const hasLogo = w.logoUrl && (w.logoUrl.startsWith('data:') || /^https?:\/\//i.test(w.logoUrl));
         const logoImgHtml = hasLogo
-          ? `<img class="work-logo-img" src="${_esc(w.logoUrl)}" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:13px;">`
+          ? `<img class="work-logo-img" src="${_esc(w.logoUrl)}" alt="" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:13px;">`
           : '';
         item.innerHTML = `
           ${_DRAG_HANDLE_HTML}

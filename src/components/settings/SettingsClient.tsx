@@ -1012,25 +1012,37 @@ function HandleCard({
     if (check.state !== "available") return;
     setSaving(true);
     setError(null);
-    try {
-      const r = await fetch("/api/me/handle", {
+    // Quiet: the line shows under the field, next to what it refused.
+    // vibeRequest never throws, so there is nothing to catch.
+    const r = await vibeRequest<{ handle?: string; handle_changed_at?: string | null }>(
+      "/api/me/handle",
+      {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ handle: normalized }),
-      });
-      const j = await r.json();
-      if (!r.ok || !j?.ok) {
-        throw new Error(j?.error ?? `HTTP ${r.status}`);
-      }
-      setSavedHandle(j.handle as string);
-      setSavedAt((j.handle_changed_at as string | undefined) ?? new Date().toISOString());
-      setValue(j.handle as string);
+        json: { handle: normalized },
+        quiet: true,
+        failure: "Couldn't change your handle.",
+      },
+    );
+    if (r.ok && typeof r.data.handle === "string") {
+      setSavedHandle(r.data.handle);
+      setSavedAt(r.data.handle_changed_at ?? new Date().toISOString());
+      setValue(r.data.handle);
       setNetworkCheck(null);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not save");
-    } finally {
-      setSaving(false);
+    } else if (r.ok) {
+      // A 2xx that doesn't carry the saved handle isn't a save.
+      setError("Couldn't change your handle. Try again.");
+    } else if (r.status === 429 && r.error?.startsWith("You can change your handle again")) {
+      // The 14-day rule answers 429, the same status as going too fast, and
+      // vibeRequest would say "Try again in a minute". The server's own line
+      // has the day count ("You can change your handle again in 5 days").
+      setError(/[.!?]$/.test(r.error) ? r.error : `${r.error}.`);
+    } else if (r.status === 409) {
+      // "Taken": someone claimed it after the live check above said it was free.
+      setError("That handle was just taken. Try another one.");
+    } else {
+      setError(r.message);
     }
+    setSaving(false);
   };
 
   const canSave =
@@ -1293,26 +1305,45 @@ function DangerZone({ handle }: { handle: string | null }) {
     if (busy || !matches) return;
     setBusy(true);
     setError(null);
-    try {
-      const res = await fetch("/api/me", {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ confirm_handle: confirm }),
-      });
-      const data = await res.json();
-      if (!res.ok || !data?.ok) {
-        throw new Error(data?.error || `HTTP ${res.status}`);
+    // Quiet: the line shows above the buttons. vibeRequest never throws, so
+    // there is nothing to catch.
+    const r = await vibeRequest<{ ok?: boolean }>("/api/me", {
+      method: "DELETE",
+      json: { confirm_handle: confirm },
+      quiet: true,
+      failure: "Couldn't delete your account.",
+    });
+    // Deleted only when the route says so. A 2xx with any other body (a page
+    // some network put in the way) must not sign this device out.
+    if (r.ok && r.data.ok !== true) {
+      setError("Couldn't delete your account. Try again.");
+      setBusy(false);
+      return;
+    }
+    if (!r.ok) {
+      if (r.status >= 500 && r.error && /[.!?]$/.test(r.error.trim())) {
+        // The route writes whole sentences for a deletion that stopped part
+        // way ("Your Vibe+ subscription is canceled, but ... your account is
+        // still here.", src/app/api/me/route.ts). They say how far it got,
+        // which the general line can't, so they show as written. Its short
+        // answers for developers ("Request failed") have no full stop and
+        // get vibeRequest's line below.
+        setError(r.error.trim());
+      } else if (r.status === 400) {
+        // The typed handle isn't the one on the account, which can only
+        // happen when this page is showing an old handle.
+        setError("That handle didn't match. Reload the page and try again.");
+      } else {
+        setError(r.message);
       }
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not delete account");
       setBusy(false);
       return;
     }
     // The account is gone, so nothing from here on may read as a failed
-    // delete (it sits outside the try on purpose). Drop every onboarding
-    // draft on this browser, then land on sign-up rather than the marketing
-    // page, the same place the suspended and verify-your-campus screens send
-    // a deleted account.
+    // delete (it sits after the refusal check on purpose). Drop every
+    // onboarding draft on this browser, then land on sign-up rather than the
+    // marketing page, the same place the suspended and verify-your-campus
+    // screens send a deleted account.
     clearDraft();
     // The rows went with the account (FK cascade); this device's own
     // subscription or token, shown notifications and storage go here

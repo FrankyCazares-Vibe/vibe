@@ -207,7 +207,7 @@ export function OrgPostsList({
             {p.media_url ? (
               <img
                 src={p.media_url}
-                alt=""
+                alt={`Photo posted by ${orgName}`}
                 style={{
                   display: "block",
                   width: "100%",

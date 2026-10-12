@@ -6967,7 +6967,7 @@ function FeedComposer({
     if (!file) return;
     if (file.type.startsWith("image/")) {
       if (file.size > 8 * 1024 * 1024) {
-        setError("Image too large — max 8MB.");
+        setError("That image is too large. The limit is 8 MB.");
         return;
       }
       // Open the cropper before staging — confirmed crop becomes the
@@ -6977,7 +6977,7 @@ function FeedComposer({
     }
     if (file.type.startsWith("video/")) {
       if (file.size > 200 * 1024 * 1024) {
-        setError("Video too large — max 200MB.");
+        setError("That video is too large. The limit is 200 MB.");
         return;
       }
       setVideoFile(file);
@@ -8274,7 +8274,10 @@ function FeedRow({
             }}
             role="button"
             tabIndex={0}
-            aria-label="Open comments"
+            aria-label={`Photo posted by ${displayName}, open comments`}
+            // Keeps the name in the label out of Sentry's speed reports: it
+            // writes "PostPhoto" for this element and never reads the label.
+            data-sentry-element="PostPhoto"
             style={{
               marginTop: 10,
               borderRadius: 12,

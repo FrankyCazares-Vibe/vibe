@@ -9,6 +9,8 @@ import {
   capturePosterFrame,
   extractHashtags,
 } from "@/lib/composer/helpers";
+import type { ToastAction } from "@/lib/feedback/failure-copy";
+import { vibeRequest, type VibeFailure } from "@/lib/feedback/request";
 import { VIDEO_LOCATION_HINT } from "@/lib/media/copy";
 
 /**
@@ -79,6 +81,33 @@ function ensureKeyframes() {
 const ENTER_DURATION_MS = 460;
 const EXIT_DURATION_MS = 300;
 
+// What the sheet says when posting fails. The calls to Vibe's own routes go
+// through vibeRequest, which words a refusal itself (signed out, Terms,
+// school email, the word filter, going too fast) and falls back to the
+// caller's line. The student never reads a caught error's own text
+// ("Load failed", "Unauthorized", "Invalid JSON").
+const PUBLISH_FAILED = "Couldn't publish your post.";
+const PHOTO_UPLOAD_FAILED = "Your photo didn't upload.";
+const VIDEO_UPLOAD_FAILED = "Your video didn't upload.";
+// The video goes straight to storage, not through a Vibe route, so
+// vibeRequest never sees that step. A failed one gets this fixed line.
+const VIDEO_STORAGE_FAILED = "Your video didn't upload. Check your connection and try again.";
+const VIDEO_WRONG_TYPE = "Use an MP4, MOV or WebM video.";
+const VIDEO_TOO_LONG = "That video is too long to post. Try a shorter one.";
+
+/**
+ * The two refusals a student fixes by picking another video. The routes word
+ * them for developers ("Unsupported video type (mp4, mov, webm only)" from
+ * /api/me/clip-upload-url, "Video exceeds 600s" from /api/me/publish-post) and
+ * vibeRequest shows a 400 as the caller's general line, so each gets its own
+ * sentence here. Every other refusal keeps vibeRequest's.
+ */
+function videoRefusalLine(r: VibeFailure): string {
+  if (r.status === 400 && r.error?.startsWith("Unsupported video type")) return VIDEO_WRONG_TYPE;
+  if (r.status === 400 && r.error?.startsWith("Video exceeds")) return VIDEO_TOO_LONG;
+  return r.message;
+}
+
 export function PostComposerMobile({ onClose, onPosted, origin }: Props) {
   const [text, setText] = useState("");
   const [imageFile, setImageFile] = useState<File | null>(null);
@@ -95,7 +124,10 @@ export function PostComposerMobile({ onClose, onPosted, origin }: Props) {
     posterBlob: Blob | null;
   } | null>(null);
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  // The line under the attachment, plus Sign in / Review Terms / Verify when
+  // vibeRequest says that is the fix (the same shape Settings' campus card
+  // keeps). One value, so a line never carries another failure's link.
+  const [error, setError] = useState<{ text: string; action?: ToastAction } | null>(null);
   // Drives the exit animation. When true, the sheet plays its slide-
   // down keyframe; the actual unmount happens via onClose() after the
   // animation finishes.
@@ -157,7 +189,7 @@ export function PostComposerMobile({ onClose, onPosted, origin }: Props) {
     if (!file) return;
     if (file.type.startsWith("image/")) {
       if (file.size > 8 * 1024 * 1024) {
-        setError("Image too large — max 8MB.");
+        setError({ text: "That image is too large. The limit is 8 MB." });
         return;
       }
       setPendingImage(file);
@@ -165,7 +197,7 @@ export function PostComposerMobile({ onClose, onPosted, origin }: Props) {
     }
     if (file.type.startsWith("video/")) {
       if (file.size > 200 * 1024 * 1024) {
-        setError("Video too large — max 200MB.");
+        setError({ text: "That video is too large. The limit is 200 MB." });
         return;
       }
       setClipFile(file);
@@ -184,7 +216,7 @@ export function PostComposerMobile({ onClose, onPosted, origin }: Props) {
       });
       return;
     }
-    setError("Pick a photo or video file.");
+    setError({ text: "Pick a photo or video file." });
   };
 
   const onCroppedImage = (blob: Blob) => {
@@ -200,6 +232,26 @@ export function PostComposerMobile({ onClose, onPosted, origin }: Props) {
     if (!hasContent || busy) return;
     setBusy(true);
     setError(null);
+    // A step that failed: show its line and stop. Every `return` below sits
+    // inside the `try`, so `finally` still clears `busy`.
+    const refuse = (line: string, action?: ToastAction) => {
+      setError(action ? { text: line, action } : { text: line });
+    };
+    // The last step of all three kinds of post. True only when the route
+    // says it published: a 2xx with any other body (a page some network put
+    // in the way) must not close the sheet as if the post went out.
+    const publish = async (post: Record<string, unknown>): Promise<boolean> => {
+      const pub = await vibeRequest<{ ok?: boolean }>("/api/me/publish-post", {
+        method: "POST",
+        json: post,
+        quiet: true,
+        failure: PUBLISH_FAILED,
+      });
+      if (pub.ok && pub.data.ok === true) return true;
+      if (pub.ok) refuse(`${PUBLISH_FAILED} Try again.`);
+      else refuse(videoRefusalLine(pub), pub.action);
+      return false;
+    };
     try {
       const trimmed = text.trim();
       const tags = extractHashtags(trimmed);
@@ -219,24 +271,42 @@ export function PostComposerMobile({ onClose, onPosted, origin }: Props) {
         }
 
         // 1. Presigned R2 PUT.
-        const sig = await fetch("/api/me/clip-upload-url", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            contentType: clipFile.type,
-            sizeBytes: clipFile.size,
-          }),
-        }).then((r) => r.json());
-        if (!sig?.ok) throw new Error(sig?.error || "Could not start upload");
+        const sig = await vibeRequest<{ uploadUrl?: string; objectKey?: string }>(
+          "/api/me/clip-upload-url",
+          {
+            method: "POST",
+            json: { contentType: clipFile.type, sizeBytes: clipFile.size },
+            quiet: true,
+            failure: VIDEO_UPLOAD_FAILED,
+          },
+        );
+        if (!sig.ok) {
+          refuse(videoRefusalLine(sig), sig.action);
+          return;
+        }
+        const { uploadUrl, objectKey } = sig.data;
+        if (!uploadUrl || !objectKey) {
+          refuse(VIDEO_STORAGE_FAILED);
+          return;
+        }
 
-        // 2. Direct PUT to R2.
-        const putRes = await fetch(sig.uploadUrl, {
-          method: "PUT",
-          headers: { "Content-Type": clipFile.type },
-          body: clipFile,
-        });
-        if (!putRes.ok) {
-          throw new Error(`Upload failed (HTTP ${putRes.status})`);
+        // 2. Direct PUT to R2. A raw upload on purpose: storage isn't a Vibe
+        //    route and answers in its own format. A dropped connection throws
+        //    and a refusal is a status; both get the same fixed line.
+        let stored = false;
+        try {
+          const putRes = await fetch(uploadUrl, {
+            method: "PUT",
+            headers: { "Content-Type": clipFile.type },
+            body: clipFile,
+          });
+          stored = putRes.ok;
+        } catch {
+          // Offline, or the connection dropped mid-upload: `stored` stays false.
+        }
+        if (!stored) {
+          refuse(VIDEO_STORAGE_FAILED);
+          return;
         }
 
         // 3. Best-effort poster upload — publish proceeds without one
@@ -256,11 +326,14 @@ export function PostComposerMobile({ onClose, onPosted, origin }: Props) {
               }),
             );
             fd.append("kind", "poster");
-            const up = await fetch("/api/me/profile-upload", {
+            // Quiet, and a refusal is not read: the post goes out without it.
+            const up = await vibeRequest<{ url?: string }>("/api/me/profile-upload", {
               method: "POST",
               body: fd,
-            }).then((r) => r.json());
-            if (up?.ok && up.url) posterUrl = up.url as string;
+              quiet: true,
+              failure: PHOTO_UPLOAD_FAILED,
+            });
+            if (up.ok && up.data.url) posterUrl = up.data.url;
           } catch {
             /* never block publishing on poster upload */
           }
@@ -268,53 +341,50 @@ export function PostComposerMobile({ onClose, onPosted, origin }: Props) {
 
         // 4. Always publish as a video POST. Clip publishing lives in
         //    the separate Clips composer.
-        const pub = await fetch("/api/me/publish-post", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            content: trimmed,
-            tags,
-            video_object_key: sig.objectKey,
-            media_thumbnail_url: posterUrl,
-            duration_sec: durationSec,
-          }),
-        }).then((r) => r.json());
-        if (!pub?.ok) throw new Error(pub?.error || "Publish failed");
+        const posted = await publish({
+          content: trimmed,
+          tags,
+          video_object_key: objectKey,
+          media_thumbnail_url: posterUrl,
+          duration_sec: durationSec,
+        });
+        if (!posted) return;
       } else if (imageFile) {
         // Image path: multipart upload then post.
         const fd = new FormData();
         fd.append("file", imageFile);
         fd.append("kind", "post");
-        const up = await fetch("/api/me/profile-upload", {
+        const up = await vibeRequest<{ url?: string }>("/api/me/profile-upload", {
           method: "POST",
           body: fd,
-        }).then((r) => r.json());
-        if (!up?.ok) throw new Error(up?.error || "Image upload failed");
+          quiet: true,
+          failure: PHOTO_UPLOAD_FAILED,
+        });
+        if (!up.ok) {
+          refuse(up.message, up.action);
+          return;
+        }
+        // An answer with no address would post the words without the photo.
+        const photoUrl = up.data.url;
+        if (!photoUrl) {
+          refuse(`${PHOTO_UPLOAD_FAILED} Try again.`);
+          return;
+        }
 
-        const pub = await fetch("/api/me/publish-post", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            content: trimmed,
-            tags,
-            media_url: up.url,
-          }),
-        }).then((r) => r.json());
-        if (!pub?.ok) throw new Error(pub?.error || "Publish failed");
+        const posted = await publish({ content: trimmed, tags, media_url: photoUrl });
+        if (!posted) return;
       } else {
         // Text-only.
-        const pub = await fetch("/api/me/publish-post", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ content: trimmed, tags }),
-        }).then((r) => r.json());
-        if (!pub?.ok) throw new Error(pub?.error || "Publish failed");
+        const posted = await publish({ content: trimmed, tags });
+        if (!posted) return;
       }
 
       onPosted();
       requestClose();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not publish");
+    } catch {
+      // vibeRequest never throws, so this is something of our own going
+      // wrong. Its text is for a developer, not the student.
+      setError({ text: `${PUBLISH_FAILED} Try again.` });
     } finally {
       setBusy(false);
     }
@@ -631,7 +701,27 @@ export function PostComposerMobile({ onClose, onPosted, origin }: Props) {
               borderRadius: 10,
             }}
           >
-            {error}
+            {error.text}
+            {error.action ? (
+              <>
+                {" "}
+                {/* A plain link: a full page load, so the sign-in and Terms
+                    checks on the page it opens run (the toast does the same). */}
+                <a
+                  href={error.action.href}
+                  style={{
+                    display: "inline-block",
+                    padding: "6px 0",
+                    color: "inherit",
+                    fontWeight: 700,
+                    textDecoration: "underline",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {error.action.label} →
+                </a>
+              </>
+            ) : null}
           </div>
         ) : null}
       </div>

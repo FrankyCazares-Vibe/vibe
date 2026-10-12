@@ -480,6 +480,9 @@ export function PostViewerMobile({
   const me = viewerId ?? selfId;
   const authorLabel =
     author?.name || (author?.handle ? `@${author.handle}` : null);
+  // The photo is a CSS background, which has no alt of its own, so a screen
+  // reader gets a label built from the name in the header above it.
+  const photoLabel = authorLabel ? `Photo posted by ${authorLabel}` : "Photo";
 
   // "Block author", next to Report in the ⋯ menu. The phone viewer offered a
   // report and no way to stop seeing the person.
@@ -866,6 +869,12 @@ export function PostViewerMobile({
           <>
             {isImage ? (
               <div
+                role="img"
+                aria-label={photoLabel}
+                // Keeps the name in the label out of Sentry's speed reports,
+                // as on the feed card (CampusMobile): it writes "PostPhoto"
+                // for this element and never reads the label.
+                data-sentry-element="PostPhoto"
                 style={{
                   borderRadius: 14,
                   overflow: "hidden",

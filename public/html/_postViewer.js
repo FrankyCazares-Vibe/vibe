@@ -1135,8 +1135,16 @@
       const poster = media_thumbnail_url ? ` poster="${esc(media_thumbnail_url)}"` : "";
       media = `<video class="vpv-video" src="${esc(media_url)}"${poster} controls playsinline preload="metadata"></video>`;
     } else if (media_url && type === "post") {
-      // Post images are stored as public URLs (Supabase profiles bucket)
-      media = `<img class="vpv-image" src="${esc(media_url)}" alt="">`;
+      // Post images are stored as public URLs (Supabase profiles bucket).
+      // The alt reuses the name paintHeader just printed (it always runs
+      // first), so a screen reader hears there is a photo and whose it is.
+      // Only once the API has said "image": a prefill with no media_kind may
+      // be a video, and an empty alt keeps that failed <img> off the screen
+      // until the server's answer repaints it as a player.
+      const by = document.getElementById("vpvName").textContent;
+      const alt = media_kind !== "image" ? ""
+        : (by && by !== "Unknown" ? "Photo posted by " + by : "Photo");
+      media = `<img class="vpv-image" src="${esc(media_url)}" alt="${esc(alt)}">`;
     }
     const tagBlock = (tags && tags.length)
       ? `<div class="vpv-tags">${tagChipsHtml(tags)}</div>`

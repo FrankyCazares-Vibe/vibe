@@ -667,7 +667,7 @@ function _vibePaintSidebarChips(user) {
     || (!user.name ? 'Set up your profile' : 'My profile');
   const banner = _vibeBannerCss(user);
   const avatarInner = user.avatarPhoto && /^(data|blob|https?):/.test(user.avatarPhoto)
-    ? '<img src="' + _vibeEsc(user.avatarPhoto) + '" style="width:100%;height:100%;object-fit:cover;border-radius:inherit;display:block;">'
+    ? '<img src="' + _vibeEsc(user.avatarPhoto) + '" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:inherit;display:block;">'
     : _vibeEsc(initials);
 
   const links = document.querySelectorAll('.left-nav a[href="/profile"].nav-item');
