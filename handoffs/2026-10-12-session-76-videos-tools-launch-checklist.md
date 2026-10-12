@@ -111,6 +111,51 @@ it). Still open from before: the live sign-up test, the Supabase Auth
 switches, the Resend timeline, the real-phone walk, the lawyer file, the Terms
 review answers.
 
+## Later on Oct 12: Franky said "yes to all six"
+
+**Wave 1 is LIVE** (`f9943f9` to `76f89a2`, build `dpl_BszmY3LcsCWBkXAsAqQZiiDKm7u2`).
+Checked: 2,420 tests, typecheck, lint, build, page = text 1,124 of 1,124, a
+local walk of every piece, and the live site signed out.
+
+| Call | What shipped | State |
+|---|---|---|
+| 1 Terms | Names CONNECTVIBE. LLC, the draft paragraph is gone, the banner says what was corrected. `TERMS_VERSION` unchanged. The county waits for v3. | Live |
+| 2 Human check | Cloudflare Turnstile box on sign-in, sign-up and resend (`TurnstileBox.tsx`, `src/lib/auth/captcha.ts`). OFF until `NEXT_PUBLIC_TURNSTILE_SITE_KEY` is set: nothing renders, nothing loads, the browser rule is unchanged. | Code live, box off. **Franky's steps and the ready policy sentences: `handoffs/2026-10-12-turnstile-policy-and-steps.md`** |
+| 3 Visit tally | `page_open_tally` + `tally_page_open()` (`20261012180000`, **applied on production through the connector, recorded, post-checks pass**), `POST /api/tally/open`, a beacon on `/`, `/waitlist`, `/auth/signup`, admin > Numbers. | Live and counting (2 opens on Oct 12, both mine) |
+| 4 Chat photos | Shrunk in the browser to 2048 px JPEG (`src/lib/media/shrink-photo.ts`), phone chat and the desktop static page (`public/html/_shrinkPhoto.js`, pinned by `shrink-photo-static.test.ts`). | Live. A real upload was never made (no storage locally): **Franky's real-phone walk covers it** |
+| 5 Contrast, pass 1 | Light-look text tokens darker (`--ink-muted #6C6761`, `--tag-ink` for orange words), static twins, emails. Night unchanged. | Live |
+| 5 Contrast, pass 2 and 6 Feed speed | Dark words on the orange buttons everywhere; phones stop downloading the desktop feed. | **Wave 2, building when this was written** |
+
+**One change beyond the builders:** the tally's per-network limit is keyed on a
+scrambled daily code (`src/lib/tally/network-code.ts`, HMAC with
+`SCHOOL_EMAIL_VERIFY_SECRET`), never the address, so opening the front page
+stores no visitor IP. Policy 3d says so.
+
+**Policy changes made the same deploy (Franky has not read them yet):** 3d
+"Page opens" bullet and the "Until October 12, 2026" label sentence; section 11
+(the waitlist page is counted); section 8 (the tally is not deleted); the short
+version item 8 and a "Chat photos" paragraph in 3c ("often", not promised for
+every photo). Date at the top: October 12, 2026.
+
+**Sentry numbers for call 6 (14 days, thin):** feed 2.2 s typical / 4.1 s slow;
+Messages about 4.1 s; landing 0.5 / 1.0 s. The Lighthouse 58 was the lab test.
+
+**Local leftovers:** the local database has the tally table with test rows;
+the preview server may be running; `.env.development.local` is back to no
+Turnstile key.
+
+**More gotchas:**
+- The repo has tests that READ SOURCE TEXT (the tally route's shape, static
+  twins). Changing a line a test quotes fails the test: run `npm test` after
+  any hand edit, not only the file's own test.
+- `node --test <folder>` fails; pass files (`src/lib/tally/*.test.ts`).
+- A test imports its module as `await import("./x.ts")` through a variable
+  (the typecheck refuses a static `.ts` import).
+- A zsh `${2:+-H "$2"}` in a curl helper makes a malformed header (a 400 with
+  an empty body that looks like an app bug).
+- Turnstile draws its frame inside a closed shadow root: look at a
+  screenshot, not `document.querySelectorAll('iframe')`.
+
 ## Left open on purpose (small, from the reviews)
 
 - The desktop composer and the static profile composer still show raw error
