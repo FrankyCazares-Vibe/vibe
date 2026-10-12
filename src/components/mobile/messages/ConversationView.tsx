@@ -11,6 +11,12 @@ import { REFUSAL_SENTENCES, type RoomKind, type ThreadMessagesResponse } from "@
 import { useMessagePins } from "@/lib/chat/use-message-pins";
 import { vibeRequest } from "@/lib/feedback/request";
 import { toast } from "@/lib/feedback/toast";
+import {
+  shouldShrinkPhoto,
+  shrinkPhoto,
+  type KeptOriginalWhy,
+  type ShrunkPhoto,
+} from "@/lib/media/shrink-photo";
 
 import { ConversationActionSheet } from "./ConversationActionSheet";
 import { entryCanPost, quotedBody, threadAvatar, threadTitle } from "./format";
@@ -42,7 +48,28 @@ type StagedMedia = {
   kind: "image" | "video";
   contentType: string;
   previewUrl: string;
+  /** The smaller copy the browser made of a big photo, once it is ready.
+   *  Here only so the chip can show the size that will really be sent;
+   *  send() reads `shrinkJobs`. */
+  shrunk?: ShrunkPhoto;
 };
+
+// A big photo is made smaller in the browser before it goes up
+// (src/lib/media/shrink-photo.ts). The work starts when the photo is picked
+// and send() waits for it here. Keyed by the picked File, so a pick that was
+// replaced or removed just drops out. A job answers null whenever the
+// original should go up as picked, and it never rejects.
+const shrinkJobs = new WeakMap<File, Promise<ShrunkPhoto | null>>();
+
+// A photo that goes up as picked does so without a word to the student.
+// Dev builds name the rule that decided in the console, so "the size under
+// the photo never dropped" can be explained. It names the rule only,
+// nothing about the photo, and the live site logs nothing.
+function noteKeptOriginal(why: KeptOriginalWhy): void {
+  if (process.env.NODE_ENV !== "production") {
+    console.debug("[messages.shrinkPhoto] sending the original:", why);
+  }
+}
 
 /** The message being replied to: the stub the optimistic row carries, and
  *  the name the pill above the composer shows. */
@@ -323,12 +350,22 @@ export function ConversationView({
         // the reply target, and the toast has said why.
         const failure =
           media.kind === "video" ? "Couldn't upload your video." : "Couldn't upload your photo.";
+        // What goes up: the smaller copy of a big photo when the browser
+        // made one (chooseMedia started it; wait if it's still running),
+        // else the pick itself, exactly as before. The size and type
+        // declared below are that same file's, never the other one's.
+        const shrunk = (await shrinkJobs.get(media.file)) ?? null;
+        const upload = shrunk ?? { file: media.file, contentType: media.contentType };
         const sign = await vibeRequest<{
           uploadUrl?: string;
           objectKey?: string;
           kind?: "image" | "video";
         }>("/api/me/messages-upload-url", {
-          json: { channelId: threadId, contentType: media.contentType, sizeBytes: media.file.size },
+          json: {
+            channelId: threadId,
+            contentType: upload.contentType,
+            sizeBytes: upload.file.size,
+          },
           failure,
           quiet: true,
         });
@@ -346,8 +383,8 @@ export function ConversationView({
         // the same-origin default sends no cookies.
         const put = await vibeRequest(uploadUrl, {
           method: "PUT",
-          body: media.file,
-          headers: { "content-type": media.contentType },
+          body: upload.file,
+          headers: { "content-type": upload.contentType },
           failure,
         });
         if (!put.ok) return;
@@ -532,15 +569,33 @@ export function ConversationView({
       return;
     }
     setStaged({ file, kind, contentType, previewUrl: URL.createObjectURL(file) });
+    // A big JPEG, PNG or WebP is made smaller now, while the student is
+    // still typing. GIFs, videos and small photos are not touched. Neither
+    // is a see-through picture or a long thin one (a scrolling screenshot,
+    // a panorama), and a shrink that fails or doesn't help answers null
+    // like those do: the original goes up.
+    if (kind === "image" && shouldShrinkPhoto({ contentType, sizeBytes: file.size })) {
+      const job = shrinkPhoto(file, { onKeptOriginal: noteKeptOriginal });
+      shrinkJobs.set(file, job);
+      void job.then((shrunk) => {
+        if (!shrunk) return;
+        // Still the staged pick? Then the chip shows the size being sent.
+        setStaged((cur) => (cur && cur.file === file ? { ...cur, shrunk } : cur));
+      });
+    }
   }, []);
 
   // The staged preview is a blob: URL. Free it once the file is sent,
-  // removed or replaced, and when the conversation closes.
+  // removed or replaced, and when the conversation closes. Keyed on the
+  // address, not on `staged`: the smaller copy arriving swaps that object
+  // while the preview is still on screen.
+  const stagedPreviewUrl = staged?.previewUrl;
   useEffect(() => {
-    if (!staged) return;
-    const url = staged.previewUrl;
-    return () => URL.revokeObjectURL(url);
-  }, [staged]);
+    if (!stagedPreviewUrl) return;
+    return () => URL.revokeObjectURL(stagedPreviewUrl);
+  }, [stagedPreviewUrl]);
+  // The size the chip shows: what will really go up.
+  const stagedBytes = staged ? (staged.shrunk?.file ?? staged.file).size : 0;
 
   const toggleReaction = useCallback(
     async (messageId: string, emoji: string) => {
@@ -1139,7 +1194,7 @@ export function ConversationView({
                 <div style={{ fontSize: 12, fontWeight: 600, color: "var(--ink-muted)" }}>
                   {sending
                     ? "Sending…"
-                    : `${Math.max(1, Math.round(staged.file.size / 1024)).toLocaleString()} KB`}
+                    : `${Math.max(1, Math.round(stagedBytes / 1024)).toLocaleString()} KB`}
                 </div>
               </div>
               <button

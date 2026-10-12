@@ -23,6 +23,7 @@
 <script src="/html/_safetyActions.js" defer></script>
 <script src="/html/_mentionPicker.js" defer></script>
 <script src="/html/_imageCropper.js" defer></script>
+<script src="/html/_shrinkPhoto.js" defer></script>
 <style>
 /* Embedded mode: when /messages renders us inside CampusAppShell via iframe,
    the React sidebar is provided by the parent. Suppress our own. */
@@ -81,7 +82,12 @@ html.vibe-pane .msg-row.pane-flash { background-color:var(--pane-flash); box-sha
    messages page — it's a 1:1 chat surface, not a content-creation
    surface where the marketing assistant adds value. */
 #ottoCorner, #ottoPanel, #ottoBackdrop { display: none !important; }
-:root{--cream:#FAF7F2;--charcoal:#1C1C1E;--soft:#2D2D2D;--muted:#8A8580;--accent:#FF5C35;--green:#2ECC71;--border:rgba(28,28,30,.08);--shadow:0 4px 24px rgba(0,0,0,.06);--shadow-lg:0 12px 48px rgba(0,0,0,.1);--paper:#FFFFFF;--on-ink:#FFFFFF;
+:root{--cream:#FAF7F2;--charcoal:#1C1C1E;--soft:#2D2D2D;--muted:#6C6761;--ink-muted:#6C6761;--accent:#FF5C35;--green:#2ECC71;--border:rgba(28,28,30,.08);--shadow:0 4px 24px rgba(0,0,0,.06);--shadow-lg:0 12px 48px rgba(0,0,0,.1);--paper:#FFFFFF;--on-ink:#FFFFFF;
+  /* --ink-muted (Oct 12, 2026) is --muted under the name the shared sheets
+     read (post viewer, share sheet, report sheet, mention list, cropper,
+     profile card). This page never set it, so when the grey went darker they
+     alone kept the old pale one here (3.65:1 on white; now 5.6, as on
+     profile.html). Keep the two names the same value. */
   /* S68 wave 5 (Night pass): each Light value is the literal it replaced. */
   --scrim-rgb:28,28,30;--t-hover:#FAFAF8;--coral-wash:#FFF8F6;--coral-wash-2:#FFF5F2;--note-wash:#FFF8F2;--danger-wash:#FDF4F2;--error-ink:#C0392B;--error-ink-hover:#9C2D1F;}
 /* Night (S67 contracts C0, dark column): the head script sets data-theme on
@@ -91,7 +97,7 @@ html.vibe-pane .msg-row.pane-flash { background-color:var(--pane-flash); box-sha
    text on a var(--charcoal) fill, which turns light in Night. The washes are
    translucent coral/red over the paper. Deliberate dark chrome (the glass
    bubbles, the reaction pill, my own attachment caption and card) stays. */
-:root[data-theme="dark"]{color-scheme:dark;--cream:#0C0B0B;--charcoal:#F6F1EA;--soft:#CFC8BE;--muted:#9C958C;--border:rgba(255,255,255,.09);--shadow:0 4px 24px rgba(0,0,0,.45);--shadow-lg:0 12px 48px rgba(0,0,0,.45);--paper:#161515;--on-ink:#0C0B0B;
+:root[data-theme="dark"]{color-scheme:dark;--cream:#0C0B0B;--charcoal:#F6F1EA;--soft:#CFC8BE;--muted:#9C958C;--ink-muted:#9C958C;--border:rgba(255,255,255,.09);--shadow:0 4px 24px rgba(0,0,0,.45);--shadow-lg:0 12px 48px rgba(0,0,0,.45);--paper:#161515;--on-ink:#0C0B0B;
   --scrim-rgb:255,255,255;--t-hover:#1F1D1C;--coral-wash:rgba(255,92,53,0.10);--coral-wash-2:rgba(255,92,53,0.14);--note-wash:rgba(255,92,53,0.10);--danger-wash:rgba(192,57,43,0.16);--error-ink:#FF7A6B;--error-ink-hover:#FF9A8C;}
 *{margin:0;padding:0;box-sizing:border-box;}
 html,body{height:100%;overflow:hidden;}
@@ -249,6 +255,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--charco
 .msg-row.mine .msg-attach-text.empty{color:rgba(255,255,255,.55);}
 .msg-row.mine .msg-attach-author{color:rgba(255,255,255,.7);border-top-color:rgba(255,255,255,.12);}
 .msg-row.mine .msg-attach-author-name{color:white;}
+.msg-row.mine .msg-attach-missing{color:rgba(255,255,255,.7);}
 .t-search{display:flex;align-items:center;gap:8px;background:var(--cream);border:1.5px solid var(--border);border-radius:12px;padding:8px 12px;transition:border-color .18s;}
 .t-search:focus-within{border-color:rgba(var(--scrim-rgb),.2);background:var(--paper);}
 .t-search input{border:none;background:none;font-family:'DM Sans',sans-serif;font-size:13px;color:var(--charcoal);outline:none;flex:1;cursor:text;}
@@ -1719,8 +1726,14 @@ function snd(){
   const sendBtn = document.getElementById('sndBtn');
   sendBtn.disabled = true;
   __dmSend(txt).then(ok => {
-    if (ok) { inp.value = ''; inp.style.height = ''; }
-    sendBtn.disabled = !inp.value.trim();
+    // The box empties only if it still holds what was sent. A photo or video
+    // can take a minute to go up, and words typed meanwhile were not sent
+    // with it: they stay for the next Send (the phone chat does the same).
+    if (ok && inp.value.trim() === txt) { inp.value = ''; inp.style.height = ''; }
+    // The same test as upd(): text, or a staged photo or video. A send that
+    // did not go through keeps its photo staged, and one may have been
+    // picked while it ran. Either way Send must still answer for it.
+    sendBtn.disabled = !inp.value.trim() && !__realDM.stagedMedia;
   });
 }
 function upd(){
@@ -2751,11 +2764,33 @@ async function __dmSend(text) {
   if (!channelId) return false;
   const staged = __realDM.stagedMedia;
   if (!text && !staged) return false;
+  // One send per staged pick at a time. A second Enter while its photo is
+  // being made smaller or is going up would put it in the chat twice. Words
+  // typed since are not sent by this Enter either, so it is said, quietly;
+  // they stay in the box (snd() empties it only of what was sent).
+  if (staged && staged.sending) {
+    if (typeof window.vibeToast === 'function') {
+      window.vibeToast('Still sending your ' + (staged.kind === 'image' ? 'photo' : 'video') + '.');
+    }
+    return false;
+  }
   try {
     let mediaPayload = null;
     if (staged) {
+      staged.sending = true;
       // Upload to R2 first, then send the message with the resulting key.
-      const stagedFile = staged.file;
+      // What goes up is ONE file with ONE type: the smaller copy of a big
+      // photo when the browser made one (__dmComposeMediaChosen started it;
+      // wait here if it is still being made), else the pick itself, exactly
+      // as before. The size and type declared in step 1, the Content-Type
+      // header and the bytes in step 2 are all that one file's. The storage
+      // signature binds the declared length, so mixing the two files is a
+      // refused upload.
+      const upload = await __dmUploadFor(staged);
+      // That wait can take seconds. If the student took the photo back or
+      // picked another one meanwhile, this send is off: nothing goes up, the
+      // text stays in the box, and Send answers for what is staged now.
+      if (__realDM.stagedMedia !== staged) return false;
       // 1. Sign the upload URL.
       const signRes = await fetch('/api/me/messages-upload-url', {
         method: 'POST',
@@ -2763,8 +2798,8 @@ async function __dmSend(text) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           channelId,
-          contentType: stagedFile.type,
-          sizeBytes: stagedFile.size,
+          contentType: upload.contentType,
+          sizeBytes: upload.file.size,
         }),
       });
       const signJson = await signRes.json();
@@ -2774,7 +2809,7 @@ async function __dmSend(text) {
       await new Promise((resolve, reject) => {
         const xhr = new XMLHttpRequest();
         xhr.open('PUT', signJson.uploadUrl, true);
-        xhr.setRequestHeader('Content-Type', stagedFile.type);
+        xhr.setRequestHeader('Content-Type', upload.contentType);
         if (xhr.upload && bar) {
           xhr.upload.onprogress = (ev) => {
             if (!ev.lengthComputable) return;
@@ -2785,7 +2820,7 @@ async function __dmSend(text) {
           ? resolve(null)
           : reject(new Error('upload failed (' + xhr.status + ')'));
         xhr.onerror = () => reject(new Error('upload network error'));
-        xhr.send(stagedFile);
+        xhr.send(upload.file);
       });
       mediaPayload = { media_url: signJson.objectKey, media_kind: signJson.kind };
     }
@@ -2807,7 +2842,9 @@ async function __dmSend(text) {
     if (!j.ok) throw __dmSendError(j, 'send failed');
     if (__realDM.T[channelId]) __realDM.T[channelId].isRequest = false;
     document.getElementById('reqBar').classList.remove('show');
-    __dmComposeMediaClear();
+    // The chip goes only if it still shows the pick that just went up. One
+    // picked while this was sending stays staged for the next send.
+    if (__realDM.stagedMedia === staged) __dmComposeMediaClear();
     await __dmLoadMessages(channelId);
     // Force-scroll to bottom after sending so the sender always sees their
     // own message even if they were scrolled up.
@@ -2843,6 +2880,9 @@ async function __dmSend(text) {
     }
     alert('Could not send: ' + e.message);
     return false;
+  } finally {
+    // Sent, refused or failed: the pick may be sent (again) from here on.
+    if (staged) staged.sending = false;
   }
 }
 // The error of a refused send. A club chat refusal (matched on `code`)
@@ -2855,6 +2895,60 @@ function __dmSendError(body, fallback) {
 }
 
 // ── Composer media (paperclip) ─────────────────────────────────────────
+// A big photo is made smaller in the browser before it goes up. The rules
+// live in /html/_shrinkPhoto.js, the copy of src/lib/media/shrink-photo.ts
+// that this page can load (the phone chat uses the .ts file): a JPEG, PNG or
+// WebP over about 1 MB is redrawn at 2048 px on the long edge as a JPEG.
+// GIFs, videos, small photos, see-through pictures and very long or wide
+// ones go up as picked, and so does any photo whose shrink fails.
+//
+// The work starts when the photo is picked and lives on the staged pick
+// itself (`shrinkJob`), so a pick that is removed or replaced takes its job
+// with it and can never hand its copy to another photo. A job answers
+// { file, contentType } or null (send the original), and never rejects.
+function __dmShrinkStart(staged) {
+  try {
+    const shrinker = window.__vibeShrinkPhoto;
+    const file = staged.file;
+    // No helper (the script did not load): every photo goes up as picked.
+    if (!shrinker || staged.kind !== 'image') return;
+    if (!shrinker.shouldShrinkPhoto({ contentType: file.type, sizeBytes: file.size })) return;
+    const job = Promise.resolve(shrinker.shrinkPhoto(file, { onKeptOriginal: __dmShrinkKeptOriginal }))
+      .catch(() => null);
+    staged.shrinkJob = job;
+    job.then((shrunk) => {
+      // Still the staged pick? Then the chip shows the size being sent.
+      if (!shrunk || !shrunk.file || __realDM.stagedMedia !== staged) return;
+      staged.sizeKb = Math.round(shrunk.file.size / 1024);
+      __dmComposeMediaRenderStaged();
+    }).catch(() => {});
+  } catch (_) { /* the original goes up */ }
+}
+
+// A photo that goes up as picked does so without a word to the student. On a
+// developer's own machine the console names the rule that decided, so "the
+// size on the chip never dropped" can be explained. It names the rule only,
+// nothing about the photo, and the live site logs nothing.
+function __dmShrinkKeptOriginal(why) {
+  if (location.hostname === 'localhost' || location.hostname === '127.0.0.1') {
+    console.debug('[dm.shrinkPhoto] sending the original:', why);
+  }
+}
+
+// The ONE file a staged pick goes up as, with its type: the smaller copy when
+// the browser made one (this waits if it is still being made; the job gives
+// up by itself after 10 seconds), else the pick as it is. Never throws:
+// anything unexpected is the original, exactly as before.
+async function __dmUploadFor(staged) {
+  try {
+    const shrunk = staged.shrinkJob ? await staged.shrinkJob : null;
+    if (shrunk && shrunk.file && shrunk.contentType) {
+      return { file: shrunk.file, contentType: shrunk.contentType };
+    }
+  } catch (_) { /* the original goes up */ }
+  return { file: staged.file, contentType: staged.file.type };
+}
+
 function __dmComposeMediaChosen(ev) {
   const file = ev.target.files && ev.target.files[0];
   ev.target.value = '';
@@ -2880,6 +2974,9 @@ function __dmComposeMediaChosen(ev) {
   };
   __dmComposeMediaRenderStaged();
   document.getElementById('sndBtn').disabled = false;
+  // A big photo is made smaller now, while the student is still typing.
+  // __dmSend waits for it; the chip shows the smaller size once it is ready.
+  __dmShrinkStart(__realDM.stagedMedia);
 }
 
 function __dmComposeMediaClear() {
