@@ -6,6 +6,13 @@ type SentryTransactionEvent = Parameters<
   NonNullable<BrowserOptions["beforeSendTransaction"]>
 >[0];
 
+/** One integration, and the client the kit hands it, read off the options the same way. */
+type SentryIntegration = Extract<
+  NonNullable<BrowserOptions["integrations"]>,
+  readonly unknown[]
+>[number];
+type SentryClient = Parameters<NonNullable<SentryIntegration["setup"]>>[0];
+
 const dsn = process.env.NEXT_PUBLIC_SENTRY_DSN?.trim();
 
 /**
@@ -153,10 +160,91 @@ export function redactDbCallValues(s: string): string {
     .replace(DB_ID_PATH_RE, (path: string) => path.replace(UUID_RE, ":id"));
 }
 
+/**
+ * Where the kit starts to write one of an element's four labels,
+ * `[aria-label="`, `[alt="`, `[title="` or `[name="`, and everything after it
+ * to the end of the string. A backslash in front of the quote is allowed for:
+ * that is the same text once it has been copied into JSON.
+ */
+const ELEMENT_LABEL_RE = /\[(aria-label|alt|title|name)=\\*"[\s\S]*$/i;
+
+/**
+ * Blanks the labels in the name the kit gives a page element:
+ * `button[type="button"] > img[alt="Photo posted by Jane Doe"]` becomes
+ * `button[type="button"] > img[alt=""]`. The attribute's name stays, so the
+ * report still says the element had a label. Pure: same input, same output.
+ *
+ * Why: to say which element was the largest thing painted, which one moved
+ * and which one was tapped, the kit writes the element out as a selector
+ * (htmlTreeAsString in @sentry/browser-utils), with the full text of its
+ * `aria-label`, `name`, `title` and `alt`. Ours hold students' names ("Open
+ * Jane Doe's profile", "Photo posted by Jane Doe") and what a person typed
+ * (`No matches for "…"`). Privacy Policy 3d says our own code puts no name
+ * on these reports.
+ *
+ * Everything from the first label to the END OF THE STRING goes, not only up
+ * to the next `"]`. The kit writes a label as it is, quotes and brackets
+ * included, so a label can hold `"]`, ` > `, or text that reads as a whole
+ * second element, and nothing in the string says where it really stops. A
+ * string cut short has no closing `"]` at all. So nothing after the first
+ * label can be trusted, and none of it is sent.
+ *
+ * What stands in front of the first label is never part of one, and stays:
+ * tags, ids, classes, a `[type="button"]` (the kit writes `type` after
+ * `aria-label` and before the other three), and the names the kit prints in
+ * place of a selector for `data-sentry-element` / `data-sentry-component`.
+ * The price is what follows a labelled element: a `type` on that same
+ * element and the elements inside it are not sent either.
+ */
+export function redactElementLabels(s: string): string {
+  return s.replace(ELEMENT_LABEL_RE, '[$1=""]');
+}
+
+/**
+ * An element's id as the kit writes it into a selector: `#`, then everything
+ * up to the next space. The kit puts a space before the next element and
+ * none inside this one, so the classes and the `[type="…"]` it writes
+ * straight after the id come along, and an id that holds a bracket or a
+ * quote is still taken whole.
+ */
+const ELEMENT_ID_RUN_RE = /#\S*/g;
+
+/**
+ * Takes a database ID out of an element's id: `input#<account ID>-days`
+ * becomes `input#:id-days`. The rest of the id stays, so the report still
+ * says which box it was. Pure: same input, same output.
+ *
+ * Why: the kit writes an element's id into the same selector as its labels,
+ * in front of them, so cutting the labels (redactElementLabels) leaves the id
+ * standing. A few ids are built from an ID in the database. On the founders'
+ * admin pages that is another person's account ID
+ * (src/app/admin/users-client.tsx: `<account ID>-days`, `-code`, `-note`),
+ * and typing in that box is a measured tap. Privacy Policy 3d says our own
+ * code puts no account on these reports.
+ *
+ * Every ID of that shape after a `#`, up to the next space, goes, whatever it
+ * is the ID of (a post's `#post-<ID>` as well): nothing in the string says
+ * which kind it is. The same rule takes one out of the `#…` end of a web
+ * address, which costs nothing we need. An ID with no `#` in front of it is
+ * not an element's id; the other scrubbers decide about those.
+ */
+export function redactElementIds(s: string): string {
+  return s.replace(ELEMENT_ID_RUN_RE, (run: string) => run.replace(UUID_RE, ":id"));
+}
+
 /** Every string scrubber, in order. */
 function scrubString(s: string): string {
-  return redactDbCallValues(redactHandles(redactAuthTokens(s)));
+  return redactElementIds(
+    redactElementLabels(redactDbCallValues(redactHandles(redactAuthTokens(s)))),
+  );
 }
+
+/**
+ * Keys the kit fills with an element's id alone, no `#` in front: the id of
+ * the largest thing painted (`lcp.id`, and `browser.web_vital.lcp.id` when
+ * spans are streamed).
+ */
+const ELEMENT_ID_KEYS = new Set(["lcp.id", "browser.web_vital.lcp.id"]);
 
 /**
  * Keys the kit fills with a query string or fragment whose leading `?` / `#`
@@ -172,6 +260,7 @@ const BARE_QUERY_KEYS = new Set([
 ]);
 
 function scrubKeyedString(key: string, s: string): string {
+  if (ELEMENT_ID_KEYS.has(key)) return scrubString(s.replace(UUID_RE, ":id"));
   if (!BARE_QUERY_KEYS.has(key) || /^[?&#]/.test(s)) return scrubString(s);
   return scrubString(`&${s}`).slice(1);
 }
@@ -284,9 +373,11 @@ function stripRequestRecord(event: Record<string, unknown>): void {
 
 /**
  * Cleans an error or speed report before it leaves. Both `beforeSend` and
- * `beforeSendTransaction` call it. First the request record is cut down
- * (stripRequestRecord): no body, no cookies, no header but the browser's
- * name. Then one pass over the whole event does two things:
+ * `beforeSendTransaction` call it, and reportScrubIntegration calls it once
+ * more for every event, the ones that skip those two included. First the
+ * request record is cut down (stripRequestRecord): no body, no cookies, no
+ * header but the browser's name. Then one pass over the whole event does two
+ * things:
  *
  * - Every copy the kit keeps of those is dropped (isRequestCopyKey), from the
  *   trace context, from each span and from the trail.
@@ -300,8 +391,10 @@ function stripRequestRecord(event: Record<string, unknown>): void {
  * `/auth/update-password?token_hash=…` in Sentry is a password reset for
  * anyone who can read the event. The same pass takes handles out
  * (redactHandles), so an event never names the student whose profile was
- * open, and the values out of the server's database calls
- * (redactDbCallValues).
+ * open, the values out of the server's database calls (redactDbCallValues),
+ * and the labels and database IDs out of the element names on a speed
+ * report: `lcp.element`, `lcp.id`, `cls.source.N`, the name of a tap's span
+ * (redactElementLabels, redactElementIds).
  *
  * The report is always sent: this never returns null and never throws. A
  * step that fails is skipped (for the request record, the whole record is
@@ -341,6 +434,142 @@ export function scrubAuthTokensFromEvent<
   return event;
 }
 
+/**
+ * The same pass as scrubAuthTokensFromEvent's second half, for a record the
+ * kit hands over that is not an event: every string scrubbed, every copy of
+ * the request record dropped, in place. Always hands back what it was given
+ * and never throws.
+ */
+function scrubRecordInPlace<T>(record: T): T {
+  try {
+    if (record === null || typeof record !== "object") return record;
+    const fields = record as unknown as Record<string, unknown>;
+    const seen = new WeakSet<object>();
+    for (const key of Object.keys(fields)) {
+      try {
+        fields[key] = scrubValue(fields[key], 1, seen);
+      } catch {
+        // Left as it was; the other keys are still scrubbed.
+      }
+    }
+  } catch {
+    // A bug here must not cost the span.
+  }
+  return record;
+}
+
+/**
+ * Cleans one span: its name (`description`), its data and the rest. This is
+ * `beforeSendSpan`.
+ *
+ * Why: the browser sends some spans on their own, outside any speed report,
+ * and those pass neither `beforeSend` nor `beforeSendTransaction`. Today
+ * that is the INP measurement (how fast the page answered a tap). Its name
+ * is the tapped element as the kit writes it, labels and id included
+ * (redactElementLabels, redactElementIds), and its data holds the page's
+ * route.
+ *
+ * The span is always sent: this hands back the span it was given, cleaned in
+ * place, never null (the kit warns and sends the span as it was if a hook
+ * returns nothing) and never throws.
+ */
+export function scrubSpan<T>(span: T): T {
+  return scrubRecordInPlace(span);
+}
+
+/**
+ * Cleans the trace header the kit builds for a report (its "dynamic sampling
+ * context": trace ID, environment, release and `transaction`, the name of the
+ * trace's first span). reportScrubIntegration hands it over, at the moment
+ * the kit builds it.
+ *
+ * Why: the header goes out next to the report, and no `beforeSend…` hook
+ * sees it. A span sent on its own that starts its own trace is that trace's
+ * first span, so its name, the tapped element with its labels, would be
+ * copied into `transaction` here after scrubSpan had cleaned the span itself.
+ * The kit normally reuses the header of the page load, which names the
+ * route; this covers the case where there is none to reuse.
+ */
+export function scrubTraceHeader<T>(header: T): T {
+  return scrubRecordInPlace(header);
+}
+
+/** The name the kit lists this integration under (`sdk.integrations` on a report). */
+export const REPORT_SCRUB_INTEGRATION_NAME = "VibeReportScrub";
+
+/**
+ * The two places no `beforeSend…` option reaches, cleaned from inside the
+ * kit. An integration is the kit's own way to be handed its client while it
+ * starts, before anything can be sent. getSentryInitOptions lists this one,
+ * so the browser, the server and the edge runtime all get it. A setup file
+ * that writes its own `integrations` list replaces ours and has to name this
+ * one again: src/instrumentation-client.ts does, and a test reads all three
+ * setup files to keep it so.
+ *
+ * - "createDsc": the trace header sent next to a report (scrubTraceHeader has
+ *   the why). It is cleaned once, where the kit builds it, before anything
+ *   copies it.
+ * - "beforeSendEvent": every event, at the last step before it is packed.
+ *   Most have been through `beforeSend` or `beforeSendTransaction` by then,
+ *   and the second pass changes nothing. The one that has not is the kit's
+ *   report about its own failure: when a step of its event pipeline throws,
+ *   it drops the event it was working on and sends the failure as a new one,
+ *   and that one skips both options (_processEvent in @sentry/core client.js,
+ *   `isInternalException`). It is built from the same scope, so it carries
+ *   the trail (every page opened and request made, with its address) and the
+ *   page's name. Here it gets the same scrub as any other report.
+ *
+ * Neither listener may throw. The kit does not catch what a listener throws:
+ * out of "beforeSendEvent" it would count as one more failure of its own and
+ * be reported the same way, through this listener again. Both scrubs catch
+ * everything themselves, and each listener is wrapped once more to be sure.
+ */
+export function reportScrubIntegration(): SentryIntegration {
+  return {
+    name: REPORT_SCRUB_INTEGRATION_NAME,
+    setup(client: SentryClient): void {
+      try {
+        client.on("createDsc", (header) => {
+          try {
+            scrubTraceHeader(header);
+          } catch {
+            // The header goes as it was.
+          }
+        });
+        client.on("beforeSendEvent", (event) => {
+          try {
+            scrubAuthTokensFromEvent(event as SentryErrorEvent);
+          } catch {
+            // The event goes as it was.
+          }
+        });
+      } catch {
+        // A client with no hooks: the `beforeSend…` options still do their part.
+      }
+    },
+  };
+}
+
+/**
+ * Error messages that come from other people's software, not from Vibe. They
+ * are dropped before they are counted, so a real error stands out. Both
+ * turned up in the 30 days to October 12, 2026:
+ *
+ * - "Object Not Found Matching Id:" is thrown by a mail service's link
+ *   scanner when it opens a link from one of our emails to check it. The
+ *   kit's own list only has the `MethodName:simulateEvent` flavour.
+ * - "SCDynimacBridge" is a name another app's built-in browser looks for on
+ *   the page. The spelling is theirs.
+ *
+ * Each is matched anywhere in the message, on top of the kit's own list
+ * (@sentry/core eventFilters). Only a browser ever throws either one. The
+ * server and edge runtimes share these options and have nothing to match.
+ */
+export const OUTSIDE_SOFTWARE_ERRORS: readonly RegExp[] = [
+  /Object Not Found Matching Id:/,
+  /SCDynimacBridge/,
+];
+
 /** Shared defaults — browser + Node + Edge. Disabled when DSN unset (local dev without Sentry). */
 export function getSentryInitOptions(): BrowserOptions {
   const enabled = Boolean(dsn);
@@ -353,13 +582,43 @@ export function getSentryInitOptions(): BrowserOptions {
       "development",
     tracesSampleRate: process.env.NODE_ENV === "development" ? 1 : 0.1,
     sendDefaultPii: false,
-    // Both hooks run the same scrub. A span sent on its own passes neither.
-    // Today that is only the browser's INP measurement: the tapped element and
-    // the page's route name, no request and no database call. Span streaming
-    // (`traceLifecycle: "stream"`, off) would send every span that way, so it
-    // needs a `beforeSendSpan` that does the same before anyone turns it on.
+    // A copy, so the kit can't change our list.
+    ignoreErrors: [...OUTSIDE_SOFTWARE_ERRORS],
+    // Three hooks, one scrub. `beforeSend` cleans an error report,
+    // `beforeSendTransaction` a speed report, and `beforeSendSpan` a span the
+    // browser sends on its own, which passes neither of the other two. Today
+    // that is only the INP measurement (how fast the page answered a tap): the
+    // tapped element and the page's route name, no request and no database
+    // call. Read in @sentry/core 10.73.0: createSpanEnvelope (envelope.js)
+    // runs `beforeSendSpan` on such a span, and on the LCP and CLS spans the
+    // kit can send the same way (`_experiments.enableStandaloneLcpSpans` and
+    // `enableStandaloneClsSpans`, both off).
+    //
+    // What comes with `beforeSendSpan`, also read there (processBeforeSend in
+    // client.js) and seen in a local run of the kit:
+    // - The kit runs it on every span of a speed report too, before
+    //   `beforeSendTransaction`. Those are scrubbed twice, which changes
+    //   nothing: the scrub gives the same result the second time.
+    // - To do that it rebuilds the report's trace context from the first
+    //   span, and the rebuilt one has no `links` (in the browser, the pointer
+    //   from one page load to the one before it). The same pointer still goes
+    //   out in the data, as `sentry.previous_trace`.
+    //
+    // What the three hooks do not reach, and what does:
+    // - The trace header sent next to a report, and the report the kit sends
+    //   about a failure of its own, which skips `beforeSend`. Both are
+    //   cleaned by reportScrubIntegration, listed under `integrations` below
+    //   for all three runtimes.
+    // - Span streaming (`traceLifecycle: "stream"`, off). A streamed span only
+    //   passes a hook wrapped in `withStreamedSpan`, and with this plain one
+    //   set the kit's streaming integration falls back to not streaming.
+    //   Before anyone turns streaming on, wrap the same scrub that way.
     beforeSend: (event) => scrubAuthTokensFromEvent(event),
     beforeSendTransaction: (event) => scrubAuthTokensFromEvent(event),
+    beforeSendSpan: (span) => scrubSpan(span),
+    // Added to the kit's own integrations, not in place of them. A setup file
+    // that sets `integrations` itself must list reportScrubIntegration() too.
+    integrations: [reportScrubIntegration()],
   };
 }
 

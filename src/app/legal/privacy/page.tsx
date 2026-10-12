@@ -19,8 +19,9 @@ import { Sections6To8 } from "./sections-6-8";
 import { Sections9To10 } from "./sections-9-10";
 import { Sections11To15 } from "./sections-11-15";
 
-// Set on the day the page goes live.
-const EFFECTIVE_DATE = "October 5, 2026";
+// The day this page last changed. Section 13 promises the new date goes at
+// the top with every change, and check/checks.mjs pins the same date.
+const EFFECTIVE_DATE = "October 12, 2026";
 
 export const metadata = {
   title: "Privacy Policy · Vibe",

@@ -1,6 +1,6 @@
 # Vibe Privacy Policy
 
-Effective October 5, 2026
+Effective October 12, 2026
 
 Vibe is a campus social app for people with an Indiana University or Purdue University email address. It is run by **CONNECTVIBE. LLC**, an Indiana limited liability company. In this policy, "we" means that company. Vibe is independent. It is not run or backed by Indiana University, Purdue University, or any campus, school or club.
 
@@ -121,7 +121,7 @@ Posts and club pages are public (section 5a), so a location inside one of those 
 - **Email log.** We log each email our own software sends. The log holds its kind, your account if there is one, the part of the address after the @ and the time. It also holds whether it worked, and the reference number that our email service (Resend) gives the message. In place of the address, the log holds a scrambled code. Nobody can turn the scrambled code back into the address. Our servers do hold a secret key that lets us test whether a particular address matches it.
 - **Error reports.** When something breaks, a report goes to Sentry, the service we use to find bugs. A speed report also goes for about one page load in ten, and for about one in ten requests to our servers. (A request is your browser or app asking our servers for something.) Sentry also gets a small signal each time you open or change a page, so it can count what share of visits hit an error. That signal holds no page address and nothing about your account.
 
-  Our own code does not put your name, account or email on these reports, and we strip sign-in links, access codes and profile handles from web addresses. A report can still hold things that point to you. It can include a club's handle, the ID (a random label) of a post or chat, or search words. It also carries a short trail of what happened just before it. The trail lists the pages you opened, the requests your browser made and lines our own software logs. Until October 8, 2026 it also listed the buttons you tapped, by their labels and never what you typed.
+  Our own code does not put your name, account or email on these reports, and we strip sign-in links, access codes and profile handles from web addresses. A report can still hold things that point to you. It can include a club's handle, the ID (a random label) of a post or chat, or search words. It also carries a short trail of what happened just before it. The trail lists the pages you opened, the requests your browser made and lines our own software logs. Until October 8, 2026 it also listed the buttons you tapped, by their labels and never what you typed. Until October 12, 2026 a speed report could also name the thing you tapped, or the largest thing on your screen, by its label, and some labels hold a person's name, such as the button that opens their profile.
 
   Until our release of October 5, 2026, an error report or a speed report about a request to our servers could also hold four things:
 

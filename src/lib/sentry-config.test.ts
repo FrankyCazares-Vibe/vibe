@@ -3,7 +3,14 @@
  * forms (handoffs/wave-plan-pwa/critic-s1.md item 18), next to the auth-token
  * scrub it runs after, and the Privacy Policy's row 14: no request body, no
  * cookie, no header but the browser's name, and no value from the address of
- * a database call on an error or speed report.
+ * a database call on an error or speed report. Then section 3d: no label of
+ * a page element ("Photo posted by Jane Doe") and no account ID from an
+ * element's id on a speed report, on the span the browser sends on its own,
+ * or in the trace header next to it; the same scrub on the report the kit
+ * sends about a failure of its own; and the three setup files, read as text,
+ * to check each hands the kit the integration that does those last two. At
+ * the end, the two errors from other people's software that are kept off
+ * the reports.
  *
  * Run with:
  *   node --test --experimental-strip-types src/lib/sentry-config.test.ts
@@ -13,20 +20,29 @@
  * `src/lib/mentions.test.ts`. The specifier goes through a variable because
  * tsc refuses a literal ".ts" specifier.
  *
- * Nothing is sent. No DSN is set, and the two tests at the end that run the
- * installed kit give it a transport that only records, with a DSN on the
- * reserved `.invalid` domain.
+ * Nothing is sent. No DSN is set, and the tests that run the installed kit
+ * give it a transport that only records, with a DSN on the reserved
+ * `.invalid` domain.
  */
 
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { test } from "node:test";
 
+// The function the browser kit names an element with, for a tap, the largest
+// paint and a layout shift (metrics/inp.js, lcp.js, cls.js, browserMetrics.js).
+import { htmlTreeAsString } from "@sentry/browser-utils";
 import {
   Scope,
+  SentrySpan,
   ServerRuntimeClient,
+  eventFiltersIntegration,
+  getIsolationScope,
   httpHeadersToSpanAttributes,
   httpRequestToRequestData,
   requestDataIntegration,
+  stringMatchesSomePattern,
+  withScope,
 } from "@sentry/core";
 
 const specifier = "./sentry-config.ts";
@@ -34,7 +50,13 @@ const {
   redactHandles,
   redactAuthTokens,
   redactDbCallValues,
+  redactElementIds,
+  redactElementLabels,
   scrubAuthTokensFromEvent,
+  scrubSpan,
+  scrubTraceHeader,
+  reportScrubIntegration,
+  REPORT_SCRUB_INTEGRATION_NAME,
   getSentryInitOptions,
 } = (await import(specifier)) as typeof import("./sentry-config");
 
@@ -321,6 +343,232 @@ test("a very long run of ? & and = is scrubbed quickly", () => {
   const out = redactDbCallValues(long);
   assert.equal(out.endsWith("?email=eq.[redacted]"), true);
   assert.equal(Date.now() - started < 1000, true);
+});
+
+// ── The name the kit gives a page element ──────────────────────────────────
+//
+// To say which element was painted largest, which one moved and which one
+// was tapped, the kit writes the element as a selector with the text of its
+// labels. The strings here have the shape the installed kit writes
+// (htmlTreeAsString in @sentry/browser-utils): elements joined by " > ",
+// attributes in the order aria-label, type, name, title, alt, and a label
+// copied as it is, quotes and brackets included.
+
+const JANE_PHOTO = 'button[type="button"] > div[aria-label="Photo posted by Jane Doe"]';
+const JANE_ROW = `a.row[aria-label="Open Jane Doe's profile"][type="button"] > img.avatar[alt="Jane Doe"]`;
+
+test("a label is blanked and the attribute's name stays, for each of the four", () => {
+  const cases: Array<[string, string]> = [
+    [JANE_PHOTO, 'button[type="button"] > div[aria-label=""]'],
+    ['a.card > img.w-full[alt="Photo posted by Jane Doe"]', 'a.card > img.w-full[alt=""]'],
+    [`li > span.chip[title="Jane Doe — Kelley '27"]`, 'li > span.chip[title=""]'],
+    ['form#new > input.field[type="text"][name="jane_doe"]', 'form#new > input.field[type="text"][name=""]'],
+    // The kit writes these names in lower case; any other case is cut as well.
+    ['IMG[ALT="Jane Doe"]', 'IMG[ALT=""]'],
+  ];
+  for (const [input, expected] of cases) assert.equal(redactElementLabels(input), expected);
+});
+
+test("what stands in front of the first label survives: type=\"button\" and a data-sentry-element name", () => {
+  assert.equal(
+    redactElementLabels('PostCard > button.like[type="button"] > img.w-full[alt="Photo posted by Jane Doe"]'),
+    'PostCard > button.like[type="button"] > img.w-full[alt=""]',
+  );
+  // The kit prints only the name for an element that carries data-sentry-element.
+  assert.equal(
+    redactElementLabels('FeedList > PostPhoto > span.badge[title="Jane Doe"]'),
+    'FeedList > PostPhoto > span.badge[title=""]',
+  );
+});
+
+test("a string with no label comes back unchanged", () => {
+  for (const same of [
+    'button[type="button"]',
+    'PostCard > button.like[type="submit"]',
+    "FeedList > PostCard > PostPhoto",
+    "div#post-42.card.rounded-xl > span.text-[13px]",
+    'input.field[type="email"]',
+    // Another attribute whose name only ends like one of the four.
+    'a[data-title="x"][data-name="y"]',
+    "<unknown>",
+    "",
+    // Not selectors at all.
+    "https://www.connectvibe.app/_next/static/chunks/app/orgs/[handle]/page-3f2a1b9c.js",
+    "/var/task/.next/server/app/[name]/page.js",
+    '{"name":"x","title":["a","b"],"alt":"c"}',
+    "/x?filter[name]=jane&alt=1",
+    '<img alt="Photo" title="x" name="y">',
+    "Cannot read properties of undefined (reading 'title')",
+  ]) {
+    assert.equal(redactElementLabels(same), same);
+  }
+});
+
+test("a label holding a double quote, a ] and a > leaves nothing of itself behind", () => {
+  const label = 'Jane "JD" Doe] said "hi"] > img.me[alt="x"] > b.Doe';
+  const out = redactElementLabels(`ul.list > li > a.row[aria-label="${label}"][type="button"] > span.name`);
+  assert.equal(out, 'ul.list > li > a.row[aria-label=""]');
+  for (const gone of ["Jane", "JD", "Doe", "said", "hi", "img.me"]) assert.equal(out.includes(gone), false, gone);
+
+  const cases: Array<[string, string]> = [
+    // In the app today: the title of the empty search result holds what was typed, in quotes.
+    ['p.empty[title="No matches for "jane doe""]', 'p.empty[title=""]'],
+    // A label that is nothing but the two characters that would end one.
+    ['img[alt=""]"]', 'img[alt=""]'],
+    // A line break, an emoji and a joined emoji.
+    ['img[alt="Jane\nDoe 🎉 👩‍💻"]', 'img[alt=""]'],
+    // Text that reads as a second, unlabelled element.
+    ['img[alt="Jane"] > Doe.is.here', 'img[alt=""]'],
+  ];
+  for (const [input, expected] of cases) assert.equal(redactElementLabels(input), expected);
+});
+
+test("two labelled elements in one selector: both labels go, and the selector ends at the first", () => {
+  assert.equal(redactElementLabels(JANE_ROW), 'a.row[aria-label=""]');
+  // Two labels on one element.
+  assert.equal(redactElementLabels('img.avatar[title="Jane Doe"][alt="Photo of Jane"]'), 'img.avatar[title=""]');
+  // A type written after the label is past the point of trust, so it goes too.
+  assert.equal(redactElementLabels('button[aria-label="Message Jane"][type="button"]'), 'button[aria-label=""]');
+});
+
+test("a selector cut short, inside a longer line, or copied into JSON text is blanked from its first label on", () => {
+  const cases: Array<[string, string]> = [
+    ['img.w-full[alt="Photo posted by Jane Do', 'img.w-full[alt=""]'],
+    ['img.w-full[alt="Jane "JD"] Doe and fri...', 'img.w-full[alt=""]'],
+    ['img.w-full[alt="', 'img.w-full[alt=""]'],
+    ['[HTMLElement: div.x[aria-label="Jane Doe"]] was not attached', '[HTMLElement: div.x[aria-label=""]'],
+    ['{"target":"img[alt=\\"Jane Doe\\"]","n":1}', '{"target":"img[alt=""]'],
+  ];
+  for (const [input, expected] of cases) assert.equal(redactElementLabels(input), expected);
+});
+
+test("the label scrub gives the same result the second time", () => {
+  for (const input of [
+    JANE_PHOTO,
+    JANE_ROW,
+    'p.empty[title="No matches for "jane doe""]',
+    'img[alt=""]"]',
+    'img.w-full[alt="',
+    'button[type="button"]',
+    "FeedList > PostPhoto",
+  ]) {
+    const once = redactElementLabels(input);
+    assert.equal(redactElementLabels(once), once, input);
+  }
+});
+
+test("a very long run of [ and a very long label are scrubbed quickly", () => {
+  const started = Date.now();
+  assert.equal(redactElementLabels(`${"[name=".repeat(20000)}img[alt="Jane Doe"]`).endsWith('img[alt=""]'), true);
+  assert.equal(redactElementLabels(`img[alt="${'Jane "] > '.repeat(20000)}"]`), 'img[alt=""]');
+  assert.equal(Date.now() - started < 1000, true);
+});
+
+// ── The id in the name the kit gives a page element ────────────────────────
+//
+// The kit writes an element's id in front of its labels, so the label scrub
+// leaves it standing. On the founders' admin pages an id holds another
+// person's account ID (src/app/admin/users-client.tsx: `${user.id}-days`).
+
+/** The box a founder types a suspension's length into, as the kit names it. */
+const ADMIN_BOX = `div.adm-card > input#${OTHER}-days[type="number"]`;
+
+test("an account ID in an element's id becomes :id, and the rest of the id and the selector stay", () => {
+  const cases: Array<[string, string]> = [
+    [ADMIN_BOX, 'div.adm-card > input#:id-days[type="number"]'],
+    [`textarea#${OTHER}-note.adm-input`, "textarea#:id-note.adm-input"],
+    // The reports page: `<kind>:<ID>-reason`, and an id on more than one element.
+    [`li#user:${OTHER}-row > select#user:${OTHER}-reason`, "li#user::id-row > select#user::id-reason"],
+    // Any ID of that shape goes, a post's too: nothing in the string says whose it is.
+    [`article#post-${ME}.card > PostPhoto`, "article#post-:id.card > PostPhoto"],
+    // Two in one id, one in capitals, and one in an id that holds a bracket.
+    [`div#${ME}_${OTHER}`, "div#:id_:id"],
+    [`div#row-${OTHER.toUpperCase()}`, "div#row-:id"],
+    [`div#row[${OTHER}].card`, "div#row[:id].card"],
+    // With a label after it: both scrubs apply.
+    [`div#${OTHER}-card > img.w-full[alt="Photo posted by Jane Doe"]`, 'div#:id-card > img.w-full[alt=""]'],
+    // The `#…` end of a web address follows the same rule.
+    [`https://www.connectvibe.app/campus?tab=is#post-${ME}`, "https://www.connectvibe.app/campus?tab=is#post-:id"],
+  ];
+  for (const [input, expected] of cases) {
+    assert.equal(redactElementLabels(redactElementIds(input)), expected);
+    // The order of the two scrubs does not matter.
+    assert.equal(redactElementIds(redactElementLabels(input)), expected);
+  }
+});
+
+test("what is not an ID in an element's id comes back unchanged", () => {
+  for (const same of [
+    "div#post-42.card.rounded-xl > span.text-[13px]",
+    "section#section-3 > h2",
+    "span.bg-[#0b0b0f].text-[#fafafa]",
+    'input#email.field[type="email"]',
+    // A trace ID has no dashes, and React's own ids are short.
+    "div#df9a3e8b36484e26b52be63852389361",
+    "label#«r1»-label",
+    // No `#` in front: not an element's id. The other scrubbers decide about these.
+    `/api/users/by-id/${ME}`,
+    `/api/me/threads/${OTHER}/messages`,
+    `{"debug_id":"${ME}"}`,
+    // A space ends the id: the kit puts one before the next element.
+    `div#x > ${ME}`,
+    "#",
+    "",
+  ]) {
+    assert.equal(redactElementIds(same), same);
+  }
+});
+
+test("the id scrub gives the same result the second time, and a very long run of # is scrubbed quickly", () => {
+  for (const input of [ADMIN_BOX, `li#user:${OTHER}-row > select#user:${OTHER}-reason`, "div#post-42", "#"]) {
+    const once = redactElementIds(input);
+    assert.equal(redactElementIds(once), once, input);
+  }
+  const started = Date.now();
+  assert.equal(redactElementIds(`${"#".repeat(60000)}${OTHER}`), `${"#".repeat(60000)}:id`);
+  assert.equal(redactElementIds(`${"#0a1b2c3d-".repeat(20000)} input#${OTHER}`).endsWith(" input#:id"), true);
+  assert.equal(Date.now() - started < 1000, true);
+});
+
+/** A stand-in for a page element, with what the kit's namer reads from one: tag, id, classes, attributes, parent. */
+function pageElement(
+  tag: string,
+  parts: { id?: string; className?: string; attrs?: Record<string, string>; parent?: unknown } = {},
+) {
+  const attrs = parts.attrs ?? {};
+  return {
+    tagName: tag.toUpperCase(),
+    id: parts.id ?? "",
+    className: parts.className ?? "",
+    parentNode: parts.parent ?? null,
+    getAttribute: (name: string): string | null => attrs[name] ?? null,
+  };
+}
+
+test("an element named by the installed kit's own namer loses its labels and the account ID in its id", () => {
+  const card = pageElement("div", { className: "adm-card" });
+  // The admin box as it is in the app: an id and a type, no label.
+  const box = pageElement("input", { id: `${OTHER}-days`, attrs: { type: "number" }, parent: card });
+  // If these two fail the kit changed how it writes an element: read it again before trusting the tests above.
+  assert.equal(htmlTreeAsString(box), ADMIN_BOX);
+  const label = 'Open Jane "JD" Doe] > x profile';
+  const row = pageElement("a", {
+    id: `${OTHER}-row`,
+    className: "row big",
+    attrs: { "aria-label": label, type: "button", name: "jane_doe", title: "Jane Doe", alt: "Jane" },
+    parent: card,
+  });
+  // The element itself is always written whole; a parent is left off once the name would pass 80 characters.
+  assert.equal(
+    htmlTreeAsString(row),
+    `a#${OTHER}-row.row.big[aria-label="${label}"][type="button"][name="jane_doe"][title="Jane Doe"][alt="Jane"]`,
+  );
+
+  const span = scrubSpan({ description: htmlTreeAsString(row), data: { "lcp.element": htmlTreeAsString(box) } });
+  assert.deepEqual(span, {
+    description: 'a#:id-row.row.big[aria-label=""]',
+    data: { "lcp.element": 'div.adm-card > input#:id-days[type="number"]' },
+  });
 });
 
 // ── The request record ─────────────────────────────────────────────────────
@@ -630,9 +878,217 @@ test("class-shaped values are left alone", () => {
   assert.equal(out.extra.when, when);
 });
 
+// ── Element names on a speed report, and the span sent on its own ──────────
+
+/**
+ * A page-load speed report with the element names the browser kit puts on it
+ * (key names read off @sentry/browser-utils metrics/browserMetrics.js:
+ * `lcp.element`, `cls.source.N`, and a tap's span named after its element).
+ */
+function pageLoadReport() {
+  return {
+    type: "transaction",
+    transaction: "/campus",
+    contexts: {
+      trace: {
+        op: "pageload",
+        data: {
+          "sentry.op": "pageload",
+          "lcp.element": 'PostCard > img.w-full[alt="Photo posted by Jane Doe"]',
+          "lcp.size": 120000,
+          "cls.source.1": `main > a.row[aria-label="Open Jane Doe's profile"][type="button"]`,
+          "cls.source.2": "div.feed > PostPhoto",
+        },
+      },
+    },
+    spans: [
+      {
+        span_id: "a6b523075f48d198",
+        op: "ui.interaction.click",
+        description: `button.like[aria-label="Like Jane Doe's post"][type="button"] > svg`,
+        data: { "sentry.origin": "auto.ui.browser.metrics", "ui.component_name": "LikeButton" },
+      },
+    ],
+  };
+}
+
+test("a speed report loses the label in lcp.element, in cls.source.1 and in a tap span's description", () => {
+  const report = pageLoadReport();
+  const sent = getSentryInitOptions().beforeSendTransaction?.(report as never, {});
+  assert.equal(sent, report);
+  assert.deepEqual(report.contexts.trace.data, {
+    "sentry.op": "pageload",
+    "lcp.element": 'PostCard > img.w-full[alt=""]',
+    "lcp.size": 120000,
+    "cls.source.1": 'main > a.row[aria-label=""]',
+    "cls.source.2": "div.feed > PostPhoto",
+  });
+  assert.equal(report.spans[0].description, 'button.like[aria-label=""]');
+  assert.equal(report.spans[0].data["ui.component_name"], "LikeButton");
+  const text = JSON.stringify(report);
+  for (const gone of ["Jane", "Doe", "Photo posted"]) assert.equal(text.includes(gone), false, gone);
+
+  // An error report carries the same strings when a page element is among its data.
+  const error = scrub({ extra: { target: `[HTMLElement: ${JANE_PHOTO}]` }, breadcrumbs: [{ category: "ui.click", message: JANE_ROW }] });
+  assert.equal(error.extra.target, '[HTMLElement: button[type="button"] > div[aria-label=""]');
+  assert.equal(error.breadcrumbs[0].message, 'a.row[aria-label=""]');
+});
+
+test("a speed report loses the account ID in lcp.id, in lcp.element, in cls.source.1 and in a tap span's description", () => {
+  // `lcp.id` is the element's id alone, with no `#` in front (browserMetrics.js).
+  const report = {
+    type: "transaction",
+    transaction: "/admin",
+    contexts: {
+      trace: {
+        op: "pageload",
+        data: {
+          "lcp.element": ADMIN_BOX,
+          "lcp.id": `${OTHER}-days`,
+          "lcp.size": 9000,
+          "cls.source.1": `div.adm-card > textarea#${OTHER}-note`,
+          // Another key with an ID in it is not an element's id, and is left alone.
+          thread: ME,
+        },
+      },
+    },
+    spans: [{ span_id: "a6b523075f48d198", op: "ui.interaction.press", description: ADMIN_BOX, data: {} }],
+  };
+  const sent = getSentryInitOptions().beforeSendTransaction?.(report as never, {});
+  assert.equal(sent, report);
+  assert.deepEqual(report.contexts.trace.data, {
+    "lcp.element": 'div.adm-card > input#:id-days[type="number"]',
+    "lcp.id": ":id-days",
+    "lcp.size": 9000,
+    "cls.source.1": "div.adm-card > textarea#:id-note",
+    thread: ME,
+  });
+  assert.equal(report.spans[0].description, 'div.adm-card > input#:id-days[type="number"]');
+  assert.equal(JSON.stringify(report).includes(OTHER), false);
+
+  // The same key on the span the kit can send on its own, under both of its names.
+  const lone = scrubSpan({ data: { "lcp.id": `${OTHER}-days`, "browser.web_vital.lcp.id": `row-${OTHER}` } });
+  assert.deepEqual(lone.data, { "lcp.id": ":id-days", "browser.web_vital.lcp.id": "row-:id" });
+});
+
+test("the whole event scrub gives the same result the second time", () => {
+  const once = JSON.stringify(scrub(pageLoadReport()));
+  assert.equal(JSON.stringify(scrub(scrub(pageLoadReport()))), once);
+  const admin = () => ({ contexts: { trace: { data: { "lcp.element": ADMIN_BOX, "lcp.id": `${OTHER}-days` } } } });
+  assert.equal(JSON.stringify(scrub(scrub(admin()))), JSON.stringify(scrub(admin())));
+});
+
+/**
+ * The tap measurement (INP) as the installed kit builds it and sends it on
+ * its own: _onInp in @sentry/browser-utils metrics/inp.js, with the data
+ * startStandaloneWebVitalSpan (metrics/utils.js) adds.
+ */
+function tapSpan() {
+  return {
+    data: {
+      "sentry.origin": "auto.http.browser.inp",
+      "sentry.op": "ui.interaction.click",
+      "sentry.exclusive_time": 184,
+      environment: "production",
+      transaction: "/profile/franky",
+      "user_agent.original": "Mozilla/5.0 (iPhone)",
+    },
+    description: JANE_ROW,
+    op: "ui.interaction.click",
+    span_id: "8bbd0bb579cf1a7e",
+    start_timestamp: 1791824018.35,
+    timestamp: 1791824018.53,
+    trace_id: "df9a3e8b36484e26b52be63852389361",
+    origin: "auto.http.browser.inp",
+    exclusive_time: 184,
+    measurements: { inp: { value: 184, unit: "millisecond" } },
+    is_segment: true,
+    segment_id: "8bbd0bb579cf1a7e",
+  };
+}
+
+test("a span sent on its own goes through beforeSendSpan: the same span back, the label and the handle gone", () => {
+  const span = tapSpan();
+  const sent = getSentryInitOptions().beforeSendSpan?.(span as never);
+  assert.equal(sent, span);
+  assert.deepEqual(span, {
+    ...tapSpan(),
+    description: 'a.row[aria-label=""]',
+    data: { ...tapSpan().data, transaction: "/profile/:handle" },
+  });
+});
+
+test("the LCP and CLS spans the kit can send the same way lose their labels too", () => {
+  // Off today (_experiments.enableStandaloneLcpSpans / enableStandaloneClsSpans); key names from metrics/lcp.js and cls.js.
+  const lcp = scrubSpan({
+    description: 'img.w-full[alt="Photo posted by Jane Doe"]',
+    data: { "sentry.op": "ui.webvital.lcp", "lcp.element": 'img.w-full[alt="Photo posted by Jane Doe"]', "lcp.size": 120000 },
+  });
+  assert.deepEqual(lcp, {
+    description: 'img.w-full[alt=""]',
+    data: { "sentry.op": "ui.webvital.lcp", "lcp.element": 'img.w-full[alt=""]', "lcp.size": 120000 },
+  });
+  const cls = scrubSpan({ description: JANE_PHOTO, data: { "cls.source.1": JANE_PHOTO, "cls.source.2": JANE_ROW } });
+  assert.equal(JSON.stringify(cls).includes("Jane"), false);
+  assert.equal(cls.data["cls.source.2"], 'a.row[aria-label=""]');
+});
+
+test("the span hook hands back whatever it was given and never throws", () => {
+  const hook = getSentryInitOptions().beforeSendSpan as unknown as (span: unknown) => unknown;
+  for (const odd of [null, undefined, "text", 7]) assert.equal(hook(odd), odd);
+
+  // A value that throws when read: the rest of the span is still cleaned.
+  const data = { ok: JANE_PHOTO } as Record<string, unknown>;
+  Object.defineProperty(data, "boom", {
+    enumerable: true,
+    get() {
+      throw new Error("unreadable");
+    },
+  });
+  const span = { description: JANE_ROW, data };
+  assert.equal(hook(span), span);
+  assert.equal(span.description, 'a.row[aria-label=""]');
+  assert.equal(data.ok, 'button[type="button"] > div[aria-label=""]');
+
+  // A span that cannot be edited comes back as it was. The kit never builds one like that.
+  const frozen = Object.freeze({ description: JANE_ROW, data: Object.freeze({ "lcp.element": JANE_PHOTO }) });
+  assert.equal(hook(frozen), frozen);
+
+  const loop: Loose = { description: JANE_ROW };
+  loop.data = { self: loop, name: JANE_PHOTO };
+  assert.equal(hook(loop), loop);
+  assert.equal(loop.data.name, 'button[type="button"] > div[aria-label=""]');
+});
+
+test("the trace header loses a label in its transaction name and keeps the rest", () => {
+  const header = {
+    trace_id: "df9a3e8b36484e26b52be63852389361",
+    public_key: "public",
+    environment: "production",
+    sample_rate: "0.1",
+    sampled: "true",
+    transaction: JANE_ROW,
+  };
+  assert.equal(scrubTraceHeader(header), header);
+  assert.deepEqual(header, {
+    trace_id: "df9a3e8b36484e26b52be63852389361",
+    public_key: "public",
+    environment: "production",
+    sample_rate: "0.1",
+    sampled: "true",
+    transaction: 'a.row[aria-label=""]',
+  });
+  // A route name is left as it is.
+  assert.deepEqual(scrubTraceHeader({ transaction: "/orgs/:handle", sampled: "true" }), {
+    transaction: "/orgs/:handle",
+    sampled: "true",
+  });
+  for (const odd of [null, undefined, "text"]) assert.equal(scrubTraceHeader(odd), odd);
+});
+
 // ── Through the installed kit ──────────────────────────────────────────────
 //
-// The tests above feed the scrubber events typed by hand. These two let the
+// The tests above feed the scrubber events typed by hand. These let the
 // installed kit build the report itself, from a request like the one a phone
 // sends with a chat message, and read what the kit would put on the wire.
 
@@ -652,18 +1108,35 @@ const INCOMING = {
   },
 };
 const BODY = '{"text":"see you at the library at nine"}';
-const SECRETS = ["library", "eyJhY2Nlc3M", "sb-abcd", "eyJhbGciOi", "Bloomington", "203.0.113.9", "abc123", "someone", ME];
+const SECRETS = ["library", "eyJhY2Nlc3M", "sb-abcd", "eyJhbGciOi", "Bloomington", "203.0.113.9", "abc123", "someone", ME, "Jane"];
 
-/** Sends one error report and one speed report through the kit; returns what it would have sent. */
-async function throughKit(withScrubber: boolean): Promise<string[]> {
+/**
+ * The integrations the shared options hand the kit. The server and edge setup
+ * files pass the options on whole, so this is the list those two run with.
+ */
+function ourIntegrations() {
+  const list = getSentryInitOptions().integrations;
+  assert.ok(Array.isArray(list), "the shared options carry a list of integrations");
+  return list;
+}
+
+/**
+ * Sends one error report and one speed report through the kit; returns what
+ * it would have sent. "hooks" is the three `beforeSend…` options alone; "all"
+ * adds the integrations the shared options carry, which is what the setup
+ * files run.
+ */
+async function throughKit(ours: "none" | "hooks" | "all"): Promise<string[]> {
   const sent: string[] = [];
-  const ours = getSentryInitOptions();
+  const options = getSentryInitOptions();
+  const withHooks = ours !== "none";
   const client = new ServerRuntimeClient({
     dsn: "https://public@o0.ingest.sentry.invalid/1",
-    sendDefaultPii: ours.sendDefaultPii,
-    beforeSend: withScrubber ? ours.beforeSend : undefined,
-    beforeSendTransaction: withScrubber ? ours.beforeSendTransaction : undefined,
-    integrations: [requestDataIntegration()],
+    sendDefaultPii: options.sendDefaultPii,
+    beforeSend: withHooks ? options.beforeSend : undefined,
+    beforeSendTransaction: withHooks ? options.beforeSendTransaction : undefined,
+    beforeSendSpan: withHooks ? options.beforeSendSpan : undefined,
+    integrations: [requestDataIntegration(), ...(ours === "all" ? ourIntegrations() : [])],
     stackParser: () => [],
     // Records and sends nothing.
     transport: () => ({
@@ -704,10 +1177,15 @@ async function throughKit(withScrubber: boolean): Promise<string[]> {
           "http.target": INCOMING.url,
           // The call @sentry/nextjs makes for the root span (addHeadersAsAttributes).
           ...httpHeadersToSpanAttributes(INCOMING.headers, client.getDataCollectionOptions()),
+          // Only a browser writes this one; here it rides the same report.
+          "lcp.element": JANE_PHOTO,
         },
       },
     },
-    spans: [dbSpan("/rest/v1/users", `id=eq.${ME}&email=eq.someone%40iu.edu`)] as never,
+    spans: [
+      dbSpan("/rest/v1/users", `id=eq.${ME}&email=eq.someone%40iu.edu`),
+      { span_id: "b7c634186059e2a9", op: "ui.interaction.click", description: JANE_ROW, data: {} },
+    ] as never,
     sdkProcessingMetadata: forRequest(),
   });
   await client.flush(2000);
@@ -716,16 +1194,16 @@ async function throughKit(withScrubber: boolean): Promise<string[]> {
 }
 
 test("control: without the scrubber the installed kit does copy the body, the cookie and the headers", async () => {
-  const sent = await throughKit(false);
+  const sent = await throughKit("none");
   const text = sent.join("\n");
   // If this fails the kit changed what it copies: read it again before trusting the test below.
-  for (const present of ["library", "eyJhY2Nlc3M", "203.0.113.9", "abc123"]) {
+  for (const present of ["library", "eyJhY2Nlc3M", "203.0.113.9", "abc123", "Photo posted by Jane Doe", "Open Jane Doe's profile"]) {
     assert.equal(text.includes(present), true, present);
   }
 });
 
 test("with the scrubber both reports are still sent, and none of it is in them", async () => {
-  const sent = await throughKit(true);
+  const sent = await throughKit("all");
   const error = sent.find((envelope) => envelope.includes('"type":"event"'));
   const speed = sent.find((envelope) => envelope.includes('"type":"transaction"'));
   assert.ok(error, "the error report was sent");
@@ -739,4 +1217,383 @@ test("with the scrubber both reports are still sent, and none of it is in them",
   assert.equal(error.includes("send failed"), true);
   assert.equal(speed.includes("token_hash=[redacted]"), true);
   assert.equal(speed.includes("email=eq.[redacted]"), true);
+  // The element names are still there, with the attribute's name and no label (as JSON text).
+  assert.equal(speed.includes('button[type=\\"button\\"] > div[aria-label=\\"\\"]'), true);
+  assert.equal(speed.includes('"description":"a.row[aria-label=\\"\\"]"'), true);
+});
+
+// The span the browser sends on its own. The kit's tap measurement starts a
+// span marked "standalone" and ends it at once (startStandaloneWebVitalSpan);
+// ending it is what sends it, in an envelope that holds only that span.
+// These do the same with the installed kit's own span class.
+
+/** One envelope the kit would have sent: its header and the first item's payload. */
+function openEnvelope(envelope: string): { header: Loose; type: string; item: Loose } {
+  const [header, items] = JSON.parse(envelope) as [Loose, Array<[Loose, Loose]>];
+  return { header, type: items[0][0].type, item: items[0][1] };
+}
+
+/**
+ * Ends one lone span named after a tapped element; returns what the kit would
+ * have sent. "hooks" is the three `beforeSend…` options alone; "all" adds the
+ * integrations the shared options carry, which is what the setup files run.
+ */
+async function tapThroughKit(ours: "none" | "hooks" | "all", name: string = JANE_ROW): Promise<string[]> {
+  const sent: string[] = [];
+  const options = getSentryInitOptions();
+  const withHooks = ours !== "none";
+  const client = new ServerRuntimeClient({
+    dsn: "https://public@o0.ingest.sentry.invalid/1",
+    tracesSampleRate: 1,
+    beforeSend: withHooks ? options.beforeSend : undefined,
+    beforeSendTransaction: withHooks ? options.beforeSendTransaction : undefined,
+    beforeSendSpan: withHooks ? options.beforeSendSpan : undefined,
+    integrations: ours === "all" ? ourIntegrations() : [],
+    stackParser: () => [],
+    // Records and sends nothing.
+    transport: () => ({
+      send: async (envelope: unknown) => {
+        sent.push(JSON.stringify(envelope));
+        return { statusCode: 200 };
+      },
+      flush: async () => true,
+    }),
+  } as unknown as ConstructorParameters<typeof ServerRuntimeClient>[0]);
+  client.init();
+
+  const span = new SentrySpan({
+    name,
+    attributes: {
+      "sentry.origin": "auto.http.browser.inp",
+      "sentry.op": "ui.interaction.click",
+      transaction: "/profile/franky",
+    },
+    isStandalone: true,
+    sampled: true,
+  });
+  // The kit looks up the client on the current scope when the span ends.
+  withScope((scope) => {
+    scope.setClient(client);
+    span.end();
+  });
+  await client.flush(2000);
+  await client.close(2000);
+  return sent;
+}
+
+test("control: without the hooks the installed kit sends a lone span with its label, in the span and in the trace header", async () => {
+  const sent = await tapThroughKit("none");
+  assert.equal(sent.length, 1);
+  const { header, type, item } = openEnvelope(sent[0]);
+  // If this fails the kit changed how it sends such a span: read it again before trusting the tests below.
+  assert.equal(type, "span");
+  assert.equal(item.description, JANE_ROW);
+  assert.equal(header.trace.transaction, JANE_ROW);
+});
+
+test("control: the three hooks alone clean the lone span and leave the label in the trace header", async () => {
+  const sent = await tapThroughKit("hooks");
+  assert.equal(sent.length, 1);
+  const { header, item } = openEnvelope(sent[0]);
+  assert.equal(item.description, 'a.row[aria-label=""]');
+  // If this fails the kit now cleans the header itself, or builds it another way: read it again.
+  assert.equal(header.trace.transaction, JANE_ROW);
+});
+
+test("with the shared options' hooks and integrations the lone span is still sent, and the label is in neither place", async () => {
+  const sent = await tapThroughKit("all");
+  assert.equal(sent.length, 1);
+  const { header, type, item } = openEnvelope(sent[0]);
+  assert.equal(type, "span");
+  assert.equal(item.description, 'a.row[aria-label=""]');
+  assert.equal(item.op, "ui.interaction.click");
+  assert.equal(item.data.transaction, "/profile/:handle");
+  assert.equal(header.trace.transaction, 'a.row[aria-label=""]');
+  for (const gone of ["Jane", "Doe", "franky"]) assert.equal(sent[0].includes(gone), false, gone);
+});
+
+test("a tap in the admin box, named by the kit's own namer, leaves with no account ID in the span or the header", async () => {
+  const card = pageElement("div", { className: "adm-card" });
+  const box = pageElement("input", { id: `${OTHER}-days`, attrs: { type: "number" }, parent: card });
+  const named = htmlTreeAsString(box);
+
+  const before = await tapThroughKit("none", named);
+  assert.equal(before[0].includes(OTHER), true);
+
+  const sent = await tapThroughKit("all", named);
+  assert.equal(sent.length, 1);
+  const { header, item } = openEnvelope(sent[0]);
+  assert.equal(item.description, 'div.adm-card > input#:id-days[type="number"]');
+  assert.equal(header.trace.transaction, 'div.adm-card > input#:id-days[type="number"]');
+  assert.equal(sent[0].includes(OTHER), false);
+});
+
+// The report the kit sends about a failure of its own. When a step of its
+// event pipeline throws, the kit drops the event it was working on and sends
+// the failure as a new event, which skips `beforeSend` (_processEvent in
+// @sentry/core client.js) and the kit's own steps (prepareEvent.js). The new
+// event is built from the same scope, so it carries the trail and the page's
+// name. The step that copies the request record is one of those skipped.
+
+/** Makes the kit fail once while it prepares an error report; returns what it would have sent. */
+async function ownFailureThroughKit(ours: "hooks" | "all"): Promise<{ sent: string[]; beforeSendCalls: number }> {
+  const sent: string[] = [];
+  let beforeSendCalls = 0;
+  const options = getSentryInitOptions();
+  const client = new ServerRuntimeClient({
+    dsn: "https://public@o0.ingest.sentry.invalid/1",
+    sendDefaultPii: options.sendDefaultPii,
+    beforeSend: (event: never, hint: never) => {
+      beforeSendCalls += 1;
+      return options.beforeSend?.(event, hint) ?? null;
+    },
+    beforeSendTransaction: options.beforeSendTransaction,
+    beforeSendSpan: options.beforeSendSpan,
+    integrations: [requestDataIntegration(), ...(ours === "all" ? ourIntegrations() : [])],
+    stackParser: () => [],
+    // Records and sends nothing.
+    transport: () => ({
+      send: async (envelope: unknown) => {
+        sent.push(JSON.stringify(envelope));
+        return { statusCode: 200 };
+      },
+      flush: async () => true,
+    }),
+  } as unknown as ConstructorParameters<typeof ServerRuntimeClient>[0]);
+  client.init();
+  // One step that throws the first time it runs, the way a bug in the kit would.
+  let failed = false;
+  client.addEventProcessor((event) => {
+    if (failed) return event;
+    failed = true;
+    throw new Error("a step of the kit broke");
+  });
+
+  // What a request leaves on the scope both events are built from.
+  const scope = getIsolationScope();
+  try {
+    scope.addBreadcrumb({ category: "navigation", data: { from: "/campus", to: "/profile/franky?token_hash=abc123" } });
+    scope.addBreadcrumb({ category: "ui.click", message: JANE_ROW });
+    scope.setTransactionName("/profile/franky");
+    scope.setSDKProcessingMetadata({ normalizedRequest: { ...httpRequestToRequestData(INCOMING), data: BODY } });
+    client.captureEvent({ exception: { values: [{ type: "Error", value: "send failed" }] } });
+    await client.flush(2000);
+  } finally {
+    // The scope is shared by every test in this file: leave it as it was found.
+    scope.clear();
+    scope.setSDKProcessingMetadata({ normalizedRequest: undefined });
+    await client.close(2000);
+  }
+  return { sent, beforeSendCalls };
+}
+
+test("control: the kit's report about its own failure skips beforeSend, and leaves with the trail and the page's name as they were", async () => {
+  const { sent, beforeSendCalls } = await ownFailureThroughKit("hooks");
+  // If any of this fails the kit changed how it reports its own failures: read it again before trusting the test below.
+  assert.equal(sent.length, 1);
+  assert.equal(beforeSendCalls, 0);
+  const { type, item } = openEnvelope(sent[0]);
+  assert.equal(type, "event");
+  assert.equal(sent[0].includes("a step of the kit broke"), true);
+  assert.equal(sent[0].includes("send failed"), false);
+  assert.equal(item.transaction, "/profile/franky");
+  assert.equal(item.breadcrumbs[0].data.to, "/profile/franky?token_hash=abc123");
+  assert.equal(item.breadcrumbs[1].message, JANE_ROW);
+  // The request record is not copied onto this one: no cookie, no body.
+  assert.equal("request" in item, false);
+  for (const absent of ["eyJhY2Nlc3M", "library", "203.0.113.9"]) assert.equal(sent[0].includes(absent), false, absent);
+});
+
+test("with the shared options' integrations that report is still sent, and none of it is in it", async () => {
+  const { sent, beforeSendCalls } = await ownFailureThroughKit("all");
+  assert.equal(sent.length, 1);
+  assert.equal(beforeSendCalls, 0);
+  const { type, item } = openEnvelope(sent[0]);
+  assert.equal(type, "event");
+  assert.equal(sent[0].includes("a step of the kit broke"), true);
+  for (const secret of [...SECRETS, "franky", "Doe"]) assert.equal(sent[0].includes(secret), false, secret);
+  assert.equal(item.transaction, "/profile/:handle");
+  assert.equal(item.breadcrumbs[0].data.to, "/profile/:handle?token_hash=[redacted]");
+  assert.equal(item.breadcrumbs[1].message, 'a.row[aria-label=""]');
+  // The scope the two runs borrowed is clean again.
+  assert.deepEqual(getIsolationScope().getScopeData().breadcrumbs, []);
+});
+
+test("an ordinary report passes both the hook and the integration, and comes out the same as from the hook alone", async () => {
+  const strip = (envelope: string) => {
+    const { item } = openEnvelope(envelope);
+    // Different on every run, and the list of integrations differs by the one under test.
+    delete item.event_id;
+    delete item.timestamp;
+    delete item.sdk;
+    delete item.contexts?.trace;
+    return item;
+  };
+  const hooksOnly = await throughKit("hooks");
+  const both = await throughKit("all");
+  assert.equal(both.length, hooksOnly.length);
+  for (const type of ['"type":"event"', '"type":"transaction"']) {
+    const one = hooksOnly.find((envelope) => envelope.includes(type));
+    const two = both.find((envelope) => envelope.includes(type));
+    assert.ok(one && two, type);
+    assert.deepEqual(strip(two), strip(one), type);
+  }
+});
+
+// ── The three setup files ──────────────────────────────────────────────────
+//
+// The scrub of the trace header and of the kit's own failure report only runs
+// if the kit is handed reportScrubIntegration. The shared options list it;
+// a setup file that writes its own `integrations` replaces that list. These
+// read the three files as text, since they cannot be loaded here (each one
+// starts the kit).
+
+/** Source text without its comments (a `//` inside a web address stays). */
+function withoutComments(source: string): string {
+  return source.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|\s)\/\/.*$/gm, "$1");
+}
+
+/** A source file, by its path from this one, without its comments. */
+function setupFile(path: string): string {
+  return withoutComments(readFileSync(new URL(path, import.meta.url), "utf8"));
+}
+
+/** What stands between the brackets of a file's own `integrations: [ … ]`, if it has one written that way. */
+function ownIntegrationsList(source: string): string | undefined {
+  const opening = /\bintegrations\s*:\s*\[/.exec(source);
+  if (!opening) return undefined;
+  const from = opening.index + opening[0].length;
+  let depth = 1;
+  for (let i = from; i < source.length; i++) {
+    if (source[i] === "[") depth += 1;
+    else if (source[i] === "]" && --depth === 0) return source.slice(from, i);
+  }
+  return undefined;
+}
+
+/** Does this setup file start the kit with the shared options, and with the report scrub among its integrations? */
+function handsKitTheReportScrub(text: string): boolean {
+  const source = withoutComments(text);
+  if (!/Sentry\.init\(/.test(source) || !/getSentryInitOptions\(\)/.test(source)) return false;
+  // No list of its own: the one in the shared options stands.
+  if (!/\bintegrations\b/.test(source)) return true;
+  // A list of its own replaces the shared one, so it has to name the scrub. Written any other way, a person has to look.
+  const list = ownIntegrationsList(source);
+  return list !== undefined && /\breportScrubIntegration\(\)/.test(list);
+}
+
+test("the shared options list the report scrub, and each of the three setup files hands it to the kit", () => {
+  assert.deepEqual(ourIntegrations().map((integration) => integration.name), [REPORT_SCRUB_INTEGRATION_NAME]);
+  assert.equal(reportScrubIntegration().name, REPORT_SCRUB_INTEGRATION_NAME);
+  for (const path of ["../instrumentation-client.ts", "../sentry.server.config.ts", "../sentry.edge.config.ts"]) {
+    assert.equal(handsKitTheReportScrub(setupFile(path)), true, path);
+  }
+  // The browser's file keeps the tap trail off as well (Privacy Policy 3d).
+  assert.match(setupFile("../instrumentation-client.ts"), /Sentry\.breadcrumbsIntegration\(\{\s*dom:\s*false\s*\}\)/);
+
+  // The check itself: these are the ways a setup file would lose the scrub.
+  const lost = [
+    // The browser's file as it was before: a list of its own, without ours.
+    "Sentry.init({\n  ...getSentryInitOptions(),\n  integrations: [Sentry.breadcrumbsIntegration({ dom: false })],\n});\n",
+    // Named, but outside the list, in a comment, or in some other list.
+    "Sentry.init({\n  ...getSentryInitOptions(),\n  integrations: [\n    Sentry.breadcrumbsIntegration({ dom: false }),\n  ],\n});\nreportScrubIntegration();\n",
+    "Sentry.init({\n  ...getSentryInitOptions(),\n  integrations: [\n    // reportScrubIntegration(),\n    other(), // reportScrubIntegration()\n  ],\n});\n",
+    "Sentry.init({ ...getSentryInitOptions(), integrations: [other()], ignoreErrors: [\n  reportScrubIntegration(),\n],\n});\n",
+    // Not a plain list, or not the shared options at all.
+    "Sentry.init({ ...getSentryInitOptions(), integrations: (defaults) => defaults });\n",
+    "Sentry.init({ dsn });\n",
+  ];
+  for (const source of lost) assert.equal(handsKitTheReportScrub(source), false, source);
+  assert.equal(handsKitTheReportScrub("Sentry.init(getSentryInitOptions());\n"), true);
+  assert.equal(
+    handsKitTheReportScrub("Sentry.init({\n  ...getSentryInitOptions(),\n  integrations: [other([1, 2]), reportScrubIntegration()],\n});\n"),
+    true,
+  );
+});
+
+test("the integration never throws, whatever it is handed", () => {
+  const integration = reportScrubIntegration();
+  const listeners = new Map<string, (...args: unknown[]) => void>();
+  const client = { on: (hook: string, listener: (...args: unknown[]) => void) => void listeners.set(hook, listener) };
+  integration.setup?.(client as never);
+  assert.deepEqual([...listeners.keys()].sort(), ["beforeSendEvent", "createDsc"]);
+  const frozen = Object.freeze({ transaction: JANE_ROW, request: Object.freeze({ data: "x" }) });
+  for (const odd of [null, undefined, "text", 7, frozen]) {
+    assert.doesNotThrow(() => listeners.get("createDsc")?.(odd));
+    assert.doesNotThrow(() => listeners.get("beforeSendEvent")?.(odd, {}));
+  }
+  // A client with no hooks at all does not stop the kit from starting.
+  assert.doesNotThrow(() => integration.setup?.({} as never));
+  assert.doesNotThrow(() => integration.setup?.(undefined as never));
+});
+
+// ── Other people's software ────────────────────────────────────────────────
+//
+// Two messages that reached Sentry in the 30 days to October 12, 2026 came
+// from outside software: a mail service's link scanner and another app's
+// built-in browser. They are on the ignore list, so a real error stands out.
+
+/** The two, in the shapes the kit matches: an error's value, and its type with the value. */
+const OUTSIDE_MESSAGES = [
+  "Non-Error promise rejection captured with value: Object Not Found Matching Id:2, MethodName:update, ParamCount:4",
+  "Object Not Found Matching Id:11, MethodName:simulateEvent, ParamCount:1",
+  "Can't find variable: SCDynimacBridge",
+  "ReferenceError: SCDynimacBridge is not defined",
+];
+
+/** Failures of our own, which must keep reaching Sentry. */
+const ORDINARY_MESSAGES = [
+  "send failed",
+  "Load failed",
+  "TypeError: Cannot read properties of undefined (reading 'id')",
+  "Object not found",
+  "No post matching id: 42",
+  "csp: script-src blocked inline",
+];
+
+test("the two errors from outside software are on the ignore list, and an ordinary error is not", () => {
+  const ignore = getSentryInitOptions().ignoreErrors ?? [];
+  const sources = ignore.map((pattern) => (typeof pattern === "string" ? pattern : pattern.source));
+  assert.equal(sources.some((source) => source.includes("Object Not Found Matching Id:")), true);
+  assert.equal(sources.some((source) => source.includes("SCDynimacBridge")), true);
+  // The kit's own matcher: a pattern may sit anywhere in the message.
+  for (const message of OUTSIDE_MESSAGES) {
+    assert.equal(stringMatchesSomePattern(message, ignore), true, message);
+  }
+  for (const message of ORDINARY_MESSAGES) {
+    assert.equal(stringMatchesSomePattern(message, ignore), false, message);
+  }
+});
+
+test("the installed kit drops the two with our list, and still sends an ordinary error", async () => {
+  const sent: string[] = [];
+  const client = new ServerRuntimeClient({
+    dsn: "https://public@o0.ingest.sentry.invalid/1",
+    ignoreErrors: getSentryInitOptions().ignoreErrors,
+    // The kit's own list is off, so only ours can drop anything here.
+    integrations: [eventFiltersIntegration({ disableErrorDefaults: true })],
+    stackParser: () => [],
+    // Records and sends nothing.
+    transport: () => ({
+      send: async (envelope: unknown) => {
+        sent.push(JSON.stringify(envelope));
+        return { statusCode: 200 };
+      },
+      flush: async () => true,
+    }),
+  } as unknown as ConstructorParameters<typeof ServerRuntimeClient>[0]);
+  client.init();
+
+  const report = (type: string, value: string) =>
+    client.captureEvent({ exception: { values: [{ type, value }] } });
+  report("UnhandledRejection", OUTSIDE_MESSAGES[0]);
+  report("ReferenceError", OUTSIDE_MESSAGES[2]);
+  report("Error", "send failed");
+  await client.flush(2000);
+  await client.close(2000);
+
+  const text = sent.join("\n");
+  assert.equal(text.includes("send failed"), true);
+  assert.equal(text.includes("Object Not Found Matching Id"), false);
+  assert.equal(text.includes("SCDynimacBridge"), false);
 });

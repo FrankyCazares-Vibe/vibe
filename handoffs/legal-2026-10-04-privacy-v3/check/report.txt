@@ -1,8 +1,8 @@
-PRIVACY POLICY, PAGE AGAINST TEXT  (Thu Oct 08 2026 12:24:12)
+PRIVACY POLICY, PAGE AGAINST TEXT  (Mon Oct 12 2026 17:43:16)
 page: http://localhost:3000/legal/privacy
 text: /Users/franciscocazares/vibe/handoffs/legal-2026-10-04-privacy-v3/privacy-policy-final.md
-sentences: 1097 in the text, 1097 on the page, 1097 the same and in the same order
-blocks: 447 in the text, 447 on the page; tables: 5 / 5
-dates on the page: {"October 5, 2026":9,"October 8, 2026":2,"October 7, 2026":1,"October 4, 2026":1}; "section N" mentions: 92 on the page, 92 of them links
+sentences: 1099 in the text, 1099 on the page, 1099 the same and in the same order
+blocks: 448 in the text, 448 on the page; tables: 5 / 5
+dates on the page: {"October 12, 2026":2,"October 5, 2026":8,"October 8, 2026":2,"October 7, 2026":1,"October 4, 2026":1}; "section N" mentions: 92 on the page, 92 of them links
 left out of the page text on purpose: contents list: On this page1. Who runs Vibe, and who there can see my infor
 RESULT: PASS, the page and the text are the same

@@ -68,7 +68,10 @@ export function Section3d() {
             trail of what happened just before it. The trail lists the pages you
             opened, the requests your browser made and lines our own software
             logs. Until October 8, 2026 it also listed the buttons you tapped,
-            by their labels and never what you typed.
+            by their labels and never what you typed. Until October 12, 2026 a
+            speed report could also name the thing you tapped, or the largest
+            thing on your screen, by its label, and some labels hold a
+            person&apos;s name, such as the button that opens their profile.
           </LegalP>
           <LegalP>
             Until our release of October 5, 2026, an error report or a speed

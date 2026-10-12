@@ -1,14 +1,25 @@
 import * as Sentry from "@sentry/nextjs";
 
-import { getSentryInitOptions } from "@/lib/sentry-config";
+import { getSentryInitOptions, reportScrubIntegration } from "@/lib/sentry-config";
 
 Sentry.init({
   ...getSentryInitOptions(),
-  // The trail a report carries keeps the pages opened, the requests made and
-  // our own log lines, and no longer the buttons tapped (Privacy Policy 3d,
-  // October 8, 2026): a tap's label says what a person was doing, and the
-  // rest is what finds a bug. Same name as the default, so it replaces it.
-  integrations: [Sentry.breadcrumbsIntegration({ dom: false })],
+  // This list replaces the one in the shared options, so the shared one's
+  // entry is named here again.
+  integrations: [
+    // Cleans what no `beforeSend…` hook sees: the trace header sent next to a
+    // report (for a tap measured on its own it can name the tapped element,
+    // labels and all) and the report the kit sends about a failure of its
+    // own. The why is at reportScrubIntegration in src/lib/sentry-config.ts,
+    // and sentry-config.test.ts fails if this line goes.
+    reportScrubIntegration(),
+    // The trail a report carries keeps the pages opened, the requests made
+    // and our own log lines, and no longer the buttons tapped (Privacy Policy
+    // 3d, October 8, 2026): a tap's label says what a person was doing, and
+    // the rest is what finds a bug. Same name as the default, so it replaces
+    // it.
+    Sentry.breadcrumbsIntegration({ dom: false }),
+  ],
 });
 
 /**
