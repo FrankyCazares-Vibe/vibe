@@ -76,7 +76,11 @@ export const dynamic = "force-dynamic";
 
 export const metadata = {
   title: "Vibe+ · Vibe",
-  description: "What Vibe+ includes, what it costs, and how to subscribe or cancel.",
+  // Follows the same switch as the page, so a search result or a link
+  // preview never promises a checkout the page doesn't have.
+  description: billingEnabled()
+    ? "What Vibe+ includes, what it costs, and how to subscribe or cancel."
+    : "What Vibe+ includes and what it costs. It isn't on sale yet.",
 };
 
 // The warm cream wash in Light, a coral bloom on Night paper (globals.css).

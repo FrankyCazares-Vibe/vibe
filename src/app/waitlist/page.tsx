@@ -13,11 +13,22 @@ const TITLE = "Join the Vibe waitlist";
 const DESCRIPTION =
   "Vibe is the social app for college students, opening in waves. Join the waitlist with your school email and we'll send you an access code when it's your turn.";
 
+// This page's own openGraph replaces the root layout's whole, and the picture
+// from src/app/opengraph-image.tsx goes with it, so the site picture is named
+// here. Next copies it to the X card. The address has no hash: add `?v=2` if
+// the card art is ever redrawn, or link previews keep the old picture.
+const SHARE_PICTURE = {
+  url: "/opengraph-image",
+  width: 1200,
+  height: 630,
+  alt: "vibe. Your campus. Your people. Yourself.",
+};
+
 export const metadata: Metadata = {
   title: TITLE,
   description: DESCRIPTION,
   alternates: { canonical: "/waitlist" },
-  openGraph: { type: "website", siteName: "Vibe", locale: "en_US", url: "/waitlist", title: TITLE, description: DESCRIPTION },
+  openGraph: { type: "website", siteName: "Vibe", locale: "en_US", url: "/waitlist", title: TITLE, description: DESCRIPTION, images: [SHARE_PICTURE] },
   twitter: { card: "summary_large_image", title: TITLE, description: DESCRIPTION },
 };
 

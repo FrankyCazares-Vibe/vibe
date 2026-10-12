@@ -9,6 +9,9 @@ import type { MetadataRoute } from "next";
  * Disallow line only advertises the path. Private pages are kept private by
  * not being served at all (the product journal left public/ in S68) or by
  * an auth check on the route, never by this file.
+ *
+ * The sitemap line points at src/app/sitemap.ts: nine public pages, and
+ * never a student, a club or a post.
  */
 export default function robots(): MetadataRoute.Robots {
   return {
@@ -22,5 +25,6 @@ export default function robots(): MetadataRoute.Robots {
         allow: ["/", "/favicon.ico", "/icon.png", "/favicon-48.png"],
       },
     ],
+    sitemap: "https://www.connectvibe.app/sitemap.xml",
   };
 }

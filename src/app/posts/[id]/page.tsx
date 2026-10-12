@@ -34,13 +34,25 @@ type Params = { params: Promise<{ id: string }> };
  * generic card below: no author, no text, no image. Public clubs' posts keep
  * their preview (product call 3). Every failure falls back to generic.
  */
-// Its own preview tags too: without them the root layout's explicit
-// openGraph / twitter titles win the merge, and a generic card read
-// "Your campus. Your people. Yourself." (feature report 3, #5).
+// Its own preview tags too, so the generic card reads "A post on Vibe" and
+// not the tab title (feature report 3, #5). Its openGraph replaces the root
+// layout's whole, so the site picture is named here; Next copies it to the X
+// card. Add `?v=2` to the address if the card art is ever redrawn.
+//
+// `robots` on both returns: link previews ignore it, and it keeps a post
+// link out of search results, where it would read "sign in to see this post"
+// or carry the author's name and words.
 const GENERIC_POST_METADATA: Metadata = {
   title: "Post · Vibe",
-  openGraph: { title: "A post on Vibe", description: "Vibe is the social app for students at IU and Purdue." },
-  twitter: { card: "summary", title: "A post on Vibe", description: "Vibe is the social app for students at IU and Purdue." },
+  robots: { index: false },
+  openGraph: {
+    title: "A post on Vibe",
+    description: "Vibe is the social app for students at IU and Purdue.",
+    images: [
+      { url: "/opengraph-image", width: 1200, height: 630, alt: "vibe. Your campus. Your people. Yourself." },
+    ],
+  },
+  twitter: { card: "summary_large_image", title: "A post on Vibe", description: "Vibe is the social app for students at IU and Purdue." },
 };
 
 export async function generateMetadata({ params }: Params): Promise<Metadata> {
@@ -133,6 +145,7 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
     return {
       title,
       description,
+      robots: { index: false },
       openGraph: {
         title,
         description,

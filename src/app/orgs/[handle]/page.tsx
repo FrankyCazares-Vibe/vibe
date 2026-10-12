@@ -121,9 +121,9 @@ export async function generateMetadata({ params }: Params) {
     .select("name, description, is_public, hidden_at")
     .eq("handle", handle)
     .maybeSingle();
-  // The preview tags are set here too: without them the root layout's
-  // explicit openGraph / twitter titles win the merge, and a shared club
-  // link unfurled as the generic site card (feature report 3, #15).
+  // The preview tags are set here too, so a shared club link unfurls as the
+  // club's own card (feature report 3, #15) and a missing or hidden club as
+  // the plain one below, never as its tab title.
   const generic = { title: "Vibe", description: "Vibe is the social app for students at IU and Purdue." };
   if (!org) return { title: "Not found · Vibe", openGraph: generic, twitter: generic };
   // A hidden club's name must not reach the tab title or a link preview.
@@ -132,11 +132,20 @@ export async function generateMetadata({ params }: Params) {
   const description =
     org.description?.slice(0, 200) ||
     (org.is_public ? "An org on Vibe." : "A private org on Vibe.");
+  // The site picture: this openGraph replaces the root layout's whole, and
+  // the card doesn't use the club's own logo. Next copies it to the X card.
+  // Add `?v=2` to the address if the card art is ever redrawn.
+  const sharePicture = {
+    url: "/opengraph-image",
+    width: 1200,
+    height: 630,
+    alt: "vibe. Your campus. Your people. Yourself.",
+  };
   return {
     title,
     description,
-    openGraph: { title: org.name, description, type: "profile" },
-    twitter: { card: "summary", title: org.name, description },
+    openGraph: { title: org.name, description, type: "profile", images: [sharePicture] },
+    twitter: { card: "summary_large_image", title: org.name, description },
   };
 }
 

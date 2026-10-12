@@ -26,18 +26,17 @@ export const metadata: Metadata = {
   description: SITE_TAGLINE,
   // Link previews (iMessage, Instagram, X, LinkedIn). The picture is
   // src/app/opengraph-image.tsx + twitter-image.tsx; no `images` key here on
-  // purpose, since one would override those files.
+  // purpose, since one would override those files. No `title` or
+  // `description` in either block on purpose too: Next then fills a page's
+  // card from that page's own title and description (the site ones above
+  // when it has none), so a link to Support or a legal page names that page.
   openGraph: {
     type: "website",
     siteName: "Vibe",
-    title: SITE_TITLE,
-    description: SITE_TAGLINE,
     locale: "en_US",
   },
   twitter: {
     card: "summary_large_image",
-    title: SITE_TITLE,
-    description: SITE_TAGLINE,
   },
   icons: {
     icon: [

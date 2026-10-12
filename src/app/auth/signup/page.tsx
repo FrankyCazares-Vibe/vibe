@@ -1,3 +1,5 @@
+import type { Metadata } from "next";
+
 import { formatAccessCode, readTypedAccessCode } from "@/lib/waitlist/access-code";
 import { isSignupOpen } from "@/lib/waitlist/signup-open";
 import { parseSignupOverride } from "@/lib/waitlist/types";
@@ -5,6 +7,16 @@ import { parseSignupOverride } from "@/lib/waitlist/types";
 import { SignupForm } from "./signup-form";
 
 export const dynamic = "force-dynamic";
+
+// The tab name, the search result and the link preview: the root layout's
+// card takes its title and description from here.
+export const metadata: Metadata = {
+  title: "Create your account · Vibe",
+  description: "Create your Vibe account with your school email.",
+  // The invite email links here with the person's access code in the address.
+  // One canonical address keeps that variant out of search results.
+  alternates: { canonical: "/auth/signup" },
+};
 
 type Props = {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
