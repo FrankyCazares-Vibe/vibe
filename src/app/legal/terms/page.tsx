@@ -28,26 +28,22 @@ export default function TermsPage() {
         Terms and the{" "}
         <Link
           href="/legal/privacy"
-          style={{ color: "#FF5C35", fontWeight: 700, textDecoration: "none" }}
+          style={{ color: "var(--tag-ink)", fontWeight: 700, textDecoration: "none" }}
         >
           Privacy Policy
         </Link>{" "}
         describe your information differently, the Privacy Policy is the
-        accurate one.
+        accurate one. On October 12, 2026 we corrected this page: it now names
+        the company that runs Vibe, and a note that called these Terms a draft
+        was removed. No rule in these Terms changed.
       </LegalP>
       <LegalP>
         These Terms of Service (&ldquo;Terms&rdquo;) govern your use of Vibe
-        (the &ldquo;Service&rdquo;), operated by the Vibe team
-        (&ldquo;we,&rdquo; &ldquo;us,&rdquo; &ldquo;our&rdquo;). By creating an
+        (the &ldquo;Service&rdquo;), operated by CONNECTVIBE. LLC, an Indiana
+        limited liability company (&ldquo;we,&rdquo; &ldquo;us,&rdquo;
+        &ldquo;our&rdquo;). By creating an
         account or using the Service, you agree to these Terms. If you
         don&apos;t agree, don&apos;t use Vibe.
-      </LegalP>
-      <LegalP>
-        <em>
-          This is a baseline draft intended for our early college rollout.
-          Review with qualified legal counsel before broad public launch or
-          before relying on it in any dispute.
-        </em>
       </LegalP>
 
       <LegalH2>1. Eligibility</LegalH2>
@@ -112,7 +108,7 @@ export default function TermsPage() {
         You can delete your account anytime from{" "}
         <Link
           href="/settings"
-          style={{ color: "#FF5C35", fontWeight: 700, textDecoration: "none" }}
+          style={{ color: "var(--tag-ink)", fontWeight: 700, textDecoration: "none" }}
         >
           Settings
         </Link>
@@ -172,7 +168,7 @@ export default function TermsPage() {
         Questions or notices about these Terms? Email us at{" "}
         <a
           href="mailto:hello@connectvibe.app"
-          style={{ color: "#FF5C35", fontWeight: 700, textDecoration: "none" }}
+          style={{ color: "var(--tag-ink)", fontWeight: 700, textDecoration: "none" }}
         >
           hello@connectvibe.app
         </a>
