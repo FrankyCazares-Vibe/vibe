@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { redirect } from "next/navigation";
 
 import { HomeLanding } from "@/components/landing/home-landing";
+import { OpenBeacon } from "@/components/tally/OpenBeacon";
 import { appShellFromRequest } from "@/lib/native/server";
 import { isSignupOpen } from "@/lib/waitlist/signup-open";
 import { parseSignupOverride } from "@/lib/waitlist/types";
@@ -51,5 +52,11 @@ export default async function Home({
   // dev-only `?signup=open|closed` previews either state locally.
   const raw = (await searchParams).signup;
   const override = parseSignupOverride(Array.isArray(raw) ? raw[0] : raw, process.env.NODE_ENV);
-  return <HomeLanding signupOpen={await isSignupOpen(override)} />;
+  return (
+    <>
+      <HomeLanding signupOpen={await isSignupOpen(override)} />
+      {/* Counts this open in Vibe's own day totals (a number, nothing about the visitor). */}
+      <OpenBeacon page="home" />
+    </>
+  );
 }

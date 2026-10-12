@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
+import { OpenBeacon } from "@/components/tally/OpenBeacon";
 import { cleanSource } from "@/lib/waitlist/form";
 import { isSignupOpen } from "@/lib/waitlist/signup-open";
 import { parseSignupOverride, SIGNUP_PATH } from "@/lib/waitlist/types";
@@ -54,9 +55,13 @@ export default async function WaitlistPage({ searchParams }: Props) {
   if (await isSignupOpen(override)) redirect(SIGNUP_PATH);
 
   return (
-    <WaitlistForm
-      source={cleanSource(first(params.src))}
-      officer={first(params.officer) === "1"}
-    />
+    <>
+      <WaitlistForm
+        source={cleanSource(first(params.src))}
+        officer={first(params.officer) === "1"}
+      />
+      {/* Counts this open in Vibe's own day totals (a number, nothing about the visitor). */}
+      <OpenBeacon page="waitlist" />
+    </>
   );
 }
