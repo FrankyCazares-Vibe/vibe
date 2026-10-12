@@ -1,12 +1,14 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { JetBrains_Mono } from "next/font/google";
+import { headers } from "next/headers";
 
 import { BuildRefresh } from "@/components/build/BuildRefresh";
 import { CustomCursor } from "@/components/CustomCursor";
 import { ToastHost } from "@/components/feedback/ToastHost";
 import { NativeBridge } from "@/components/native/NativeBridge";
 import { ServiceWorkerRegistrar } from "@/components/pwa/ServiceWorkerRegistrar";
+import { NONCE_HEADER } from "@/lib/security/csp";
 import { THEME_BOOT_SCRIPT } from "@/lib/theme/theme";
 import { ThemeSync } from "@/lib/theme/ThemeSync";
 import { cn } from "@/lib/utils";
@@ -68,11 +70,19 @@ export const viewport: Viewport = {
   themeColor: "#FAF7F2",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  // The request's nonce, minted by src/proxy.ts for the browser code rule
+  // (security report 2026-10-08). Reading headers() makes every page render
+  // per request, and that is the point: Next stamps its own inline scripts
+  // with the nonce only at render time, so a page prerendered at build time
+  // would ship them nonce-less and the browser would refuse to run them.
+  // Undefined only where the proxy sets no rule, and then nothing checks it.
+  const nonce = (await headers()).get(NONCE_HEADER) ?? undefined;
+
   return (
     // data-theme is the RESOLVED theme (light | dark, never "system"). The
     // server can't know the student's device, so it ships "light" and the
@@ -91,8 +101,9 @@ export default function RootLayout({
             "system" with matchMedia and sets data-theme. Nothing else; the
             theme-color meta below is React's (viewport.themeColor) and
             applyTheme repaints it after mount. The four static pages paste
-            this same string; theme.test.ts fails per file when it drifts. */}
-        <script dangerouslySetInnerHTML={{ __html: THEME_BOOT_SCRIPT }} />
+            this same string; theme.test.ts fails per file when it drifts.
+            The nonce is what lets it run under the browser code rule. */}
+        <script nonce={nonce} dangerouslySetInnerHTML={{ __html: THEME_BOOT_SCRIPT }} />
         {/* The font stylesheet blocks the first paint. React already puts a
             preload for it at the top of <head>, which opens that connection;
             the font files come from gstatic, fetched in CORS mode, so that is
@@ -124,8 +135,9 @@ export default function RootLayout({
         {/* The App Store / Google Play apps' half of the bridge: links the
             phone opens, new-window links, the status bar, Android back.
             Renders nothing and does nothing in a browser. It decides on the
-            client, so this layout never reads headers() (that would make
-            every route dynamic). */}
+            client. This layout does read headers() now, on purpose, for the
+            nonce above (every route renders per request because of it), but
+            the bridge keeps deciding on the client so it needs no request. */}
         <NativeBridge />
         {/* Keeps an open tab on the newest build: when the person comes back
             to it, asks /api/version and reloads if another build is live,

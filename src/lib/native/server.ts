@@ -13,9 +13,13 @@ import { detectAppShell, type AppShell } from "@/lib/native/detect";
  * SHOW (no Vibe+ purchase in the app, no landing page), never who may do
  * what. Someone faking the token only hides things from themselves.
  *
- * Reading the request headers makes the page that calls this dynamic. Never
- * call it from the root layout: every route would stop being static
- * (critic-s2s3.md item 18).
+ * Reading the request headers makes the page that calls this dynamic. Since
+ * S75 (2026-10-11) the root layout reads headers() on purpose anyway, for the
+ * browser code rule's nonce (src/lib/security/csp.ts), so every route already
+ * renders per request and calling this from a page adds no cost. The old
+ * warning (critic-s2s3.md item 18, "never from the root layout") was about
+ * keeping routes static; that is no longer a goal, and making a page static
+ * again would ship Next's inline scripts without their nonce.
  */
 
 /**

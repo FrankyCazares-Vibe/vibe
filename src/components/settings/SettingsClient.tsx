@@ -12,6 +12,7 @@ import {
 import { AppearanceCard } from "@/components/settings/AppearanceCard";
 import { NotificationsCard } from "@/components/settings/NotificationsCard";
 import { PersonalEmailRow } from "@/components/settings/PersonalEmail";
+import { SessionsCard } from "@/components/settings/SessionsCard";
 import type { NotificationPrefs } from "@/components/settings/notifications-card-view";
 import { vibeRequest } from "@/lib/feedback/request";
 import { clearDraft } from "@/lib/onboarding/draft";
@@ -148,6 +149,7 @@ export function SettingsClient({
       />
       <BlockedUsersCard />
       <HelpAndSafetyCard />
+      <SessionsCard />
       <SignOutCard />
       <DangerZone handle={profile.handle} />
       <LegalFooter />

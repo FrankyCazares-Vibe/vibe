@@ -3,6 +3,14 @@ import { type NextRequest, NextResponse } from "next/server";
 
 import { updateSession } from "@/lib/supabase/middleware";
 import { isGlobalFeedSurfaceEnabled } from "@/lib/feature-flags";
+import {
+  CSP_HEADER,
+  NONCE_HEADER,
+  buildCsp,
+  cspEnvFromProcess,
+  cspFlavor,
+  makeNonce,
+} from "@/lib/security/csp";
 
 /**
  * Request proxy — Next 16's name for middleware.
@@ -30,6 +38,13 @@ import { isGlobalFeedSurfaceEnabled } from "@/lib/feature-flags";
  *  4. Two clean-URL conveniences: `/profile` bounces anonymous visitors to
  *     login, and `/feed` goes straight to /campus while the global feed flag
  *     is off.
+ *  5. Puts the browser code rule (Content-Security-Policy, security report
+ *     2026-10-08) on every page: which code may run and where the page may
+ *     send data. React pages get a fresh nonce per request; the static
+ *     /html pages and /onboarding/classic get the looser "static" flavour
+ *     until their ~280 inline handlers move into files. The policy itself
+ *     is src/lib/security/csp.ts. /offline.html and /sw.js skip this file
+ *     (the matcher); next.config.ts covers the first, the second has none.
  */
 
 /** Clean route each static URL belongs to — the redirect target and the login `next`. */
@@ -161,7 +176,10 @@ function restrictedPageAllowed(pathname: string): boolean {
  * account), stopping the money (the Vibe+ portal), stopping notifications
  * (removing a push device — DELETE only; registering one stays refused), and
  * protecting themselves (block, mute — being restricted doesn't mean someone
- * else gets to harass you). Everything else that writes is refused.
+ * else gets to harass you — and "Sign out of other devices", DELETE
+ * /api/me/sessions: a restricted student who thinks someone else is in their
+ * account must still be able to throw them out). Everything else that writes
+ * is refused.
  *
  * The portal line is a door with no handle on it in wave 1, and saying so here
  * is the point: /plus and /settings both come here like every other page, and
@@ -177,6 +195,7 @@ function restrictedApiAllowed(pathname: string, method: string): boolean {
   if (pathname === "/api/me" && method === "DELETE") return true;
   if (pathname === "/api/billing/portal") return true;
   if (pathname === "/api/me/push-devices" && method === "DELETE") return true;
+  if (pathname === "/api/me/sessions" && method === "DELETE") return true;
   return pathname === "/api/me/block" || pathname === "/api/me/mute";
 }
 
@@ -220,8 +239,57 @@ function loginFor(request: NextRequest, session: NextResponse, next: string) {
 }
 
 export async function proxy(request: NextRequest) {
-  const { response: sessionResponse, user } = await updateSession(request);
   const { pathname, searchParams } = request.nextUrl;
+
+  // The browser code rule (item 5 above). Only pages carry one: an API answer
+  // or a script file has no document for a policy to govern. `cspFlavor`
+  // never says "no"; deciding what is a page is this file's job.
+  const page = !pathname.startsWith("/api/") && !isFileRequest(pathname);
+  const flavor = page ? cspFlavor(pathname) : null;
+  const nonce = flavor === "app" ? makeNonce() : undefined;
+  const csp = flavor
+    ? buildCsp({
+        flavor,
+        nonce,
+        env: cspEnvFromProcess(),
+        dev: process.env.NODE_ENV === "development",
+        // The Host header, not nextUrl.host, for the dev HMR socket entry: a
+        // phone on the LAN asks for http://192.168.x.x:3000, and the Host
+        // header is what its browser will also use for the websocket, while
+        // nextUrl.host has in past Next versions come back as the configured
+        // hostname instead (skeptic review, 2026-10-11).
+        requestHost: request.headers.get("host") ?? request.nextUrl.host,
+      })
+    : null;
+
+  // A React page learns its nonce from the REQUEST: Next reads it out of the
+  // request's Content-Security-Policy header while rendering and stamps its
+  // own inline scripts with it (app-render getScriptNonceFromHeader), and
+  // the root layout reads x-nonce for the theme script. This must happen
+  // BEFORE updateSession, whose NextResponse.next({ request }) is what
+  // forwards the request headers to the render.
+  //
+  // A plain `request.headers.set` is in use, not a rebuilt NextRequest: the
+  // proxy adapter builds this request on a fresh, writable Headers object,
+  // and updateSession's `request.cookies.set` already writes the Cookie
+  // header on that same object on every refresh. Both names are set or
+  // removed on every request, so a nonce only this file minted ever reaches
+  // a render (a missing-file 404 is rendered by React too).
+  if (csp && nonce) {
+    request.headers.set(CSP_HEADER, csp);
+    request.headers.set(NONCE_HEADER, nonce);
+  } else {
+    request.headers.delete(CSP_HEADER);
+    request.headers.delete(NONCE_HEADER);
+  }
+
+  /** The page itself goes out with the rule. Redirects and the restricted JSON don't need it. */
+  const finish = (res: NextResponse) => {
+    if (csp) res.headers.set(CSP_HEADER, csp);
+    return res;
+  };
+
+  const { response: sessionResponse, user } = await updateSession(request);
 
   // A suspended or banned student gets one page and almost nothing else. It
   // sits above everything below on purpose: it covers the static `?app=1`
@@ -267,7 +335,7 @@ export async function proxy(request: NextRequest) {
       if (handle) {
         // Public viewer mode, reached from /profile/<h>: anyone may load
         // it, signed in or not.
-        if (fromApp) return sessionResponse;
+        if (fromApp) return finish(sessionResponse);
         // An old share link or bookmark: the clean address unfurls with the
         // person's preview card and picks the phone or desktop view. It hops
         // back here WITH `?app=1`, so this never loops. The settings the
@@ -291,7 +359,7 @@ export async function proxy(request: NextRequest) {
     // retired prototype: logged-out visitors go to login and come back to
     // the clean route, never to a fabricated page.
     if (!user) return loginFor(request, sessionResponse, clean);
-    if (fromApp && APP_HTML.has(pathname)) return sessionResponse;
+    if (fromApp && APP_HTML.has(pathname)) return finish(sessionResponse);
     // Signed in but not in app mode (bookmark, typed URL, retired page): the
     // clean route owns the consent/campus/onboarding gates and re-enters
     // app mode itself. Bouncing `?app=1` here would loop — hence the check.
@@ -312,7 +380,9 @@ export async function proxy(request: NextRequest) {
     return redirectTo(request, sessionResponse, "/campus");
   }
 
-  return sessionResponse;
+  // Every other page (and every API and file request, for which `csp` is
+  // null and finish() adds nothing).
+  return finish(sessionResponse);
 }
 
 // The installable app's three public files skip the proxy entirely: no GoTrue
