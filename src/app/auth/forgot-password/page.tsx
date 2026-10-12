@@ -3,20 +3,34 @@
 import Link from "next/link";
 import { useState } from "react";
 
-/** The per-IP limit resets in 15 minutes; the per-email one can take up to an hour, which Retry-After reports. */
+/**
+ * The per-network limit resets in 15 minutes; the per-address ones can take
+ * up to an hour or a day, which Retry-After reports
+ * (src/lib/auth/password-reset-limits.ts).
+ */
 const DEFAULT_RETRY_MINUTES = 15;
+
+const UNAVAILABLE_COPY =
+  "Password reset isn't available right now. Try again in a few minutes.";
 
 function tooManyRequestsCopy(retryAfter: string | null): string {
   const seconds = Number(retryAfter);
+  const known = retryAfter !== null && Number.isFinite(seconds) && seconds > 0;
+  // A wait shorter than the shortest limit isn't a limit at all: the server
+  // couldn't count the request and refused it to be safe.
+  if (known && seconds < DEFAULT_RETRY_MINUTES * 60) return UNAVAILABLE_COPY;
+  // Over an hour is the per-address daily limit. It resets at midnight UTC,
+  // which is evening in Indiana, so "tomorrow" could be too early: 24 hours
+  // is the longest the wait can be.
+  if (known && seconds > 60 * 60) {
+    return "Too many reset requests. Try again in 24 hours.";
+  }
   const minutes =
-    Number.isFinite(seconds) && seconds > DEFAULT_RETRY_MINUTES * 60
+    known && seconds > DEFAULT_RETRY_MINUTES * 60
       ? Math.ceil(seconds / 60)
       : DEFAULT_RETRY_MINUTES;
   return `Too many reset requests. Try again in ${minutes} minutes.`;
 }
-
-const UNAVAILABLE_COPY =
-  "Password reset isn't available right now. Try again in a few minutes.";
 
 /**
  * What to tell the student after POST /api/auth/password-reset, or null when
@@ -96,15 +110,18 @@ export default function ForgotPasswordPage() {
 
         <form onSubmit={onSubmit} className="vibe-auth-form">
           <label className="vibe-auth-field">
+            {/* Reads exactly like the sign-in page's field: new students sign
+                up with their school address, and the answer below is the same
+                whether or not the address has an account, so this label is
+                the only guidance they get. */}
             <span className="vibe-auth-label-row">
-              <span className="vibe-auth-label">
-                Personal email (the one you log in with)
-              </span>
+              <span className="vibe-auth-label">Email</span>
+              <span className="vibe-auth-label-hint">the one you signed up with</span>
             </span>
             <input
               type="email"
               autoComplete="email"
-              placeholder="you@gmail.com"
+              placeholder="you@iu.edu"
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
@@ -143,6 +160,16 @@ export default function ForgotPasswordPage() {
         <p className="vibe-auth-tail">
           <Link href="/auth/login" className="vibe-auth-link">
             Back to log in
+          </Link>
+        </p>
+        {/* The policy and the Terms, the same line the sign-in page ends on. */}
+        <p className="vibe-auth-tail" style={{ marginTop: 28, fontSize: 12.5, opacity: 0.75 }}>
+          <Link href="/legal/privacy" className="vibe-auth-link--tap" style={{ color: "inherit", textDecoration: "underline", textUnderlineOffset: 3 }}>
+            Privacy Policy
+          </Link>
+          {" · "}
+          <Link href="/legal/terms" className="vibe-auth-link--tap" style={{ color: "inherit", textDecoration: "underline", textUnderlineOffset: 3 }}>
+            Terms
           </Link>
         </p>
       </div>

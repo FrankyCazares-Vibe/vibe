@@ -1,15 +1,27 @@
 import { after, NextResponse } from "next/server";
 
+import {
+  firstRefusal,
+  resetAddressLimits,
+  resetNetworkLimit,
+  resetSendLimits,
+  type ResetLimit,
+} from "@/lib/auth/password-reset-limits";
 import { getSiteUrl } from "@/lib/auth/site-url";
 import { recipientRateKey } from "@/lib/email/send-log-core";
 import { sendPasswordResetEmail } from "@/lib/email/resend-transactional";
-import { clientIp, rateLimit, tooManyRequests } from "@/lib/rate-limit";
+import { clientNetworkKey, rateLimit, tooManyRequests } from "@/lib/rate-limit";
 import {
   createSupabaseServiceClient,
   isSupabaseServiceConfigured,
 } from "@/lib/supabase/service";
 
 type Body = { email?: string };
+
+/** One ask of the shared limiter for a limit from password-reset-limits.ts. */
+function hit(limit: ResetLimit) {
+  return rateLimit(limit.key, limit);
+}
 
 /**
  * P1-006 — password reset via Resend: admin generateLink (recovery) + custom email.
@@ -24,6 +36,12 @@ type Body = { email?: string };
  *
  * Every non-config outcome returns the same constant body so the endpoint
  * cannot be used to enumerate which emails have accounts.
+ *
+ * Three limits (numbers and keys in src/lib/auth/password-reset-limits.ts),
+ * because every reset email comes out of the daily email allowance sign-up
+ * codes share: per network and per address before the answer (a 429, the
+ * same for an address with or without an account), and a cap on reset emails
+ * as a whole after it, which never changes the answer.
  */
 export async function POST(req: Request) {
   const generic = {
@@ -32,11 +50,14 @@ export async function POST(req: Request) {
       "If an account exists for that email, you'll receive reset instructions shortly.",
   };
 
-  const perIp = await rateLimit(`pw-reset-ip:${clientIp(req)}`, {
-    limit: 5,
-    windowSec: 900,
-  });
-  if (!perIp.allowed) return tooManyRequests(perIp);
+  // The network bucket, not the raw address: one device on IPv6 can pick a
+  // new address at will. Refuses when the limiter is down, as the cap below
+  // does, so a database hiccup is never an open door to the email allowance.
+  const perNetwork = await firstRefusal(
+    [resetNetworkLimit(clientNetworkKey(req))],
+    hit,
+  );
+  if (perNetwork) return tooManyRequests(perNetwork);
 
   let body: Body;
   try {
@@ -53,12 +74,11 @@ export async function POST(req: Request) {
 
   // Keyed on a hash, never the address: public.rate_limits used to hold
   // every reset address in plaintext (the E1 migration deleted those rows).
+  // Counted for every address typed, account or not, so the 429 says nothing
+  // about who is on Vibe.
   const emailKey = recipientRateKey(email, process.env.SCHOOL_EMAIL_VERIFY_SECRET);
-  const perEmail = await rateLimit(`pw-reset-email:${emailKey}`, {
-    limit: 3,
-    windowSec: 3600,
-  });
-  if (!perEmail.allowed) return tooManyRequests(perEmail);
+  const perAddress = await firstRefusal(resetAddressLimits(emailKey), hit);
+  if (perAddress) return tooManyRequests(perAddress);
 
   if (!isSupabaseServiceConfigured()) {
     return NextResponse.json(
@@ -74,7 +94,7 @@ export async function POST(req: Request) {
   // Only a real account costs a generated link and an email send, so doing
   // them before answering made real accounts measurably slower to respond.
   // They run after the response instead: every answer above takes the same
-  // path (both limits, validation), and nothing below can reach the caller.
+  // path (the limits, validation), and nothing below can reach the caller.
   after(async () => {
     try {
       const admin = createSupabaseServiceClient();
@@ -89,6 +109,19 @@ export async function POST(req: Request) {
         if (error) {
           console.error("[auth/password-reset] generateLink", error.message);
         }
+        return;
+      }
+
+      // The cap on reset emails as a whole. Counted here and nowhere earlier:
+      // only an address with an account gets this far, so requests for
+      // addresses with no account can't spend it. The answer has already
+      // gone out, so a spent cap looks the same to the caller as a send.
+      // The link above is already made, so while the cap is spent an older
+      // reset email for this address stops working with no new one sent.
+      if (await firstRefusal(resetSendLimits(), hit)) {
+        console.warn(
+          "[auth/password-reset] the cap on reset emails is spent, or the limiter is down: a reset email was not sent",
+        );
         return;
       }
 
