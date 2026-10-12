@@ -2,6 +2,15 @@
 
 import { useEffect, useRef, useState, type JSX } from "react";
 
+import { TurnstileBox, type TurnstileBoxHandle } from "@/components/auth/TurnstileBox";
+import {
+  captchaErrorMessage,
+  captchaOptions,
+  humanCheckWaitLabel,
+  initialHumanCheck,
+  isCaptchaError,
+  type HumanCheck,
+} from "@/lib/auth/captcha";
 import {
   getAuthEmailCallbackUrl,
   getBrowserSiteOrigin,
@@ -28,6 +37,10 @@ const SEND_FAILED = "Couldn't send right now. Try again in a minute.";
  * With `hideEmailField` the parent owns the address (one field shared with
  * the code box above): no field or "Sending to" line here, and a send uses
  * `initialEmail` as it is at the tap.
+ *
+ * /resend is one of the doors Supabase's captcha switch guards, so this has
+ * its own "are you a person" box (TurnstileBox), above the button. With no
+ * site key there is no box and a send is the request it always was.
  */
 export function ResendConfirmation({
   initialEmail,
@@ -52,6 +65,9 @@ export function ResendConfirmation({
   );
   const cooldownEndsAt = useRef<number | null>(null);
   const cooling = secondsLeft > 0;
+  const [human, setHuman] = useState<HumanCheck>(initialHumanCheck);
+  const humanBox = useRef<TurnstileBoxHandle>(null);
+  const humanWait = humanCheckWaitLabel(human);
 
   // A parent that learns the address after mount (typed on login, read from
   // storage) updates the field, unless the student already edited it.
@@ -99,7 +115,9 @@ export function ResendConfirmation({
   }
 
   async function onSend() {
-    if (sending || cooling) return;
+    // The button is disabled while the box is still checking; this is for
+    // Enter in the email field.
+    if (sending || cooling || humanWait !== null) return;
     const target = (hideEmailField ? seedEmail : email).trim();
     setError(null);
     setSentTo(null);
@@ -117,6 +135,8 @@ export function ResendConfirmation({
         email: target,
         options: {
           emailRedirectTo: getAuthEmailCallbackUrl(getBrowserSiteOrigin()),
+          // { captchaToken } when the box has one, else nothing.
+          ...captchaOptions(human),
         },
       });
       if (sendErr) {
@@ -134,7 +154,10 @@ export function ResendConfirmation({
           // Anything else, including the project-wide email cap, which uses
           // the same code but says "Email rate limit exceeded" with no
           // seconds: it won't clear in 60s, so don't claim "we just sent one".
-          setError(SEND_FAILED);
+          // A refused "are you a person" check gets its own sentence.
+          setError(
+            isCaptchaError(sendErr) ? captchaErrorMessage(human) : SEND_FAILED,
+          );
           if (sendErr.code === "over_email_send_rate_limit") {
             startCooldown(DEFAULT_COOLDOWN_SEC);
           }
@@ -150,6 +173,8 @@ export function ResendConfirmation({
       setError(SEND_FAILED);
     } finally {
       setSending(false);
+      // A token works once: a new check after every send, good or bad.
+      humanBox.current?.reset();
     }
   }
 
@@ -219,17 +244,21 @@ export function ResendConfirmation({
         </p>
       ) : null}
 
+      {/* Renders nothing until NEXT_PUBLIC_TURNSTILE_SITE_KEY is set. */}
+      <TurnstileBox ref={humanBox} action="resend" onChange={setHuman} />
+
+      {/* While the box is still checking, the button waits and says so. */}
       <button
         type="button"
         className="vibe-auth-secondary"
-        disabled={sending || cooling}
+        disabled={sending || cooling || humanWait !== null}
         onClick={() => void onSend()}
       >
         {sending
           ? "Sending…"
           : cooling
             ? `Send again in ${secondsLeft}s`
-            : "Send a new email"}
+            : (humanWait ?? "Send a new email")}
       </button>
 
       <p className="vibe-auth-tip">{INBOX_TIP}</p>

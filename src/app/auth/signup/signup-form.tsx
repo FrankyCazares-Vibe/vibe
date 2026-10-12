@@ -11,6 +11,15 @@ import { useEffect, useRef, useState } from "react";
 
 import { ConfirmCodeForm } from "@/components/auth/ConfirmCodeForm";
 import { ResendConfirmation } from "@/components/auth/ResendConfirmation";
+import { TurnstileBox, type TurnstileBoxHandle } from "@/components/auth/TurnstileBox";
+import {
+  captchaErrorMessage,
+  captchaOptions,
+  humanCheckWaitLabel,
+  initialHumanCheck,
+  isCaptchaError,
+  type HumanCheck,
+} from "@/lib/auth/captcha";
 import {
   getAuthEmailCallbackUrl,
   getBrowserSiteOrigin,
@@ -70,9 +79,10 @@ const LOST_CODE_HREF = "mailto:help@connectvibe.app?subject=My%20Vibe%20access%2
  * What to say when signUp fails. Never the browser's own text ("Load failed",
  * "Failed to fetch") or GoTrue's. A weak password says what to fix from
  * auth-js's `reasons` ("length" | "characters" | "pwned"), in that order when
- * there are several; with none it falls back to the general hint.
+ * there are several; with none it falls back to the general hint. `human` is
+ * the "are you a person" box as it was when the request left.
  */
-function signUpErrorMessage(err: AuthError): string {
+function signUpErrorMessage(err: AuthError, human: HumanCheck): string {
   // The waitlist gate (auth_hooks.hook_waitlist_gate) refused the access code:
   // a 403 whose message starts with its own tag. Checked first, and always
   // our own words for the reason, never the hook's message.
@@ -80,6 +90,9 @@ function signUpErrorMessage(err: AuthError): string {
   if (refusal) return gateRefusalCopy(refusal);
   // A fetch that threw (offline, blocked) or a 502/503/504 from the gateway.
   if (isAuthRetryableFetchError(err)) return OFFLINE;
+  // Supabase refused the "are you a person" check (`captcha_failed`): its own
+  // sentence, with what to do. No account was made and no email was sent.
+  if (isCaptchaError(err)) return captchaErrorMessage(human);
   const message = (err.message ?? "").trim();
   if (isAuthWeakPasswordError(err)) {
     const reasons: string[] = err.reasons ?? [];
@@ -174,6 +187,12 @@ export function SignupForm({
   const [codeShown, setCodeShown] = useState(!signupOpen);
   const codeInput = useRef<HTMLInputElement>(null);
   const [focusCode, setFocusCode] = useState(0);
+  // The "are you a person" box (TurnstileBox). With no site key it is "off"
+  // for good: no box, the button never waits, and signUp sends what it
+  // always sent.
+  const [human, setHuman] = useState<HumanCheck>(initialHumanCheck);
+  const humanBox = useRef<TurnstileBoxHandle>(null);
+  const humanWait = humanCheckWaitLabel(human);
 
   // The code came in the address: it's in the field now, so take it out of
   // the address bar, history and anything shared from this tab.
@@ -237,8 +256,10 @@ export function SignupForm({
     // One signUp at a time, and none while the pending view is up. Every
     // signUp from this browser writes a new PKCE code verifier, which breaks
     // the ?code= link in an email that is already on its way. "Wrong
-    // address? Start over" is the only way back to this form.
-    if (submitting.current || pending) return;
+    // address? Start over" is the only way back to this form. And none while
+    // the "are you a person" box is still checking (the button is disabled
+    // then; this is the same rule for a submit that arrives any other way).
+    if (submitting.current || pending || humanWait !== null) return;
     setError(null);
     setMaybeExisting(false);
     if (!agreed) {
@@ -278,6 +299,9 @@ export function SignupForm({
         password,
         options: {
           emailRedirectTo: getAuthEmailCallbackUrl(getBrowserSiteOrigin()),
+          // { captchaToken } when the box has one, else nothing and the
+          // request is the one it always was.
+          ...captchaOptions(human),
           // Lands in auth.users.raw_user_meta_data; the on_auth_user_created
           // trigger copies it into users.terms_version / terms_accepted_at /
           // age_attested_at so the consent record is born with the row.
@@ -295,7 +319,7 @@ export function SignupForm({
         if (parseGateRefusal(signErr)) {
           // Every field stays filled; the cursor goes to the code.
           setCodeShown(true);
-          setError(signUpErrorMessage(signErr));
+          setError(signUpErrorMessage(signErr, human));
           setFocusCode((n) => n + 1);
           return;
         }
@@ -326,7 +350,7 @@ export function SignupForm({
           setMaybeExisting(true);
           return;
         }
-        setError(signUpErrorMessage(signErr));
+        setError(signUpErrorMessage(signErr, human));
         return;
       }
       if (data.session) {
@@ -354,6 +378,10 @@ export function SignupForm({
     } finally {
       submitting.current = false;
       setLoading(false);
+      // A token works once: a new check after every try, good or bad. (Once
+      // the "Check your email" view is up this form's box is gone, and the
+      // resend button below has its own.)
+      humanBox.current?.reset();
     }
   }
 
@@ -607,9 +635,12 @@ export function SignupForm({
           ) : null}
           {/* Said where it is agreed to (Privacy Policy, short version item
               6), not only inside the policy. */}
-          <p className="vibe-auth-consent-note" style={{ opacity: 0.8 }}>
+          <p className="vibe-auth-consent-note">
             Good to know: people can see that you viewed their profile or post.
           </p>
+
+          {/* Renders nothing until NEXT_PUBLIC_TURNSTILE_SITE_KEY is set. */}
+          <TurnstileBox ref={humanBox} action="sign-up" onChange={setHuman} />
 
           {error ? <p role="alert" className="vibe-auth-error">{error}</p> : null}
           {maybeExisting ? (
@@ -642,13 +673,15 @@ export function SignupForm({
             </div>
           ) : null}
 
+          {/* Unticked consent keeps its own lock and wording. With it ticked,
+              the button waits while the box is still checking, and says so. */}
           <button
             type="submit"
-            disabled={loading || !agreed}
+            disabled={loading || !agreed || humanWait !== null}
             className={`vibe-auth-submit${!agreed ? " vibe-auth-submit--locked" : ""}`}
           >
-            {loading ? "Creating…" : "Create account"}
-            {loading ? null : (
+            {loading ? "Creating…" : agreed && humanWait !== null ? humanWait : "Create account"}
+            {loading || (agreed && humanWait !== null) ? null : (
               <span aria-hidden style={{ marginLeft: 8 }}>
                 →
               </span>

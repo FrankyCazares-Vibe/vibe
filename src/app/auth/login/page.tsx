@@ -3,10 +3,19 @@
 import { isAuthRetryableFetchError, type AuthError } from "@supabase/supabase-js";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 
 import { ConfirmCodeForm } from "@/components/auth/ConfirmCodeForm";
 import { ResendConfirmation } from "@/components/auth/ResendConfirmation";
+import { TurnstileBox, type TurnstileBoxHandle } from "@/components/auth/TurnstileBox";
+import {
+  captchaErrorMessage,
+  captchaOptions,
+  humanCheckWaitLabel,
+  initialHumanCheck,
+  isCaptchaError,
+  type HumanCheck,
+} from "@/lib/auth/captcha";
 import { getPostLoginDestination } from "@/lib/auth/post-login";
 import { sanitizeLoginNextParam } from "@/lib/auth/login-next";
 import { readPendingSignupEmail } from "@/lib/auth/pending-signup";
@@ -31,10 +40,14 @@ const ACCOUNT_CLOSED =
  * What to say when sign-in fails. Never the provider's or the browser's own
  * text: "Load failed" and "Failed to fetch" are how iOS and Chrome say "no
  * connection", and GoTrue's other messages aren't written for students.
+ * `human` is the "are you a person" box as it was when the request left.
  */
-function signInErrorMessage(err: AuthError): string {
+function signInErrorMessage(err: AuthError, human: HumanCheck): string {
   // A fetch that threw (offline, blocked) or a 502/503/504 from the gateway.
   if (isAuthRetryableFetchError(err)) return OFFLINE;
+  // Supabase refused the "are you a person" check (`captcha_failed`): its own
+  // sentence, with what to do. Nothing was decided about the password.
+  if (isCaptchaError(err)) return captchaErrorMessage(human);
   if (err.code === "email_not_confirmed") return NOT_CONFIRMED;
   if (err.code === "invalid_credentials") return WRONG_CREDENTIALS;
   if (err.code === "user_banned") return ACCOUNT_CLOSED;
@@ -84,6 +97,12 @@ function LoginForm() {
   const [continuing, setContinuing] = useState(false);
   const [resendOpen, setResendOpen] = useState(false);
   const [resendEmail, setResendEmail] = useState<string | null>(null);
+  // The "are you a person" box (TurnstileBox). With no site key it is "off"
+  // for good: no box, the button never waits, and sign-in sends what it
+  // always sent.
+  const [human, setHuman] = useState<HumanCheck>(initialHumanCheck);
+  const humanBox = useRef<TurnstileBoxHandle>(null);
+  const humanWait = humanCheckWaitLabel(human);
 
   const urlError = searchParams.get("error");
   const schoolVerifiedHint = searchParams.get("school_verified") === "1";
@@ -120,6 +139,8 @@ function LoginForm() {
       if (!e.persisted) return;
       setLoading(false);
       setContinuing(false);
+      // Whatever token the box held went with the sign-in that left this page.
+      humanBox.current?.reset();
     };
     window.addEventListener("pageshow", onPageShow);
     return () => window.removeEventListener("pageshow", onPageShow);
@@ -127,7 +148,9 @@ function LoginForm() {
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (loading) return;
+    // The button is disabled while the box is still checking; this is the
+    // same rule for a submit that arrives any other way.
+    if (loading || humanWait !== null) return;
     const address = email.trim();
     setError(null);
     // unconfirmedEmail is left alone until the answer is in: the same
@@ -140,12 +163,15 @@ function LoginForm() {
         await supabase.auth.signInWithPassword({
           email: address,
           password,
+          // { captchaToken } when the box has one, else {} and the request
+          // is the one it always was.
+          options: captchaOptions(human),
         });
       if (signErr) {
         setUnconfirmedEmail(
           signErr.code === "email_not_confirmed" ? address : null,
         );
-        setError(signInErrorMessage(signErr));
+        setError(signInErrorMessage(signErr, human));
         return;
       }
       if (!signData.session) {
@@ -160,6 +186,8 @@ function LoginForm() {
       return;
     } finally {
       if (!signedInNow) setLoading(false);
+      // A token works once: a new check after every try, good or bad.
+      humanBox.current?.reset();
     }
     const dest = await destinationAfterSignIn(supabase, next);
     // Full navigation so middleware always sees the new auth cookies.
@@ -321,15 +349,23 @@ function LoginForm() {
             />
           </label>
 
+          {/* Renders nothing until NEXT_PUBLIC_TURNSTILE_SITE_KEY is set. */}
+          <TurnstileBox ref={humanBox} action="sign-in" onChange={setHuman} />
+
           {error ? (
             <p role="alert" className="vibe-auth-error">
               {error}
             </p>
           ) : null}
 
-          <button type="submit" disabled={loading} className="vibe-auth-submit">
-            {loading ? "Signing in…" : "Sign in"}
-            {loading ? null : (
+          {/* While the box is still checking, the button waits and says so. */}
+          <button
+            type="submit"
+            disabled={loading || humanWait !== null}
+            className="vibe-auth-submit"
+          >
+            {loading ? "Signing in…" : (humanWait ?? "Sign in")}
+            {loading || humanWait !== null ? null : (
               <span aria-hidden style={{ marginLeft: 8 }}>
                 →
               </span>
@@ -410,8 +446,9 @@ function LoginForm() {
           </>
         )}
         {/* The policy and the Terms, on the first screen a signed-out person
-            (and a store reviewer) sees. */}
-        <p className="vibe-auth-tail" style={{ marginTop: 28, fontSize: 12.5, opacity: 0.75 }}>
+            (and a store reviewer) sees. Full strength: at 0.75 these small
+            links failed the contrast check in Light. */}
+        <p className="vibe-auth-tail" style={{ marginTop: 28, fontSize: 12.5 }}>
           <Link href="/legal/privacy" className="vibe-auth-link--tap" style={{ color: "inherit", textDecoration: "underline", textUnderlineOffset: 3 }}>
             Privacy Policy
           </Link>

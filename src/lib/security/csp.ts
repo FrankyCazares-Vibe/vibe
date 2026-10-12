@@ -11,22 +11,26 @@
  *    (Next stamps it on its own inline scripts; our layout puts it on the
  *    theme boot script), or the NIGHT_LOCK_SCRIPT hash, or because a trusted
  *    script created them ('strict-dynamic': /html/_otto-tour.js, the mention
- *    picker, pdf.js from cdnjs).
+ *    picker, pdf.js from cdnjs, the "are you a person" box).
  *  - "static" (/html/*.html and /onboarding/classic): those pages still carry
  *    inline <script> blocks and ~280 inline on*= handlers, which no nonce can
  *    cover, so their scripts get 'unsafe-inline' and NO nonce, hash or
  *    'strict-dynamic' (browsers ignore 'unsafe-inline' as soon as one of those
  *    is present, which would silently kill every handler). Every other
- *    directive is exactly as tight as the app flavour's.
+ *    directive is exactly as tight as the app flavour's, with ONE exception:
+ *    the "are you a person" box. Only React pages have a sign-in form, so
+ *    only the app flavour ever lets Cloudflare's challenge host in.
  *
  * Hosts are origins only, never paths. An origin whose env var is missing (or
  * malformed) is left out: dev has no Sentry, and a typo must never smuggle a
  * ";" or a space into the header.
  *
  * PURE: no `server-only`, no Node-only APIs. It runs in the proxy and in
- * `node --test` (csp.test.ts). The one import, demo-media.ts, is pure too.
+ * `node --test` (csp.test.ts). The two imports, demo-media.ts and
+ * auth/captcha.ts, are pure too.
  */
 
+import { readTurnstileSiteKey, TURNSTILE_ORIGIN } from "@/lib/auth/captcha";
 import { demoMediaBase } from "@/lib/landing/demo-media";
 
 export type CspFlavor = "app" | "static";
@@ -40,6 +44,13 @@ export type CspEnv = {
   sentryDsn?: string;
   /** The landing film's folder: NEXT_PUBLIC_DEMO_MEDIA_BASE, else DEFAULT_DEMO_MEDIA_BASE (demo-media.ts). */
   demoMediaBase?: string;
+  /**
+   * NEXT_PUBLIC_TURNSTILE_SITE_KEY: the switch for the "are you a person" box
+   * (src/lib/auth/captcha.ts). The key itself never goes in the header: set,
+   * it lets Cloudflare's challenge host into the app flavour; unset, the
+   * header is the one Vibe had before the box existed.
+   */
+  turnstileSiteKey?: string;
 };
 
 export const CSP_HEADER = "Content-Security-Policy";
@@ -102,6 +113,7 @@ export function cspEnvFromProcess(env: NodeJS.ProcessEnv = literalProcessEnv()):
     // "/landing-media/" → this site ('self' already covers it), "off" or a
     // typo → no film, so no host.
     demoMediaBase: demoMediaBase(env.NEXT_PUBLIC_DEMO_MEDIA_BASE) ?? undefined,
+    turnstileSiteKey: env.NEXT_PUBLIC_TURNSTILE_SITE_KEY,
   };
 }
 
@@ -112,6 +124,7 @@ function literalProcessEnv(): NodeJS.ProcessEnv {
     R2_ACCOUNT_ID: process.env.R2_ACCOUNT_ID,
     NEXT_PUBLIC_SENTRY_DSN: process.env.NEXT_PUBLIC_SENTRY_DSN,
     NEXT_PUBLIC_DEMO_MEDIA_BASE: process.env.NEXT_PUBLIC_DEMO_MEDIA_BASE,
+    NEXT_PUBLIC_TURNSTILE_SITE_KEY: process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY,
   };
 }
 
@@ -159,9 +172,18 @@ export function buildCsp(opts: {
     throw new Error("buildCsp: the app flavour needs a base64 nonce (makeNonce())");
   }
 
-  const scriptSrc =
+  // The "are you a person" box (Cloudflare Turnstile) on sign-up, sign-in and
+  // "send a new email": React pages only, and only once its site key is set.
+  // TurnstileBox.tsx creates the <script> itself, so 'strict-dynamic' already
+  // lets it run; the host in script-src is for browsers too old to know
+  // 'strict-dynamic', the same reason cdnjs is listed. The challenge runs in
+  // a frame from this host, which is what frame-src must let in.
+  const humanCheck =
+    flavor === "app" && readTurnstileSiteKey(env.turnstileSiteKey) ? TURNSTILE_ORIGIN : null;
+
+  const scriptSrc: Array<string | null> =
     flavor === "app"
-      ? ["'self'", `'nonce-${nonce}'`, NIGHT_LOCK_SCRIPT_HASH, "'strict-dynamic'", PDFJS_CDN]
+      ? ["'self'", `'nonce-${nonce}'`, NIGHT_LOCK_SCRIPT_HASH, "'strict-dynamic'", PDFJS_CDN, humanCheck]
       : ["'self'", "'unsafe-inline'", PDFJS_CDN];
   // React rebuilds server error stacks with eval in development only (Next's
   // CSP guide); production never needs it.
@@ -187,8 +209,9 @@ export function buildCsp(opts: {
     // Vibe frames only its own pages (/html/messages.html, /onboarding/classic,
     // /messages?mini=1); résumé PDFs are rasterised by pdf.js into <img>,
     // never framed. Storage origins stay OUT so a stored URL can't frame a
-    // Supabase or R2 object (skeptic amendment 1, 2026-10-11).
-    ["frame-src", ["'self'"]],
+    // Supabase or R2 object (skeptic amendment 1, 2026-10-11). The one outside
+    // frame is Cloudflare's "are you a person" challenge (humanCheck above).
+    ["frame-src", ["'self'", humanCheck]],
     // pdf.js wraps its CDN worker in a blob: URL; /sw.js is same-origin.
     ["worker-src", ["'self'", "blob:"]],
     ["manifest-src", ["'self'"]],

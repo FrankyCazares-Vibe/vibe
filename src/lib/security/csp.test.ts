@@ -2,8 +2,9 @@
  * Tests for `csp.ts`, the browser code rule (security report 2026-10-08, "No
  * browser rule limiting which code can run on Vibe's pages"; plan
  * handoffs/2026-10-11-browser-rule-plan.md): the two flavours, dev vs prod,
- * the env-derived hosts, the path → flavour map, the nonce, and the DRIFT
- * TRIPWIRE for NIGHT_LOCK_SCRIPT_HASH.
+ * the env-derived hosts, the path → flavour map, the nonce, the DRIFT
+ * TRIPWIRE for NIGHT_LOCK_SCRIPT_HASH, and the "are you a person" box's host
+ * (app flavour only, and only once its site key is set).
  *
  * Run with:
  *   node --test src/lib/security/csp.test.ts
@@ -67,6 +68,10 @@ const R2 = "https://0123456789abcdef0123456789abcdef.r2.cloudflarestorage.com";
 const SENTRY = "https://o4511312043704320.ingest.us.sentry.io";
 const DEMO = "https://npzptkkzqxthhsnu.public.blob.vercel-storage.com";
 const NONCE = "AAECAwQFBgcICQoLDA0ODw==";
+/** Cloudflare's "are you a person" host, and PROD_ENV with the box switched on (their published test site key). */
+const HUMAN_CHECK = "https://challenges.cloudflare.com";
+const TURNSTILE_TEST_KEY = "1x00000000000000000000AA";
+const BOX_ON_ENV: CspEnv = { ...PROD_ENV, turnstileSiteKey: TURNSTILE_TEST_KEY };
 
 /** directive name → its source list. */
 function parse(header: string): Map<string, string[]> {
@@ -121,7 +126,8 @@ test("static flavour: unsafe-inline scripts, and no nonce, hash or strict-dynami
   }
 });
 
-test("every directive except script-src is identical in the two flavours", () => {
+// With the "are you a person" box on, frame-src differs too: see the three tests after the frame-src one.
+test("every directive except script-src is identical in the two flavours (the box off)", () => {
   for (const dev of [false, true]) {
     const a = parse(app(dev, PROD_ENV, "localhost:3000"));
     const s = parse(stat(dev, PROD_ENV, "localhost:3000"));
@@ -185,6 +191,49 @@ test("the env's hosts land where the browser uses them, as origins only", () => 
 
 test("frame-src is 'self' only, both flavours (skeptic amendment 1: no storage origins in frames)", () => {
   for (const header of ALL) assert.deepEqual(src(header, "frame-src"), ["'self'"]);
+});
+
+test("no site key: Cloudflare's challenge host is nowhere in the header, either flavour", () => {
+  for (const header of ALL) assert.ok(!header.includes("challenges.cloudflare.com"));
+  for (const turnstileSiteKey of [undefined, "", "   ", "not a key", '"1x00000000000000000000AA"', "abc; script-src *"]) {
+    for (const dev of [false, true]) {
+      const env = { ...PROD_ENV, turnstileSiteKey };
+      assert.equal(app(dev, env), app(dev), String(turnstileSiteKey));
+      assert.equal(stat(dev, env), stat(dev), String(turnstileSiteKey));
+    }
+  }
+});
+
+test("site key set: the app flavour lets the challenge host frame and (as a fallback) run script; nothing else moves", () => {
+  for (const dev of [false, true]) {
+    const on = parse(app(dev, BOX_ON_ENV, "localhost:3000"));
+    const off = parse(app(dev, PROD_ENV, "localhost:3000"));
+    assert.deepEqual(on.get("frame-src"), ["'self'", HUMAN_CHECK]);
+    const scripts = on.get("script-src") ?? [];
+    assert.ok(scripts.includes(HUMAN_CHECK));
+    // Still nonce + strict-dynamic, and the host adds no way to run inline script.
+    assert.ok(scripts.includes(`'nonce-${NONCE}'`));
+    assert.ok(scripts.includes("'strict-dynamic'"));
+    assert.ok(!scripts.includes("'unsafe-inline'"));
+    assert.deepEqual(scripts.filter((s) => s !== HUMAN_CHECK), off.get("script-src"));
+    assert.deepEqual([...on.keys()], [...off.keys()]);
+    for (const [name, sources] of off) {
+      if (name !== "script-src" && name !== "frame-src") assert.deepEqual(on.get(name), sources, name);
+    }
+    // The host is never somewhere the box does not need it, and the key never reaches the header.
+    for (const name of ["connect-src", "img-src", "media-src", "style-src", "form-action", "frame-ancestors"]) {
+      assert.ok(!(on.get(name) ?? []).includes(HUMAN_CHECK), name);
+    }
+    assert.ok(!app(dev, BOX_ON_ENV).includes(TURNSTILE_TEST_KEY));
+  }
+});
+
+test("site key set: the static flavour does not change (no static page has a sign-in form)", () => {
+  for (const dev of [false, true]) {
+    assert.equal(stat(dev, BOX_ON_ENV), stat(dev));
+    assert.ok(!stat(dev, BOX_ON_ENV).includes("challenges.cloudflare.com"));
+    assert.deepEqual(src(stat(dev, BOX_ON_ENV), "frame-src"), ["'self'"]);
+  }
 });
 
 test("a missing env var leaves its host out instead of writing an empty or broken entry", () => {
@@ -281,7 +330,7 @@ test("makeNonce: 16 random bytes as 24 characters of standard base64, fresh ever
   assert.notEqual(makeNonce(), makeNonce());
 });
 
-test("cspEnvFromProcess: maps the four variables; the film host defaults to the Blob store and 'off' drops it", () => {
+test("cspEnvFromProcess: maps the five variables; the film host defaults to the Blob store and 'off' drops it", () => {
   const base = { NODE_ENV: "test" } as NodeJS.ProcessEnv;
   assert.deepEqual(
     cspEnvFromProcess({
@@ -289,18 +338,25 @@ test("cspEnvFromProcess: maps the four variables; the film host defaults to the 
       NEXT_PUBLIC_SUPABASE_URL: SUPABASE,
       R2_ACCOUNT_ID: "0123456789abcdef0123456789abcdef",
       NEXT_PUBLIC_SENTRY_DSN: PROD_ENV.sentryDsn,
+      NEXT_PUBLIC_TURNSTILE_SITE_KEY: TURNSTILE_TEST_KEY,
     }),
     {
       supabaseUrl: SUPABASE,
       r2AccountId: "0123456789abcdef0123456789abcdef",
       sentryDsn: PROD_ENV.sentryDsn,
       demoMediaBase: DEFAULT_DEMO_MEDIA_BASE,
+      turnstileSiteKey: TURNSTILE_TEST_KEY,
     },
   );
   const bare = cspEnvFromProcess(base);
   assert.equal(bare.supabaseUrl, undefined);
   assert.equal(bare.r2AccountId, undefined);
   assert.equal(bare.sentryDsn, undefined);
+  assert.equal(bare.turnstileSiteKey, undefined);
+  // The variable alone switches the host on, end to end.
+  const boxOn = cspEnvFromProcess({ ...base, NEXT_PUBLIC_TURNSTILE_SITE_KEY: TURNSTILE_TEST_KEY });
+  assert.deepEqual(src(app(false, boxOn), "frame-src"), ["'self'", HUMAN_CHECK]);
+  assert.deepEqual(src(app(false, bare), "frame-src"), ["'self'"]);
   assert.equal(bare.demoMediaBase, DEFAULT_DEMO_MEDIA_BASE);
   assert.equal(cspEnvFromProcess({ ...base, NEXT_PUBLIC_DEMO_MEDIA_BASE: "off" }).demoMediaBase, undefined);
   const other = cspEnvFromProcess({ ...base, NEXT_PUBLIC_DEMO_MEDIA_BASE: "https://cdn.example.com/film" });
