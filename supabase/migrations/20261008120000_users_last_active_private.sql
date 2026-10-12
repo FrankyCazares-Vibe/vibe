@@ -98,7 +98,16 @@ $$;
 comment on function public.users_active_count(text[]) is
   'How many accounts the caller may see were active in the last 5 minutes, everywhere (null) or in the listed campuses. The window is fixed here on purpose. For GET /api/stats/campus (20261008120000).';
 
-revoke execute on function public.users_active_count(text[]) from public, anon;
+-- CORRECTION (S75, 2026-10-11): the first version revoked anon here, which
+-- breaks the standing rule of 20260922090000_guard_function_privileges.sql
+-- (a role calling a public function it can't EXECUTE crashes the Supabase
+-- backend). Every role may call it; anon gets only the public number
+-- (accounts visible to anyone). Applied LOCALLY on Oct 11. OWED ON
+-- PRODUCTION: the session's tool was refused the GRANT, so run the one
+-- `grant execute ... to anon, service_role;` line below in the Supabase SQL
+-- editor, then the post-check in handoffs/2026-10-11-session-75-close-browser-rule-and-next-up.md.
+revoke execute on function public.users_active_count(text[]) from public;
+grant execute on function public.users_active_count(text[]) to anon, service_role;
 grant  execute on function public.users_active_count(text[]) to authenticated, service_role;
 
 -- 2. the times themselves ----------------------------------------------------

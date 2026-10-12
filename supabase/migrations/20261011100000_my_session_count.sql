@@ -15,7 +15,8 @@
 --   2. public.my_session_count(): how many auth.sessions rows belong to the
 --      caller (auth.uid()). SECURITY DEFINER, search_path '', returns one
 --      integer. It takes no argument, so nobody can ask about anyone else.
---   3. EXECUTE for authenticated only (not anon, not PUBLIC).
+--   3. EXECUTE for anon, authenticated and service_role (the no-denied-calls
+--      rule, see the grant below); anon simply gets 0.
 --   4. POST-CHECK, then notify pgrst.
 --
 -- WHAT THE NUMBER MEANS. One row per sign-in, NOT per device: every magic
@@ -29,6 +30,11 @@
 -- DOES NOT: return any session's id, time, IP or user agent; filter on
 -- not_after (only Pro's time-box sets it; null for every row here); touch
 -- auth.sessions itself or any grant on it.
+--
+-- APPLIED ON PRODUCTION 2026-10-11 through the Supabase connector's
+-- apply_migration (body minus begin/commit), recorded under this file's
+-- version; the pre-flight read gave fn_absent = t. The anon/service_role
+-- grant was added minutes later with execute_sql (see the grant below).
 --
 -- LIVE STATE (as written before applying): not read for this file. Before
 -- applying, read on production (a setting, allowed by the counts-only rule):
@@ -89,14 +95,21 @@ $$;
 comment on function public.my_session_count() is
   'How many sign-ins (auth.sessions rows) the caller has open. One row per sign-in, not per device. For GET /api/me/sessions (20261011100000).';
 
-revoke all on function public.my_session_count() from public, anon;
-grant execute on function public.my_session_count() to authenticated;
+-- EXECUTE for every role, on purpose (standing rule since 2026-09-22,
+-- 20260922090000_guard_function_privileges.sql): on Supabase's Postgres image
+-- a role calling a public function it can't EXECUTE crashes the backend and
+-- drops every connection, so the refusal lives INSIDE the function. Here it
+-- needs none: anon has no auth.uid() and gets 0, and nobody can ask about
+-- anyone else. A first version revoked anon; it was corrected the same day.
+revoke all on function public.my_session_count() from public;
+grant execute on function public.my_session_count() to anon, authenticated, service_role;
 
 -- 2. POST-CHECK inside the transaction ---------------------------------------
 do $$
 begin
-  if has_function_privilege('anon', 'public.my_session_count()', 'EXECUTE')
-     or not has_function_privilege('authenticated', 'public.my_session_count()', 'EXECUTE') then
+  if not has_function_privilege('anon', 'public.my_session_count()', 'EXECUTE')
+     or not has_function_privilege('authenticated', 'public.my_session_count()', 'EXECUTE')
+     or not has_function_privilege('service_role', 'public.my_session_count()', 'EXECUTE') then
     raise exception 'session-count: my_session_count grants are not as written';
   end if;
 end $$;
