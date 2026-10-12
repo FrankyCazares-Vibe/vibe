@@ -84,8 +84,11 @@ export function ShortVersion() {
         <li>
           <strong>Photos and videos can show where you were.</strong> On new
           uploads we strip the hidden location from your profile photo, your
-          cover and the photos on your own posts. Videos, chat photos and
-          anything posted as a club keep it, and posts are public.
+          cover and the photos on your own posts. Videos and anything posted
+          as a club keep it, and posts are public. A large photo sent in a chat
+          is often made smaller on your device before it is sent, and the
+          smaller copy does not carry the location. We do not promise that for
+          every chat photo (<Sec to="3c">section 3c</Sec>).
         </li>
         <li>
           <strong>No selling, no ads.</strong> We do not sell your information.

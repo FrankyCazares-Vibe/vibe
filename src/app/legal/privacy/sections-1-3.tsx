@@ -219,6 +219,19 @@ export function Sections1To3() {
         </li>
       </LegalUL>
       <LegalP>
+        <strong>Chat photos.</strong> Since our release of October 12, 2026,
+        the app often makes a large photo (over about 1 MB) smaller on your
+        device before it is sent in a chat. When it does, only the smaller copy
+        is sent. The copy is a new picture and does not carry the hidden
+        details the camera saved. This happens on your device, and we do not
+        promise it for every photo. GIFs, videos and photos of about 1 MB or
+        less are sent exactly as you picked them. So is any photo the app
+        leaves as it is, for example a picture with see-through parts, a very
+        long or very wide picture such as a scrolling screenshot or a panorama,
+        or one your device could not make smaller. Photos sent in chats before
+        that release were stored exactly as they were picked.
+      </LegalP>
+      <LegalP>
         Posts and club pages are public (<Sec to="5a">section 5a</Sec>), so a
         location inside one of those files is public too.
       </LegalP>

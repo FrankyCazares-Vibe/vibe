@@ -18,17 +18,35 @@ export function Section3d() {
           your first look that day. Until October 7, 2026 we also recorded the
           web address of the page you came from (up to 80 characters). We no
           longer record it, the addresses recorded before then are still
-          stored, and nothing in Vibe reads them. Your own views and
-          signed-out views are not recorded.
+          stored, and nothing in Vibe reads them. Your own views, and
+          signed-out views of profiles and posts, are not recorded.
         </li>
         <li>
           <strong>Last active.</strong> While the Campus page is open, we store
           the latest time your browser checked in.
         </li>
         <li>
+          <strong>Page opens.</strong> We count how many times three pages are
+          opened by a browser that is not signed in: the front page, the
+          waitlist page and the sign-up page. The count is one number for each
+          day, page and link label. The label is the short tag on the link you
+          came in on, if it had one, for example one that says the link was
+          posted on Instagram. The tally holds no account, no IP address, no
+          browser or device details, no cookie, no address of the page you came
+          from and no time of day. Opens by search engines and other automated
+          tools that name themselves are left out. To tell them apart, our
+          server looks at the name your browser gives itself. The tally does
+          not keep it. To stop someone inflating the numbers, we also count the
+          opens from each network in an hour and in a day. We keep that count
+          under a scrambled code made from the network (an IP address or part
+          of one), the day and a secret only our servers hold, not under the
+          address, and the code changes every day.
+        </li>
+        <li>
           <strong>Abuse counts.</strong> We count how often some actions happen,
           mostly per account. A few counts hold an IP address or part of one,
-          and a few hold a scrambled code made from an email address. We clear
+          and a few hold a scrambled code made from an email address or from a
+          network. We clear
           them from time to time, not on a set schedule, so they can stay for
           weeks. Apart from these counts, the parts of the database that we
           built hold no IP address.

@@ -58,11 +58,16 @@ export function Section11Waitlist() {
       <LegalP>
         Your entry holds no IP address (the number that identifies your internet
         connection), no browser, no device and no location. The waitlist pages
-        set no cookie. Apart from your entry, two counts stop abuse. The
-        waitlist pages count how often each IP address uses them. The form
-        counts how often one school address is sent in, and keeps that count
-        under a scrambled code, not the address. These counts can stay for
-        weeks.
+        set no cookie. Each time the waitlist page is opened by a browser that
+        is not signed in, we add one to a tally for that day and for the link
+        label, if the link had one. The tally holds no IP address, no browser,
+        no device and no cookie (<Sec to="3d">section 3d</Sec>). Apart from
+        your entry and that tally, three counts stop abuse. The waitlist pages
+        count how often each IP address uses them. The form counts how often
+        one school address is sent in, and keeps that count under a scrambled
+        code, not the address. The tally counts the opens from each network
+        under a scrambled code that changes every day, not the address. These
+        counts can stay for weeks.
       </LegalP>
       <LegalP>
         One more place could hold what you typed. Sentry is the service we use

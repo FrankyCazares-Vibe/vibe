@@ -80,7 +80,9 @@ export function Sections6To8() {
       <LegalP>
         Vibe does not delete things just because they are old. They stay until
         you, a club or we delete them. Only one thing is deleted on a schedule
-        today: waitlist entries (<Sec to="11">section 11</Sec>).
+        today: waitlist entries (<Sec to="11">section 11</Sec>). The page-open
+        tally (<Sec to="3d">section 3d</Sec>) is not deleted either. It holds
+        day totals and nothing about a person.
       </LegalP>
       <LegalTable
         head={["What", "Kept until"]}
