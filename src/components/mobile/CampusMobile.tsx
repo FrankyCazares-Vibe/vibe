@@ -196,8 +196,16 @@ export function CampusMobile() {
   // `?tab=chat` / `?channel=` to /messages; `false` is today's page.
   const chatV2 = useChatV2();
   const router = useRouter();
+  // The Chat tab shows only once the flag has answered `false` (the old
+  // chat), or, while it is still unknown, when the address itself asks for
+  // chat. It used to show until the flag answered, so everyone saw a Chat
+  // pill appear and vanish in the first half second (Oct 13, 2026).
+  const chatInOrder =
+    chatV2 === false ||
+    (chatV2 === null &&
+      (searchParams.get("tab") === "chat" || !!searchParams.get("channel")));
   const tabOrder =
-    chatV2 === true
+    !chatInOrder
       ? mapHidden
         ? CHAT_V2_VISITING_CLOSED_TAB_ORDER
         : CHAT_V2_TAB_ORDER
@@ -1005,7 +1013,7 @@ export function CampusMobile() {
             }
           />
         </section>
-        {chatV2 === true && tab !== "chat" ? null : (
+        {(chatV2 === true ? tab !== "chat" : !chatInOrder) ? null : (
           <section style={paneStyle}>
             {/* Keyed so a club joined on the Orgs tab remounts it, and it
                 reloads its own club list. Stays while visiting: it lists the
