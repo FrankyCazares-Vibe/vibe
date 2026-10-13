@@ -814,6 +814,25 @@ function PageWrap({
           key={`bar-${j}`}
           data-bar="1"
           aria-label={editing ? "Tap to remove bar" : undefined}
+          role={editing && onDeleteBar ? "button" : undefined}
+          tabIndex={editing && onDeleteBar ? 0 : undefined}
+          onKeyDown={
+            editing && onDeleteBar
+              ? (e) => {
+                  // The keyboard's way to the same removal a tap makes.
+                  if (e.key !== "Enter" && e.key !== " ") return;
+                  e.preventDefault();
+                  e.stopPropagation();
+                  if (
+                    typeof window !== "undefined" &&
+                    !window.confirm("Remove this bar?")
+                  ) {
+                    return;
+                  }
+                  onDeleteBar(j);
+                }
+              : undefined
+          }
           onClick={
             editing && onDeleteBar
               ? (e) => {

@@ -296,7 +296,7 @@
     <div class="vmm-msgs" id="vmmMsgs" style="display:none"></div>
     <div class="vmm-comp" id="vmmComp" style="display:none">
       <textarea id="vmmInput" rows="1" placeholder="Message…"></textarea>
-      <button class="vmm-send" id="vmmSend" disabled title="Send">
+      <button class="vmm-send" id="vmmSend" disabled title="Send" aria-label="Send">
         <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
           <path d="M13 1L1 6l5 2 2 5 5-12z" fill="white" stroke="white" stroke-width=".3"/>
         </svg>
@@ -631,7 +631,7 @@
     document.getElementById("vmmHdr").innerHTML = `
       <div class="vmm-hdr-title">Messages</div>
       <a class="vmm-hdr-link" href="/messages">Open</a>
-      <button class="vmm-hdr-x" type="button" onclick="window.closeMiniMessenger()">×</button>
+      <button class="vmm-hdr-x" type="button" onclick="window.closeMiniMessenger()" aria-label="Close">×</button>
     `;
     document.getElementById("vmmSearch").style.display = "";
     document.getElementById("vmmList").style.display = "";
@@ -771,13 +771,13 @@
       avatarHtml = `<div class="vmm-av" style="width:32px;height:32px;background:${avBg(state.peerInfo.handle || state.peerInfo.id)}">${esc(initialsOf(name))}</div>`;
     }
     document.getElementById("vmmHdr").innerHTML = `
-      <button class="vmm-hdr-back" type="button" id="vmmBack" title="Back to chats">
+      <button class="vmm-hdr-back" type="button" id="vmmBack" title="Back to chats" aria-label="Back to chats">
         <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M9 2L4 7l5 5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>
       </button>
       ${avatarHtml}
       <div class="vmm-hdr-title" style="font-size:13.5px;font-family:'DM Sans',system-ui,sans-serif;font-weight:700">${esc(name)}</div>
       <a class="vmm-hdr-link" href="/messages?to=${peer.handle ? encodeURIComponent(peer.handle) : ""}">Expand</a>
-      <button class="vmm-hdr-x" type="button" onclick="window.closeMiniMessenger()">×</button>
+      <button class="vmm-hdr-x" type="button" onclick="window.closeMiniMessenger()" aria-label="Close">×</button>
     `;
     document.getElementById("vmmBack").addEventListener("click", showListView);
     document.getElementById("vmmSearch").style.display = "none";

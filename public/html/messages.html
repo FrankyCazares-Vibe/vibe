@@ -1074,13 +1074,13 @@ input,textarea,[contenteditable="true"]{cursor:text!important;}
           <span class="cal-title">My Calendar</span>
           <span class="cal-event-count-badge" id="calEventCount">0</span>
         </button>
-        <button class="cal-toggle" onclick="toggleCalView()" id="calToggleBtn">&#8964;</button>
+        <button class="cal-toggle" onclick="toggleCalView()" id="calToggleBtn" aria-label="Show or hide calendar">&#8964;</button>
       </div>
       <div id="calBody">
         <div class="cal-month-nav">
-          <button class="cal-nav-btn" onclick="changeMonth(-1)">&#8249;</button>
+          <button class="cal-nav-btn" onclick="changeMonth(-1)" aria-label="Previous month">&#8249;</button>
           <span class="cal-month-label" id="calMonthLabel"></span>
-          <button class="cal-nav-btn" onclick="changeMonth(1)">&#8250;</button>
+          <button class="cal-nav-btn" onclick="changeMonth(1)" aria-label="Next month">&#8250;</button>
         </div>
         <div class="cal-grid" id="calGrid"></div>
         <div class="cal-events-panel" id="calEventsPanel">
@@ -1145,15 +1145,15 @@ input,textarea,[contenteditable="true"]{cursor:text!important;}
         <div><div class="c-name" id="cName"></div><div class="c-status" id="cStatus"></div></div>
         <a href="/profile" class="vibe-pill" id="cPill" style="display:none"><div class="vp-thumb"><div id="cPillBg" style="width:100%;height:100%"></div></div><div><div class="vp-label" id="cPillLabel"></div><div class="vp-sub">Latest Vibe</div></div></a>
         <div class="c-actions">
-          <button class="c-btn" onclick="window.__vibeTopNav('/profile')"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="7" cy="5" r="3" stroke="currentColor" stroke-width="1.3"/><path d="M1 13c0-3.314 2.686-5 6-5s6 1.686 6 5" stroke="currentColor" stroke-width="1.3" fill="none" stroke-linecap="round"/></svg></button>
-          <button class="c-btn" onclick="__dmPanelOpen()"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="7" cy="2.5" r="1.2" fill="currentColor"/><circle cx="7" cy="7" r="1.2" fill="currentColor"/><circle cx="7" cy="11.5" r="1.2" fill="currentColor"/></svg></button>
+          <button class="c-btn" onclick="window.__vibeTopNav('/profile')" aria-label="Open profile"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="7" cy="5" r="3" stroke="currentColor" stroke-width="1.3"/><path d="M1 13c0-3.314 2.686-5 6-5s6 1.686 6 5" stroke="currentColor" stroke-width="1.3" fill="none" stroke-linecap="round"/></svg></button>
+          <button class="c-btn" onclick="__dmPanelOpen()" aria-label="Chat info"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="7" cy="2.5" r="1.2" fill="currentColor"/><circle cx="7" cy="7" r="1.2" fill="currentColor"/><circle cx="7" cy="11.5" r="1.2" fill="currentColor"/></svg></button>
           <button class="c-btn" id="cPinsBtn" style="display:none" aria-label="Pinned and shared" aria-pressed="false"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="1.5" y="2.5" width="11" height="9" rx="2" stroke="currentColor" stroke-width="1.3"/><path d="M8.8 2.5v9" stroke="currentColor" stroke-width="1.3"/></svg></button>
         </div>
       </div>
       <aside class="c-panel" id="cPanel">
         <div class="cp-hdr">
           <div class="cp-title" id="cpTitle">Chat info</div>
-          <button class="cp-x" onclick="__dmPanelClose()">×</button>
+          <button class="cp-x" onclick="__dmPanelClose()" aria-label="Close">×</button>
         </div>
         <div class="cp-body" id="cpBody">
           <!-- Filled dynamically by __dmPanelRender() -->
@@ -1165,12 +1165,12 @@ input,textarea,[contenteditable="true"]{cursor:text!important;}
       <div class="comp" id="compBox">
         <div class="comp-staged" id="compStaged" style="display:none"></div>
         <div class="comp-inner">
-        <button class="comp-attach-btn" type="button" onclick="document.getElementById('compMediaInput').click()" title="Attach photo or video">
+        <button class="comp-attach-btn" type="button" onclick="document.getElementById('compMediaInput').click()" title="Attach photo or video" aria-label="Attach photo or video">
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M13 7.5L8 12.5C6.343 14.157 3.657 14.157 2 12.5S1 8.157 2.657 6.5L8 1l4 4L6.5 10.5C5.672 11.328 4.328 11.328 3.5 10.5s-.828-2.172 0-3L9 2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" fill="none"/></svg>
         </button>
         <input type="file" id="compMediaInput" accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,video/quicktime,video/webm" style="display:none" onchange="__dmComposeMediaChosen(event)">
         <textarea class="comp-txt" id="msgIn" placeholder="Message…" rows="1" oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,110)+'px';upd()" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();snd();}"></textarea>
-        <button class="snd-btn" id="sndBtn" onclick="snd()" disabled><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M13 1L1 6l5 2 2 5 5-12z" fill="white" stroke="white" stroke-width=".3" stroke-linejoin="round"/></svg></button>
+        <button class="snd-btn" id="sndBtn" onclick="snd()" disabled aria-label="Send"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M13 1L1 6l5 2 2 5 5-12z" fill="white" stroke="white" stroke-width=".3" stroke-linejoin="round"/></svg></button>
       </div>
       <div class="comp-quiet" id="compQuiet" role="note"></div>
       </div>
@@ -1823,7 +1823,7 @@ function miniSelectDay(year,month,day){
         list=document.getElementById('calEventsList'),title=document.getElementById('calPanelTitle');
   title.textContent=new Date(year,month,day).toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'});
   if(!evts.length){list.innerHTML=`<div class="cal-empty">No events </div>`;}
-  else{list.innerHTML=evts.map(e=>`<div class="cal-event-item"><div class="cal-event-dot" style="background:${e.color}"></div><div class="cal-event-info"><div class="cal-event-name">${e.name}</div><div class="cal-event-time">${fmtTime(e.time)}${e.location?' &middot; '+e.location:''}</div></div><button onclick="removeCalEvent('${key}','${e.name}')" style="background:none;border:none;color:var(--muted);cursor:none;font-size:14px;padding:2px 4px;border-radius:5px;transition:color .15s" onmouseover="this.style.color='var(--tag-ink)'" onmouseout="this.style.color='var(--muted)'">&times;</button></div>`).join('');}
+  else{list.innerHTML=evts.map(e=>`<div class="cal-event-item"><div class="cal-event-dot" style="background:${e.color}"></div><div class="cal-event-info"><div class="cal-event-name">${e.name}</div><div class="cal-event-time">${fmtTime(e.time)}${e.location?' &middot; '+e.location:''}</div></div><button aria-label="Remove event" onclick="removeCalEvent('${key}','${e.name}')" style="background:none;border:none;color:var(--muted);cursor:none;font-size:14px;padding:2px 4px;border-radius:5px;transition:color .15s" onmouseover="this.style.color='var(--tag-ink)'" onmouseout="this.style.color='var(--muted)'">&times;</button></div>`).join('');}
   panel.classList.add('open');
 }
 function removeCalEvent(key,name){
@@ -1873,7 +1873,7 @@ function renderModalSidebar(){
   dateEl.textContent=dateObj.toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'});
   const evts=calendarEvents[modalSelectedKey]||[];
   if(!evts.length){listEl.innerHTML=noEvtHTML+`No events yet</div>`;}
-  else{listEl.innerHTML=evts.map(e=>`<div class="cal-modal-event-card"><div class="cal-modal-event-bar" style="background:${e.color}"></div><div class="cal-modal-event-body"><div class="cal-modal-event-name">${e.name}</div><div class="cal-modal-event-meta">${e.time?fmtTime(e.time)+'<br>':''}${e.location?'&#128205; '+e.location+'<br>':''}${e.notes?'&#128221; '+e.notes:''}</div></div><button class="cal-modal-event-del" onclick="removeCalEvent('${modalSelectedKey}','${e.name}')">&times;</button></div>`).join('');}
+  else{listEl.innerHTML=evts.map(e=>`<div class="cal-modal-event-card"><div class="cal-modal-event-bar" style="background:${e.color}"></div><div class="cal-modal-event-body"><div class="cal-modal-event-name">${e.name}</div><div class="cal-modal-event-meta">${e.time?fmtTime(e.time)+'<br>':''}${e.location?'&#128205; '+e.location+'<br>':''}${e.notes?'&#128221; '+e.notes:''}</div></div><button class="cal-modal-event-del" onclick="removeCalEvent('${modalSelectedKey}','${e.name}')" aria-label="Remove event">&times;</button></div>`).join('');}
 }
 
 // No create-event form on this page. The "+ Add another event" button
@@ -3022,7 +3022,7 @@ function __dmComposeMediaRenderStaged() {
           '<div class="comp-progress"><div class="comp-progress-bar" id="compStagedProgressBar"></div></div>' +
         '</div>' +
       '</div>' +
-      '<button class="comp-staged-x" type="button" onclick="__dmComposeMediaClear()" title="Remove">×</button>' +
+      '<button class="comp-staged-x" type="button" onclick="__dmComposeMediaClear()" title="Remove" aria-label="Remove attachment">×</button>' +
     '</div>';
 }
 
@@ -3145,7 +3145,7 @@ function __dmComposeRenderSelected() {
     return '<span class="compose-chip">' +
       '<span class="compose-chip-av" style="background:' + __dmAvBg(u.handle || u.id || u.name) + '">' + av + '</span>' +
       __dmEsc(u.name || ('@' + u.handle)) +
-      '<button class="compose-chip-x" onclick="__dmComposeRemove(' + JSON.stringify(u.id || '').replace(/"/g, '&quot;') + ')">×</button>' +
+      '<button class="compose-chip-x" aria-label="Remove" onclick="__dmComposeRemove(' + JSON.stringify(u.id || '').replace(/"/g, '&quot;') + ')">×</button>' +
     '</span>';
   }).join('');
 }
@@ -3300,7 +3300,7 @@ function __dmPanelRender() {
       inner = __dmEsc(d.av);
     }
     const editBtn = d.isGroup && !clubRoom
-      ? '<button class="cp-photo-edit" title="Change photo" onclick="document.getElementById(\'cPanelPhotoInput\').click()">+</button>'
+      ? '<button class="cp-photo-edit" title="Change photo" aria-label="Change photo" onclick="document.getElementById(\'cPanelPhotoInput\').click()">+</button>'
       : '';
     return '<div class="cp-photo" style="background:' + d.bg + '">' + inner + editBtn + '</div>';
   })();
@@ -3523,7 +3523,7 @@ function __dmPickMuteDuration(name, labels, noteHtml) {
           ? '<div style="background:var(--note-wash);border:1px solid rgba(255,92,53,.18);border-radius:10px;padding:10px 12px;margin-bottom:12px;font-size:12px;color:var(--charcoal);line-height:1.5;">ℹ️ ' + noteHtml + '</div>'
           : '<p class="vsa-note" style="margin-bottom:12px">No unread badge or notification ping for messages in this chat. Messages still arrive.</p>';
         card.innerHTML =
-          '<div class="vsa-hdr"><div class="vsa-title">Mute ' + __dmEsc(name) + '</div><button class="vsa-x" type="button" onclick="window.__vsaCloseSheet();window.__vsaResolveMute && window.__vsaResolveMute(null);">×</button></div>' +
+          '<div class="vsa-hdr"><div class="vsa-title">Mute ' + __dmEsc(name) + '</div><button class="vsa-x" type="button" onclick="window.__vsaCloseSheet();window.__vsaResolveMute && window.__vsaResolveMute(null);" aria-label="Close">×</button></div>' +
           '<div class="vsa-body">' +
             note +
             labels.map(l => '<button class="vsa-row" data-h="' + l.hours + '">' + __dmEsc(l.label) + '</button>').join('') +
@@ -4337,7 +4337,7 @@ if (IS_PANE) {
   <div class="compose-card">
     <div class="compose-hdr">
       <div class="compose-title" id="composeTitle">New message</div>
-      <button class="compose-x" onclick="__dmComposeClose()">×</button>
+      <button class="compose-x" onclick="__dmComposeClose()" aria-label="Close">×</button>
     </div>
     <div class="compose-tabs" id="composeTabs">
       <button class="compose-tab active" id="composeTabDirect" onclick="__dmComposeSwitchMode('direct')">Direct</button>
@@ -4365,12 +4365,12 @@ if (IS_PANE) {
       <div class="cal-modal-header">
         <div class="cal-modal-title">My Calendar</div>
         <div class="cal-modal-month-nav">
-          <button class="cal-modal-nav-btn" onclick="modalChangeMonth(-1)">&#8249;</button>
+          <button class="cal-modal-nav-btn" onclick="modalChangeMonth(-1)" aria-label="Previous month">&#8249;</button>
           <span class="cal-modal-month-label" id="modalMonthLabel"></span>
-          <button class="cal-modal-nav-btn" onclick="modalChangeMonth(1)">&#8250;</button>
+          <button class="cal-modal-nav-btn" onclick="modalChangeMonth(1)" aria-label="Next month">&#8250;</button>
         </div>
         <div class="cal-modal-header-actions">
-          <button class="cal-modal-close" onclick="closeCalModal()">&#215;</button>
+          <button class="cal-modal-close" onclick="closeCalModal()" aria-label="Close">&#215;</button>
         </div>
       </div>
       <div class="cal-modal-body">

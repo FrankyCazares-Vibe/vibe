@@ -3357,7 +3357,7 @@ body.empty-profile-mode #profileEmpty { display: flex !important; }
   <!-- Right: calendar + messages + actions -->
   <div class="nav-right" style="margin-left:auto;">
     <!-- Calendar icon -->
-    <button class="nav-msg-btn" onclick="openCalModal()" title="Calendar" style="position:relative;">
+    <button class="nav-msg-btn" onclick="openCalModal()" title="Calendar" aria-label="Calendar" style="position:relative;">
       <svg width="17" height="17" viewBox="0 0 17 17" fill="none">
         <rect x="1" y="2.5" width="15" height="13" rx="2.5" stroke="currentColor" stroke-width="1.4" fill="none"/>
         <path d="M1 7h15" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
@@ -3369,7 +3369,7 @@ body.empty-profile-mode #profileEmpty { display: flex !important; }
     </button>
     <!-- Messages icon. The unread dot comes only from _miniMessenger's
          paintBadge (it targets data-messages-badge), never from markup. -->
-    <button class="nav-msg-btn" data-messages-badge onclick="toggleMessenger()" title="Messages">
+    <button class="nav-msg-btn" data-messages-badge onclick="toggleMessenger()" title="Messages" aria-label="Messages">
       <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
         <path d="M9 1C4.58 1 1 4.36 1 8.5c0 2.18 1 4.14 2.6 5.52L3 17l3.42-1.72C7.23 15.72 8.1 15.9 9 15.9c4.42 0 8-3.36 8-7.4C17 4.36 13.42 1 9 1z" stroke="currentColor" stroke-width="1.4" fill="none" stroke-linejoin="round"/>
         <path d="M5 8.5h.01M9 8.5h.01M13 8.5h.01" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
@@ -3513,7 +3513,7 @@ body.empty-profile-mode #profileEmpty { display: flex !important; }
         <!-- Safety actions: Block / Mute / Report. Visible only in
              viewer-mode (someone else's profile). -->
         <div style="position:relative">
-          <button class="action-btn" id="vibeMoreBtn" onclick="toggleVibeMoreMenu(event)" title="More" style="padding:8px 10px;line-height:1;font-size:18px;background:none;border:1.5px solid var(--border);">⋯</button>
+          <button class="action-btn" id="vibeMoreBtn" onclick="toggleVibeMoreMenu(event)" title="More" aria-label="More" style="padding:8px 10px;line-height:1;font-size:18px;background:none;border:1.5px solid var(--border);">⋯</button>
           <div id="vibeMoreMenu" class="vibe-more-menu" style="display:none;position:absolute;top:100%;right:0;margin-top:6px;background:var(--paper);border:1px solid var(--border);border-radius:12px;box-shadow:0 12px 36px rgba(0,0,0,.12);min-width:200px;overflow:hidden;z-index:50;">
             <!-- Items rendered dynamically by paintVibeMoreMenu() -->
           </div>
@@ -3776,7 +3776,7 @@ body.empty-profile-mode #profileEmpty { display: flex !important; }
           <input type="file" id="composerPostImage" accept="image/jpeg,image/png,image/webp,image/gif" hidden onchange="composerOnImagePicked(this)">
           <div id="composerPostImagePreview" style="display:none;position:relative;margin-top:10px;border-radius:12px;overflow:hidden;max-width:240px;">
             <img id="composerPostImageImg" alt="" style="display:block;width:100%;height:auto;">
-            <button type="button" onclick="composerClearImage()" title="Remove image"
+            <button type="button" onclick="composerClearImage()" title="Remove image" aria-label="Remove image"
               style="position:absolute;top:6px;right:6px;background:rgba(0,0,0,.65);color:white;border:none;border-radius:999px;width:24px;height:24px;font-size:14px;line-height:1;cursor:none;">&times;</button>
           </div>
           <div class="composer-btns">
@@ -3913,7 +3913,7 @@ body.empty-profile-mode #profileEmpty { display: flex !important; }
 <!-- Resume / Portfolio viewer -->
 <div class="modal-backdrop" id="docModal">
   <div class="modal" style="padding:16px 18px 16px;">
-    <button class="modal-close" onclick="closeModal('docModal')">×</button>
+    <button class="modal-close" onclick="closeModal('docModal')" aria-label="Close">×</button>
     <div class="modal-title" style="margin-bottom:10px;font-size:18px;flex-shrink:0">Resume / Portfolio</div>
     <div class="doc-viewer-grid">
       <div class="doc-thumb-panel">
@@ -3983,7 +3983,7 @@ body.empty-profile-mode #profileEmpty { display: flex !important; }
 <!-- Gradient cover modal -->
 <div class="modal-backdrop" id="gradientModal">
   <div class="modal" style="width:420px">
-    <button class="modal-close" onclick="closeModal('gradientModal')">×</button>
+    <button class="modal-close" onclick="closeModal('gradientModal')" aria-label="Close">×</button>
     <div class="modal-title">Choose a cover</div>
     <div class="form-group">
       <label class="form-label">Upload your own</label>
@@ -4009,7 +4009,7 @@ body.empty-profile-mode #profileEmpty { display: flex !important; }
 <!-- Skill add modal -->
 <div class="modal-backdrop" id="skillModal">
   <div class="modal" style="width:360px">
-    <button class="modal-close" onclick="closeModal('skillModal')">×</button>
+    <button class="modal-close" onclick="closeModal('skillModal')" aria-label="Close">×</button>
     <div class="modal-title">Add a skill</div>
     <div class="form-group">
       <label class="form-label">Skill name</label>
@@ -4026,7 +4026,7 @@ body.empty-profile-mode #profileEmpty { display: flex !important; }
 </div>
 <div class="modal-backdrop" id="workModal">
   <div class="modal">
-    <button class="modal-close" onclick="closeModal('workModal')">×</button>
+    <button class="modal-close" onclick="closeModal('workModal')" aria-label="Close">×</button>
     <div class="modal-title">Add experience</div>
     <div class="form-group">
       <label class="form-label">Job title</label>
@@ -4081,7 +4081,7 @@ body.empty-profile-mode #profileEmpty { display: flex !important; }
 <!-- Add current interest modal -->
 <div class="modal-backdrop" id="currentModal">
   <div class="modal">
-    <button class="modal-close" onclick="closeModal('currentModal')">×</button>
+    <button class="modal-close" onclick="closeModal('currentModal')" aria-label="Close">×</button>
     <div class="modal-title">What are you into?</div>
     <div class="form-group">
       <label class="form-label">Pick an icon</label>
@@ -4102,7 +4102,7 @@ body.empty-profile-mode #profileEmpty { display: flex !important; }
 <!-- Tag add modal -->
 <div class="modal-backdrop" id="tagModal">
   <div class="modal" style="width:360px">
-    <button class="modal-close" onclick="closeModal('tagModal')">×</button>
+    <button class="modal-close" onclick="closeModal('tagModal')" aria-label="Close">×</button>
     <div class="modal-title">Add a vibe tag</div>
     <div class="form-group">
       <label class="form-label">Tag text</label>
@@ -4713,7 +4713,7 @@ function saveTag(){
   const addBtn = tags.querySelector('.tag-add');
   const span = document.createElement('span');
   span.className=`vibe-tag ${color}`;
-  span.innerHTML=`${text} <button class="tag-remove" onclick="removeTag(this)">×</button>`;
+  span.innerHTML=`${text} <button class="tag-remove" onclick="removeTag(this)" aria-label="Remove tag">×</button>`;
   tags.insertBefore(span, addBtn);
   document.getElementById('tag-text').value='';
   closeModal('tagModal');
@@ -4746,7 +4746,7 @@ function saveSkillModal(){
   const wrap = document.getElementById('skillsWrap');
   const pill = document.createElement('span');
   pill.className='skill-pill';
-  pill.innerHTML=`${name} <button class="skill-remove" onclick="removeSkill(this)">×</button>`;
+  pill.innerHTML=`${name} <button class="skill-remove" onclick="removeSkill(this)" aria-label="Remove skill">×</button>`;
   wrap.appendChild(pill);
   closeModal('skillModal');
   showToast('Skill added');
@@ -4942,7 +4942,7 @@ function saveWork(){
       </div>
       ${desc?`<div class="work-desc" data-edit="true" contenteditable="${editMode}">${desc}</div>`:''}
     </div>
-    <button class="work-delete" onclick="deleteWork(this)">×</button>
+    <button class="work-delete" onclick="deleteWork(this)" aria-label="Remove experience">×</button>
   `;
   if (pendingWorkLogo) {
     const def = item.querySelector('.work-logo-default');
@@ -4986,7 +4986,7 @@ function saveCurrent(){
   const list = document.getElementById('currentList');
   const item = document.createElement('div');
   item.className='current-item';
-  item.innerHTML=`${_DRAG_HANDLE_HTML}<span class="current-icon-wrap" onclick="triggerCurrentLogoUpload(this)"><span class="current-icon">${selectedCurrentIcon}</span><input type="file" accept="image/*" class="current-logo-input" onchange="applyCurrentLogoFromInput(this)" style="display:none"></span><span data-edit="true" contenteditable="${editMode}">${text}</span><button class="current-delete" onclick="deleteCurrent(this)">×</button>`;
+  item.innerHTML=`${_DRAG_HANDLE_HTML}<span class="current-icon-wrap" onclick="triggerCurrentLogoUpload(this)"><span class="current-icon">${selectedCurrentIcon}</span><input type="file" accept="image/*" class="current-logo-input" onchange="applyCurrentLogoFromInput(this)" style="display:none"></span><span data-edit="true" contenteditable="${editMode}">${text}</span><button class="current-delete" onclick="deleteCurrent(this)" aria-label="Remove">×</button>`;
   list.appendChild(item);
   document.getElementById('c-text').value='';
   closeModal('currentModal');
@@ -5551,6 +5551,7 @@ function renderRedactionBars() {
       del.className = 'redaction-delete';
       del.textContent = '×';
       del.title = 'Delete bar';
+      del.setAttribute('aria-label', 'Delete bar');
       del.addEventListener('pointerdown', (ev) => ev.stopPropagation());
       del.addEventListener('click', (ev) => {
         ev.stopPropagation();
@@ -7364,7 +7365,7 @@ function renderProfSR(r, isRecent) {
   // onclick doesn't also fire.
   var removeBtn = '';
   if (isRecent && r.handle) {
-    removeBtn = '<button class="sr-remove" title="Remove from recent" '
+    removeBtn = '<button class="sr-remove" title="Remove from recent" aria-label="Remove from recent" '
       + 'onclick="event.stopPropagation();removeRecentSearch(\'' + _esc(r.handle).replace(/\'/g, '&#39;') + '\')">×</button>';
   }
   // The pill does what it says. It used to be a bare <button>, so every
@@ -7486,7 +7487,7 @@ function miniSelectDay(year,month,day){
         list=document.getElementById('calEventsList'),title=document.getElementById('calPanelTitle');
   title.textContent=new Date(year,month,day).toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'});
   if(!evts.length){list.innerHTML=`<div class="cal-empty">No events &mdash; <button onclick="openCreateEventForKey('${key}')" style="background:none;border:none;color:var(--tag-ink);cursor:none;font-size:11px;font-weight:700;padding:0">+ Add</button></div>`;}
-  else{list.innerHTML=evts.map(e=>`<div class="cal-event-item"><div class="cal-event-dot" style="background:${e.color}"></div><div class="cal-event-info"><div class="cal-event-name">${e.name}</div><div class="cal-event-time">${fmtTime(e.time)}${e.location?' &middot; '+e.location:''}</div></div><button onclick="removeCalEvent('${key}','${e.name}')" style="background:none;border:none;color:var(--muted);cursor:none;font-size:14px;padding:2px 4px;border-radius:5px;transition:color .15s" onmouseover="this.style.color='var(--tag-ink)'" onmouseout="this.style.color='var(--muted)'">&times;</button></div>`).join('');}
+  else{list.innerHTML=evts.map(e=>`<div class="cal-event-item"><div class="cal-event-dot" style="background:${e.color}"></div><div class="cal-event-info"><div class="cal-event-name">${e.name}</div><div class="cal-event-time">${fmtTime(e.time)}${e.location?' &middot; '+e.location:''}</div></div><button aria-label="Remove event" onclick="removeCalEvent('${key}','${e.name}')" style="background:none;border:none;color:var(--muted);cursor:none;font-size:14px;padding:2px 4px;border-radius:5px;transition:color .15s" onmouseover="this.style.color='var(--tag-ink)'" onmouseout="this.style.color='var(--muted)'">&times;</button></div>`).join('');}
   panel.classList.add('open');
 }
 function removeCalEvent(key,name){
@@ -7541,7 +7542,7 @@ function renderModalSidebar(){
   dateEl.textContent=dateObj.toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'});
   const evts=calendarEvents[modalSelectedKey]||[];
   if(!evts.length){listEl.innerHTML=noEvtHTML+`No events yet<br><button onclick="openCreateEventForKey('${modalSelectedKey}')" style="background:none;border:none;color:var(--tag-ink);cursor:none;font-size:13px;font-weight:700;margin-top:8px;padding:0">+ Add an event</button></div>`;}
-  else{listEl.innerHTML=evts.map(e=>`<div class="cal-modal-event-card"><div class="cal-modal-event-bar" style="background:${e.color}"></div><div class="cal-modal-event-body"><div class="cal-modal-event-name">${e.name}</div><div class="cal-modal-event-meta">${e.time?fmtTime(e.time)+'<br>':''}${e.location?'&#128205; '+e.location+'<br>':''}${e.notes?'&#128221; '+e.notes:''}</div></div><button class="cal-modal-event-del" onclick="removeCalEvent('${modalSelectedKey}','${e.name}')">&times;</button></div>`).join('')+`<button onclick="openCreateEventForKey('${modalSelectedKey}')" style="width:100%;margin-top:8px;padding:10px;border-radius:12px;border:1.5px dashed var(--border);background:none;color:var(--muted);font-family:'DM Sans',sans-serif;font-size:12px;font-weight:700;cursor:none;transition:all .15s" onmouseover="this.style.borderColor='var(--accent)';this.style.color='var(--tag-ink)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--muted)'">+ Add another event</button>`;}
+  else{listEl.innerHTML=evts.map(e=>`<div class="cal-modal-event-card"><div class="cal-modal-event-bar" style="background:${e.color}"></div><div class="cal-modal-event-body"><div class="cal-modal-event-name">${e.name}</div><div class="cal-modal-event-meta">${e.time?fmtTime(e.time)+'<br>':''}${e.location?'&#128205; '+e.location+'<br>':''}${e.notes?'&#128221; '+e.notes:''}</div></div><button class="cal-modal-event-del" onclick="removeCalEvent('${modalSelectedKey}','${e.name}')" aria-label="Remove event">&times;</button></div>`).join('')+`<button onclick="openCreateEventForKey('${modalSelectedKey}')" style="width:100%;margin-top:8px;padding:10px;border-radius:12px;border:1.5px dashed var(--border);background:none;color:var(--muted);font-family:'DM Sans',sans-serif;font-size:12px;font-weight:700;cursor:none;transition:all .15s" onmouseover="this.style.borderColor='var(--accent)';this.style.color='var(--tag-ink)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--muted)'">+ Add another event</button>`;}
 }
 
 // CREATE EVENT
@@ -10142,7 +10143,7 @@ function _renderPostCard(p) {
   if (removed) card.dataset.postRemoved = '1';
   const deleteBtn = removed
     ? ''
-    : `<button class="ppost-delete owner-only" onclick="deleteProfilePost(this)" title="Delete post">&times;</button>`;
+    : `<button class="ppost-delete owner-only" onclick="deleteProfilePost(this)" title="Delete post" aria-label="Delete post">&times;</button>`;
   const headerExtras = p.ottoBadgeHTML || '';
   const tagsBlock = p.tagsHTML ? `<div class="ppost-tags">${p.tagsHTML}</div>` : '';
   const platformBlock = p.platformStatsHTML ? `<div class="op-platform-stats">${p.platformStatsHTML}</div>` : '';
@@ -10323,7 +10324,7 @@ function renderUserSections(user, opts) {
       user.vibeTags.forEach(t => {
         const span = document.createElement('span');
         span.className = `vibe-tag ${t.color || 'coral'}`;
-        span.innerHTML = `${_esc(t.label)} <button class="tag-remove" onclick="removeTag(this)">&times;</button>`;
+        span.innerHTML = `${_esc(t.label)} <button class="tag-remove" onclick="removeTag(this)" aria-label="Remove tag">&times;</button>`;
         if (addBtn) wrap.insertBefore(span, addBtn); else wrap.appendChild(span);
       });
     }
@@ -10335,7 +10336,7 @@ function renderUserSections(user, opts) {
       user.skills.forEach(s => {
         const pill = document.createElement('span');
         pill.className = 'skill-pill';
-        pill.innerHTML = `${_esc(s)} <button class="skill-remove" onclick="removeSkill(this)">&times;</button>`;
+        pill.innerHTML = `${_esc(s)} <button class="skill-remove" onclick="removeSkill(this)" aria-label="Remove skill">&times;</button>`;
         wrap.appendChild(pill);
       });
     }
@@ -10356,7 +10357,7 @@ function renderUserSections(user, opts) {
         const iconHtml = hasLogo
           ? `<img class="current-icon current-icon-img" src="${_esc(c.logoUrl)}" data-logo-url="${_esc(c.logoUrl)}" alt="" style="width:20px;height:20px;border-radius:999px;object-fit:cover;display:inline-block;vertical-align:middle;">`
           : `<span class="current-icon">${_esc(c.icon || '📱')}</span>`;
-        item.innerHTML = `${_DRAG_HANDLE_HTML}<span class="current-icon-wrap" onclick="triggerCurrentLogoUpload(this)">${iconHtml}<input type="file" accept="image/*" class="current-logo-input" onchange="applyCurrentLogoFromInput(this)" style="display:none"></span><span data-edit="true" contenteditable="${editMode}">${_esc(c.text)}</span><button class="current-delete" onclick="deleteCurrent(this)">&times;</button>`;
+        item.innerHTML = `${_DRAG_HANDLE_HTML}<span class="current-icon-wrap" onclick="triggerCurrentLogoUpload(this)">${iconHtml}<input type="file" accept="image/*" class="current-logo-input" onchange="applyCurrentLogoFromInput(this)" style="display:none"></span><span data-edit="true" contenteditable="${editMode}">${_esc(c.text)}</span><button class="current-delete" onclick="deleteCurrent(this)" aria-label="Remove">&times;</button>`;
         list.appendChild(item);
       });
     }
@@ -10395,7 +10396,7 @@ function renderUserSections(user, opts) {
             </div>
             ${w.description ? `<div class="work-desc" data-edit="true" contenteditable="${editMode}">${_esc(w.description)}</div>` : ''}
           </div>
-          <button class="work-delete" onclick="deleteWork(this)">&times;</button>
+          <button class="work-delete" onclick="deleteWork(this)" aria-label="Remove experience">&times;</button>
         `;
         list.appendChild(item);
       });
@@ -10557,7 +10558,7 @@ function showWelcomeBanner() {
         <div style="font-family:'Fraunces',serif;font-size:15px;font-weight:800;color:white;letter-spacing:-.2px;">welcome — let's fill this in</div>
         <div style="font-size:12px;color:rgba(255,255,255,.6);margin-top:2px;font-family:'DM Sans',sans-serif;">click any field to edit. otto's already set up and watching.</div>
       </div>
-      <button onclick="this.parentElement.parentElement.remove()" style="background:none;border:none;color:rgba(255,255,255,.5);cursor:none;font-size:18px;padding:6px 10px;line-height:1;font-family:'DM Sans',sans-serif;">×</button>
+      <button aria-label="Close" onclick="this.parentElement.parentElement.remove()" style="background:none;border:none;color:rgba(255,255,255,.5);cursor:none;font-size:18px;padding:6px 10px;line-height:1;font-family:'DM Sans',sans-serif;">×</button>
     </div>
   `;
   // Dark chrome in both themes: the copy inside is white-alpha literals.
@@ -10592,16 +10593,16 @@ function showWelcomeBanner() {
       <div class="cal-modal-header">
         <div class="cal-modal-title">My Calendar</div>
         <div class="cal-modal-month-nav">
-          <button class="cal-modal-nav-btn" onclick="modalChangeMonth(-1)">&#8249;</button>
+          <button class="cal-modal-nav-btn" onclick="modalChangeMonth(-1)" aria-label="Previous month">&#8249;</button>
           <span class="cal-modal-month-label" id="modalMonthLabel"></span>
-          <button class="cal-modal-nav-btn" onclick="modalChangeMonth(1)">&#8250;</button>
+          <button class="cal-modal-nav-btn" onclick="modalChangeMonth(1)" aria-label="Next month">&#8250;</button>
         </div>
         <div class="cal-modal-header-actions">
           <button class="cal-modal-add-btn" onclick="openCreateEvent()">
             <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M6.5 1v11M1 6.5h11" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
             New Event
           </button>
-          <button class="cal-modal-close" onclick="closeCalModal()">&#215;</button>
+          <button class="cal-modal-close" onclick="closeCalModal()" aria-label="Close">&#215;</button>
         </div>
       </div>
       <div class="cal-modal-body">
@@ -10630,7 +10631,7 @@ function showWelcomeBanner() {
   <div class="create-event-box">
     <div class="create-event-hdr">
       <h3>New Event</h3>
-      <button class="cal-modal-close" onclick="closeCreateEvent()">&#215;</button>
+      <button class="cal-modal-close" onclick="closeCreateEvent()" aria-label="Close">&#215;</button>
     </div>
     <div class="create-event-body">
       <div class="form-field">

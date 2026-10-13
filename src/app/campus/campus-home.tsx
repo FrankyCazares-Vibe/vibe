@@ -6126,6 +6126,7 @@ function PersonRow(props: {
             props.onRemove?.();
           }}
           title="Remove from recent"
+          aria-label="Remove from recent"
           style={{
             width: 22,
             height: 22,
@@ -12344,8 +12345,8 @@ function OrgsTabBody({ onCreateOrg }: { onCreateOrg: () => void }) {
                   title="Verified"
                   hint={
                     shownLabel
-                      ? `Officially recognized clubs at ${shownLabel}.`
-                      : "Officially recognized clubs."
+                      ? `Clubs verified by Vibe at ${shownLabel}.`
+                      : "Clubs verified by Vibe."
                   }
                   orgs={verifiedOrgs}
                   {...groupProps}
@@ -15388,6 +15389,7 @@ function ServerRail({
       <button
         type="button"
         title="Create a new org"
+        aria-label="Create a new org"
         onClick={onCreateOrg}
         style={{
           width: 44,
@@ -15618,6 +15620,7 @@ function ChannelRow({
         <button
           type="button"
           title="Channel settings"
+          aria-label="Channel settings"
           onClick={(e) => {
             e.stopPropagation();
             onSettings();

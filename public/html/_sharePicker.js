@@ -69,7 +69,7 @@
     <div class="vsp-card" onclick="event.stopPropagation()">
       <div class="vsp-hdr">
         <div class="vsp-title">Send to</div>
-        <button class="vsp-x" type="button" onclick="window.closeSharePicker()">×</button>
+        <button class="vsp-x" type="button" onclick="window.closeSharePicker()" aria-label="Close">×</button>
       </div>
       <div class="vsp-preview" id="vspPreview"></div>
       <div class="vsp-search"><input id="vspSearch" type="text" placeholder="Search threads…" autocomplete="off"></div>

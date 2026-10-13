@@ -232,7 +232,7 @@
     openSheet(`
       <div class="vsa-hdr">
         <div class="vsa-title">Mute ${esc(name)}</div>
-        <button class="vsa-x" type="button" onclick="window.__vsaCloseSheet()">×</button>
+        <button class="vsa-x" type="button" onclick="window.__vsaCloseSheet()" aria-label="Close">×</button>
       </div>
       <div class="vsa-body">
         <p class="vsa-note" style="margin-bottom:12px">You won't see their posts in your feed or get notifications from them. They won't know.</p>
@@ -374,7 +374,7 @@
       openSheet(`
         <div class="vsa-hdr">
           <div class="vsa-title">Report ${esc(reportHeadingNoun(targetType))}</div>
-          <button class="vsa-x" type="button" onclick="window.__vsaCloseSheet()">×</button>
+          <button class="vsa-x" type="button" onclick="window.__vsaCloseSheet()" aria-label="Close">×</button>
         </div>
         <div class="vsa-body">
           <p class="vsa-note" style="margin-bottom:10px">Reports go to Vibe admins only. The person you're reporting won't see this.</p>

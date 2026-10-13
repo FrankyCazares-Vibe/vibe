@@ -434,21 +434,23 @@
         <div class="vpv-removed" id="vpvRemoved" style="display:none"></div>
         <div class="vpv-body" id="vpvBody"></div>
         <div class="vpv-actions">
-          <button class="vpv-act" id="vpvLike" onclick="window.__vpvToggleLike()">
+          <button class="vpv-act" id="vpvLike" onclick="window.__vpvToggleLike()" aria-labelledby="vpvLikeLbl vpvLikeCount">
+            <span id="vpvLikeLbl" style="display:none">Likes:</span>
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
               <path class="vpv-heart" d="M8 13.5s-5-3.2-5-7a3 3 0 0 1 5-2.2A3 3 0 0 1 13 6.5c0 3.8-5 7-5 7z"
                 stroke="#1C1C1E" stroke-width="1.4" fill="none" stroke-linejoin="round"/>
             </svg>
             <span id="vpvLikeCount">0</span>
           </button>
-          <button class="vpv-act" id="vpvComment" onclick="window.__vpvFocusComposer()">
+          <button class="vpv-act" id="vpvComment" onclick="window.__vpvFocusComposer()" aria-labelledby="vpvCommentLbl vpvCommentCount">
+            <span id="vpvCommentLbl" style="display:none">Comments:</span>
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
               <path d="M2 3.5A.5.5 0 0 1 2.5 3h11a.5.5 0 0 1 .5.5v7a.5.5 0 0 1-.5.5H6L2.5 14V3.5z"
                 stroke="#1C1C1E" stroke-width="1.4" fill="none" stroke-linejoin="round"/>
             </svg>
             <span id="vpvCommentCount">0</span>
           </button>
-          <button class="vpv-act" id="vpvShare" onclick="window.__vpvShare()" title="Send to a chat">
+          <button class="vpv-act" id="vpvShare" onclick="window.__vpvShare()" title="Send to a chat" aria-label="Send to a chat">
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
               <path d="M14 2L7.5 8.5M14 2L9.5 14L7.5 8.5M14 2L2 6.5L7.5 8.5"
                 stroke="#1C1C1E" stroke-width="1.4" fill="none" stroke-linejoin="round" stroke-linecap="round"/>
@@ -470,7 +472,7 @@
             </svg>
             <span id="vpvViewCount"></span>
           </button>
-          <button class="vpv-act" id="vpvSave" onclick="window.__vpvToggleSave()" title="Save">
+          <button class="vpv-act" id="vpvSave" onclick="window.__vpvToggleSave()" title="Save" aria-label="Save">
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
               <path class="vpv-bookmark" d="M3.5 2.5h9v11l-4.5-3-4.5 3v-11z"
                 stroke="#1C1C1E" stroke-width="1.4" fill="none" stroke-linejoin="round"/>
