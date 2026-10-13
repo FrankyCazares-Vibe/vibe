@@ -476,7 +476,9 @@ export function ResumeViewerMobile({
                 ? "1px solid #FF5C35"
                 : "1px solid rgba(255,255,255,0.18)",
               background: editing ? "#FF5C35" : "rgba(255,255,255,0.06)",
-              color: "#fff",
+              // "Done" sits on orange: dark words there (6.3:1; white was
+              // 3.1:1). White stays on the dark pill.
+              color: editing ? "var(--on-coral, #160A06)" : "#fff",
               fontFamily: "DM Sans, sans-serif",
               fontSize: 12,
               fontWeight: 700,

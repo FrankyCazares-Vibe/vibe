@@ -24,7 +24,7 @@
     .vsp-poster{width:56px;height:56px;border-radius:10px;overflow:hidden;flex-shrink:0;background:#1C1C1E;}
     .vsp-poster img{width:100%;height:100%;object-fit:cover;display:block;}
     .vsp-pinfo{flex:1;min-width:0;}
-    .vsp-plabel{font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#FF5C35;margin-bottom:3px;}
+    .vsp-plabel{font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--tag-ink, #B83A1A);margin-bottom:3px;}
     .vsp-ptitle{font-size:13px;font-weight:600;color:var(--charcoal,#1C1C1E);line-height:1.35;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;}
     .vsp-pauthor{font-size:11px;color:var(--ink-muted, #6C6761);margin-top:3px;}
     .vsp-search{padding:10px 16px;border-bottom:1px solid var(--hairline,rgba(28,28,30,.08));}
@@ -35,7 +35,7 @@
     .vsp-row:hover{background:var(--cream,#FAF7F2);}
     .vsp-row.selected{background:rgba(255,92,53,.06);}
     .vsp-cb{width:18px;height:18px;border:1.5px solid rgba(var(--scrim-rgb,28,28,30),.18);border-radius:6px;background:var(--paper,white);display:flex;align-items:center;justify-content:center;flex-shrink:0;}
-    .vsp-row.selected .vsp-cb{background:#FF5C35;border-color:#FF5C35;color:white;}
+    .vsp-row.selected .vsp-cb{background:#FF5C35;border-color:#FF5C35;color:var(--on-coral, #160A06);}
     .vsp-av{width:36px;height:36px;border-radius:10px;background:#1C1C1E;color:white;display:flex;align-items:center;justify-content:center;font-family:'Fraunces',serif;font-size:12px;font-weight:700;flex-shrink:0;overflow:hidden;}
     .vsp-av img{width:100%;height:100%;object-fit:cover;display:block;}
     .vsp-rowinfo{flex:1;min-width:0;}
@@ -44,15 +44,15 @@
     .vsp-empty{padding:32px 16px;text-align:center;color:var(--ink-muted, #6C6761);font-size:12.5px;}
     .vsp-foot{padding:12px 16px;border-top:1px solid var(--hairline,rgba(28,28,30,.08));display:flex;flex-direction:column;gap:10px;}
     .vsp-caption{width:100%;border:1.5px solid var(--hairline,rgba(28,28,30,.08));border-radius:10px;padding:9px 12px;font-family:inherit;font-size:13px;outline:none;resize:none;min-height:32px;max-height:80px;}
-    .vsp-cta{background:#FF5C35;color:white;border:none;border-radius:100px;padding:9px 18px;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;align-self:flex-end;}
+    .vsp-cta{background:#FF5C35;color:var(--on-coral, #160A06);border:none;border-radius:100px;padding:9px 18px;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;align-self:flex-end;}
     .vsp-cta:disabled{opacity:.45;cursor:not-allowed;}
     /* Night (S68 wave 5): the picker's own copy of the Night tokens it reads,
        scoped to its overlay, so it paints Night on any host (messages.html
-       has no --ink-muted / --hairline). Light sets nothing here: each var()
+       has no --hairline). Light sets nothing here: each var()
        above falls back to the literal it replaced. The title and the two
        inputs had no colour of their own (host ink, browser field), so Night
        alone gives them one. The dim, avatars, poster and coral stay. */
-    html[data-theme="dark"] .vsp-overlay{--paper:#161515;--cream:#0C0B0B;--charcoal:#F6F1EA;--ink-muted:#9C958C;--hairline:rgba(255,255,255,0.09);--scrim-rgb:255,255,255;}
+    html[data-theme="dark"] .vsp-overlay{--paper:#161515;--cream:#0C0B0B;--charcoal:#F6F1EA;--ink-muted:#9C958C;--tag-ink:#FF8A66;--hairline:rgba(255,255,255,0.09);--scrim-rgb:255,255,255;}
     html[data-theme="dark"] .vsp-card{color:var(--charcoal,#1C1C1E);}
     html[data-theme="dark"] .vsp-search input,html[data-theme="dark"] .vsp-caption{background:var(--paper,white);color:var(--charcoal,#1C1C1E);}
     html[data-theme="dark"] .vsp-search input::placeholder,html[data-theme="dark"] .vsp-caption::placeholder{color:var(--ink-muted, #6C6761);}
@@ -186,7 +186,7 @@
         ? esc(label.slice(0, 80))
         : (t.type === "group" ? `${(t.members || []).length + 1} members` : "");
       const cb = state.selectedIds.has(t.id)
-        ? '<svg width="11" height="11" viewBox="0 0 11 11"><path d="M2 5.5L4.5 8L9 3" stroke="white" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>'
+        ? '<svg width="11" height="11" viewBox="0 0 11 11"><path d="M2 5.5L4.5 8L9 3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>'
         : "";
       return `
         <div class="vsp-row ${sel}" data-cid="${esc(t.id)}">

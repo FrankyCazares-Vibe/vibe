@@ -94,7 +94,8 @@ export default async function FeedPage() {
               fontFamily: "DM Sans, sans-serif",
               fontSize: 15,
               fontWeight: 600,
-              color: "#FF5C35",
+              // --tag-ink, not raw coral: as words on cream, coral is 2.9:1.
+              color: "var(--tag-ink)",
               textDecoration: "none",
             }}
           >

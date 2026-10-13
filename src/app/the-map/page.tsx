@@ -61,9 +61,17 @@ const MAX_W = 1080;
 const fontDisplay = "Fraunces, serif";
 const fontBody = "DM Sans, sans-serif";
 
+// This page is cream in both looks (its colours are written out, not tokens),
+// so its grey and its orange words are the Light values of --ink-muted and
+// --tag-ink, written out too: Night's lighter inks would fade on cream. The
+// old grey #8A8580 was 3.4:1 on cream and raw coral 2.9:1; these are 5.2 and
+// 5.4. The dark sections (the hero, Otto) keep raw coral, which passes there.
+const INK_MUTED = "#6C6761";
+const CORAL_INK = "#B83A1A";
+
 function Eyebrow({
   children,
-  color = "#8A8580",
+  color = INK_MUTED,
 }: {
   children: React.ReactNode;
   color?: string;
@@ -114,7 +122,7 @@ function SectionHeader({
       >
         {title}{" "}
         {italic ? (
-          <span style={{ fontStyle: "italic", color: "#FF5C35" }}>
+          <span style={{ fontStyle: "italic", color: CORAL_INK }}>
             {italic}
           </span>
         ) : null}
@@ -125,7 +133,7 @@ function SectionHeader({
             fontFamily: fontBody,
             fontSize: 17,
             lineHeight: 1.55,
-            color: "#8A8580",
+            color: INK_MUTED,
             margin: "20px auto 0",
             maxWidth: align === "center" ? 620 : 720,
           }}
@@ -311,7 +319,7 @@ function Thesis() {
                   fontFamily: fontBody,
                   fontSize: 15,
                   lineHeight: 1.6,
-                  color: "#8A8580",
+                  color: INK_MUTED,
                   marginTop: 16,
                 }}
               >
@@ -355,7 +363,7 @@ function PullQuote() {
         >
           &ldquo;Don&apos;t make Vibe more professional. Make it unmistakably
           useful{" "}
-          <span style={{ color: "#FF5C35" }}>to professionals.</span>&rdquo;
+          <span style={{ color: CORAL_INK }}>to professionals.</span>&rdquo;
         </p>
       </div>
     </section>
@@ -436,7 +444,7 @@ function Built() {
                     fontFamily: fontBody,
                     fontWeight: 600,
                     fontSize: 12,
-                    color: "#8A8580",
+                    color: INK_MUTED,
                     letterSpacing: "0.04em",
                   }}
                 >
@@ -473,7 +481,7 @@ function Built() {
                   fontFamily: fontBody,
                   fontSize: 14.5,
                   lineHeight: 1.55,
-                  color: "#8A8580",
+                  color: INK_MUTED,
                   marginTop: 10,
                 }}
               >
@@ -651,7 +659,7 @@ function Team() {
                   fontFamily: fontBody,
                   fontSize: 13,
                   letterSpacing: "0.04em",
-                  color: "#8A8580",
+                  color: INK_MUTED,
                   marginTop: 6,
                   textTransform: "lowercase",
                 }}
@@ -806,7 +814,7 @@ function TaskColumn({
                     fontFamily:
                       "ui-monospace, SFMono-Regular, Menlo, monospace",
                     fontSize: 12,
-                    color: "#8A8580",
+                    color: INK_MUTED,
                     background: "rgba(28,28,30,0.04)",
                     padding: "2px 8px",
                     borderRadius: 4,
@@ -979,7 +987,7 @@ function Research() {
                   fontFamily: fontBody,
                   fontSize: 14.5,
                   lineHeight: 1.55,
-                  color: "#8A8580",
+                  color: INK_MUTED,
                   marginTop: 10,
                 }}
               >
@@ -1018,7 +1026,7 @@ function Closing() {
           }}
         >
           This is the moment to{" "}
-          <span style={{ fontStyle: "italic", color: "#FF5C35" }}>commit.</span>
+          <span style={{ fontStyle: "italic", color: CORAL_INK }}>commit.</span>
         </h2>
         <p
           style={{
@@ -1042,7 +1050,7 @@ function Closing() {
             fontFamily: fontDisplay,
             fontStyle: "italic",
             fontSize: 16,
-            color: "#8A8580",
+            color: INK_MUTED,
           }}
         >
           vibe. · founding crew · april 2026

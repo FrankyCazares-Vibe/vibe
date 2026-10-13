@@ -172,7 +172,7 @@
     .vmm-hdr-back:hover{background:var(--cream, #FAF7F2);color:var(--charcoal, #1C1C1E);}
     .vmm-hdr-x{background:none;border:none;color:var(--ink-muted, #6C6761);cursor:pointer;font-size:18px;line-height:1;padding:6px 8px;border-radius:6px;}
     .vmm-hdr-x:hover{background:var(--cream, #FAF7F2);color:var(--charcoal, #1C1C1E);}
-    .vmm-hdr-link{font-size:11px;font-weight:600;color:#FF5C35;text-decoration:none;padding:4px 8px;border-radius:6px;}
+    .vmm-hdr-link{font-size:11px;font-weight:600;color:var(--tag-ink, #B83A1A);text-decoration:none;padding:4px 8px;border-radius:6px;}
     .vmm-hdr-link:hover{background:var(--cream, #FAF7F2);}
     .vmm-search{padding:10px 14px;border-bottom:1px solid rgba(var(--scrim-rgb, 28,28,30),.06);}
     .vmm-search input{width:100%;background:var(--paper, #FFFFFF);border:1.5px solid rgba(var(--scrim-rgb, 28,28,30),.08);border-radius:10px;padding:8px 12px;font-family:inherit;font-size:13px;outline:none;}
@@ -251,9 +251,13 @@
     .vmm-comp{padding:10px 12px;border-top:1px solid rgba(var(--scrim-rgb, 28,28,30),.08);background:var(--paper, white);display:flex;gap:8px;align-items:flex-end;flex-shrink:0;}
     .vmm-comp textarea{flex:1;border:none;background:none;font-family:inherit;font-size:13.5px;color:var(--charcoal, #1C1C1E);resize:none;outline:none;line-height:1.45;min-height:22px;max-height:96px;padding:4px 0;}
     .vmm-comp textarea::placeholder{color:var(--ink-muted, #6C6761);}
-    .vmm-send{background:#FF5C35;color:white;border:none;width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;transition:filter .15s,transform .15s;}
+    .vmm-send{background:#FF5C35;color:var(--on-coral, #160A06);border:none;width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;transition:filter .15s,transform .15s;}
     .vmm-send:hover{filter:brightness(1.05);}
     .vmm-send:disabled{background:rgba(var(--scrim-rgb, 28,28,30),.12);cursor:not-allowed;}
+    /* The arrow on the orange send button is dark ink (white on orange is
+       3.1:1). A CSS fill wins over the icon's own white, so the greyed-out
+       button keeps the look it had. Same rule as .snd-btn in messages.html. */
+    .vmm-send:not(:disabled) svg path{fill:var(--on-coral, #160A06);stroke:var(--on-coral, #160A06);}
     /* Club chat v1: the quiet line that stands in for the composer in a room
        the viewer can't post in. The composer's own surface and tokens. */
     .vmm-quiet{padding:14px 16px;min-height:44px;box-sizing:border-box;border-top:1px solid rgba(var(--scrim-rgb, 28,28,30),.08);background:var(--paper, white);color:var(--ink-2, #5C5853);font-size:12.5px;font-weight:600;line-height:1.3;text-align:center;flex-shrink:0;}
@@ -687,7 +691,7 @@
       return;
     }
     if (state.threads.length === 0) {
-      el.innerHTML = `<div class="vmm-empty">No conversations yet.<br><a href="/messages" style="color:#FF5C35;font-weight:600;text-decoration:none">Start one</a></div>`;
+      el.innerHTML = `<div class="vmm-empty">No conversations yet.<br><a href="/messages" style="color:var(--tag-ink, #B83A1A);font-weight:600;text-decoration:none">Start one</a></div>`;
       return;
     }
     if (state.filtered.length === 0) {

@@ -518,7 +518,8 @@ function NetworkTabs({
               background: active
                 ? "linear-gradient(180deg, #FF7B4A 0%, #FF5C35 100%)"
                 : "linear-gradient(180deg, var(--glass) 0%, var(--glass-warm-68, rgba(255,250,240,0.68)) 100%)",
-              color: active ? "#fff" : "var(--charcoal)",
+              // Dark words on the coral pill (6.3:1 or better); white was 3.1:1.
+              color: active ? "var(--on-coral, #160A06)" : "var(--charcoal)",
               fontFamily: "DM Sans, sans-serif",
               fontSize: 13,
               fontWeight: 700,
@@ -537,7 +538,10 @@ function NetworkTabs({
                 style={{
                   marginLeft: 6,
                   fontWeight: 700,
-                  color: active ? "rgba(255,255,255,0.78)" : "var(--ink-muted)",
+                  // --on-coral at 78%, the count's old dimming kept (4.7:1 on
+                  // the pill). A plain rgba: color-mix over var() fails on
+                  // old iPhones.
+                  color: active ? "rgba(22,10,6,0.78)" : "var(--ink-muted)",
                 }}
               >
                 {count}
@@ -863,7 +867,7 @@ function EmptyState({
             padding: "10px 18px",
             borderRadius: 999,
             background: "linear-gradient(180deg, #FF7B4A 0%, #FF5C35 100%)",
-            color: "#fff",
+            color: "var(--on-coral, #160A06)",
             fontFamily: "DM Sans, sans-serif",
             fontSize: 13,
             fontWeight: 700,

@@ -351,7 +351,7 @@ function _vibeTopHere() {
       btn.textContent = action.label || 'Open';
       btn.style.cssText =
         'flex-shrink:0;margin:0;padding:6px 12px;border:none;border-radius:999px;' +
-        "background:#FF5C35;color:#FAF7F2;font-family:'DM Sans',sans-serif;font-size:12px;" +
+        "background:#FF5C35;color:var(--on-coral, #160A06);font-family:'DM Sans',sans-serif;font-size:12px;" +
         'font-weight:700;letter-spacing:.02em;line-height:1.4;white-space:nowrap;cursor:pointer;';
       btn.addEventListener('click', e => {
         e.stopPropagation();
@@ -524,7 +524,7 @@ function _vibeTopHere() {
     btn.style.cssText =
       'flex-shrink:0;margin:0;border:none;border-radius:999px;' +
       (compact ? 'padding:5px 12px;font-size:12px;' : 'padding:7px 16px;font-size:13px;') +
-      "background:#FF5C35;color:#FAF7F2;font-family:'DM Sans',sans-serif;" +
+      "background:#FF5C35;color:var(--on-coral, #160A06);font-family:'DM Sans',sans-serif;" +
       'font-weight:700;letter-spacing:.02em;line-height:1.4;white-space:nowrap;cursor:inherit;';
     btn.addEventListener('click', e => {
       // Kept from click-outside handlers: a retry usually repaints `el`,
@@ -684,7 +684,7 @@ function _vibePaintSidebarChips(user) {
         '</div>' +
         '<div style="min-width:0;flex:1;padding-top:1px;">' +
           '<div style="font-family:\'DM Sans\',sans-serif;font-size:12.5px;font-weight:600;color:#1C1C1E;line-height:1.38;letter-spacing:-0.01em;overflow-wrap:anywhere;word-break:break-word;">' + _vibeEsc(name) + '</div>' +
-          '<div style="font-family:\'DM Sans\',sans-serif;font-size:11px;color:#8A8580;line-height:1.4;margin-top:4px;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;">' + _vibeEsc(subtitle) + '</div>' +
+          '<div style="font-family:\'DM Sans\',sans-serif;font-size:11px;color:#6C6761;line-height:1.4;margin-top:4px;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;">' + _vibeEsc(subtitle) + '</div>' +
         '</div>' +
       '</div>';
   });

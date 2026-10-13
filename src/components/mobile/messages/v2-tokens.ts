@@ -7,9 +7,11 @@
  * app's own tokens stand in wherever the contract says so (page, ink,
  * secondary, muted, surface, hairline): the Light mockup's ink literals
  * (`#141416 / #4A4541 / #6B645C`) are NOT adopted (MK:16.2). Muted is
- * `--ink-sub` in Light (`#5A564F`, 6.8:1 on cream; `--ink-muted` `#8A8580`
- * is 3.5:1 and never used on the new screens in Light; SCREENS-M4) and
- * `--ink-muted` in Night (`#9C958C`, the mockups' own muted).
+ * `--ink-sub` in Light (`#5A564F`, 6.8:1 on cream; SCREENS-M4. `--ink-muted`
+ * was `#8A8580` at 3.4:1 when these screens were drawn, which is why they
+ * never used it in Light; it is `#6C6761` at 5.2:1 since Oct 12, 2026, and
+ * the new screens still read `--ink-sub`) and `--ink-muted` in Night
+ * (`#9C958C`, the mockups' own muted).
  *
  * Pure: no React, no DOM. Nothing here is a `className`.
  */

@@ -113,7 +113,9 @@ export const primaryCtaStyle: CSSProperties = {
   display: "block",
   width: "100%",
   background: COLORS.accent,
-  color: "white",
+  // Dark words on the orange button, as on the landing page: white on coral
+  // is 3.1:1, this ink is 6.3:1. The fall-back is the token's own value.
+  color: "var(--on-coral, #160A06)",
   fontFamily: "inherit",
   fontWeight: 700,
   fontSize: 16,

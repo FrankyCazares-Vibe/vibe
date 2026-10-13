@@ -81,7 +81,7 @@
       '  font-family: "DM Sans", sans-serif; font-size: 12px; font-weight: 700;',
       '  letter-spacing: 0.08em;',
       '  padding: 9px 16px; border-radius: 999px;',
-      '  background: #ff5c35; color: #faf7f2;',
+      '  background: #ff5c35; color: var(--on-coral, #160A06);',
       '  box-shadow: 0 6px 18px rgba(255, 92, 53, 0.4), inset 0 1px 0 rgba(255,255,255,0.18);',
       '  transition: transform 180ms ease, box-shadow 180ms ease;',
       '}',

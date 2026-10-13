@@ -208,7 +208,8 @@ function CampusTourCard({ handle }: { handle: string | null }) {
           padding: "10px 18px",
           borderRadius: 999,
           background: "#FF5C35",
-          color: "#FAF7F2",
+          // Dark words on coral (6.3:1); cream on coral was 2.9:1.
+          color: "var(--on-coral, #160A06)",
           boxShadow:
             "0 6px 18px rgba(255, 92, 53, 0.35), inset 0 1px 0 rgba(255,255,255,0.18)",
         }}
@@ -477,7 +478,7 @@ function AccountCard({ profile }: { profile: Profile }) {
                 Not yet verified.{" "}
                 <Link
                   href="/auth/school-email"
-                  style={{ color: "#FF5C35", fontWeight: 700, textDecoration: "none" }}
+                  style={{ color: "var(--tag-ink)", fontWeight: 700, textDecoration: "none" }}
                 >
                   Verify now →
                 </Link>
@@ -521,7 +522,7 @@ function AccountCard({ profile }: { profile: Profile }) {
         }}
       >
         Edit your name, bio, and other profile details on{" "}
-        <Link href="/profile" style={{ color: "#FF5C35", fontWeight: 700, textDecoration: "none" }}>
+        <Link href="/profile" style={{ color: "var(--tag-ink)", fontWeight: 700, textDecoration: "none" }}>
           your profile page
         </Link>
         . Change your handle in the section below.
@@ -663,7 +664,7 @@ function CampusCard({ initial }: { initial: SettingsCampusInput | null }) {
     appearance: "none",
     border: "none",
     background: "#FF5C35",
-    color: "#FAF7F2",
+    color: "var(--on-coral, #160A06)",
     cursor: saving ? "wait" : "pointer",
     opacity: saving ? 0.7 : 1,
   };
@@ -711,7 +712,7 @@ function CampusCard({ initial }: { initial: SettingsCampusInput | null }) {
           {"Verify your school email to pick your campus."}{" "}
           <Link
             href="/auth/school-email"
-            style={{ color: "#FF5C35", fontWeight: 700, textDecoration: "none" }}
+            style={{ color: "var(--tag-ink)", fontWeight: 700, textDecoration: "none" }}
           >
             Verify now →
           </Link>
@@ -874,7 +875,7 @@ function CampusCard({ initial }: { initial: SettingsCampusInput | null }) {
               {" "}
               <Link
                 href={error.action.href}
-                style={{ color: "#FF5C35", fontWeight: 700, textDecoration: "none" }}
+                style={{ color: "var(--tag-ink)", fontWeight: 700, textDecoration: "none" }}
               >
                 {error.action.label} →
               </Link>
@@ -1177,7 +1178,7 @@ function HandleCard({
             borderRadius: 10,
             border: "none",
             background: canSave ? "#FF5C35" : "rgba(var(--scrim-rgb),0.10)",
-            color: canSave ? "#fff" : "var(--ink-muted)",
+            color: canSave ? "var(--on-coral, #160A06)" : "var(--ink-muted)",
             fontFamily: "DM Sans, sans-serif",
             fontWeight: 700,
             fontSize: 13,

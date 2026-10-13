@@ -305,7 +305,8 @@ export function PostAudienceList({
                 padding: "7px 14px",
                 borderRadius: 999,
                 background: "#FF5C35",
-                color: "#FAF7F2",
+                // Dark words on coral (6.3:1); cream on coral was 2.9:1.
+                color: "var(--on-coral, #160A06)",
                 fontFamily: "DM Sans, sans-serif",
                 fontSize: 13,
                 fontWeight: 700,

@@ -47,8 +47,9 @@ export function TabPill({
             borderRadius: 999,
             background: active ? "rgba(255,255,255,0.18)" : "#FF5C35",
             // On the active pill it follows the pill's ink (the pill inverts
-            // in Night); on coral it stays white.
-            color: active ? "var(--paper)" : "#fff",
+            // in Night); on coral it is the dark ink in both looks (6.3:1,
+            // white was 3.1:1).
+            color: active ? "var(--paper)" : "var(--on-coral, #160A06)",
             fontSize: 11,
             fontWeight: 800,
             alignItems: "center",
@@ -156,7 +157,8 @@ export function ThreadRow({
               style={{
                 fontFamily: "DM Sans, sans-serif",
                 fontSize: 11.5,
-                color: unread ? "#FF5C35" : "var(--ink-muted)",
+                // Orange words read --tag-ink: raw coral is 2.9:1 on cream.
+                color: unread ? "var(--tag-ink)" : "var(--ink-muted)",
                 fontWeight: unread ? 800 : 600,
                 flexShrink: 0,
               }}

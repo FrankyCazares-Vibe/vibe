@@ -240,7 +240,7 @@
     .msg-profile-attach--dark .msg-profile-av { border-color: #262528; }
     /* Night (S68 wave 5): the light card's own copy of the Night tokens it
        reads, scoped to it, so it paints Night on any host (messages.html has
-       no --ink-muted / --hairline). Light sets nothing here: each var()
+       no --hairline). Light sets nothing here: each var()
        above falls back to the literal it replaced. The --dark variant is
        deliberate dark chrome and keeps its literals in both themes; the
        banner gradient and the avatar stay as they are. */

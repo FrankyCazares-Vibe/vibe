@@ -433,7 +433,8 @@ const pillBase: CSSProperties = {
 
 const followButtonStyle: CSSProperties = {
   ...pillBase,
-  color: "#fff",
+  // Dark words on orange (6.3:1; white was 3.1:1).
+  color: "var(--on-coral, #160A06)",
   background: COLORS.accent,
   border: `1px solid ${COLORS.accent}`,
 };

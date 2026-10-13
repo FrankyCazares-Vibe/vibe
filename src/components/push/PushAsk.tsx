@@ -422,7 +422,8 @@ const STYLES: Record<AskPlacement, Look> = {
       color: "var(--charcoal)",
     },
     body: {},
-    primary: { ...buttonBase, padding: "0 16px", fontSize: 14, background: "#FF5C35", color: "#fff", border: "none" },
+    // Dark words on the coral button (6.3:1); white was 3.1:1.
+    primary: { ...buttonBase, padding: "0 16px", fontSize: 14, background: "#FF5C35", color: "var(--on-coral, #160A06)", border: "none" },
     secondary: { ...buttonBase, padding: "0 10px", background: "transparent", color: "var(--ink-2)", border: "none" },
     result: { fontSize: 12.5, lineHeight: 1.4, color: "var(--ink-2)" },
     resultMargin: "6px 0",

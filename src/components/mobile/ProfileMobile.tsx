@@ -352,6 +352,19 @@ const WIDGET_DOT: Record<WidgetId, string> = {
   posts: "var(--coral)",
 };
 
+/** Words drawn on an orange fill (the camera badges, Save, Follow back, the
+ *  "+" button): dark, as on the landing page. White on coral is 3.1:1,
+ *  this is 6.3:1. The fall-back is the token's own value. */
+const ON_CORAL = "var(--on-coral, #160A06)";
+
+/** A few surfaces here keep their light paint in Night too (the role card
+ *  in the Experience editor, the sheet's top bar, the pale peach tag chips,
+ *  the blocked screen's avatar disc). Words on them use the Light values of
+ *  --ink-muted and --tag-ink as literals: the tokens turn pale in Night and
+ *  would wash out on a light surface. */
+const MUTED_ON_LIGHT = "#6C6761";
+const TAG_INK_ON_LIGHT = "#B83A1A";
+
 /** Swap `id` with its neighbour. No-op at the ends (the buttons are
  *  disabled there anyway) and when `id` isn't in the order. */
 function moveWidget(order: WidgetId[], id: WidgetId, dir: -1 | 1): WidgetId[] {
@@ -1786,7 +1799,7 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
                     borderRadius: "50%",
                     background: "#FF5C35",
                     border: "2.5px solid var(--cream)",
-                    color: "#fff",
+                    color: ON_CORAL,
                     fontSize: 14,
                     lineHeight: 1,
                     cursor: uploadingKind ? "default" : "pointer",
@@ -2093,7 +2106,7 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
                 {"Verify your school email to pick your campus."}{" "}
                 <Link
                   href="/auth/school-email"
-                  style={{ color: "#FF5C35", fontWeight: 700, textDecoration: "none" }}
+                  style={{ color: "var(--tag-ink)", fontWeight: 700, textDecoration: "none" }}
                 >
                   Verify now →
                 </Link>
@@ -2623,7 +2636,9 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
             border: "none",
             background:
               "linear-gradient(135deg, #FF7A4D 0%, #FF5C35 60%, #E04A26 100%)",
-            color: "#fff",
+            // 6.3:1 at the middle of the gradient, 4.8:1 at its darkest
+            // corner (white was 3.1 and 4.1).
+            color: ON_CORAL,
             boxShadow:
               "0 10px 24px rgba(255,92,53,0.42), 0 2px 6px rgba(0,0,0,0.18)",
             display: "flex",
@@ -2986,7 +3001,7 @@ function renderInlineContentInline(text: string): React.ReactNode {
     if (start > lastIndex)
       nodes.push(<span key={`t${key++}`}>{text.slice(lastIndex, start)}</span>);
     nodes.push(
-      <span key={`tok${key++}`} style={{ color: "#FF5C35", fontWeight: 600 }}>
+      <span key={`tok${key++}`} style={{ color: "var(--tag-ink)", fontWeight: 600 }}>
         {token}
       </span>,
     );
@@ -4347,7 +4362,7 @@ function ExperienceCard({
               fontWeight: 800,
               letterSpacing: "0.12em",
               textTransform: "uppercase",
-              color: "#8A8580",
+              color: MUTED_ON_LIGHT,
             }}
           >
             Role {index + 1}
@@ -4687,7 +4702,9 @@ function ArrangeProfileSheet({
               borderRadius: 14,
               border: "none",
               background: saving ? "rgba(var(--scrim-rgb),0.25)" : "var(--coral)",
-              color: "#fff",
+              // While it saves the button is grey, not orange, and keeps
+              // its white words as before.
+              color: saving ? "#fff" : ON_CORAL,
               fontFamily: "DM Sans, sans-serif",
               fontSize: 15,
               fontWeight: 800,
@@ -5028,7 +5045,8 @@ function PortfolioEditorShell({
                   borderRadius: 999,
                   border: "none",
                   background: saving ? "rgba(28,28,30,0.25)" : "#FF5C35",
-                  color: "#fff",
+                  // Grey while it saves, with its white words as before.
+                  color: saving ? "#fff" : ON_CORAL,
                   fontFamily: "DM Sans, sans-serif",
                   fontSize: 13,
                   fontWeight: 800,
@@ -5203,7 +5221,7 @@ function UploadableLogo({
               borderRadius: 999,
               background: "#FF5C35",
               border: "2px solid var(--cream)",
-              color: "#fff",
+              color: ON_CORAL,
               display: "inline-flex",
               alignItems: "center",
               justifyContent: "center",
@@ -5353,7 +5371,7 @@ function SheetInput({
           fontWeight: 700,
           letterSpacing: "0.06em",
           textTransform: "uppercase",
-          color: "#8A8580",
+          color: MUTED_ON_LIGHT,
         }}
       >
         {label}
@@ -5400,7 +5418,7 @@ function SheetTextarea({
           fontWeight: 700,
           letterSpacing: "0.06em",
           textTransform: "uppercase",
-          color: "#8A8580",
+          color: MUTED_ON_LIGHT,
         }}
       >
         {label}
@@ -5522,7 +5540,7 @@ function EmptyTab({
             padding: "9px 16px",
             borderRadius: 999,
             background: "#FF5C35",
-            color: "#fff",
+            color: ON_CORAL,
             fontFamily: "DM Sans, sans-serif",
             fontSize: 12,
             fontWeight: 700,
@@ -5633,7 +5651,7 @@ function FollowButton({
         ? "#FF5C35"
         : "var(--charcoal)"
       : "var(--paper-70)",
-    color: primaryFilled ? (state === "followed_by" ? "#fff" : "var(--paper)") : "var(--charcoal)",
+    color: primaryFilled ? (state === "followed_by" ? ON_CORAL : "var(--paper)") : "var(--charcoal)",
     border: primaryFilled
       ? "1px solid rgba(0,0,0,0.06)"
       : "1px solid rgba(var(--scrim-rgb),0.18)",
@@ -5754,7 +5772,7 @@ function BlockedByTargetView({ user }: { user: VibeUser }) {
           overflow: "hidden",
           fontFamily: "Fraunces, serif",
           fontSize: 34,
-          color: "#8A8580",
+          color: MUTED_ON_LIGHT,
           filter: avatar ? "grayscale(.6)" : undefined,
           opacity: avatar ? 0.85 : 1,
         }}
@@ -6500,7 +6518,9 @@ function StatTile({
           fontFamily: "Fraunces, serif",
           fontWeight: 800,
           fontSize: prominent ? 22 : 20,
-          color: prominent ? "#FF5C35" : "var(--charcoal)",
+          // Orange numbers read --tag-ink: raw coral is 2.9:1 on cream,
+          // under even the 3:1 asked of large type.
+          color: prominent ? "var(--tag-ink)" : "var(--charcoal)",
           lineHeight: 1,
         }}
       >
@@ -6601,7 +6621,7 @@ const floatingActionSaveStyle: React.CSSProperties = {
   padding: "8px 16px",
   borderRadius: 999,
   background: "#FF5C35",
-  color: "#fff",
+  color: ON_CORAL,
   border: "1px solid rgba(255,92,53,0.55)",
   fontFamily: "DM Sans, sans-serif",
   fontSize: 12,
@@ -6616,7 +6636,8 @@ const vibeTagStyle: React.CSSProperties = {
   padding: "5px 12px",
   borderRadius: 999,
   background: "#FFF0EC",
-  color: "#FF5C35",
+  // 5.2:1 on the peach chip (raw coral was 2.8:1).
+  color: TAG_INK_ON_LIGHT,
 };
 
 // "Here for" row. View mode: the picked answers, and no row at all when
@@ -6667,7 +6688,7 @@ function HereForRow({
                     opacity: disabled ? 0.6 : 1,
                     background: on ? "#FFF0EC" : "transparent",
                     border: on ? "1px solid rgba(255,92,53,0.3)" : "1px dashed rgba(var(--scrim-rgb),0.18)",
-                    color: on ? "#FF5C35" : "rgba(var(--scrim-rgb),0.55)",
+                    color: on ? TAG_INK_ON_LIGHT : "rgba(var(--scrim-rgb),0.55)",
                   }}
                 >
                   {LOOKING_FOR_PROFILE_COPY.labels[token]}
@@ -6765,7 +6786,9 @@ function EditableVibeTags({
               height: 16,
               borderRadius: 999,
               background: "rgba(255,92,53,0.18)",
-              color: "#FF5C35",
+              // The × sits on its own orange dot, where the tag ink is
+              // only 4.3:1, so it takes the dark ink (raw coral was 2.3:1).
+              color: ON_CORAL,
               border: "none",
               fontSize: 12,
               lineHeight: 1,

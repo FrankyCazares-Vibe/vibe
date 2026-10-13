@@ -179,7 +179,10 @@ export function MessageBubble({
   //   - dark + theirs   → translucent dark glass, white text
   //   - dark + mine     → orange-tinted dark glass, white text
   //   - cream + theirs  → white tile, dark text
-  //   - cream + mine    → solid accent orange, white text
+  //   - cream + mine    → solid accent orange, dark text (white on coral
+  //                       is 3.1:1; the dark ink is 6.3:1)
+  const onCoral = isMine && !darkMode;
+  const onCoralInk = "var(--on-coral, #160A06)";
   const bubbleBg = isMine
     ? darkMode
       ? "linear-gradient(180deg,rgba(255,92,53,0.32) 0%,rgba(255,92,53,0.12) 100%),linear-gradient(180deg,rgba(20,16,28,0.62) 0%,rgba(14,11,22,0.66) 100%)"
@@ -187,7 +190,7 @@ export function MessageBubble({
     : darkMode
       ? "linear-gradient(180deg,rgba(20,16,28,0.62) 0%,rgba(14,11,22,0.66) 100%)"
       : "rgba(255,255,255,0.88)";
-  const bubbleColor = isMine || darkMode ? "#fff" : "#1C1C1E";
+  const bubbleColor = onCoral ? onCoralInk : darkMode ? "#fff" : "#1C1C1E";
   const bubbleBorder = darkMode
     ? "1px solid rgba(255,255,255,0.08)"
     : isMine
@@ -205,10 +208,12 @@ export function MessageBubble({
     : darkMode
       ? "0 6px 18px rgba(20,8,40,0.18)"
       : "0 2px 8px rgba(180,120,60,0.06)";
-  // Shared-post card text: white on the coral / dark-glass surfaces,
-  // charcoal with an accent label on the cream theirs-card (desktop's).
+  // Shared-post card text: the dark ink on the coral card, white on the
+  // dark-glass ones, charcoal with an accent label on the cream theirs-card
+  // (desktop's). The grey and the accent there are tokens: that branch is
+  // only ever the Light look, where both pass 4.5:1 on the white tile.
   const onTint = isMine || darkMode;
-  const cardMuted = onTint ? "rgba(255,255,255,0.66)" : "#8A8580";
+  const cardMuted = onCoral ? onCoralInk : onTint ? "rgba(255,255,255,0.66)" : "var(--ink-muted)";
 
   // Every piece of the message shares this: no iOS callout or
   // selection, and the same press-in scale while the picker is open.
@@ -255,7 +260,7 @@ export function MessageBubble({
         border: darkMode
           ? "1px dashed rgba(255,255,255,0.18)"
           : "1px dashed rgba(28,28,30,0.16)",
-        color: darkMode ? "rgba(255,255,255,0.62)" : "#8A8580",
+        color: darkMode ? "rgba(255,255,255,0.62)" : "var(--ink-muted)",
         fontFamily: "DM Sans, sans-serif",
         fontSize: 12.5,
         fontWeight: 600,
@@ -455,7 +460,7 @@ export function MessageBubble({
               fontWeight: 800,
               letterSpacing: "0.14em",
               textTransform: "uppercase",
-              color: onTint ? "rgba(255,255,255,0.8)" : "#FF5C35",
+              color: onCoral ? onCoralInk : onTint ? "rgba(255,255,255,0.8)" : "var(--tag-ink)",
               marginBottom: 5,
             }}
           >
@@ -525,7 +530,7 @@ export function MessageBubble({
                 }}
               >
                 by{" "}
-                <span style={{ fontWeight: 700, color: onTint ? "#fff" : "#1C1C1E" }}>
+                <span style={{ fontWeight: 700, color: onCoral ? onCoralInk : onTint ? "#fff" : "#1C1C1E" }}>
                   {author.name || `@${author.handle}`}
                 </span>
                 {author.name && author.handle ? (
@@ -562,7 +567,7 @@ export function MessageBubble({
         style={{
           fontSize: 11,
           fontWeight: 700,
-          color: darkMode ? "rgba(255,180,150,0.95)" : "#FF5C35",
+          color: darkMode ? "rgba(255,180,150,0.95)" : "var(--tag-ink)",
           whiteSpace: "nowrap",
           overflow: "hidden",
           textOverflow: "ellipsis",
@@ -609,7 +614,7 @@ export function MessageBubble({
         border: darkMode
           ? "1px solid rgba(255,255,255,0.10)"
           : "1px solid rgba(28,28,30,0.08)",
-        color: darkMode ? "rgba(255,255,255,0.72)" : "#8A8580",
+        color: darkMode ? "rgba(255,255,255,0.72)" : "var(--ink-muted)",
         fontFamily: "DM Sans, sans-serif",
         fontSize: 15,
         fontWeight: 700,
@@ -762,8 +767,13 @@ export function MessageBubble({
                     : darkMode
                       ? "1px solid rgba(255,255,255,0.10)"
                       : "1px solid rgba(28,28,30,0.08)",
+                  // The count on a chip I reacted to: pale peach on the
+                  // dark glass; in Light the chip is a pale orange wash,
+                  // where peach was 1.1:1, so it reads --tag-ink there.
                   color: r.viewer_reacted
-                    ? "#FFD0BF"
+                    ? darkMode
+                      ? "#FFD0BF"
+                      : "var(--tag-ink)"
                     : darkMode
                       ? "rgba(255,255,255,0.85)"
                       : "#1C1C1E",

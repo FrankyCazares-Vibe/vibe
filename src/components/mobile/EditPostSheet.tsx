@@ -313,7 +313,10 @@ export function EditPostSheet({
               style={{
                 ...topButtonStyle,
                 justifySelf: "end",
-                color: canSave || saving ? "#FF5C35" : "rgba(28,28,30,0.32)",
+                // The Light value of --tag-ink (5.4:1; raw coral was 2.9:1).
+                // A literal, like the greys below: this sheet stays cream
+                // in Night too, where the token turns pale.
+                color: canSave || saving ? "#B83A1A" : "rgba(28,28,30,0.32)",
                 fontWeight: 800,
                 opacity: saving ? 0.6 : 1,
                 cursor: canSave ? "pointer" : "default",
@@ -393,7 +396,7 @@ export function EditPostSheet({
                     style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 4 }}
                   >
                     {hasMedia ? (
-                      <span style={{ color: "#8A8580" }}>
+                      <span style={{ color: "#6C6761" }}>
                         You can change the words. The photo or video stays.
                       </span>
                     ) : null}
@@ -403,7 +406,7 @@ export function EditPostSheet({
                       </span>
                     ) : null}
                   </div>
-                  <span style={{ marginLeft: "auto", fontSize: 11, color: "#8A8580", flexShrink: 0 }}>
+                  <span style={{ marginLeft: "auto", fontSize: 11, color: "#6C6761", flexShrink: 0 }}>
                     {draft.length}/{POST_MAX_CHARS}
                   </span>
                 </div>

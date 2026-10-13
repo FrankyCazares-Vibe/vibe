@@ -358,7 +358,8 @@ export function GroupSettingsView({
                 borderRadius: 999,
                 border: "none",
                 background: "#FF5C35",
-                color: "#fff",
+                // Dark words on orange (6.3:1; white was 3.1:1).
+                color: "var(--on-coral, #160A06)",
                 fontFamily: "DM Sans, sans-serif",
                 fontSize: 13,
                 fontWeight: 700,
@@ -459,7 +460,8 @@ export function GroupSettingsView({
               style={{
                 background: "transparent",
                 border: "none",
-                color: "#FF5C35",
+                // Orange words read --tag-ink (raw coral is 2.9:1 on cream).
+                color: "var(--tag-ink)",
                 fontFamily: "DM Sans, sans-serif",
                 fontSize: 12.5,
                 fontWeight: 800,
@@ -626,7 +628,7 @@ function MemberRow({
                 fontFamily: "DM Sans, sans-serif",
                 fontSize: 10,
                 fontWeight: 800,
-                color: "#FF5C35",
+                color: "var(--tag-ink)",
                 letterSpacing: "0.06em",
                 textTransform: "uppercase",
                 background: "rgba(255,92,53,0.10)",

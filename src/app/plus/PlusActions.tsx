@@ -112,7 +112,8 @@ function buttonStyle(primary: boolean, disabled: boolean): CSSProperties {
     borderRadius: 999,
     border: primary ? `1px solid ${CORAL}` : "1px solid var(--charcoal)",
     background: primary ? CORAL : "transparent",
-    color: primary ? "#FFFFFF" : "var(--charcoal)",
+    // Dark words on the coral button (6.3:1); white was 3.1:1.
+    color: primary ? "var(--on-coral, #160A06)" : "var(--charcoal)",
     fontFamily: SANS,
     fontSize: 14.5,
     fontWeight: 700,

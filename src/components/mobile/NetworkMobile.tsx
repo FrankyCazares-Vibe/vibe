@@ -971,7 +971,13 @@ export function UserRow({
             : state === "followed_by"
               ? "#FF5C35"
               : "#1C1C1E",
-          color: isFollowing ? "#1C1C1E" : "#fff",
+          // "Follow back" sits on orange: dark words there (6.3:1; white
+          // was 3.1:1). White stays on the charcoal "Follow" pill.
+          color: isFollowing
+            ? "#1C1C1E"
+            : state === "followed_by"
+              ? "var(--on-coral, #160A06)"
+              : "#fff",
           border: isFollowing
             ? "1px solid rgba(28,28,30,0.16)"
             : "1px solid rgba(0,0,0,0.06)",

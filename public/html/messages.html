@@ -48,7 +48,7 @@ html.vibe-pane .msg-row > div:not(.msg-av):not(.mv) { max-width:min(70%, 520px);
 }
 html.vibe-pane #cPinsBtn:not([data-off]) { display:flex !important; }
 /* The header button while the shell's Pinned and Shared panel is open. */
-html.vibe-pane #cPinsBtn[aria-pressed="true"] { background:var(--paper); color:var(--accent); box-shadow:var(--shadow); }
+html.vibe-pane #cPinsBtn[aria-pressed="true"] { background:var(--paper); color:var(--tag-ink); box-shadow:var(--shadow); }
 /* Pin / Unpin in the hover pill: the pill's own ink and wash come from
    .dm-act-report, which the button also carries; coral once pinned. */
 html.vibe-pane .dm-act-pin { width:24px; height:24px; padding:0; justify-content:center; border-radius:999px; }
@@ -82,7 +82,7 @@ html.vibe-pane .msg-row.pane-flash { background-color:var(--pane-flash); box-sha
    messages page — it's a 1:1 chat surface, not a content-creation
    surface where the marketing assistant adds value. */
 #ottoCorner, #ottoPanel, #ottoBackdrop { display: none !important; }
-:root{--cream:#FAF7F2;--charcoal:#1C1C1E;--soft:#2D2D2D;--muted:#6C6761;--ink-muted:#6C6761;--accent:#FF5C35;--green:#2ECC71;--border:rgba(28,28,30,.08);--shadow:0 4px 24px rgba(0,0,0,.06);--shadow-lg:0 12px 48px rgba(0,0,0,.1);--paper:#FFFFFF;--on-ink:#FFFFFF;
+:root{--cream:#FAF7F2;--charcoal:#1C1C1E;--soft:#2D2D2D;--muted:#6C6761;--ink-muted:#6C6761;--accent:#FF5C35;--green:#2ECC71;--border:rgba(28,28,30,.08);--shadow:0 4px 24px rgba(0,0,0,.06);--shadow-lg:0 12px 48px rgba(0,0,0,.1);--paper:#FFFFFF;--on-ink:#FFFFFF;--on-coral:#160A06;--tag-ink:#B83A1A;
   /* --ink-muted (Oct 12, 2026) is --muted under the name the shared sheets
      read (post viewer, share sheet, report sheet, mention list, cropper,
      profile card). This page never set it, so when the grey went darker they
@@ -97,7 +97,7 @@ html.vibe-pane .msg-row.pane-flash { background-color:var(--pane-flash); box-sha
    text on a var(--charcoal) fill, which turns light in Night. The washes are
    translucent coral/red over the paper. Deliberate dark chrome (the glass
    bubbles, the reaction pill, my own attachment caption and card) stays. */
-:root[data-theme="dark"]{color-scheme:dark;--cream:#0C0B0B;--charcoal:#F6F1EA;--soft:#CFC8BE;--muted:#9C958C;--ink-muted:#9C958C;--border:rgba(255,255,255,.09);--shadow:0 4px 24px rgba(0,0,0,.45);--shadow-lg:0 12px 48px rgba(0,0,0,.45);--paper:#161515;--on-ink:#0C0B0B;
+:root[data-theme="dark"]{color-scheme:dark;--cream:#0C0B0B;--charcoal:#F6F1EA;--soft:#CFC8BE;--muted:#9C958C;--ink-muted:#9C958C;--border:rgba(255,255,255,.09);--shadow:0 4px 24px rgba(0,0,0,.45);--shadow-lg:0 12px 48px rgba(0,0,0,.45);--paper:#161515;--on-ink:#0C0B0B;--on-coral:#160A06;--tag-ink:#FF8A66;
   --scrim-rgb:255,255,255;--t-hover:#1F1D1C;--coral-wash:rgba(255,92,53,0.10);--coral-wash-2:rgba(255,92,53,0.14);--note-wash:rgba(255,92,53,0.10);--danger-wash:rgba(192,57,43,0.16);--error-ink:#FF7A6B;--error-ink-hover:#FF9A8C;}
 *{margin:0;padding:0;box-sizing:border-box;}
 html,body{height:100%;overflow:hidden;}
@@ -122,7 +122,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--charco
 .thread-hdr{padding:18px 16px 12px;border-bottom:1px solid var(--border);flex-shrink:0;}
 .thread-title-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;}
 .thread-title{font-family:'Fraunces',serif;font-size:20px;font-weight:800;letter-spacing:-.3px;}
-.t-new-btn{display:inline-flex;align-items:center;gap:5px;background:var(--accent);color:white;border:none;border-radius:100px;padding:6px 12px;font-family:'DM Sans',sans-serif;font-size:12px;font-weight:700;cursor:none;transition:transform .15s,filter .15s;}
+.t-new-btn{display:inline-flex;align-items:center;gap:5px;background:var(--accent);color:var(--on-coral, #160A06);border:none;border-radius:100px;padding:6px 12px;font-family:'DM Sans',sans-serif;font-size:12px;font-weight:700;cursor:none;transition:transform .15s,filter .15s;}
 .t-new-btn:hover{transform:translateY(-1px);filter:brightness(1.05);}
 .t-new-btn svg{display:block;}
 
@@ -157,14 +157,14 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--charco
 .compose-row:hover{background:var(--cream);}
 .compose-row:last-child{border-bottom:none;}
 .compose-row .checkbox{width:18px;height:18px;border:1.5px solid var(--border);border-radius:6px;display:flex;align-items:center;justify-content:center;flex-shrink:0;background:var(--paper);}
-.compose-row.selected .checkbox{background:var(--accent);border-color:var(--accent);color:white;}
+.compose-row.selected .checkbox{background:var(--accent);border-color:var(--accent);color:var(--on-coral, #160A06);}
 .compose-av{width:36px;height:36px;border-radius:10px;background:#1C1C1E;color:white;display:flex;align-items:center;justify-content:center;font-family:'Fraunces',serif;font-size:12px;font-weight:700;flex-shrink:0;overflow:hidden;}
 .compose-info{flex:1;min-width:0;}
 .compose-name{font-size:13.5px;font-weight:600;color:var(--charcoal);}
 .compose-sub{font-size:11px;color:var(--muted);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .compose-empty{padding:32px 16px;text-align:center;color:var(--muted);font-size:12.5px;}
 .compose-foot{padding:12px 16px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;}
-.compose-cta{background:var(--accent);color:white;border:none;border-radius:100px;padding:8px 18px;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:700;cursor:none;transition:filter .15s;}
+.compose-cta{background:var(--accent);color:var(--on-coral, #160A06);border:none;border-radius:100px;padding:8px 18px;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:700;cursor:none;transition:filter .15s;}
 .compose-cta:disabled{opacity:.45;cursor:not-allowed;}
 .compose-cta:not(:disabled):hover{filter:brightness(1.05);}
 
@@ -178,7 +178,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--charco
 .cp-photo-wrap{display:flex;flex-direction:column;align-items:center;gap:8px;margin-bottom:14px;}
 .cp-photo{width:84px;height:84px;border-radius:20px;background:var(--cream);display:flex;align-items:center;justify-content:center;color:white;font-family:'Fraunces',serif;font-size:24px;font-weight:700;overflow:hidden;position:relative;}
 .cp-photo img{width:100%;height:100%;object-fit:cover;display:block;}
-.cp-photo-edit{position:absolute;bottom:0;right:0;background:var(--accent);color:white;width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;border:2px solid var(--paper);cursor:none;font-size:12px;line-height:1;}
+.cp-photo-edit{position:absolute;bottom:0;right:0;background:var(--accent);color:var(--on-coral, #160A06);width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;border:2px solid var(--paper);cursor:none;font-size:12px;line-height:1;}
 .cp-name{font-family:'Fraunces',serif;font-size:18px;font-weight:800;text-align:center;margin-bottom:2px;}
 .cp-name input{width:100%;border:none;background:transparent;font:inherit;text-align:center;outline:none;border-bottom:1.5px solid transparent;padding:2px 0;cursor:text;}
 .cp-name input:focus{border-bottom-color:var(--accent);}
@@ -187,7 +187,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--charco
 .cp-section-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;}
 .cp-section-title{font-family:'DM Sans',sans-serif;font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);}
 .cp-add-btn{background:none;border:1px solid var(--border);border-radius:100px;padding:4px 10px;font-size:11px;font-weight:700;color:var(--charcoal);cursor:none;}
-.cp-add-btn:hover{border-color:var(--accent);color:var(--accent);}
+.cp-add-btn:hover{border-color:var(--accent);color:var(--tag-ink);}
 .cp-mem{display:flex;align-items:center;gap:10px;padding:8px 4px;}
 .cp-mem-av{width:34px;height:34px;border-radius:10px;color:white;display:flex;align-items:center;justify-content:center;font-family:'Fraunces',serif;font-size:11px;font-weight:700;flex-shrink:0;overflow:hidden;}
 .cp-mem-av img{width:100%;height:100%;object-fit:cover;display:block;}
@@ -199,7 +199,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--charco
 .cp-mem-mute{background:none;border:none;color:var(--muted);font-size:11px;font-weight:600;cursor:none;padding:4px 6px;}
 .cp-mem-mute:hover{color:var(--charcoal);text-decoration:underline;}
 .cp-action{display:block;width:100%;text-align:left;background:none;border:none;border-top:1px solid var(--border);padding:13px 0;font-family:'DM Sans',sans-serif;font-size:13px;color:var(--charcoal);cursor:none;}
-.cp-action:hover{color:var(--accent);}
+.cp-action:hover{color:var(--tag-ink);}
 .cp-action.danger{color:var(--error-ink);}
 .cp-action.danger:hover{color:var(--error-ink-hover);}
 .c-hdr{position:relative;}
@@ -213,7 +213,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--charco
 
 /* Read/Delivered receipt label — flush to the bubble's right edge. */
 .rr{font-size:10.5px;color:var(--muted);text-align:right;padding:2px 0 6px;letter-spacing:.02em;}
-.rr.read{color:var(--accent);font-weight:600;}
+.rr.read{color:var(--tag-ink);font-weight:600;}
 
 /* Typing indicator — peer's avatar + a bubble with 3 bouncing dots. */
 .typ-row{display:flex;gap:7px;align-items:flex-end;margin-top:6px;}
@@ -235,7 +235,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--charco
 .msg-attach-play{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.18);}
 .msg-attach-play div{width:46px;height:46px;border-radius:50%;background:rgba(255,255,255,.94);display:flex;align-items:center;justify-content:center;color:#1C1C1E;}
 .msg-attach-body{padding:10px 12px 12px;}
-.msg-attach-label{font-size:9.5px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--accent);margin-bottom:5px;}
+.msg-attach-label{font-size:9.5px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--tag-ink);margin-bottom:5px;}
 .msg-attach-text{font-size:13px;color:var(--charcoal);line-height:1.4;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:3;overflow:hidden;}
 .msg-attach-text.empty{color:var(--muted);font-style:italic;font-size:12px;}
 .msg-attach-missing{padding:14px;text-align:center;color:var(--muted);font-size:12px;}
@@ -256,15 +256,19 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--charco
 .msg-row.mine .msg-attach-author{color:rgba(255,255,255,.7);border-top-color:rgba(255,255,255,.12);}
 .msg-row.mine .msg-attach-author-name{color:white;}
 .msg-row.mine .msg-attach-missing{color:rgba(255,255,255,.7);}
+/* The small label reads --tag-ink on the light card (Oct 12). My own card is
+   dark in both looks, where the darker Light ink would fade, so it keeps the
+   plain orange it always had there (5.0:1). */
+.msg-row.mine .msg-attach-label{color:var(--accent);}
 .t-search{display:flex;align-items:center;gap:8px;background:var(--cream);border:1.5px solid var(--border);border-radius:12px;padding:8px 12px;transition:border-color .18s;}
 .t-search:focus-within{border-color:rgba(var(--scrim-rgb),.2);background:var(--paper);}
 .t-search input{border:none;background:none;font-family:'DM Sans',sans-serif;font-size:13px;color:var(--charcoal);outline:none;flex:1;cursor:text;}
 .t-search input::placeholder{color:var(--muted);}
 .req-banner{margin:10px 12px 0;padding:10px 12px;border-radius:12px;background:var(--coral-wash);border:1px solid rgba(255,92,53,.15);display:flex;align-items:center;gap:10px;cursor:none;transition:all .18s;flex-shrink:0;}
 .req-banner:hover{transform:translateY(-1px);box-shadow:var(--shadow);}
-.req-icon{width:28px;height:28px;border-radius:8px;background:var(--accent);display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.req-icon{width:28px;height:28px;border-radius:8px;background:var(--accent);color:var(--on-coral, #160A06);display:flex;align-items:center;justify-content:center;flex-shrink:0;}
 .req-txt h4{font-size:12px;font-weight:700;}.req-txt p{font-size:11px;color:var(--muted);}
-.req-badge{margin-left:auto;background:var(--accent);color:white;font-size:11px;font-weight:800;width:20px;height:20px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.req-badge{margin-left:auto;background:var(--accent);color:var(--on-coral, #160A06);font-size:11px;font-weight:800;width:20px;height:20px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
 /* Requests view: the banner opens it, the list shows only message
    requests, and the back button returns to All (__dmShowRequests). */
 .req-view-hdr{display:flex;align-items:center;gap:10px;padding:10px 12px;border-bottom:1px solid var(--border);flex-shrink:0;}
@@ -311,7 +315,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--charco
 .req-bar p{font-size:13px;color:var(--soft);line-height:1.55;margin-bottom:10px;}
 .req-btns{display:flex;gap:8px;}
 .btn-acc{font-family:'DM Sans',sans-serif;font-size:13px;font-weight:700;background:var(--charcoal);color:var(--on-ink);border:none;padding:8px 20px;border-radius:100px;cursor:none;transition:all .2s;}
-.btn-acc:hover{background:var(--accent);color:white;}
+.btn-acc:hover{background:var(--accent);color:var(--on-coral, #160A06);}
 .btn-dec{font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;background:none;color:var(--muted);border:1.5px solid var(--border);padding:8px 20px;border-radius:100px;cursor:none;transition:all .15s;}
 .btn-dec:hover{border-color:rgba(var(--scrim-rgb),.2);color:var(--charcoal);}
 /* Disabled while an Accept / Decline is waiting on the server. */
@@ -468,6 +472,10 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--charco
 .snd-btn{width:32px;height:32px;border-radius:50%;background:var(--accent);border:none;cursor:none;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .2s;align-self:flex-end;}
 .snd-btn:hover{background:#ff7055;transform:scale(1.08);}
 .snd-btn:disabled{background:var(--border);transform:none;}
+/* The arrow on the orange send button is dark ink (white on orange is 3.1:1).
+   A CSS fill wins over the icon's own white, so the greyed-out button keeps
+   the look it had. */
+.snd-btn:not(:disabled) svg path{fill:var(--on-coral, #160A06);stroke:var(--on-coral, #160A06);}
 /* Club chat v1: the quiet line that stands in for the composer in a room the
    viewer can't post in, on the composer's own surface and tokens. A club's
    room has no attach button. Both classes are set by __dmPaintComposer. */
@@ -495,7 +503,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--charco
 .empty h3{font-family:'Fraunces',serif;font-size:19px;font-weight:700;color:var(--charcoal);margin-bottom:7px;}
 .empty p{font-size:14px;text-align:center;max-width:240px;line-height:1.6;}
 .start-btn{margin-top:18px;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:700;background:var(--charcoal);color:var(--on-ink);border:none;padding:11px 26px;border-radius:100px;cursor:none;transition:all .2s;}
-.start-btn:hover{background:var(--accent);transform:translateY(-1px);color:white;}
+.start-btn:hover{background:var(--accent);transform:translateY(-1px);color:var(--on-coral, #160A06);}
 
 /* Left-column empty (no conversations yet) */
 .t-empty{display:none;flex:1;flex-direction:column;align-items:center;justify-content:center;padding:40px 28px;text-align:center;color:var(--muted);}
@@ -504,7 +512,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--charco
 .t-empty h4{font-family:'Fraunces',serif;font-size:17px;font-weight:700;color:var(--charcoal);margin-bottom:7px;letter-spacing:-.3px;}
 .t-empty p{font-size:13px;line-height:1.6;max-width:220px;margin-bottom:16px;}
 .t-empty-cta{display:inline-flex;align-items:center;gap:5px;font-family:'DM Sans',sans-serif;font-size:12.5px;font-weight:600;color:var(--on-ink);background:var(--charcoal);padding:9px 18px;border-radius:100px;text-decoration:none;cursor:none;transition:all .15s;}
-.t-empty-cta:hover{background:var(--accent);color:white;}
+.t-empty-cta:hover{background:var(--accent);color:var(--on-coral, #160A06);}
 
 
 /* ════ CALENDAR WIDGET ════ */
@@ -546,7 +554,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--charco
   background: none; border: none; cursor: none;
   transition: color .15s;
 }
-.cal-toggle:hover { color: var(--accent); }
+.cal-toggle:hover { color: var(--tag-ink); }
 .cal-grid {
   display: grid; grid-template-columns: repeat(7, 1fr); gap: 1px;
 }
@@ -572,9 +580,9 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--charco
   position: absolute; bottom: 2px;
 }
 .cal-day.today.has-event::after { background: var(--on-ink); }
-.cal-day.selected { background: var(--accent); color: white; }
+.cal-day.selected { background: var(--accent); color: var(--on-coral, #160A06); }
 .cal-day.selected:hover { background: #ff7055; }
-.cal-day.selected.has-event::after { background: white; }
+.cal-day.selected.has-event::after { background: var(--on-coral, #160A06); }
 
 /* Event list panel — slides open below grid */
 .cal-events-panel {
@@ -609,7 +617,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--charco
 }
 .cal-event-count-badge {
   font-size: 9px; font-weight: 800; background: var(--accent);
-  color: white; padding: 1px 6px; border-radius: 100px; margin-left: 3px;
+  color: var(--on-coral, #160A06); padding: 1px 6px; border-radius: 100px; margin-left: 3px;
 }
 
 /* ════ CALENDAR FULL MODAL ════ */
@@ -663,7 +671,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--charco
 }
 .cal-modal-add-btn {
   display: flex; align-items: center; gap: 6px;
-  background: var(--accent); color: white;
+  background: var(--accent); color: var(--on-coral, #160A06);
   font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 700;
   border: none; padding: 9px 18px; border-radius: 100px; cursor: none;
   transition: all .2s;
@@ -722,7 +730,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--charco
   background: var(--charcoal); color: var(--on-ink);
 }
 .cal-modal-day.selected .cal-modal-day-num {
-  background: var(--accent); color: white;
+  background: var(--accent); color: var(--on-coral, #160A06);
 }
 .cal-modal-event-pill {
   font-size: 10px; font-weight: 700;
@@ -730,6 +738,10 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--charco
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   color: white; cursor: none;
 }
+/* Oct 12: an event left on the default orange gets the dark ink (white on
+   orange is 3.1:1, this is 6.3:1). The other event colours keep white. The
+   pill's fill is an inline style, hence the attribute match. */
+.cal-modal-event-pill[style*="#FF5C35" i] { color: var(--on-coral, #160A06); }
 
 /* Right panel */
 .cal-modal-sidebar {
@@ -770,7 +782,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--charco
   color: var(--muted); font-size: 16px; padding: 0 2px;
   transition: color .15s; align-self: flex-start;
 }
-.cal-modal-event-del:hover { color: var(--accent); }
+.cal-modal-event-del:hover { color: var(--tag-ink); }
 .cal-modal-no-events {
   text-align: center; padding: 32px 16px;
   color: var(--muted); font-size: 13px; line-height: 1.6;
@@ -833,7 +845,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--charco
 .btn-cancel:hover { background: var(--border); }
 .btn-save-event {
   font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 700;
-  background: var(--accent); color: white; border: none;
+  background: var(--accent); color: var(--on-coral, #160A06); border: none;
   padding: 10px 24px; border-radius: 100px; cursor: none; transition: all .2s;
 }
 .btn-save-event:hover { background: #ff7055; }
@@ -931,7 +943,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--charco
 .votd-rank {
   position: absolute; top: 12px; left: 12px; z-index: 2;
   display: flex; align-items: center; gap: 5px;
-  background: rgba(255,92,53,.9); color: white;
+  background: rgba(255,92,53,.9); color: var(--on-coral, #160A06);
   font-size: 10px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase;
   padding: 4px 10px; border-radius: 100px;
   backdrop-filter: blur(4px);
@@ -970,7 +982,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--charco
   font-size: 12px; font-weight: 600; color: var(--muted);
 }
 .votd-stat svg { flex-shrink: 0; }
-.votd-stat.hot { color: var(--accent); }
+.votd-stat.hot { color: var(--tag-ink); }
 
 /* React bar */
 .votd-react-bar {
@@ -984,8 +996,8 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--charco
   font-size: 12px; font-weight: 600; color: var(--muted);
   cursor: none; transition: all .15s; border-style: solid;
 }
-.votd-react-btn:hover { border-color: var(--accent); color: var(--accent); background: var(--coral-wash-2); }
-.votd-react-btn.active { border-color: var(--accent); color: var(--accent); background: var(--coral-wash-2); }
+.votd-react-btn:hover { border-color: var(--accent); color: var(--tag-ink); background: var(--coral-wash-2); }
+.votd-react-btn.active { border-color: var(--accent); color: var(--tag-ink); background: var(--coral-wash-2); }
 .votd-comment-btn {
   margin-left: auto; display: flex; align-items: center; gap: 6px;
   background: none; border: none; font-size: 12px; font-weight: 600;
@@ -1084,7 +1096,7 @@ input,textarea,[contenteditable="true"]{cursor:text!important;}
       <div class="thread-title-row">
         <div class="thread-title">Messages</div>
         <button class="t-new-btn" onclick="__dmComposeOpen()" title="New message">
-          <svg width="11" height="11" viewBox="0 0 11 11" fill="none"><path d="M5.5 1v9M1 5.5h9" stroke="white" stroke-width="1.7" stroke-linecap="round"/></svg>
+          <svg width="11" height="11" viewBox="0 0 11 11" fill="none"><path d="M5.5 1v9M1 5.5h9" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
           New
         </button>
       </div>
@@ -1092,7 +1104,7 @@ input,textarea,[contenteditable="true"]{cursor:text!important;}
     </div>
     <!-- Hidden by default — populated by __dmRenderList only when real requests exist. -->
     <div class="req-banner" style="display:none">
-      <div class="req-icon"><svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M1 1h11v8H4L1 12V1z" stroke="white" stroke-width="1.3" fill="none" stroke-linejoin="round"/></svg></div>
+      <div class="req-icon"><svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M1 1h11v8H4L1 12V1z" stroke="currentColor" stroke-width="1.3" fill="none" stroke-linejoin="round"/></svg></div>
       <div class="req-txt"><h4>Message requests</h4><p></p></div>
       <div class="req-badge"></div>
     </div>
@@ -1811,7 +1823,7 @@ function miniSelectDay(year,month,day){
         list=document.getElementById('calEventsList'),title=document.getElementById('calPanelTitle');
   title.textContent=new Date(year,month,day).toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'});
   if(!evts.length){list.innerHTML=`<div class="cal-empty">No events </div>`;}
-  else{list.innerHTML=evts.map(e=>`<div class="cal-event-item"><div class="cal-event-dot" style="background:${e.color}"></div><div class="cal-event-info"><div class="cal-event-name">${e.name}</div><div class="cal-event-time">${fmtTime(e.time)}${e.location?' &middot; '+e.location:''}</div></div><button onclick="removeCalEvent('${key}','${e.name}')" style="background:none;border:none;color:var(--muted);cursor:none;font-size:14px;padding:2px 4px;border-radius:5px;transition:color .15s" onmouseover="this.style.color='var(--accent)'" onmouseout="this.style.color='var(--muted)'">&times;</button></div>`).join('');}
+  else{list.innerHTML=evts.map(e=>`<div class="cal-event-item"><div class="cal-event-dot" style="background:${e.color}"></div><div class="cal-event-info"><div class="cal-event-name">${e.name}</div><div class="cal-event-time">${fmtTime(e.time)}${e.location?' &middot; '+e.location:''}</div></div><button onclick="removeCalEvent('${key}','${e.name}')" style="background:none;border:none;color:var(--muted);cursor:none;font-size:14px;padding:2px 4px;border-radius:5px;transition:color .15s" onmouseover="this.style.color='var(--tag-ink)'" onmouseout="this.style.color='var(--muted)'">&times;</button></div>`).join('');}
   panel.classList.add('open');
 }
 function removeCalEvent(key,name){
@@ -3181,7 +3193,7 @@ function __dmComposeSearch(q) {
           ? '__dmComposeToggle(' + JSON.stringify(JSON.stringify(u)).replace(/"/g, '&quot;') + ')'
           : '__dmComposeSelectDirect(' + JSON.stringify(u.handle || '').replace(/"/g, '&quot;') + ')';
         const checkbox = isGroup
-          ? '<div class="checkbox">' + (selected ? '<svg width="11" height="11" viewBox="0 0 11 11" fill="none"><path d="M2 5.5L4.5 8L9 3" stroke="white" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>' : '') + '</div>'
+          ? '<div class="checkbox">' + (selected ? '<svg width="11" height="11" viewBox="0 0 11 11" fill="none"><path d="M2 5.5L4.5 8L9 3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>' : '') + '</div>'
           : '';
         return '<div class="compose-row' + (selected ? ' selected' : '') + '" onclick="' + onClick + '">' +
           checkbox +

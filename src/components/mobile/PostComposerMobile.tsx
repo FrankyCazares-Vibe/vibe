@@ -498,7 +498,9 @@ export function PostComposerMobile({ onClose, onPosted, origin }: Props) {
             border: "none",
             background:
               hasContent && !busy ? "#FF5C35" : "rgba(28,28,30,0.16)",
-            color: "#fff",
+            // Dark words on orange (6.3:1; white was 3.1:1). While the pill
+            // is grey it is not on orange and keeps its white words.
+            color: hasContent && !busy ? "var(--on-coral, #160A06)" : "#fff",
             fontFamily: "inherit",
             fontSize: 13,
             fontWeight: 700,
@@ -562,7 +564,10 @@ export function PostComposerMobile({ onClose, onPosted, origin }: Props) {
             fontFamily: "inherit",
             fontSize: 14,
             fontWeight: 700,
-            color: "#C2461F",
+            // The Light value of --tag-ink (4.8:1 on this orange wash; the
+            // old #C2461F was 4.2:1). A literal because the sheet stays
+            // cream in Night too.
+            color: "#B83A1A",
             cursor: busy ? "default" : "pointer",
           }}
         >
@@ -573,7 +578,8 @@ export function PostComposerMobile({ onClose, onPosted, origin }: Props) {
           </svg>
           Photo / Video
         </button>
-        <span style={{ marginLeft: "auto", fontSize: 11, color: "#8A8580" }}>
+        {/* The Light value of --ink-muted (5.2:1; #8A8580 was 3.4:1). */}
+        <span style={{ marginLeft: "auto", fontSize: 11, color: "#6C6761" }}>
           {text.length}/2000
         </span>
       </div>
@@ -659,7 +665,7 @@ export function PostComposerMobile({ onClose, onPosted, origin }: Props) {
             >
               🎬 {clipFile.name} · {(clipFile.size / (1024 * 1024)).toFixed(1)} MB
               {videoMeta?.duration ? (
-                <span style={{ color: "#8A8580" }}>
+                <span style={{ color: "#6C6761" }}>
                   {" · "}
                   {Math.round(videoMeta.duration)}s
                 </span>

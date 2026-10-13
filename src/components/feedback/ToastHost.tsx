@@ -129,7 +129,8 @@ function ToastPill({ item }: { item: ToastItem }) {
             borderRadius: 999,
             border: "none",
             background: "#FF5C35",
-            color: "#FAF7F2",
+            // Dark words on coral (6.3:1); cream on coral was 2.9:1.
+            color: "var(--on-coral, #160A06)",
             fontFamily: "DM Sans, sans-serif",
             fontSize: 12,
             fontWeight: 700,

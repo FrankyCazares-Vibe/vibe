@@ -73,7 +73,7 @@
     .vsa-btn{padding:8px 18px;border-radius:100px;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:700;cursor:pointer;border:none;}
     .vsa-btn.ghost{background:none;border:1px solid rgba(var(--scrim-rgb,28,28,30),.12);color:var(--charcoal,#1C1C1E);}
     .vsa-btn.ghost:hover{background:var(--cream,#FAF7F2);}
-    .vsa-btn.primary{background:#FF5C35;color:white;}
+    .vsa-btn.primary{background:#FF5C35;color:var(--on-coral, #160A06);}
     .vsa-btn.primary:hover{filter:brightness(1.05);}
     .vsa-btn.primary:disabled{opacity:.45;cursor:not-allowed;}
     .vsa-btn.danger{background:#C0392B;color:white;}
@@ -87,7 +87,7 @@
       font-family:inherit;font-size:12.5px;font-weight:700;color:var(--error-ink,#C0392B);text-decoration:underline;cursor:pointer;}
     /* Night (S68 wave 5): the sheet's own copy of the Night tokens it reads,
        scoped to its overlay and the fallback toast, so it paints Night on any
-       host (messages.html has no --ink-muted / --hairline / --error-ink).
+       host (messages.html has no --hairline).
        Light sets nothing here: each var() above falls back to the literal it
        replaced. The toast's charcoal fill turns cream with dark text, the
        --on-ink pattern. The note textarea had no colour of its own (browser

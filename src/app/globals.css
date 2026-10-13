@@ -72,6 +72,11 @@
   /* Coral is for fills, borders and the wordmark's dot. As words on a light
      page it is only 2.9:1, so orange text reads --tag-ink (5.4:1 on cream). */
   --coral: #FF5C35;
+  /* Words, arrows and counts drawn ON a coral fill (a button, a badge, a
+     chip): dark, the way the landing page's button does it. White on coral
+     is only 3.1:1; this is 6.3:1. The same value in both looks, because the
+     coral under it is the same in both. Added Oct 12, 2026. */
+  --on-coral: #160A06;
   --tag-ink: #B83A1A;
   --tag-bg: rgba(255,92,53,0.10);
   --card-shadow: inset 0 1px 0 rgba(255,255,255,0.85), 0 4px 14px rgba(180,120,60,0.08);
@@ -171,6 +176,7 @@
   --glass: rgba(22,21,21,0.86);
   --glass-border: rgba(255,255,255,0.07);
   --coral: #FF5C35;
+  --on-coral: #160A06;
   --tag-ink: #FF8A66;
   --tag-bg: rgba(255,92,53,0.14);
   --card-shadow: inset 0 1px 0 rgba(255,255,255,0.04), 0 6px 18px rgba(0,0,0,0.45);
@@ -866,7 +872,9 @@ body > .vibe-auth-page {
   border-radius: 12px;
   border: none;
   background: #ff5c35;
-  color: #fff;
+  /* Dark words on the orange button (6.3:1); white was 3.1:1 and the
+     standard asks for 4.5. The fallback is for a page without the token. */
+  color: var(--on-coral, #160A06);
   font-family: "DM Sans", sans-serif;
   font-size: 15px;
   font-weight: 600;
@@ -983,11 +991,12 @@ body > .vibe-auth-page {
 }
 .vibe-auth-step--active .vibe-auth-step-num {
   background: #ff5c35;
-  color: #fff;
+  color: var(--on-coral, #160A06);
 }
+/* The same dark ink on the gold step: 8.2:1 (white on this gold was 2.4:1). */
 .vibe-auth-step--active.vibe-auth-step--edu .vibe-auth-step-num {
   background: #d4a020;
-  color: #fff;
+  color: var(--on-coral, #160A06);
 }
 .vibe-auth-step--done .vibe-auth-step-num {
   background: #2e7d32;
@@ -1950,7 +1959,8 @@ a.otto-room-row-title:hover {
   top: 1px;
   width: 5px;
   height: 9px;
-  border: solid #fff;
+  /* The tick is drawn on coral, so it takes the same dark ink as words do. */
+  border: solid var(--on-coral, #160A06);
   border-width: 0 2px 2px 0;
   transform: rotate(45deg);
 }

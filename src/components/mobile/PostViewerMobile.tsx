@@ -660,7 +660,10 @@ export function PostViewerMobile({
               <div
                 style={{
                   fontSize: 11,
-                  color: "#8A8580",
+                  // This bar stays light in Night too, so the grey is the
+                  // Light value of --ink-muted, not the token (5.5:1 here;
+                  // the old #8A8580 was 3.6:1).
+                  color: "#6C6761",
                   overflow: "hidden",
                   textOverflow: "ellipsis",
                   whiteSpace: "nowrap",
@@ -932,7 +935,8 @@ export function PostViewerMobile({
                       borderRadius: 999,
                       background: "var(--tag-bg)",
                       border: "1px solid rgba(255,92,53,0.22)",
-                      color: "#FF5C35",
+                      // As the feed's tag chip: raw coral is 2.6:1 on it.
+                      color: "var(--tag-ink)",
                       fontFamily: "DM Sans, sans-serif",
                       fontSize: 12,
                       fontWeight: 700,
@@ -967,7 +971,9 @@ export function PostViewerMobile({
                 label={String(counts.likes)}
                 active={viewer.liked}
                 onTap={toggleLike}
-                activeColor="#FF5C35"
+                // The count is words, so it reads --tag-ink (raw coral is
+                // 2.9:1 on cream). The heart keeps its coral (HeartIcon).
+                activeColor="var(--tag-ink)"
                 icon={<HeartIcon filled={viewer.liked} />}
               />
               <EngagementButton
@@ -1151,7 +1157,9 @@ export function PostViewerMobile({
               borderRadius: 999,
               background:
                 draft.trim() && !posting ? "#FF5C35" : "rgba(28,28,30,0.10)",
-              color: draft.trim() && !posting ? "#fff" : "#8A8580",
+              // Dark words on orange (6.3:1; white was 3.1:1). The grey is
+              // the switched-off button's own dimming, left as it was.
+              color: draft.trim() && !posting ? "var(--on-coral, #160A06)" : "#8A8580",
               border: "none",
               fontFamily: "DM Sans, sans-serif",
               fontWeight: 700,
@@ -1439,7 +1447,7 @@ function EngagementStat({ label, icon }: { label: string; icon: React.ReactNode 
 // ── inline icons (kept here so the viewer is fully self-contained) ──
 function HeartIcon({ filled }: { filled?: boolean }) {
   return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill={filled ? "#FF5C35" : "none"} stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+    <svg width="18" height="18" viewBox="0 0 24 24" fill={filled ? "#FF5C35" : "none"} stroke={filled ? "#FF5C35" : "currentColor"} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
       <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
     </svg>
   );
@@ -1506,7 +1514,8 @@ function PostViewerSkeleton() {
 
 // Inline @handle / #tag linkifier — matches the desktop feed's
 // renderPostContent behavior. Mentions route to /profile/<handle>;
-// tags route to the campus feed filtered to that hashtag.
+// tags route to the campus feed filtered to that hashtag. Both read
+// --tag-ink: as words, raw coral is only 2.9:1 on the cream page.
 function renderInlineContent(text: string): React.ReactNode {
   if (!text) return null;
   const re = /(^|[^A-Za-z0-9_@#])([@#][A-Za-z0-9_]{1,32})/g;
@@ -1526,7 +1535,7 @@ function renderInlineContent(text: string): React.ReactNode {
         <Link
           key={`m${key++}`}
           href={`/profile/${encodeURIComponent(body)}`}
-          style={{ color: "#FF5C35", fontWeight: 600, textDecoration: "none" }}
+          style={{ color: "var(--tag-ink)", fontWeight: 600, textDecoration: "none" }}
         >
           {token}
         </Link>,
@@ -1536,7 +1545,7 @@ function renderInlineContent(text: string): React.ReactNode {
         <Link
           key={`h${key++}`}
           href={`/campus?tab=feed&tag=${encodeURIComponent(body)}`}
-          style={{ color: "#FF5C35", fontWeight: 600, textDecoration: "none" }}
+          style={{ color: "var(--tag-ink)", fontWeight: 600, textDecoration: "none" }}
         >
           {token}
         </Link>,

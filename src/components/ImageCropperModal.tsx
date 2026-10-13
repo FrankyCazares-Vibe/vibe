@@ -522,7 +522,10 @@ export function ImageCropperModal({
         </div>
 
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <span style={{ fontSize: 11, fontWeight: 700, color: "#8A8580" }}>
+          {/* Light's --ink-muted, written out: this card is white in both
+              looks, so Night's lighter grey would fade on it. Was #8A8580
+              (3.7:1 on white); 5.6:1. */}
+          <span style={{ fontSize: 11, fontWeight: 700, color: "#6C6761" }}>
             ZOOM
           </span>
           <input
@@ -567,7 +570,7 @@ export function ImageCropperModal({
                   }}
                 />
                 <span style={{ fontWeight: 700 }}>{g.label}</span>
-                <span style={{ color: "#8A8580" }}>visible area</span>
+                <span style={{ color: "#6C6761" }}>visible area</span>
               </div>
             ))}
           </div>
@@ -606,7 +609,8 @@ export function ImageCropperModal({
               border: "none",
               background:
                 busy || !imgDims ? "rgba(28,28,30,0.18)" : "#FF5C35",
-              color: "#fff",
+              // Dark words on the coral fill (6.3:1); white was 3.1:1.
+              color: busy || !imgDims ? "#fff" : "var(--on-coral, #160A06)",
               fontFamily: "inherit",
               fontSize: 12,
               fontWeight: 700,

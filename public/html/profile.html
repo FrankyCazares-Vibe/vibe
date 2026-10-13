@@ -116,6 +116,11 @@ html.vibe-pre-paint .profile-cover { opacity: 0; }
   --card-shadow: inset 0 1px 0 rgba(255,255,255,0.85), 0 4px 14px rgba(180,120,60,0.08);
   /* Text on a var(--charcoal) fill (buttons, chips, today). */
   --on-ink: #FFFFFF;
+  /* Words, icons and counts on an orange fill (Oct 12): white on coral is
+     3.1:1, this dark ink is 6.3:1. The same value in both looks, because the
+     orange does not change. Orange used as words on a light surface reads
+     --tag-ink instead; --accent stays for fills and borders. */
+  --on-coral: #160A06;
   /* Wave 5 (S68): every literal the night pass swapped, Light value = the
      literal it replaced, exactly. The -rgb triplets feed rgba(var(--x),a)
      the way --scrim-rgb does. Status inks match globals.css. */
@@ -187,6 +192,7 @@ html.vibe-pre-paint .profile-cover { opacity: 0; }
   --tag-bg: rgba(255,92,53,0.14);
   --card-shadow: inset 0 1px 0 rgba(255,255,255,0.04), 0 6px 18px rgba(0,0,0,0.45);
   --on-ink: #0C0B0B;
+  --on-coral: #160A06;
   --cream-rgb: 12,11,11;
   --warm-white-rgb: 22,21,21;
   --paper-rgb: 22,21,21;
@@ -317,8 +323,8 @@ nav {
   background:var(--paper);color:var(--muted);
   cursor:none;transition:all .22s;
 }
-.edit-toggle:hover { border-color:var(--accent);color:var(--accent); }
-.edit-toggle.active { background:var(--accent);color:white;border-color:var(--accent); }
+.edit-toggle:hover { border-color:var(--accent);color:var(--tag-ink); }
+.edit-toggle.active { background:var(--accent);color:var(--on-coral, #160A06);border-color:var(--accent); }
 .edit-toggle .dot { width:7px;height:7px;border-radius:50%;background:currentColor;opacity:.6; }
 .edit-toggle.active .dot { opacity:1;animation:blink 1.2s infinite; }
 @keyframes blink { 0%,100%{opacity:1} 50%{opacity:.4} }
@@ -329,7 +335,7 @@ nav {
   transition:all .2s;
 }
 .btn-nav.dark { background:var(--charcoal);color:var(--on-ink); }
-.btn-nav.dark:hover { background:var(--accent);transform:translateY(-1px);color:white; }
+.btn-nav.dark:hover { background:var(--accent);transform:translateY(-1px);color:var(--on-coral, #160A06); }
 .btn-nav.ghost { background:none;color:var(--muted);border:1px solid var(--border); }
 .btn-nav.ghost:hover { color:var(--charcoal);border-color:rgba(var(--scrim-rgb),.2); }
 
@@ -451,7 +457,7 @@ body.edit-mode .avatar:hover .avatar-edit-hint { opacity:1; }
   padding:10px 20px;border-radius:100px;border:none;cursor:none;
   transition:all .2s;
 }
-.action-btn.primary { background:var(--accent);color:white; }
+.action-btn.primary { background:var(--accent);color:var(--on-coral, #160A06); }
 .action-btn.primary:hover { background:#ff7055;transform:translateY(-1px);box-shadow:0 8px 20px rgba(255,92,53,.3); }
 .action-btn.outline { background:transparent;border:1.5px solid rgba(var(--scrim-rgb),.15);color:var(--charcoal); }
 .action-btn.outline:hover { border-color:var(--charcoal); }
@@ -556,7 +562,7 @@ body.edit-mode .meta-campus-hint { display:block !important; }
 .meta-campus-hint [data-campus-sub]:not(:empty), .meta-campus-hint [data-campus-note]:not(:empty) { display:block; margin-top:2px; }
 .meta-campus-hint [data-campus-note] { color:var(--error-ink); }
 .meta-campus-static { font-size:12.5px; color:var(--muted); }
-.meta-campus-static a { color:var(--accent); font-weight:700; text-decoration:none; }
+.meta-campus-static a { color:var(--tag-ink); font-weight:700; text-decoration:none; }
 
 /* "Here for": the onboarding answer to "What are you here for?". Owner
    only (ruling H6): the bootstrap blanks it for every other viewer, and
@@ -579,10 +585,10 @@ body.edit-mode:not(.viewer-mode) .here-chip {
   display:inline-flex;background:none;color:var(--muted);
   border:1px dashed rgba(var(--scrim-rgb),.18);transition:color .15s,border-color .15s,background .15s;
 }
-body.edit-mode:not(.viewer-mode) .here-chip:hover { color:var(--accent);border-color:rgba(255,92,53,.3); }
+body.edit-mode:not(.viewer-mode) .here-chip:hover { color:var(--tag-ink);border-color:rgba(255,92,53,.3); }
 body.edit-mode:not(.viewer-mode) .here-chip:disabled { opacity:.5;pointer-events:none; }
 body.edit-mode:not(.viewer-mode) .here-chip.on {
-  background:var(--wash-coral);color:var(--accent);border:1px solid rgba(255,92,53,.3);
+  background:var(--wash-coral);color:var(--tag-ink);border:1px solid rgba(255,92,53,.3);
 }
 .here-for-hint { display:none;font-size:12px;color:var(--muted); }
 body.edit-mode:not(.viewer-mode) .here-for-hint { display:inline; }
@@ -596,7 +602,7 @@ body.edit-mode:not(.viewer-mode) .here-for-hint { display:inline; }
   transition:transform .15s;
 }
 .vibe-tag:hover { transform:scale(1.04); }
-.vibe-tag.coral { background:var(--wash-coral);color:#FF5C35; }
+.vibe-tag.coral { background:var(--wash-coral);color:var(--tag-ink); }
 .vibe-tag.purple { background:var(--wash-purple);color:var(--purple-ink); }
 .vibe-tag.mint { background:var(--wash-mint);color:var(--ok-ink); }
 .vibe-tag.gold { background:var(--wash-gold);color:var(--gold-ink); }
@@ -615,7 +621,7 @@ body.edit-mode .tag-remove { display:flex; }
   cursor:none;display:none;transition:all .15s;
 }
 body.edit-mode .tag-add { display:flex;align-items:center;gap:5px; }
-.tag-add:hover { border-color:var(--accent);color:var(--accent); }
+.tag-add:hover { border-color:var(--accent);color:var(--tag-ink); }
 
 /* Card panels */
 .card {
@@ -629,7 +635,7 @@ body.edit-mode .tag-add { display:flex;align-items:center;gap:5px; }
   display:flex;align-items:center;justify-content:space-between;
 }
 .card-add-btn {
-  font-size:12px;font-weight:600;color:var(--accent);
+  font-size:12px;font-weight:600;color:var(--tag-ink);
   background:none;border:none;cursor:none;display:none;
   transition:opacity .15s;
 }
@@ -806,7 +812,7 @@ body.edit-mode .work-logo-wrap:hover { transform:scale(1.06);box-shadow:0 4px 16
 }
 .work-logo-upload-hint {
   position:absolute;inset:0;border-radius:13px;
-  background:rgba(255,92,53,.85);color:white;
+  background:rgba(255,92,53,.85);color:var(--on-coral, #160A06);
   display:flex;align-items:center;justify-content:center;
   font-size:10px;font-weight:700;letter-spacing:.5px;
   opacity:0;transition:opacity .18s;
@@ -885,7 +891,7 @@ body.edit-mode .current-icon-wrap::after {
   border-radius:999px;
   background:#FF5C35;
   border:2px solid var(--cream);
-  color:#fff;
+  color:var(--on-coral, #160A06);
   font-size:10px;
   line-height:1;
   font-weight:800;
@@ -924,7 +930,7 @@ body.edit-mode .current-item:hover .current-delete { opacity:1; }
   transition:border-color .15s,color .15s;
 }
 body.edit-mode .vibe-add-thumb { display:flex; }
-.vibe-add-thumb:hover { border-color:var(--accent);color:var(--accent); }
+.vibe-add-thumb:hover { border-color:var(--accent);color:var(--tag-ink); }
 
 /* ── RIGHT COLUMN ── */
 .profile-right {}
@@ -960,7 +966,7 @@ body.edit-mode .vibe-add-thumb { display:flex; }
 /* Connect button */
 .connect-full {
   width:100%;padding:14px;border-radius:16px;
-  background:var(--accent);color:white;
+  background:var(--accent);color:var(--on-coral, #160A06);
   font-family:'DM Sans',sans-serif;font-size:14px;font-weight:700;
   border:none;cursor:none;margin-top:12px;
   transition:all .2s;
@@ -978,7 +984,7 @@ body.edit-mode .vibe-add-thumb { display:flex; }
 .pav-avatar { width:40px;height:40px;border-radius:12px;background:var(--cream);font-size:20px;display:flex;align-items:center;justify-content:center;flex-shrink:0; }
 .pav-info h4 { font-size:13px;font-weight:700;margin-bottom:1px; }
 .pav-info p { font-size:11px;color:var(--muted); }
-.pav-follow { margin-left:auto;font-size:11px;font-weight:700;color:var(--accent);background:none;border:none;cursor:none; }
+.pav-follow { margin-left:auto;font-size:11px;font-weight:700;color:var(--tag-ink);background:none;border:none;cursor:none; }
 
 /* ── POSTS FEED ── */
 .posts-header-row {
@@ -1111,7 +1117,7 @@ body.edit-mode .vibe-add-thumb { display:flex; }
 .save-link {
   font-size:12px;
   font-weight:700;
-  color:var(--accent);
+  color:var(--tag-ink);
   cursor:none;
   white-space:nowrap;
 }
@@ -1181,14 +1187,14 @@ body.edit-mode .vibe-add-thumb { display:flex; }
 body.edit-mode .resume-upload-row { display:flex; }
 .resume-upload-btn {
   font-size:12px;font-weight:700;border:none;border-radius:999px;cursor:none;
-  padding:9px 14px;background:var(--accent);color:white;transition:all .15s;
+  padding:9px 14px;background:var(--accent);color:var(--on-coral, #160A06);transition:all .15s;
 }
 .resume-upload-btn:hover { background:#ff7055;transform:translateY(-1px); }
 .resume-clear-btn {
   font-size:12px;font-weight:700;border:1px solid var(--border);border-radius:999px;cursor:none;
   padding:9px 14px;background:transparent;color:var(--muted);transition:all .15s;
 }
-.resume-clear-btn:hover { color:var(--accent);border-color:rgba(255,92,53,.25);background:var(--wash-coral-faint); }
+.resume-clear-btn:hover { color:var(--tag-ink);border-color:rgba(255,92,53,.25);background:var(--wash-coral-faint); }
 
 .doc-viewer-grid {
   display:grid;grid-template-columns:180px 1fr;gap:14px;
@@ -1306,7 +1312,7 @@ body.doc-modal-open { overflow:hidden; }
   opacity:0;
 }
 .doc-page-thumb:hover .doc-page-thumb-remove { opacity:1; }
-.doc-page-thumb-remove:hover { background:var(--accent); transform:scale(1.1); }
+.doc-page-thumb-remove:hover { background:var(--accent); color:var(--on-coral, #160A06); transform:scale(1.1); }
 .doc-main {
   display:flex;flex-direction:column;gap:12px;
   /* Flex child of .doc-viewer-grid — needs min-height:0 so the inner
@@ -1412,7 +1418,7 @@ body.doc-modal-open { overflow:hidden; }
 }
 .doc-nav-btn:hover { background:var(--border); }
 .doc-nav-btn.primary { background:var(--charcoal);color:var(--on-ink); }
-.doc-nav-btn.primary:hover { background:var(--accent);color:white; }
+.doc-nav-btn.primary:hover { background:var(--accent);color:var(--on-coral, #160A06); }
 .doc-counter {
   font-size:12px;color:var(--muted);font-weight:700;
 }
@@ -1470,7 +1476,7 @@ body.doc-modal-open { overflow:hidden; }
   height:22px;
   border-radius:50%;
   background:#FF5C35;
-  color:white;
+  color:var(--on-coral, #160A06);
   border:1.5px solid white;
   font-size:13px;
   font-weight:700;
@@ -1511,7 +1517,7 @@ body.viewer-mode .redaction-delete { display:none !important; }
 .redaction-chip:hover {
   background:var(--paper);
   border-color:rgba(255,92,53,.25);
-  color:var(--accent);
+  color:var(--tag-ink);
 }
 .redaction-hint {
   font-size:11px;
@@ -1547,7 +1553,7 @@ body.viewer-mode .redaction-delete { display:none !important; }
 .doc-edit-cta-text { flex:1 1 auto;line-height:1.45; }
 .doc-edit-cta-text strong { font-weight:700; }
 .doc-edit-cta-go {
-  flex-shrink:0;font-weight:700;color:var(--accent);font-size:12px;
+  flex-shrink:0;font-weight:700;color:var(--tag-ink);font-size:12px;
   letter-spacing:.3px;text-transform:uppercase;
 }
 /* Hide when edit mode is already on OR when viewing someone else. */
@@ -1588,7 +1594,7 @@ body.viewer-mode .doc-edit-cta { display:none; }
 .modal-actions { display:flex;gap:10px;margin-top:24px;justify-content:flex-end; }
 .btn-cancel { background:var(--cream);color:var(--muted);border:none;padding:11px 20px;border-radius:100px;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;cursor:none;transition:background .15s; }
 .btn-cancel:hover { background:var(--border); }
-.btn-save-modal { background:var(--accent);color:white;border:none;padding:11px 24px;border-radius:100px;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:700;cursor:none;transition:all .2s; }
+.btn-save-modal { background:var(--accent);color:var(--on-coral, #160A06);border:none;padding:11px 24px;border-radius:100px;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:700;cursor:none;transition:all .2s; }
 .btn-save-modal:hover { background:#ff7055;transform:translateY(-1px); }
 
 /* ── Image upload zones ── */
@@ -1749,7 +1755,7 @@ body.edit-mode .profile-cover:hover .cover-panel { opacity:1;pointer-events:all;
   display:none;
 }
 body.edit-mode:not(.viewer-mode) .pin-unpin-btn { display:block; }
-.pin-unpin-btn:hover { color:var(--accent);border-color:rgba(255,92,53,.3); }
+.pin-unpin-btn:hover { color:var(--tag-ink);border-color:rgba(255,92,53,.3); }
 body.viewer-mode .pin-unpin-btn { display:none !important; }
 .pin-post-body { font-size:14px;line-height:1.75;color:var(--soft);margin-bottom:12px; }
 .pin-post-body strong { color:var(--charcoal); }
@@ -1769,7 +1775,7 @@ body.viewer-mode .viewer-only { display:block !important; }
 body:not(.viewer-mode) .viewer-only { display:none !important; }
 body.viewer-mode .edit-toggle,
 body.viewer-mode #editToggle { display:none !important; }
-body.viewer-mode #viewerBtn { background:rgba(255,92,53,.1);color:var(--accent);border-color:rgba(255,92,53,.3); }
+body.viewer-mode #viewerBtn { background:rgba(255,92,53,.1);color:var(--tag-ink);border-color:rgba(255,92,53,.3); }
 
 /* Edit-mode visitor-preview button: only shown while editing. The
    .owner-edit-only class also hides itself in viewer mode (the floating
@@ -1781,13 +1787,13 @@ body.viewer-mode .owner-edit-only { display:none !important; }
    reads as the live mode indicator (replaces the old "Exit edit" pill). */
 .nav-edit-btn.active {
   background: var(--accent);
-  color: white;
+  color: var(--on-coral, #160A06);
   border-color: var(--accent);
   box-shadow: 0 4px 14px rgba(255,92,53,.28);
 }
 .nav-edit-btn.active:hover {
   background: var(--accent);
-  color: white;
+  color: var(--on-coral, #160A06);
   border-color: var(--accent);
 }
 
@@ -1832,7 +1838,7 @@ body:not(.edit-mode) .meta-item:has(> [data-user-field]:empty) { display: none; 
 .preview-edit-pill .pep-text { color: rgba(255,255,255,.78); }
 .preview-edit-pill .pep-cta {
   padding: 6px 14px; border-radius: 999px;
-  background: var(--accent); color: white;
+  background: var(--accent); color: var(--on-coral, #160A06);
   border: none; font-family: inherit; font-size: 12px; font-weight: 700;
   cursor: none;
 }
@@ -1912,7 +1918,7 @@ body.edit-mode .vibe-grid-play { display:none; }
 }
 .post-thumb-cell.theme-coral    { background:#FFE5DB;color:#C54323; }
 .post-thumb-cell.theme-purple   { background:#F0EDFF;color:#5b3fd9; }
-.post-thumb-cell.theme-mint     { background:#EAFFF5;color:#1A9E5B; }
+.post-thumb-cell.theme-mint     { background:#EAFFF5;color:#147A45; }
 .post-thumb-cell.theme-gold     { background:#FFF7D6;color:#A17500; }
 .post-thumb-cell.theme-sky      { background:#E5F4FF;color:#1A6FB5; }
 .post-thumb-cell.theme-lavender { background:#F3EAFF;color:#7C3FE0; }
@@ -1946,7 +1952,7 @@ body.viewer-mode .avatar-row-actions .action-btn {
   cursor:none;transition:color .15s;
   min-width:64px;
 }
-.profile-stat:hover .profile-stat-num { color:var(--accent); }
+.profile-stat:hover .profile-stat-num { color:var(--tag-ink); }
 .profile-stat-num {
   font-family:'Fraunces',serif;font-weight:800;
   font-size:24px;line-height:1;letter-spacing:-.5px;
@@ -1957,7 +1963,7 @@ body.viewer-mode .avatar-row-actions .action-btn {
   letter-spacing:.6px;text-transform:uppercase;font-weight:600;
 }
 .profile-stat--prominent .profile-stat-num {
-  color:var(--accent);font-size:28px;
+  color:var(--tag-ink);font-size:28px;
 }
 
 /* ── Mutual pill — sits to the right of the Connect button ──
@@ -2036,7 +2042,7 @@ body.viewer-mode .avatar-row-actions .action-btn {
 .composer-btns { display:flex;align-items:center;justify-content:space-between; }
 .composer-publish {
   font-family:'DM Sans',sans-serif;font-size:13px;font-weight:700;
-  background:var(--accent);color:white;border:none;padding:8px 18px;
+  background:var(--accent);color:var(--on-coral, #160A06);border:none;padding:8px 18px;
   border-radius:100px;cursor:none;transition:all .2s;
 }
 .composer-publish:hover { background:#ff7055;transform:translateY(-1px); }
@@ -2074,7 +2080,7 @@ body.viewer-mode .avatar-row-actions .action-btn {
 }
 body.edit-mode .ppost-delete { display:flex; }
 body.viewer-mode .ppost-delete { display:none !important; }
-.ppost-delete:hover { background:var(--accent);color:white; }
+.ppost-delete:hover { background:var(--accent);color:var(--on-coral, #160A06); }
 .ppost-pin {
   position:absolute;top:10px;right:42px;
   background:rgba(0,0,0,.06);color:var(--charcoal);
@@ -2103,7 +2109,7 @@ body.viewer-mode .ppost-pin { display:none !important; }
 /* Read more truncation (LinkedIn-style) — clamped to 6 lines until expanded. */
 .ppost-body.is-clamped { display:-webkit-box; -webkit-line-clamp:6; -webkit-box-orient:vertical; overflow:hidden; }
 .ppost-body.is-expanded { display:block; }
-.ppost-readmore { display:none; background:none;border:none;padding:0;margin:-2px 0 10px;color:var(--accent);font-family:'DM Sans',sans-serif;font-size:13px;font-weight:700;cursor:none; }
+.ppost-readmore { display:none; background:none;border:none;padding:0;margin:-2px 0 10px;color:var(--tag-ink);font-family:'DM Sans',sans-serif;font-size:13px;font-weight:700;cursor:none; }
 .ppost-readmore.show { display:inline-block; }
 .ppost-tags { display:flex;flex-wrap:wrap;gap:5px;margin-bottom:10px; }
 .ppost-tag { font-size:11px;font-weight:600;padding:3px 9px;border-radius:100px;background:var(--paper);color:var(--muted); }
@@ -2123,7 +2129,7 @@ body.viewer-mode .ppost-pin { display:none !important; }
   padding:12px 14px;background:var(--cream);border-radius:12px;
   font-size:12px;color:var(--muted);line-height:1.5;margin-bottom:14px;
 }
-.viewer-nudge a { color:var(--accent);font-weight:600;text-decoration:none; }
+.viewer-nudge a { color:var(--tag-ink);font-weight:600;text-decoration:none; }
 
 /* ── Layout toggle pill (tabs vs side-by-side) ── */
 .layout-toggle {
@@ -2138,15 +2144,15 @@ body.viewer-mode .layout-toggle { display:flex; }
 .layout-btn.active { background:var(--paper);color:var(--charcoal);box-shadow:0 1px 4px rgba(0,0,0,.08); }
 
 /* ── Connection system ── */
-.action-btn.following { background:var(--wash-coral);color:var(--accent);border:1.5px solid rgba(255,92,53,.3); }
+.action-btn.following { background:var(--wash-coral);color:var(--tag-ink);border:1.5px solid rgba(255,92,53,.3); }
 .action-btn.following:hover { background:var(--wash-coral-deep); }
 .action-btn.pending   { opacity:.6;pointer-events:none; }
 .action-btn.connected { background:var(--cream);color:var(--charcoal);border:1.5px solid var(--border); }
 .action-btn:disabled  { opacity:.55;pointer-events:none; }
 /* Post pin button */
 .ppost-pin-btn { font-size:11px;font-weight:700;color:var(--muted);background:none;border:none;cursor:none;transition:color .15s;display:none; }
-.ppost-pin-btn:hover { color:var(--accent); }
-.ppost-pin-btn.pinned-active { color:var(--accent);font-weight:800; }
+.ppost-pin-btn:hover { color:var(--tag-ink); }
+.ppost-pin-btn.pinned-active { color:var(--tag-ink);font-weight:800; }
 body.edit-mode:not(.viewer-mode) .ppost-pin-btn { display:block; }
 
 /* ── Smart Connect Button ── */
@@ -2168,7 +2174,7 @@ body.edit-mode:not(.viewer-mode) .ppost-pin-btn { display:block; }
 }
 .vibe-connect-btn.state-message:hover {
   background: var(--accent); transform: translateY(-1px);
-  box-shadow: 0 8px 20px rgba(255,92,53,.25); color: white;
+  box-shadow: 0 8px 20px rgba(255,92,53,.25); color: var(--on-coral, #160A06);
 }
 .vibe-connect-btn.state-message svg path {
   /* swap + to message icon via CSS — icon swapped in JS */
@@ -2180,7 +2186,7 @@ body.edit-mode:not(.viewer-mode) .ppost-pin-btn { display:block; }
   text-underline-offset: 2px;
 }
 .vibe-soft-follow:hover { color: var(--charcoal); }
-.vibe-soft-follow.following { color: var(--accent); text-decoration: none; }
+.vibe-soft-follow.following { color: var(--tag-ink); text-decoration: none; }
 
 /* Connected badge under stats */
 .connected-badge {
@@ -2228,15 +2234,18 @@ body.edit-mode:not(.viewer-mode) .ppost-pin-btn { display:block; }
 .prof-search-wrap .search-result{display:flex;align-items:center;gap:10px;padding:8px 16px;cursor:none;transition:background .12s;}
 .prof-search-wrap .search-result:hover{background:var(--cream);}
 .prof-search-wrap .sr-av{width:36px;height:36px;border-radius:11px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-family:'Fraunces',serif;font-size:12px;font-weight:700;color:white;}
+/* Oct 12: an event result's tile is orange, so its initials take the dark ink
+   (6.3:1; white was 3.1:1). Person and club tiles are dark and keep white. */
+.prof-search-wrap .sr-av[style*="#FF5C35" i]{color:var(--on-coral, #160A06);}
 .prof-search-wrap .sr-info{flex:1;min-width:0;}
 .prof-search-wrap .sr-name{font-size:13px;font-weight:700;color:var(--charcoal);}
 .prof-search-wrap .sr-role{font-size:11px;color:var(--muted);margin-top:1px;}
-.prof-search-wrap .sr-action{font-size:11px;font-weight:700;color:var(--accent);background:var(--wash-coral-soft);border:1px solid rgba(255,92,53,.2);border-radius:100px;padding:3px 10px;flex-shrink:0;cursor:none;}
-.prof-search-wrap .sr-action:hover{background:var(--accent);color:white;}
+.prof-search-wrap .sr-action{font-size:11px;font-weight:700;color:var(--tag-ink);background:var(--wash-coral-soft);border:1px solid rgba(255,92,53,.2);border-radius:100px;padding:3px 10px;flex-shrink:0;cursor:none;}
+.prof-search-wrap .sr-action:hover{background:var(--accent);color:var(--on-coral, #160A06);}
 .prof-search-wrap .sr-remove{width:22px;height:22px;border-radius:999px;border:none;background:transparent;color:var(--muted);font-size:14px;line-height:1;display:flex;align-items:center;justify-content:center;flex-shrink:0;cursor:none;opacity:0;transition:opacity .12s,background .12s,color .12s;margin-left:-2px;}
 .prof-search-wrap .search-result:hover .sr-remove{opacity:1;}
-.prof-search-wrap .sr-remove:hover{background:rgba(255,92,53,.12);color:var(--accent);}
-.prof-search-wrap .search-footer{border-top:1px solid var(--border);padding:10px 16px;font-size:12px;font-weight:600;color:var(--accent);cursor:none;}
+.prof-search-wrap .sr-remove:hover{background:rgba(255,92,53,.12);color:var(--tag-ink);}
+.prof-search-wrap .search-footer{border-top:1px solid var(--border);padding:10px 16px;font-size:12px;font-weight:600;color:var(--tag-ink);cursor:none;}
 .prof-search-wrap .search-footer:hover{background:var(--cream);}
 .prof-search-wrap .search-empty{padding:20px 16px;text-align:center;font-size:13px;color:var(--muted);}
 
@@ -2299,7 +2308,7 @@ body.edit-mode:not(.viewer-mode) .ppost-pin-btn { display:block; }
 .mm-new-msg-btn {
   display: flex; align-items: center; gap: 5px;
   padding: 5px 12px; border-radius: 100px;
-  background: var(--accent); color: white; border: none;
+  background: var(--accent); color: var(--on-coral, #160A06); border: none;
   font-size: 12px; font-weight: 700; cursor: none; transition: all .15s;
 }
 .mm-new-msg-btn:hover { background: #ff7055; }
@@ -2356,7 +2365,7 @@ body.edit-mode:not(.viewer-mode) .ppost-pin-btn { display:block; }
 .mm-t-meta { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; flex-shrink: 0; }
 .mm-t-time { font-size: 10px; color: var(--muted); }
 .mm-t-badge {
-  background: var(--accent); color: white; font-size: 9px; font-weight: 700;
+  background: var(--accent); color: var(--on-coral, #160A06); font-size: 9px; font-weight: 700;
   width: 16px; height: 16px; border-radius: 50%;
   display: flex; align-items: center; justify-content: center;
 }
@@ -2377,12 +2386,12 @@ body.edit-mode:not(.viewer-mode) .ppost-pin-btn { display:block; }
 .mm-convo-name { font-size: 13px; font-weight: 700; color: var(--charcoal); }
 .mm-convo-status { font-size: 11px; color: #2ECC71; }
 .mm-view-profile {
-  margin-left: auto; font-size: 11px; font-weight: 700; color: var(--accent);
+  margin-left: auto; font-size: 11px; font-weight: 700; color: var(--tag-ink);
   background: var(--wash-coral-soft); border: 1px solid rgba(255,92,53,.2);
   border-radius: 100px; padding: 4px 12px; cursor: none; text-decoration: none;
   transition: all .15s; flex-shrink: 0;
 }
-.mm-view-profile:hover { background: var(--accent); color: white; }
+.mm-view-profile:hover { background: var(--accent); color: var(--on-coral, #160A06); }
 
 .mm-messages {
   flex: 1; overflow-y: auto; padding: 14px 14px 8px;
@@ -2404,7 +2413,7 @@ body.edit-mode:not(.viewer-mode) .ppost-pin-btn { display:block; }
   background: var(--cream); border-radius: 14px 14px 14px 4px;
 }
 .mm-bubble-wrap.mine .mm-bubble {
-  background: var(--accent); color: white;
+  background: var(--accent); color: var(--on-coral, #160A06);
   border-radius: 14px 14px 4px 14px;
 }
 .mm-time {
@@ -2440,7 +2449,7 @@ body.edit-mode:not(.viewer-mode) .ppost-pin-btn { display:block; }
   display: flex; align-items: center; justify-content: space-between;
   cursor: none;
 }
-.prof-cal-title:hover { color: var(--accent); }
+.prof-cal-title:hover { color: var(--tag-ink); }
 /* ════ CALENDAR WIDGET ════ */
 /* Lives in the left nav (200px wide) — compact sizing */
 .cal-widget {
@@ -2480,7 +2489,7 @@ body.edit-mode:not(.viewer-mode) .ppost-pin-btn { display:block; }
   background: none; border: none; cursor: none;
   transition: color .15s;
 }
-.cal-toggle:hover { color: var(--accent); }
+.cal-toggle:hover { color: var(--tag-ink); }
 .cal-grid {
   display: grid; grid-template-columns: repeat(7, 1fr); gap: 1px;
 }
@@ -2506,9 +2515,9 @@ body.edit-mode:not(.viewer-mode) .ppost-pin-btn { display:block; }
   position: absolute; bottom: 2px;
 }
 .cal-day.today.has-event::after { background: var(--on-ink); }
-.cal-day.selected { background: var(--accent); color: white; }
+.cal-day.selected { background: var(--accent); color: var(--on-coral, #160A06); }
 .cal-day.selected:hover { background: #ff7055; }
-.cal-day.selected.has-event::after { background: white; }
+.cal-day.selected.has-event::after { background: var(--on-coral, #160A06); }
 
 /* Event list panel — slides open below grid */
 .cal-events-panel {
@@ -2543,7 +2552,7 @@ body.edit-mode:not(.viewer-mode) .ppost-pin-btn { display:block; }
 }
 .cal-event-count-badge {
   font-size: 9px; font-weight: 800; background: var(--accent);
-  color: white; padding: 1px 6px; border-radius: 100px; margin-left: 3px;
+  color: var(--on-coral, #160A06); padding: 1px 6px; border-radius: 100px; margin-left: 3px;
 }
 
 /* ════ CALENDAR FULL MODAL ════ */
@@ -2597,7 +2606,7 @@ body.edit-mode:not(.viewer-mode) .ppost-pin-btn { display:block; }
 }
 .cal-modal-add-btn {
   display: flex; align-items: center; gap: 6px;
-  background: var(--accent); color: white;
+  background: var(--accent); color: var(--on-coral, #160A06);
   font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 700;
   border: none; padding: 9px 18px; border-radius: 100px; cursor: none;
   transition: all .2s;
@@ -2656,7 +2665,7 @@ body.edit-mode:not(.viewer-mode) .ppost-pin-btn { display:block; }
   background: var(--charcoal); color: var(--on-ink);
 }
 .cal-modal-day.selected .cal-modal-day-num {
-  background: var(--accent); color: white;
+  background: var(--accent); color: var(--on-coral, #160A06);
 }
 .cal-modal-event-pill {
   font-size: 10px; font-weight: 700;
@@ -2664,6 +2673,10 @@ body.edit-mode:not(.viewer-mode) .ppost-pin-btn { display:block; }
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   color: white; cursor: none;
 }
+/* Oct 12: an event left on the default orange gets the dark ink (white on
+   orange is 3.1:1, this is 6.3:1). The other event colours keep white. The
+   pill's fill is an inline style, hence the attribute match. */
+.cal-modal-event-pill[style*="#FF5C35" i] { color: var(--on-coral, #160A06); }
 
 /* Right panel */
 .cal-modal-sidebar {
@@ -2704,7 +2717,7 @@ body.edit-mode:not(.viewer-mode) .ppost-pin-btn { display:block; }
   color: var(--muted); font-size: 16px; padding: 0 2px;
   transition: color .15s; align-self: flex-start;
 }
-.cal-modal-event-del:hover { color: var(--accent); }
+.cal-modal-event-del:hover { color: var(--tag-ink); }
 .cal-modal-no-events {
   text-align: center; padding: 32px 16px;
   color: var(--muted); font-size: 13px; line-height: 1.6;
@@ -2767,7 +2780,7 @@ body.edit-mode:not(.viewer-mode) .ppost-pin-btn { display:block; }
 .btn-cancel:hover { background: var(--border); }
 .btn-save-event {
   font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 700;
-  background: var(--accent); color: white; border: none;
+  background: var(--accent); color: var(--on-coral, #160A06); border: none;
   padding: 10px 24px; border-radius: 100px; cursor: none; transition: all .2s;
 }
 .btn-save-event:hover { background: #ff7055; }
@@ -2865,7 +2878,7 @@ body.edit-mode:not(.viewer-mode) .ppost-pin-btn { display:block; }
 .votd-rank {
   position: absolute; top: 12px; left: 12px; z-index: 2;
   display: flex; align-items: center; gap: 5px;
-  background: rgba(255,92,53,.9); color: white;
+  background: rgba(255,92,53,.9); color: var(--on-coral, #160A06);
   font-size: 10px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase;
   padding: 4px 10px; border-radius: 100px;
   backdrop-filter: blur(4px);
@@ -2904,7 +2917,7 @@ body.edit-mode:not(.viewer-mode) .ppost-pin-btn { display:block; }
   font-size: 12px; font-weight: 600; color: var(--muted);
 }
 .votd-stat svg { flex-shrink: 0; }
-.votd-stat.hot { color: var(--accent); }
+.votd-stat.hot { color: var(--tag-ink); }
 
 /* React bar */
 .votd-react-bar {
@@ -2918,8 +2931,8 @@ body.edit-mode:not(.viewer-mode) .ppost-pin-btn { display:block; }
   font-size: 12px; font-weight: 600; color: var(--muted);
   cursor: none; transition: all .15s; border-style: solid;
 }
-.votd-react-btn:hover { border-color: var(--accent); color: var(--accent); background: var(--wash-coral-soft); }
-.votd-react-btn.active { border-color: var(--accent); color: var(--accent); background: var(--wash-coral-soft); }
+.votd-react-btn:hover { border-color: var(--accent); color: var(--tag-ink); background: var(--wash-coral-soft); }
+.votd-react-btn.active { border-color: var(--accent); color: var(--tag-ink); background: var(--wash-coral-soft); }
 .votd-comment-btn {
   margin-left: auto; display: flex; align-items: center; gap: 6px;
   background: none; border: none; font-size: 12px; font-weight: 600;
@@ -2972,7 +2985,7 @@ body.empty-profile-mode #profileEmpty { display: flex !important; }
 .empty-eyebrow {
   font-size: 11px; font-weight: 700;
   letter-spacing: 1.8px; text-transform: uppercase;
-  color: var(--accent); margin-bottom: 14px;
+  color: var(--tag-ink); margin-bottom: 14px;
 }
 .empty-title {
   font-family: 'Fraunces', serif;
@@ -2981,7 +2994,7 @@ body.empty-profile-mode #profileEmpty { display: flex !important; }
   letter-spacing: -2px; color: var(--charcoal);
   margin-bottom: 22px; max-width: 720px;
 }
-.empty-title em { font-style: italic; color: var(--accent); }
+.empty-title em { font-style: italic; color: var(--tag-ink); }
 .empty-otto-line {
   font-family: 'Fraunces', serif; font-style: italic;
   font-size: 17px; line-height: 1.6;
@@ -3006,7 +3019,7 @@ body.empty-profile-mode #profileEmpty { display: flex !important; }
   justify-content: center;
 }
 .empty-primary:not([disabled]):hover {
-  background: var(--accent); border-color: var(--accent); color: white;
+  background: var(--accent); border-color: var(--accent); color: var(--on-coral, #160A06);
 }
 .empty-primary[disabled] { opacity: .5; cursor: not-allowed; }
 .empty-secondary {
@@ -3049,7 +3062,10 @@ body.empty-profile-mode #profileEmpty { display: flex !important; }
   font-size: 10px;
   letter-spacing: 0.22em;
   text-transform: uppercase;
-  color: #ff5c35;
+  /* The lighter orange for dark surfaces (--tag-ink's Night value, written
+     plain because this card is dark in both looks): 5.9:1. The raw orange
+     was 4.4:1 here in Light, where the cream page shows through the card. */
+  color: #FF8A66;
   font-weight: 700;
   margin-bottom: 6px;
   display: flex;
@@ -3111,7 +3127,7 @@ body.empty-profile-mode #profileEmpty { display: flex !important; }
   padding: 8px 16px;
   border-radius: 999px;
   background: #ff5c35;
-  color: #faf7f2;
+  color: var(--on-coral, #160A06);
   box-shadow:
     0 6px 18px rgba(255, 92, 53, 0.35),
     inset 0 1px 0 rgba(255, 255, 255, 0.18);
@@ -3472,7 +3488,7 @@ body.empty-profile-mode #profileEmpty { display: flex !important; }
            drifting into the cover gradient. -->
       <div class="avatar-row-actions" id="profileViewerActions">
         <button class="action-btn primary vibe-connect-btn" id="vibeConnectBtn" onclick="handleVibConnect()">
-          <svg width="13" height="13" viewBox="0 0 13 13" fill="none" style="flex-shrink:0"><path d="M6.5 1v11M1 6.5h11" stroke="white" stroke-width="1.8" stroke-linecap="round"/></svg>
+          <svg width="13" height="13" viewBox="0 0 13 13" fill="none" style="flex-shrink:0"><path d="M6.5 1v11M1 6.5h11" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
           Connect
         </button>
         <button class="vibe-soft-follow" id="vibeSoftFollow" onclick="handleSoftFollow()" style="display:none">
@@ -3533,7 +3549,7 @@ body.empty-profile-mode #profileEmpty { display: flex !important; }
       <span class="meta-item"><span class="meta-label">Location</span><span data-edit="true" data-user-field="location" data-placeholder="City, country" contenteditable="false"></span></span>
       <span class="meta-item" id="metaMajor"><span class="meta-label">Major</span><span data-user-field="headline" data-major-display data-placeholder="Pick a major"></span><span class="meta-major-edit" style="display:none;gap:6px;align-items:center;flex-wrap:wrap"><select id="majorSelect" class="meta-major-select" onchange="_onMajorYearChange()" aria-label="Major"></select><input type="text" id="majorInput" class="meta-major-select" maxlength="200" placeholder="Your major" aria-label="Major" onchange="_onMajorYearChange()" style="display:none;cursor:text"><select id="yearSelect" class="meta-year-select" onchange="_onMajorYearChange()" aria-label="Year"><option value="">Year</option><option value="1">Year 1</option><option value="2">Year 2</option><option value="3">Year 3</option><option value="4">Year 4</option><option value="5">Year 5</option><option value="6">Grad</option></select></span></span>
       <span class="meta-item" id="metaCampus"><span class="meta-label">Campus</span><span data-campus-display></span><span class="meta-campus-edit" style="display:none;gap:6px;align-items:center;flex-wrap:wrap"><span class="meta-campus-static" data-campus-static></span><select id="campusSelect" class="meta-campus-select" onchange="_onCampusChange()" aria-label="Campus"></select></span></span>
-      <span class="meta-item"><span class="meta-label">Web</span><span data-edit="true" data-user-field="website" data-placeholder="yourname.com" contenteditable="false" style="color:var(--accent)"></span></span>
+      <span class="meta-item"><span class="meta-label">Web</span><span data-edit="true" data-user-field="website" data-placeholder="yourname.com" contenteditable="false" style="color:var(--tag-ink)"></span></span>
       <span class="meta-campus-hint" style="display:none"><span data-campus-hint-copy>Your campus community: its clubs, events and map. Indianapolis is one community for IU and Purdue students.</span><span data-campus-sub></span><span data-campus-note></span></span>
     </div>
     <!-- "Here for": owner only (ruling H6). Static markup: the labels
@@ -3598,7 +3614,7 @@ body.empty-profile-mode #profileEmpty { display: flex !important; }
 
     .otto-profile-hero .op-review {
       font-size: 12px; padding: 9px 18px;
-      background: var(--accent); color: white;
+      background: var(--accent); color: var(--on-coral, #160A06);
       border-radius: 100px; font-weight: 600; letter-spacing: .2px;
       text-decoration: none; cursor: none; flex-shrink: 0;
       position: relative; z-index: 1;
@@ -3642,7 +3658,7 @@ body.empty-profile-mode #profileEmpty { display: flex !important; }
       animation: op-pulse-tiny 2s ease-in-out infinite;
       flex-shrink: 0;
     }
-    .op-badge.orange { background: rgba(255,92,53,.08); color: var(--accent); }
+    .op-badge.orange { background: rgba(255,92,53,.08); color: var(--tag-ink); }
     .op-badge.orange .op-badge-dot { background: var(--accent); box-shadow: 0 0 6px var(--accent); }
     .op-badge.purple { background: rgba(124,92,252,.1); color: var(--purple-ink); border: 0.5px solid rgba(124,92,252,.3); }
     .op-badge.purple .op-badge-dot { background: #7C5CFC; box-shadow: 0 0 6px #7C5CFC; }
@@ -4095,7 +4111,7 @@ body.empty-profile-mode #profileEmpty { display: flex !important; }
     <div class="form-group">
       <label class="form-label">Color</label>
       <div style="display:flex;gap:10px;margin-top:6px">
-        <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer"><input type="radio" name="tagColor" value="coral" checked> <span style="background:var(--wash-coral);color:#FF5C35;padding:3px 10px;border-radius:100px;font-size:12px;font-weight:600">coral</span></label>
+        <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer"><input type="radio" name="tagColor" value="coral" checked> <span style="background:var(--wash-coral);color:var(--tag-ink);padding:3px 10px;border-radius:100px;font-size:12px;font-weight:600">coral</span></label>
         <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer"><input type="radio" name="tagColor" value="purple"> <span style="background:var(--wash-purple);color:var(--purple-ink);padding:3px 10px;border-radius:100px;font-size:12px;font-weight:600">purple</span></label>
         <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer"><input type="radio" name="tagColor" value="mint"> <span style="background:var(--wash-mint);color:var(--ok-ink);padding:3px 10px;border-radius:100px;font-size:12px;font-weight:600">mint</span></label>
         <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer"><input type="radio" name="tagColor" value="gold"> <span style="background:var(--wash-gold);color:var(--gold-ink);padding:3px 10px;border-radius:100px;font-size:12px;font-weight:600">gold</span></label>
@@ -6731,7 +6747,7 @@ let vibeRelState = 'none'; // 'none' | 'pending' | 'connected' | 'following'
 let _vibeFollowBusy = false;
 
 const ICONS = {
-  connect: '<svg width="13" height="13" viewBox="0 0 13 13" fill="none" style="flex-shrink:0"><path d="M6.5 1v11M1 6.5h11" stroke="white" stroke-width="1.8" stroke-linecap="round"/></svg>',
+  connect: '<svg width="13" height="13" viewBox="0 0 13 13" fill="none" style="flex-shrink:0"><path d="M6.5 1v11M1 6.5h11" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>',
   message: '<svg width="13" height="13" viewBox="0 0 13 13" fill="none" style="flex-shrink:0"><path d="M1 1.5A.5.5 0 011.5 1h10a.5.5 0 01.5.5v7a.5.5 0 01-.5.5H4.5L1 12V1.5z" stroke="currentColor" stroke-width="1.4" fill="none" stroke-linejoin="round"/></svg>',
 };
 
@@ -7469,8 +7485,8 @@ function miniSelectDay(year,month,day){
   const evts=calendarEvents[key]||[],panel=document.getElementById('calEventsPanel'),
         list=document.getElementById('calEventsList'),title=document.getElementById('calPanelTitle');
   title.textContent=new Date(year,month,day).toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'});
-  if(!evts.length){list.innerHTML=`<div class="cal-empty">No events &mdash; <button onclick="openCreateEventForKey('${key}')" style="background:none;border:none;color:var(--accent);cursor:none;font-size:11px;font-weight:700;padding:0">+ Add</button></div>`;}
-  else{list.innerHTML=evts.map(e=>`<div class="cal-event-item"><div class="cal-event-dot" style="background:${e.color}"></div><div class="cal-event-info"><div class="cal-event-name">${e.name}</div><div class="cal-event-time">${fmtTime(e.time)}${e.location?' &middot; '+e.location:''}</div></div><button onclick="removeCalEvent('${key}','${e.name}')" style="background:none;border:none;color:var(--muted);cursor:none;font-size:14px;padding:2px 4px;border-radius:5px;transition:color .15s" onmouseover="this.style.color='var(--accent)'" onmouseout="this.style.color='var(--muted)'">&times;</button></div>`).join('');}
+  if(!evts.length){list.innerHTML=`<div class="cal-empty">No events &mdash; <button onclick="openCreateEventForKey('${key}')" style="background:none;border:none;color:var(--tag-ink);cursor:none;font-size:11px;font-weight:700;padding:0">+ Add</button></div>`;}
+  else{list.innerHTML=evts.map(e=>`<div class="cal-event-item"><div class="cal-event-dot" style="background:${e.color}"></div><div class="cal-event-info"><div class="cal-event-name">${e.name}</div><div class="cal-event-time">${fmtTime(e.time)}${e.location?' &middot; '+e.location:''}</div></div><button onclick="removeCalEvent('${key}','${e.name}')" style="background:none;border:none;color:var(--muted);cursor:none;font-size:14px;padding:2px 4px;border-radius:5px;transition:color .15s" onmouseover="this.style.color='var(--tag-ink)'" onmouseout="this.style.color='var(--muted)'">&times;</button></div>`).join('');}
   panel.classList.add('open');
 }
 function removeCalEvent(key,name){
@@ -7524,8 +7540,8 @@ function renderModalSidebar(){
   const p=modalSelectedKey.split('-').map(Number),dateObj=new Date(p[0],p[1]-1,p[2]);
   dateEl.textContent=dateObj.toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'});
   const evts=calendarEvents[modalSelectedKey]||[];
-  if(!evts.length){listEl.innerHTML=noEvtHTML+`No events yet<br><button onclick="openCreateEventForKey('${modalSelectedKey}')" style="background:none;border:none;color:var(--accent);cursor:none;font-size:13px;font-weight:700;margin-top:8px;padding:0">+ Add an event</button></div>`;}
-  else{listEl.innerHTML=evts.map(e=>`<div class="cal-modal-event-card"><div class="cal-modal-event-bar" style="background:${e.color}"></div><div class="cal-modal-event-body"><div class="cal-modal-event-name">${e.name}</div><div class="cal-modal-event-meta">${e.time?fmtTime(e.time)+'<br>':''}${e.location?'&#128205; '+e.location+'<br>':''}${e.notes?'&#128221; '+e.notes:''}</div></div><button class="cal-modal-event-del" onclick="removeCalEvent('${modalSelectedKey}','${e.name}')">&times;</button></div>`).join('')+`<button onclick="openCreateEventForKey('${modalSelectedKey}')" style="width:100%;margin-top:8px;padding:10px;border-radius:12px;border:1.5px dashed var(--border);background:none;color:var(--muted);font-family:'DM Sans',sans-serif;font-size:12px;font-weight:700;cursor:none;transition:all .15s" onmouseover="this.style.borderColor='var(--accent)';this.style.color='var(--accent)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--muted)'">+ Add another event</button>`;}
+  if(!evts.length){listEl.innerHTML=noEvtHTML+`No events yet<br><button onclick="openCreateEventForKey('${modalSelectedKey}')" style="background:none;border:none;color:var(--tag-ink);cursor:none;font-size:13px;font-weight:700;margin-top:8px;padding:0">+ Add an event</button></div>`;}
+  else{listEl.innerHTML=evts.map(e=>`<div class="cal-modal-event-card"><div class="cal-modal-event-bar" style="background:${e.color}"></div><div class="cal-modal-event-body"><div class="cal-modal-event-name">${e.name}</div><div class="cal-modal-event-meta">${e.time?fmtTime(e.time)+'<br>':''}${e.location?'&#128205; '+e.location+'<br>':''}${e.notes?'&#128221; '+e.notes:''}</div></div><button class="cal-modal-event-del" onclick="removeCalEvent('${modalSelectedKey}','${e.name}')">&times;</button></div>`).join('')+`<button onclick="openCreateEventForKey('${modalSelectedKey}')" style="width:100%;margin-top:8px;padding:10px;border-radius:12px;border:1.5px dashed var(--border);background:none;color:var(--muted);font-family:'DM Sans',sans-serif;font-size:12px;font-weight:700;cursor:none;transition:all .15s" onmouseover="this.style.borderColor='var(--accent)';this.style.color='var(--tag-ink)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--muted)'">+ Add another event</button>`;}
 }
 
 // CREATE EVENT
@@ -8271,7 +8287,7 @@ function _afterCampusSync(sent, err) {
     const NOT_FOUND_HTML = `<div style="padding:48px 32px;text-align:center;font-family:'DM Sans',sans-serif;">
           <h1 style="font-family:'Fraunces',serif;font-size:28px;margin-bottom:8px">User not found</h1>
           <p style="color:var(--ink-muted);margin-bottom:24px">No one with that handle on Vibe yet.</p>
-          <a href="/campus" style="color:#FF5C35;font-weight:700;text-decoration:none">← Back to campus</a>
+          <a href="/campus" style="color:var(--tag-ink);font-weight:700;text-decoration:none">← Back to campus</a>
         </div>`;
     const BOOTSTRAP_LINE = "Couldn't load this profile.";
     // No onRetry: the box's Retry reloads the page, which re-runs this whole
@@ -10582,7 +10598,7 @@ function showWelcomeBanner() {
         </div>
         <div class="cal-modal-header-actions">
           <button class="cal-modal-add-btn" onclick="openCreateEvent()">
-            <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M6.5 1v11M1 6.5h11" stroke="white" stroke-width="1.8" stroke-linecap="round"/></svg>
+            <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M6.5 1v11M1 6.5h11" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
             New Event
           </button>
           <button class="cal-modal-close" onclick="closeCalModal()">&#215;</button>
@@ -10707,7 +10723,7 @@ function showWelcomeBanner() {
   }
   #connectionsModal .conn-modal-tab.active {
     background: linear-gradient(180deg, #FF7B4A 0%, #FF5C35 100%);
-    color: white;
+    color: var(--on-coral, #160A06);
     border-color: rgba(200,74,32,0.4);
     box-shadow: inset 0 1px 0 rgba(255,255,255,0.32), 0 4px 12px rgba(255,92,53,0.22);
   }
@@ -10760,7 +10776,7 @@ function showWelcomeBanner() {
   }
   #connectionsModal .conn-row .conn-action.connect {
     background: linear-gradient(180deg, #FF7B4A 0%, #FF5C35 100%);
-    color: white; border-color: rgba(200,74,32,0.35);
+    color: var(--on-coral, #160A06); border-color: rgba(200,74,32,0.35);
     box-shadow: inset 0 1px 0 rgba(255,255,255,0.32), 0 3px 8px rgba(255,92,53,0.2);
   }
   #connectionsModal .conn-row .conn-action.connect-back {
@@ -10843,7 +10859,7 @@ function showWelcomeBanner() {
   #shareProfileModal .share-copy-btn {
     padding: 10px 16px; border-radius: 12px;
     background: linear-gradient(180deg, #FF7B4A 0%, #FF5C35 100%);
-    color: white; border: 1px solid rgba(200,74,32,0.35);
+    color: var(--on-coral, #160A06); border: 1px solid rgba(200,74,32,0.35);
     font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 700;
     cursor: none; flex-shrink: 0;
     box-shadow: inset 0 1px 0 rgba(255,255,255,0.32), 0 4px 12px rgba(255,92,53,0.22);

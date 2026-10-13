@@ -25,6 +25,12 @@
 <script src="/html/_imageCropper.js" defer></script>
 <style>
 :root { --cream:#FAF7F2; --charcoal:#1C1C1E; --accent:#FF5C35; --purple:#7C5CFC; --lavender:#C8B8FF; --green:#1A9E5B; --ink-muted:#6C6761;
+  /* Oct 12: --on-coral is the dark ink for words on an orange fill (6.3:1;
+     white on orange is 3.1:1), the same in both looks. --tag-ink is orange
+     as words on a LIGHT card, for the shared sheets this page loads (the
+     photo cropper's card is white in Light). This page itself is dark in
+     both looks, so its own orange words keep var(--accent) (6:1 on it). */
+  --on-coral:#160A06; --tag-ink:#B83A1A;
   /* S68 wave 5: the pieces cut from the page colour follow it into Night.
      --bg-rgb is --charcoal as channels (the top bar's fade); --surface and
      --surface-2 are the confirm card and the club/person logo disc;
@@ -37,7 +43,7 @@
    follow it, and the option list turns light because color-scheme:dark
    paints the native popup dark. --cream is unused. Coral, purple, lavender,
    green unchanged. */
-:root[data-theme="dark"] { color-scheme:dark; --charcoal:#0C0B0B; --cream:#F6F1EA; --ink-muted:#9C958C;
+:root[data-theme="dark"] { color-scheme:dark; --charcoal:#0C0B0B; --cream:#F6F1EA; --ink-muted:#9C958C; --on-coral:#160A06; --tag-ink:#FF8A66;
   --bg-rgb:12,11,11; --surface:#161515; --surface-2:#1F1D1C; --option-ink:#F6F1EA; }
 * { margin: 0; padding: 0; box-sizing: border-box; }
 html, body { height: 100%; }
@@ -166,13 +172,16 @@ input, textarea, [contenteditable="true"] { cursor:text!important; }
 .cta-row { display: flex; gap: 10px; align-items: center; }
 .btn-coral {
   font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 600;
-  padding: 13px 28px; background: var(--accent); color: white;
+  padding: 13px 28px; background: var(--accent); color: var(--on-coral, #160A06);
   border: none; border-radius: 100px; cursor: none;
   box-shadow: 0 6px 20px rgba(255,92,53,.32);
   transition: all .18s; letter-spacing: .2px;
 }
 .btn-coral:hover { background: #ff7055; transform: translateY(-1px); box-shadow: 0 8px 24px rgba(255,92,53,.42); }
-.btn-coral:disabled { background: rgba(255,92,53,.3); box-shadow: none; cursor: not-allowed; }
+/* Greyed out, the fill is 30% orange over this dark page: a dark fill, not an
+   orange one. Its words stay white as before (10.9:1); the dark ink would be
+   1.8:1 there, and Verify sits greyed out the whole time a code is typed. */
+.btn-coral:disabled { background: rgba(255,92,53,.3); color: white; box-shadow: none; cursor: not-allowed; }
 .btn-skip-step {
   font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 500;
   padding: 13px 22px; color: rgba(255,255,255,.55); background: none; border: none;
@@ -350,7 +359,7 @@ input, textarea, [contenteditable="true"] { cursor:text!important; }
   font-family: 'DM Sans', sans-serif; font-size: 13.5px; font-weight: 700; line-height: 1.2;
   text-align: center; text-decoration: none; white-space: nowrap; transition: opacity .15s, background .15s;
 }
-.pick-btn.filled { color: #fff; background: var(--accent); border: 1px solid var(--accent); }
+.pick-btn.filled { color: var(--on-coral, #160A06); background: var(--accent); border: 1px solid var(--accent); }
 .pick-btn.outline { color: #fff; background: transparent; border: 1px solid rgba(255,255,255,.28); }
 .pick-btn.quiet { color: rgba(255,255,255,.85); background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.12); }
 .pick-btn.locked { opacity: .6; }
@@ -2790,11 +2799,16 @@ function fillDatalist(id, values) {
 let handleSeq = 0;
 let handleTimer = null;
 
+// Oct 12: the status words sit inside the handle box (7% white over a page
+// that is dark in both looks), so they take the Night inks written out, not
+// var(--ink-muted): that token is the dark grey in Light, for the cropper's
+// white card. In the box: grey 4.7:1, green 7.1:1, red 5.5:1 (the old grey,
+// green and red were 3.8, 4.1 and 2.8).
 function handleStatusColor(status) {
-  if (!status) return '#8A8580';
-  if (status.kind === 'available') return '#1A9E5B';
-  if (status.kind === 'taken' || status.kind === 'reason' || status.kind === 'format') return '#C54323';
-  return '#8A8580';
+  if (!status) return '#9C958C';
+  if (status.kind === 'available') return '#4FD08A';
+  if (status.kind === 'taken' || status.kind === 'reason' || status.kind === 'format') return '#FF7A6B';
+  return '#9C958C';
 }
 
 function setHandleStatus(status) {

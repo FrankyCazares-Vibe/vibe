@@ -137,7 +137,8 @@ function ReactionChips({ reactions, night, onToggle }: { reactions: ChatMessage[
             borderRadius: 999,
             background: r.viewer_reacted ? "rgba(255,140,90,0.22)" : night ? "rgba(20,16,28,0.55)" : "rgba(255,255,255,0.78)",
             border: r.viewer_reacted ? "1px solid rgba(255,180,150,0.55)" : night ? "1px solid rgba(255,255,255,0.10)" : "1px solid rgba(28,28,30,0.08)",
-            color: r.viewer_reacted ? "#FFD0BF" : night ? "rgba(255,255,255,0.85)" : "#1C1C1E",
+            // In Light the reacted chip is a pale orange wash, where the peach count was 1.1:1: it reads --tag-ink there (as in `MessageBubble`).
+            color: r.viewer_reacted ? (night ? "#FFD0BF" : "var(--tag-ink)") : night ? "rgba(255,255,255,0.85)" : "#1C1C1E",
             fontFamily: FONT,
             fontSize: 12,
             fontWeight: 700,

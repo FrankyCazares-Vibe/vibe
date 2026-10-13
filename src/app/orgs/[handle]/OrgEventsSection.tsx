@@ -138,7 +138,9 @@ export function OrgEventsSection({
               border: "none",
               background:
                 "linear-gradient(135deg,#FF7A4D 0%,#FF5C35 60%,#E04A26 100%)",
-              color: "#fff",
+              // Dark words on the coral fill (4.8:1 at its darkest corner);
+              // white was 3.1:1.
+              color: "var(--on-coral, #160A06)",
               fontFamily: "DM Sans, sans-serif",
               fontSize: 12,
               fontWeight: 800,

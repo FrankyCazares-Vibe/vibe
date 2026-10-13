@@ -276,6 +276,13 @@ const COLORS = {
   muted: "var(--ink-2)",
   faint: "var(--ink-muted)",
   accent: "#FF5C35",
+  // Words and icons drawn ON a coral fill (a button, a badge): dark, the way
+  // the landing page's button does it. White on coral is only 3.1:1; this is
+  // 6.3:1 in both looks.
+  onAccent: "var(--on-coral, #160A06)",
+  // Coral as WORDS on the page's own paper (a link, a group title). Raw coral
+  // is 2.9:1 on cream, so they read --tag-ink (a shade lighter on Night).
+  accentInk: "var(--tag-ink)",
   accentSand: "#7B5FE0",
 
   // Glass surfaces (translucent dark over the gradient backdrop)
@@ -4651,7 +4658,9 @@ function PickCampusStrip() {
       <span>Pick your campus to see its clubs, events and map.</span>
       <Link
         href="/settings#campus"
-        style={{ color: "#C84A20", fontWeight: 700, textDecoration: "none" }}
+        // The Light value of --eyebrow-ink, written out: this strip is the
+        // same pale peach in both looks, and Night's lighter ink fades on it.
+        style={{ color: "#B83A1A", fontWeight: 700, textDecoration: "none" }}
       >
         Pick campus →
       </Link>
@@ -6098,7 +6107,8 @@ function PersonRow(props: {
         style={{
           fontSize: 11,
           fontWeight: 700,
-          color: COLORS.accent,
+          // Light's --tag-ink written out: the chip is pale peach in both looks.
+          color: "#B83A1A",
           background: "#FFF5F2",
           border: "1px solid rgba(255,92,53,0.2)",
           borderRadius: 100,
@@ -6193,7 +6203,8 @@ function EntityRow(props: {
         style={{
           fontSize: 11,
           fontWeight: 700,
-          color: COLORS.accent,
+          // Light's --tag-ink written out: the chip is pale peach in both looks.
+          color: "#B83A1A",
           background: "#FFF5F2",
           border: "1px solid rgba(255,92,53,0.2)",
           borderRadius: 100,
@@ -7302,7 +7313,7 @@ function FeedComposer({
               borderRadius: 999,
               border: "none",
               background: hasContent && !busy ? COLORS.accent : "rgba(var(--scrim-rgb),0.18)",
-              color: "#fff",
+              color: hasContent && !busy ? COLORS.onAccent : "#fff",
               fontFamily: "DM Sans, sans-serif",
               fontWeight: 700,
               fontSize: 13,
@@ -7412,7 +7423,7 @@ function renderPostContent(
         <Link
           key={`m${key++}`}
           href={`/profile/${encodeURIComponent(body)}`}
-          style={{ color: "#FF5C35", fontWeight: 600, textDecoration: "none" }}
+          style={{ color: COLORS.accentInk, fontWeight: 600, textDecoration: "none" }}
         >
           {token}
         </Link>,
@@ -7427,7 +7438,7 @@ function renderPostContent(
             background: "none",
             border: "none",
             padding: 0,
-            color: "#FF5C35",
+            color: COLORS.accentInk,
             fontWeight: 600,
             cursor: "pointer",
             fontFamily: "inherit",
@@ -9043,7 +9054,7 @@ function CommentsDrawer({
                 borderRadius: 999,
                 border: "none",
                 background: draft.trim() ? COLORS.accent : "rgba(var(--scrim-rgb),0.18)",
-                color: "#fff",
+                color: draft.trim() ? COLORS.onAccent : "#fff",
                 fontSize: 12,
                 fontWeight: 700,
                 cursor: submitting || !draft.trim() ? "default" : "pointer",
@@ -9442,7 +9453,7 @@ function CommentRow({
                 borderRadius: 999,
                 border: "none",
                 background: replyDraft.trim() ? COLORS.accent : "rgba(var(--scrim-rgb),0.18)",
-                color: "#fff",
+                color: replyDraft.trim() ? COLORS.onAccent : "#fff",
                 fontSize: 11,
                 fontWeight: 700,
                 cursor:
@@ -9869,7 +9880,7 @@ function EventsTabBody({
               border: "1px solid rgba(255,92,53,0.45)",
               background:
                 "linear-gradient(180deg, #FF5C35 0%, #E04918 100%)",
-              color: "#fff",
+              color: COLORS.onAccent,
               fontFamily: "DM Sans, sans-serif",
               fontWeight: 700,
               fontSize: 13,
@@ -10934,7 +10945,7 @@ function AttendeesModal({
                 borderRadius: 999,
                 border: "none",
                 background: COLORS.accent,
-                color: "#fff",
+                color: COLORS.onAccent,
                 fontFamily: "DM Sans, sans-serif",
                 fontWeight: 700,
                 fontSize: 12,
@@ -11573,7 +11584,7 @@ export function CreateEventModal(props: CreateEventModalProps) {
               borderRadius: 999,
               border: "none",
               background: canSubmit ? COLORS.accent : "rgba(255,255,255,0.18)",
-              color: "#fff",
+              color: canSubmit ? COLORS.onAccent : "#fff",
               fontFamily: "DM Sans, sans-serif",
               fontWeight: 700,
               fontSize: 12,
@@ -12289,7 +12300,7 @@ function OrgsTabBody({ onCreateOrg }: { onCreateOrg: () => void }) {
                     invitesErr && !invitesRetrying ? { failure: invitesErr.failure, onRetry: retryInvites } : null
                   }
                   loading={invitesRetrying}
-                  titleStyle={{ color: "#FF5C35" }}
+                  titleStyle={{ color: COLORS.accentInk }}
                 />
               ) : null}
               {showYours ? (
@@ -12354,7 +12365,7 @@ function OrgsTabBody({ onCreateOrg }: { onCreateOrg: () => void }) {
                   hint="Groups created by people on Vibe. Anyone can follow them."
                   orgs={communityOrgs}
                   {...groupProps}
-                  titleStyle={{ color: "#FF5C35" }}
+                  titleStyle={{ color: COLORS.accentInk }}
                 />
               ) : null}
               {dormantOrgs.length > 0 ? (
@@ -12795,7 +12806,7 @@ function CreateOrgBanner({ onClick }: { onClick: () => void }) {
           justifyContent: "center",
           fontSize: 22,
           fontWeight: 300,
-          color: "#fff",
+          color: COLORS.onAccent,
           boxShadow: "inset 0 1px 0 rgba(255,255,255,0.32)",
           flexShrink: 0,
         }}

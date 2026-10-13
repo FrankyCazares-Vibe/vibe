@@ -823,7 +823,7 @@ export function ConversationView({
               style={{
                 fontFamily: "DM Sans, sans-serif",
                 fontSize: 11.5,
-                color: onDark ? "rgba(255,255,255,0.6)" : "#8A8580",
+                color: onDark ? "rgba(255,255,255,0.6)" : "var(--ink-muted)",
                 fontWeight: 600,
                 display: "block",
               }}
@@ -909,7 +909,7 @@ export function ConversationView({
               style={{
                 padding: 24,
                 textAlign: "center",
-                color: onDark ? "rgba(255,255,255,0.6)" : "#8A8580",
+                color: onDark ? "rgba(255,255,255,0.6)" : "var(--ink-muted)",
                 fontFamily: "DM Sans, sans-serif",
                 fontSize: 13,
               }}
@@ -1035,7 +1035,8 @@ export function ConversationView({
                 borderRadius: 999,
                 border: "none",
                 background: "#FF5C35",
-                color: "#fff",
+                // Dark words on orange (6.3:1; white was 3.1:1).
+                color: "var(--on-coral, #160A06)",
                 fontFamily: "DM Sans, sans-serif",
                 fontSize: 14,
                 fontWeight: 700,
@@ -1115,7 +1116,9 @@ export function ConversationView({
                   style={{
                     fontSize: 12,
                     fontWeight: 700,
-                    color: onDark ? "rgba(255,180,150,0.95)" : "#FF5C35",
+                    // Light with no backdrop: orange words read --tag-ink
+                    // (raw coral is 2.9:1 on this cream bar).
+                    color: onDark ? "rgba(255,180,150,0.95)" : "var(--tag-ink)",
                     whiteSpace: "nowrap",
                     overflow: "hidden",
                     textOverflow: "ellipsis",
@@ -1392,7 +1395,11 @@ export function ConversationView({
             border: "none",
             background:
               (!draft.trim() && !staged) || sending ? "rgba(var(--scrim-rgb),0.18)" : "#FF5C35",
-            color: "#fff",
+            // The arrow is the dark ink on orange (6.3:1; white was 3.1:1).
+            // With nothing to send the disc is grey, not orange, and keeps
+            // its white arrow as before.
+            color:
+              (!draft.trim() && !staged) || sending ? "#fff" : "var(--on-coral, #160A06)",
             cursor: (!draft.trim() && !staged) || sending ? "default" : "pointer",
             display: "inline-flex",
             alignItems: "center",

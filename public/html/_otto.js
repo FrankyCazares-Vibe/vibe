@@ -142,12 +142,12 @@
     #ottoPanel .otto-draft-meta { display: flex; align-items: center; gap: 7px; margin-bottom: 9px; }
     #ottoPanel .otto-platform-square { width: 12px; height: 12px; border-radius: 3px; flex-shrink: 0; }
     #ottoPanel .otto-draft-label { font-size: 10px; font-weight: 600; color: rgba(255,255,255,.72); letter-spacing: .6px; }
-    #ottoPanel .otto-draft-tag { margin-left: auto; font-size: 9px; padding: 2px 8px; background: #FF5C35; color: white; border-radius: 100px; font-weight: 700; letter-spacing: .5px; }
+    #ottoPanel .otto-draft-tag { margin-left: auto; font-size: 9px; padding: 2px 8px; background: #FF5C35; color: var(--on-coral, #160A06); border-radius: 100px; font-weight: 700; letter-spacing: .5px; }
     #ottoPanel .otto-draft-tag.skip { background: rgba(255,255,255,.06); color: rgba(255,255,255,.5); font-weight: 500; }
     #ottoPanel .otto-draft-text { font-size: 12.5px; line-height: 1.6; color: rgba(255,255,255,.78); }
     #ottoPanel .otto-draft.skip .otto-draft-text { color: rgba(255,255,255,.5); }
     #ottoPanel .otto-draft-actions { display: flex; gap: 6px; margin-top: 11px; }
-    #ottoPanel .otto-btn-primary { font-size: 11px; padding: 6px 14px; background: #FF5C35; color: white; border-radius: 100px; font-weight: 600; cursor: none; border: none; font-family: 'DM Sans', sans-serif; transition: background .15s; }
+    #ottoPanel .otto-btn-primary { font-size: 11px; padding: 6px 14px; background: #FF5C35; color: var(--on-coral, #160A06); border-radius: 100px; font-weight: 600; cursor: none; border: none; font-family: 'DM Sans', sans-serif; transition: background .15s; }
     #ottoPanel .otto-btn-primary:hover { background: #ff7055; }
     #ottoPanel .otto-btn-ghost { font-size: 11px; padding: 6px 14px; border: 0.5px solid rgba(255,255,255,.18); color: rgba(255,255,255,.78); border-radius: 100px; cursor: none; background: none; font-family: 'DM Sans', sans-serif; transition: all .15s; }
     #ottoPanel .otto-btn-ghost:hover { border-color: rgba(255,255,255,.4); color: white; }
@@ -208,7 +208,7 @@
     }
     #ottoPanel .otto-notif-filter:hover { color:white; border-color:rgba(255,255,255,.28); }
     #ottoPanel .otto-notif-filter.on {
-      background:#FF5C35; color:white; border-color:#FF5C35;
+      background:#FF5C35; color:var(--on-coral, #160A06); border-color:#FF5C35;
     }
 
     /* Real notification rows (P1-021). */
@@ -263,8 +263,8 @@
 
     /* Frame 1 — post freshly published */
     .otto-just-posted { position: relative; box-shadow: inset 0 0 0 1.5px #FF5C35, 0 0 0 4px rgba(255,92,53,.08); border-radius: 12px; transition: box-shadow .35s; }
-    .otto-posted-badge { position: absolute; top: -10px; left: 18px; font-size: 10px; padding: 4px 10px; background: #FF5C35; color: white; border-radius: 100px; font-weight: 600; letter-spacing: .5px; text-transform: uppercase; display: inline-flex; align-items: center; gap: 5px; box-shadow: 0 2px 8px rgba(255,92,53,.3); z-index: 2; }
-    .otto-syndicated-badge { display: inline-flex; align-items: center; gap: 6px; font-size: 10px; padding: 4px 10px; background: rgba(255,92,53,.1); color: #FF5C35; border-radius: 100px; font-weight: 600; letter-spacing: .3px; margin-left: auto; flex-shrink: 0; }
+    .otto-posted-badge { position: absolute; top: -10px; left: 18px; font-size: 10px; padding: 4px 10px; background: #FF5C35; color: var(--on-coral, #160A06); border-radius: 100px; font-weight: 600; letter-spacing: .5px; text-transform: uppercase; display: inline-flex; align-items: center; gap: 5px; box-shadow: 0 2px 8px rgba(255,92,53,.3); z-index: 2; }
+    .otto-syndicated-badge { display: inline-flex; align-items: center; gap: 6px; font-size: 10px; padding: 4px 10px; background: rgba(255,92,53,.1); color: var(--tag-ink, #B83A1A); border-radius: 100px; font-weight: 600; letter-spacing: .3px; margin-left: auto; flex-shrink: 0; }
     .otto-syndicated-dot { width: 5px; height: 5px; border-radius: 50%; background: #FF5C35; box-shadow: 0 0 4px #FF5C35; animation: ottoPulseCore 2.4s ease-in-out infinite; }
 
     /* Corner glow during ask state */
@@ -283,7 +283,7 @@
     #ottoAskBubble .oab-platforms { display: flex; gap: 5px; margin-bottom: 12px; }
     #ottoAskBubble .oab-tile { width: 16px; height: 16px; border-radius: 4px; }
     #ottoAskBubble .oab-actions { display: flex; gap: 6px; align-items: center; }
-    #ottoAskBubble .oab-yes { font-size: 11px; padding: 7px 14px; background: #FF5C35; color: white; border-radius: 100px; font-weight: 600; cursor: none; border: none; font-family: 'DM Sans', sans-serif; flex: 1; transition: background .15s; }
+    #ottoAskBubble .oab-yes { font-size: 11px; padding: 7px 14px; background: #FF5C35; color: var(--on-coral, #160A06); border-radius: 100px; font-weight: 600; cursor: none; border: none; font-family: 'DM Sans', sans-serif; flex: 1; transition: background .15s; }
     #ottoAskBubble .oab-yes:hover { background: #ff7055; }
     #ottoAskBubble .oab-skip { font-size: 11px; padding: 7px 14px; color: rgba(255,255,255,.55); border-radius: 100px; cursor: none; background: none; border: none; font-family: 'DM Sans', sans-serif; transition: color .15s; }
     #ottoAskBubble .oab-skip:hover { color: rgba(255,255,255,.85); }
@@ -328,7 +328,7 @@
     #ottoPubPanel .opp-draft-meta { display: flex; align-items: center; gap: 7px; margin-bottom: 9px; }
     #ottoPubPanel .opp-platform-square { width: 12px; height: 12px; border-radius: 3px; flex-shrink: 0; }
     #ottoPubPanel .opp-draft-label { font-size: 10px; font-weight: 600; color: rgba(255,255,255,.72); letter-spacing: .6px; }
-    #ottoPubPanel .opp-draft-tag { margin-left: auto; font-size: 9px; padding: 2px 8px; background: #FF5C35; color: white; border-radius: 100px; font-weight: 700; letter-spacing: .5px; display: inline-flex; align-items: center; gap: 4px; }
+    #ottoPubPanel .opp-draft-tag { margin-left: auto; font-size: 9px; padding: 2px 8px; background: #FF5C35; color: var(--on-coral, #160A06); border-radius: 100px; font-weight: 700; letter-spacing: .5px; display: inline-flex; align-items: center; gap: 4px; }
     #ottoPubPanel .opp-draft-tag.skip { background: rgba(255,255,255,.06); color: rgba(255,255,255,.5); font-weight: 500; }
     #ottoPubPanel .opp-draft-tag.approved { background: #2ECC71; }
     #ottoPubPanel .opp-draft-text { font-size: 12.5px; line-height: 1.6; color: rgba(255,255,255,.85); white-space: pre-wrap; word-wrap: break-word; }
@@ -336,14 +336,14 @@
     #ottoPubPanel .opp-draft-edit { width: 100%; background: rgba(255,255,255,.04); border: 0.5px solid rgba(255,92,53,.4); border-radius: 8px; padding: 10px 12px; color: white; font-family: 'DM Sans', sans-serif; font-size: 12.5px; line-height: 1.6; resize: vertical; min-height: 90px; }
     #ottoPubPanel .opp-draft-edit:focus { outline: none; border-color: #FF5C35; }
     #ottoPubPanel .opp-draft-actions { display: flex; gap: 6px; margin-top: 11px; align-items: center; }
-    #ottoPubPanel .opp-btn-primary { font-size: 11px; padding: 6px 14px; background: #FF5C35; color: white; border-radius: 100px; font-weight: 600; cursor: none; border: none; font-family: 'DM Sans', sans-serif; transition: background .15s; }
+    #ottoPubPanel .opp-btn-primary { font-size: 11px; padding: 6px 14px; background: #FF5C35; color: var(--on-coral, #160A06); border-radius: 100px; font-weight: 600; cursor: none; border: none; font-family: 'DM Sans', sans-serif; transition: background .15s; }
     #ottoPubPanel .opp-btn-primary:hover { background: #ff7055; }
     #ottoPubPanel .opp-btn-ghost { font-size: 11px; padding: 6px 14px; border: 0.5px solid rgba(255,255,255,.18); color: rgba(255,255,255,.78); border-radius: 100px; cursor: none; background: none; font-family: 'DM Sans', sans-serif; transition: all .15s; }
     #ottoPubPanel .opp-btn-ghost:hover { border-color: rgba(255,255,255,.4); color: white; }
     #ottoPubPanel .opp-approved-flag { font-size: 11px; color: #2ECC71; font-weight: 600; display: flex; align-items: center; gap: 6px; }
 
     #ottoPubPanel .opp-footer { padding: 14px 22px; border-top: 0.5px solid rgba(255,255,255,.06); flex-shrink: 0; display: flex; gap: 8px; align-items: center; }
-    #ottoPubPanel .opp-approve-all { flex: 1; padding: 11px; background: #FF5C35; color: white; border-radius: 100px; font-size: 12.5px; font-weight: 600; cursor: none; border: none; font-family: 'DM Sans', sans-serif; transition: background .15s; }
+    #ottoPubPanel .opp-approve-all { flex: 1; padding: 11px; background: #FF5C35; color: var(--on-coral, #160A06); border-radius: 100px; font-size: 12.5px; font-weight: 600; cursor: none; border: none; font-family: 'DM Sans', sans-serif; transition: background .15s; }
     #ottoPubPanel .opp-approve-all:hover { background: #ff7055; }
     #ottoPubPanel .opp-skip-all { padding: 11px 16px; color: rgba(255,255,255,.55); cursor: none; background: none; border: none; font-family: 'DM Sans', sans-serif; font-size: 12.5px; font-weight: 500; transition: color .15s; }
     #ottoPubPanel .opp-skip-all:hover { color: white; }
@@ -1057,7 +1057,7 @@
     pcard.classList.add('otto-just-posted');
     const badge = document.createElement('div');
     badge.className = 'otto-posted-badge';
-    badge.innerHTML = '<svg width="10" height="10" viewBox="0 0 16 16" fill="none"><path d="M3 8 L7 12 L13 4" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>posted';
+    badge.innerHTML = '<svg width="10" height="10" viewBox="0 0 16 16" fill="none"><path d="M3 8 L7 12 L13 4" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>posted';
     pcard.appendChild(badge);
 
     // Frame 2 — Otto bubble after a 1.5s beat
@@ -1259,7 +1259,7 @@
     }
     tag.classList.add('approved');
     tag.classList.remove('skip');
-    tag.innerHTML = `<svg width="10" height="10" viewBox="0 0 16 16" fill="none"><path d="M3 8 L7 12 L13 4" stroke="white" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/></svg>APPROVED`;
+    tag.innerHTML = `<svg width="10" height="10" viewBox="0 0 16 16" fill="none"><path d="M3 8 L7 12 L13 4" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/></svg>APPROVED`;
     const actions = d.querySelector('.opp-draft-actions');
     if (actions) actions.innerHTML = `<span class="opp-approved-flag">✓ scheduled to post</span>`;
   }

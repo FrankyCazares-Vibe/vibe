@@ -146,7 +146,7 @@
   }
   .vpv-tags { margin-top: 10px; display: flex; flex-wrap: wrap; gap: 6px; }
   .vpv-tag {
-    font-size: 11px; font-weight: 600; color: #FF5C35;
+    font-size: 11px; font-weight: 600; color: var(--tag-ink, #B83A1A);
     background: rgba(255,92,53,.08); padding: 3px 8px; border-radius: 999px;
   }
   .vpv-mention { color: var(--vpv-mention, #7B5FE0); font-weight: 600; text-decoration: none; }
@@ -169,7 +169,7 @@
   }
   .vpv-act:hover { background: rgba(var(--scrim-rgb, 28,28,30),.06); }
   .vpv-act:active { transform: scale(.97); }
-  .vpv-act.on { color: #FF5C35; }
+  .vpv-act.on { color: var(--tag-ink, #B83A1A); }
   .vpv-act.on .vpv-heart { fill: #FF5C35; stroke: #FF5C35; }
   .vpv-act.on .vpv-bookmark { fill: var(--charcoal, #1C1C1E); stroke: var(--charcoal, #1C1C1E); }
   .vpv-act svg { display: block; }
@@ -329,7 +329,7 @@
   .vpv-aud-lock-line { font-size: 14px; font-weight: 600; margin-top: 16px; }
   .vpv-aud-cta {
     display: inline-block; margin-top: 14px;
-    background: #FF5C35; color: #FAF7F2; text-decoration: none;
+    background: #FF5C35; color: var(--on-coral, #160A06); text-decoration: none;
     font-size: 12.5px; font-weight: 700; letter-spacing: .02em;
     padding: 8px 18px; border-radius: 999px;
   }
@@ -376,7 +376,7 @@
 
   /* Night (S68 wave 5): the viewer's own copy of the Night tokens it reads,
      scoped to its two overlays, so it paints Night on any host
-     (messages.html has no --ink-muted / --hairline). Light sets nothing
+     (messages.html has no --hairline). Light sets nothing
      here: each var() above falls back to the literal it replaced, and the
      four --vpv-* tokens exist only for literals no shared token matches.
      Charcoal buttons and the toast turn cream with dark text (--on-ink).
@@ -385,7 +385,7 @@
   html[data-theme="dark"] .vpv-overlay,
   html[data-theme="dark"] .vpv-aud-overlay {
     --cream: #0C0B0B; --charcoal: #F6F1EA; --paper: #161515;
-    --ink-muted: #9C958C; --hairline: rgba(255,255,255,0.09);
+    --ink-muted: #9C958C; --tag-ink: #FF8A66; --hairline: rgba(255,255,255,0.09);
     --scrim-rgb: 255,255,255; --on-ink: #0C0B0B;
     --vpv-danger: #FF7A6B; --vpv-removed-bg: rgba(255,122,107,0.08);
     --vpv-media-bg: #1F1D1C; --vpv-mention: #A590FF;

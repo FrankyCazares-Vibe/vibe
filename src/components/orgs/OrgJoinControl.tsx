@@ -442,7 +442,8 @@ const GLASS: Palette = {
 /** Onboarding: charcoal, with the solid accent its primary buttons use. */
 const CHARCOAL: Palette = {
   base: { ...PILL, borderRadius: 999 },
-  filled: { color: "#fff", background: "#FF5C35", border: "1px solid #FF5C35" },
+  // Dark words on solid coral (6.3:1); white was 3.1:1.
+  filled: { color: "var(--on-coral, #160A06)", background: "#FF5C35", border: "1px solid #FF5C35" },
   outline: {
     color: "#fff",
     background: "transparent",
@@ -459,7 +460,7 @@ const CHARCOAL: Palette = {
 /** Phone Orgs rows: cream cards, like the MessagesMobile request bar. */
 const CREAM: Palette = {
   base: { ...PILL, borderRadius: 999 },
-  filled: { color: "#fff", background: "#FF5C35", border: "1px solid #FF5C35" },
+  filled: { color: "var(--on-coral, #160A06)", background: "#FF5C35", border: "1px solid #FF5C35" },
   // C0 tokens (S67 wave 3): the phone Orgs row card is var(--glass), which
   // turns near-black in Night. Light values are unchanged.
   outline: {

@@ -136,7 +136,7 @@ export function ProfileHtmlBridge() {
         <p style={{ margin: 0, lineHeight: 1.55 }}>{fatal}</p>
         <Link
           href="/auth/login?next=%2Fprofile"
-          style={{ color: "#FF5C35", fontWeight: 600 }}
+          style={{ color: "var(--tag-ink)", fontWeight: 600 }}
         >
           Sign in again
         </Link>

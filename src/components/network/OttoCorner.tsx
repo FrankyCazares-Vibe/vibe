@@ -305,7 +305,8 @@ export function OttoCorner() {
               border: "2px solid var(--cream)",
               boxShadow:
                 "0 0 12px rgba(255,92,53,0.6), 0 2px 6px rgba(0,0,0,0.18)",
-              color: "#FFF",
+              // Dark number on coral (6.3:1); white was 3.1:1.
+              color: "var(--on-coral, #160A06)",
               fontFamily: "DM Sans, sans-serif",
               fontWeight: 800,
               fontSize: 10,
@@ -598,7 +599,7 @@ export function OttoCorner() {
                 padding: "7px 12px",
                 borderRadius: 999,
                 background: "#FF5C35",
-                color: "#FAF7F2",
+                color: "var(--on-coral, #160A06)",
                 textDecoration: "none",
                 fontSize: 12,
                 fontWeight: 700,

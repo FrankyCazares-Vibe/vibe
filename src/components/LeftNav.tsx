@@ -571,7 +571,8 @@ export function CalendarWidget() {
                 fontSize: 9,
                 fontWeight: 800,
                 background: "#FF5C35",
-                color: "#fff",
+                // Dark on coral (6.3:1); white was 3.1:1.
+                color: "var(--on-coral, #160A06)",
                 padding: "1px 6px",
                 borderRadius: 999,
                 marginLeft: 3,
@@ -904,7 +905,7 @@ function CalendarModal({
               borderRadius: 999,
               border: "none",
               background: "#FF5C35",
-              color: "#fff",
+              color: "var(--on-coral, #160A06)",
               fontFamily: "DM Sans, sans-serif",
               fontWeight: 700,
               fontSize: 13,
@@ -1178,7 +1179,7 @@ function CalendarModal({
                           marginTop: 10,
                           background: "transparent",
                           border: "none",
-                          color: "#FF5C35",
+                          color: "var(--tag-ink)",
                           fontWeight: 700,
                           fontSize: 13,
                           cursor: "pointer",
@@ -1444,7 +1445,7 @@ function CalModalEventCard({
             style={{
               fontSize: 11,
               fontWeight: 600,
-              color: "#FF5C35",
+              color: "var(--tag-ink)",
               textDecoration: "none",
             }}
           >
@@ -1681,7 +1682,7 @@ function AddPersonalEventForm({
               border: "none",
               background:
                 title.trim() && !busy ? "#FF5C35" : "rgba(var(--scrim-rgb),0.18)",
-              color: "#fff",
+              color: title.trim() && !busy ? "var(--on-coral, #160A06)" : "#fff",
               fontWeight: 700,
               fontSize: 12,
               fontFamily: "inherit",

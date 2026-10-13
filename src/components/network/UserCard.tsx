@@ -459,7 +459,8 @@ function ActionButton({
 
   const ORANGE_FILLED: React.CSSProperties = {
     background: "linear-gradient(180deg, #FF7B4A 0%, #FF5C35 100%)",
-    color: "#fff",
+    // Dark words on coral (6.3:1 or better); white was 3.1:1.
+    color: "var(--on-coral, #160A06)",
     border: "1px solid rgba(200,74,32,0.35)",
     boxShadow: "inset 0 1px 0 rgba(255,255,255,0.32), 0 4px 12px rgba(255,92,53,0.22)",
   };

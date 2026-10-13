@@ -46,7 +46,7 @@
       .vc-btn { padding: 8px 14px; min-height: 44px; border-radius: 999px; font-family: inherit;
         font-size: 12px; font-weight: 700; cursor: pointer; border: 1px solid rgba(var(--scrim-rgb, 28,28,30),0.12);
         background: transparent; color: var(--charcoal, #1C1C1E); }
-      .vc-btn-primary { padding: 8px 18px; border: none; background: #FF5C35; color: #fff;
+      .vc-btn-primary { padding: 8px 18px; border: none; background: #FF5C35; color: var(--on-coral, #160A06);
         box-shadow: 0 4px 14px rgba(255,92,53,0.32); }
       .vc-btn[disabled] { opacity: 0.5; cursor: default; box-shadow: none; }
       /* Night (S68 wave 5): the cropper's own copy of the Night tokens it

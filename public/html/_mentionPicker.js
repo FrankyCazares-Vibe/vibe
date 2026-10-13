@@ -56,7 +56,7 @@
     .vmp-empty{padding:16px 14px;color:var(--ink-muted, #6C6761);font-size:12px;text-align:center;}
     /* Night (S68 wave 5): the popover's own copy of the Night tokens it
        reads, scoped to it, so it paints Night on any host (messages.html has
-       no --ink-muted / --hairline). Light sets nothing here: each var()
+       no --hairline). Light sets nothing here: each var()
        above falls back to the literal it replaced. The avatar stays dark. */
     html[data-theme="dark"] .vmp-popover{--paper:#161515;--cream:#0C0B0B;--charcoal:#F6F1EA;--ink-muted:#9C958C;--hairline:rgba(255,255,255,0.09);--scrim-rgb:255,255,255;}
   `;

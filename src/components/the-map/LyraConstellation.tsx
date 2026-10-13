@@ -712,10 +712,12 @@ function NavigationRow({
                 border: isActive
                   ? `1px solid ${isVega ? "#FFD08A" : "#FF5C35"}`
                   : "1px solid rgba(255,229,219,0.18)",
+                // The number on the solid coral dot is dark, like the one on
+                // the gold dot (6.3:1; cream on coral was 2.9:1).
                 color: isActive
                   ? isVega
                     ? "#1C1C1E"
-                    : "#FAF7F2"
+                    : "var(--on-coral, #160A06)"
                   : isVisited
                   ? "#FFE5DB"
                   : "rgba(255,229,219,0.55)",

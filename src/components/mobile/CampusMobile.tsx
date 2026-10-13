@@ -1932,7 +1932,9 @@ function FeedCard({
             borderRadius: 999,
             border: "1px solid rgba(var(--scrim-rgb),0.06)",
             background: liked ? "rgba(255,92,53,0.10)" : "var(--paper-55)",
-            color: liked ? "#E04A26" : "var(--ink-2)",
+            // The count is words: --tag-ink (the old #E04A26 was 3.5:1 on
+            // this chip in Light). The heart keeps its coral below.
+            color: liked ? "var(--tag-ink)" : "var(--ink-2)",
             fontFamily: "inherit",
             fontWeight: 700,
             cursor: "pointer",
@@ -3954,7 +3956,9 @@ const ComposerFab = ({
           borderRadius: 999,
           border: "none",
           background: "linear-gradient(135deg,#FF7A4D 0%,#FF5C35 60%,#E04A26 100%)",
-          color: "#fff",
+          // The plus is the dark ink on orange: 6.3:1 at the middle of the
+          // gradient, 4.8:1 at its darkest corner (white was 3.1 and 4.1).
+          color: "var(--on-coral, #160A06)",
           boxShadow: "0 12px 30px rgba(255,92,53,0.42)",
           cursor: "pointer",
           display: "inline-flex",

@@ -1055,7 +1055,8 @@ const ROW_BUTTON: CSSProperties = {
 const PRIMARY: CSSProperties = {
   border: "1px solid #FF5C35",
   background: "#FF5C35",
-  color: "#fff",
+  // Dark words on coral (6.3:1); white was 3.1:1.
+  color: "var(--on-coral, #160A06)",
 };
 
 const ELLIPSIS: CSSProperties = {

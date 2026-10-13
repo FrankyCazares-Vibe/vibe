@@ -325,7 +325,8 @@ export function SharePostSheet({
                   fontWeight: 800,
                   letterSpacing: "0.12em",
                   textTransform: "uppercase",
-                  color: "#FF5C35",
+                  // Orange words read --tag-ink (raw coral is 2.9:1 here).
+                  color: "var(--tag-ink)",
                   marginBottom: 2,
                 }}
               >
@@ -508,7 +509,13 @@ export function SharePostSheet({
                   selectedIds.size === 0 || sending
                     ? "rgba(var(--scrim-rgb),0.18)"
                     : "#FF5C35",
-                color: "#fff",
+                // Dark words on orange (6.3:1; white was 3.1:1). While the
+                // pill is grey ("Pick a chat", "Sending…") it is not on
+                // orange and keeps its white words as before.
+                color:
+                  selectedIds.size === 0 || sending
+                    ? "#fff"
+                    : "var(--on-coral, #160A06)",
                 fontFamily: "DM Sans, sans-serif",
                 fontSize: 13.5,
                 fontWeight: 800,
@@ -582,7 +589,8 @@ function ThreadRow({
             ? "1.5px solid #FF5C35"
             : "1.5px solid rgba(var(--scrim-rgb),0.22)",
           background: selected ? "#FF5C35" : "var(--paper)",
-          color: "#fff",
+          // The tick only shows on the orange box: dark on orange.
+          color: "var(--on-coral, #160A06)",
           display: "inline-flex",
           alignItems: "center",
           justifyContent: "center",

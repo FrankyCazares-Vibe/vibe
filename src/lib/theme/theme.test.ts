@@ -297,3 +297,86 @@ test("drift: public/html/_persistence.js matches DEFAULT_THEME_PREF and THEME_ME
     "public/html/_persistence.js: _VIBE_THEME_COLORS must equal THEME_META_COLORS.",
   );
 });
+
+/**
+ * DRIFT TRIPWIRE for the grey helper text (Oct 12, 2026). The static pages
+ * can't read globals.css, so each keeps a hand copy of its colour tokens.
+ * The grey was darkened that day so small grey words reach 4.5:1 in Light; a
+ * page left on the old value reads paler than the rest of the app. It must be
+ * ONE value in Light and ONE in Night, under every name it goes by:
+ * `--ink-muted` in globals.css, `--muted` and `--ink-muted` on the static
+ * pages that set them (the shared sheets read `--ink-muted`).
+ */
+const GREY_TOKEN_FILES: Array<{ file: string; names: string[] }> = [
+  // Only --ink-muted here: globals.css also holds the UI kit's own --muted.
+  { file: "src/app/globals.css", names: ["--ink-muted"] },
+  { file: "public/html/profile.html", names: ["--muted", "--ink-muted"] },
+  { file: "public/html/messages.html", names: ["--muted", "--ink-muted"] },
+  { file: "public/html/onboarding.html", names: ["--muted", "--ink-muted"] },
+];
+
+/**
+ * Every value `name` is given in the file's Light blocks (`:root { … }`) or
+ * its Night blocks (`:root[data-theme="dark"] { … }`), upper-cased. A longer
+ * selector such as `:root[data-theme="dark"] .card` is not a token block.
+ */
+function tokenValues(css: string, look: "light" | "night", name: string): string[] {
+  const selector = look === "night" ? ':root\\[data-theme="dark"\\]' : ":root";
+  const blocks = new RegExp(`(?:^|[\\s,}])${selector}\\s*\\{([^{}]*)\\}`, "g");
+  const declaration = new RegExp(`(?:^|[;\\s])${name}\\s*:\\s*([^;}]+)`, "g");
+  const values: string[] = [];
+  for (const block of css.matchAll(blocks)) {
+    for (const found of block[1].matchAll(declaration)) values.push(found[1].trim().toUpperCase());
+  }
+  return values;
+}
+
+test("drift: the grey helper text is one value in Light and one in Night on every page", async () => {
+  const seen = { light: new Map<string, string[]>(), night: new Map<string, string[]>() };
+  for (const { file, names } of GREY_TOKEN_FILES) {
+    const css = await readFile(new URL(file, REPO_ROOT), "utf8");
+    let found = 0;
+    for (const name of names) {
+      const light = tokenValues(css, "light", name);
+      const night = tokenValues(css, "night", name);
+      // A static page may leave one of the two names out, but never half of one.
+      if (light.length === 0 && night.length === 0) continue;
+      found++;
+      assert.equal(light.length, 1, `${file}: ${name} must be set once in the Light block (:root); found ${light.length}.`);
+      assert.equal(
+        night.length,
+        1,
+        `${file}: ${name} must be set once in the Night block (:root[data-theme="dark"]); found ${night.length}. ` +
+          `Without it Night falls back to the Light grey.`,
+      );
+      for (const [look, value] of [["light", light[0]], ["night", night[0]]] as const) {
+        seen[look].set(value, [...(seen[look].get(value) ?? []), `${file} ${name}`]);
+      }
+    }
+    assert.ok(found > 0, `${file}: no grey token found (${names.join(" / ")}). Did the token block move or get renamed?`);
+  }
+  for (const look of ["light", "night"] as const) {
+    const where = [...seen[look]].map(([value, places]) => `${value} in ${places.join(", ")}`).join("; ");
+    assert.equal(
+      seen[look].size,
+      1,
+      `The ${look === "light" ? "Light" : "Night"} grey is out of step: ${where}. ` +
+        `Copy the --ink-muted value from src/app/globals.css to every name listed.`,
+    );
+  }
+});
+
+/**
+ * The ink for words drawn on a coral fill (Oct 12, 2026: dark, 6.3:1; white
+ * was 3.1:1). The coral under it is the same in both looks, so the ink is too.
+ * Only globals.css is checked here; the static pages' copies join this test
+ * once they all carry the token.
+ */
+test("drift: --on-coral is set once in each look in globals.css, to the same value", async () => {
+  const css = await readFile(new URL("src/app/globals.css", REPO_ROOT), "utf8");
+  const light = tokenValues(css, "light", "--on-coral");
+  const night = tokenValues(css, "night", "--on-coral");
+  assert.equal(light.length, 1, "globals.css: --on-coral must be set once in the Light block");
+  assert.equal(night.length, 1, "globals.css: --on-coral must be set once in the Night block");
+  assert.equal(night[0], light[0], "globals.css: --on-coral must be the same ink in Light and Night");
+});

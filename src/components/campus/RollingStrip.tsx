@@ -350,7 +350,8 @@ const LEAD_IN: CSSProperties = {
   fontStyle: "italic",
   fontSize: 16,
   lineHeight: 1,
-  color: "var(--coral)",
+  // --tag-ink, not raw coral: as a word on cream, coral is only 2.9:1.
+  color: "var(--tag-ink)",
   userSelect: "none",
 };
 

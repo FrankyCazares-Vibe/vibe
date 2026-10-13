@@ -384,5 +384,7 @@ const sheetNoteStyle: React.CSSProperties = {
   fontFamily: "DM Sans, sans-serif",
   fontSize: 12.5,
   lineHeight: 1.5,
-  color: "#8A8580",
+  // The Light value of --ink-muted (5.2:1; #8A8580 was 3.4:1). A literal:
+  // this sheet stays cream in Night too, where the token turns pale.
+  color: "#6C6761",
 };
