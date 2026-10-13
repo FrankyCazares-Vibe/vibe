@@ -124,7 +124,8 @@ local walk of every piece, and the live site signed out.
 | 3 Visit tally | `page_open_tally` + `tally_page_open()` (`20261012180000`, **applied on production through the connector, recorded, post-checks pass**), `POST /api/tally/open`, a beacon on `/`, `/waitlist`, `/auth/signup`, admin > Numbers. | Live and counting (2 opens on Oct 12, both mine) |
 | 4 Chat photos | Shrunk in the browser to 2048 px JPEG (`src/lib/media/shrink-photo.ts`), phone chat and the desktop static page (`public/html/_shrinkPhoto.js`, pinned by `shrink-photo-static.test.ts`). | Live. A real upload was never made (no storage locally): **Franky's real-phone walk covers it** |
 | 5 Contrast, pass 1 | Light-look text tokens darker (`--ink-muted #6C6761`, `--tag-ink` for orange words), static twins, emails. Night unchanged. | Live |
-| 5 Contrast, pass 2 and 6 Feed speed | Dark words on the orange buttons everywhere; phones stop downloading the desktop feed. | **Wave 2, building when this was written** |
+| 5 Contrast, pass 2 | Dark words on everything drawn on coral (`--on-coral #160A06`), coral-as-text uses `--tag-ink`, leftover greys follow `--ink-muted`; React, phone components, static pages, the offline page (`SW_VERSION` bumped). | Live (`91e0b9d`) |
+| 6 Feed speed | The server guesses phone or laptop (`src/lib/device-hint.ts`) and sends that screen first; `useScreen` in `src/lib/use-is-mobile.ts`; campus, profile, network, otto load each screen with `next/dynamic`. | Live (`95578ea`), **half of the goal: see below** |
 
 **One change beyond the builders:** the tally's per-network limit is keyed on a
 scrambled daily code (`src/lib/tally/network-code.ts`, HMAC with
@@ -155,6 +156,54 @@ Turnstile key.
   an empty body that looks like an app bug).
 - Turnstile draws its frame inside a closed shadow root: look at a
   screenshot, not `document.querySelectorAll('iframe')`.
+
+## Wave 2 is LIVE too (Oct 12 night, build `dpl_747szdcvv7jw6zrkGBi1dC4skRcu`)
+
+Checked: 2,460 tests, typecheck, lint (0 new), build; walked locally signed in
+as Blake: phone preset (server markup is the phone feed, no hydration error on
+campus, profile, a visitor profile, network, otto), 1280 (desktop markup,
+desktop feed), and the wrong guess (a laptop browser at 800px: desktop markup,
+one swap to the phone feed, no error). Live, signed out: every public page
+200, the button token in the stylesheet, the offline page's rule intact, no
+console error, no new Sentry issue.
+
+**What call 6 does and does not deliver.** A phone no longer gets the desktop
+feed built on the server, hydrated and thrown away: its first paint is the
+phone feed. It STILL DOWNLOADS the desktop feed's file (about 74 KB
+compressed) because `CampusMobile.tsx` imports nine things from
+`campus-home.tsx` (CampusBanner, EventCard, useViewerCampus,
+useReportedPostIds, withoutReportedPosts, BACKDROP_PRESETS, three types), and
+`ProfileMobile` imports `CampusMobile`. **Next step, not done:** move those
+shared pieces into their own file (and `CampusSearchOverlay` out of
+CampusMobile, `UserRow` out of NetworkMobile). Then check
+`.next/server/app/campus/page/react-loadable-manifest.json`: the CampusMobile
+entry must not list the desktop feed's chunk. Messages was left as it was (its
+framed and mini logic); a smaller safe step for it is described in the
+builder's notes. **Measure before doing more:** Sentry, `span.op:pageload`,
+`transaction:/campus`, LCP by release (before: 2.2 s typical, 4.1 s slow).
+
+**The one look change Franky should see:** in Light, my own chat bubble is
+coral, so its words are now dark instead of white (`MessageBubble.tsx`). It
+follows his "dark words on orange" call but he approved buttons, not bubbles.
+To undo only that: the four `--on-coral` lines in
+`src/components/mobile/messages/MessageBubble.tsx`.
+
+**Left by the wave 2 reviewers (small):**
+- Buttons whose fill turns GREY when disabled keep white words (feed Post,
+  event Save, share, composer): faint, as before.
+- Calendar event pills in other colours keep white names; green, purple and
+  gold are under 4.5:1 (static profile and messages).
+- Night only: the gold school chip (`--edu-ink`) is 3.5:1; a lighter gold
+  would pass. The finished step on the school-email strip is dimmed to 4.3:1.
+- A wide window with a phone user-agent loads both screens (the old behaviour
+  for every phone); `?post=` and `?tag=` links are put back by `useScreen`.
+- The Android store app's web view must send `Sec-CH-UA-Mobile: ?1` or say
+  "Mobile" in its user-agent, else it silently gets the old desktop-first path.
+- `/otto` formats an event time in the server's time zone (an older
+  difference; it can make React rebuild that list in the browser).
+
+**Not seen:** anything signed in on the live site, a real phone, Safari, the
+store apps, VoiceOver, a real chat photo upload.
 
 ## Left open on purpose (small, from the reviews)
 
