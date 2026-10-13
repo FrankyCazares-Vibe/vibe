@@ -16,6 +16,7 @@ import {
   useViewerCampus,
   withoutReportedPosts,
 } from "@/app/campus/campus-home";
+import { VIBE_BLOOM_HOST, VibeBloom } from "@/components/bloom/VibeBloom";
 import { CampusBrowsePicker } from "@/components/campus/CampusBrowsePicker";
 import { RollingStrip } from "@/components/campus/RollingStrip";
 import { nextTagFilter } from "@/components/campus/rolling-strip-view";
@@ -829,14 +830,17 @@ export function CampusMobile() {
 
   return (
     <main
+      // The campus backdrop, shared with the desktop campus page and
+      // Settings: cream with a coral bloom in Light, near-black in Night.
+      // It is the host class's `--feed-backdrop`, or the drifting layer
+      // below when motion is allowed (components/bloom/VibeBloom.tsx).
+      className={VIBE_BLOOM_HOST}
       style={{
-        // The campus backdrop, shared with the desktop campus page and
-        // Settings: cream with a coral bloom in Light, near-black in Night.
-        background: "var(--feed-backdrop)",
         minHeight: "100dvh",
         position: "relative",
       }}
     >
+      <VibeBloom />
       {/* Campus banner (shared with desktop): campus identity, live stats line, search icon. */}
       <div
         style={{

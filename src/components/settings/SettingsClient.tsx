@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { AFTER_DELETE } from "@/app/account/suspended/suspended-actions";
+import { VIBE_BLOOM_HOST, VibeBloom } from "@/components/bloom/VibeBloom";
 import {
   asLoadFailure,
   LoadFailed,
@@ -48,8 +49,8 @@ type Profile = {
 
 // The campus feed's backdrop (contracts C0): cream with a coral bloom in
 // Light, near-black with the bloom in Night. One token, so Settings and the
-// feed can't drift apart.
-const PAGE_BG = "var(--feed-backdrop)";
+// feed can't drift apart. It is painted by the host class on <main>, or by
+// the drifting <VibeBloom> layer when motion is allowed.
 
 // Glass cards read the C0 tokens so they flip with data-theme (S67 wave 3):
 // the white tint becomes Night's rgba(22,21,21,0.86), the bright rim and the
@@ -82,14 +83,14 @@ export function SettingsClient({
 }) {
   return (
     <main
-      className="vibe-settings-main"
+      className={`vibe-settings-main ${VIBE_BLOOM_HOST}`}
       style={{
-        background: PAGE_BG,
         borderRight: "1px solid var(--hairline)",
         padding: "32px 28px 80px",
         minWidth: 0,
       }}
     >
+      <VibeBloom column />
       <header style={{ marginBottom: 24 }}>
         <div
           style={{

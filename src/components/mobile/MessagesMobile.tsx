@@ -9,6 +9,7 @@ import {
   useState,
 } from "react";
 
+import { VIBE_BLOOM_HOST, VibeBloom } from "@/components/bloom/VibeBloom";
 import { asLoadFailure, LoadFailed, type LoadFailure } from "@/components/feedback/LoadFailed";
 import { arrivalWrites, channelOfEntry } from "@/lib/chat/layer-stack";
 import type { RoomKind, ThreadMessagesResponse } from "@/lib/chat/types";
@@ -86,7 +87,8 @@ export function MessagesMobile({
 function FlagPending() {
   const night = useNightTheme();
   return (
-    <main style={{ background: "var(--feed-backdrop)", minHeight: "100dvh" }}>
+    <main className={VIBE_BLOOM_HOST} style={{ minHeight: "100dvh" }}>
+      <VibeBloom />
       <header
         style={{
           padding: "calc(env(safe-area-inset-top, 0px) + 14px) 16px 14px",
@@ -795,13 +797,15 @@ function MessagesMobileV1({
 
   return (
     <main
+      // The campus Feed's backdrop (contracts C0): cream with a coral
+      // bloom in Light, near-black in Night. Painted by the host class, or
+      // by the drifting layer when motion is allowed (VibeBloom.tsx).
+      className={VIBE_BLOOM_HOST}
       style={{
-        // The campus Feed's backdrop (contracts C0): cream with a coral
-        // bloom in Light, near-black in Night.
-        background: "var(--feed-backdrop)",
         minHeight: "100dvh",
       }}
     >
+      <VibeBloom />
       <header
         style={{
           padding: "calc(env(safe-area-inset-top, 0px) + 14px) 16px 6px",

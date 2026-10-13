@@ -81,6 +81,16 @@
   --tag-bg: rgba(255,92,53,0.10);
   --card-shadow: inset 0 1px 0 rgba(255,255,255,0.85), 0 4px 14px rgba(180,120,60,0.08);
   --feed-backdrop: radial-gradient(620px 520px at 100% 0%, rgba(255,92,53,0.30), rgba(255,92,53,0.06) 45%, transparent 70%), radial-gradient(520px 420px at 0% 100%, rgba(255,92,53,0.16), transparent 65%), #FAF7F2;
+  /* The living bloom (Oct 13, 2026): --feed-backdrop taken apart, so each glow
+     can be its own layer and drift (the vibe-bloom block at the end of this
+     file). Same sizes and stops as the line above; only the anchor differs:
+     each layer hangs 48px outside its corner, so the corner is 48px in. A
+     test keeps the two in step (components/bloom/vibe-bloom.test.ts). */
+  --bloom-base: #FAF7F2;
+  --bloom-a: radial-gradient(620px 520px at calc(100% - 48px) 48px, rgba(255,92,53,0.30), rgba(255,92,53,0.06) 45%, transparent 70%);
+  --bloom-a-inset: -48px -48px auto auto;
+  --bloom-b: radial-gradient(520px 420px at 48px calc(100% - 48px), rgba(255,92,53,0.16), transparent 65%);
+  --bloom-b-inset: auto auto -48px -48px;
   /* Status inks (S67 wave 3): the error reds, the success green and the
      coral-brown eyebrow, so they stay readable on Night paper. The reds keep
      their first hex. The green and the eyebrow went darker on Oct 12, 2026
@@ -181,6 +191,12 @@
   --tag-bg: rgba(255,92,53,0.14);
   --card-shadow: inset 0 1px 0 rgba(255,255,255,0.04), 0 6px 18px rgba(0,0,0,0.45);
   --feed-backdrop: radial-gradient(720px 620px at 0% 100%, rgba(255,92,53,0.42), rgba(255,92,53,0.10) 40%, transparent 68%), radial-gradient(560px 420px at 100% 0%, rgba(255,92,53,0.20), transparent 60%), #0C0B0B;
+  /* The living bloom, Night: the big glow is bottom-left here. */
+  --bloom-base: #0C0B0B;
+  --bloom-a: radial-gradient(720px 620px at 48px calc(100% - 48px), rgba(255,92,53,0.42), rgba(255,92,53,0.10) 40%, transparent 68%);
+  --bloom-a-inset: auto auto -48px -48px;
+  --bloom-b: radial-gradient(560px 420px at calc(100% - 48px) 48px, rgba(255,92,53,0.20), transparent 60%);
+  --bloom-b-inset: -48px -48px auto auto;
   --danger-ink: #FF7A6B;
   --error-ink: #FF7A6B;
   --ok-ink: #4FD08A;
@@ -2522,4 +2538,121 @@ html.vibe-app body {
    Seen in the first simulator run. */
 html.vibe-app .vibe-auth-back {
   display: none;
+}
+
+/* ---------------------------------------------------------------------------
+   The living bloom (Oct 13, 2026). The page backdrop's coral glow drifts very
+   slowly behind the content. One block for every screen; the markup is
+   components/bloom/VibeBloom.tsx, which says how a screen adopts it.
+
+   Rules this block keeps (components/bloom/vibe-bloom.test.ts reads it):
+   - the keyframes move `transform` and `opacity` only, never a gradient, a
+     background position or a custom property, so nothing is repainted;
+   - no blur filter: the radial gradients are already soft;
+   - everything that changes the page sits inside the no-preference query, so
+     `prefers-reduced-motion: reduce` is the static backdrop exactly as it
+     was: the host paints the token, the layer is `display: none` (and an
+     element that is not displayed runs no animation).
+   --------------------------------------------------------------------------- */
+.vibe-bloom {
+  display: none;
+}
+.vibe-bloom-host {
+  background: var(--feed-backdrop);
+}
+.vibe-bloom-host--network {
+  background: var(--network-backdrop);
+}
+.vibe-mobile-shell {
+  background: var(--cream);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  /* The layer is at z-index -1 in the root stacking context, so anything
+     opaque between it and the host would cover it. While a bloom is mounted
+     the page colour moves from <body> to <html> (the same colour, still
+     behind everything, still what overscroll shows), and the phone shell and
+     the host stop painting. Last in the file, so it also beats the
+     installed-app rules above that paint the body. */
+  html:has(.vibe-bloom) {
+    background-color: var(--cream);
+  }
+  html:has(.vibe-bloom) body,
+  .vibe-mobile-shell:has(.vibe-bloom),
+  .vibe-bloom-host:has(> .vibe-bloom) {
+    background: transparent;
+  }
+
+  .vibe-bloom {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    overflow: hidden;
+    pointer-events: none;
+    background: var(--bloom-base);
+  }
+  .vibe-bloom-glow {
+    position: absolute;
+    will-change: transform, opacity;
+    animation-timing-function: ease-in-out;
+    animation-iteration-count: infinite;
+    animation-direction: alternate;
+  }
+  /* Each layer is only its corner of the screen: the gradient has faded to
+     nothing before the two inner edges, and the two outer edges hang 48px
+     off screen, more than the drift ever travels. */
+  .vibe-bloom-glow--a {
+    inset: var(--bloom-a-inset);
+    width: var(--bloom-a-w, 560px);
+    height: var(--bloom-a-h, 480px);
+    background: var(--bloom-a);
+    animation-name: vibe-bloom-drift-a;
+    animation-duration: 34s;
+    /* Half a loop in: the first frame is the backdrop where it always was. */
+    animation-delay: -17s;
+  }
+  .vibe-bloom-glow--b {
+    inset: var(--bloom-b-inset);
+    width: var(--bloom-b-w, 560px);
+    height: var(--bloom-b-h, 480px);
+    background: var(--bloom-b);
+    animation-name: vibe-bloom-drift-b;
+    animation-duration: 26s;
+    animation-delay: -13s;
+  }
+
+  /* Settings and the desktop Network page are the column beside the 200px
+     LeftNav (.vibe-app-shell): the glow keeps to that column. */
+  @media (min-width: 900px) {
+    .vibe-bloom--column {
+      left: 200px;
+    }
+  }
+
+  /* Desktop Network, Light only: its own peach wash (--network-backdrop),
+     sized in percent. 120% x 80% fading out at 60% is 72% x 48% of the box,
+     so each layer is that plus the 48px overhang. Night is the feed's bloom. */
+  :root:not([data-theme="dark"]) .vibe-bloom--network {
+    --bloom-base: linear-gradient(180deg, #FAF7F2 0%, #F4EDE2 100%);
+    --bloom-a: radial-gradient(calc((100% - 48px) / 0.6) calc((100% - 48px) / 0.6) at 48px 48px, rgba(255,222,180,0.45) 0%, rgba(255,222,180,0) 60%);
+    --bloom-a-inset: -48px auto auto -48px;
+    --bloom-a-w: calc(72% + 48px);
+    --bloom-a-h: calc(48% + 48px);
+    --bloom-b: radial-gradient(calc((100% - 48px) / 0.6) calc((100% - 48px) / 0.6) at calc(100% - 48px) calc(100% - 48px), rgba(255,200,170,0.35) 0%, rgba(255,200,170,0) 60%);
+    --bloom-b-inset: auto -48px -48px auto;
+    --bloom-b-w: calc(66% + 48px);
+    --bloom-b-h: calc(48% + 48px);
+  }
+}
+
+/* Never brighter than the static glow (opacity tops out at 1), and never
+   further than 22px from where it rests. */
+@keyframes vibe-bloom-drift-a {
+  from { transform: translate3d(-20px, 14px, 0); opacity: 1; }
+  to { transform: translate3d(22px, -16px, 0); opacity: 0.88; }
+}
+@keyframes vibe-bloom-drift-b {
+  from { transform: translate3d(16px, 18px, 0); opacity: 0.9; }
+  to { transform: translate3d(-18px, -14px, 0); opacity: 1; }
 }

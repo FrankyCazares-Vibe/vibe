@@ -17,6 +17,7 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 
+import { VIBE_BLOOM_HOST, VibeBloom } from "@/components/bloom/VibeBloom";
 import { CampusAppShell } from "@/components/campus-app-shell";
 import { CampusBrowsePicker } from "@/components/campus/CampusBrowsePicker";
 import { RollingStrip } from "@/components/campus/RollingStrip";
@@ -946,12 +947,18 @@ export function CampusHome({
 
   const showThreeColumn = tab === "chat" && !isEmpty && !isLoading;
   const scene = getTabScene(shownTab);
+  // The living bloom (components/bloom/VibeBloom.tsx): on every scene that
+  // is the feed backdrop, the host class paints it (or goes transparent over
+  // the drifting layer when motion is allowed). Chat keeps its own inline
+  // chrome, which is opaque, and no bloom is mounted there.
+  const bloomScene = scene.css === FEED_BACKDROP;
 
   return (
     <CampusAppShell>
       <CampusViewContext.Provider value={campusView}>
       <style>{SHEEN_KEYFRAMES}</style>
       <div
+        className={bloomScene ? VIBE_BLOOM_HOST : undefined}
         style={{
           // Feed / events / orgs / map can grow with content (minHeight),
           // but chat needs to be locked to the viewport so the message
@@ -961,7 +968,7 @@ export function CampusHome({
           ...(tab === "chat"
             ? { height: "100dvh", overflow: "hidden" }
             : { minHeight: "100vh" }),
-          background: scene.css,
+          ...(bloomScene ? {} : { background: scene.css }),
           backgroundAttachment: "fixed",
           color: scene.tone === "light" ? COLORS.glassText : COLORS.text,
           transition: "background 600ms ease",
@@ -969,6 +976,7 @@ export function CampusHome({
           flexDirection: "column",
         }}
       >
+        {bloomScene ? <VibeBloom /> : null}
         {/* One desktop top bar (S68, Franky's "diagonal" pick): the campus
             name, Campuses and search on the left, the tab pills on the
             right, in the school's colours. It replaces the old banner +

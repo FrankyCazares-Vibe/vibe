@@ -4,6 +4,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 
+import { VIBE_BLOOM_HOST, VibeBloom } from "@/components/bloom/VibeBloom";
 import { asLoadFailure, LoadFailed, type LoadFailure } from "@/components/feedback/LoadFailed";
 import {
   atCampusLabel,
@@ -348,13 +349,15 @@ export function NetworkMobile() {
 
   return (
     <main
+      // The campus Feed's backdrop (contracts C0): cream with a coral
+      // bloom in Light, near-black in Night. Painted by the host class, or
+      // by the drifting layer when motion is allowed (VibeBloom.tsx).
+      className={VIBE_BLOOM_HOST}
       style={{
-        // The campus Feed's backdrop (contracts C0): cream with a coral
-        // bloom in Light, near-black in Night.
-        background: "var(--feed-backdrop)",
         minHeight: "100dvh",
       }}
     >
+      <VibeBloom />
       <header
         id="otto-mobile-tour-network-tabs"
         style={{

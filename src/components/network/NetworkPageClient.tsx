@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import { VIBE_BLOOM_HOST_NETWORK, VibeBloom } from "@/components/bloom/VibeBloom";
 import { asLoadFailure, LoadFailed, type LoadFailure } from "@/components/feedback/LoadFailed";
 import { vibeRequest } from "@/lib/feedback/request";
 
@@ -355,7 +356,7 @@ export function NetworkPageClient() {
 
   return (
     <main
-      className="vibe-network-main"
+      className={`vibe-network-main ${VIBE_BLOOM_HOST_NETWORK}`}
       style={{
         // Same warm radial cream wash the campus Feed uses — keeps the surface
         // continuous when bouncing between Campus → Network → Messages.
@@ -364,17 +365,16 @@ export function NetworkPageClient() {
         // and UserCard, the tabs, filters, search and empty islands read the
         // C0 glass steps, so the page follows the theme. Each new token's
         // fallback is today's Light literal, so Light can't drift.
-        background: `var(--network-backdrop, ${[
-          "radial-gradient(120% 80% at 0% 0%, rgba(255,222,180,0.45) 0%, rgba(255,222,180,0) 60%)",
-          "radial-gradient(110% 80% at 100% 100%, rgba(255,200,170,0.35) 0%, rgba(255,200,170,0) 60%)",
-          "linear-gradient(180deg, #FAF7F2 0%, #F4EDE2 100%)",
-        ].join(", ")})`,
+        // Since Oct 13 the wash itself comes from the host class
+        // (`--network-backdrop`), or from the drifting <VibeBloom> layer
+        // when motion is allowed (components/bloom/VibeBloom.tsx).
         color: "var(--charcoal)",
         borderRight: "1px solid var(--hairline)",
         padding: "32px 28px 80px",
         minWidth: 0,
       }}
     >
+      <VibeBloom variant="network" column />
       <header style={{ marginBottom: 24 }}>
         <div
           style={{

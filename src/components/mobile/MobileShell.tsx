@@ -25,12 +25,14 @@ type Props = {
 export function MobileShell({ children }: Props) {
   return (
     <div
+      // The cream lives on the class (globals.css) so a screen with a living
+      // bloom can clear it: the bloom layer sits behind this element.
+      className="vibe-mobile-shell"
       style={{
         minHeight: "100dvh",
         // Reserve space for the bottom tab bar (64px + iOS home indicator)
         // so the last item of the page doesn't get covered.
         paddingBottom: "calc(64px + env(safe-area-inset-bottom, 0px))",
-        background: "var(--cream)",
       }}
     >
       {children}
