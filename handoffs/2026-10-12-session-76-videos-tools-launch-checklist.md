@@ -237,8 +237,17 @@ email", with the sign-in address masked (`g•••@gmail.com`).
 - Checked: 2,491 tests, typecheck, lint, build; the real route run locally
   (a seed school address reached the send once, the repeat was refused, the
   answer never changed; nothing can be sent locally, there is no Resend key in
-  dev). **Not seen when this was written: a real note arriving in a school
-  inbox** (Franky's test: his IU address on Forgot password; then
+  dev). **Seen Oct 13, 1:29 am: the note reached Franky's IU inbox within
+  about a minute of the send, but in JUNK** (Outlook: "This message was
+  identified as junk"). So link-free mail is fast now, and placement is the
+  open problem. Mail records checked the same night: SPF passes on the
+  `send.` subdomain, DKIM is signed for connectvibe.app, DMARC is `p=none`.
+  Nothing is misconfigured; it is sender reputation (a new domain on a shared
+  pool) and wording that reads like a password email. **Nobody knows yet
+  whether the sign-up and school-verification CODE emails land in Junk too:
+  that is the launch risk, and the owed live sign-up test with James's or
+  Rylan's school email is how to find out (look in Inbox AND Junk).** First written as: a real note arriving in a school
+  inbox (Franky's test: his IU address on Forgot password; then
   `select count(*) from email_sends where kind = 'signin_hint'`).
 
 **Gotcha:** this session ran the gstack `investigate` skill for the report;
