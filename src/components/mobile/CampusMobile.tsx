@@ -1640,8 +1640,11 @@ function FeedCard({
   }
 
   return (
-    <button
-      type="button"
+    // A plain box, not a <button>: it holds real buttons (More actions, the
+    // #chips, Like, Comment, Repost, Save) and a button inside a button is
+    // invalid HTML. A tap anywhere on it still opens the post and a double
+    // tap likes it; by keyboard the Comment button opens the same post.
+    <div
       // Taps in this card's sheets (Post options, Send to chats, Edit post)
       // reach here through their portals in React's tree, but aren't inside
       // the card on the page: they neither open nor like the post. Checked
@@ -2150,7 +2153,7 @@ function FeedCard({
           onClose={() => setMenuOpen(false)}
         />
       ) : null}
-    </button>
+    </div>
   );
 }
 
