@@ -342,7 +342,8 @@ function LiveBox({ siteKey, action, onChange, ref }: Props & { siteKey: string }
 
   return (
     // minmax(0, 1fr): the column is as wide as the form, never as wide as the 300px holder inside it.
-    <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: 8 }}>
+    // data-keep-clear: the cookie notice never sits over this box (src/lib/legal/cookie-notice.ts).
+    <div data-keep-clear style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: 8 }}>
       <div ref={frame} style={frameStyle}>
         <div ref={holder} style={holderStyle} />
       </div>

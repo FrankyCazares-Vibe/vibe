@@ -1,0 +1,138 @@
+/* The cookie notice (CookieNotice.tsx): a small card fixed to the bottom of
+   the signed-out pages. Fixed, so it never moves the page. Its colours are
+   the app's tokens, so it follows Light and Night; the --night tone writes
+   Night's values out for the landing and the waitlist, which are Night in
+   either theme (the same values as --paper, --charcoal, --ink-2 and
+   --hairline under :root[data-theme="dark"] in globals.css). Under the toast
+   (z 12000) and the custom cursor. */
+.vibe-cookie-notice {
+  --cn-bg: var(--paper, #FFFFFF);
+  --cn-fg: var(--charcoal, #1C1C1E);
+  --cn-sub: var(--ink-2, #5C5853);
+  --cn-line: var(--hairline, rgba(28, 28, 30, 0.08));
+  --cn-shadow: 0 10px 34px rgba(28, 28, 30, 0.16);
+  position: fixed;
+  z-index: 9000;
+  left: max(12px, env(safe-area-inset-left));
+  right: max(12px, env(safe-area-inset-right));
+  bottom: calc(12px + env(safe-area-inset-bottom));
+  box-sizing: border-box;
+  max-width: 560px;
+  margin: 0 auto;
+  padding: 14px 16px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  border-radius: 18px;
+  border: 1px solid var(--cn-line);
+  background: var(--cn-bg);
+  color: var(--cn-fg);
+  box-shadow: var(--cn-shadow);
+  font-family: "DM Sans", sans-serif;
+  transition: opacity 160ms ease;
+}
+.vibe-cookie-notice--night {
+  --cn-bg: #161515;
+  --cn-fg: #F6F1EA;
+  --cn-sub: #CFC8BE;
+  --cn-line: rgba(255, 255, 255, 0.12);
+  --cn-shadow: 0 10px 34px rgba(0, 0, 0, 0.5);
+}
+:root[data-theme="dark"] .vibe-cookie-notice {
+  --cn-line: rgba(255, 255, 255, 0.12);
+  --cn-shadow: 0 10px 34px rgba(0, 0, 0, 0.5);
+}
+
+/* Out of the way while a main button, a submit button or the human-check box
+   is under it: not seen, and taps go through to what is underneath. Keyboard
+   focus inside brings it back, so nobody tabs onto something they can't see. */
+.vibe-cookie-notice[data-aside]:not(:focus-within) {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.vibe-cookie-notice-text {
+  margin: 0;
+  font-size: 13.5px;
+  font-weight: 500;
+  line-height: 1.45;
+  color: var(--cn-fg);
+}
+.vibe-cookie-notice-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+/* 44px tall to tap; the words are what is drawn. */
+.vibe-cookie-notice-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--cn-sub);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.vibe-cookie-notice-link:hover {
+  color: var(--cn-fg);
+}
+/* The pill: 36px to look at, 44px to tap (the landing's small button). */
+.vibe-cookie-notice-btn {
+  position: relative;
+  flex: none;
+  height: 36px;
+  padding: 0 20px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--coral, #FF5C35);
+  color: var(--on-coral, #160A06);
+  font: 700 13.5px/1 "DM Sans", sans-serif;
+  cursor: pointer;
+}
+.vibe-cookie-notice-btn::after {
+  content: "";
+  position: absolute;
+  inset: -4px 0;
+}
+.vibe-cookie-notice-link:focus-visible,
+.vibe-cookie-notice-btn:focus-visible {
+  outline: 2px solid var(--cn-fg);
+  outline-offset: 3px;
+  border-radius: 999px;
+}
+
+/* Room for one line: the words on the left, the link and the button on the right. */
+@media (min-width: 620px) {
+  .vibe-cookie-notice {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    max-width: 720px;
+    padding: 8px 12px 8px 20px;
+  }
+  .vibe-cookie-notice-row {
+    flex: none;
+    gap: 16px;
+  }
+}
+
+/* A gentle arrival, each time it comes (back) into view. */
+@media (prefers-reduced-motion: no-preference) {
+  .vibe-cookie-notice:not([data-aside]) {
+    animation: vibe-cookie-notice-in 240ms ease-out backwards;
+  }
+}
+@keyframes vibe-cookie-notice-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .vibe-cookie-notice {
+    transition: none;
+  }
+}

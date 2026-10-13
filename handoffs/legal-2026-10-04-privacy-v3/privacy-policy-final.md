@@ -370,9 +370,9 @@ These companies use providers of their own. Supabase and Resend, for example, ru
 
 ## 7. What does Vibe keep on my phone or computer?
 
-**Cookies.** The only cookies Vibe sets are the ones that keep you signed in. Our sign-in software, which is made by Supabase, sets them on connectvibe.app. They last up to 400 days and are refreshed as you use Vibe. There are no advertising or tracking cookies, so there is no cookie banner.
+**Cookies.** The only cookies Vibe sets are the ones that keep you signed in. Our sign-in software, which is made by Supabase, sets them on connectvibe.app. They last up to 400 days and are refreshed as you use Vibe. There are no advertising or tracking cookies. A short notice on the signed-out pages of the website says so. When you close it, your browser remembers that, so it is not shown again. Nothing about that is sent to us.
 
-**Kept in your browser.** To load faster, Vibe keeps copies of some of your own information in your browser, such as your profile card, your own posts, follow list and recent searches. They are cleared when you sign out or delete your account in that browser, and stay in your other browsers until you sign out there. Your theme, the email you just signed up with and a few similar notes can stay until you clear your browser data for Vibe. Cloudflare's check that you are a person may keep its own data in your browser, inside its box and under Cloudflare's own address. Vibe cannot read it. The check sets no cookie under connectvibe.app.
+**Kept in your browser.** To load faster, Vibe keeps copies of some of your own information in your browser, such as your profile card, your own posts, follow list and recent searches. They are cleared when you sign out or delete your account in that browser, and stay in your other browsers until you sign out there. Your theme, the email you just signed up with, the note that you closed the cookie notice and a few similar notes can stay until you clear your browser data for Vibe. Cloudflare's check that you are a person may keep its own data in your browser, inside its box and under Cloudflare's own address. Vibe cannot read it. The check sets no cookie under connectvibe.app.
 
 **Sign out.** Signing out in Settings signs your account out on every device. Another device can stay signed in for about an hour more.
 

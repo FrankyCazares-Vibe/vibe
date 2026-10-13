@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 
+import { CookieNotice } from "@/components/legal/CookieNotice";
+
 /**
  * /auth/forgot-password is a client page, so it can't export metadata
  * itself; this layout names it for the tab, search results and link
@@ -17,5 +19,11 @@ export default function AuthForgotPasswordLayout({
 }: {
   children: ReactNode;
 }) {
-  return children;
+  return (
+    <>
+      {children}
+      {/* The one-time cookie notice of the signed-out pages (a notice, nothing to accept). */}
+      <CookieNotice />
+    </>
+  );
 }

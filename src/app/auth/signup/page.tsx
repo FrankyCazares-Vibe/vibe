@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 
+import { CookieNotice } from "@/components/legal/CookieNotice";
 import { OpenBeacon } from "@/components/tally/OpenBeacon";
 import { formatAccessCode, readTypedAccessCode } from "@/lib/waitlist/access-code";
 import { isSignupOpen } from "@/lib/waitlist/signup-open";
@@ -63,6 +64,8 @@ export default async function SignupPage({ searchParams }: Props) {
       />
       {/* Counts this open in Vibe's own day totals. Only `?src=` is read: the access code stays here. */}
       <OpenBeacon page="signup" />
+      {/* The one-time cookie notice of the signed-out pages (a notice, nothing to accept). */}
+      <CookieNotice />
     </>
   );
 }

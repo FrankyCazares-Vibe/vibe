@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { redirect } from "next/navigation";
 
 import { HomeLanding } from "@/components/landing/home-landing";
+import { CookieNotice } from "@/components/legal/CookieNotice";
 import { OpenBeacon } from "@/components/tally/OpenBeacon";
 import { appShellFromRequest } from "@/lib/native/server";
 import { isSignupOpen } from "@/lib/waitlist/signup-open";
@@ -57,6 +58,8 @@ export default async function Home({
       <HomeLanding signupOpen={await isSignupOpen(override)} />
       {/* Counts this open in Vibe's own day totals (a number, nothing about the visitor). */}
       <OpenBeacon page="home" />
+      {/* The one-time cookie notice of the signed-out pages (a notice, nothing to accept). */}
+      <CookieNotice tone="night" />
     </>
   );
 }

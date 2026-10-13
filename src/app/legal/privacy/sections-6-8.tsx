@@ -44,7 +44,9 @@ export function Sections6To8() {
         keep you signed in. Our sign-in software, which is made by Supabase,
         sets them on connectvibe.app. They last up to 400 days and are
         refreshed as you use Vibe. There are no advertising or tracking
-        cookies, so there is no cookie banner.
+        cookies. A short notice on the signed-out pages of the website says
+        so. When you close it, your browser remembers that, so it is not shown
+        again. Nothing about that is sent to us.
       </LegalP>
       <LegalP>
         <strong>Kept in your browser.</strong> To load faster, Vibe keeps
@@ -52,8 +54,9 @@ export function Sections6To8() {
         profile card, your own posts, follow list and recent searches. They are
         cleared when you sign out or delete your account in that browser, and
         stay in your other browsers until you sign out there. Your theme, the
-        email you just signed up with and a few similar notes can stay until
-        you clear your browser data for Vibe. Cloudflare&apos;s check that you
+        email you just signed up with, the note that you closed the cookie
+        notice and a few similar notes can stay until you clear your browser
+        data for Vibe. Cloudflare&apos;s check that you
         are a person may keep its own data in your browser, inside its box and
         under Cloudflare&apos;s own address. Vibe cannot read it. The check
         sets no cookie under connectvibe.app.

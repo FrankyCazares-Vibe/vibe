@@ -2,6 +2,7 @@ import type { Viewport } from "next";
 import Link from "next/link";
 
 import "@/components/landing/landing.css";
+import { CookieNotice } from "@/components/legal/CookieNotice";
 import { frauncesSoft } from "@/components/landing/soft-font";
 
 import "./waitlist.css";
@@ -38,6 +39,8 @@ export default function WaitlistLayout({ children }: { children: React.ReactNode
         </nav>
         <p>Vibe is not affiliated with Indiana University or Purdue University.</p>
       </footer>
+      {/* The one-time cookie notice of the signed-out pages (a notice, nothing to accept). */}
+      <CookieNotice tone="night" />
     </div>
   );
 }
