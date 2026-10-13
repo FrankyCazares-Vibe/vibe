@@ -1,5 +1,14 @@
 # Vibe — manual QA checklist
 
+> **Partly out of date (note added 2026-10-13).** This list was written for Phase 1, in spring 2026. Since then:
+>
+> - The static prototypes it mentions (`feed.html`, `network.html`, `campus.html`, `otto.html`, `opportunities.html`, `landing.html`) were deleted. Their old addresses redirect to the clean routes, and a signed-out visitor is sent to sign-in. There is no anonymous demo. Section 1 no longer describes the app.
+> - There are far more than two migrations. Locally, `supabase start` applies all of them.
+> - Sign-up now sits behind the waitlist switch, access codes and, in production, a human check. School email comes first.
+> - A Vercel Preview build cannot sign in while the human check is on, so walk the list on `npm run dev` against the local stack.
+>
+> Sections 2 onward are still a useful order to walk in, but check each box against `ARCHITECTURE.md` before trusting it.
+
 Phase 1 smoke test. Walk through this on a Vercel preview (or `npm run dev`) before merging anything that touches auth, the profile bridge, storage uploads, or the campus gate.
 
 Each box is one observable assertion. If something fails, file it in `handoffs/` and pause the deploy.
