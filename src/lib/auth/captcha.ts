@@ -95,7 +95,7 @@ export function initialHumanCheck(siteKey: string | null = turnstileSiteKey()): 
 }
 
 export const HUMAN_CHECK_CHECKING_LABEL = "Checking you're a person…";
-export const HUMAN_CHECK_TAP_LABEL = "Tick the box above first";
+export const HUMAN_CHECK_TAP_LABEL = "Check the box above first";
 
 /**
  * What the form's button says while it waits for the box, or null when it
