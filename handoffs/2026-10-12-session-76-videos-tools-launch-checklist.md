@@ -205,6 +205,46 @@ To undo only that: the four `--on-coral` lines in
 **Not seen:** anything signed in on the live site, a real phone, Safari, the
 store apps, VoiceOver, a real chat photo upload.
 
+## Oct 13, after midnight: the sign-in note (Franky: "yes build that")
+
+**What happened.** With the human check on, Franky tried Forgot password with
+his school email and got nothing. Not a bug: a reset goes to the address an
+account SIGNS IN with, and his signs in with a personal one. Counts: 0 sign-in
+accounts under the typed address, 1 account holding it as its school email,
+0 emails logged. With his sign-in address the reset arrived at once, which is
+also the proof that resets still send with the human check on.
+**15 of the 20 accounts sign in with a different address than their school
+email**, so they would all have met the same silence.
+
+**What shipped** (`136bf7d`, build `dpl_4FKbUDNCE8mnuLB1KJCFgJZ9SxtX`): when the
+typed address is the verified school email or proven personal email of exactly
+one account, that inbox gets a short link-free note, "Your Vibe sign-in
+email", with the sign-in address masked (`g•••@gmail.com`).
+- `sendSigninNote` in `src/app/api/auth/password-reset/route.ts`, the pure
+  pieces in `src/lib/auth/signin-hint.ts`, the sender `sendSigninHintEmail`.
+- Same answer, status and timing on screen for every address. All new work
+  runs after the answer.
+- Limits: the reset limits, plus one note per typed address per UTC day
+  (`pw-reset-hint-day:`), and the note counts against the 20-an-hour,
+  40-a-day reset cap.
+- No note for a suspended or banned account, a retired IU domain, a sign-in
+  email that does not start with a letter or digit, or when two accounts match.
+- New email kind `signin_hint`: `20261013090000`, **applied on production
+  BEFORE the push** (so no note goes out unlogged), recorded, and on the local
+  database.
+- Privacy Policy sections 3a, 4 ("these eight") and 5; date October 13, 2026;
+  page = text 1,150 of 1,150.
+- Checked: 2,491 tests, typecheck, lint, build; the real route run locally
+  (a seed school address reached the send once, the repeat was refused, the
+  answer never changed; nothing can be sent locally, there is no Resend key in
+  dev). **Not seen when this was written: a real note arriving in a school
+  inbox** (Franky's test: his IU address on Forgot password; then
+  `select count(*) from email_sends where kind = 'signin_hint'`).
+
+**Gotcha:** this session ran the gstack `investigate` skill for the report;
+its setup step offers an upgrade and three one-time questions (telemetry and
+so on). They were skipped, not answered.
+
 ## Left open on purpose (small, from the reviews)
 
 - The desktop composer and the static profile composer still show raw error
