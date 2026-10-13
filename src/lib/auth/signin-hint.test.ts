@@ -218,14 +218,19 @@ test("the email: plain words, the masked address once, the subject fixed", () =>
   assert.equal(email.subject, "Your Vibe sign-in email");
   assert.equal(email.subject, SIGNIN_HINT_SUBJECT);
   assert.equal(email.text, [
-    "Someone asked to reset the password of the Vibe account that uses this email address.",
+    "Someone asked Vibe for help signing in with this email address.",
     "",
-    "That account signs in with a different email: g•••@gmail.com",
+    "Your Vibe account signs in with a different email: g•••@gmail.com",
     "",
-    'To reset the password, open Vibe, tap "Forgot?" on the sign-in page and type that email in full.',
+    'Use that email on the sign-in page. If you tapped "Forgot?", type that email there in full.',
     "",
     "If this wasn't you, ignore this email. Nothing has changed.",
   ].join("\n"));
+  // Never the word "password": beside a partly hidden address it reads like
+  // phishing, and Outlook junked the first wording in a school inbox (Oct 13).
+  for (const part of [email.subject, email.text, email.html]) {
+    assert.ok(!/password/i.test(part), part.slice(0, 60));
+  }
   assert.equal(count(email.text, MASKED), 1);
   assert.equal(count(email.html, MASKED), 1);
 });

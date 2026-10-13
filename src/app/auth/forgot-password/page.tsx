@@ -141,9 +141,9 @@ export default function ForgotPasswordPage() {
               role="status"
               style={{ overflowWrap: "anywhere" }}
             >
-              If an account exists for {sentTo}, a reset link is on its way.
-              Only the newest reset email works. Not there after a minute?
-              Check Spam or Junk.
+              If a Vibe account uses {sentTo}, an email is on its way. If you
+              asked more than once, only the newest one works. Not there after
+              a minute? Check Spam or Junk.
             </div>
           ) : null}
 

@@ -242,6 +242,12 @@ function escapeHtml(text: string): string {
  * nothing fetched, and no address in it but the masked one. Keep it this
  * small.
  *
+ * THE WORDS (Oct 13 2026). The first wording said "reset the password" twice,
+ * and Outlook filed the note under Junk in a school inbox within a minute of
+ * its first real send. A partly hidden address beside the word "password" is
+ * what a phishing email looks like, so the note now says what it is for
+ * (signing in) and never says "password". `signin-hint.test.ts` pins that.
+ *
  * Throws when `masked` is not a masked address: a programming error, the
  * same as a code email given something that is not digits.
  */
@@ -249,11 +255,10 @@ export function signinHintEmail(masked: string): SigninHintEmail {
   if (!isMaskedSignInEmail(masked)) {
     throw new Error("The sign-in note needs a masked address.");
   }
-  const asked =
-    "Someone asked to reset the password of the Vibe account that uses this email address.";
-  const different = "That account signs in with a different email:";
+  const asked = "Someone asked Vibe for help signing in with this email address.";
+  const different = "Your Vibe account signs in with a different email:";
   const how =
-    'To reset the password, open Vibe, tap "Forgot?" on the sign-in page and type that email in full.';
+    'Use that email on the sign-in page. If you tapped "Forgot?", type that email there in full.';
   const ignore = "If this wasn't you, ignore this email. Nothing has changed.";
 
   const paragraph = (words: string, style = "margin:0 0 16px;") =>
