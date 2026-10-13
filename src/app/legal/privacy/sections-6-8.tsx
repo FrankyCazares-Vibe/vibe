@@ -53,7 +53,10 @@ export function Sections6To8() {
         cleared when you sign out or delete your account in that browser, and
         stay in your other browsers until you sign out there. Your theme, the
         email you just signed up with and a few similar notes can stay until
-        you clear your browser data for Vibe.
+        you clear your browser data for Vibe. Cloudflare&apos;s check that you
+        are a person may keep its own data in your browser, inside its box and
+        under Cloudflare&apos;s own address. Vibe cannot read it. The check
+        sets no cookie under connectvibe.app.
       </LegalP>
       <LegalP>
         <strong>Sign out.</strong> Signing out in{" "}

@@ -22,7 +22,10 @@ export function CompanyList() {
         Delete account) does the same. Your browser also talks to Supabase when
         a profile page checks that you are signed in, and each time a profile
         or post photo loads. Supabase writes the &ldquo;confirm your
-        account&rdquo; email and passes it to Resend to send.
+        account&rdquo; email and passes it to Resend to send. When you sign
+        in, sign up or ask for a new email, Supabase sends the one-time code
+        from the check that you are a person, with your IP address, to
+        Cloudflare to confirm it.
       </li>
       <li>
         <strong>Vercel</strong> (hosting). It runs the site, our server
@@ -34,13 +37,29 @@ export function CompanyList() {
         view or you press Play.
       </li>
       <li>
-        <strong>Cloudflare</strong> (media storage and incoming mail). It holds
+        <strong>Cloudflare</strong> (media storage, incoming mail and the check
+        that you are a person). It holds
         post videos, a club&apos;s photos and videos, chat photos and videos,
         and group chat photos, including ones kept as evidence. Your browser
         fetches them straight from Cloudflare. It also serves the small program
         that shows a résumé PDF, and looks after the connectvibe.app name. And
         it forwards every email sent to hello@ or help@ (
-        <Sec to="3g">section 3g</Sec>).
+        <Sec to="3g">section 3g</Sec>). It also runs the check that you are a
+        person. The sign-up page, the sign-in page and any page that shows
+        &ldquo;Send a new email&rdquo; load a small box straight from
+        Cloudflare. The check starts when the page shows the box, not when you
+        press the button. So on the &ldquo;Check your email&rdquo; screen it
+        runs even if you never ask for a new email. Through the box Cloudflare
+        sees your IP address, details of your browser and device, the address
+        of the Vibe page you are on, and which of the three forms it is. We
+        send Cloudflare nothing you type. Cloudflare says it uses what it sees
+        only to tell people from bots and to make the check better. The box
+        gives your browser a one-time code that lasts five minutes, and your
+        browser sends that code to Supabase with the form. Cloudflare tells us
+        pass or fail for each try. We also see totals of passes and fails,
+        never who. We have turned off the box&apos;s link for sending feedback
+        to Cloudflare. Cloudflare publishes its own notice for this check, the
+        Turnstile Privacy Addendum.
       </li>
       <li>
         <strong>Resend</strong> (sending email). It gets the address and full

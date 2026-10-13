@@ -12,8 +12,11 @@ export function Sections3eTo3h() {
       <LegalUL bullets>
         <li>
           No advertising tracker, and no outside tool that builds a profile of
-          you. Sentry is the one outside tool that measures anything: errors,
-          speed and visits (<Sec to="3d">section 3d</Sec>). What Vibe itself
+          you. Sentry is the one outside tool that measures how Vibe is used:
+          errors, speed and visits (<Sec to="3d">section 3d</Sec>). One other
+          outside tool looks at your browser, for one job: Cloudflare&apos;s
+          check that you are a person on the sign-in and sign-up pages (
+          <Sec to="6">section 6</Sec>). What Vibe itself
           records about what you open is also in <Sec to="3d">section 3d</Sec>.
         </li>
         <li>
@@ -108,7 +111,9 @@ export function Sections3eTo3h() {
           <strong>What they do not have.</strong> No location, no contacts, no
           advertising software, and nothing that follows you into other
           companies&apos; apps or websites. Sentry&apos;s reports (
-          <Sec to="3d">section 3d</Sec>) work the same inside the app.
+          <Sec to="3d">section 3d</Sec>) work the same inside the app. The
+          check that you are a person (<Sec to="6">section 6</Sec>) runs inside
+          the apps too, because they show the same sign-in pages.
         </li>
         <li>
           <strong>The stores.</strong> If you install the app, Apple or Google
