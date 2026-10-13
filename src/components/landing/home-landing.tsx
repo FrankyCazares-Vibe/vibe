@@ -1,5 +1,6 @@
 "use client";
 
+import { KineticWordmark } from "@/components/brand/KineticWordmark";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Fragment, useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type FocusEvent, type PointerEvent } from "react";
@@ -200,7 +201,7 @@ export function HomeLanding({ signupOpen }: { signupOpen: boolean }) {
   return (
     <div className={`vln-root ${frauncesSoft.variable}${warping ? " is-warping" : ""}`}>
       <header className="vln-bar">
-        <span className="vln-wordmark">vibe<i>.</i></span>
+        <KineticWordmark className="vln-wordmark" dotClassName="vln-wordmark-dot" />
         <nav aria-label="Account">
           <a href={LOGIN_HREF} data-warp-trigger className="vln-textlink">Log in</a>
           <a href={cta.href} data-warp-trigger className="vln-btn vln-btn-sm">{cta.label}</a>

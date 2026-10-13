@@ -34,6 +34,7 @@
 .vln-bar nav { display: flex; align-items: center; gap: 6px; }
 .vln-wordmark { font-weight: 900; font-size: 26px; line-height: 1; }
 .vln-wordmark i { color: var(--coral); font-style: normal; }
+.vln-wordmark-dot { color: var(--coral); }
 .vln-textlink { display: inline-flex; align-items: center; min-height: 44px; padding: 0 10px; color: rgba(246, 241, 234, 0.78); font-size: 14px; font-weight: 600; text-decoration: none; }
 .vln-textlink:hover { color: var(--cream); }
 

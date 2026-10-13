@@ -1,5 +1,6 @@
 "use client";
 
+import { KineticWordmark } from "@/components/brand/KineticWordmark";
 import {
   isAuthRetryableFetchError,
   isAuthWeakPasswordError,
@@ -401,8 +402,8 @@ export function SignupForm({
         </Link>
 
         <div className="vibe-auth-card">
-          <div className="vibe-auth-brand" aria-hidden>
-            vibe<span className="vibe-auth-dot">.</span>
+          <div className="vibe-auth-brand vibe-auth-brand--kinetic">
+            <KineticWordmark dotClassName="vibe-auth-dot" />
           </div>
 
           <h1 className="vibe-auth-headline">
@@ -477,8 +478,8 @@ export function SignupForm({
       </Link>
 
       <div className="vibe-auth-card">
-        <div className="vibe-auth-brand" aria-hidden>
-          vibe<span className="vibe-auth-dot">.</span>
+        <div className="vibe-auth-brand vibe-auth-brand--kinetic">
+          <KineticWordmark dotClassName="vibe-auth-dot" />
         </div>
 
         <h1 className="vibe-auth-headline">
