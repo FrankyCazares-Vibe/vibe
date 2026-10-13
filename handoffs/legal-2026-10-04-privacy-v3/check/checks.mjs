@@ -76,7 +76,7 @@ export function dateIssues(mdBlocks, pageBlocks) {
     return c;
   };
   const header = pageBlocks[1] ? norm(pageBlocks[1].text) : "";
-  if (header !== "Effective October 12, 2026") out.push(`the line under the title reads "${header}", not "Effective October 12, 2026"`);
+  if (header !== "Effective October 13, 2026") out.push(`the line under the title reads "${header}", not "Effective October 13, 2026"`);
   for (const phrase of [
     "our release of October 5, 2026",
     "We published this policy on October 5, 2026",
@@ -89,7 +89,7 @@ export function dateIssues(mdBlocks, pageBlocks) {
   const mc = count(md);
   for (const d of new Set([...Object.keys(pc), ...Object.keys(mc)])) {
     if ((pc[d] || 0) !== (mc[d] || 0)) out.push(`"${d}" is ${mc[d] || 0} times in the text and ${pc[d] || 0} times on the page`);
-    if (d !== "October 5, 2026" && d !== "October 4, 2026" && d !== "October 7, 2026" && d !== "October 8, 2026" && d !== "October 12, 2026") out.push(`an unexpected date on the page or in the text: "${d}"`);
+    if (d !== "October 5, 2026" && d !== "October 4, 2026" && d !== "October 7, 2026" && d !== "October 8, 2026" && d !== "October 12, 2026" && d !== "October 13, 2026") out.push(`an unexpected date on the page or in the text: "${d}"`);
   }
   if ((pc["October 4, 2026"] || 0) !== 1) out.push(`"October 4, 2026" should be on the page exactly once (the counts-only rule); it is there ${pc["October 4, 2026"] || 0} times`);
   return { issues: out, pageDates: pc, mdDates: mc };

@@ -52,6 +52,10 @@ export const EMAIL_SEND_KINDS = [
   "personal_email_code",
   // The yearly school check-in and its countdown notice (20261008140000).
   "school_checkin",
+  // "Your account signs in with a different email": the note Forgot password
+  // sends to an account's school or personal address (20261013090000 widens
+  // the CHECK; src/lib/auth/signin-hint.ts has the rule and the words).
+  "signin_hint",
 ] as const;
 export type EmailSendKind = (typeof EMAIL_SEND_KINDS)[number];
 

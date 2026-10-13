@@ -16,12 +16,14 @@ const specifier = "./password-reset-limits.ts";
 const {
   RESET_EMAILS_PER_DAY,
   RESET_EMAILS_PER_HOUR,
+  RESET_HINTS_PER_ADDRESS_PER_DAY,
   RESET_NETWORK_WINDOW_SEC,
   RESET_REQUESTS_PER_ADDRESS_PER_DAY,
   RESET_REQUESTS_PER_ADDRESS_PER_HOUR,
   RESET_REQUESTS_PER_NETWORK,
   firstRefusal,
   resetAddressLimits,
+  resetHintLimit,
   resetNetworkLimit,
   resetSendLimits,
 } = (await import(specifier)) as typeof import("./password-reset-limits");
@@ -67,6 +69,7 @@ test("the numbers are exact", () => {
   assert.equal(RESET_REQUESTS_PER_ADDRESS_PER_DAY, 5);
   assert.equal(RESET_EMAILS_PER_HOUR, 20);
   assert.equal(RESET_EMAILS_PER_DAY, 40);
+  assert.equal(RESET_HINTS_PER_ADDRESS_PER_DAY, 1);
 });
 
 test("per network: 5 per 15 minutes on the network bucket, refusing when the limiter is down", () => {
@@ -92,11 +95,21 @@ test("reset emails as a whole: 20 an hour then 40 a day, refusing when the limit
   ]);
 });
 
+test("the sign-in note: one a day per address, on the hash and its own key, refusing when the limiter is down", () => {
+  assert.deepEqual(resetHintLimit("abc123"), {
+    key: "pw-reset-hint-day:abc123",
+    limit: 1,
+    windowSec: DAY,
+    failClosed: true,
+  });
+});
+
 test("no two limits share a key: an hour's window and a day's start together at midnight UTC", () => {
-  const keys = [resetNetworkLimit("n"), ...resetAddressLimits("n"), ...resetSendLimits()].map((l) => l.key);
+  const keys = [resetNetworkLimit("n"), ...resetAddressLimits("n"), resetHintLimit("n"), ...resetSendLimits()].map((l) => l.key);
   assert.equal(new Set(keys).size, keys.length);
   // One address's hash can never be read as another limit's key.
   assert.notEqual(resetAddressLimits("day:x")[0].key, resetAddressLimits("x")[1].key);
+  assert.notEqual(resetAddressLimits("x")[1].key, resetHintLimit("x").key);
 });
 
 test("firstRefusal: null when every limit allows, each asked once and in order", async () => {
@@ -182,4 +195,31 @@ test("the first hour of a UTC day counts right: hour and day rows stay apart", a
   const { hit } = fakeLimiter(clock);
   assert.equal(await passes(resetAddressLimits("abc"), hit, 10), 3);
   assert.equal(await passes(resetSendLimits(), hit, 50), 20);
+});
+
+test("the sign-in note: once a day per address, and a repeat never counts against the reset emails", async () => {
+  const clock = { now: 10 * DAY + 60 };
+  const { hit, asked } = fakeLimiter(clock);
+  // The order the route asks in: the note's own limit, then the reset emails.
+  const limits = (emailKey: string) => [resetHintLimit(emailKey), ...resetSendLimits()];
+
+  assert.equal(await firstRefusal(limits("abc"), hit), null);
+  // Four more requests the same day (the per-address limit allows 5): refused
+  // by the note's own limit, so the reset emails are not asked again.
+  assert.equal(await passes(limits("abc"), hit, 4), 0);
+  assert.deepEqual(await firstRefusal(limits("abc"), hit), { allowed: false, retryAfterSec: DAY });
+  assert.equal(asked.filter((key) => key === "pw-reset-global-hour").length, 1);
+  assert.equal(asked.filter((key) => key === "pw-reset-global-day").length, 1);
+
+  // Another address is not affected; the next day is fresh.
+  assert.equal(await firstRefusal(limits("other"), hit), null);
+  clock.now = 11 * DAY;
+  assert.equal(await firstRefusal(limits("abc"), hit), null);
+});
+
+test("the sign-in note comes out of the reset emails: a spent budget sends none", async () => {
+  const clock = { now: 10 * DAY };
+  const { hit } = fakeLimiter(clock);
+  assert.equal(await passes(resetSendLimits(), hit, 20), 20);
+  assert.deepEqual(await firstRefusal([resetHintLimit("abc"), ...resetSendLimits()], hit), { allowed: false, retryAfterSec: HOUR });
 });

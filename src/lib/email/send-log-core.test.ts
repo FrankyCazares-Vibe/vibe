@@ -14,6 +14,7 @@
 
 import assert from "node:assert/strict";
 import { createHmac } from "node:crypto";
+import { readFileSync } from "node:fs";
 import * as nodeModule from "node:module";
 import { test } from "node:test";
 
@@ -81,8 +82,42 @@ test("the kinds match the DB CHECK and the label is fixed", () => {
     "personal_email_code",
     // 20261008140000_school_checkin.sql.
     "school_checkin",
+    // 20261013090000_email_kind_signin_hint.sql.
+    "signin_hint",
   ]);
   assert.equal(HASH_LABEL, "email-send-v1|");
+});
+
+const newestKindMigration = () =>
+  readFileSync(
+    new URL("../../../supabase/migrations/20261013090000_email_kind_signin_hint.sql", import.meta.url),
+    "utf8",
+  );
+
+test("the newest migration says it goes before the code: a send with no log row breaks the policy's promise", () => {
+  const sql = newestKindMigration();
+  // The header as running text: no comment marks, one space between words.
+  const header = sql.slice(0, sql.indexOf("\nbegin;")).replace(/^--\s?/gm, "").replace(/\s+/g, " ");
+  // `sendWithLog` sends first and logs second, so with the code live and the
+  // old list every 'signin_hint' email goes out and its row is refused.
+  // "Either order is safe" was true of the route and untrue of the log.
+  assert.ok(header.includes("DEPLOY ORDER. THIS FILE FIRST, then the push."));
+  assert.ok(!/either order/i.test(header));
+  assert.ok(header.includes('Privacy Policy 3d says "We log each email our own software sends"'));
+});
+
+test("the newest migration's CHECK lists the same kinds, in the same order", () => {
+  const sql = newestKindMigration();
+  // The statements only: the header's ROLLBACK carries the older, shorter list.
+  const body = sql.slice(sql.indexOf("\nbegin;"));
+  const added = /add constraint email_sends_kind_check\s+check \(kind in \(([^)]*)\)\)/.exec(body);
+  assert.ok(added, "the migration adds email_sends_kind_check");
+  const kinds = [...added[1].matchAll(/'([a-z_]+)'/g)].map((m) => m[1]);
+  assert.deepEqual(kinds, [...EMAIL_SEND_KINDS]);
+  // What it expects to find first is the list without the newest kind, as
+  // Postgres prints it.
+  const before = EMAIL_SEND_KINDS.slice(0, -1).map((k) => `''${k}''::text`).join(", ");
+  assert.ok(body.includes(`CHECK ((kind = ANY (ARRAY[${before}])))`));
 });
 
 test("canonicalRecipient trims, lowercases and drops trailing host dots", () => {

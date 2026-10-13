@@ -1,6 +1,6 @@
 # Vibe Privacy Policy
 
-Effective October 12, 2026
+Effective October 13, 2026
 
 Vibe is a campus social app for people with an Indiana University or Purdue University email address. It is run by **CONNECTVIBE. LLC**, an Indiana limited liability company. In this policy, "we" means that company. Vibe is independent. It is not run or backed by Indiana University, Purdue University, or any campus, school or club.
 
@@ -75,7 +75,7 @@ One exception: we can mark a test account that we run ourselves as verified by h
 
 ### 3a. What do I give when I make an account?
 
-- **Sign-in email.** Shown to you in Settings. No other user is shown it. The one exception is your starter name, below.
+- **Sign-in email.** Shown to you in Settings. No other user is shown it. The one exception is your starter name, below. A short form of it (its first character and the part after the @) can also be emailed to your own school email or personal email (section 4). Whoever can read that inbox can read the short form.
 - **Password.** We never store the password itself. Supabase, the company that runs our sign-in, stores a scrambled version that cannot be read back.
 - **Starter name.** If you made your account before October 8, 2026 and have not chosen a name, your display name is the part of your sign-in email before the @. Anyone who sees your name on Vibe can read it. An account made since then starts with the name "Member".
 - **School email.** Stored once you confirm it. No other user is shown it. Section 10 names one gap.
@@ -174,7 +174,7 @@ The apps are not in the stores yet. When they are, they will show the same Vibe 
 
 We use your information to run Vibe. That includes suggesting people and clubs to you, based on who you follow, your campus and your major. We use it to keep accounts secure, to review reports and act on them, to fix bugs, and to answer you. We also count things, so we can see in totals how Vibe is used.
 
-**Emails.** The automatic emails Vibe sends you are these seven: to confirm your account, reset your password, verify your school email, confirm a personal email you add, check once a year that you still have your school inbox, confirm your waitlist spot and send your access code. A person on the Vibe team may also write to you. They may answer you, write about a report, your account or a club you run, or tell you something you need to know. Examples are a security problem or a change to this policy. Vibe sends no bulk marketing email and no email about activity on your account.
+**Emails.** The automatic emails Vibe sends you are these eight: to confirm your account, reset your password, tell you which email your account signs in with, verify your school email, confirm a personal email you add, check once a year that you still have your school inbox, confirm your waitlist spot and send your access code. The third one can be sent when someone types your school email or your personal email into the Forgot password form and your account signs in with a different email. It goes only to the address that was typed, at most once per calendar day for that address. It shows the first character of your sign-in email and the part after the @ (for example g•••@gmail.com). The screen shows the same sentence whether or not the address belongs to an account. An account that is suspended or banned is not sent it. A person on the Vibe team may also write to you. They may answer you, write about a report, your account or a club you run, or tell you something you need to know. Examples are a security problem or a change to this policy. Vibe sends no bulk marketing email and no email about activity on your account.
 
 **What we do not do.** We do not:
 
@@ -206,7 +206,7 @@ One paid feature lets a person see who looked at them. With Vibe+, they see the 
 | A club's member list | The club's members. For a club that anyone can join, also any signed-in account (on the Map) |
 | A club's follower list, and who RSVP'd to its events | The club's owner and admins. The people in an event's chat also see who is in it, and the first few who marked Going (up to 8) |
 | Drafts, saved posts, your mute list, your personal calendar | Only you |
-| Your sign-in email, school email and personal email | Only you, except your starter name (section 3a) |
+| Your sign-in email, school email and personal email | Only you, except your starter name (section 3a). A short form of your sign-in email can be emailed to your own school or personal inbox (section 4) |
 
 The Vibe team and the cofounder with direct access can see more than this table shows. Sections 1 and 5h say what.
 

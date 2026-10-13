@@ -23,10 +23,18 @@ export function Sections4To5() {
       </LegalP>
       <LegalP>
         <strong>Emails.</strong> The automatic emails Vibe sends you are these
-        seven: to confirm your account, reset your password, verify your school
-        email, confirm a personal email you add, check once a year that you
-        still have your school inbox, confirm your waitlist spot and send your
-        access code. A person on
+        eight: to confirm your account, reset your password, tell you which
+        email your account signs in with, verify your school email, confirm a
+        personal email you add, check once a year that you still have your
+        school inbox, confirm your waitlist spot and send your access code. The
+        third one can be sent when someone types your school email or your
+        personal email into the Forgot password form and your account signs in
+        with a different email. It goes only to the address that was typed, at
+        most once per calendar day for that address. It shows the first
+        character of your sign-in email and the part after the @ (for example
+        g•••@gmail.com). The screen shows the same sentence whether or not the
+        address belongs to an account. An account that is suspended or banned
+        is not sent it. A person on
         the Vibe team may also write to you. They may answer you, write about a
         report, your account or a club you run, or tell you something you need
         to know. Examples are a security problem or a change to this policy.
@@ -108,7 +116,9 @@ export function Sections4To5() {
             "Your sign-in email, school email and personal email",
             <>
               Only you, except your starter name (
-              <Sec to="3a">section 3a</Sec>)
+              <Sec to="3a">section 3a</Sec>). A short form of your sign-in
+              email can be emailed to your own school or personal inbox (
+              <Sec to="4">section 4</Sec>)
             </>,
           ],
         ]}

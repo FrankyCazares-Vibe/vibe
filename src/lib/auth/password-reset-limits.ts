@@ -15,6 +15,11 @@
  *      so requests for addresses with no account can't spend it (refuses if
  *      the limiter is down).
  *
+ * One more, for the "you sign in with a different email" note only
+ * (src/lib/auth/signin-hint.ts): one note per typed address per day. The
+ * note is asked this first and layer 3 second, because it is one more email
+ * out of the same allowance.
+ *
  * Each limit has its own key. The limiter stores one row per key and window
  * start, and an hour's window and a day's start at the same moment at
  * midnight UTC, so two limits sharing a key would share a count there.
@@ -37,6 +42,8 @@ export const RESET_REQUESTS_PER_ADDRESS_PER_DAY = 5;
 export const RESET_EMAILS_PER_HOUR = 20;
 /** Reset emails to everyone in a day: the most of that shared daily allowance resets may ever use. */
 export const RESET_EMAILS_PER_DAY = 40;
+/** "You sign in with a different email" notes to one address in a day: it says the same thing every time, so once is enough. */
+export const RESET_HINTS_PER_ADDRESS_PER_DAY = 1;
 
 /** One limiter question: `key` counts up to `limit` per `windowSec`. */
 export type ResetLimit = {
@@ -94,6 +101,23 @@ export function resetSendLimits(): ResetLimit[] {
       failClosed: true,
     },
   ];
+}
+
+/**
+ * The note's own limit: one a day for the typed address (`emailKey` is its
+ * hash, as in layer 2). Layer 2 lets an address be named 5 times a day, and
+ * without this each of those would mail the same note again. Asked only when
+ * a note is about to be sent, and before layer 3, so a repeat is refused here
+ * and never counts against the reset emails. Refuses if the limiter is down,
+ * as layer 3 does.
+ */
+export function resetHintLimit(emailKey: string): ResetLimit {
+  return {
+    key: `pw-reset-hint-day:${emailKey}`,
+    limit: RESET_HINTS_PER_ADDRESS_PER_DAY,
+    windowSec: DAY_SEC,
+    failClosed: true,
+  };
 }
 
 /**

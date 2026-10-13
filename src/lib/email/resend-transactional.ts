@@ -1,5 +1,6 @@
 import "server-only";
 import { createResendClient } from "@/lib/resend";
+import { signinHintEmail } from "@/lib/auth/signin-hint";
 import { getSiteUrl } from "@/lib/auth/site-url";
 import { sendLogged } from "@/lib/email/send-log";
 import { maskEmail } from "@/lib/waitlist/admin-view";
@@ -339,6 +340,39 @@ export async function sendSchoolCheckinEmail(
         "Never share this code. Vibe will never ask you for it.",
         "Questions: help@connectvibe.app",
       ].join("\n"),
+    }),
+  );
+  if (!outcome.ok) {
+    throw new Error(outcome.errorMessage || outcome.errorCode);
+  }
+}
+
+/**
+ * "Your Vibe sign-in email": the note Forgot password sends when the address
+ * typed is an account's school or personal email and not the one it signs in
+ * with (src/lib/auth/signin-hint.ts has the rule and every word). `to` is the
+ * typed address, never another one. `maskedSignIn` is `maskSignInEmail`
+ * output ("g•••@gmail.com").
+ *
+ * The same small, link-free message as every code email, because `to` is
+ * most often a school inbox: nothing to tap, nothing fetched, and no address
+ * in it but the masked one.
+ */
+export async function sendSigninHintEmail(
+  to: string,
+  maskedSignIn: string,
+  userId: string | null = null,
+): Promise<void> {
+  // Throws on anything that is not a masked address. A programming error,
+  // not a send attempt, so it is not logged.
+  const content = signinHintEmail(maskedSignIn);
+  const outcome = await sendLogged("signin_hint", to, userId, () =>
+    createResendClient().emails.send({
+      from: getFrom(),
+      to: [to],
+      subject: content.subject,
+      html: content.html,
+      text: content.text,
     }),
   );
   if (!outcome.ok) {

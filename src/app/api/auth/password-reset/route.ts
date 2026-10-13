@@ -1,15 +1,30 @@
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { after, NextResponse } from "next/server";
 
 import {
   firstRefusal,
   resetAddressLimits,
+  resetHintLimit,
   resetNetworkLimit,
   resetSendLimits,
   type ResetLimit,
 } from "@/lib/auth/password-reset-limits";
+import { normalizePersonalEmail } from "@/lib/auth/personal-email";
+import { isRetiredIuDomain, normalizeSchoolEmail } from "@/lib/auth/school-email-domains";
+import {
+  hintCandidate,
+  hintLookupKey,
+  signinHintDecision,
+  type HintLookup,
+} from "@/lib/auth/signin-hint";
 import { getSiteUrl } from "@/lib/auth/site-url";
-import { recipientRateKey } from "@/lib/email/send-log-core";
-import { sendPasswordResetEmail } from "@/lib/email/resend-transactional";
+import { isMissingColumnError } from "@/lib/db/missing-column";
+import { recipientRateKey, redactAddresses } from "@/lib/email/send-log-core";
+import {
+  sendPasswordResetEmail,
+  sendSigninHintEmail,
+} from "@/lib/email/resend-transactional";
+import { getActiveRestriction } from "@/lib/moderation/access";
 import { clientNetworkKey, rateLimit, tooManyRequests } from "@/lib/rate-limit";
 import {
   createSupabaseServiceClient,
@@ -21,6 +36,114 @@ type Body = { email?: string };
 /** One ask of the shared limiter for a limit from password-reset-limits.ts. */
 function hit(limit: ResetLimit) {
   return rateLimit(limit.key, limit);
+}
+
+/** A read that is skipped: the typed address cannot be in that column. */
+const NO_ROWS = { data: [], error: null };
+
+/** The columns of 20261008130000: missing on a database that file has not reached. */
+const PERSONAL_EMAIL_COLUMNS = ["personal_email", "personal_email_verified_at"] as const;
+
+/**
+ * The "you sign in with a different email" note (Franky, Oct 13 2026; the
+ * rule, the mask and the words are in src/lib/auth/signin-hint.ts).
+ *
+ * Reached only when no reset link could be made for the typed address. If
+ * that address is the verified school email of exactly one account, or the
+ * personal email one account added, a short note goes to THAT inbox: the
+ * account signs in with a different email, "g•••@gmail.com", use that one.
+ * 15 of the 20 accounts sign in with a different address than their school
+ * email, and without this they typed the school one and got silence.
+ *
+ * Called from inside `after()`, so the answer has gone out already and
+ * nothing here can change it or slow it down. It never throws.
+ *
+ * `users.school_email` and `users.personal_email` are private columns: read
+ * here with the service client, each by exact match, never by a pattern,
+ * and only when the typed address is already written the way the column
+ * stores it. Any other spelling of it finds nobody and counts nothing.
+ */
+async function sendSigninNote(
+  admin: SupabaseClient,
+  email: string,
+  emailKey: string,
+): Promise<void> {
+  try {
+    // A retired IU domain (@iupui.edu and the rest) no longer receives mail.
+    // A note there can only bounce, and a hard bounce counts against a small
+    // sender, so it is not looked up at all.
+    if (isRetiredIuDomain(email)) return;
+
+    // How each column stores an address, kept only when that IS what was
+    // typed (null: do not look in that column). "name@iu.edu." is stored as
+    // "name@iu.edu" and shares its once-a-day count, so looking it up spent
+    // the student's note for the day on a send to the dotted address
+    // (`hintLookupKey` has the whole story).
+    const schoolKey = hintLookupKey(email, normalizeSchoolEmail(email));
+    const personalKey = hintLookupKey(email, normalizePersonalEmail(email));
+    const [signIn, school, personal] = await Promise.all([
+      admin.from("users").select("id").eq("email", email).limit(2),
+      schoolKey
+        ? admin.from("users").select("id, school_verified").eq("school_email", schoolKey).limit(2)
+        : NO_ROWS,
+      personalKey
+        ? admin.from("users").select("id, personal_email_verified_at").eq("personal_email", personalKey).limit(2)
+        : NO_ROWS,
+    ]);
+    // No personal-email columns yet means nobody has a personal email.
+    const noPersonalColumns = isMissingColumnError(personal.error, PERSONAL_EMAIL_COLUMNS);
+    const failed = signIn.error ?? school.error ?? (noPersonalColumns ? null : personal.error);
+    if (failed) {
+      // The code only: these reads were filtered on an address, and the
+      // error text can carry it back.
+      console.error("[auth/password-reset] sign-in note: lookup failed", failed.code ?? "");
+      return;
+    }
+    const lookup: HintLookup = {
+      signIn: signIn.data ?? [],
+      school: school.data ?? [],
+      personal: noPersonalColumns ? [] : (personal.data ?? []),
+    };
+
+    const candidate = hintCandidate(lookup);
+    if (!candidate.ok) return;
+
+    // The two things the rule still needs, for that one account only: is it
+    // suspended or banned (no note then), and the address it signs in with,
+    // asked of the sign-in system itself because that is where a reset goes.
+    const [restriction, account] = await Promise.all([
+      getActiveRestriction(candidate.userId),
+      admin.auth.admin.getUserById(candidate.userId),
+    ]);
+    const decision = signinHintDecision({
+      typed: email,
+      lookup,
+      restricted: restriction.ok ? restriction.restriction !== null : null,
+      signInEmail: account.error ? null : (account.data?.user?.email ?? null),
+    });
+    if (decision.action !== "send") return;
+
+    // One note a day for this address. Asked only now, when a note is really
+    // about to go, and before the cap below, so a repeat stops here and
+    // never counts against the reset emails. Quiet: a repeat is expected.
+    if (await firstRefusal([resetHintLimit(emailKey)], hit)) return;
+
+    // The note is one more email out of the cap on reset emails as a whole.
+    if (await firstRefusal(resetSendLimits(), hit)) {
+      console.warn(
+        "[auth/password-reset] the cap on reset emails is spent, or the limiter is down: a sign-in note was not sent",
+      );
+      return;
+    }
+
+    // To the typed address and nowhere else. The account's id goes into the
+    // send log, as it does for a reset email.
+    await sendSigninHintEmail(email, decision.masked, decision.userId);
+  } catch (err) {
+    // Logged only, with any address taken out.
+    const message = err instanceof Error ? err.message : String(err);
+    console.error("[auth/password-reset] sign-in note:", redactAddresses(message));
+  }
 }
 
 /**
@@ -42,6 +165,12 @@ function hit(limit: ResetLimit) {
  * codes share: per network and per address before the answer (a 429, the
  * same for an address with or without an account), and a cap on reset emails
  * as a whole after it, which never changes the answer.
+ *
+ * An address no account signs in with gets no reset email. When it is an
+ * account's school or personal email, that inbox gets the short note of
+ * `sendSigninNote` above instead, at most once a day and out of the same
+ * cap. The answer is the same sentence either way, and it has gone out
+ * before any of that is looked up.
  */
 export async function POST(req: Request) {
   const generic = {
@@ -109,6 +238,10 @@ export async function POST(req: Request) {
         if (error) {
           console.error("[auth/password-reset] generateLink", error.message);
         }
+        // No reset link: almost always because no account signs in with
+        // this address. It may still be an account's school or personal
+        // email, and then that inbox gets a note saying which one to type.
+        await sendSigninNote(admin, email, emailKey);
         return;
       }
 

@@ -114,7 +114,11 @@ export function Sections1To3() {
         <li>
           <strong>Sign-in email.</strong> Shown to you in{" "}
           <PageLink href="/settings">Settings</PageLink>. No other user is shown
-          it. The one exception is your starter name, below.
+          it. The one exception is your starter name, below. A short form of it
+          (its first character and the part after the @) can also be emailed to
+          your own school email or personal email (
+          <Sec to="4">section 4</Sec>). Whoever can read that inbox can read the
+          short form.
         </li>
         <li>
           <strong>Password.</strong> We never store the password itself.
