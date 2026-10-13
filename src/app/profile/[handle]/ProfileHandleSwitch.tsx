@@ -1,11 +1,17 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import dynamic from "next/dynamic";
+import { startTransition, useEffect, useState } from "react";
 
-import { ProfileMobile } from "@/components/mobile/ProfileMobile";
 import { MobileShell } from "@/components/mobile/MobileShell";
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser";
-import { MOBILE_BREAKPOINT_PX, useIsMobile } from "@/lib/use-is-mobile";
+import {
+  MOBILE_QUERY,
+  orLoadFailed,
+  ScreenGuess,
+  useScreen,
+  warmScreen,
+} from "@/lib/use-is-mobile";
 
 import { forwardedProfileParams, staticProfileHref } from "../profile-html-bridge";
 
@@ -14,9 +20,23 @@ type Props = {
   /** The address's query string, read by the server page. Only the
    *  settings forwardedProfileParams allows are carried anywhere. */
   query?: string;
+  /** The server's guess at "is this a phone" (page.tsx, from the request). */
+  firstGuessPhone?: boolean;
 };
 
-const MOBILE_QUERY = `(max-width: ${MOBILE_BREAKPOINT_PX - 1}px)`;
+// The phone screen is its own download (`next/dynamic`): a laptop only hops
+// to the static page from here and never fetches it. It is never part of the
+// server's markup on this route (the self-check below holds it back), so
+// nothing preloads it; `warmScreen` starts the fetch as soon as this file
+// runs on a phone, while the self-check is still asking.
+//
+// `orLoadFailed`: if the file does not arrive (no signal, or a new build has
+// replaced it), the screen is the "couldn't load" card with a Retry, not
+// Next's bare error page.
+const ProfileMobile = dynamic(() =>
+  orLoadFailed(import("@/components/mobile/ProfileMobile").then((mod) => mod.ProfileMobile)),
+);
+warmScreen({ phone: () => import("@/components/mobile/ProfileMobile") });
 
 /**
  * Viewport-based fork for the `/profile/[handle]` route.
@@ -35,13 +55,16 @@ const MOBILE_QUERY = `(max-width: ${MOBILE_BREAKPOINT_PX - 1}px)`;
  *            (your own profile, behind that route's Terms, school-email
  *            and onboarding gates).
  *
- * Doing the redirect client-side lets us branch on viewport without
- * UA sniffing on the server. SSR renders nothing (returns null until
- * the hook resolves) so we don't briefly paint the desktop tree on
- * mobile.
+ * The server builds the branch its guess names (`firstGuessPhone`): the
+ * empty phone shell for a phone, the "Loading profile…" line for a laptop.
+ * The redirect itself stays on the client, where the window's real width is
+ * known, so a wrong guess can never send a phone to the desktop page.
  */
-export function ProfileHandleSwitch({ handle, query = "" }: Props) {
-  const isMobile = useIsMobile();
+export function ProfileHandleSwitch({ handle, query = "", firstGuessPhone = false }: Props) {
+  const screen = useScreen(firstGuessPhone);
+  // "none" (the phone screen has just left a wide window) counts as desktop
+  // here: that branch is one line of text and the hop, nothing to wait for.
+  const isMobile = screen.show === "phone";
   // The signed-in viewer's own handle, for the mobile self-check:
   // undefined while it's being looked up, null when signed out or unknown.
   const [viewerHandle, setViewerHandle] = useState<string | null | undefined>(undefined);
@@ -51,10 +74,12 @@ export function ProfileHandleSwitch({ handle, query = "" }: Props) {
   useEffect(() => {
     if (isMobile) return;
     if (typeof window === "undefined") return;
-    // useIsMobile reports desktop until hydration finishes, so this effect
-    // runs once with isMobile=false on phones too. Ask the viewport itself
-    // (as profile-html-bridge.tsx does), or every shared profile link
-    // opened on a phone lands on the desktop page.
+    // Until hydration finishes the hook repeats the server's guess, and the
+    // guess can be "desktop" on a phone (Safari's "Request Desktop Website",
+    // any browser the request doesn't give away), so this effect can run
+    // once with isMobile=false there. Ask the viewport itself (as
+    // profile-html-bridge.tsx does), or a shared profile link opened on
+    // such a phone lands on the desktop page.
     if (window.matchMedia(MOBILE_QUERY).matches) return;
     window.location.replace(
       staticProfileHref(new URLSearchParams(query), window.location.hash, handle),
@@ -90,7 +115,11 @@ export function ProfileHandleSwitch({ handle, query = "" }: Props) {
         // Can't tell who's looking: show the visitor view, as before.
         own = null;
       }
-      if (!cancelled) setViewerHandle(own);
+      // As a background update: ProfileMobile's code may still be on its
+      // way, and this way the empty shell simply stays until it is in. A
+      // plain update would need a placeholder in its place, and React then
+      // holds the real screen back 300 ms.
+      if (!cancelled) startTransition(() => setViewerHandle(own));
     })();
     return () => {
       cancelled = true;
@@ -121,11 +150,13 @@ export function ProfileHandleSwitch({ handle, query = "" }: Props) {
     // Hold the profile until the self-check answers, so your own link
     // never flashes the visitor view (a Connect button on yourself) first,
     // and stays blank while it hands off to /profile.
-    if (viewerHandle === undefined || isSelf) return <MobileShell>{null}</MobileShell>;
+    const held = viewerHandle === undefined || isSelf;
     return (
-      <MobileShell>
-        <ProfileMobile targetHandle={handle} />
-      </MobileShell>
+      <ScreenGuess phone={screen.guess}>
+        <MobileShell>
+          {held ? null : <ProfileMobile targetHandle={handle} />}
+        </MobileShell>
+      </ScreenGuess>
     );
   }
   // Desktop: brief loading state while the redirect kicks in.

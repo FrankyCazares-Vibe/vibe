@@ -1,9 +1,11 @@
 import { cache } from "react";
+import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 
 import { requirePlatformAdmin } from "@/lib/auth/require-platform-admin";
 import { getSiteUrl } from "@/lib/auth/site-url";
+import { isPhoneRequest } from "@/lib/device-hint";
 import { getActiveRestriction } from "@/lib/moderation/access";
 import { profilePreviewDescription } from "@/lib/profile/hidden-fields";
 import { sanitizeProfileLayout } from "@/lib/profile/profile-layout";
@@ -121,7 +123,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 /**
  * `/profile/<handle>` route — public profile view, then a client-side
- * viewport fork.
+ * viewport fork (started from the server's phone-or-not guess).
  *
  * Mobile: renders ProfileMobile in visitor mode (Connect/Follow CTA,
  * Posts/Clips/Portfolio tabs read from the per-handle public APIs).
@@ -184,5 +186,14 @@ export default async function ProfileByHandlePage({
       if (typeof one === "string") query.append(k, one);
     }
   }
-  return <ProfileHandleSwitch handle={handle} query={query.toString()} />;
+  // The server's guess at the screen this device needs (device-hint.ts). It
+  // only picks what is built here; the hop to the static page is still
+  // decided in the browser, by the window's width.
+  return (
+    <ProfileHandleSwitch
+      handle={handle}
+      query={query.toString()}
+      firstGuessPhone={isPhoneRequest(await headers())}
+    />
+  );
 }

@@ -1,6 +1,8 @@
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 
 import { enforceCampusAccess } from "@/lib/auth/campus-access";
+import { isPhoneRequest } from "@/lib/device-hint";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 import { profileNextPath } from "./profile-params";
@@ -29,5 +31,8 @@ export default async function ProfilePage({
     redirect(`/auth/login?next=${encodeURIComponent(next)}`);
   }
 
-  return <ProfileSwitch />;
+  // The server's guess at the screen this device needs (device-hint.ts):
+  // ProfileSwitch builds that one here, and a laptop never downloads the
+  // phone profile it would only hop away from.
+  return <ProfileSwitch firstGuessPhone={isPhoneRequest(await headers())} />;
 }

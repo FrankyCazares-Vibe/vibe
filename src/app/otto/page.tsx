@@ -1,11 +1,11 @@
 import { Suspense } from "react";
 import { redirect } from "next/navigation";
 
-import { CampusAppShell } from "@/components/campus-app-shell";
 import { enforceCampusAccess } from "@/lib/auth/campus-access";
+import { isPhoneRequest } from "@/lib/device-hint";
 import { headers } from "next/headers";
 
-import { OttoSwitch } from "./OttoSwitch";
+import { OttoOffline, OttoSwitch } from "./OttoSwitch";
 
 export const metadata = {
   title: "otto · vibe",
@@ -39,15 +39,9 @@ export default async function OttoPage() {
   });
 
   if (!res.ok) {
-    return (
-      <CampusAppShell>
-        <main className="otto-room">
-          <div className="otto-room-main">
-            <p className="otto-room-empty">otto&rsquo;s offline. try again in a sec.</p>
-          </div>
-        </main>
-      </CampusAppShell>
-    );
+    // The shell and its one line, from OttoSwitch.tsx: this file must not
+    // import the desktop shell itself (see OttoOffline for why).
+    return <OttoOffline />;
   }
 
   const payload = await res.json();
@@ -55,9 +49,13 @@ export default async function OttoPage() {
   // Suspense boundary: OttoPageClient reads useSearchParams (for the ?tab=
   // tab state), which Next 16 requires to be inside a Suspense — otherwise
   // any URL with searchParams forces the whole route into client-render.
+  //
+  // `firstGuessPhone` is the server's guess at the screen this device needs
+  // (src/lib/device-hint.ts), from the headers already read above. OttoSwitch
+  // builds that screen here and the browser fetches only that one.
   return (
     <Suspense fallback={null}>
-      <OttoSwitch initial={payload} />
+      <OttoSwitch initial={payload} firstGuessPhone={isPhoneRequest(h)} />
     </Suspense>
   );
 }
