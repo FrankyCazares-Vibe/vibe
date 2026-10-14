@@ -61,6 +61,7 @@ import {
 } from "@/lib/orgs/join-copy";
 import type { JoinPolicy, JoinState, OrgAudience, OrgRole } from "@/lib/orgs/join-state";
 import type { EditedPost } from "@/lib/posts/edit";
+import { deletesAsOfficer, postSheetRows } from "@/lib/posts/feed-actions";
 
 /**
  * iOS-native rebuild of `/campus` for mobile. Swipeable tabs:
@@ -719,6 +720,28 @@ export function CampusMobile() {
     setFeed((prev) => (prev ? prev.map(patch) : prev));
     setTagFeed((prev) => (prev && prev.posts ? { ...prev, posts: prev.posts.map(patch) } : prev));
   }, []);
+  // The refetchFeed for the campus on screen now. A Delete's answer can land
+  // after another campus came on screen (its card is gone by then, still
+  // holding the old callbacks); calling that campus's refetchFeed would take
+  // the newest seq, throw away this campus's first load and paint the last
+  // campus's posts under the new name.
+  const refetchFeedRef = useRef(refetchFeed);
+  useEffect(() => {
+    refetchFeedRef.current = refetchFeed;
+  }, [refetchFeed]);
+  // A post the viewer deleted, from the post viewer or a card's ⋯ menu: it
+  // leaves both lists at once (S68 C5), then the feed refetches as before (a
+  // delete can shift the ranked page). That refetch also retires any older
+  // load still out (refetchFeed bumps feedSeqRef first thing), so one that
+  // predates the delete can't put the post back. Never changes, so a stale
+  // caller still reaches today's campus (refetchFeedRef).
+  const dropDeletedPost = useCallback((postId: string) => {
+    setFeed((prev) => (prev ? prev.filter((p) => p.id !== postId) : prev));
+    setTagFeed((prev) =>
+      prev?.posts ? { ...prev, posts: prev.posts.filter((p) => p.id !== postId) } : prev,
+    );
+    void refetchFeedRef.current("refresh");
+  }, []);
   // `tagFeed` for the effect below, which decides before it asks whether a
   // failure has rows to keep; reading the state there would re-run it on
   // every answer. Declared first, so it has caught up when that effect runs.
@@ -959,6 +982,9 @@ export function CampusMobile() {
             onClearTag={() => setFeedTag(null)}
             viewerId={viewerId}
             onEdited={applyPostEdit}
+            // A Delete from a card's ⋯: the post leaves at once, its sheet
+            // with it (see FeedCard).
+            onDeleted={dropDeletedPost}
             // A block made from a card's ⋯ has to take their posts off the
             // screen, or it reads as though nothing happened.
             onBlocked={() => void refetchFeed("refresh")}
@@ -1125,14 +1151,8 @@ export function CampusMobile() {
           }
           onClose={() => setOpenPostId(null)}
           onDeleted={() => {
-            // The post leaves both lists at once (S68 C5), then the feed
-            // refetches as before (a delete can shift the ranked page).
-            const gone = openPostId;
-            setFeed((prev) => (prev ? prev.filter((p) => p.id !== gone) : prev));
-            setTagFeed((prev) =>
-              prev?.posts ? { ...prev, posts: prev.posts.filter((p) => p.id !== gone) } : prev,
-            );
-            void refetchFeed("refresh");
+            // The post leaves both lists at once (dropDeletedPost).
+            dropDeletedPost(openPostId);
             setOpenPostId(null);
           }}
           // Same reason as the card's ⋯ above: the viewer closes onto this
@@ -1305,6 +1325,7 @@ function FeedPane({
   onClearTag,
   viewerId,
   onEdited,
+  onDeleted,
   onBlocked,
   visitingName,
 }: {
@@ -1324,6 +1345,8 @@ function FeedPane({
   /** The signed-in viewer, from the feed answer; null until it lands. */
   viewerId: string | null;
   onEdited: (p: EditedPost) => void;
+  /** A post deleted from a card's ⋯: take it off both lists. */
+  onDeleted: (postId: string) => void;
   /** A block landed from a card's ⋯: reload so their posts go. */
   onBlocked: () => void;
   /** The campus being looked at when it isn't home; null at home. Its empty
@@ -1374,6 +1397,7 @@ function FeedPane({
           // Owner means author, the same rule as the edit route and desktop.
           isOwner={!!viewerId && p.user_id === viewerId}
           onEdited={onEdited}
+          onDeleted={onDeleted}
           onBlocked={onBlocked}
         />
       ))}
@@ -1494,6 +1518,7 @@ function FeedCard({
   onPickTag,
   isOwner,
   onEdited,
+  onDeleted,
   onBlocked,
 }: {
   post: FeedPost;
@@ -1504,6 +1529,8 @@ function FeedCard({
   isOwner: boolean;
   /** An edit saved from the card's ⋯ menu. */
   onEdited: (p: EditedPost) => void;
+  /** The post was deleted from the card's ⋯ menu: take it off the lists. */
+  onDeleted: (postId: string) => void;
   /** The author was blocked from the card's ⋯ menu. */
   onBlocked: () => void;
 }) {
@@ -1633,10 +1660,11 @@ function FeedCard({
     }
   };
 
-  // A moderator took this down, and only its author is ever served the row.
-  // Not a button: there is nothing behind it to open. Unreachable today —
-  // `/api/feed` does not select `removed_at` (see the desktop FeedPost type),
-  // so a removed post still reaches its author looking live.
+  // A moderator took this down, and only its author is ever served the row:
+  // `/api/feed` sends `removed_at` / `removed_reason` on their own removed
+  // post (RLS keeps it from everyone else; see the desktop FeedPost type).
+  // Not a button, and no ⋯ menu: there is nothing behind it to open, and
+  // nobody edits or deletes a removed post.
   if (isOwner && post.removed_at) {
     return (
       <RemovedContentCard
@@ -1736,7 +1764,7 @@ function FeedCard({
             {post.org ? ` · ${post.org.name}` : ""}
           </div>
         </div>
-        {/* 3-dot menu: Send to chats, Copy link, and Report (others' posts) or Edit post (your own). Delete stays in the post viewer. */}
+        {/* 3-dot menu: Send to chats, Copy link, then Edit post and Delete post (your own) or Report post (others'), with Delete post for a club officer too. See postSheetRows. */}
         <button
           type="button"
           onClick={(e) => {
@@ -2154,9 +2182,19 @@ function FeedCard({
           }
           isOwner={isOwner}
           removed={!!post.removed_at}
+          // The server's own answer (`viewer_can_delete`) covers the author
+          // and a current club owner / admin; missing means no Delete.
+          canDelete={post.viewer_can_delete === true && !post.removed_at}
+          clubName={post.org?.name ?? null}
           initialContent={post.content ?? ""}
           hasMedia={!!post.media_url}
           onEdited={onEdited}
+          // The card leaves the list at once and takes this sheet with it.
+          // The sheet never animates closed (it unmounts on onClose, as on
+          // Cancel), and vaul's unmount puts the page's scroll back, so
+          // there is no close to wait out, unlike ReportSheet's drawers
+          // (REPORTED_POST_DROP_MS on desktop).
+          onDeleted={() => onDeleted(post.id)}
           onBlocked={onBlocked}
           onClose={() => setMenuOpen(false)}
         />
@@ -3584,8 +3622,10 @@ function EmptyTab({ title, body }: { title: string; body: string }) {
 }
 
 /** 3-dot menu sheet: slides up from the bottom. Send to chats, Copy link,
- *  then Edit post on your own post or Report post on anyone else's. Delete
- *  lives in the post viewer.
+ *  then Edit post and Delete post on your own post, or Report post on anyone
+ *  else's (plus Delete post for a club officer, as on desktop). Delete moved
+ *  here from the post viewer on Oct 14 2026 at Franky's ask, reversing the
+ *  Sept 16 call; the viewer keeps its own. The rows: postSheetRows.
  *
  *  Implemented as a portaled vaul Drawer so it doesn't inherit the
  *  feed card's button cursor / hover styles, and so the tap on the
@@ -3598,9 +3638,12 @@ function PostActionsSheet({
   authorName,
   isOwner,
   removed = false,
+  canDelete,
+  clubName,
   initialContent,
   hasMedia,
   onEdited,
+  onDeleted,
   onBlocked,
   onClose,
 }: {
@@ -3615,9 +3658,16 @@ function PostActionsSheet({
   /** A moderator took it down (`removed_at` set): no Edit (S68 C3). The card
    *  shows RemovedContentCard instead of opening this sheet; the belt. */
   removed?: boolean;
+  /** The server's `viewer_can_delete`: the author, or a current owner /
+   *  admin of the post's club (S68 C3). False → no Delete post. */
+  canDelete: boolean;
+  /** Named in an officer's Delete confirm (S68 C5). */
+  clubName?: string | null;
   initialContent: string;
   hasMedia: boolean;
   onEdited: (p: EditedPost) => void;
+  /** The Delete went through; onClose follows at once. */
+  onDeleted: () => void;
   /** Report → Block, or "Block author": the feed reloads without them. */
   onBlocked: () => void;
   onClose: () => void;
@@ -3637,6 +3687,43 @@ function PostActionsSheet({
   // "Edit post" opens EditPostSheet on top, the same way.
   const [editOpen, setEditOpen] = useState(false);
   const [blocking, setBlocking] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  // "Delete post", the post viewer's flow (PostViewerMobile's handleDelete).
+  // An officer deleting a club post someone else wrote is told whose post it
+  // is and toasted when it goes (C5); the author's card just fades and leaves.
+  // The toast is vibeRequest's `success`: the `toast` here is the local one.
+  const deletePost = useCallback(async () => {
+    if (deleting) return;
+    const asOfficer = deletesAsOfficer({ isOwner, viewerCanDelete: canDelete });
+    const club = clubName?.trim() || "the club";
+    const prompt = asOfficer
+      ? `Delete this post from ${club}? This can't be undone.`
+      : "Delete this post?";
+    if (typeof window !== "undefined" && !window.confirm(prompt)) return;
+    setDeleting(true);
+    const r = await vibeRequest(`/api/posts/${postId}`, {
+      method: "DELETE",
+      credentials: "include",
+      failure: "Couldn't delete this post.",
+      ...(asOfficer ? { success: "Post deleted" } : {}),
+    });
+    // A refusal already said why in a toast; the sheet stays open for a retry.
+    if (!r.ok) {
+      setDeleting(false);
+      return;
+    }
+    // The card leaves the list, and this sheet with it (FeedCard).
+    onDeleted();
+    onClose();
+  }, [deleting, isOwner, canDelete, clubName, postId, onDeleted, onClose]);
+
+  const rows = postSheetRows({
+    isOwner,
+    viewerCanDelete: canDelete,
+    removed,
+    canBlock: !!authorId,
+  });
 
   // "Block author" — the phone feed card had Report and no way to stop seeing
   // the person, which is the thing most students actually want.
@@ -3679,17 +3766,25 @@ function PostActionsSheet({
   }, [postId, onClose]);
 
   return (
-    <Drawer.Root open onOpenChange={(o) => { if (!o) onClose(); }}>
+    <Drawer.Root
+      open
+      // While a Delete is out the sheet stays up (no scrim tap, swipe or
+      // Escape, and Cancel waits): `deleting` lives here, so closing and
+      // reopening ⋯ would send a second DELETE and toast an error for a
+      // delete that worked.
+      dismissible={!deleting}
+      onOpenChange={(o) => { if (!o) onClose(); }}
+    >
       <Drawer.Portal>
         {/* Above the tab bar (z 9988): this sheet opens from a feed card
             with the bar on screen and no vibe-composer-open, so at 1201 the
             bar painted over its bottom row. Below SharePostSheet
             (10400/10401), which "Send to chats" opens from here, and below
             the toasts, so a refusal still shows over both.
-            The feed card that renders this is a <button>, and React bubbles
-            clicks through portals; the card ignores clicks from outside its
-            own box (see FeedCard), so a tap on the scrim closes this sheet
-            without opening the post. Don't stop clicks here: on a phone vaul
+            The feed card that renders this opens the post on a tap, and
+            React bubbles clicks through portals; the card ignores clicks
+            from outside its own box (see FeedCard), so a tap on the scrim
+            closes this sheet without opening the post. Don't stop clicks here: on a phone vaul
             closes on an outside tap only once its click reaches the document. */}
         <Drawer.Overlay
           style={{
@@ -3758,37 +3853,60 @@ function PostActionsSheet({
             </div>
           ) : null}
 
-          <ActionSheetRow
-            label="Send to chats"
-            onClick={() => setShareOpen(true)}
-          />
-          <ActionSheetRow label="Copy link" onClick={copyLink} />
-          {isOwner ? (
-            removed ? null : (
-              <ActionSheetRow label="Edit post" onClick={() => setEditOpen(true)} />
-            )
-          ) : (
-            <>
-              <ActionSheetRow
-                label="Report post"
-                tone="danger"
-                onClick={() => setReportOpen(true)}
-              />
-              {authorId ? (
-                <ActionSheetRow
-                  label={blocking ? "Blocking…" : "Block author"}
-                  tone="danger"
-                  onClick={() => void blockAuthor()}
-                  disabled={blocking}
-                />
-              ) : null}
-            </>
-          )}
+          {/* Which rows, and in what order: postSheetRows. */}
+          {rows.map((row) => {
+            switch (row) {
+              case "send":
+                return (
+                  <ActionSheetRow
+                    key={row}
+                    label="Send to chats"
+                    onClick={() => setShareOpen(true)}
+                  />
+                );
+              case "copy":
+                return <ActionSheetRow key={row} label="Copy link" onClick={copyLink} />;
+              case "edit":
+                return (
+                  <ActionSheetRow key={row} label="Edit post" onClick={() => setEditOpen(true)} />
+                );
+              case "delete":
+                return (
+                  <ActionSheetRow
+                    key={row}
+                    label={deleting ? "Deleting…" : "Delete post"}
+                    tone="danger"
+                    onClick={() => void deletePost()}
+                    disabled={deleting}
+                  />
+                );
+              case "report":
+                return (
+                  <ActionSheetRow
+                    key={row}
+                    label="Report post"
+                    tone="danger"
+                    onClick={() => setReportOpen(true)}
+                  />
+                );
+              case "block":
+                return (
+                  <ActionSheetRow
+                    key={row}
+                    label={blocking ? "Blocking…" : "Block author"}
+                    tone="danger"
+                    onClick={() => void blockAuthor()}
+                    disabled={blocking}
+                  />
+                );
+            }
+          })}
           <ActionSheetRow
             label="Cancel"
             onClick={onClose}
             divider={false}
             bold
+            disabled={deleting}
           />
         </Drawer.Content>
       </Drawer.Portal>
