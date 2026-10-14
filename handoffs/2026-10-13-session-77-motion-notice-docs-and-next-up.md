@@ -15,8 +15,17 @@ everything this file does not mention.
 4. The live sign-up test can wait (his call). The Junk question stays open.
 
 **Research is assigned to James and Rylan, not to a session.** The two briefs
-are in `handoffs/2026-10-13-research-briefs-james-rylan.md`, ready for Franky
-to send. Do not run that research unless he asks.
+are in `handoffs/2026-10-13-research-briefs-james-rylan.md`. **Franky sent
+both on Oct 14** (James: Lounge; Rylan: Rally and the other IU Innovates
+startup; suggested due Sunday Oct 18). Do not run that research unless he asks.
+
+**Eli Serrano** (IU Innovates community manager, co-founder of vovy.ai) was
+introduced by Sebastian Penix; Franky meets him Thursday Oct 22, 1:30 pm ET.
+Franky sent him a summary page of the build as an HTML file (artifact
+claude.ai/artifact/STMedTHbLZutMC1fA6iu9K). The repo was NOT shared: it sits
+under a personal account, where a collaborator gets write access. If Eli
+should see code later: a GitHub organization (read-only role) or a cleaned
+copy.
 
 **First ten minutes of S78:**
 1. `git branch -r | grep claude/` (Oct 13: `claude/relaxed-davinci-9d11h3`
@@ -110,7 +119,6 @@ resume features hidden already match it.
 
 ## Franky's list
 
-- Send James and Rylan their research briefs (the file above).
 - Look at the bloom, the wordmark, the cookie notice and the Campus page on
   his phone and say what feels off.
 - Whether the liquid glass counts or the holographic card ever get built
