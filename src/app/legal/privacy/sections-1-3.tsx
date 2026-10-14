@@ -33,6 +33,11 @@ export function Sections1To3() {
           or video of a removed post;
         </li>
         <li>
+          totals of how Vibe is used, such as sign-ups, posts and chat messages
+          per day. The totals do not say who did what, but on a quiet day a
+          daily total can come from one person;
+        </li>
+        <li>
           the waitlist (<Sec to="11">section 11</Sec>).
         </li>
       </LegalUL>

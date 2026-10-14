@@ -6,6 +6,7 @@ import { AdminShell, type AdminTab } from "./admin-shell";
 import { LogClient } from "./log-client";
 import { NumbersClient } from "./numbers-client";
 import { ReportsClient } from "./reports-client";
+import { UsageClient } from "./usage-client";
 import { UsersClient } from "./users-client";
 import { WaitlistClient } from "./waitlist-client";
 
@@ -30,7 +31,7 @@ type Props = {
  * implies. This page used to run its own inline flag read and
  * `redirect("/campus")`, which quietly told a curious student the page exists.
  *
- * THE SERVER READS ONLY CLUBS. The reports, users, waitlist, numbers and log tabs fetch their own
+ * THE SERVER READS ONLY CLUBS. The reports, users, waitlist, numbers, usage and log tabs fetch their own
  * data from the admin API, which is deliberately narrow: GET /api/admin/users
  * selects `id, handle, name, school_verified, created_at` and returns no email
  * at all. A service-role `users` read here to "save a round trip" is exactly
@@ -51,7 +52,12 @@ export default async function AdminPage({ searchParams }: Props) {
   const raw = (await searchParams).tab;
   const asked = Array.isArray(raw) ? raw[0] : raw;
   const tab: AdminTab =
-    asked === "clubs" || asked === "users" || asked === "waitlist" || asked === "numbers" || asked === "log"
+    asked === "clubs" ||
+    asked === "users" ||
+    asked === "waitlist" ||
+    asked === "numbers" ||
+    asked === "usage" ||
+    asked === "log"
       ? asked
       : "reports";
 
@@ -62,6 +68,7 @@ export default async function AdminPage({ searchParams }: Props) {
       {tab === "users" ? <UsersClient /> : null}
       {tab === "waitlist" ? <WaitlistClient /> : null}
       {tab === "numbers" ? <NumbersClient /> : null}
+      {tab === "usage" ? <UsageClient /> : null}
       {tab === "log" ? <LogClient /> : null}
     </AdminShell>
   );

@@ -16,6 +16,9 @@ const eslintConfig = defineConfig([
     // generated Xcode / Gradle trees (with minified Capacitor JS inside).
     // Relative to this file, so src/components/mobile/ is still linted.
     "mobile/**",
+    // The marketing workspace is its own repo, kept inside this folder on
+    // the Mac and hidden from git (.git/info/exclude); it is not the app.
+    "vibe-marketing/**",
   ]),
 ]);
 

@@ -1,6 +1,6 @@
 # Vibe Privacy Policy
 
-Effective October 13, 2026
+Effective October 14, 2026
 
 Vibe is a campus social app for people with an Indiana University or Purdue University email address. It is run by **CONNECTVIBE. LLC**, an Indiana limited liability company. In this policy, "we" means that company. Vibe is independent. It is not run or backed by Indiana University, Purdue University, or any campus, school or club.
 
@@ -49,6 +49,7 @@ Vibe is built and run by the three cofounders of CONNECTVIBE. LLC. This policy c
 - for any account: handle, name, verified or not, join date, any suspension or ban with its reason and private note, and the moderation actions about it;
 - every club and its posts, hidden ones included;
 - the photos an account, club or group chat shows. For two minutes at a time they can also open a photo that was removed, including the photo or video of a removed post;
+- totals of how Vibe is used, such as sign-ups, posts and chat messages per day. The totals do not say who did what, but on a quiet day a daily total can come from one person;
 - the waitlist (section 11).
 
 They can look an account up by its exact email address, and the result does not show the address. The admin tools do not show email addresses (except on the waitlist), passwords, résumés or billing details. They do not show messages that were not reported, who viewed what, or IP addresses. An IP address is the number that identifies your internet connection.

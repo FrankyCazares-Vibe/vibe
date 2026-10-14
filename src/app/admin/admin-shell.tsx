@@ -25,7 +25,7 @@ import Link from "next/link";
 
 import { vibeRequest } from "@/lib/feedback/request";
 
-export type AdminTab = "reports" | "clubs" | "users" | "waitlist" | "numbers" | "log";
+export type AdminTab = "reports" | "clubs" | "users" | "waitlist" | "numbers" | "usage" | "log";
 
 export const COLORS = {
   bg: "#0F0D17",
@@ -76,6 +76,13 @@ const TABS: Array<{ key: AdminTab; label: string; title: string; blurb: string }
     title: "Numbers",
     blurb:
       "How many times the front page, the waitlist page and the sign-up page were opened, by day and by link label. Set them against the joins on the Waitlist tab to see what share of visitors join. Totals only: nothing here is about a person.",
+  },
+  {
+    key: "usage",
+    label: "Usage",
+    title: "Usage",
+    blurb:
+      "Totals of how Vibe is used: how many sign up, how many come back, what gets used, how clubs are doing and where people are. Founders and the store-review accounts are left out. Small groups in the wave, sign-up week, school, campus and club tables show as <5; daily counts and totals are exact. Totals only: no names.",
   },
   {
     key: "log",

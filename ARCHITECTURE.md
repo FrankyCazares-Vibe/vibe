@@ -54,6 +54,7 @@ Routes are folders under `src/app/`. API routes are `src/app/api/**/route.ts`. "
 | Vibe+ billing | `src/app/plus/`, `src/app/api/billing/`, `src/lib/billing/`, `src/lib/premium/require-plus.ts`, `scripts/stripe-setup.mjs` |
 | Legal pages, cookie notice, Terms acceptance | `src/app/legal/`, `src/components/legal/`, `src/lib/legal/`, `src/app/auth/terms/` |
 | The page-open tally (admin "Numbers") | `src/lib/tally/`, `src/components/tally/OpenBeacon.tsx`, `src/app/api/tally/open/`, `src/app/admin/numbers-client.tsx` |
+| The usage summary (admin "Usage") | `src/lib/usage/`, `src/app/api/admin/usage/`, `src/app/admin/usage-client.tsx`, `supabase/migrations/20261014120000_admin_usage_summary.sql` |
 | Colours, Light and Night | `src/app/globals.css`, `src/lib/theme/` |
 | The moving coral glow | `src/components/bloom/VibeBloom.tsx` + the `vibe-bloom-*` block at the end of `globals.css` |
 | The animated "vibe." wordmark | `src/components/brand/KineticWordmark.tsx` + the `vibe-kinetic` block in `globals.css` |
@@ -256,7 +257,7 @@ A screen learns `chat_v2` from `GET /api/me/features`; the desktop pages get `ch
 
 **Otto.** The in-app guide: the onboarding questions, a panel with upcoming events, requests and activity, typed reminders (`src/lib/otto/parse-reminder.ts`), and on desktop a corner button that opens a side panel. No outside AI service is called.
 
-**Moderation.** Reports, a text filter, image quarantine, and account restrictions (suspend or ban). A restriction is mirrored into the user's auth `app_metadata` so the proxy sees it on the next request. Bans are keyed on a keyed hash of the email, using `RESTRICTION_PEPPER`; read its comment in `.env.example` before setting it, because it can never be rotated. The admin page (`/admin`) has tabs for Reports, Clubs, Users, Waitlist, Numbers and Log, and is open to platform admins only.
+**Moderation.** Reports, a text filter, image quarantine, and account restrictions (suspend or ban). A restriction is mirrored into the user's auth `app_metadata` so the proxy sees it on the next request. Bans are keyed on a keyed hash of the email, using `RESTRICTION_PEPPER`; read its comment in `.env.example` before setting it, because it can never be rotated. The admin page (`/admin`) has tabs for Reports, Clubs, Users, Waitlist, Numbers, Usage and Log, and is open to platform admins only.
 
 **Billing (Vibe+).** Stripe Checkout, the customer portal and a webhook (`/api/billing/`). Prices are found by lookup key, never by an id in code or env. Entitlements are stored in the database and read through `requirePlus()`, which fails closed. Checkout is off unless `BILLING_ENABLED` is exactly `true` and both Stripe values are set; it is off in production.
 
