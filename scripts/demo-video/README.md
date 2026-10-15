@@ -118,7 +118,7 @@ Eighteen small things are changed in the film and NOT in the app. Most hide a fl
 phone in Night, so each is also a thing to look at in the app. 1 to 5 and 14 to 17 are in `shim.mjs` (`pageDot`,
 its rules 1 to 9), the rest are in `storyboard.mjs`.
 
-1. Campus header: the count line ("13 at IU Bloomington · 1 active now") is left out; on screen for nine seconds
+1. Campus header: the count line ("13 at IU Bloomington"; " · N active now" only from 5 up) is left out; on screen for nine seconds
    it told a new student the app is nearly empty. The campus name stays.
 2. The chip row (Feed, Events, Orgs, Map) gets a solid backing; posts used to show through it while scrolling.
 3. The tab bar is fully opaque; lines under it used to ghost through.

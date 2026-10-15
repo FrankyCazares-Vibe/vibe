@@ -1,10 +1,12 @@
 "use client";
 
 import dynamic from "next/dynamic";
+import { useEffect } from "react";
 
 import type { OttoPayload } from "@/app/api/me/otto/route";
 import { MobileShell } from "@/components/mobile/MobileShell";
 import { orLoadFailed, ScreenGuess, useScreen, warmScreen } from "@/lib/use-is-mobile";
+import { countOpen } from "@/lib/usage/touch-client";
 
 // Each screen is its own download (`next/dynamic`), so a device fetches the
 // one it draws and not the other. All three are still built on the server
@@ -57,6 +59,12 @@ export function OttoSwitch({
   firstGuessPhone?: boolean;
 }) {
   const screen = useScreen(firstGuessPhone);
+  // An Otto open for the use totals (src/lib/usage/touch.ts): `/otto` is the
+  // phone's Otto tab and the desktop's Otto page. This stays mounted when the
+  // screen swaps after a wrong guess, so a visit counts once.
+  useEffect(() => {
+    countOpen("otto");
+  }, []);
   if (screen.show === "phone") {
     return (
       <ScreenGuess phone={screen.guess}>

@@ -6,11 +6,31 @@ import { scopeCampusIds } from "@/lib/iu/campus-scope";
 import { SCHOOL_SYSTEMS } from "@/lib/iu/campuses";
 import { campusScopeError } from "@/lib/iu/community-scope";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { floorActiveNow } from "@/lib/usage/active-now";
 
 /**
  * Lightweight stats for the campus banner: how many students there are and
  * how many were pinging the heartbeat in the last 5 minutes ("active now").
  * Auth required so we don't leak the headcount to scrapers.
+ *
+ * "ACTIVE NOW" FROM 5 UP (Franky, Oct 14 2026; src/lib/usage/active-now.ts).
+ * Every page checks in now, so an exact small count would show whether one
+ * person on a quiet campus has Vibe open. `activeNow` and `campusActiveNow`
+ * are 0 under 5, and 0 means "not shown": the header drops the part. The
+ * fields keep their names and stay numbers, because open tabs read them (a
+ * tab from before this change prints "0 active now" until the person comes
+ * back to it and it reloads onto the new build, BuildRefresh).
+ * The database counts each campus on its own and leaves out any campus where
+ * fewer than 5 people other than the caller are active, or fewer than 5
+ * other than the caller are not, so a campus under 10 people never shows
+ * (users_active_count, 20261014150000), and `activeNow` can be lower than
+ * everyone active (Privacy Policy 3d says so). This route floors what it
+ * answers at 5 as well (`floorActiveNow`), but that covers only what the
+ * header prints, and not the second floor: until that file is applied the
+ * function is the exact count, so a direct call, or `activeNow` minus
+ * `campusActiveNow`, can still give a number under 5, and a small campus
+ * still shows. That file goes on straight after the deploy (its DEPLOY
+ * ORDER).
  *
  * TWO NUMBERS, TWO NAMES — ON PURPOSE (plan §6 compatibility, and the
  * "no vanity metrics" principle read the other way round: a number must not
@@ -107,14 +127,15 @@ export async function GET(req: Request) {
   // (`users_active_count`, 20261008120000), so nobody's last-active time has
   // to be readable to get it. Until that file is applied the function is
   // missing (PGRST202) and the count is read the old way; after it, the old
-  // way is refused, and is never reached.
+  // way is refused, and is never reached. Either way the answer is floored:
+  // under 5 is 0, "not shown" (`floorActiveNow`).
   type CountRes = { count: number | null; error: { code?: string; message: string } | null };
   const activeCount = async (ids: string[] | null): Promise<CountRes> => {
     const { data, error } = await supabase.rpc("users_active_count", { p_campus_ids: ids });
-    if (!error) return { count: typeof data === "number" ? data : Number(data ?? 0), error: null };
+    if (!error) return { count: floorActiveNow(typeof data === "number" ? data : Number(data ?? 0)), error: null };
     if (error.code !== "PGRST202") return { count: null, error };
     const old = await (ids ? community() : headCount()).gte("last_active_at", activeSince);
-    return { count: old.count, error: old.error };
+    return { count: old.error ? null : floorActiveNow(old.count), error: old.error };
   };
 
   const [globalRes, communityRes, splitRes] = await Promise.all([
@@ -141,7 +162,8 @@ export async function GET(req: Request) {
 
   return NextResponse.json({
     ok: true,
-    // Unchanged meaning for deployed bundles: everyone on Vibe.
+    // Unchanged meaning for deployed bundles: everyone on Vibe. activeNow
+    // and campusActiveNow: 0 under 5 ("not shown").
     totalUsers: globalRes[0].count ?? 0,
     activeNow: globalRes[1].count ?? 0,
     active_window_minutes: ACTIVE_WINDOW_MS / 60000,

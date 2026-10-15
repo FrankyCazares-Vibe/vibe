@@ -12,6 +12,14 @@
  * name, a club's public name or a wave's batch name. No id, handle, email or
  * message is in the shape, and a field the function sends that isn't in it
  * is dropped here.
+ *
+ * THE DAY TOTALS are a second answer, from `public.admin_usage_tally`
+ * (20261014150000_usage_day_tally.sql): people with Vibe open per UTC day
+ * and per Monday week, sign-up weeks coming back, the device kind of each
+ * person's first visit of the day, and Otto and map opens. They are counted
+ * as they happen, from the day that migration is applied, so they start
+ * there and nothing before it is rebuilt. Same rules: counts only, the
+ * small grouped cells floored before they leave the server.
  */
 
 /** How far back the tab reads: today and the 29 days before it. */
@@ -114,6 +122,95 @@ export type UsageRaw = UsageShape<number, number>;
 /** What the tab is sent: the small counts floored, club chat in bands. */
 export type UsageView = UsageShape<Cell, ChatBand>;
 
+/* ---------------------------------------------------------------- the day totals */
+
+/**
+ * The day totals' columns, as `public.admin_usage_tally` names them
+ * (20261014150000_usage_day_tally.sql). The table says `unknown` for both a
+ * school and a device; the function answers `unknown_school` and
+ * `unknown_device` so one day row can hold both.
+ */
+export const TALLY_SCHOOL_KEYS = ["iu", "purdue", "unknown_school"] as const;
+export const TALLY_DEVICE_KEYS = ["phone", "desktop", "installed", "unknown_device"] as const;
+export const TALLY_DAY_KEYS = ["active", ...TALLY_SCHOOL_KEYS, ...TALLY_DEVICE_KEYS, "otto_open", "map_open"] as const;
+
+/**
+ * A day's two marks, true or false, not counts: the cap turned at least one
+ * Otto (or map) open away that day. The writer leaves the mark the moment it
+ * turns one away, so a day reads "hit the cap" even when more people became
+ * active later and the day's final opens sit under ten per person.
+ */
+export const TALLY_CAP_KEYS = ["otto_capped", "map_capped"] as const;
+
+/**
+ * How many weeks each sign-up week is followed for: its own week, then the
+ * next four. The writer keeps cohort rows 0 to 28 days on and no further, so
+ * nothing is stored that the tab doesn't show.
+ */
+export const TALLY_COHORT_WEEKS = 5;
+
+/**
+ * A day's Otto or map opens stop at this many times that day's active
+ * people (at least one). The same 10 as OPEN_CAP_PER_ACTIVE in
+ * src/lib/usage/touch.ts and the writer's `10 * greatest(v_active, 1)`;
+ * written out here because this file imports nothing. view.test.ts checks
+ * the two agree.
+ */
+export const TALLY_OPEN_CAP_PER_ACTIVE = 10;
+
+type TallySchoolKey = (typeof TALLY_SCHOOL_KEYS)[number];
+type TallyDeviceKey = (typeof TALLY_DEVICE_KEYS)[number];
+type TallyCapKey = (typeof TALLY_CAP_KEYS)[number];
+
+/**
+ * One UTC day. `active` and the two opens are exact; the school and device
+ * splits are `C`, floored for the browser like the other grouped cells; the
+ * cap marks are true or false.
+ */
+type TallyDay<C> = { day: string; active: number; otto_open: number; map_open: number } & {
+  [K in TallySchoolKey | TallyDeviceKey]: C;
+} & { [K in TallyCapKey]: boolean };
+
+type TallyShape<C> = {
+  /** The server's own day (UTC). */
+  today: string;
+  /** The first day in `by_day`. */
+  since: string;
+  days: number;
+  /** The first UTC day anything was counted, or null before the first count. */
+  started: string | null;
+  /**
+   * The Monday after the week `started` falls in: the first whole week
+   * counted. The week counting began in is partial even when it began on a
+   * Monday (anyone the old Campus beat stamped earlier that day was missed).
+   * A week before it is partial, and a sign-up week's cell before it is null.
+   */
+  first_week: string | null;
+  /** Every day of the window, oldest first, zero-filled by the function. */
+  by_day: TallyDay<C>[];
+  /** Monday weeks, oldest first, ending with this one (still running). */
+  by_week: { week: string; active: number; partial: boolean }[];
+  /**
+   * Sign-up weeks, oldest first. `seen[k]` is how many of the people who
+   * signed up that week had Vibe open k weeks later (0 = their own week);
+   * null where that week hasn't come yet or wasn't counted in full.
+   */
+  cohorts: { week: string; seen: (C | null)[]; next_week_pct: number | null }[];
+};
+
+/** What `admin_usage_tally` answers, every count a number. Never sent to the browser. */
+export type TallyRaw = TallyShape<number>;
+
+/** What the tab is sent: the school, device and sign-up week cells floored. */
+export type TallyView = TallyShape<Cell>;
+
+/**
+ * The day totals' own state, beside the summary's: `off` while the
+ * function's migration (20261014150000) is not applied, `failed` when it
+ * answered something the tab can't read (the rest of the tab still shows).
+ */
+export type TallyState = { state: "off" } | { state: "failed" } | { state: "on"; view: TallyView };
+
 /** What GET /api/admin/usage answers. */
 export type AdminUsage = {
   ok: true;
@@ -122,6 +219,8 @@ export type AdminUsage = {
   view: UsageView | null;
   /** Always false: one jsonb answer, nothing is paged or cut. Kept so the tab reads like Numbers. */
   truncated: false;
+  /** The day totals (20261014150000), always set, whatever `ready` says. */
+  tally: TallyState;
 };
 
 const DAY_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -292,7 +391,7 @@ export function toUsageRaw(raw: unknown): UsageRaw | null {
  * count), and the Clubs tab already shows exact member counts. What keeps
  * people out of this tab is that the function returns counts only.
  */
-function floorCell(n: number): Cell {
+export function floorCell(n: number): Cell {
   return n >= 1 && n < SMALL_CELL_FLOOR ? "<5" : n;
 }
 
@@ -341,4 +440,156 @@ export function toUsageView(raw: UsageRaw): UsageView {
       by_campus: raw.where.by_campus.map((c) => ({ campus: c.campus, accounts: floorCell(c.accounts) })),
     },
   };
+}
+
+/* ---------------------------------------------------------------- the day totals: reading */
+
+const DAY_MS = 86_400_000;
+
+/** A real calendar day as `YYYY-MM-DD`, or null: "2026-02-30" passes the pattern but not this. */
+function calendarDay(v: unknown): string | null {
+  const d = day(v);
+  if (!d) return null;
+  const ms = Date.parse(`${d}T00:00:00Z`);
+  return !Number.isNaN(ms) && new Date(ms).toISOString().slice(0, 10) === d ? d : null;
+}
+
+/** `d` moved by `n` days. `d` must be a real `YYYY-MM-DD`; the answer is one too. */
+export function addUtcDays(d: string, n: number): string {
+  return new Date(Date.parse(`${d}T00:00:00Z`) + n * DAY_MS).toISOString().slice(0, 10);
+}
+
+/** The Monday of `d`'s week, as the function counts weeks (Monday first, UTC). */
+export function mondayOf(d: string): string {
+  const sunday0 = new Date(Date.parse(`${d}T00:00:00Z`)).getUTCDay();
+  return addUtcDays(d, -((sunday0 + 6) % 7));
+}
+
+/** A date that must be there: a real day, or an explicit null. Missing or anything else is undefined. */
+function dayOrNull(o: Obj, key: string): string | null | undefined {
+  if (!(key in o)) return undefined;
+  if (o[key] === null) return null;
+  return calendarDay(o[key]) ?? undefined;
+}
+
+/**
+ * Next-week share for a sign-up week: of the people seen in their own week,
+ * how many were seen the week after, as a whole percent. Only when both
+ * weeks were counted in full and the first is at least the floor: "1 of 2"
+ * as 50% would read like a trend.
+ */
+function nextWeekPct(seen: ReadonlyArray<number | null>): number | null {
+  const [first, next] = seen;
+  if (first === null || first === undefined || next === null || next === undefined) return null;
+  return first >= SMALL_CELL_FLOOR ? Math.round((100 * next) / first) : null;
+}
+
+/** Each day's cap marks beside its counts: true only where the function said true. */
+function withCapMarks<R extends { day: string }>(days: R[], raw: unknown[]): (R & Record<TallyCapKey, boolean>)[] {
+  const marks = new Map<string, Obj>();
+  for (const v of raw) {
+    const o = obj(v);
+    const d = o && day(o.day);
+    if (o && d) marks.set(d, o);
+  }
+  return days.map((d) => {
+    const o = marks.get(d.day);
+    return { ...d, otto_capped: o?.otto_capped === true, map_capped: o?.map_capped === true };
+  });
+}
+
+/**
+ * `admin_usage_tally`'s answer, cleaned, or null when it isn't the shape (a
+ * date, `started`, `first_week` or a whole list missing): the route then
+ * shows "couldn't read the day totals", never a section of noughts. A day,
+ * week or sign-up week row that can't be read is dropped; a sign-up week
+ * needs exactly TALLY_COHORT_WEEKS cells.
+ *
+ * Two things are worked out HERE whatever the function says, so a slip in
+ * the SQL can't show a number that means something else: a week before
+ * `first_week` is `partial`, and a sign-up week's cell is null when its week
+ * is after this one or before `first_week`. The first counted week misses
+ * anyone already stamped earlier that week, so its cells would read low and
+ * a next-week share could pass 100%. `next_week_pct` is computed here too.
+ */
+export function toTallyRaw(raw: unknown): TallyRaw | null {
+  const r = obj(raw);
+  if (!r) return null;
+  const today = calendarDay(r.today);
+  const since = calendarDay(r.since);
+  const days = count(r.days);
+  const started = dayOrNull(r, "started");
+  const first_week = dayOrNull(r, "first_week");
+  if (!today || !since || days === null || started === undefined || first_week === undefined) return null;
+  if (!Array.isArray(r.by_day) || !Array.isArray(r.by_week) || !Array.isArray(r.cohorts)) return null;
+
+  const counted = series(r.by_day, "day", TALLY_DAY_KEYS);
+  const by_day = counted && withCapMarks(counted, r.by_day);
+  const weeks = series(r.by_week, "week", ["active"] as const);
+  if (!by_day || !weeks) return null;
+  const by_week = weeks.map((w) => ({ ...w, partial: first_week === null || w.week < first_week }));
+
+  const thisWeek = mondayOf(today);
+  const cohorts = rows(r.cohorts, (o) => {
+    const week = calendarDay(o.week);
+    if (!week || mondayOf(week) !== week) return null;
+    if (!Array.isArray(o.seen) || o.seen.length !== TALLY_COHORT_WEEKS) return null;
+    const seen: (number | null)[] = [];
+    for (let k = 0; k < TALLY_COHORT_WEEKS; k += 1) {
+      const n = o.seen[k] === null ? null : count(o.seen[k]);
+      if (n === null && o.seen[k] !== null) return null;
+      const at = addUtcDays(week, 7 * k);
+      seen.push(at > thisWeek || first_week === null || at < first_week ? null : n);
+    }
+    return { week, seen, next_week_pct: nextWeekPct(seen) };
+  });
+  if (!cohorts) return null;
+  cohorts.sort((a, b) => a.week.localeCompare(b.week));
+
+  return { today, since, days, started, first_week, by_day, by_week, cohorts };
+}
+
+/**
+ * The day totals as the browser gets them: the school and device splits and
+ * the sign-up week cells floored ("<5" for 1 to 4; null stays null), the
+ * day's active people and the two opens exact, as in the step-1 view. The
+ * floor is cosmetic, not privacy (see `floorCell`): the exact active count
+ * sits beside the splits, and on a quiet day a total can be one person.
+ */
+export function toTallyView(raw: TallyRaw): TallyView {
+  const splits = [...TALLY_SCHOOL_KEYS, ...TALLY_DEVICE_KEYS];
+  return {
+    ...raw,
+    by_day: raw.by_day.map((d) => {
+      const out: TallyView["by_day"][number] = { ...d };
+      for (const k of splits) out[k] = floorCell(d[k]);
+      return out;
+    }),
+    by_week: raw.by_week.map((w) => ({ ...w })),
+    cohorts: raw.cohorts.map((c) => ({
+      week: c.week,
+      seen: c.seen.map((n) => (n === null ? null : floorCell(n))),
+      next_week_pct: c.next_week_pct,
+    })),
+  };
+}
+
+/** The days counted: the rows from `started` on (none before the first count). */
+export function fromStart<R extends { day: string }>(rows: ReadonlyArray<R>, started: string | null): R[] {
+  return started === null ? [] : rows.filter((r) => r.day >= started);
+}
+
+/** The weeks counted, the partial first one included: every week whose Sunday is on or after `started`. */
+export function weeksFromStart<R extends { week: string }>(rows: ReadonlyArray<R>, started: string | null): R[] {
+  return started === null ? [] : rows.filter((r) => addUtcDays(r.week, 6) >= started);
+}
+
+/**
+ * "hit the cap": the stop turned at least one of that day's Otto (or map)
+ * opens away, by the writer's own mark. Not worked out from the day's final
+ * counts: the stop is checked at each open against the people active so
+ * far, so a day can be cut early and still end under ten per person.
+ */
+export function openCapped(day: Record<TallyCapKey, boolean>, key: "otto_open" | "map_open"): boolean {
+  return key === "otto_open" ? day.otto_capped === true : day.map_capped === true;
 }

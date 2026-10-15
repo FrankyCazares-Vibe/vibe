@@ -177,7 +177,7 @@ export function pageDot() {
   const css = document.createElement("style");
   css.textContent = [
     "nextjs-portal{display:none!important}",
-    // 1. Campus header: the count line under the campus name ("13 at IU Bloomington · 1 active now") is left out.
+    // 1. Campus header: the count line under the campus name ("13 at IU Bloomington"; " · N active now" only from 5 up) is left out.
     //    On screen for nine seconds it told a new student the app is nearly empty. The name stays.
     "header.vibe-campus-banner>div:nth-of-type(2)>div:nth-child(2){display:none!important}",
     // 2. The chip row (Feed / Events / Orgs / Map) is see-through: post text slid behind the chips while the feed scrolled.

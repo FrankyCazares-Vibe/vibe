@@ -62,6 +62,7 @@ import {
 import type { JoinPolicy, JoinState, OrgAudience, OrgRole } from "@/lib/orgs/join-state";
 import type { EditedPost } from "@/lib/posts/edit";
 import { deletesAsOfficer, postSheetRows } from "@/lib/posts/feed-actions";
+import { countOpen } from "@/lib/usage/touch-client";
 
 /**
  * iOS-native rebuild of `/campus` for mobile. Swipeable tabs:
@@ -73,7 +74,8 @@ import { deletesAsOfficer, postSheetRows } from "@/lib/posts/feed-actions";
  *   - Chat / Map → Discord-style org chat + the campus social map.
  *
  * Sticky header has the school greeting + live "on Vibe / active now"
- * stats. Composer FAB at the bottom-right opens the mobile post
+ * stats (CampusBanner's line, campusStatsLine in src/lib/usage/active-now.ts:
+ * "active now" only from 5 up). Composer FAB at the bottom-right opens the mobile post
  * composer on the Feed tab.
  *
  * A separate surface for video posts (vertical short-form video) is
@@ -214,6 +216,12 @@ export function CampusMobile() {
         ? VISITING_CLOSED_TAB_ORDER
         : TAB_ORDER;
   if (mapHidden && tab === "map") setTab("feed");
+  // A map open for the use totals (src/lib/usage/touch.ts): the Map tab came
+  // on screen (a tap on its pill, a swipe, or `?tab=map`). Not MapMobile's
+  // mount: the pager mounts it on every Campus load, whatever the tab.
+  useEffect(() => {
+    if (tab === "map" && !mapHidden) countOpen("map");
+  }, [tab, mapHidden]);
   const [pickerOpen, setPickerOpen] = useState(false);
   // The picker's home row says "you can change it on <date>" (the 45-day
   // lock). Only the profile bootstrap carries that date, so it's read the

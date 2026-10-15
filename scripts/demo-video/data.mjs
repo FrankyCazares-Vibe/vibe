@@ -6,6 +6,10 @@
 // (the send limiter's counter). restore() takes all of it back out, and digest() proves it: one
 // fingerprint per table of the public schema, the same before the take and after the clean-up. Outside the
 // public schema a run leaves one more thing, the sign-in it opened for Franky: signOut() closes it.
+// Since Oct 14 the heartbeat (POST /api/me/heartbeat) also adds to the use totals (usage_day_tally). It stays
+// refused in the browser (storyboard.mjs `allow`), so a take adds nothing there; if one ever slips through,
+// digest() names the table in stillDifferent, and on the local database only it is cleared with
+// `delete from public.usage_day_tally where day >= <the take's day>;`.
 //
 // LOCAL ONLY by construction: every statement goes through `docker exec` into the local Supabase database
 // container named in supabase/config.toml. There is no URL and no key here, and no .env file is read.

@@ -149,10 +149,15 @@ export async function campus(take, ids) {
   };
   // The feed is up, all three panes hold their rows, the chips are the four of the new app (no "Chat"), the
   // header's count line is out of the picture (shim.mjs, dressing rule 1), and we are at the top.
+  // The count line is looked for by its own shape ("13 at IU Bloomington", "40 on Vibe", with " · N active now"
+  // only from 5 up), not by "active now": under 5 the line has no "active now" to find, shown or not.
   const campusReady = () => p.evaluate(() => {
     const has = (t) => document.body.innerText.includes(t);
     const chips = [...document.querySelectorAll("#otto-mobile-tour-tabs button")].map((b) => b.innerText.trim()).join();
-    return chips === "Feed,Events,Orgs,Map" && has("Blitz Night is tonight") && has("Resume Review Night") && !!document.querySelector('a[href="/orgs/sae"]') && !has("active now") && scrollY === 0;
+    const countLine = [...document.querySelectorAll("header.vibe-campus-banner *")].some((el) =>
+      el.children.length === 0 && el.getClientRects().length > 0 &&
+      /^[\d,]+ (at .+|on Vibe)( · [\d,]+ active now)?$/.test(el.textContent.trim()));
+    return chips === "Feed,Events,Orgs,Map" && has("Blitz Night is tonight") && has("Resume Review Night") && !!document.querySelector('a[href="/orgs/sae"]') && !countLine && scrollY === 0;
   });
   // Film-only, on /campus:
   //  - the "Report event" buttons on the event cards are hidden (beside "Add to calendar" they keep their room;

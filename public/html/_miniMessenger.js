@@ -532,6 +532,9 @@
   let ottoOpen = false;
   let ottoTab = "otto";        // kept while the panel is closed
   let pendingHandle = null;    // a chat to open when the frame is made
+  // _otto.js asks this when the panel opens: an open on the Messages tab is
+  // not an Otto open for the use totals (_usageTouch.js).
+  window.__vibeOttoTab = function () { return ottoTab; };
 
   function removeFrame() {
     const f = document.getElementById("vmmFrame");
@@ -591,7 +594,13 @@
       `;
       const header = ottoPanel.querySelector(".otto-panel-header");
       header.insertAdjacentElement("afterend", row);
-      row.querySelectorAll(".vmm-tab").forEach((b) => b.addEventListener("click", () => { ottoTab = b.dataset.tab; paintOttoTabs(); }));
+      row.querySelectorAll(".vmm-tab").forEach((b) => b.addEventListener("click", () => {
+        const was = ottoTab;
+        ottoTab = b.dataset.tab;
+        paintOttoTabs();
+        // From Messages to Otto in the open panel: an Otto open (_usageTouch.js).
+        if (ottoOpen && was !== "otto" && ottoTab === "otto" && typeof window.__vibeCountOpen === "function") window.__vibeCountOpen('otto');
+      }));
       // The pencil is out here, the compose sheet in the frame's page.
       row.querySelector("#vmmNew").addEventListener("click", () => {
         const f = document.getElementById("vmmFrame");

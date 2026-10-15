@@ -332,3 +332,230 @@ test("the view is a copy: the raw answer is left as it was", () => {
   assert.notEqual(view.door.by_day, raw.door.by_day);
   assert.notEqual(view.used.totals, raw.used.totals);
 });
+
+/* ---------------------------------------------------------------- the day totals */
+
+const {
+  TALLY_COHORT_WEEKS,
+  TALLY_DAY_KEYS,
+  TALLY_OPEN_CAP_PER_ACTIVE,
+  addUtcDays,
+  fromStart,
+  mondayOf,
+  openCapped,
+  toTallyRaw,
+  toTallyView,
+  weeksFromStart,
+} = (await import(specifier)) as typeof import("./view");
+
+// Wednesday Oct 28; counting began Wednesday Oct 14, so the first whole week is Oct 19.
+const T_DAYS = ["2026-10-26", "2026-10-27", "2026-10-28"];
+const n5 = (a: unknown, b: unknown, c: unknown, d: unknown, e: unknown) => [a, b, c, d, e];
+
+/** A whole answer the way `admin_usage_tally` sends it, every day count `n`. */
+function tally(n: number) {
+  return {
+    today: "2026-10-28",
+    since: "2026-10-26",
+    days: 3,
+    started: "2026-10-14",
+    first_week: "2026-10-19",
+    by_day: T_DAYS.map((day) => ({ day, ...every([...TALLY_DAY_KEYS], n), otto_capped: false, map_capped: false })),
+    by_week: [
+      { week: "2026-10-12", active: n },
+      { week: "2026-10-19", active: n },
+      { week: "2026-10-26", active: n },
+    ],
+    cohorts: [
+      { week: "2026-10-12", seen: n5(null, n, n, null, null) },
+      { week: "2026-10-19", seen: n5(n, n, null, null, null) },
+      { week: "2026-10-26", seen: n5(n, null, null, null, null) },
+    ],
+  };
+}
+
+/** `tally(7)` with the value at a dotted path replaced (or removed, for `undefined` with `drop`). */
+function tallyWith(path: string, value: unknown, drop = false): unknown {
+  const a = structuredClone(tally(7)) as unknown as Json;
+  const keys = path.split(".");
+  let o = a;
+  for (const k of keys.slice(0, -1)) o = o[k] as Json;
+  if (drop) delete o[keys[keys.length - 1]];
+  else o[keys[keys.length - 1]] = value;
+  return a;
+}
+
+test("the day totals: the same 10 as the browser's cap, five weeks per sign-up week, the columns", async () => {
+  const touchSpecifier = "./touch.ts";
+  const touch = (await import(touchSpecifier)) as typeof import("./touch");
+  assert.equal(TALLY_OPEN_CAP_PER_ACTIVE, touch.OPEN_CAP_PER_ACTIVE);
+  assert.equal(TALLY_COHORT_WEEKS, 5);
+  assert.deepEqual(
+    [...TALLY_DAY_KEYS],
+    ["active", "iu", "purdue", "unknown_school", "phone", "desktop", "installed", "unknown_device", "otto_open", "map_open"],
+  );
+});
+
+test("dates: Monday weeks and day sums in UTC", () => {
+  assert.equal(mondayOf("2026-10-14"), "2026-10-12");
+  assert.equal(mondayOf("2026-10-12"), "2026-10-12");
+  assert.equal(mondayOf("2026-10-18"), "2026-10-12");
+  assert.equal(mondayOf("2027-01-01"), "2026-12-28");
+  assert.equal(addUtcDays("2026-10-28", 7), "2026-11-04");
+  assert.equal(addUtcDays("2026-03-01", -1), "2026-02-28");
+});
+
+test("a clean day-totals answer reads back, with partial weeks and the next-week share worked out", () => {
+  const raw = toTallyRaw(tally(7));
+  assert.ok(raw);
+  assert.deepEqual(raw.by_day, tally(7).by_day);
+  assert.deepEqual(
+    raw.by_week.map((w) => `${w.week} ${w.active} ${w.partial}`),
+    ["2026-10-12 7 true", "2026-10-19 7 false", "2026-10-26 7 false"],
+  );
+  assert.deepEqual(raw.cohorts, [
+    { week: "2026-10-12", seen: [null, 7, 7, null, null], next_week_pct: null },
+    { week: "2026-10-19", seen: [7, 7, null, null, null], next_week_pct: 100 },
+    { week: "2026-10-26", seen: [7, null, null, null, null], next_week_pct: null },
+  ]);
+  assert.equal(raw.started, "2026-10-14");
+  assert.equal(raw.first_week, "2026-10-19");
+});
+
+test("before the first count: started and first_week null, every week partial, every cell null", () => {
+  const a = tallyWith("started", null) as Json;
+  a.first_week = null;
+  const raw = toTallyRaw(a);
+  assert.ok(raw);
+  assert.equal(raw.started, null);
+  assert.ok(raw.by_week.every((w) => w.partial));
+  assert.ok(raw.cohorts.every((c) => c.seen.every((n) => n === null) && c.next_week_pct === null));
+  assert.deepEqual(fromStart(raw.by_day, raw.started), []);
+  assert.deepEqual(weeksFromStart(raw.by_week, raw.started), []);
+});
+
+test("not the day totals' shape: null, so the route says it couldn't read them", () => {
+  for (const bad of [null, undefined, "on", 3, [], {}]) assert.equal(toTallyRaw(bad), null, String(bad));
+  assert.equal(toTallyRaw(tallyWith("started", undefined, true)), null, "no started key");
+  assert.equal(toTallyRaw(tallyWith("first_week", undefined, true)), null, "no first_week key");
+  const cases: [string, unknown][] = [
+    ["today", "2026-02-30"],
+    ["since", "Oct 26"],
+    ["days", -1],
+    ["started", "Oct 14"],
+    ["started", undefined],
+    ["first_week", 20261019],
+    ["by_day", {}],
+    ["by_day", null],
+    ["by_week", undefined],
+    ["cohorts", null],
+    ["cohorts", "2026-10-19"],
+  ];
+  for (const [path, value] of cases) {
+    assert.equal(toTallyRaw(tallyWith(path, value)), null, `${path} = ${JSON.stringify(value)}`);
+  }
+});
+
+test("a day, week or sign-up week row that can't be read is dropped; fields not in the shape too", () => {
+  const day = (d: string, active: unknown) => ({ day: d, ...every([...TALLY_DAY_KEYS], 1), active, user_id: "df5ab44e" });
+  let raw = toTallyRaw(tallyWith("by_day", [day("2026-10-28", 3), day("2026-10-27", -1), day("Oct 26", 2), null]));
+  assert.deepEqual(raw?.by_day.map((d) => `${d.day} ${d.active}`), ["2026-10-28 3"]);
+  assert.ok(!JSON.stringify(raw).includes("df5ab44e"));
+
+  raw = toTallyRaw(
+    tallyWith("cohorts", [
+      { week: "2026-10-19", seen: [7, 7, null, null] }, // four cells, not five
+      { week: "2026-10-20", seen: n5(7, 7, null, null, null) }, // not a Monday
+      { week: "2026-10-26", seen: n5(-1, null, null, null, null) }, // not a count
+      { week: "2026-10-26", seen: "7,7" },
+      { week: "2026-10-19", seen: n5("6", "3", null, null, null), next_week_pct: 99, user_id: "x" },
+    ]),
+  );
+  assert.deepEqual(raw?.cohorts, [{ week: "2026-10-19", seen: [6, 3, null, null, null], next_week_pct: 50 }]);
+});
+
+test("a cell the function shouldn't have counted is nulled here: before the first whole week, or still to come", () => {
+  const raw = toTallyRaw(
+    tallyWith("cohorts", [
+      { week: "2026-10-12", seen: n5(9, 9, 9, 9, 9) },
+      { week: "2026-10-26", seen: n5(9, 9, 9, 9, 9) },
+    ]),
+  );
+  assert.deepEqual(raw?.cohorts.map((c) => c.seen), [
+    [null, 9, 9, null, null],
+    [9, null, null, null, null],
+  ]);
+  // The apply week's own sign-ups can't read over 100% back: their first week is partial, so no share.
+  assert.equal(raw?.cohorts[0].next_week_pct, null);
+});
+
+test("the next-week share needs both weeks counted and at least 5 the first week", () => {
+  const share = (a: unknown, b: unknown) =>
+    toTallyRaw(tallyWith("cohorts", [{ week: "2026-10-19", seen: n5(a, b, null, null, null) }]))?.cohorts[0]
+      .next_week_pct;
+  assert.equal(share(4, 4), null);
+  assert.equal(share(5, 2), 40);
+  assert.equal(share(6, 4), 67);
+  assert.equal(share(5, 0), 0);
+  assert.equal(share(5, null), null);
+  assert.equal(share(null, 5), null);
+});
+
+test("the day totals' floor: school, device and sign-up week cells; active and opens exact; nulls kept", () => {
+  const expected: [number, number | "<5"][] = [
+    [0, 0],
+    [1, "<5"],
+    [4, "<5"],
+    [5, 5],
+    [12, 12],
+  ];
+  for (const [n, cell] of expected) {
+    const raw = toTallyRaw(tally(n));
+    assert.ok(raw);
+    const v = toTallyView(raw);
+    const d = v.by_day[0];
+    for (const k of ["iu", "purdue", "unknown_school", "phone", "desktop", "installed", "unknown_device"] as const) {
+      assert.equal(d[k], cell, `${k} ${n}`);
+    }
+    assert.equal(d.active, n);
+    assert.equal(d.otto_open, n);
+    assert.equal(d.map_open, n);
+    assert.ok(v.by_week.every((w) => w.active === n));
+    assert.deepEqual(v.cohorts[1].seen, [cell, cell, null, null, null]);
+    assert.deepEqual(raw, toTallyRaw(tally(n)), "the raw answer is left as it was");
+  }
+});
+
+test("from the start: days before the first count and weeks that ended before it are left out", () => {
+  const rows = T_DAYS.map((day) => ({ day }));
+  assert.deepEqual(fromStart(rows, "2026-10-27").map((r) => r.day), ["2026-10-27", "2026-10-28"]);
+  assert.deepEqual(fromStart(rows, "2026-10-01").length, 3);
+  const weeks = ["2026-10-05", "2026-10-12", "2026-10-19"].map((week) => ({ week }));
+  // Counting began Wed Oct 14: the week of Oct 12 is kept (partial), Oct 5 ended before it.
+  assert.deepEqual(weeksFromStart(weeks, "2026-10-14").map((w) => w.week), ["2026-10-12", "2026-10-19"]);
+  assert.deepEqual(weeksFromStart(weeks, "2026-10-18").map((w) => w.week), ["2026-10-12", "2026-10-19"]);
+  assert.deepEqual(weeksFromStart(weeks, "2026-10-19").map((w) => w.week), ["2026-10-19"]);
+});
+
+test("hit the cap: the writer's own mark, read as true only when it says true", () => {
+  const marked = (otto: unknown, map: unknown) =>
+    toTallyRaw(tallyWith("by_day", [{ ...tally(7).by_day[2], otto_capped: otto, map_capped: map }]))?.by_day[0];
+  // A day cut early: 15 Otto opens with 2 active is under 10 per person, yet the stop turned some away.
+  const day = { ...tally(7).by_day[2], active: 2, otto_open: 15, otto_capped: true, map_capped: false };
+  const raw = toTallyRaw(tallyWith("by_day", [day]));
+  assert.ok(raw);
+  assert.equal(openCapped(raw.by_day[0], "otto_open"), true);
+  assert.equal(openCapped(raw.by_day[0], "map_open"), false);
+  assert.equal(openCapped(toTallyView(raw).by_day[0], "otto_open"), true, "the mark reaches the browser");
+  // Not the final counts: a day at exactly the stop with no mark is not flagged.
+  const full = toTallyRaw(tallyWith("by_day", [{ ...day, otto_open: 20, otto_capped: false }]));
+  assert.equal(full && openCapped(full.by_day[0], "otto_open"), false);
+  // Anything but true is false, and a day without the marks still reads.
+  for (const v of ["true", 1, null, undefined]) {
+    const d = marked(v, v);
+    assert.ok(d);
+    assert.equal(d.otto_capped, false, String(v));
+    assert.equal(d.map_capped, false, String(v));
+  }
+  assert.deepEqual(marked(true, true) && [marked(true, true)?.otto_capped, marked(true, true)?.map_capped], [true, true]);
+});

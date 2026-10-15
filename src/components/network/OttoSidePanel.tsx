@@ -11,6 +11,7 @@ import {
   eventTitleText,
   eventWhenText,
 } from "@/lib/push/event-notice";
+import { countOpen } from "@/lib/usage/touch-client";
 
 type NotifType =
   | "follow"
@@ -233,6 +234,13 @@ export function OttoSidePanel({
       runRef.current += 1;
     };
   }, [open, load]);
+
+  // An Otto open for the use totals (src/lib/usage/touch.ts): the panel
+  // opened on its Otto tab, or switched to it from Messages. The panel opens
+  // on the tab it was left on, so an open on Messages is not one.
+  useEffect(() => {
+    if (open && (!withMessages || tab === "otto")) countOpen("otto");
+  }, [open, tab, withMessages]);
 
   const briefing = useMemo(() => {
     // The counts are what this line is about, so a refused read says so

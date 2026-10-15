@@ -446,6 +446,10 @@
   // the panel without poking at file-internal closures.
   window.__ottoOpenPanel = openOttoPanel;
   function openOttoPanel() {
+    // An Otto open for the use totals (_usageTouch.js; rules in
+    // src/lib/usage/touch.ts), unless the panel is opening on its Messages
+    // tab (a "Message" button, or the tab it was left on: _miniMessenger.js).
+    if (typeof window.__vibeCountOpen === 'function' && !(typeof window.__vibeOttoTab === 'function' && window.__vibeOttoTab() === 'messages')) window.__vibeCountOpen('otto');
     if (!panel) buildPanel();
     else {
       backdrop.style.display = '';

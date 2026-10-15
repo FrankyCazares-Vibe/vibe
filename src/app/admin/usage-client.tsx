@@ -1,9 +1,16 @@
 "use client";
 
 /**
- * The Usage tab: how Vibe is used, in five parts. The door (who signs up and
- * gets in), coming back (who returns), what gets used (posts, likes, chat),
+ * The Usage tab: how Vibe is used, in six parts. The door (who signs up and
+ * gets in), coming back (who returns), counted from launch on (the day
+ * totals: people with Vibe open per day and week, sign-up weeks coming back,
+ * which device, Otto and map opens), what gets used (posts, likes, chat),
  * clubs, and where people are (school and campus).
+ *
+ * TWO READS IN ONE. The day totals come from a second function
+ * (`admin_usage_tally`, migration 20261014150000) in the same answer, with
+ * their own state: "not switched on" or "couldn't read" there never hides
+ * the rest of the tab, and the rest never hides them.
  *
  * ONE READ. GET /api/admin/usage asks the database's own counter
  * (`admin_usage_summary`, migration 20261014120000) for numbers and nothing
@@ -26,7 +33,21 @@
 
 import { useCallback, useEffect, useState } from "react";
 
-import { type AdminUsage, type Cell, SMALL_CELL_FLOOR, type UsageView } from "@/lib/usage/view";
+import {
+  type AdminUsage,
+  addUtcDays,
+  type Cell,
+  fromStart,
+  mondayOf,
+  openCapped,
+  SMALL_CELL_FLOOR,
+  TALLY_COHORT_WEEKS,
+  TALLY_OPEN_CAP_PER_ACTIVE,
+  type TallyState,
+  type TallyView,
+  type UsageView,
+  weeksFromStart,
+} from "@/lib/usage/view";
 
 import { ActionButton, adminGet, type AdminResult, COLORS, Empty, inputStyle, labelStyle, Notice } from "./admin-shell";
 
@@ -70,6 +91,8 @@ const headCell: React.CSSProperties = { ...labelStyle, ...cell, display: "table-
 const numberHead: React.CSSProperties = { ...headCell, textAlign: "right" };
 const numberCell: React.CSSProperties = { ...cell, textAlign: "right", fontVariantNumeric: "tabular-nums" };
 const dayCell: React.CSSProperties = { ...cell, whiteSpace: "nowrap" };
+/** A number with a faint word after it ("so far", "hit the cap") that stays on the number's line. */
+const markedCell: React.CSSProperties = { ...numberCell, whiteSpace: "nowrap" };
 const rowLine: React.CSSProperties = { borderTop: `1px solid ${COLORS.border}` };
 const tableStyle: React.CSSProperties = { width: "100%", borderCollapse: "collapse", fontSize: 13, lineHeight: 1.45 };
 const captionStyle: React.CSSProperties = {
@@ -98,12 +121,14 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   );
 }
 
-/** A big number with what it counts under it. */
-function Stat({ label, value, note }: { label: string; value: Cell; note?: string }) {
+/** A big number with what it counts under it; a dash for a number there isn't (yet). */
+function Stat({ label, value, note }: { label: string; value: Cell | null; note?: string }) {
   return (
     <div className="adm-card" style={{ minWidth: 0 }}>
       <div style={labelStyle}>{label}</div>
-      <div style={{ fontSize: 22, fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>{fmtCell(value)}</div>
+      <div style={{ fontSize: 22, fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>
+        {value === null ? "–" : fmtCell(value)}
+      </div>
       {note ? <div style={noteStyle}>{note}</div> : null}
     </div>
   );
@@ -173,18 +198,22 @@ function Bars({
  * The numbers behind a row of bars, folded away until asked for: thirty rows
  * a section would bury the next one. Days where every column is 0 are left
  * out, and the newest day is on top. The table scrolls inside its own box,
- * never the page, so it reads on a 375 px phone.
+ * never the page, so it reads on a 375 px phone. A cell can be a floored
+ * "<5" (the day totals' school and device splits), and `flag` can put a
+ * short faint word after one.
  */
-function DayTable<K extends string>({
+function DayTable<K extends string, R extends { day: string } & Record<K, Cell> = { day: string } & Record<K, Cell>>({
   summary,
   rows,
   columns,
+  flag,
 }: {
   summary: string;
-  rows: ReadonlyArray<{ day: string } & Record<K, number>>;
+  rows: ReadonlyArray<R>;
   columns: ReadonlyArray<{ key: K; label: string }>;
+  flag?: (row: R, key: K) => string | null;
 }) {
-  const shown = rows.filter((row) => columns.some((c) => row[c.key] > 0)).reverse();
+  const shown = rows.filter((row) => columns.some((c) => row[c.key] !== 0)).reverse();
   return (
     <details className="adm-card" style={{ minWidth: 0, padding: 6 }}>
       <summary style={{ ...noteStyle, cursor: "pointer", padding: "6px 10px" }}>{summary}</summary>
@@ -207,11 +236,15 @@ function DayTable<K extends string>({
               {shown.map((row) => (
                 <tr key={row.day} style={rowLine}>
                   <td style={dayCell}>{fmtUsageDay(row.day)}</td>
-                  {columns.map((c) => (
-                    <td key={c.key} style={numberCell}>
-                      {COUNT.format(row[c.key])}
-                    </td>
-                  ))}
+                  {columns.map((c) => {
+                    const word = flag ? flag(row, c.key) : null;
+                    return (
+                      <td key={c.key} style={word ? markedCell : numberCell}>
+                        {fmtCell(row[c.key])}
+                        {word ? <span style={{ color: COLORS.faint }}> {word}</span> : null}
+                      </td>
+                    );
+                  })}
                 </tr>
               ))}
             </tbody>
@@ -265,6 +298,8 @@ export function UsageClient() {
   }, [apply]);
 
   const view = usage?.view ?? null;
+  // `?? null` too: an answer from a build older than the day totals has no `tally`.
+  const tally = usage?.tally ?? null;
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 12, minWidth: 0 }}>
@@ -279,10 +314,13 @@ export function UsageClient() {
       {/* "Not counting yet" is not "nobody did anything", so a database
           without the counter shows this line and no wall of noughts. */}
       {usage && (!usage.ready || !view) ? (
-        <Notice tone="info">
-          The usage counter is not switched on yet. It starts working the day its database change (20261014120000) is
-          applied.
-        </Notice>
+        <>
+          <Notice tone="info">
+            The usage counter is not switched on yet. It starts working the day its database change (20261014120000) is
+            applied.
+          </Notice>
+          {tally ? <TallySection tally={tally} /> : null}
+        </>
       ) : view ? (
         <>
           <div style={{ display: "flex", flexDirection: "column", gap: 6, ...noteStyle }}>
@@ -300,6 +338,7 @@ export function UsageClient() {
 
           <DoorSection view={view} />
           <BackSection view={view} />
+          {tally ? <TallySection tally={tally} /> : null}
           <UsedSection view={view} />
           <ClubsSection view={view} />
           <WhereSection view={view} />
@@ -480,8 +519,9 @@ function BackSection({ view }: { view: UsageView }) {
 
       <div style={{ display: "flex", flexDirection: "column", gap: 6, ...noteStyle }}>
         <div>
-          Right now and the rolling windows count anyone who had Campus open, read a chat or a notification, or did
-          something. A chat someone was added to without opening it doesn’t count.
+          Right now and the rolling windows count anyone who had Vibe open on any page (only Campus until the update
+          that added the day totals), read a chat or a notification, or did something. A chat someone was added to without
+          opening it doesn’t count.
         </div>
         <div>
           Did something means a dated action that day or week: a post, comment, like, repost, save, RSVP, reaction or
@@ -493,8 +533,216 @@ function BackSection({ view }: { view: UsageView }) {
           For the newest sign-up week that following week is this one, still running, so it says so far, as does this
           week’s did something.
         </div>
+        <div>
+          The days and weeks here are rebuilt from dated actions, so someone who only scrolls is missed. Counted from
+          launch on, next, counts every visit as it happens, from the day it went on.
+        </div>
       </div>
     </Section>
+  );
+}
+
+/* ---------------------------------------------------------------- counted from launch on */
+
+type TallyDay = TallyView["by_day"][number];
+type TallyKey = Exclude<keyof TallyDay, "day" | "otto_capped" | "map_capped">;
+type TallyColumns = ReadonlyArray<{ key: TallyKey; label: string }>;
+
+const DEVICE_COLUMNS: TallyColumns = [
+  { key: "active", label: "Active" },
+  { key: "phone", label: "Phone" },
+  { key: "desktop", label: "Computer" },
+  { key: "installed", label: "Installed app" },
+  { key: "unknown_device", label: "Not known" },
+];
+
+const SCHOOL_COLUMNS: TallyColumns = [
+  { key: "iu", label: "IU" },
+  { key: "purdue", label: "Purdue" },
+  { key: "unknown_school", label: "Not known" },
+];
+
+const OPEN_COLUMNS: TallyColumns = [
+  { key: "active", label: "Active" },
+  { key: "otto_open", label: "Otto" },
+  { key: "map_open", label: "Map" },
+];
+
+/** "hit the cap" after an Otto or map cell whose day had an open turned away by the stop. */
+function capFlag(row: TallyDay, key: TallyKey): string | null {
+  if (key !== "otto_open" && key !== "map_open") return null;
+  return openCapped(row, key) ? "hit the cap" : null;
+}
+
+/** The day totals: their own state first, so "not on yet" never reads as "nobody came". */
+function TallySection({ tally }: { tally: TallyState }) {
+  return (
+    <Section title="Counted from launch on">
+      {tally.state === "off" ? (
+        <Notice tone="info">
+          The day totals are not switched on yet. They start the day their database change (20261014150000) is applied.
+        </Notice>
+      ) : tally.state === "failed" ? (
+        <Notice tone="error">Couldn’t read the day totals. The rest of the tab is fine.</Notice>
+      ) : tally.view.started === null ? (
+        <Empty>Nothing counted yet. The first signed-in visit after the change starts it.</Empty>
+      ) : (
+        <TallyCounted view={tally.view} started={tally.view.started} />
+      )}
+    </Section>
+  );
+}
+
+/** Today, yesterday, this week and last week; a dash for one from before counting began. */
+function TallyStats({ view, started }: { view: TallyView; started: string }) {
+  const yesterday = addUtcDays(view.today, -1);
+  const thisMonday = mondayOf(view.today);
+  const lastMonday = addUtcDays(thisMonday, -7);
+  const dayCount = (d: string) => (d >= started ? (view.by_day.find((r) => r.day === d)?.active ?? null) : null);
+  const week = (w: string) => (addUtcDays(w, 6) >= started ? (view.by_week.find((r) => r.week === w) ?? null) : null);
+  const thisWeek = week(thisMonday);
+  const lastWeek = week(lastMonday);
+  const yesterdayCount = dayCount(yesterday);
+  return (
+    <div style={cardGrid}>
+      <Stat
+        label="Today"
+        value={dayCount(view.today)}
+        note={started === view.today ? "so far; counting began today" : "people so far"}
+      />
+      <Stat
+        label="Yesterday"
+        value={yesterdayCount}
+        note={yesterdayCount === null ? "before counting began" : started === yesterday ? "partial: counting began that day" : "people"}
+      />
+      <Stat
+        label="This week"
+        value={thisWeek?.active ?? null}
+        note={thisWeek?.partial ? "so far; counting began this week" : "people so far"}
+      />
+      <Stat
+        label="Last week"
+        value={lastWeek?.active ?? null}
+        note={lastWeek === null ? "before counting began" : lastWeek.partial ? "partial: counting began that week" : "people"}
+      />
+    </div>
+  );
+}
+
+function TallyCounted({ view, started }: { view: TallyView; started: string }) {
+  const days = fromStart(view.by_day, started);
+  const weeks = weeksFromStart(view.by_week, started);
+  const first = fmtShortDay(days.length ? days[0].day : started);
+  const openPoints = (key: "otto_open" | "map_open") =>
+    days.map((d) => ({
+      key: d.day,
+      title: `${fmtUsageDay(d.day)}${openCapped(d, key) ? " (hit the cap)" : ""}`,
+      value: d[key],
+    }));
+  return (
+    <>
+      <div style={noteStyle}>
+        {`Counted since ${fmtUsageDay(started)}. Each person counts once a day and once a week, the first time Vibe is open on their screen, any page, phone scrolling included. Founders and store-review accounts are left out, and so are suspended and banned ones; someone signed in but still finishing sign-up counts. The first day and week are partial.`}
+      </div>
+
+      <TallyStats view={view} started={started} />
+
+      <Bars label="People with Vibe open, per day" points={dayPoints(days, "active")} first={first} last="today" people />
+      <Bars
+        label="People with Vibe open, per week"
+        points={weeks.map((w) => ({
+          key: w.week,
+          title: `Week of ${fmtShortDay(w.week)}${w.partial ? " (partial)" : ""}`,
+          value: w.active,
+        }))}
+        first={weeks.length ? `week of ${fmtShortDay(weeks[0].week)}` : ""}
+        last="this week"
+        people
+      />
+
+      <CohortTable view={view} />
+
+      <DayTable summary="Which device, by day" rows={days} columns={DEVICE_COLUMNS} />
+      <div style={noteStyle}>
+        {`Which device is the device of each person’s first visit that day, so the four add up to the day’s active people (give or take the cells shown as <${SMALL_CELL_FLOOR}). Phone means a touch screen under 900 px wide at the time: a phone held sideways can read as a computer, an iPad held upright as a phone. Installed app means Vibe added to a Home Screen or installed from the browser. Inside the App Store and Google Play apps (not out yet) a visit reads as a phone.`}
+      </div>
+
+      <DayTable summary="Which school, by day" rows={days} columns={SCHOOL_COLUMNS} />
+      <div style={noteStyle}>
+        The school is the one on the account at the day’s first visit, from its school email; not known is someone
+        without one yet. These add up to the day’s active people too.
+      </div>
+
+      <Bars label="Otto opens per day" points={openPoints("otto_open")} first={first} last="today" />
+      <Bars label="Map opens per day" points={openPoints("map_open")} first={first} last="today" />
+      <DayTable summary="Otto and map opens, by day" rows={days} columns={OPEN_COLUMNS} flag={capFlag} />
+      <div style={noteStyle}>
+        {`An open is the Otto tab or page, the Otto side of the desktop panel, or the Map tab on Campus. Each browser tab counts an open at most once every 10 minutes, and a day’s opens stop at ${TALLY_OPEN_CAP_PER_ACTIVE} times the people active that day so far. Hit the cap means that stop turned at least one open away that day, so part of the day’s opens may be one account opening over and over. One account can also fill a day’s opens to just under the stop without the mark, so read a day close to ${TALLY_OPEN_CAP_PER_ACTIVE} per active person with the same care.`}
+      </div>
+    </>
+  );
+}
+
+/** A sign-up week's columns: its own week, the next, then week 2, 3 and so on. */
+function cohortHead(k: number): string {
+  if (k === 0) return "Their first week";
+  return k === 1 ? "Next week" : `Week ${k}`;
+}
+
+/**
+ * Sign-up weeks coming back, newest on top. A dash is a week that hasn't come
+ * yet or wasn't counted in full; "so far" marks this week, still running. A
+ * sign-up week with nothing counted in it is left out.
+ */
+function CohortTable({ view }: { view: TallyView }) {
+  const thisMonday = mondayOf(view.today);
+  const shown = view.cohorts.filter((c) => c.seen.some((n) => n !== null && n !== 0)).reverse();
+  const soFar = (week: string, k: number) =>
+    addUtcDays(week, 7 * k) === thisMonday ? <span style={{ color: COLORS.faint }}> so far</span> : null;
+  const wholeFrom = view.first_week ? ` (the week of ${fmtShortDay(view.first_week)})` : "";
+  return (
+    <>
+      {shown.length === 0 ? (
+        <div style={noteStyle}>No sign-up week has a counted week yet. A row lands here once one does.</div>
+      ) : (
+        <div className="adm-card" style={{ overflowX: "auto", padding: 6, minWidth: 0 }}>
+          <table style={tableStyle}>
+            <caption style={captionStyle}>Coming back, by sign-up week, newest first</caption>
+            <thead>
+              <tr>
+                <th scope="col" style={headCell}>Sign-up week</th>
+                {Array.from({ length: TALLY_COHORT_WEEKS }, (_, k) => (
+                  <th key={k} scope="col" style={numberHead}>
+                    {cohortHead(k)}
+                  </th>
+                ))}
+                <th scope="col" style={numberHead}>Next week share</th>
+              </tr>
+            </thead>
+            <tbody>
+              {shown.map((c) => (
+                <tr key={c.week} style={rowLine}>
+                  <td style={dayCell}>{fmtShortDay(c.week)}</td>
+                  {c.seen.map((n, k) => (
+                    <td key={k} style={markedCell}>
+                      {n === null ? "–" : fmtCell(n)}
+                      {n === null ? null : soFar(c.week, k)}
+                    </td>
+                  ))}
+                  <td style={markedCell}>
+                    {c.next_week_pct === null ? "–" : `${c.next_week_pct}%`}
+                    {c.next_week_pct === null ? null : soFar(c.week, 1)}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+      <div style={noteStyle}>
+        {`A sign-up week is the Monday week someone made their account. Their first week is how many of them had Vibe open that same week; next week and the weeks after count the same people later on. Next week share is next week over their first week, shown once their first week has at least ${SMALL_CELL_FLOOR}. A dash is a week still to come, or one before the first whole week counted${wholeFrom}: people already seen earlier in the week counting began were missed that week, so it would read low.`}
+      </div>
+    </>
   );
 }
 

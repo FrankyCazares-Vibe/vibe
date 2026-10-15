@@ -22,8 +22,41 @@ export function Section3d() {
           signed-out views of profiles and posts, are not recorded.
         </li>
         <li>
-          <strong>Last active.</strong> While the Campus page is open, we store
-          the latest time your browser checked in.
+          <strong>Last active.</strong> While you are signed in and Vibe is open
+          on your screen, your browser checks in with our server every few
+          minutes, from any page. We store the latest time it checked in, to
+          within a minute. It shows how many people are active right now, and
+          it tells us when you are active for the first time in a day or a
+          week, for the use totals below. The &ldquo;active now&rdquo; number
+          that people see in the app counts each campus on its own. It leaves
+          out a campus unless at least 5 people besides the viewer are active
+          there and at least 5 besides the viewer are not, so it never shows
+          for a campus of fewer than 10 people. It is never under 5, and it can
+          be lower than the number of people active. The Vibe team&apos;s own
+          usage page shows the exact number.
+        </li>
+        <li>
+          <strong>Use totals.</strong> We count how many people use Vibe each
+          day and each week. The first time your browser checks in on a day, we
+          add one to that day&apos;s count, to the count for your school system
+          (IU or Purdue), and to the count for the kind of device: a phone, a
+          computer, or Vibe added to your Home Screen (or installed from your
+          browser on a computer). Your browser works out the kind itself, and
+          we keep only that word, never the browser&apos;s name or details. The
+          first time you check in during a week, we add one to that week&apos;s
+          count and, in your first few weeks on Vibe, to a count of people who
+          joined Vibe in the same week as you, so we can see how many come
+          back. We also count how many times Otto and the campus map are
+          opened. Each browser tab counts an open at most once every 10
+          minutes, and a day&apos;s opens stop at ten times the number of
+          people active that day (at least ten), so one account cannot inflate them without
+          limit. These totals are numbers for each day or week and nothing
+          else: no account, no IP address, no browser name or version and no
+          time of day. To know a check-in is your first that day or week, we
+          compare it with your last-active time, and we store nothing else
+          about you for this. The Vibe team&apos;s own accounts are not
+          counted. A total does not say who was active, but on a quiet day, or
+          for a small sign-up week, it can come from one person.
         </li>
         <li>
           <strong>Page opens.</strong> We count how many times three pages are

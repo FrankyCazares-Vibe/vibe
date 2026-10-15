@@ -116,6 +116,8 @@ import {
   POST_MAX_CHARS,
 } from "@/lib/posts/edit";
 import { useIsMobile } from "@/lib/use-is-mobile";
+import { campusStatsLine, type CampusStats } from "@/lib/usage/active-now";
+import { countOpen, touchActivity } from "@/lib/usage/touch-client";
 
 declare global {
   interface Window {
@@ -4595,34 +4597,9 @@ function bannerPalette(
   };
 }
 
-type BannerStats = {
-  totalUsers: number;
-  activeNow: number;
-  campusUsers: number | null;
-  campusActiveNow: number | null;
-  /** The campus the stats route counted (null when it counted none). */
-  campusId: string | null;
-};
-
-/**
- * "{n} at Indianapolis · {m} active now", or "{total} on Vibe · …" with no
- * campus. The two answers come from different requests on different clocks
- * (a campus switched on another device shows up in the 30 s stats poll before
- * the campus re-read), so the campus count is only printed under the name of
- * the campus it actually counted.
- */
-function bannerStatsLine(
-  stats: BannerStats | null,
-  label: string | null,
-  campusId: string | null,
-): string {
-  if (!stats) return "";
-  if (label && campusId && stats.campusId === campusId && stats.campusUsers !== null) {
-    const active = stats.campusActiveNow ?? 0;
-    return `${stats.campusUsers.toLocaleString()} at ${label} · ${active.toLocaleString()} active now`;
-  }
-  return `${stats.totalUsers.toLocaleString()} on Vibe · ${stats.activeNow.toLocaleString()} active now`;
-}
+// The header's stats line ("{n} at Indianapolis · {m} active now", the
+// " · … active now" part only from 5 up) is `campusStatsLine` in
+// src/lib/usage/active-now.ts, where it is tested.
 
 function countOrNull(v: unknown): number | null {
   return typeof v === "number" && Number.isFinite(v) ? v : null;
@@ -4692,10 +4669,11 @@ type CampusHeader = {
 };
 
 /**
- * The campus header's identity, heartbeat and live stats line (lifted out
- * of CampusBanner in S68 so the desktop top bar behaves identically). Each
+ * The campus header's identity and live stats line (lifted out of
+ * CampusBanner in S68 so the desktop top bar behaves identically). Each
  * page mounts exactly one header (the phone: CampusBanner; the desktop:
- * CampusTopBar), so there is exactly one heartbeat per page.
+ * CampusTopBar), so the stats are read once per page. It only reads: every
+ * page checks in on its own (<ActivityTouch /> in the root layout).
  */
 function useCampusHeader(): CampusHeader {
   // Whose campus this is: the title, the tile, the colour and the stats
@@ -4724,23 +4702,18 @@ function useCampusHeader(): CampusHeader {
       : null;
   const statsUrl = withCampus("/api/stats/campus", viewingId, homeId);
 
-  // Live stats for the campus header line. The heartbeat updates the
-  // viewer's `users.last_active_at` so the active-now count includes
-  // them; the stats endpoint counts everyone with a fresh timestamp
-  // (5-minute window). Both refresh every 30s while the tab is visible.
+  // Live stats for the campus header line, read every 30s while the tab is
+  // visible. Every page checks in (ActivityTouch); this only reads. The
+  // stats endpoint counts everyone seen in the last 5 minutes, and answers
+  // 0 under 5: the line then leaves "active now" out. The first read waits
+  // for this tab's check-in (the same request, if ActivityTouch already sent
+  // it), so the viewer is in "active now" from the start.
   // The campus numbers (`campusUsers` / `campusActiveNow`) are read when the
   // viewer has a campus; with none, the line falls back to everyone on Vibe.
   // No answer yet, or a failed first read, renders no line at all.
-  const [stats, setStats] = useState<BannerStats | null>(null);
+  const [stats, setStats] = useState<CampusStats | null>(null);
   useEffect(() => {
     let cancelled = false;
-    const beat = async () => {
-      try {
-        await fetch("/api/me/heartbeat", { method: "POST", cache: "no-store" });
-      } catch {
-        /* silent — missing a beat just drops the user out of the window */
-      }
-    };
     const refresh = async () => {
       try {
         const r = await fetch(statsUrl, { cache: "no-store" });
@@ -4760,12 +4733,11 @@ function useCampusHeader(): CampusHeader {
       }
     };
     void (async () => {
-      await beat();
+      await touchActivity();
       await refresh();
     })();
     const tick = window.setInterval(async () => {
       if (document.visibilityState !== "visible") return;
-      await beat();
       await refresh();
     }, 30_000);
     return () => {
@@ -4773,7 +4745,7 @@ function useCampusHeader(): CampusHeader {
       window.clearInterval(tick);
     };
   }, [statsUrl]);
-  const statsLine = known ? bannerStatsLine(stats, label, campus?.id ?? null) : "";
+  const statsLine = known ? campusStatsLine(stats, label, campus?.id ?? null) : "";
   return { campus, known, isVisiting, title, monogram, sharedSub, statsLine };
 }
 
@@ -13517,6 +13489,11 @@ function bubbleRadiusFor(total: number): number {
 // imported below.)
 
 export function MapTabBody() {
+  // A map open for the use totals (src/lib/usage/touch.ts): this body is
+  // drawn only while the Map tab is the one on screen.
+  useEffect(() => {
+    countOpen("map");
+  }, []);
   // The viewer's university decides which taxonomy wins for a major both
   // Indianapolis universities teach (schoolForMajorIn).
   const { label: homeLabel, system: viewerSystem } = useViewerCampus();

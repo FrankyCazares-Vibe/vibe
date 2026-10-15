@@ -8,6 +8,7 @@ import { CustomCursor } from "@/components/CustomCursor";
 import { ToastHost } from "@/components/feedback/ToastHost";
 import { NativeBridge } from "@/components/native/NativeBridge";
 import { ServiceWorkerRegistrar } from "@/components/pwa/ServiceWorkerRegistrar";
+import { ActivityTouch } from "@/components/usage/ActivityTouch";
 import { NONCE_HEADER } from "@/lib/security/csp";
 import { THEME_BOOT_SCRIPT } from "@/lib/theme/theme";
 import { ThemeSync } from "@/lib/theme/ThemeSync";
@@ -143,6 +144,12 @@ export default async function RootLayout({
             never while they are in the middle of something. Renders nothing
             and does nothing where the build has no id (local dev). */}
         <BuildRefresh />
+        {/* "Vibe is open on my screen": while signed in and on screen, checks
+            in with /api/me/heartbeat at most once every four minutes per tab,
+            from any page. Feeds "active now" and the founders' day and week
+            totals (src/lib/usage/touch.ts). Renders nothing; does nothing
+            signed out or inside a frame. */}
+        <ActivityTouch />
       </body>
     </html>
   );
