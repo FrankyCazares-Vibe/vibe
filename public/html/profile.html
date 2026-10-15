@@ -2004,6 +2004,16 @@ body.viewer-mode .avatar-row-actions .action-btn {
   font-size:14px;line-height:1.55;color:var(--muted);
   max-width:340px;margin:0 auto;
 }
+/* Signed out, a visited grid stops at 24 posts; this one line under each
+   posts pane says more exist (_profileShowSignInForMore). Its own rule for
+   [hidden], since display:block would otherwise beat the attribute. */
+.signin-more {
+  display:block;width:max-content;max-width:100%;margin:18px auto 4px;
+  padding:6px 12px;font-family:'DM Sans',sans-serif;font-size:13px;
+  font-weight:700;color:var(--tag-ink);text-decoration:none;cursor:none;
+}
+.signin-more:hover { text-decoration:underline; }
+.signin-more[hidden] { display:none; }
 
 /* ── Side-by-side Vibes+Posts layout ── */
 .vibes-posts-split {
@@ -3804,6 +3814,7 @@ body.empty-profile-mode #profileEmpty { display: flex !important; }
              #profilePostsList so it always matches the Posts tab. -->
         <div class="content-pane active" id="all-pane">
           <div class="vibes-tab-feed" id="profileAllFeed"></div>
+          <a class="signin-more" href="/auth/login" hidden>Sign in to see all of their posts</a>
           <div class="content-empty" id="allEmptyState" style="display:none">
             <div class="content-empty-title">Nothing here yet</div>
             <div class="content-empty-body">
@@ -3823,6 +3834,7 @@ body.empty-profile-mode #profileEmpty { display: flex !important; }
 
           <!-- Posts list — rebuilt from vibe_posts_v1 / the API on load. -->
           <div id="profilePostsList"></div><!-- /profilePostsList -->
+          <a class="signin-more" href="/auth/login" hidden>Sign in to see all of their posts</a>
 
         </div><!-- /posts-pane -->
 
@@ -9774,6 +9786,20 @@ async function hydrateProfilePostsFromAPI() {
   } catch (e) { /* silent — the rows just rendered stay */ }
 }
 
+// Signed out, GET /api/users/[handle]/posts stops at 24 posts and answers
+// `more: true` when it held some back (rate limits and upload caps, Oct 15,
+// B1.3). One line under each posts pane then says so and links to sign-in,
+// coming back to this profile. The lines sit outside #profileAllFeed and
+// #profilePostsList, so populateAllGrid's rebuild never wipes them. Signed
+// in, the route sends no `more` and the lines stay hidden.
+function _profileShowSignInForMore(more, handle) {
+  const href = '/auth/login?next=' + encodeURIComponent('/profile/' + handle);
+  document.querySelectorAll('.signin-more').forEach(a => {
+    a.href = href;
+    a.hidden = !more;
+  });
+}
+
 // Hydrate the VISITED user's posts when in viewer mode (P1-011b).
 // Mirror of hydrateProfilePostsFromAPI but hits /api/users/[handle]/posts
 // and explicitly does NOT call savePostsToStorage (we don't want the
@@ -9788,6 +9814,7 @@ async function hydrateVisitedUserPosts(handle) {
     { quiet: true, failure: LINE });
   const posts = r.ok && Array.isArray(r.data.posts) ? r.data.posts : null;
   if (!posts) {
+    _profileShowSignInForMore(false, handle);
     // Without this the pane reads "They haven't posted anything yet."
     _profilePaintPostsFailure(window.vibeLoadFailure(r, LINE),
       () => hydrateVisitedUserPosts(handle));
@@ -9803,6 +9830,8 @@ async function hydrateVisitedUserPosts(handle) {
       postRows.map(_profileMapDbRow).filter(Boolean)
         .forEach(c => list.appendChild(_renderPostCard(c)));
     }
+    // In the same pass as the cards, so the line arrives with them.
+    _profileShowSignInForMore(r.data.more === true, handle);
 
     // Same for a visited profile: a student with no posts would otherwise
     // keep "Couldn't load their posts." on the tab that opens by default.

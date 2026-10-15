@@ -330,7 +330,7 @@ test("inbox: the happy path, field by field (7.1.2-7.1.9)", async () => {
   assert.deepEqual(clubs.map((c) => c.org.id), [ORG2, ORG1], "the pinned club first, then by activity");
 
   const salsa = clubs[1];
-  assert.deepEqual(salsa.org, { id: ORG1, handle: "salsa", name: "Salsa", logo_url: "/api/orgs/salsa/asset/logo", banner_url: null, verified: true });
+  assert.deepEqual(salsa.org, { id: ORG1, handle: "salsa", name: "Salsa", logo_url: "/api/orgs/salsa/asset/logo?v=logo.png", banner_url: null, verified: true });
   assert.equal(salsa.viewer_role, "member");
   assert.deepEqual(salsa.board, {
     room_id: B1,
@@ -695,7 +695,7 @@ test("space: the happy path, field by field (7.2.1-7.2.5), and ?events=1 (7.2.6)
   const res = await space.GET(req("http://localhost/api/orgs/salsa/space"), ctx());
   assert.equal(res.status, 200);
   const body = res.body as unknown as SpaceResponse;
-  assert.deepEqual(body.org, { id: ORG1, handle: "salsa", name: "Salsa", logo_url: "/api/orgs/salsa/asset/logo", banner_url: "https://cdn/banner.png", verified: true, member_count: 42 });
+  assert.deepEqual(body.org, { id: ORG1, handle: "salsa", name: "Salsa", logo_url: "/api/orgs/salsa/asset/logo?v=logo.png", banner_url: "https://cdn/banner.png", verified: true, member_count: 42 });
   assert.deepEqual(body.viewer, { role: "member", can_moderate: false });
   assert.deepEqual(body.rooms.map((r) => [r.id, r.unread, r.can_post]), [
     [SP.lounge, true, true],

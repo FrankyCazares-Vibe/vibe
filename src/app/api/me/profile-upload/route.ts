@@ -104,7 +104,14 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
 
-  const rl = await rateLimit(`upload:profile-upload:${user.id}`, { limit: 30, windowSec: 600 });
+  // failLocal, like the four signed-link routes (rate limits, wave 1): when
+  // the limiter's database call fails, this server counts on its own instead
+  // of letting every upload through.
+  const rl = await rateLimit(`upload:profile-upload:${user.id}`, {
+    limit: 30,
+    windowSec: 600,
+    failLocal: true,
+  });
   if (!rl.allowed) return tooManyRequests(rl);
 
   // Same Terms body requireTermsAccepted sent, plus the restriction check.

@@ -9,6 +9,8 @@ import {
 } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
+import { mediaTypeForKey } from "@/lib/media/r2-media-types";
+
 /** DB stores keys like `clips/abc123.mp4`, never public URLs (PHASE_1 storage rules). */
 export const CLIP_KEY_PREFIX = "clips/";
 export const GROUP_PHOTO_KEY_PREFIX = "groups/";
@@ -55,22 +57,27 @@ export function isR2Configured(): boolean {
 }
 
 /**
- * Options shared by every presigned PUT signer.
+ * Options shared by every presigned PUT signer. Both fields below are bound
+ * into the signature, so R2 answers 403 to a PUT that differs from either.
  *
- * `contentLength` is REQUIRED and is bound into the signature: SigV4 signs the
- * `content-length` header (it is not in @smithy/signature-v4's unsignable set),
- * so R2 rejects with 403 any PUT whose actual body length differs from the
- * value signed here. The browser sets Content-Length automatically from the
- * body, so callers just need to upload exactly the bytes they declared.
+ * `contentLength`: SigV4 signs the `content-length` header (it is not in
+ * @smithy/signature-v4's unsignable set). The browser sets Content-Length
+ * from the body, so callers just upload exactly the bytes they declared.
  *
- * Note: the presigner deliberately marks `content-type` as unsignable, so the
- * Content-Type passed here is a default for the stored object, not an
- * enforced constraint on the upload.
+ * `contentType` (rate limits and upload caps, wave 1, B1.1): the presigner
+ * marks `content-type` unsignable on its own, so until this wave the type
+ * was only a default and an upload could store any type it liked. Every PUT
+ * signer now passes `signableHeaders: content-type`, which overrides that,
+ * and refuses a type that is not the key's own (`mediaTypeForKey`: a
+ * `.mp4` key signs `video/mp4` and nothing else). The upload route answers
+ * with the exact string it signed, as `contentType`; the client sends that
+ * string as the PUT's Content-Type, byte for byte.
  */
 type PutSignOptions = {
   /** Exact byte length of the upload body. Must be a positive safe integer. */
   contentLength: number;
-  contentType?: string;
+  /** Exact Content-Type of the upload. Must be the key's own type. */
+  contentType: string;
   expiresInSec?: number;
 };
 
@@ -81,6 +88,68 @@ function assertPutContentLength(contentLength: number): void {
       "Presigned PUT contentLength must be a positive safe integer (bytes)",
     );
   }
+}
+
+/**
+ * Throws unless `contentType` is exactly the type the key's extension maps
+ * to. An extension outside the table is never signed for upload at all.
+ */
+function assertPutContentType(objectKey: string, contentType: string): void {
+  const expected = mediaTypeForKey(objectKey);
+  if (!expected.known || contentType !== expected.contentType) {
+    throw new Error(
+      "Presigned PUT contentType must be the media type of the key's extension",
+    );
+  }
+}
+
+/**
+ * The shared PUT signer, after the family's own key check. Length and type
+ * are both signed headers (see PutSignOptions).
+ */
+async function presignPut(
+  objectKey: string,
+  options: PutSignOptions,
+): Promise<string> {
+  assertPutContentLength(options.contentLength);
+  assertPutContentType(objectKey, options.contentType);
+  const bucket = requireEnv("R2_BUCKET_NAME");
+  const client = getR2S3Client();
+  const cmd = new PutObjectCommand({
+    Bucket: bucket,
+    Key: objectKey,
+    ContentType: options.contentType,
+    ContentLength: options.contentLength,
+  });
+  return getSignedUrl(client, cmd, {
+    expiresIn: options.expiresInSec ?? DEFAULT_SIGN_EXPIRES_SEC,
+    signableHeaders: new Set(["content-type"]),
+  });
+}
+
+/**
+ * The shared GET signer, after the family's own key check. The link asks
+ * storage to answer with the key's own type and `inline` (an unknown
+ * extension: octet-stream and `attachment`), whatever type the object was
+ * stored with, so a file uploaded before the PUT lock is still served as
+ * the media its name says.
+ */
+async function presignGet(
+  objectKey: string,
+  expiresInSec?: number,
+): Promise<string> {
+  const media = mediaTypeForKey(objectKey);
+  const bucket = requireEnv("R2_BUCKET_NAME");
+  const client = getR2S3Client();
+  const cmd = new GetObjectCommand({
+    Bucket: bucket,
+    Key: objectKey,
+    ResponseContentType: media.contentType,
+    ResponseContentDisposition: media.disposition,
+  });
+  return getSignedUrl(client, cmd, {
+    expiresIn: expiresInSec ?? DEFAULT_SIGN_EXPIRES_SEC,
+  });
 }
 
 function assertClipObjectKey(objectKey: string): void {
@@ -105,18 +174,7 @@ export async function signClipPutUrl(
   options: PutSignOptions,
 ): Promise<string> {
   assertClipObjectKey(objectKey);
-  assertPutContentLength(options.contentLength);
-  const bucket = requireEnv("R2_BUCKET_NAME");
-  const client = getR2S3Client();
-  const cmd = new PutObjectCommand({
-    Bucket: bucket,
-    Key: objectKey,
-    ContentType: options.contentType ?? "video/mp4",
-    ContentLength: options.contentLength,
-  });
-  return getSignedUrl(client, cmd, {
-    expiresIn: options.expiresInSec ?? DEFAULT_SIGN_EXPIRES_SEC,
-  });
+  return presignPut(objectKey, options);
 }
 
 function assertGroupPhotoObjectKey(objectKey: string): void {
@@ -141,18 +199,7 @@ export async function signGroupPhotoPutUrl(
   options: PutSignOptions,
 ): Promise<string> {
   assertGroupPhotoObjectKey(objectKey);
-  assertPutContentLength(options.contentLength);
-  const bucket = requireEnv("R2_BUCKET_NAME");
-  const client = getR2S3Client();
-  const cmd = new PutObjectCommand({
-    Bucket: bucket,
-    Key: objectKey,
-    ContentType: options.contentType ?? "image/jpeg",
-    ContentLength: options.contentLength,
-  });
-  return getSignedUrl(client, cmd, {
-    expiresIn: options.expiresInSec ?? DEFAULT_SIGN_EXPIRES_SEC,
-  });
+  return presignPut(objectKey, options);
 }
 
 /** Short-lived signed GET for a group photo. */
@@ -161,12 +208,7 @@ export async function signGroupPhotoGetUrl(
   expiresInSec?: number,
 ): Promise<string> {
   assertGroupPhotoObjectKey(objectKey);
-  const bucket = requireEnv("R2_BUCKET_NAME");
-  const client = getR2S3Client();
-  const cmd = new GetObjectCommand({ Bucket: bucket, Key: objectKey });
-  return getSignedUrl(client, cmd, {
-    expiresIn: expiresInSec ?? DEFAULT_SIGN_EXPIRES_SEC,
-  });
+  return presignGet(objectKey, expiresInSec);
 }
 
 function assertMessageMediaObjectKey(objectKey: string): void {
@@ -191,18 +233,7 @@ export async function signMessageMediaPutUrl(
   options: PutSignOptions,
 ): Promise<string> {
   assertMessageMediaObjectKey(objectKey);
-  assertPutContentLength(options.contentLength);
-  const bucket = requireEnv("R2_BUCKET_NAME");
-  const client = getR2S3Client();
-  const cmd = new PutObjectCommand({
-    Bucket: bucket,
-    Key: objectKey,
-    ContentType: options.contentType ?? "application/octet-stream",
-    ContentLength: options.contentLength,
-  });
-  return getSignedUrl(client, cmd, {
-    expiresIn: options.expiresInSec ?? DEFAULT_SIGN_EXPIRES_SEC,
-  });
+  return presignPut(objectKey, options);
 }
 
 /** Short-lived signed GET for inline message media (image or video). */
@@ -211,12 +242,7 @@ export async function signMessageMediaGetUrl(
   expiresInSec?: number,
 ): Promise<string> {
   assertMessageMediaObjectKey(objectKey);
-  const bucket = requireEnv("R2_BUCKET_NAME");
-  const client = getR2S3Client();
-  const cmd = new GetObjectCommand({ Bucket: bucket, Key: objectKey });
-  return getSignedUrl(client, cmd, {
-    expiresIn: expiresInSec ?? DEFAULT_SIGN_EXPIRES_SEC,
-  });
+  return presignGet(objectKey, expiresInSec);
 }
 
 /** Short-lived signed GET after permission checks (Supabase session + post visibility in later tickets). */
@@ -225,12 +251,7 @@ export async function signClipGetUrl(
   expiresInSec?: number,
 ): Promise<string> {
   assertClipObjectKey(objectKey);
-  const bucket = requireEnv("R2_BUCKET_NAME");
-  const client = getR2S3Client();
-  const cmd = new GetObjectCommand({ Bucket: bucket, Key: objectKey });
-  return getSignedUrl(client, cmd, {
-    expiresIn: expiresInSec ?? DEFAULT_SIGN_EXPIRES_SEC,
-  });
+  return presignGet(objectKey, expiresInSec);
 }
 
 function assertOrgAssetObjectKey(objectKey: string): void {
@@ -255,18 +276,7 @@ export async function signOrgAssetPutUrl(
   options: PutSignOptions,
 ): Promise<string> {
   assertOrgAssetObjectKey(objectKey);
-  assertPutContentLength(options.contentLength);
-  const bucket = requireEnv("R2_BUCKET_NAME");
-  const client = getR2S3Client();
-  const cmd = new PutObjectCommand({
-    Bucket: bucket,
-    Key: objectKey,
-    ContentType: options.contentType ?? "application/octet-stream",
-    ContentLength: options.contentLength,
-  });
-  return getSignedUrl(client, cmd, {
-    expiresIn: options.expiresInSec ?? DEFAULT_SIGN_EXPIRES_SEC,
-  });
+  return presignPut(objectKey, options);
 }
 
 /** Short-lived signed GET for an org asset. Used to render banner/logo and post media. */
@@ -275,12 +285,7 @@ export async function signOrgAssetGetUrl(
   expiresInSec?: number,
 ): Promise<string> {
   assertOrgAssetObjectKey(objectKey);
-  const bucket = requireEnv("R2_BUCKET_NAME");
-  const client = getR2S3Client();
-  const cmd = new GetObjectCommand({ Bucket: bucket, Key: objectKey });
-  return getSignedUrl(client, cmd, {
-    expiresIn: expiresInSec ?? DEFAULT_SIGN_EXPIRES_SEC,
-  });
+  return presignGet(objectKey, expiresInSec);
 }
 
 /**

@@ -7,7 +7,7 @@ import {
   isR2Configured,
   signOrgAssetPutUrl,
 } from "@/lib/r2";
-import { requireTermsAccepted } from "@/lib/legal/require-terms";
+import { requireCanPublish } from "@/lib/moderation/access";
 import { officerGate } from "@/lib/orgs/hidden-gate";
 import { SETTINGS_ROLES, isOrgRole } from "@/lib/orgs/join-state";
 import { rateLimit, tooManyRequests } from "@/lib/rate-limit";
@@ -48,10 +48,17 @@ const VALID_KINDS = new Set<Kind>(["banner", "logo", "post-image", "post-video"]
  * Body: { kind: 'banner' | 'logo' | 'post-image' | 'post-video',
  *         contentType: string, sizeBytes: number }
  *
- * Returns: { uploadUrl, objectKey, publicUrl? }
+ * Returns: { uploadUrl, objectKey, contentType }
  *
  * `sizeBytes` is bound into the signature (Content-Length is a signed
  * header), so clients must PUT exactly the bytes they declared or R2 403s.
+ * `contentType` is the normalized type the link was signed for; the client
+ * sends that exact string as the PUT's Content-Type.
+ *
+ * Gate: requireCanPublish (rate limits, wave 1), the gate of both saves that
+ * use these keys: the settings PATCH (banner, logo) and the club post route.
+ * Terms alone let a suspended or unverified officer mint paid-for uploads
+ * neither save would take.
  *
  * Permissions: owner / admin only. We check role directly here and via the
  * service client (RLS isn't sufficient since signed URLs aren't a row).
@@ -75,14 +82,17 @@ export async function POST(req: Request, { params }: Params) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
 
+  // failLocal: when the limiter's database call fails, this server counts on
+  // its own instead of letting every upload through (rate limits, wave 1).
   const rl = await rateLimit(`upload:org-upload-url:${user.id}`, {
     limit: 20,
     windowSec: 600,
+    failLocal: true,
   });
   if (!rl.allowed) return tooManyRequests(rl);
 
-  const termsGate = await requireTermsAccepted(user.id);
-  if (termsGate) return termsGate;
+  const gate = await requireCanPublish(user.id);
+  if (gate) return gate;
 
   const service = createSupabaseServiceClient();
   const { data: org } = await service
@@ -101,15 +111,15 @@ export async function POST(req: Request, { params }: Params) {
     .eq("user_id", user.id)
     .maybeSingle();
   const rawRole: unknown = viewer?.role;
-  const gate = officerGate({
+  const officer = officerGate({
     hidden: !!org.hidden_at,
     role: isOrgRole(rawRole) ? rawRole : null,
     allowed: SETTINGS_ROLES,
   });
-  if (gate === "not_found") {
+  if (officer === "not_found") {
     return NextResponse.json({ ok: false, error: "Not found" }, { status: 404 });
   }
-  if (gate === "forbidden") {
+  if (officer === "forbidden") {
     return NextResponse.json({ ok: false, error: "Admin only" }, { status: 403 });
   }
 
@@ -176,7 +186,7 @@ export async function POST(req: Request, { params }: Params) {
       contentType,
       contentLength: sizeBytes,
     });
-    return NextResponse.json({ ok: true, uploadUrl, objectKey });
+    return NextResponse.json({ ok: true, uploadUrl, objectKey, contentType });
   } catch (err) {
     console.error("[orgs/[slug]/upload-url POST]", err);
     const message = err instanceof Error ? err.message : "Could not sign upload URL";

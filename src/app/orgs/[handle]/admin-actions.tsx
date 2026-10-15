@@ -403,10 +403,11 @@ function UploadAssetModal({
         return;
       }
 
-      // 2) PUT the file directly to R2.
+      // 2) PUT the file directly to R2, with the exact Content-Type the link
+      //    was signed for (the route's `contentType`, else the one declared).
       const putRes = await fetch(signData.uploadUrl, {
         method: "PUT",
-        headers: { "content-type": file.type },
+        headers: { "content-type": signData.contentType ?? file.type },
         body: file,
       });
       if (!putRes.ok) {
@@ -586,10 +587,11 @@ function NewPostModal({
           setErr(signData?.error || "Could not start upload");
           return;
         }
-        // 2) PUT the file.
+        // 2) PUT the file, with the exact Content-Type the link was signed
+        //    for (the route's `contentType`, else the one declared).
         const putRes = await fetch(signData.uploadUrl, {
           method: "PUT",
-          headers: { "content-type": file.type },
+          headers: { "content-type": signData.contentType ?? file.type },
           body: file,
         });
         if (!putRes.ok) {

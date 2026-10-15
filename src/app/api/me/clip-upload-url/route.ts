@@ -26,6 +26,8 @@ type Body = { contentType?: unknown; sizeBytes?: unknown };
  *
  * The declared `sizeBytes` is bound into the signature as Content-Length, so
  * clients must PUT exactly the bytes they declared or R2 rejects the upload.
+ * The answer carries the normalized `contentType` the link was signed for;
+ * the client sends that exact string as the PUT's Content-Type.
  */
 export async function POST(req: Request) {
   if (!isR2Configured()) {
@@ -44,9 +46,12 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
 
+  // failLocal: when the limiter's database call fails, this server counts on
+  // its own instead of letting every upload through (rate limits, wave 1).
   const rl = await rateLimit(`upload:clip-upload-url:${user.id}`, {
     limit: 20,
     windowSec: 600,
+    failLocal: true,
   });
   if (!rl.allowed) return tooManyRequests(rl);
 
@@ -91,7 +96,7 @@ export async function POST(req: Request) {
       contentType,
       contentLength: sizeBytes,
     });
-    return NextResponse.json({ ok: true, uploadUrl, objectKey });
+    return NextResponse.json({ ok: true, uploadUrl, objectKey, contentType });
   } catch (err) {
     console.error("[clip-upload-url]", err);
     const message = err instanceof Error ? err.message : "Could not sign upload URL";

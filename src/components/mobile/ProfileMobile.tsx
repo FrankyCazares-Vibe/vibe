@@ -432,6 +432,9 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
   const [posts, setPosts] = useState<PostRow[] | null>(null);
   /** Set only while no posts have loaded; loaded rows stay on a failure. */
   const [postsErr, setPostsErr] = useState<LoadFailure | null>(null);
+  /** Signed out, the grid stops at 24 and the route says whether more exist
+   *  (`more`, users/[handle]/posts). Never set for a signed-in viewer. */
+  const [postsMore, setPostsMore] = useState(false);
   const [tab, setTab] = useState<ProfileTab>("posts");
   // Unified search overlay — opened by the magnifying-glass button in
   // the floating top-right actions. Reuses CampusMobile's overlay so
@@ -633,7 +636,7 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
       const line = "Couldn't load posts.";
       // The state updates live in the .then callback, so the mount
       // effect below schedules them rather than running them in its body.
-      return vibeRequest<{ posts?: unknown }>(endpoint, {
+      return vibeRequest<{ posts?: unknown; more?: unknown }>(endpoint, {
         cache: "no-store",
         failure: line,
         // A refetch follows the student's own publish or delete, so its
@@ -645,6 +648,9 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
           postsLoadedRef.current = true;
           setPostsErr(null);
           setPosts(r.data.posts as PostRow[]);
+          // Set in the same pass as the rows, so the line under the grid
+          // arrives with them and nothing above it moves.
+          setPostsMore(isVisitor && r.data.more === true);
           return;
         }
         // Never [] on a failure: that reads as "No posts yet". Rows
@@ -2342,6 +2348,11 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
               }}
               isVisitor={isVisitor}
               ownerName={name}
+              signInForMoreHref={
+                postsMore && targetHandle
+                  ? `/auth/login?next=${encodeURIComponent(`/profile/${targetHandle}`)}`
+                  : null
+              }
               onOpenPost={(id) => setOpenPost({ id, mine: !isVisitor })}
               onEdited={applyPostEdit}
               onDeleted={() => void refetchPosts()}
@@ -2757,6 +2768,7 @@ function PostsGrid({
   onRetry,
   isVisitor,
   ownerName,
+  signInForMoreHref,
   onOpenPost,
   onEdited,
   onDeleted,
@@ -2769,6 +2781,9 @@ function PostsGrid({
   onRetry: () => void;
   isVisitor: boolean;
   ownerName: string;
+  /** Signed out and the 24-post cap held some back: where the one line
+   *  under the grid sends them to sign in. Null hides the line. */
+  signInForMoreHref: string | null;
   onOpenPost: (id: string) => void;
   /** A card's "Edit post" saved: patch that post in place. */
   onEdited: (p: EditedPost) => void;
@@ -2815,6 +2830,23 @@ function PostsGrid({
           onDeleted={onDeleted}
         />
       ))}
+      {signInForMoreHref ? (
+        // Below the last card, so it moves nothing; it arrives with the rows.
+        <Link
+          href={signInForMoreHref}
+          style={{
+            alignSelf: "center",
+            padding: "6px 12px",
+            fontFamily: "DM Sans, sans-serif",
+            fontSize: 13,
+            fontWeight: 700,
+            color: "var(--tag-ink)",
+            textDecoration: "none",
+          }}
+        >
+          Sign in to see all of their posts
+        </Link>
+      ) : null}
     </div>
   );
 }

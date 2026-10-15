@@ -2820,12 +2820,14 @@ async function __dmSend(text) {
       });
       const signJson = await signRes.json();
       if (!signJson.ok) throw __dmSendError(signJson, 'upload sign failed');
-      // 2. PUT the bytes (XHR for progress reporting).
+      // 2. PUT the bytes (XHR for progress reporting). The link is signed
+      // for one exact Content-Type: the route's `contentType`, else (an
+      // older server) the one declared in step 1.
       const bar = document.getElementById('compStagedProgressBar');
       await new Promise((resolve, reject) => {
         const xhr = new XMLHttpRequest();
         xhr.open('PUT', signJson.uploadUrl, true);
-        xhr.setRequestHeader('Content-Type', upload.contentType);
+        xhr.setRequestHeader('Content-Type', signJson.contentType ?? upload.contentType);
         if (xhr.upload && bar) {
           xhr.upload.onprogress = (ev) => {
             if (!ev.lengthComputable) return;
@@ -3834,10 +3836,11 @@ async function __dmPanelPhotoChosen(ev) {
     });
     const signJson = await signRes.json();
     if (!signJson.ok) throw new Error(signJson.error || 'sign failed');
-    // 2. PUT to R2
+    // 2. PUT to R2, with the exact Content-Type the link was signed for
+    // (the route's `contentType`, else the one declared in step 1).
     const putRes = await fetch(signJson.uploadUrl, {
       method: 'PUT',
-      headers: { 'Content-Type': file.type },
+      headers: { 'Content-Type': signJson.contentType ?? file.type },
       body: file,
     });
     if (!putRes.ok) throw new Error('upload failed (' + putRes.status + ')');

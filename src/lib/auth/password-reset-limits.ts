@@ -54,7 +54,7 @@ export type ResetLimit = {
   failClosed: boolean;
 };
 
-/** The limiter's answer, the shape of `RateLimitResult` in src/lib/rate-limit.ts. */
+/** The limiter's answer: the `allowed` and `retryAfterSec` of `RateLimitResult` in src/lib/rate-limit.ts. */
 export type ResetLimitResult = { allowed: boolean; retryAfterSec: number };
 
 /** Layer 1. `network` is `clientNetworkKey(req)`: IPv4 as is, IPv6 as its /64. */

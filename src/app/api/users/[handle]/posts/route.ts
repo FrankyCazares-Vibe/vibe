@@ -12,6 +12,22 @@ const DEFAULT_LIMIT = 100;
 const MAX_LIMIT = 500;
 
 /**
+ * Signed out, a grid answers this many posts at most (rate limits and upload
+ * caps, Oct 15, B1.3). A share link still opens on a full screen of someone's
+ * posts; a script walking every handle gets 24 each instead of 500. One more
+ * row is read so the answer can say `more: true`, and the page can say "Sign
+ * in to see all of their posts" instead of passing 24 off as all of them.
+ * Signed in, the limits above are unchanged.
+ *
+ * KNOWN GAP, accepted for now: the desktop profile pins a post only when its
+ * card is in the grid (`_restorePinIfPossible`, profile.html), so a pinned
+ * post older than someone's 24 newest doesn't show as pinned to a signed-out
+ * visitor. Nobody has 24 posts yet; when the signed-out caps come (Wave 2),
+ * answer the pinned row alongside the 24.
+ */
+const SIGNED_OUT_POST_CAP = 24;
+
+/**
  * What the moderation migration adds to `posts`. Production does not have them
  * yet, so the grid select is built twice — once with, and, for a 42703 naming
  * one of these two and nothing else, once without.
@@ -28,7 +44,8 @@ type RouteContext = { params: Promise<{ handle: string }> };
  * visits use the service-role client against the same published-only
  * filter — `posts` RLS is authenticated-only, same as profile bootstrap —
  * so that branch restates the rules RLS would apply: a restricted author
- * 404s and club posts are left out (S67 security wave 2, A1).
+ * 404s and club posts are left out (S67 security wave 2, A1). That branch
+ * also stops at `SIGNED_OUT_POST_CAP` posts and says whether more exist.
  */
 export async function GET(req: Request, ctx: RouteContext) {
   const { handle: rawHandle } = await ctx.params;
@@ -96,10 +113,16 @@ export async function GET(req: Request, ctx: RouteContext) {
   }
 
   const url = new URL(req.url);
-  const limit = Math.min(
-    MAX_LIMIT,
-    Math.max(1, Number(url.searchParams.get("limit")) || DEFAULT_LIMIT),
-  );
+  // A whole number, or the default. PostgREST ignores a limit that isn't
+  // one (`limit=23.5` reads up to its 1,000-row ceiling), so a fraction
+  // passed through would undo both caps, signed in and out.
+  const wanted = Math.floor(Number(url.searchParams.get("limit")));
+  const asked = Math.min(MAX_LIMIT, wanted > 0 ? wanted : DEFAULT_LIMIT);
+  // Signed out, never past the cap. Only a caller who asked for at least the
+  // cap gets the extra row read: that row is the one thing that can say the
+  // cap, and not the caller's own smaller limit, held posts back.
+  const limit = user ? asked : Math.min(asked, SIGNED_OUT_POST_CAP);
+  const probeMore = !user && asked >= SIGNED_OUT_POST_CAP;
 
   // Filter drafts even when viewer == target owner — drafts only appear
   // in the composer's Drafts box, never in the public-shaped grid.
@@ -131,7 +154,7 @@ export async function GET(req: Request, ctx: RouteContext) {
     // this service-role read is the one place it has to be restated, or a
     // hidden club's posts reach a stranger through its officer's grid.
     if (!user) q = q.is("org_id", null);
-    return q.order("created_at", { ascending: false }).limit(limit);
+    return q.order("created_at", { ascending: false }).limit(probeMore ? limit + 1 : limit);
   };
 
   let { data, error } = await readGrid(true);
@@ -149,9 +172,14 @@ export async function GET(req: Request, ctx: RouteContext) {
   // Raw R2 keys become proxy URLs — as an <img src> a bare key 404s. The
   // built select string defeats Supabase's row typing (GenericStringError),
   // the same cast /api/feed and GET /api/posts/[id] make.
-  const rows = (data ?? []) as unknown as Array<{ id: string } & Record<string, unknown>>;
+  const read = (data ?? []) as unknown as Array<{ id: string } & Record<string, unknown>>;
+  const more = probeMore && read.length > limit;
+  const rows = more ? read.slice(0, limit) : read;
   return NextResponse.json({
     ok: true,
     posts: rows.map((p) => withPostMediaUrls(p)),
+    // Signed out only, and only ever about the cap. A signed-in answer keeps
+    // the shape it always had.
+    ...(user ? {} : { more }),
   });
 }

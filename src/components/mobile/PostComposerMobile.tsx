@@ -271,7 +271,11 @@ export function PostComposerMobile({ onClose, onPosted, origin }: Props) {
         }
 
         // 1. Presigned R2 PUT.
-        const sig = await vibeRequest<{ uploadUrl?: string; objectKey?: string }>(
+        const sig = await vibeRequest<{
+          uploadUrl?: string;
+          objectKey?: string;
+          contentType?: string;
+        }>(
           "/api/me/clip-upload-url",
           {
             method: "POST",
@@ -292,12 +296,14 @@ export function PostComposerMobile({ onClose, onPosted, origin }: Props) {
 
         // 2. Direct PUT to R2. A raw upload on purpose: storage isn't a Vibe
         //    route and answers in its own format. A dropped connection throws
-        //    and a refusal is a status; both get the same fixed line.
+        //    and a refusal is a status; both get the same fixed line. The link
+        //    is signed for one exact Content-Type: the route's, else (an
+        //    older server) the type declared in step 1.
         let stored = false;
         try {
           const putRes = await fetch(uploadUrl, {
             method: "PUT",
-            headers: { "Content-Type": clipFile.type },
+            headers: { "Content-Type": sig.data.contentType ?? clipFile.type },
             body: clipFile,
           });
           stored = putRes.ok;

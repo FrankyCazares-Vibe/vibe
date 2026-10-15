@@ -631,11 +631,10 @@ type EditRow = {
  *
  * Rate limit: 30 PATCHes per author per 10 minutes (429 with Retry-After).
  *
- * KNOWN GAP (critic W2 Low 8): this route's GET, /api/me/posts and
- * /api/users/[handle]/posts return `edited_at`. Readers that aren't edit
- * surfaces (club posts on /api/orgs/[slug]/profile, shared posts in DMs, the
- * /posts/[id] share page) don't select it yet, so an edited post shows no
- * marker there.
+ * KNOWN GAP (critic W2 Low 8): this route's GET, /api/me/posts,
+ * /api/users/[handle]/posts and the club page grid return `edited_at`.
+ * Readers that aren't edit surfaces (shared posts in DMs, the /posts/[id]
+ * share page) don't select it yet, so an edited post shows no marker there.
  */
 export async function PATCH(req: Request, ctx: RouteContext) {
   const { id } = await ctx.params;

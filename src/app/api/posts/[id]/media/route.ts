@@ -115,10 +115,18 @@ export async function GET(req: Request, { params }: Params) {
 
   // An answer that depended on the session cookie (a draft, a hidden club's
   // post, a removed post or a restricted author) stays out of any shared cache.
+  //
+  // Every other answer is the same for everyone, so the browser keeps it for
+  // five minutes (rate limits and upload caps, Oct 15, B1.3): a grid scrolled
+  // past twice, or a video that seeks, asks this route once instead of each
+  // time. `private` keeps it out of the CDN, so a removal or a suspension
+  // reaches everyone else at once; only a browser that already asked keeps
+  // the old answer, for those five minutes, well inside the signed link's
+  // hour (`60 * 60` below).
   const privateAnswer = !isPublished || hiddenClub || isRemoved || authorRestricted;
   const redirect = (target: string) => {
     const res = NextResponse.redirect(target, 307);
-    if (privateAnswer) res.headers.set("Cache-Control", "private, no-store");
+    res.headers.set("Cache-Control", privateAnswer ? "private, no-store" : "private, max-age=300");
     return res;
   };
 

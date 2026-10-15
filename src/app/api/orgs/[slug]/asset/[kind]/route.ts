@@ -10,6 +10,25 @@ type Params = { params: Promise<{ slug: string; kind: string }> };
 const VALID_KINDS = new Set(["banner", "logo"]);
 
 /**
+ * A visible club's logo or banner is the same answer for everyone, so the
+ * browser keeps the redirect for five minutes (rate limits and upload caps,
+ * Oct 15, B1.3): a Discover list or a feed full of one club's posts asks this
+ * route once per asset, not once per tile. `private` keeps it out of the CDN,
+ * so a club hidden reaches everyone else at once; only a browser that
+ * already asked keeps the old answer, and only for those five minutes, well
+ * inside the signed link's hour. A logo or banner replaced is a new URL
+ * (`orgAssetProxyUrl` puts the key's file name in `?v=`, which this route
+ * ignores), so nobody waits on it, the officer who replaced it least of all.
+ * A hidden club's answer depends on who is asking, so it never gets this
+ * header (the same split `/api/posts/[id]/media` makes).
+ */
+function publicRedirect(target: string) {
+  const res = NextResponse.redirect(target, 307);
+  res.headers.set("Cache-Control", "private, max-age=300");
+  return res;
+}
+
+/**
  * GET /api/orgs/[slug]/asset/[kind] — proxies R2-stored org assets via a
  * 307 redirect to a freshly-signed GET URL. Lets the rest of the app refer
  * to a stable public path (e.g. `/api/orgs/sae/asset/banner`) without
@@ -49,7 +68,10 @@ export async function GET(_req: Request, { params }: Params) {
     return NextResponse.json({ ok: false, error: "Not found" }, { status: 404 });
   }
 
-  if ((org as { hidden_at?: string | null }).hidden_at) {
+  const hidden = !!(org as { hidden_at?: string | null }).hidden_at;
+  const redirect = (target: string) =>
+    hidden ? NextResponse.redirect(target, 307) : publicRedirect(target);
+  if (hidden) {
     const allowed = await viewerMaySeeHiddenOrg(service, org.id as string);
     if (!allowed) {
       // The same answer a handle that was never registered gets: an asset 404
@@ -70,14 +92,14 @@ export async function GET(_req: Request, { params }: Params) {
     if (!isSupabaseHttpsUrl(stored)) {
       return NextResponse.json({ ok: false, error: "Unrecognized asset" }, { status: 404 });
     }
-    return NextResponse.redirect(stored, 307);
+    return redirect(stored);
   }
 
   // R2 object key: sign and redirect.
   if (stored.startsWith(ORG_ASSET_KEY_PREFIX)) {
     try {
       const signed = await signOrgAssetGetUrl(stored, 60 * 60); // 1h
-      return NextResponse.redirect(signed, 307);
+      return redirect(signed);
     } catch (e) {
       console.error("[orgs/[slug]/asset GET]", e);
       return NextResponse.json(

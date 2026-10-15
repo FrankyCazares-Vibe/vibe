@@ -360,6 +360,7 @@ export function ConversationView({
           uploadUrl?: string;
           objectKey?: string;
           kind?: "image" | "video";
+          contentType?: string;
         }>("/api/me/messages-upload-url", {
           json: {
             channelId: threadId,
@@ -379,12 +380,14 @@ export function ConversationView({
           return;
         }
         // The signature binds Content-Length to the declared size, and a
-        // File body sends exactly those bytes. R2 is another origin, so
-        // the same-origin default sends no cookies.
+        // File body sends exactly those bytes. It binds the Content-Type
+        // too: the route's `contentType`, else (an older server) the one
+        // declared above. R2 is another origin, so the same-origin default
+        // sends no cookies.
         const put = await vibeRequest(uploadUrl, {
           method: "PUT",
           body: upload.file,
-          headers: { "content-type": upload.contentType },
+          headers: { "content-type": sign.data.contentType ?? upload.contentType },
           failure,
         });
         if (!put.ok) return;

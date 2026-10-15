@@ -13,13 +13,14 @@ import {
 } from "./club-posts";
 
 /**
- * The reads behind a club's recent-posts list, shared by the club page grid
- * (`src/app/orgs/[handle]/page.tsx`) and `GET /api/orgs/[slug]/profile`
- * (S67 security wave 2, integration I1). `club-posts.ts` holds the rule and
- * says which piece of `posts_select_authenticated` each read stands in for;
- * `visibleClubPosts` applies the author filters these return.
+ * The reads behind a club's recent-posts list on the club page grid
+ * (`src/app/orgs/[handle]/page.tsx`; S67 security wave 2, integration I1).
+ * `GET /api/orgs/[slug]/profile` shared them until it was deleted on Oct 15
+ * (B1.3), unused. `club-posts.ts` holds the rule and says which piece of
+ * `posts_select_authenticated` each read stands in for; `visibleClubPosts`
+ * applies the author filters these return.
  *
- * Both callers go through `readClubPostsForViewer`: blocked authors are known
+ * Any caller goes through `readClubPostsForViewer`: blocked authors are known
  * before the posts read, so they come off inside the query (before the
  * limit). A restriction can only be judged once the rows are in (it lives in
  * another table, and the author list isn't known until then), so restricted

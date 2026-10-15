@@ -2,9 +2,11 @@
  * Which club posts a viewer may see on the club's own page, when the posts
  * were read with the SERVICE role (S67 security wave 2, integration I1).
  *
- * Two surfaces read a club's recent posts past RLS: the club page grid
- * (`src/app/orgs/[handle]/page.tsx`) and `GET /api/orgs/[slug]/profile`.
- * No policy runs on those reads, so each has to write
+ * One surface reads a club's recent posts past RLS: the club page grid
+ * (`src/app/orgs/[handle]/page.tsx`). `GET /api/orgs/[slug]/profile` was the
+ * other, and nothing called it; it was deleted on Oct 15 (rate limits and
+ * upload caps, B1.3), since it still handed club posts and their authors to
+ * anyone who asked. No policy runs on that read, so it has to write
  * `posts_select_authenticated` out by hand:
  *
  *   status = 'published' AND removed_at IS NULL      -> in the query

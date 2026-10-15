@@ -39,6 +39,8 @@ type Body = {
  * Auth + channel-membership gated, rate limited per user. The declared
  * `sizeBytes` is bound into the signature (Content-Length), so the client
  * must PUT exactly the bytes it declared or R2 rejects the upload.
+ * The answer carries the normalized `contentType` the link was signed for;
+ * the client sends that exact string as the PUT's Content-Type.
  * The client uploads, then POSTs the resulting `objectKey` + `kind` along
  * with `/api/me/threads/[id]/messages`.
  */
@@ -52,9 +54,12 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
 
+  // failLocal: when the limiter's database call fails, this server counts on
+  // its own instead of letting every upload through (rate limits, wave 1).
   const rl = await rateLimit(`upload:messages-upload-url:${user.id}`, {
     limit: 20,
     windowSec: 600,
+    failLocal: true,
   });
   if (!rl.allowed) return tooManyRequests(rl);
 
@@ -142,7 +147,7 @@ export async function POST(req: Request) {
       contentType,
       contentLength: sizeBytes,
     });
-    return NextResponse.json({ ok: true, uploadUrl, objectKey, kind });
+    return NextResponse.json({ ok: true, uploadUrl, objectKey, kind, contentType });
   } catch (err) {
     console.error("[messages-upload-url]", err);
     const message = err instanceof Error ? err.message : "Could not sign upload URL";

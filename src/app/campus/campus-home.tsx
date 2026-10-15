@@ -7035,10 +7035,12 @@ function FeedComposer({
         }).then((r) => r.json());
         if (!sig?.ok) throw new Error(sig?.error || "Could not start upload");
 
-        // 2. Upload directly to R2.
+        // 2. Upload directly to R2. The link is signed for one exact
+        //    Content-Type: the one the route answers with, else (an older
+        //    server) the type declared in step 1.
         const putRes = await fetch(sig.uploadUrl, {
           method: "PUT",
-          headers: { "Content-Type": videoFile.type },
+          headers: { "Content-Type": sig.contentType ?? videoFile.type },
           body: videoFile,
         });
         if (!putRes.ok) throw new Error(`Upload failed (HTTP ${putRes.status})`);

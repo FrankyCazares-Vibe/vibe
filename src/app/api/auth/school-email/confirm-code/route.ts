@@ -20,22 +20,31 @@ type Body = { schoolEmail?: string; code?: string };
 const PER_USER_WINDOW_SEC = 900;
 const PER_IP_WINDOW_SEC = 3600;
 
-const TOO_MANY_TRIES =
-  "Too many tries. Wait 15 minutes, then ask for a new code.";
+/**
+ * The per-user lockout, with the minutes actually left. Windows start on the
+ * quarter hour, so the wait is anywhere from a second to 15 minutes, and the
+ * line says what the Retry-After header says (rounded up to whole minutes).
+ */
+function tooManyTries(retryAfterSec: number): string {
+  const minutes = Math.max(1, Math.ceil(retryAfterSec / 60));
+  const wait = minutes === 1 ? "a minute" : `${minutes} minutes`;
+  return `Too many tries. Wait ${wait}, then ask for a new code.`;
+}
 const TOO_MANY_FROM_NETWORK =
   "Lots of tries from this network. Try again later this hour.";
 const LIMITER_DOWN = "Couldn't check your code right now. Try again in a minute.";
 
 /**
- * The 429 for a denied limiter. rateLimit reports a real limit hit with the
- * whole window as retryAfterSec, and its own failure (failClosed) with a
- * short 60s retry, so anything shorter than the window is "the limiter is
- * down", not "you tried too often".
+ * The 429 for a denied limiter. rateLimit says why it refused: "limited" is
+ * a real limit hit, retrying when the window ends; "unavailable" is its own
+ * failure (failClosed), with a short 60s retry, so "the limiter is down",
+ * not "you tried too often". (This used to compare the retry with the
+ * window; the retry is now the time actually left, so it can't.)
  */
-function denied(result: RateLimitResult, windowSec: number, limitCopy: string) {
+function denied(result: RateLimitResult, limitCopy: string) {
   return tooManyRequests(
     result,
-    result.retryAfterSec < windowSec ? LIMITER_DOWN : limitCopy,
+    result.reason === "unavailable" ? LIMITER_DOWN : limitCopy,
   );
 }
 
@@ -113,7 +122,7 @@ export async function POST(req: Request) {
     failClosed: true,
   });
   if (!perUser.allowed) {
-    return denied(perUser, PER_USER_WINDOW_SEC, TOO_MANY_TRIES);
+    return denied(perUser, tooManyTries(perUser.retryAfterSec));
   }
 
   const perIp = await rateLimit(`school-code-ip:${clientNetworkKey(req)}`, {
@@ -122,7 +131,7 @@ export async function POST(req: Request) {
     failClosed: true,
   });
   if (!perIp.allowed) {
-    return denied(perIp, PER_IP_WINDOW_SEC, TOO_MANY_FROM_NETWORK);
+    return denied(perIp, TOO_MANY_FROM_NETWORK);
   }
 
   if (!verifySchoolEmailCode(user.id, schoolEmail, code)) {

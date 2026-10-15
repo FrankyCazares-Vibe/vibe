@@ -5,6 +5,12 @@ import { hasSafeMediaUrlShape, isOrgAssetKey } from "./posts/media-ownership";
  * doesn't have to sign R2 GET URLs at every render. The asset route
  * `/api/orgs/[slug]/asset/[kind]` 307-redirects to a freshly signed URL.
  *
+ * `?v=` is the stored key's file name (a fresh uuid per upload), so a new
+ * logo or banner is a new URL. The route ignores it; it is there because a
+ * visible club's redirect is kept in the browser for five minutes (rate
+ * limits and upload caps, Oct 15, B1.3), and without it the officer who just
+ * replaced the picture would keep seeing the old one, reload or not.
+ *
  * Pass through full http(s) URLs unchanged for forward compatibility with
  * any direct-set values that pre-date the upload flow.
  *
@@ -21,7 +27,9 @@ export function orgAssetProxyUrl(
     return stored;
   }
   if (stored.startsWith("orgs/")) {
-    return `/api/orgs/${encodeURIComponent(handle)}/asset/${kind}`;
+    const file = stored.slice(stored.lastIndexOf("/") + 1);
+    const version = file ? `?v=${encodeURIComponent(file)}` : "";
+    return `/api/orgs/${encodeURIComponent(handle)}/asset/${kind}${version}`;
   }
   return null;
 }
