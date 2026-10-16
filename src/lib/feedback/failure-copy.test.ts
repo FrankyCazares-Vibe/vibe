@@ -118,3 +118,27 @@ test("drift: public/html/_persistence.js NO_RETRY matches NO_RETRY_STATUSES", as
     "public/html/_persistence.js retryable() must keep the same \"Try again\" exception.",
   );
 });
+
+/**
+ * The signed-out read cap's 429 (src/lib/security/anon-read-limit.ts): its
+ * own line with Sign in back to the page, on both sides. The static profile
+ * page reads it through public/html/_persistence.js, so the twin must have
+ * the same line and pill.
+ */
+test("describeFailure: the signed-out read cap's 429 is its own line with Sign in, here and in _persistence.js", async () => {
+  const line = "Vibe is getting a lot of visits from people who aren't signed in. Try again later, or sign in.";
+  const shown = describeFailure({ status: 429, code: "anon_read_limited", error: line, retryAfterSec: 600 }, "Couldn't load this profile.", "/profile/someone");
+  assert.deepEqual(shown, { message: line, action: { label: "Sign in", href: "/auth/login?next=%2Fprofile%2Fsomeone" } });
+
+  const js = await readFile(new URL("public/html/_persistence.js", REPO_ROOT), "utf8");
+  assert.ok(
+    js.includes(
+      `if (st === 429 && sig.code === 'anon_read_limited') return { message: "${line}", action: { label: 'Sign in', href: '/auth/login?next=' + next } };`,
+    ),
+    "public/html/_persistence.js must word the anon_read_limited 429 the same, with the same Sign in pill.",
+  );
+  assert.ok(
+    js.indexOf("sig.code === 'anon_read_limited'") < js.indexOf("if (st === 429) return"),
+    "the twin's rule must come before its generic 429 line.",
+  );
+});

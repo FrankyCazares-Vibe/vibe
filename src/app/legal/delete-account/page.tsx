@@ -39,7 +39,9 @@ import {
 //     provider_message_id and drops recipient_hash (it never had an address
 //     column); orgs.owner_id is ON DELETE SET NULL; the signup_allowlist
 //     row is deleted by DELETE /api/me; auth.audit_log_entries has no FK to auth.users.
-// No number of days anywhere: the evidence and report records have no end
+// One number of days only: the abuse counts (rate_limits) are deleted within
+// three days, by rate_limits_purge from both daily crons; policy 3d says the
+// same. Nothing else gets one: the evidence and report records have no end
 // date until the lawyer sets one, there are no database backups, and nobody
 // has confirmed how long Vercel, Sentry and Resend keep their logs.
 // Still open, and each one would let a line leave this page (rows of
@@ -330,9 +332,10 @@ export default function DeleteAccountPage() {
         </li>
         <li>
           <strong>Abuse counts.</strong> We count how often some actions
-          happen. A few counts hold an IP address or part of one, and a few
-          hold a scrambled code made from an email address. They stay until
-          they are cleared, which can take weeks.
+          happen. Many counts hold your account ID. A few hold a scrambled
+          code made from an email address or from a network (an IP address or
+          part of one), not the address itself. We delete each count within
+          three days.
         </li>
         <li>
           <strong>Payments, once billing is on.</strong> Vibe+ is not on sale

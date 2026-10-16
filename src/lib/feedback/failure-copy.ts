@@ -177,6 +177,16 @@ export function describeFailure(
       action: { label: "See Vibe+", href: `/plus?next=${next}` },
     };
   }
+  // The cap on signed-out reads (src/lib/security/anon-read-limit.ts,
+  // ANON_READ_LINE): a busy hour for visitors who aren't signed in, nothing
+  // this one did. Signing in is the way past it, so the pill is Sign in, not
+  // a Retry the same hour refuses again.
+  if (status === 429 && code === "anon_read_limited") {
+    return {
+      message: "Vibe is getting a lot of visits from people who aren't signed in. Try again later, or sign in.",
+      action: { label: "Sign in", href: `/auth/login?next=${next}` },
+    };
+  }
   if (status === 429) {
     return { message: `You're going a little fast. ${retryLine(sig.retryAfterSec)}` };
   }

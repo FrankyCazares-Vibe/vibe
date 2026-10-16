@@ -9,8 +9,13 @@
  * script spending it here stops new students' codes from arriving.
  *
  * Three layers:
- *   1. per network, before anything else (refuses if the limiter is down);
- *   2. per address, by its hash, whether or not it has an account;
+ *   1. per network, before anything else, on the network's scrambled code
+ *      for the day, never the address (refuses if the limiter is down or
+ *      there is no code);
+ *   2. per address, by its hash, whether or not it has an account: 3 a
+ *      UTC day, and no hour of its own (the hour's 3 could never refuse
+ *      anything the day's 3 had not, and asked first it told the 4th request
+ *      to wait minutes the day then refused; Franky, Oct 15 2026);
  *   3. reset emails as a whole, asked only when an email is about to be sent,
  *      so requests for addresses with no account can't spend it (refuses if
  *      the limiter is down).
@@ -34,10 +39,13 @@ const DAY_SEC = 86_400;
 export const RESET_REQUESTS_PER_NETWORK = 5;
 /** The per-network window, 15 minutes: short, so a shared campus network is never stuck for long. */
 export const RESET_NETWORK_WINDOW_SEC = 900;
-/** Requests naming one address in an hour: nobody's inbox fills with reset emails. */
-export const RESET_REQUESTS_PER_ADDRESS_PER_HOUR = 3;
-/** Requests naming one address in a day: one student can't be mailed hour after hour. */
-export const RESET_REQUESTS_PER_ADDRESS_PER_DAY = 5;
+/**
+ * Requests naming one address in a UTC day: nobody's inbox fills with reset
+ * emails (Franky, Oct 15 2026; it was 3 an hour and 5 a day). Once an
+ * address has had its three, nothing more goes to it until the next UTC day,
+ * and the refusal's Retry-After says so.
+ */
+export const RESET_REQUESTS_PER_ADDRESS_PER_DAY = 3;
 /** Reset emails to everyone in an hour: a burst can't empty the shared daily email allowance sign-up codes also depend on. */
 export const RESET_EMAILS_PER_HOUR = 20;
 /** Reset emails to everyone in a day: the most of that shared daily allowance resets may ever use. */
@@ -45,37 +53,50 @@ export const RESET_EMAILS_PER_DAY = 40;
 /** "You sign in with a different email" notes to one address in a day: it says the same thing every time, so once is enough. */
 export const RESET_HINTS_PER_ADDRESS_PER_DAY = 1;
 
-/** One limiter question: `key` counts up to `limit` per `windowSec`. */
+/**
+ * One limiter question: `key` counts up to `limit` per `windowSec`. A null
+ * key has nothing to count on (layer 1 with no network code): the limiter
+ * then answers as it does when it is down, so `failClosed` refuses.
+ */
 export type ResetLimit = {
-  key: string;
+  key: string | null;
   limit: number;
   windowSec: number;
   /** Refuse, not allow, when the limiter itself can't be reached. */
   failClosed: boolean;
 };
 
-/** The limiter's answer: the `allowed` and `retryAfterSec` of `RateLimitResult` in src/lib/rate-limit.ts. */
-export type ResetLimitResult = { allowed: boolean; retryAfterSec: number };
+/**
+ * The limiter's answer: `RateLimitResult` in src/lib/rate-limit.ts. `reason`
+ * says why a refusal came ("limited": the count is spent; "unavailable": the
+ * limiter couldn't count), so the 429 can tell the two apart.
+ */
+export type ResetLimitResult = { allowed: boolean; retryAfterSec: number; reason?: "limited" | "unavailable" | null };
 
-/** Layer 1. `network` is `clientNetworkKey(req)`: IPv4 as is, IPv6 as its /64. */
-export function resetNetworkLimit(network: string): ResetLimit {
+/** The reset route's 429 `code`: the same for an address with or without an account. */
+export function resetRefusalCode(result: ResetLimitResult): "limiter_unavailable" | "rate_limited" {
+  return result.reason === "unavailable" ? "limiter_unavailable" : "rate_limited";
+}
+
+/**
+ * Layer 1. `networkCode` is `clientNetworkCode(req, "pw-reset-net")`
+ * (src/lib/rate-limit.ts): a scrambled code for the network (IPv4 as is,
+ * IPv6 as its /64) that changes every UTC day, never the address. Null when
+ * there is no code (no secret on the server): the key is null then, and the
+ * limiter refuses, as it does when it is down. Never the address instead.
+ */
+export function resetNetworkLimit(networkCode: string | null): ResetLimit {
   return {
-    key: `pw-reset-net:${network}`,
+    key: networkCode === null ? null : `pw-reset-net:${networkCode}`,
     limit: RESET_REQUESTS_PER_NETWORK,
     windowSec: RESET_NETWORK_WINDOW_SEC,
     failClosed: true,
   };
 }
 
-/** Layer 2, the hour then the day. `emailKey` is the address's hash (`recipientRateKey`), never the address. */
+/** Layer 2, the day. `emailKey` is the address's hash (`recipientRateKey`), never the address. */
 export function resetAddressLimits(emailKey: string): ResetLimit[] {
   return [
-    {
-      key: `pw-reset-email:${emailKey}`,
-      limit: RESET_REQUESTS_PER_ADDRESS_PER_HOUR,
-      windowSec: HOUR_SEC,
-      failClosed: false,
-    },
     {
       key: `pw-reset-email-day:${emailKey}`,
       limit: RESET_REQUESTS_PER_ADDRESS_PER_DAY,
@@ -105,7 +126,7 @@ export function resetSendLimits(): ResetLimit[] {
 
 /**
  * The note's own limit: one a day for the typed address (`emailKey` is its
- * hash, as in layer 2). Layer 2 lets an address be named 5 times a day, and
+ * hash, as in layer 2). Layer 2 lets an address be named 3 times a day, and
  * without this each of those would mail the same note again. Asked only when
  * a note is about to be sent, and before layer 3, so a repeat is refused here
  * and never counts against the reset emails. Refuses if the limiter is down,

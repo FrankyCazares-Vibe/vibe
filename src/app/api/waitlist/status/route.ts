@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { redactAddresses } from "@/lib/email/send-log-core";
-import { clientNetworkKey, rateLimit, tooManyRequests } from "@/lib/rate-limit";
+import { clientNetworkCode, rateLimit, tooManyRequests } from "@/lib/rate-limit";
 import { createSupabaseServiceClient, isSupabaseServiceConfigured } from "@/lib/supabase/service";
 import { findLiveByTokenHash } from "@/lib/waitlist/store";
 import { parseTokenRequest, waitlistPublicState } from "@/lib/waitlist/tokens";
@@ -25,7 +25,10 @@ const UNKNOWN: WaitlistStatusResponse = { ok: false, state: "unknown" };
  *   network, shared with confirm and leave) · 503 · 500
  */
 export async function POST(req: Request) {
-  const rl = await rateLimit(`waitlist-token-net:${clientNetworkKey(req)}`, { limit: 60, windowSec: 3600 });
+  // On the network's scrambled code for the day, never the address. No code
+  // (no secret) skips the count, as a limiter that's down does.
+  const netCode = clientNetworkCode(req, "waitlist-token-net");
+  const rl = await rateLimit(netCode === null ? null : `waitlist-token-net:${netCode}`, { limit: 60, windowSec: 3600 });
   if (!rl.allowed) return tooManyRequests(rl);
 
   let raw: unknown;

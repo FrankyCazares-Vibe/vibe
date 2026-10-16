@@ -11,6 +11,11 @@ import {
   cspFlavor,
   makeNonce,
 } from "@/lib/security/csp";
+import {
+  anonReadLimit,
+  anonReadPageRefusal,
+  isSignedOutReadPage,
+} from "@/lib/security/anon-read-limit";
 
 /**
  * Request proxy — Next 16's name for middleware.
@@ -45,6 +50,11 @@ import {
  *     until their ~280 inline handlers move into files. The policy itself
  *     is src/lib/security/csp.ts. /offline.html and /sw.js skip this file
  *     (the matcher); next.config.ts covers the first, the second has none.
+ *  6. Counts signed-out reads of the profile, club and post pages per network
+ *     (limits plan Wave 2, B2.3), and answers a small 429 page past the cap.
+ *     src/lib/security/anon-read-limit.ts holds the numbers and the why. It
+ *     is the one database call this file makes, and only for those pages
+ *     with nobody signed in.
  */
 
 /** Clean route each static URL belongs to — the redirect target and the login `next`. */
@@ -202,9 +212,10 @@ function restrictedApiAllowed(pathname: string, method: string): boolean {
 /**
  * The 403 every write route speaks when a restriction is in force. Written out
  * here rather than imported: `accountRestrictedResponse` in
- * src/lib/moderation/access.ts is server-only and pulls in the service client,
- * which the proxy runtime must not load. The two bodies have to stay identical
- * — every client branches on `code`.
+ * src/lib/moderation/access.ts brings the moderation reads with it, and the
+ * proxy loads nothing it doesn't use (its one database call is the signed-out
+ * read count below, item 6). The two bodies have to stay identical — every
+ * client branches on `code`.
  */
 function restrictedResponse(session: NextResponse) {
   return forwardCookies(
@@ -313,6 +324,22 @@ export async function proxy(request: NextRequest) {
       }
     } else if (!isFileRequest(pathname) && !restrictedPageAllowed(pathname)) {
       return redirectTo(request, sessionResponse, SUSPENDED_PAGE);
+    }
+  }
+
+  // Signed-out reads (item 6). Any request but OPTIONS for `/profile/<h>`,
+  // `/orgs/<h>` or `/posts/<id>` with nobody signed in (Next renders these
+  // pages for a POST as for a GET) is one count in the pages' pot for the
+  // caller's network; the profile's own data calls count in their routes.
+  // Past the cap: a small 429 page with Retry-After, the same for a handle or
+  // post that exists and one that doesn't. Every other path, and every
+  // signed-in request, goes on exactly as before. `user` is also null when
+  // GoTrue blips (see above), so a signed-in visitor can be counted then.
+  if (!user && isSignedOutReadPage(pathname, request.method)) {
+    const verdict = await anonReadLimit(request, "page");
+    if (!verdict.allowed) {
+      const { body, init } = anonReadPageRefusal(verdict, pathname);
+      return finish(forwardCookies(sessionResponse, new NextResponse(body, init)));
     }
   }
 

@@ -349,7 +349,7 @@ const STUBS: Record<string, string> = {
     "export const createSupabaseServiceClient = () => globalThis.__vibeResetNote.admin;\nexport const isSupabaseServiceConfigured = () => true;",
   ),
   "@/lib/rate-limit": dataModule(
-    "export const clientNetworkKey = () => 'net';\n" +
+    "export const clientNetworkCode = () => 'net';\n" +
       "export async function rateLimit(key, opts) { return globalThis.__vibeResetNote.limit(key, opts); }\n" +
       "export const tooManyRequests = () => ({ status: 429, body: null });",
   ),
@@ -449,13 +449,13 @@ test("route, run for real: a dot on the end finds nobody and counts nothing, and
   assert.ok(state.reads.every(([, value]) => value === "gina@iu.edu."));
   // Only the limits every address gets: the day's one note and the reset
   // emails are not touched.
-  assert.deepEqual(state.asked, ["pw-reset-net", "pw-reset-email", "pw-reset-email-day"]);
+  assert.deepEqual(state.asked, ["pw-reset-net", "pw-reset-email-day"]);
 
   // The student types it right, the same day: the note is still theirs, and
   // it goes to the address they typed.
   const plain = await forgot(state, " Gina@IU.edu ");
   assert.deepEqual(state.sent, [["note", "gina@iu.edu", "g•••@gmail.com"]]);
-  assert.deepEqual(state.asked.slice(3), ["pw-reset-net", "pw-reset-email", "pw-reset-email-day", "pw-reset-hint-day", "pw-reset-global-hour", "pw-reset-global-day"]);
+  assert.deepEqual(state.asked.slice(2), ["pw-reset-net", "pw-reset-email-day", "pw-reset-hint-day", "pw-reset-global-hour", "pw-reset-global-day"]);
   // One answer for both.
   assert.deepEqual(plain, dotted);
   assert.equal(plain.status, 200);

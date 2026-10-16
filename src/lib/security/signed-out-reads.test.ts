@@ -57,6 +57,12 @@ const STUBS: Record<string, string> = {
     "export async function orgContentAccess() { return globalThis.__soOrgAccess ?? { allowed: true, hidden: false }; }\n" +
       "export async function viewerMaySeeHiddenOrg() { return globalThis.__soHiddenAllowed === true; }",
   ),
+  // The signed-out read cap has tests of its own (anon-read-limit.test.ts);
+  // here it always allows, so no limiter runs against the fake clients.
+  "@/lib/security/anon-read-limit": dataModule(
+    "export async function anonReadLimit() { return { allowed: true, retryAfterSec: 0, reason: null }; }\n" +
+      "export function anonReadRefusal() { throw new Error('the cap never refuses in this test'); }",
+  ),
   "@/lib/r2": dataModule(
     "export const CLIP_KEY_PREFIX = 'clips/';\nexport const ORG_ASSET_KEY_PREFIX = 'orgs/';\n" +
       "export async function signClipGetUrl(key) { return 'https://r2.example/' + key + '?sig=1'; }\n" +

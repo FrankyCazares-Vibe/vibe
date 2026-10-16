@@ -9,7 +9,7 @@ import {
 import { isSchoolVerifySecretConfigured } from "@/lib/auth/school-email-token";
 import { isMissingColumnError } from "@/lib/db/missing-column";
 import { sendPersonalEmailCodeEmail } from "@/lib/email/resend-transactional";
-import { clientNetworkKey, rateLimit, tooManyRequests } from "@/lib/rate-limit";
+import { clientNetworkCode, rateLimit, tooManyRequests, type RateLimitResult } from "@/lib/rate-limit";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseServiceClient, isSupabaseServiceConfigured } from "@/lib/supabase/service";
 
@@ -44,6 +44,21 @@ const TRY_WINDOW_SEC = 900;
 
 const json = (body: Record<string, unknown>, status = 200) => NextResponse.json(body, { status, headers: NO_STORE });
 const fail = (status: number, code: string, error: string) => json({ ok: false, code, error }, status);
+
+/** Every limit here fails closed: when the limiter can't count, these say so, not "you've asked too often". */
+const SEND_DOWN = "Couldn't send the code right now. Try again in a minute.";
+const CHECK_DOWN = "Couldn't check your code right now. Try again in a minute.";
+
+/** The 429 for a refused limit: `limitCopy` when the count is spent, `downCopy` when the limiter couldn't count. */
+function denied(result: RateLimitResult, limitCopy: string, downCopy: string) {
+  return tooManyRequests(result, result.reason === "unavailable" ? downCopy : limitCopy);
+}
+
+/** The wait actually left, as the Retry-After header says it (rounded up to whole minutes). */
+function waitLeft(retryAfterSec: number): string {
+  const minutes = Math.max(1, Math.ceil(retryAfterSec / 60));
+  return minutes === 1 ? "a minute" : `${minutes} minutes`;
+}
 
 async function signedIn() {
   const supabase = await createSupabaseServerClient();
@@ -103,9 +118,12 @@ export async function POST(req: Request) {
   }
 
   const perUser = await rateLimit(`personal-email-send:${user.id}`, { limit: 5, windowSec: SEND_WINDOW_SEC, failClosed: true });
-  if (!perUser.allowed) return tooManyRequests(perUser, "You've asked for a few codes. Try again in an hour.");
-  const perNet = await rateLimit(`personal-email-send-net:${clientNetworkKey(req)}`, { limit: 40, windowSec: SEND_WINDOW_SEC, failClosed: true });
-  if (!perNet.allowed) return tooManyRequests(perNet, "Lots of requests from this network. Try again later.");
+  if (!perUser.allowed) return denied(perUser, "You've asked for a few codes. Try again in an hour.", SEND_DOWN);
+  // Per network, on the network's scrambled code for the day, never the
+  // address. No code (no secret) refuses, as a limiter that's down does.
+  const netCode = clientNetworkCode(req, "personal-email-send-net");
+  const perNet = await rateLimit(netCode === null ? null : `personal-email-send-net:${netCode}`, { limit: 40, windowSec: SEND_WINDOW_SEC, failClosed: true });
+  if (!perNet.allowed) return denied(perNet, "Lots of requests from this network. Try again later.", SEND_DOWN);
 
   // Is the address someone else's already? Each matched with `.eq`, never
   // inside an `in.(…)` list. The answer below is the same either way.
@@ -143,10 +161,14 @@ export async function PUT(req: Request) {
   if (!/^\d{8}$/.test(code)) return fail(400, "code_shape", "Enter the 8-digit code from the email.");
 
   // The only bound on guesses (10^8 codes): both fail closed.
+  // The lockout says the minutes actually left: windows start on the quarter hour, so it's 1 to 15.
   const perUser = await rateLimit(`personal-email-code:${user.id}`, { limit: 5, windowSec: TRY_WINDOW_SEC, failClosed: true });
-  if (!perUser.allowed) return tooManyRequests(perUser, "Too many tries. Wait 15 minutes, then ask for a new code.");
-  const perNet = await rateLimit(`personal-email-code-net:${clientNetworkKey(req)}`, { limit: 150, windowSec: 3600, failClosed: true });
-  if (!perNet.allowed) return tooManyRequests(perNet, "Lots of tries from this network. Try again later this hour.");
+  if (!perUser.allowed) {
+    return denied(perUser, `Too many tries. Wait ${waitLeft(perUser.retryAfterSec)}, then ask for a new code.`, CHECK_DOWN);
+  }
+  const netCode = clientNetworkCode(req, "personal-email-code-net");
+  const perNet = await rateLimit(netCode === null ? null : `personal-email-code-net:${netCode}`, { limit: 150, windowSec: 3600, failClosed: true });
+  if (!perNet.allowed) return denied(perNet, "Lots of tries from this network. Try again later this hour.", CHECK_DOWN);
 
   if (!verifyPersonalEmailCode(user.id, email, code)) {
     return fail(400, "code_invalid", "That code didn't match. Check the newest email: codes work for 30 minutes.");

@@ -22,6 +22,7 @@ import {
   sanitizeResumeRedactions,
 } from "@/lib/profile/resume-redactions";
 import { loadPairBlock } from "@/lib/safety/pair-block";
+import { anonReadLimit, anonReadRefusal } from "@/lib/security/anon-read-limit";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 
@@ -97,7 +98,7 @@ async function readViewerVerified(service: SupabaseClient, viewerId: string): Pr
  * See the restriction check below, right after the row is found and before any
  * of it is spoken out loud.
  */
-export async function GET(_req: Request, ctx: RouteContext) {
+export async function GET(req: Request, ctx: RouteContext) {
   const { handle: rawHandle } = await ctx.params;
   const handle = (rawHandle || "").trim().toLowerCase();
   if (!handle) {
@@ -108,6 +109,17 @@ export async function GET(_req: Request, ctx: RouteContext) {
   const {
     data: { user: viewer },
   } = await supabase.auth.getUser();
+
+  // SIGNED OUT, this read is counted for the caller's network before the
+  // handle is looked up (limits plan Wave 2, B2.3; anon-read-limit.ts says
+  // how), so a probe for a handle nobody has costs the same as one that
+  // exists, and past the cap both get the same 429. Signed in, nothing is
+  // counted: this is the busiest read in the app (hover cards, chat
+  // previews).
+  if (!viewer) {
+    const verdict = await anonReadLimit(req, "profile");
+    if (!verdict.allowed) return anonReadRefusal(verdict);
+  }
 
   // `service` reads the profile row (see the docblock) and the counts;
   // `reader` is the client used for the pinned post — the viewer's own

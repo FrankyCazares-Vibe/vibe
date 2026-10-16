@@ -5,6 +5,7 @@ import { isMissingColumnError } from "@/lib/db/missing-column";
 import { getActiveRestriction } from "@/lib/moderation/access";
 import { withPostMediaUrls } from "@/lib/post-media-url";
 import { loadPairBlock } from "@/lib/safety/pair-block";
+import { anonReadLimit, anonReadRefusal } from "@/lib/security/anon-read-limit";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 
@@ -58,6 +59,16 @@ export async function GET(req: Request, ctx: RouteContext) {
   const {
     data: { user },
   } = await supabase.auth.getUser();
+
+  // SIGNED OUT, counted for the caller's network before the handle is looked
+  // up (limits plan Wave 2, B2.3; anon-read-limit.ts says how). Grids have a
+  // pot of their own, so opening a profile is one view here, one in the
+  // bootstrap's pot and one in the pages'. A handle that exists and one that
+  // doesn't get the same 429. Signed in, nothing is counted.
+  if (!user) {
+    const verdict = await anonReadLimit(req, "grid");
+    if (!verdict.allowed) return anonReadRefusal(verdict);
+  }
 
   let reader: SupabaseClient;
   try {

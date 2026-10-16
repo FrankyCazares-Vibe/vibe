@@ -77,12 +77,15 @@ export function Section3d() {
         </li>
         <li>
           <strong>Abuse counts.</strong> We count how often some actions happen,
-          mostly per account. A few counts hold an IP address or part of one,
-          and a few hold a scrambled code made from an email address or from a
-          network. We clear
-          them from time to time, not on a set schedule, so they can stay for
-          weeks. Apart from these counts, the parts of the database that we
-          built hold no IP address.
+          mostly per account. A few counts are kept under a scrambled code
+          made from an email address, not under the address. A few are kept
+          under a scrambled code made from a network (an IP address or part of
+          one), the day and a secret only our servers hold, and a
+          network&apos;s code changes every day. The network counts include
+          how often a browser that is not signed in opens a profile, a club
+          page or a post&apos;s share link, in an hour and in a day. They do
+          not say which page was opened. We delete each count within three
+          days. The parts of the database that we built hold no IP address.
         </li>
         <li>
           <strong>Sign-in records.</strong> The sign-in system, which is

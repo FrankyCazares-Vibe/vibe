@@ -7,7 +7,7 @@ import {
   verifySchoolEmailCode,
 } from "@/lib/auth/school-email-token";
 import {
-  clientNetworkKey,
+  clientNetworkCode,
   rateLimit,
   tooManyRequests,
   type RateLimitResult,
@@ -65,6 +65,8 @@ function denied(result: RateLimitResult, limitCopy: string) {
  *   the account typing it). The per-network one is a backstop sized for a
  *   signup table on shared campus Wi-Fi, where one IPv4 address can be a
  *   whole room; IPv6 is bucketed by /64 so rotating addresses doesn't help.
+ *   It is keyed on the network's scrambled code for the day, never the
+ *   address.
  */
 export async function POST(req: Request) {
   if (!isSchoolVerifySecretConfigured() || !isSupabaseServiceConfigured()) {
@@ -125,7 +127,10 @@ export async function POST(req: Request) {
     return denied(perUser, tooManyTries(perUser.retryAfterSec));
   }
 
-  const perIp = await rateLimit(`school-code-ip:${clientNetworkKey(req)}`, {
+  // The network's scrambled code for the day, never the address. No code
+  // (no secret) refuses, as a limiter that's down does.
+  const netCode = clientNetworkCode(req, "school-code-ip");
+  const perIp = await rateLimit(netCode === null ? null : `school-code-ip:${netCode}`, {
     limit: 150,
     windowSec: PER_IP_WINDOW_SEC,
     failClosed: true,

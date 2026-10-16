@@ -249,6 +249,10 @@ function _vibeTopHere() {
     // test as src/lib/native/detect.ts; keep the regex in step with it.
     if (st === 403 && sig.code === 'plus_required' && _vibeInStoreApp()) return { message: "That isn't available in the app." };
     if (st === 403 && sig.code === 'plus_required') return { message: "That's a Vibe+ feature.", action: { label: 'See Vibe+', href: '/plus?next=' + next } };
+    // The cap on signed-out reads: a busy hour for visitors who aren't signed
+    // in, nothing this one did. Twin of the anon_read_limited rule in
+    // src/lib/feedback/failure-copy.ts; change both together.
+    if (st === 429 && sig.code === 'anon_read_limited') return { message: "Vibe is getting a lot of visits from people who aren't signed in. Try again later, or sign in.", action: { label: 'Sign in', href: '/auth/login?next=' + next } };
     if (st === 429) return { message: "You're going a little fast. " + retryLine(sig.retryAfterSec) };
     if (st === 403 && err === 'Unavailable') return { message: "You can't connect with this person." };
     if (st === 403 && isSentence(err)) return { message: err.trim() };

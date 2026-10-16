@@ -1,3 +1,4 @@
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 
 import { cronAuthorization } from "@/lib/cron/auth";
@@ -10,6 +11,8 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 const NO_STORE = { "cache-control": "no-store" };
+/** The limiter's purge gives up after this, so it can't hold the answer to maxDuration. */
+const LIMIT_PURGE_TIMEOUT_MS = 10_000;
 
 /**
  * GET /api/cron/waitlist-purge: the daily backstop of the waitlist's
@@ -31,8 +34,17 @@ const NO_STORE = { "cache-control": "no-store" };
  * public.waitlist_purge_expired). The answer carries only a count, never an
  * address.
  *
+ * THEN THE LIMITER'S OLD COUNTS, whatever the waitlist purge did:
+ * public.rate_limits_purge (20261015120000) deletes every limiter count whose
+ * window started over a day ago, so the Privacy Policy's "within three days"
+ * holds. /api/cron/school-checkin runs the same purge at 14:47, since a cron
+ * is never retried. `rate_limits_deleted` is how many went, or null when the
+ * purge failed or isn't applied yet; that is logged, and never fails the
+ * waitlist purge.
+ *
  * RESPONSES
- *   200 {ok:true, deleted} · 401 not Vercel Cron · 503 no service key · 500 purge_failed
+ *   200 {ok:true, deleted, rate_limits_deleted} · 401 not Vercel Cron
+ *   503 no service key · 500 {ok:false, error:"purge_failed", rate_limits_deleted}
  */
 export async function GET(req: Request) {
   const auth = cronAuthorization(req.headers.get("authorization"), process.env.CRON_SECRET);
@@ -47,11 +59,39 @@ export async function GET(req: Request) {
     return NextResponse.json({ ok: false, error: "unavailable" }, { status: 503, headers: NO_STORE });
   }
 
+  let service: SupabaseClient | null = null;
+  let deleted: number | null = null;
   try {
-    const deleted = await purgeExpiredWaitlist(createSupabaseServiceClient());
-    return NextResponse.json({ ok: true, deleted }, { headers: NO_STORE });
+    service = createSupabaseServiceClient();
+    deleted = await purgeExpiredWaitlist(service);
   } catch (err) {
     console.error("[cron/waitlist-purge]", redactAddresses(err instanceof Error ? err.message : String(err)));
-    return NextResponse.json({ ok: false, error: "purge_failed" }, { status: 500, headers: NO_STORE });
+  }
+  // After the job, whether it worked or not; never this job's failure.
+  const rate_limits_deleted = service ? await purgeLimitCounts(service) : null;
+  if (deleted === null) {
+    return NextResponse.json({ ok: false, error: "purge_failed", rate_limits_deleted }, { status: 500, headers: NO_STORE });
+  }
+  return NextResponse.json({ ok: true, deleted, rate_limits_deleted }, { headers: NO_STORE });
+}
+
+/**
+ * public.rate_limits_purge(): how many old limiter counts went, or null when
+ * it failed (the error is logged; it holds no key, the function answers a
+ * count). Never throws. The twin of the one in /api/cron/school-checkin.
+ */
+async function purgeLimitCounts(service: SupabaseClient): Promise<number | null> {
+  try {
+    const { data, error } = await service
+      .rpc("rate_limits_purge")
+      .abortSignal(AbortSignal.timeout(LIMIT_PURGE_TIMEOUT_MS));
+    if (error) {
+      console.error("[cron/waitlist-purge] limiter purge:", error.code || "no code", error.message.slice(0, 120));
+      return null;
+    }
+    return typeof data === "number" ? data : null;
+  } catch (err) {
+    console.error("[cron/waitlist-purge] limiter purge:", err instanceof Error ? err.message.slice(0, 120) : "failed");
+    return null;
   }
 }

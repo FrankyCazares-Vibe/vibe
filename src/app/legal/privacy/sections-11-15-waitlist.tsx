@@ -63,11 +63,12 @@ export function Section11Waitlist() {
         label, if the link had one. The tally holds no IP address, no browser,
         no device and no cookie (<Sec to="3d">section 3d</Sec>). Apart from
         your entry and that tally, three counts stop abuse. The waitlist pages
-        count how often each IP address uses them. The form counts how often
-        one school address is sent in, and keeps that count under a scrambled
-        code, not the address. The tally counts the opens from each network
-        under a scrambled code that changes every day, not the address. These
-        counts can stay for weeks.
+        count how often each network uses them, under a scrambled code that
+        changes every day, not the address. The form counts how often one
+        school address is sent in, and keeps that count under a scrambled code,
+        not the address. The tally counts the opens from each network under a
+        scrambled code that changes every day, not the address. We delete these
+        counts within three days.
       </LegalP>
       <LegalP>
         One more place could hold what you typed. Sentry is the service we use
@@ -172,7 +173,7 @@ export function Section11Waitlist() {
           Our email log, without the scrambled code. It keeps the reference
           number Resend gave each message.
         </li>
-        <li>The abuse counts, until they are cleared.</li>
+        <li>The abuse counts, which we delete within three days.</li>
         <li>
           Resend&apos;s own record of the emails it sent you. It holds your
           address and, for the access-code email, your name and the access code.

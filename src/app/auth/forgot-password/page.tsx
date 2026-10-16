@@ -3,54 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 
-/**
- * The per-network limit resets in 15 minutes; the per-address ones can take
- * up to an hour or a day, which Retry-After reports
- * (src/lib/auth/password-reset-limits.ts).
- */
-const DEFAULT_RETRY_MINUTES = 15;
-
-const UNAVAILABLE_COPY =
-  "Password reset isn't available right now. Try again in a few minutes.";
-
-function tooManyRequestsCopy(retryAfter: string | null): string {
-  const seconds = Number(retryAfter);
-  const known = retryAfter !== null && Number.isFinite(seconds) && seconds > 0;
-  // A wait shorter than the shortest limit isn't a limit at all: the server
-  // couldn't count the request and refused it to be safe.
-  if (known && seconds < DEFAULT_RETRY_MINUTES * 60) return UNAVAILABLE_COPY;
-  // Over an hour is the per-address daily limit. It resets at midnight UTC,
-  // which is evening in Indiana, so "tomorrow" could be too early: 24 hours
-  // is the longest the wait can be.
-  if (known && seconds > 60 * 60) {
-    return "Too many reset requests. Try again in 24 hours.";
-  }
-  const minutes =
-    known && seconds > DEFAULT_RETRY_MINUTES * 60
-      ? Math.ceil(seconds / 60)
-      : DEFAULT_RETRY_MINUTES;
-  return `Too many reset requests. Try again in ${minutes} minutes.`;
-}
-
-/**
- * What to tell the student after POST /api/auth/password-reset, or null when
- * the request went through. Never the server's own text: a 503 carries a
- * config message meant for us, and a 5xx from the host may not be JSON.
- */
-function resetRequestError(
-  status: number,
-  retryAfter: string | null,
-  body: unknown,
-): string | null {
-  if (status === 429) return tooManyRequestsCopy(retryAfter);
-  const ok =
-    status >= 200 &&
-    status < 300 &&
-    typeof body === "object" &&
-    body !== null &&
-    (body as { ok?: unknown }).ok === true;
-  return ok ? null : UNAVAILABLE_COPY;
-}
+import { resetRequestError } from "@/lib/auth/password-reset-copy";
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("");

@@ -15,7 +15,12 @@ import {
 import { sendSchoolVerificationEmail } from "@/lib/email/resend-transactional";
 import { requireTermsAccepted } from "@/lib/legal/require-terms";
 import { schoolIdentityConflict } from "@/lib/moderation/access";
-import { clientNetworkKey, rateLimit, tooManyRequests } from "@/lib/rate-limit";
+import {
+  clientNetworkCode,
+  rateLimit,
+  tooManyRequests,
+  type RateLimitResult,
+} from "@/lib/rate-limit";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import {
   createSupabaseServiceClient,
@@ -23,6 +28,22 @@ import {
 } from "@/lib/supabase/service";
 
 type Body = { schoolEmail?: string };
+
+/** Both limits fail closed: when the limiter can't count, nothing is sent and nothing was spent. */
+const LIMITER_DOWN = "Couldn't send the email right now. Try again in a minute.";
+
+/**
+ * The 429 for a refused limit. rateLimit says why: "limited" is the count
+ * spent (`limitCopy`, retrying when the window ends); "unavailable" is the
+ * limiter's own failure, refused with a short 60s retry, so the student
+ * hears that, not "you've asked too often" (limits plan, critique #7).
+ */
+function denied(result: RateLimitResult, limitCopy: string) {
+  return tooManyRequests(
+    result,
+    result.reason === "unavailable" ? LIMITER_DOWN : limitCopy,
+  );
+}
 
 /**
  * P1-006 — request school email verification (signed link + typed code, Resend).
@@ -146,28 +167,34 @@ export async function POST(req: Request) {
   //
   // These MUST stay above the "linked to another account" lookup below:
   // without a limit in front of it, that 409 is an unlimited oracle for
-  // which school addresses already have a Vibe account.
+  // which school addresses already have a Vibe account. That is also why
+  // both fail closed: a limiter that can't count must not open the oracle,
+  // or the email allowance, for as long as the database is down.
   const perUser = await rateLimit(`school-email:${user.id}`, {
     limit: 3,
     windowSec: 3600,
+    failClosed: true,
   });
   if (!perUser.allowed) {
-    return tooManyRequests(
+    return denied(
       perUser,
       "You've asked for 3 emails this hour. Use the code or link from the newest one, or try again later this hour.",
     );
   }
 
   // Per network, sized for a signup table on shared campus Wi-Fi, where one
-  // IPv4 address can be a whole room. IPv6 counts by /64, so rotating
+  // IPv4 address can be a whole room. Keyed on the network's scrambled code
+  // for the day, never the address; IPv6 counts by /64, so rotating
   // addresses doesn't buy more sends; the per-user limit above still caps
-  // each account at 3.
-  const perIp = await rateLimit(`school-email-ip:${clientNetworkKey(req)}`, {
+  // each account at 3. No code (no secret) refuses, like a limiter that's down.
+  const netCode = clientNetworkCode(req, "school-email-ip");
+  const perIp = await rateLimit(netCode === null ? null : `school-email-ip:${netCode}`, {
     limit: 60,
     windowSec: 3600,
+    failClosed: true,
   });
   if (!perIp.allowed) {
-    return tooManyRequests(
+    return denied(
       perIp,
       "Lots of verification emails from this network right now. Try again later this hour.",
     );

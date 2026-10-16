@@ -6,8 +6,10 @@ import {
   resetAddressLimits,
   resetHintLimit,
   resetNetworkLimit,
+  resetRefusalCode,
   resetSendLimits,
   type ResetLimit,
+  type ResetLimitResult,
 } from "@/lib/auth/password-reset-limits";
 import { normalizePersonalEmail } from "@/lib/auth/personal-email";
 import { isRetiredIuDomain, normalizeSchoolEmail } from "@/lib/auth/school-email-domains";
@@ -25,7 +27,7 @@ import {
   sendSigninHintEmail,
 } from "@/lib/email/resend-transactional";
 import { getActiveRestriction } from "@/lib/moderation/access";
-import { clientNetworkKey, rateLimit, tooManyRequests } from "@/lib/rate-limit";
+import { clientNetworkCode, rateLimit, tooManyRequests } from "@/lib/rate-limit";
 import {
   createSupabaseServiceClient,
   isSupabaseServiceConfigured,
@@ -36,6 +38,16 @@ type Body = { email?: string };
 /** One ask of the shared limiter for a limit from password-reset-limits.ts. */
 function hit(limit: ResetLimit) {
   return rateLimit(limit.key, limit);
+}
+
+/**
+ * The 429 for a refused request. Its `code` says whether the count is spent
+ * ("rate_limited") or the limiter couldn't count ("limiter_unavailable"), so
+ * the forgot-password page words each one right; the same for an address
+ * with or without an account.
+ */
+function refused(result: ResetLimitResult) {
+  return tooManyRequests(result, undefined, resetRefusalCode(result));
 }
 
 /** A read that is skipped: the typed address cannot be in that column. */
@@ -179,14 +191,15 @@ export async function POST(req: Request) {
       "If an account exists for that email, you'll receive reset instructions shortly.",
   };
 
-  // The network bucket, not the raw address: one device on IPv6 can pick a
-  // new address at will. Refuses when the limiter is down, as the cap below
-  // does, so a database hiccup is never an open door to the email allowance.
+  // The network's scrambled code for the day, never the address (IPv6
+  // counts by /64, so one device can't pick a new address for a fresh
+  // count). Refuses when the limiter is down or there is no code, as the cap
+  // below does, so neither is ever an open door to the email allowance.
   const perNetwork = await firstRefusal(
-    [resetNetworkLimit(clientNetworkKey(req))],
+    [resetNetworkLimit(clientNetworkCode(req, "pw-reset-net"))],
     hit,
   );
-  if (perNetwork) return tooManyRequests(perNetwork);
+  if (perNetwork) return refused(perNetwork);
 
   let body: Body;
   try {
@@ -207,7 +220,7 @@ export async function POST(req: Request) {
   // about who is on Vibe.
   const emailKey = recipientRateKey(email, process.env.SCHOOL_EMAIL_VERIFY_SECRET);
   const perAddress = await firstRefusal(resetAddressLimits(emailKey), hit);
-  if (perAddress) return tooManyRequests(perAddress);
+  if (perAddress) return refused(perAddress);
 
   if (!isSupabaseServiceConfigured()) {
     return NextResponse.json(

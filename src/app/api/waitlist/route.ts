@@ -3,7 +3,7 @@ import { after, NextResponse } from "next/server";
 import { getSiteOriginForRequest } from "@/lib/auth/site-url";
 import { sendWaitlistConfirmEmail } from "@/lib/email/resend-transactional";
 import { recipientRateKey, redactAddresses } from "@/lib/email/send-log-core";
-import { clientNetworkKey, rateLimit, tooManyRequests } from "@/lib/rate-limit";
+import { clientNetworkCode, rateLimit, tooManyRequests } from "@/lib/rate-limit";
 import { createSupabaseServiceClient, isSupabaseServiceConfigured } from "@/lib/supabase/service";
 import { remainingBudget, waitlistEmailKey } from "@/lib/waitlist/admin-view";
 import { waitlistConfirmUrl, waitlistLeaveUrl } from "@/lib/waitlist/email-content";
@@ -48,7 +48,8 @@ function badInput(field: "form" | "email", error: string, status = 400) {
  * browser must say same-origin), so no other website can make its visitors
  * submit the form; 400 for input that doesn't parse (the field and the copy,
  * from `parseWaitlistForm`); 429 for the per-network limit (30 an hour: a
- * tabling table on campus Wi-Fi shares one address) and the global one (300
+ * tabling table on campus Wi-Fi shares one address; counted on the network's
+ * scrambled code for the day, never the address) and the global one (300
  * an hour, closed if the limiter is down); 503 without a service key, and 503
  * when the waitlist's part of the database is not there or can't be reached
  * (request-guard.ts `waitlistStoreRefusal`: the site deployed before the
@@ -68,9 +69,10 @@ function badInput(field: "form" | "email", error: string, status = 400) {
  * date now (trigger `waitlist_restart_clock`, 20261003170000), so a late
  * confirm still gets the full time. A confirm email needs room in the CONFIRM budget
  * (`WAITLIST_CONFIRM_DAILY_CAP`, its own allowance: the form can never spend
- * the founders' access-code sends) and in this network's 10 a day; without
- * it the row is saved and nothing is sent. At most once an hour the same
- * background step runs the retention purge (store.ts
+ * the founders' access-code sends) and in this network's 10 a day (its own
+ * code, made before the answer goes, so the background step never holds the
+ * address); without it the row is saved and nothing is sent. At most once an
+ * hour the same background step runs the retention purge (store.ts
  * `purgeExpiredWaitlistIfDue`: every entry 38 days after it joined,
  * unconfirmed ones 28 days after their last confirm email, two days inside
  * the promised 40 and 30).
@@ -82,8 +84,12 @@ export async function POST(req: Request) {
   });
   if (refused) return badInput("form", refused.error, refused.status);
 
-  const network = clientNetworkKey(req);
-  const perNet = await rateLimit(`waitlist-net:${network}`, { limit: 30, windowSec: 3600 });
+  // Each per-network limit has its own scrambled code for the day, never the
+  // address, and both are made here, from the request. No code (no secret)
+  // skips that count, as a limiter that's down does.
+  const networkCode = clientNetworkCode(req, "waitlist-net");
+  const confirmNetworkCode = clientNetworkCode(req, "waitlist-confirm-net");
+  const perNet = await rateLimit(networkCode === null ? null : `waitlist-net:${networkCode}`, { limit: 30, windowSec: 3600 });
   if (!perNet.allowed) return tooManyRequests(perNet);
 
   let raw: unknown;
@@ -112,12 +118,21 @@ export async function POST(req: Request) {
 
   // Links point at this host locally (localhost:3102), at the site otherwise.
   const site = getSiteOriginForRequest(req);
-  after(() => saveAndConfirm(value, emailKey, site, network));
+  after(() => saveAndConfirm(value, emailKey, site, confirmNetworkCode));
   return NextResponse.json(OK);
 }
 
-/** The part of a submit that runs after the answer has gone. Never throws. */
-async function saveAndConfirm(value: WaitlistFormValue, emailKey: string, site: string, network: string): Promise<void> {
+/**
+ * The part of a submit that runs after the answer has gone. Never throws.
+ * `confirmNetworkCode` is the network's code for the confirm-email limit
+ * (null: no code, that count is skipped), never the address.
+ */
+async function saveAndConfirm(
+  value: WaitlistFormValue,
+  emailKey: string,
+  site: string,
+  confirmNetworkCode: string | null,
+): Promise<void> {
   try {
     const service = createSupabaseServiceClient();
     await purgeExpiredWaitlistIfDue(service);
@@ -134,7 +149,7 @@ async function saveAndConfirm(value: WaitlistFormValue, emailKey: string, site: 
     // Confirmed, invited or joined: nothing changes and nothing is sent.
     if (existing && (existing.confirmed_at || existing.code_hash || existing.redeemed_at)) return;
 
-    const token = (await mayEmail(service, network)) ? mintManageToken() : null;
+    const token = (await mayEmail(service, confirmNetworkCode)) ? mintManageToken() : null;
     if (!existing) {
       if ((await insertFormRow(service, value, emailKey, token?.hash ?? null)) === "exists") return;
     } else if (!token || !(await renewConfirmToken(service, existing.id, token.hash, value))) {
@@ -158,13 +173,16 @@ async function saveAndConfirm(value: WaitlistFormValue, emailKey: string, site: 
  * access-code budget) and this network's daily share. Warns when either is
  * spent, so a flood shows up in the logs.
  */
-async function mayEmail(service: ReturnType<typeof createSupabaseServiceClient>, network: string): Promise<boolean> {
+async function mayEmail(
+  service: ReturnType<typeof createSupabaseServiceClient>,
+  confirmNetworkCode: string | null,
+): Promise<boolean> {
   const budget = await readWaitlistBudget(service, "waitlist_confirm");
   if (remainingBudget(budget.used, budget.cap) < 1) {
     console.warn("[waitlist] the confirm-email budget is spent for today: a confirm email was not sent");
     return false;
   }
-  const perDay = await rateLimit(`waitlist-confirm-net:${network}`, {
+  const perDay = await rateLimit(confirmNetworkCode === null ? null : `waitlist-confirm-net:${confirmNetworkCode}`, {
     limit: CONFIRMS_PER_NETWORK_PER_DAY,
     windowSec: 86_400,
   });

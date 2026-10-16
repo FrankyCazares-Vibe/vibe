@@ -326,7 +326,7 @@ export function clientNetworkKey(req: Request): string {
 
 /**
  * clientNetworkKey as a scrambled code for one limiter's `purpose` (a short
- * tag like `pw-reset-ip`) on `now`'s UTC day: the key part a per-network
+ * tag like `pw-reset-net`) on `now`'s UTC day: the key part a per-network
  * limiter stores instead of the network (src/lib/tally/network-code.ts,
  * `limiterNetworkCode`, says how). The code changes at midnight UTC and
  * differs per purpose, so no two limiters' rows, and no two days', can be
@@ -338,7 +338,8 @@ export function clientNetworkKey(req: Request): string {
  * through). It never falls back to the address. A request with no address
  * header is the "unknown" network, one shared bucket, as today.
  *
- * Not used by any route yet: Wave 2 moves the 10 per-network keys onto it.
+ * Used by the 10 per-network limiters (since Oct 15 2026) and by the
+ * signed-out read cap (src/lib/security/anon-read-limit.ts).
  */
 export function clientNetworkCode(
   req: Request,
@@ -351,6 +352,32 @@ export function clientNetworkCode(
     utcDay(now),
     process.env.SCHOOL_EMAIL_VERIFY_SECRET,
   );
+}
+
+/**
+ * clientWideNetworkCode's network: an IPv6 address's /48, or null for IPv4
+ * (IPv4-mapped included) and anything that isn't an address. A /64 is one
+ * device or one Wi-Fi, but whoever holds a /48 (a free tunnel, some homes)
+ * holds 65,536 of them, each a fresh /64 count. Exported for tests.
+ */
+export function wideNetworkBucket(ip: string): string | null {
+  const narrow = /^([0-9a-f]{1,4}:[0-9a-f]{1,4}:[0-9a-f]{1,4}):[0-9a-f]{1,4}::\/64$/.exec(networkBucket(ip));
+  return narrow ? `${narrow[1]}::/48` : null;
+}
+
+/**
+ * clientNetworkCode for the /48 around an IPv6 address, made the same way
+ * (never stored as the prefix); null on IPv4, where there is no wider
+ * network to count, or with no secret. Only the signed-out read cap uses it.
+ */
+export function clientWideNetworkCode(
+  req: Request,
+  purpose: string,
+  now: Date = new Date(),
+): string | null {
+  const wide = wideNetworkBucket(clientIp(req));
+  if (wide === null) return null;
+  return limiterNetworkCode(purpose, wide, utcDay(now), process.env.SCHOOL_EMAIL_VERIFY_SECRET);
 }
 
 /** See clientNetworkKey. Exported for tests. */
@@ -414,15 +441,16 @@ function parseIpv6(address: string): number[] | null {
 
 /**
  * Standard 429 body + Retry-After header. `message` overrides the generic
- * copy. Only the retry is read, so a result shaped like ours without
- * `reason` (password-reset-limits.ts) fits too.
+ * copy; `code`, when given, goes in the body for a screen that words the
+ * refusal itself. Only the retry is read from `result`.
  */
 export function tooManyRequests(
   result: Pick<RateLimitResult, "retryAfterSec">,
   message = "Too many requests. Try again shortly.",
+  code?: string,
 ) {
   return new Response(
-    JSON.stringify({ ok: false, error: message }),
+    JSON.stringify(code ? { ok: false, code, error: message } : { ok: false, error: message }),
     {
       status: 429,
       headers: {

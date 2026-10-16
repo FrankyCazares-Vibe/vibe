@@ -88,6 +88,17 @@ const quiet: React.CSSProperties = {
 };
 const small: React.CSSProperties = { fontFamily: "DM Sans, sans-serif", fontSize: 12.5, lineHeight: 1.5, color: "var(--ink-muted)", margin: 0 };
 
+/**
+ * The line for a failed send or check. A 429 from these routes says which
+ * limit it was and how long is left, or that the code couldn't be sent or
+ * checked right now (src/app/api/me/personal-email/route.ts, school-checkin),
+ * and the shared copy would turn every one into "You're going a little fast",
+ * so the route's own sentence is shown, as StepCampus does.
+ */
+function limitLine(r: { status: number; error: string | null; message: string }): string {
+  return r.status === 429 && r.error ? r.error : r.message;
+}
+
 /** The two steps: the address, then the code. `onAdded` gets the stored address. */
 function AddPersonalEmail({ onAdded }: { onAdded: (email: string) => void }) {
   const [email, setEmail] = useState("");
@@ -105,7 +116,7 @@ function AddPersonalEmail({ onAdded }: { onAdded: (email: string) => void }) {
     const r = await vibeRequest("/api/me/personal-email", { method: "POST", json: { email: address }, quiet: true, failure: "Couldn't send the code." });
     setBusy(false);
     if (r.ok) setSentTo(address);
-    else setError(r.message);
+    else setError(limitLine(r));
   };
   const confirm = async () => {
     if (busy || !sentTo) return;
@@ -119,7 +130,7 @@ function AddPersonalEmail({ onAdded }: { onAdded: (email: string) => void }) {
     });
     setBusy(false);
     if (r.ok && typeof r.data.personal_email === "string") onAdded(r.data.personal_email);
-    else if (!r.ok) setError(r.message);
+    else if (!r.ok) setError(limitLine(r));
   };
 
   return (
@@ -348,7 +359,7 @@ function SchoolCheckinCard({ checkin, onDone }: { checkin: Checkin; onDone: () =
     const r = await vibeRequest("/api/me/school-checkin", { method: "POST", json: { code }, quiet: true, failure: "Couldn't check that code." });
     setBusy(false);
     if (r.ok) onDone();
-    else setError(r.message);
+    else setError(limitLine(r));
   };
   const again = async () => {
     if (busy) return;
@@ -357,7 +368,7 @@ function SchoolCheckinCard({ checkin, onDone }: { checkin: Checkin; onDone: () =
     const r = await vibeRequest("/api/me/school-checkin", { method: "PUT", quiet: true, failure: "Couldn't send the code." });
     setBusy(false);
     if (r.ok) setNote("Sent again to your school email.");
-    else setError(r.message);
+    else setError(limitLine(r));
   };
 
   return (

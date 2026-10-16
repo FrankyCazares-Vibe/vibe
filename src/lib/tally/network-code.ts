@@ -23,9 +23,10 @@
  * the limiter's purpose in it, so the waitlist's code for a network can't be
  * matched to the reset form's, or to the tally's. `networkDayCode` and its
  * label stay exactly as they are: changing either would change every code the
- * tally has already written (network-code.test.ts pins one). Nothing calls
- * the new one yet; Wave 2 moves the 10 per-network keys onto it through
- * `clientNetworkCode` in src/lib/rate-limit.ts.
+ * tally has already written (network-code.test.ts pins one). The 10
+ * per-network limiters and the signed-out read cap call the new one, through
+ * `clientNetworkCode` (and, for an IPv6 /48, `clientWideNetworkCode`) in
+ * src/lib/rate-limit.ts.
  */
 import { createHmac } from "node:crypto";
 
@@ -65,7 +66,7 @@ export function networkDayCode(
 const LIMITER_LABEL = "vibe:limiter-net:v1:";
 
 /**
- * A limiter's purpose, e.g. `pw-reset-ip`: short, lowercase, and no colon, so
+ * A limiter's purpose, e.g. `pw-reset-net`: short, lowercase, and no colon, so
  * label, purpose, day and network can't run into one another.
  */
 const PURPOSE_SHAPE = /^[a-z0-9-]{1,40}$/;
