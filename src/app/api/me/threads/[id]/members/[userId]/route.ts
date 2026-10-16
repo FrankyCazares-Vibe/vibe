@@ -1,11 +1,16 @@
 import { NextResponse } from "next/server";
 
 import { refusalBody } from "@/lib/chat/types";
+import { limitFor } from "@/lib/limits/budgets";
 import { isUuid } from "@/lib/pgrest";
+import { tooManyRequests } from "@/lib/rate-limit";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 
 type RouteCtx = { params: Promise<{ id: string; userId: string }> };
+
+/** What a refusal on the `threadSettings` budget says: the same line on every route that shares it (the numbers are in src/lib/limits/budgets.ts). */
+const SETTINGS_TOO_FAST = "You're changing chat settings too fast. Try again in a few minutes.";
 
 /**
  * Remove a member from a group chat.
@@ -16,10 +21,13 @@ type RouteCtx = { params: Promise<{ id: string; userId: string }> };
  * A CLUB'S ROOM CANNOT BE LEFT (chat rooms, wave 1, contract 6.6): the row is
  * what lists the room for the member, and nothing would bring it back. A club
  * room answers 400 `club_room`, for self and for others; the way out is to
- * leave the club. Asked first on the viewer's own client, before anything
- * else; then with the service role right before the delete (which runs with
+ * leave the club. Asked first on the viewer's own client, before any other
+ * read; then with the service role right before the delete (which runs with
  * the service role and so is held by no policy) whenever the first read
  * could not settle it: a kick, or a channel the viewer's read did not show.
+ *
+ * Leaving and removing count against the account's `threadSettings` budget
+ * (rate limits, wave 3), right after sign-in and before that first read.
  */
 export async function DELETE(_req: Request, ctx: RouteCtx) {
   const { id: channelId, userId: targetUserId } = await ctx.params;
@@ -31,6 +39,8 @@ export async function DELETE(_req: Request, ctx: RouteCtx) {
   if (authErr || !user) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
+  const rl = await limitFor("threadSettings", user.id);
+  if (!rl.allowed) return tooManyRequests(rl, SETTINGS_TOO_FAST);
 
   // The club-room guard, first. Read on the viewer's client, so a room the
   // viewer cannot see answers like any other thread they are not in (403

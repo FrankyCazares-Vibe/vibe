@@ -11,6 +11,7 @@ import {
 } from "@/lib/iu/campuses";
 import { campusScopeError } from "@/lib/iu/community-scope";
 import { hasBlockedNewLinkLabel } from "@/lib/club-routes/link-labels";
+import { limitFor } from "@/lib/limits/budgets";
 import {
   contentBlockedResponse,
   requireCanPublish,
@@ -745,6 +746,11 @@ export async function DELETE(_req: Request, { params }: Params) {
   if (!user) {
     return fail(401, "unauthorized", "Unauthorized");
   }
+
+  // `bigDelete`, shared with deleting an account (limits wave 3): before the
+  // first read, so a refused caller costs nothing.
+  const rl = await limitFor("bigDelete", user.id);
+  if (!rl.allowed) return tooManyRequests(rl, "Too many tries. Try again in a few minutes.");
 
   // The delete runs on the service role (authenticated holds no DELETE on
   // orgs since 20260929110000_post_club_deletes.sql; orgs_delete is dormant),

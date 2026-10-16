@@ -111,7 +111,9 @@ export function OrgJoinControl({
 
   const refuse = (r: VibeFailure) => {
     if (r.status === 429) {
-      toast({ message: ORG_COPY.errors.tooMany, tone: "error" });
+      // vibeRequest's line carries the route's own wait ("Try again in 8
+      // minutes"): a fixed "in a minute" would send them back too soon.
+      toast({ message: r.message, tone: "error" });
       return;
     }
     if (r.code === "not_found") {

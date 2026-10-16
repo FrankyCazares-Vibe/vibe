@@ -581,7 +581,8 @@ for (const policy of ["officers", "listed", "everyone"] as const) {
     assert.equal(argOf(update, "eq", "id"), CHANNEL);
     assert.equal(selectOf(update), `${UPDATED_COLUMNS}, post_policy`);
     assert.equal((res.body.channel as Record<string, unknown>).post_policy, policy);
-    assert.deepEqual(state.events, ["requireNotRestricted", ...GUARD, "service:channels.select", "service:channels.update"]);
+    assert.deepEqual(state.events, ["rateLimit", "requireNotRestricted", ...GUARD, "service:channels.select", "service:channels.update"]);
+    assert.deepEqual(state.rateArgs, [`budget-orgOfficer:${ME}`, { limit: 300, windowSec: 600 }]);
   });
 }
 
@@ -622,7 +623,7 @@ for (const missing of [NOT_IN_CACHE, MISSING_COLUMN]) {
     const channel = res.body.channel as Record<string, unknown>;
     assert.equal(channel.topic, "Rush week");
     assert.equal(channel.post_policy, "everyone", "a missing column means everyone");
-    assert.deepEqual(state.events, ["requireNotRestricted", ...GUARD, "service:channels.select", "service:channels.update", "service:channels.update"]);
+    assert.deepEqual(state.events, ["rateLimit", "requireNotRestricted", ...GUARD, "service:channels.select", "service:channels.update", "service:channels.update"]);
   });
 }
 
@@ -671,13 +672,13 @@ test("edit: a body without post_policy runs today's code: today's patch, today's
   assert.deepEqual(await edit({ topic: "New topic" }), { status: 500, body: { ok: false, error: "Failed to update channel" } }, "a missing schema without post_policy in the patch is not a 503");
 });
 
-test("edit: the gates before the room are today's (401, the restriction gate, the officer guard)", async () => {
+test("edit: the gates before the room (401, the limiter, the restriction gate, the officer guard)", async () => {
   const out = setup({ user: null });
   assert.deepEqual(await edit({ post_policy: "officers" }), { status: 401, body: { ok: false, error: "Unauthorized" } });
   assert.deepEqual(out.events, []);
   const restricted = setup({ restricted: true, service: editService("room") });
   assert.deepEqual(await edit({ post_policy: "officers" }), { status: 403, body: { ok: false, error: "restricted" } });
-  assert.deepEqual(restricted.events, ["requireNotRestricted"]);
+  assert.deepEqual(restricted.events, ["rateLimit", "requireNotRestricted"]);
   const member = setup({ role: "member", service: editService("room") });
   assert.deepEqual(await edit({ post_policy: "officers" }), { status: 403, body: { ok: false, error: "Admin only" } });
   assert.equal(updates(member).length, 0);

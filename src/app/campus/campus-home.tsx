@@ -16319,15 +16319,17 @@ function ChannelChat({
         }),
       );
       try {
-        const res = await fetch(
+        // vibeRequest shows the refusal (a 429 says when to try again), so
+        // the rollback below never makes a reaction just vanish.
+        const r = await vibeRequest(
           `/api/me/threads/${channelId}/messages/${messageId}/react`,
           {
             method: nextActive ? "POST" : "DELETE",
-            headers: { "content-type": "application/json" },
-            body: JSON.stringify({ emoji }),
+            json: { emoji },
+            failure: nextActive ? "Couldn't add your reaction." : "Couldn't remove your reaction.",
           },
         );
-        if (!res.ok) throw new Error(`react ${res.status}`);
+        if (!r.ok) throw new Error(`react ${r.status}`);
         // Refetch immediately so the next state replace already includes
         // (or excludes) this reaction. The pending guard above prevents
         // the 2s poll from racing with us in the meantime.

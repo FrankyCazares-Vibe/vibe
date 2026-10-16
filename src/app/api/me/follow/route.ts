@@ -10,6 +10,15 @@ type FollowBody = {
   target_handle?: unknown;
 };
 
+/**
+ * `follow:<uid>`, shared by follow (POST) and unfollow (DELETE). One
+ * constant, so the two can never disagree: the limiter's deny cache keys on
+ * the key, the limit and the window together (limits wave 3).
+ */
+const FOLLOW_LIMIT = { limit: 60, windowSec: 600 } as const;
+/** What a refusal on `follow:<uid>` says, following or unfollowing. */
+const FOLLOW_TOO_FAST = "Too many tries. Try again in a few minutes.";
+
 async function resolveTargetId(
   supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>,
   body: FollowBody,
@@ -65,8 +74,8 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, error: "Cannot follow yourself" }, { status: 400 });
   }
 
-  const rl = await rateLimit(`follow:${user.id}`, { limit: 60, windowSec: 600 });
-  if (!rl.allowed) return tooManyRequests(rl);
+  const rl = await rateLimit(`follow:${user.id}`, FOLLOW_LIMIT);
+  if (!rl.allowed) return tooManyRequests(rl, FOLLOW_TOO_FAST);
 
   // A block in either direction ends the relationship; neither party may
   // re-follow until it is lifted. Same two-direction pattern as the profile
@@ -108,7 +117,11 @@ export async function POST(req: Request) {
   return NextResponse.json({ ok: true });
 }
 
-/** Unfollow. Idempotent — deletes 0 rows is success. */
+/**
+ * Unfollow. Idempotent — deletes 0 rows is success. Counts against the same
+ * `follow:<uid>` budget as following, before the handle lookup, so a script
+ * can't loop follow and unfollow on one budget each.
+ */
 export async function DELETE(req: Request) {
   const supabase = await createSupabaseServerClient();
   const {
@@ -118,6 +131,8 @@ export async function DELETE(req: Request) {
   if (authErr || !user) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
+  const rl = await rateLimit(`follow:${user.id}`, FOLLOW_LIMIT);
+  if (!rl.allowed) return tooManyRequests(rl, FOLLOW_TOO_FAST);
 
   let body: FollowBody;
   try {

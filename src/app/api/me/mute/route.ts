@@ -1,6 +1,11 @@
 import { NextResponse } from "next/server";
 
+import { limitFor } from "@/lib/limits/budgets";
+import { tooManyRequests } from "@/lib/rate-limit";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+
+/** Mute and unmute count against the `prefs` budget (src/lib/limits/budgets.ts), before any read. */
+const PREFS_TOO_FAST = "Too many changes at once. Try again in a few minutes.";
 
 type Body = {
   target_id?: unknown;
@@ -47,6 +52,8 @@ export async function POST(req: Request) {
   if (authErr || !user) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
+  const rl = await limitFor("prefs", user.id);
+  if (!rl.allowed) return tooManyRequests(rl, PREFS_TOO_FAST);
 
   let body: Body;
   try {
@@ -99,6 +106,8 @@ export async function DELETE(req: Request) {
   if (authErr || !user) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
+  const rl = await limitFor("prefs", user.id);
+  if (!rl.allowed) return tooManyRequests(rl, PREFS_TOO_FAST);
 
   let body: Body;
   try {

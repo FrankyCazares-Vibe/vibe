@@ -18,6 +18,15 @@ type Params = { params: Promise<{ slug: string }> };
 
 type Body = { message?: unknown };
 
+/**
+ * `org-join:<uid>`, shared by joining (POST) and leaving (DELETE). One
+ * constant, so the two can never disagree: the limiter's deny cache keys on
+ * the key, the limit and the window together (limits wave 3).
+ */
+const JOIN_LIMIT = { limit: 30, windowSec: 600 } as const;
+/** What a refusal on `org-join:<uid>` says, joining or leaving. */
+const JOIN_TOO_FAST = "Too many tries. Try again in a few minutes.";
+
 /** The error shape every org route now speaks (spec §4 conventions). */
 function fail(
   status: number,
@@ -72,8 +81,8 @@ export async function POST(req: Request, { params }: Params) {
   // Plan §2.6: join had neither a limit nor a Terms gate. 30 per 10 minutes
   // is far above a human tapping Join and low enough that a script can't walk
   // the club directory filing requests.
-  const rl = await rateLimit(`org-join:${user.id}`, { limit: 30, windowSec: 600 });
-  if (!rl.allowed) return tooManyRequests(rl);
+  const rl = await rateLimit(`org-join:${user.id}`, JOIN_LIMIT);
+  if (!rl.allowed) return tooManyRequests(rl, JOIN_TOO_FAST);
 
   const termsGate = await requireTermsAccepted(user.id);
   if (termsGate) return termsGate;
@@ -269,6 +278,10 @@ export async function POST(req: Request, { params }: Params) {
  * org_channel_members), in the database: the SECURITY DEFINER AFTER DELETE
  * trigger `org_members_drop_club_access` (20260928100000). A voluntary leave
  * keeps RSVPs; only a removal (members/[userId] DELETE) drops those.
+ *
+ * Leaving counts against the same `org-join:<uid>` budget as joining
+ * (limits wave 3), before the first read: joining and leaving in a loop
+ * spend one budget, not two.
  */
 export async function DELETE(_req: Request, { params }: Params) {
   const { slug } = await params;
@@ -277,6 +290,9 @@ export async function DELETE(_req: Request, { params }: Params) {
   if (!user) {
     return fail(401, "unauthorized", "Unauthorized");
   }
+
+  const rl = await rateLimit(`org-join:${user.id}`, JOIN_LIMIT);
+  if (!rl.allowed) return tooManyRequests(rl, JOIN_TOO_FAST);
 
   const service = createSupabaseServiceClient();
   const { data: org, error: orgErr } = await service

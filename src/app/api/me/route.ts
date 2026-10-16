@@ -7,7 +7,9 @@ import {
   isStripeResourceMissing,
   logBillingError,
 } from "@/lib/billing/stripe";
+import { limitFor } from "@/lib/limits/budgets";
 import { purgeUserUploads, type PurgeResult } from "@/lib/profile/storage-purge";
+import { tooManyRequests } from "@/lib/rate-limit";
 import {
   createSupabaseServiceClient,
   isSupabaseServiceConfigured,
@@ -22,7 +24,10 @@ type DeleteBody = { confirm_handle?: unknown };
  * email hosting + lets users exercise the right-to-be-forgotten.
  *
  * Flow:
- *   1. Verify the signed-in user.
+ *   1. Verify the signed-in user, then count one try against the
+ *      `bigDelete` budget (src/lib/limits/budgets.ts, shared with deleting a
+ *      club) before anything is read. It lets through when the limiter
+ *      can't count: nobody should be kept from leaving by a hiccup.
  *   2. Require `confirm_handle` to match the user's actual handle — guards
  *      against accidental double-clicks and confused-deputy attacks (a
  *      malicious site can't trigger this without knowing the handle).
@@ -65,6 +70,8 @@ export async function DELETE(req: Request) {
   if (authErr || !user) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
+  const rl = await limitFor("bigDelete", user.id);
+  if (!rl.allowed) return tooManyRequests(rl, "Too many tries. Try again in a few minutes.");
 
   let body: DeleteBody;
   try {

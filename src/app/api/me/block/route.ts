@@ -1,8 +1,19 @@
 import { NextResponse } from "next/server";
 
+import { limitFor } from "@/lib/limits/budgets";
 import { isUuid } from "@/lib/pgrest";
+import { tooManyRequests } from "@/lib/rate-limit";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
+
+/**
+ * Block and unblock share the `block` budget (src/lib/limits/budgets.ts),
+ * counted right after sign-in and before any read. It is not behind the
+ * Terms or restriction gates, so a suspended account that may still block
+ * is limited too. It lets through when the limiter can't count: nobody
+ * should be kept from blocking by a database hiccup.
+ */
+const BLOCK_TOO_FAST = "Too many blocks and unblocks at once. Try again in a few minutes.";
 
 type Body = {
   target_id?: unknown;
@@ -119,6 +130,8 @@ export async function POST(req: Request) {
   if (authErr || !user) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
+  const rl = await limitFor("block", user.id);
+  if (!rl.allowed) return tooManyRequests(rl, BLOCK_TOO_FAST);
 
   let body: Body;
   try {
@@ -242,6 +255,8 @@ export async function DELETE(req: Request) {
   if (authErr || !user) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
+  const rl = await limitFor("block", user.id);
+  if (!rl.allowed) return tooManyRequests(rl, BLOCK_TOO_FAST);
 
   let body: Body;
   try {

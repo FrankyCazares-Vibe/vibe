@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 
+import { limitFor } from "@/lib/limits/budgets";
+import { tooManyRequests } from "@/lib/rate-limit";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 type RouteContext = { params: Promise<{ id: string }> };
@@ -19,6 +21,9 @@ export async function DELETE(_req: Request, ctx: RouteContext) {
   if (authErr || !user) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
+  // The `prefs` budget (src/lib/limits/budgets.ts), before the delete.
+  const rl = await limitFor("prefs", user.id);
+  if (!rl.allowed) return tooManyRequests(rl, "Too many changes at once. Try again in a few minutes.");
 
   const { error } = await supabase
     .from("personal_events")

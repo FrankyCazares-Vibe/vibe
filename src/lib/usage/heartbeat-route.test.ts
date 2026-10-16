@@ -2,7 +2,12 @@
  * POST /api/me/heartbeat against fakes of both Supabase clients: who may
  * check in, what reaches `public.usage_touch` (the account from the sign-in
  * server, never from the body), the fallback while the function is missing,
- * and that every answer is no-store.
+ * the 20-second gate (a repeat skipped only when nothing is opened, never
+ * across a UTC midnight, the memory capped), and that every answer is
+ * no-store.
+ *
+ * THE CLOCK is node:test's mock of Date, so the gate can be stepped through:
+ * every install() moves it 21 s on, past the gate, unless told not to.
  *
  * Run with:
  *   node --test --experimental-strip-types src/lib/usage/heartbeat-route.test.ts
@@ -14,7 +19,7 @@
 
 import assert from "node:assert/strict";
 import * as nodeModule from "node:module";
-import { test } from "node:test";
+import { mock, test } from "node:test";
 
 type NextResolve = (specifier: string, context?: unknown) => unknown;
 const { registerHooks } = nodeModule as unknown as {
@@ -46,6 +51,9 @@ const routeSpecifier = "../../app/api/me/heartbeat/route.ts";
 type Answer = { status: number; body: { ok: boolean; error?: string }; headers: Record<string, string> };
 const route = (await import(routeSpecifier)) as { POST: (req: Request) => Promise<Answer> };
 
+const NOON_UTC = Date.parse("2026-10-16T12:00:00Z");
+mock.timers.enable({ apis: ["Date"], now: NOON_UTC });
+
 type PgError = { code?: string; message: string } | null;
 type Seen = { rpc: [string, unknown][]; updates: { patch: unknown; eq: unknown[] }[] };
 
@@ -53,7 +61,15 @@ const ME = "11111111-1111-4111-8111-111111111111";
 const SOMEONE_ELSE = "22222222-2222-4222-8222-222222222222";
 
 /** Installs both fakes: the person's own client (sign-in and the fallback) and the service client (the check-in). */
-function install(opts: { user?: string | null; rpcError?: PgError; rpcThrows?: boolean; updateError?: PgError }): Seen {
+function install(opts: {
+  user?: string | null;
+  rpcError?: PgError;
+  rpcThrows?: boolean;
+  updateError?: PgError;
+  /** false: keep the clock where it is (the gate still remembers the last check-in). */
+  tick?: boolean;
+}): Seen {
+  if (opts.tick !== false) mock.timers.tick(21_000);
   const seen: Seen = { rpc: [], updates: [] };
   const g = globalThis as Record<string, unknown>;
   g.__vibeBeatUser = {
@@ -167,4 +183,80 @@ test("any other error from the check-in: 500, and no fallback write", async () =
   const res = await post(JSON.stringify({ device: "phone" }));
   assert.equal(res.status, 500);
   assert.deepEqual(seen.updates, []);
+});
+
+test("the gate: a repeat within 20 s with nothing opened answers 200 and calls nothing; an open always goes through", async () => {
+  const seen = install({});
+  await post(JSON.stringify({ device: "phone" }));
+  assert.equal(seen.rpc.length, 1);
+
+  mock.timers.tick(5_000);
+  const skipped = await post(JSON.stringify({ device: "phone" }));
+  assert.equal(skipped.status, 200);
+  assert.deepEqual(skipped.body, { ok: true });
+  assertNoStore(skipped);
+  await post(undefined);
+  assert.equal(seen.rpc.length, 1, "no database call for a repeat");
+  assert.deepEqual(seen.updates, [], "and no fallback write either");
+
+  // Otto and map opens are counted, so they are never skipped.
+  await post(JSON.stringify({ device: "phone", open: "otto" }));
+  await post(JSON.stringify({ device: "phone", open: "map" }));
+  assert.deepEqual(seen.rpc.slice(1), [
+    ["usage_touch", { p_user: ME, p_device: "phone", p_open: "otto" }],
+    ["usage_touch", { p_user: ME, p_device: "phone", p_open: "map" }],
+  ]);
+
+  // 20 s after the last one that landed (the map open), a check-in goes through again.
+  mock.timers.tick(19_999);
+  await post(JSON.stringify({ device: "phone" }));
+  assert.equal(seen.rpc.length, 3);
+  mock.timers.tick(1);
+  await post(JSON.stringify({ device: "phone" }));
+  assert.equal(seen.rpc.length, 4);
+});
+
+test("the gate is per account, and remembers only a check-in that landed", async () => {
+  let seen = install({});
+  await post(JSON.stringify({ device: "phone" }));
+  assert.equal(seen.rpc.length, 1);
+  seen = install({ user: SOMEONE_ELSE, tick: false });
+  await post(JSON.stringify({ device: "phone" }));
+  assert.deepEqual(seen.rpc, [["usage_touch", { p_user: SOMEONE_ELSE, p_device: "phone", p_open: null }]]);
+
+  // A failed check-in is not remembered: the next one is tried at once.
+  seen = install({ rpcError: { code: "XX000", message: "down" } });
+  assert.equal((await post(JSON.stringify({ device: "phone" }))).status, 500);
+  seen = install({ tick: false });
+  await post(JSON.stringify({ device: "phone" }));
+  assert.equal(seen.rpc.length, 1);
+});
+
+test("the gate never skips a day's first check-in (UTC midnight)", async () => {
+  install({});
+  mock.timers.setTime(Date.parse("2026-10-16T23:59:55Z"));
+  const seen = install({ tick: false });
+  await post(JSON.stringify({ device: "phone" }));
+  mock.timers.tick(10_000);
+  await post(JSON.stringify({ device: "phone" }));
+  assert.equal(seen.rpc.length, 2, "00:00:05 is a new UTC day");
+  mock.timers.tick(5_000);
+  await post(JSON.stringify({ device: "phone" }));
+  assert.equal(seen.rpc.length, 2, "and within the new day the gate holds again");
+});
+
+test("the gate's memory stays capped at 10,000 accounts: the oldest goes first", async () => {
+  const seen = install({});
+  await post(JSON.stringify({ device: "desktop" }));
+  const g = globalThis as Record<string, unknown>;
+  for (let n = 0; n < 10_000; n += 1) {
+    const id = `00000000-0000-4000-8000-${n.toString().padStart(12, "0")}`;
+    g.__vibeBeatUser = { auth: { getUser: async () => ({ data: { user: { id } }, error: null }) } };
+    await post(JSON.stringify({ device: "desktop" }));
+  }
+  assert.equal(seen.rpc.length, 10_001);
+  // All within the same second, so only the cap can have let ME go.
+  const again = install({ tick: false });
+  await post(JSON.stringify({ device: "desktop" }));
+  assert.equal(again.rpc.length, 1, "the oldest account was dropped, so it is checked in again");
 });

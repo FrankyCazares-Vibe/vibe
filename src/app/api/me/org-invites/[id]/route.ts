@@ -1,8 +1,10 @@
 import { NextResponse } from "next/server";
 
 import { requireTermsAccepted } from "@/lib/legal/require-terms";
+import { limitFor } from "@/lib/limits/budgets";
 import { expireStaleInvites } from "@/lib/orgs/membership";
 import { isUuid } from "@/lib/pgrest";
+import { tooManyRequests } from "@/lib/rate-limit";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 
@@ -39,6 +41,8 @@ function fail(status: number, code: string, error: string): NextResponse {
  * 200 `{ok:true}` · 200 `{ok:true, already:true}` when it was already declined
  * 400 `invalid_action` · `invalid_body`
  * 401 `unauthorized` · 403 `terms_required`
+ * 429 (no code, as `orgErrorCopy` expects) — the `prefs` budget
+ *     (src/lib/limits/budgets.ts), counted before the Terms read
  * 404 `invite_not_found` — including every invite that is not this student's,
  *     so the endpoint can never confirm somebody else's invite exists
  * 409 `invite_not_pending` — accepted, revoked or expired
@@ -51,6 +55,8 @@ export async function POST(req: Request, { params }: Params) {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return fail(401, "unauthorized", "Unauthorized");
+  const rl = await limitFor("prefs", user.id);
+  if (!rl.allowed) return tooManyRequests(rl, "Too many changes at once. Try again in a few minutes.");
 
   const termsGate = await requireTermsAccepted(user.id);
   if (termsGate) return termsGate;

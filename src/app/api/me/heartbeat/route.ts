@@ -9,6 +9,29 @@ const NO_STORE = { "cache-control": "no-store" } as const;
 /** The refused fallback (see THE MINUTE AFTER THE CHANGE) is logged once per server, not per check-in. */
 let fallbackRefusedLogged = false;
 
+/** THE 20-SECOND GATE (below): how long a check-in stands in for the next, and how many accounts one server keeps. */
+const REPEAT_MS = 20_000;
+const REPEAT_MAX = 10_000;
+const DAY_MS = 86_400_000;
+/** Account id -> when this server last checked it in. Oldest first; nothing older than REPEAT_MS is kept. */
+const lastCheckIn = new Map<string, number>();
+
+/** This server checked the account in under 20 s ago, on the same UTC day (a day's first check-in is never skipped). */
+function checkedInJustNow(userId: string, now: number): boolean {
+  const at = lastCheckIn.get(userId);
+  return at !== undefined && now >= at && now - at < REPEAT_MS && Math.floor(at / DAY_MS) === Math.floor(now / DAY_MS);
+}
+
+/** Remembers a check-in that landed, then drops the stale and, past REPEAT_MAX, the oldest. */
+function rememberCheckIn(userId: string, now: number): void {
+  lastCheckIn.delete(userId);
+  lastCheckIn.set(userId, now);
+  for (const [id, at] of lastCheckIn) {
+    if (lastCheckIn.size <= REPEAT_MAX && now - at < REPEAT_MS) break;
+    lastCheckIn.delete(id);
+  }
+}
+
 function failed(): NextResponse {
   return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500, headers: NO_STORE });
 }
@@ -40,8 +63,19 @@ function failed(): NextResponse {
  * NO LIMITER HERE, on purpose. A per-account limiter key would keep an
  * hour-by-hour row for every active person in rate_limit_hit for days, a
  * record of when each person was online. The function is the throttle: it
- * skips the stamp while the last one is under a minute old, and a day's
- * opens stop at ten times that day's active people.
+ * skips the stamp while the last one is under a minute old (without
+ * locking the person's row, 20261016120000), and a day's opens stop at ten
+ * times that day's active people.
+ *
+ * THE 20-SECOND GATE (rate limits wave 3, Oct 16). A second check-in from
+ * the same account within 20 s of one that landed on THIS server answers
+ * 200 without calling the database. The stamp is then at most 80 s old,
+ * well inside the five-minute "active now" window, and the tab's next
+ * check-in moves it as usual. Only when nothing is opened: an Otto
+ * or map open always goes through, or it would go uncounted. Never across
+ * a UTC midnight, so a day's first check-in is not skipped. The memory is
+ * this server's only, holds no more than 10,000 accounts and nothing older
+ * than 20 s, and goes with the server: it is not a stored record.
  *
  * BEFORE THE CHANGE IS APPLIED the function is missing (PGRST202 / 42883),
  * and the route stamps the old way, with the person's own client: "active
@@ -75,6 +109,11 @@ export async function POST(req: Request) {
   const raw = length > 128 ? "" : await req.text().catch(() => "");
   const { device, open } = readTouchBody(raw);
 
+  const now = Date.now();
+  if (open === null && checkedInJustNow(user.id, now)) {
+    return NextResponse.json({ ok: true }, { headers: NO_STORE });
+  }
+
   let error: { code?: string; message?: string } | null;
   try {
     ({ error } = await createSupabaseServiceClient().rpc("usage_touch", {
@@ -86,7 +125,10 @@ export async function POST(req: Request) {
     console.error("[me/heartbeat]", err instanceof Error ? err.message : String(err));
     return failed();
   }
-  if (!error) return NextResponse.json({ ok: true }, { headers: NO_STORE });
+  if (!error) {
+    rememberCheckIn(user.id, now);
+    return NextResponse.json({ ok: true }, { headers: NO_STORE });
+  }
 
   if (!isMissingFunction(error)) {
     console.error("[me/heartbeat] usage_touch", error.code ?? "unknown", error.message);

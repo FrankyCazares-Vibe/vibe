@@ -2,11 +2,16 @@ import { NextResponse } from "next/server";
 
 import { refusalBody } from "@/lib/chat/types";
 import { loadClubOfficer } from "@/lib/club-routes/officer-guard";
+import { limitFor } from "@/lib/limits/budgets";
 import { requireNotRestricted } from "@/lib/moderation/access";
+import { tooManyRequests } from "@/lib/rate-limit";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 type Params = { params: Promise<{ slug: string; channelId: string }> };
 type PostBody = { user_id?: unknown; handle?: unknown };
+
+/** The `orgOfficer` refusal, the same line on every club officer route. */
+const OFFICER_BUSY = "Too many club changes at once. Try again in a few minutes.";
 
 /**
  * Owner/admin of THIS club, and the channel is the club's. A stranger asking
@@ -112,6 +117,12 @@ export async function POST(req: Request, { params }: Params) {
   if (!user) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
+
+  // One person per call, so a chapter's setup is many calls: `orgOfficer` is
+  // sized for that. Before the staff guard, so a refused caller costs no
+  // database read (limits wave 3). The GET above is a read and has none.
+  const rl = await limitFor("orgOfficer", user.id);
+  if (!rl.allowed) return tooManyRequests(rl, OFFICER_BUSY);
 
   const guard = await requireChannelStaff(slug, channelId, user.id, true);
   if ("response" in guard) return guard.response;

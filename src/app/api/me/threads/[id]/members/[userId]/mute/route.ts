@@ -1,9 +1,14 @@
 import { NextResponse } from "next/server";
 
+import { limitFor } from "@/lib/limits/budgets";
+import { tooManyRequests } from "@/lib/rate-limit";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 type RouteCtx = { params: Promise<{ id: string; userId: string }> };
 type Body = { duration_hours?: unknown };
+
+/** What a refusal on the `prefs` budget says: the same line on every route that shares it (the numbers are in src/lib/limits/budgets.ts). */
+const PREFS_TOO_FAST = "Too many changes at once. Try again in a few minutes.";
 
 const ALLOWED_HOURS: ReadonlySet<number> = new Set([1, 8, 24, 168]);
 const FOREVER_YEARS = 100;
@@ -13,6 +18,10 @@ const FOREVER_YEARS = 100;
  * Distinct from /api/me/mute (which is global) and /api/me/threads/[id]/mute
  * (which silences a whole channel). Body `{ duration_hours }` set to
  * 1/8/24/168, omitted = forever.
+ *
+ * Both methods count against the account's `prefs` budget (rate limits,
+ * wave 3), the one the global mute shares, right after sign-in and before
+ * the membership read.
  */
 export async function POST(req: Request, ctx: RouteCtx) {
   const { id: channelId, userId: targetUserId } = await ctx.params;
@@ -24,6 +33,8 @@ export async function POST(req: Request, ctx: RouteCtx) {
   if (authErr || !user) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
+  const rl = await limitFor("prefs", user.id);
+  if (!rl.allowed) return tooManyRequests(rl, PREFS_TOO_FAST);
   if (targetUserId === user.id) {
     return NextResponse.json({ ok: false, error: "Cannot mute yourself" }, { status: 400 });
   }
@@ -94,6 +105,8 @@ export async function DELETE(_req: Request, ctx: RouteCtx) {
   if (authErr || !user) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
+  const rl = await limitFor("prefs", user.id);
+  if (!rl.allowed) return tooManyRequests(rl, PREFS_TOO_FAST);
   const { error } = await supabase
     .from("channel_member_mutes")
     .delete()

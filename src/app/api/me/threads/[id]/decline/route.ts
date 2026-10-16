@@ -1,10 +1,15 @@
 import { NextResponse } from "next/server";
 
 import { refusalBody } from "@/lib/chat/types";
+import { limitFor } from "@/lib/limits/budgets";
 import { isUuid } from "@/lib/pgrest";
+import { tooManyRequests } from "@/lib/rate-limit";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 type RouteCtx = { params: Promise<{ id: string }> };
+
+/** What a refusal on the `threadSettings` budget says: the same line on every route that shares it (the numbers are in src/lib/limits/budgets.ts). */
+const SETTINGS_TOO_FAST = "You're changing chat settings too fast. Try again in a few minutes.";
 
 /**
  * Decline a message request — removes the viewer's own membership row while
@@ -34,6 +39,8 @@ export async function POST(_req: Request, ctx: RouteCtx) {
   if (authErr || !user) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
+  const rl = await limitFor("threadSettings", user.id);
+  if (!rl.allowed) return tooManyRequests(rl, SETTINGS_TOO_FAST);
 
   // The club-room guard. Read on the viewer's client: a room they hold a row
   // on is a room they can read. An id that is not a uuid names no room and

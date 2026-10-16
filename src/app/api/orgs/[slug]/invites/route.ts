@@ -93,10 +93,10 @@ export const PAIR_INVITE_WINDOW_DAYS = 90;
 /** {@link PAIR_INVITE_WINDOW_DAYS} in milliseconds. */
 export const PAIR_INVITE_WINDOW_MS = PAIR_INVITE_WINDOW_DAYS * 24 * 60 * 60 * 1000;
 
-/** Per officer: 30 invites an hour. */
-const LIMIT_PER_OFFICER = { limit: 30, windowSec: 3600 };
-/** Per org: 100 invites a day, across all of its officers. */
-const LIMIT_PER_ORG = { limit: 100, windowSec: 86400 };
+/** Per officer: 50 invites an hour (Franky, Oct 16: a chapter is invited at its demo day). */
+const LIMIT_PER_OFFICER = { limit: 50, windowSec: 3600 };
+/** Per org: 200 invites a day, across all of its officers (Franky, Oct 16). */
+const LIMIT_PER_ORG = { limit: 200, windowSec: 86400 };
 /** Per invitee: 10 invites a day, across all orgs (critic A6b). */
 const LIMIT_PER_INVITEE = { limit: 10, windowSec: 86400 };
 

@@ -2,9 +2,11 @@ import { NextResponse } from "next/server";
 
 import { REMOVED_PICTURE_MESSAGE } from "@/app/api/admin/images/_lib/removed-picture";
 import { checkRemovedPicture } from "@/app/api/admin/images/_lib/removed-picture-store";
+import { limitFor } from "@/lib/limits/budgets";
 import { contentBlockedResponse, requireCanPublish } from "@/lib/moderation/access";
 import { checkText } from "@/lib/moderation/text-filter";
 import { GROUP_PHOTO_KEY_PREFIX } from "@/lib/r2";
+import { tooManyRequests } from "@/lib/rate-limit";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 
@@ -14,6 +16,9 @@ type Body = {
   /** R2 object key (`groups/<channel_id>/<uuid>.<ext>`). Pass null/empty to clear. */
   photo_url?: unknown;
 };
+
+/** What a refusal on the `threadEdit` budget says: the same line on every route that shares it (the numbers are in src/lib/limits/budgets.ts). */
+const EDIT_TOO_FAST = "You're changing this group too fast. Try again in a few minutes.";
 
 /**
  * PATCH a channel — set group name or photo. Any member can change either
@@ -30,6 +35,9 @@ type Body = {
  * follow-up P2): the takedown keeps the R2 object as evidence, so re-sending
  * its key would put it back in every member's inbox. 422 picture_removed; a
  * new upload (new random key) passes.
+ *
+ * Renames and photo changes count against the account's `threadEdit` budget
+ * (rate limits, wave 3): every member sees each one in their inbox.
  */
 export async function PATCH(req: Request, ctx: RouteCtx) {
   const { id: channelId } = await ctx.params;
@@ -41,6 +49,11 @@ export async function PATCH(req: Request, ctx: RouteCtx) {
   if (authErr || !user) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
+
+  // Before the gate: requireCanPublish reads the account, and a refused
+  // caller should cost one count, not a read.
+  const rl = await limitFor("threadEdit", user.id);
+  if (!rl.allowed) return tooManyRequests(rl, EDIT_TOO_FAST);
 
   const gate = await requireCanPublish(user.id);
   if (gate) return gate;

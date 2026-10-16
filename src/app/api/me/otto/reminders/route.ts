@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 
 import { requireTermsAccepted } from "@/lib/legal/require-terms";
+import { limitFor } from "@/lib/limits/budgets";
+import { tooManyRequests } from "@/lib/rate-limit";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 const TITLE_MAX = 240;
@@ -18,6 +20,9 @@ const BODY_MAX = 1000;
  * `kind` is always 'manual' here — system-generated kinds (rsvp / mention /
  * milestone / unanswered_dm / connection) come from background jobs, not
  * the API surface.
+ *
+ * Counts against the `ottoReminderCreate` budget (src/lib/limits/budgets.ts)
+ * right after sign-in, before the Terms read.
  */
 export async function POST(req: Request) {
   const supabase = await createSupabaseServerClient();
@@ -27,6 +32,10 @@ export async function POST(req: Request) {
   } = await supabase.auth.getUser();
   if (authErr || !user) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+  }
+  const rl = await limitFor("ottoReminderCreate", user.id);
+  if (!rl.allowed) {
+    return tooManyRequests(rl, "You've added a lot of reminders this hour. Try again later.");
   }
 
   const termsGate = await requireTermsAccepted(user.id);

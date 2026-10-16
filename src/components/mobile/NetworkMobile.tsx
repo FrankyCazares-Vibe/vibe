@@ -320,7 +320,8 @@ export function NetworkMobile() {
 
   // Dismiss a Discover suggestion — optimistic remove + server POST.
   // On failure, restore the user back into the suggestions list so the
-  // UI matches reality.
+  // UI matches reality. vibeRequest says why (a 429 says when to try
+  // again), so the card never just comes back with no word.
   const onDismissSuggestion = useCallback(
     async (user: ListUser) => {
       let snapshot: ListUser[] | null = null;
@@ -329,19 +330,12 @@ export function NetworkMobile() {
         if (!prev) return prev;
         return prev.filter((u) => u.id !== user.id);
       });
-      try {
-        const r = await fetch("/api/me/dismiss-suggestion", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          credentials: "include",
-          body: JSON.stringify({ target_id: user.id }),
-        });
-        const j = await r.json().catch(() => ({}));
-        if (!r.ok || !j?.ok) throw new Error(j?.error ?? "Dismiss failed");
-      } catch {
-        // Restore on failure.
-        setSuggestions(snapshot);
-      }
+      const r = await vibeRequest("/api/me/dismiss-suggestion", {
+        method: "POST",
+        json: { target_id: user.id },
+        failure: "Couldn't hide that suggestion.",
+      });
+      if (!r.ok) setSuggestions(snapshot);
     },
     [],
   );

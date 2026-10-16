@@ -1,12 +1,22 @@
 import { NextResponse } from "next/server";
 
+import { limitFor } from "@/lib/limits/budgets";
 import { contentBlockedResponse, requireCanPublish } from "@/lib/moderation/access";
 import { checkText } from "@/lib/moderation/text-filter";
 import { postAccessForCaller } from "@/lib/orgs/hidden-org-access";
+import { tooManyRequests } from "@/lib/rate-limit";
 import { loadPairBlock } from "@/lib/safety/pair-block";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 const MAX_COMMENT = 500;
+
+/**
+ * One `repost` budget (src/lib/limits/budgets.ts) for repost, quote edit and
+ * un-repost, counted right after sign-in and before any read, so a refused
+ * call costs nothing. It lets through when the limiter can't count, like the
+ * like and save routes: it is cost control, not a lock.
+ */
+const REPOST_TOO_FAST = "You're reposting too fast. Try again in a few minutes.";
 
 const requestFailed = () =>
   NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
@@ -134,6 +144,8 @@ export async function POST(req: Request, ctx: RouteContext) {
   }
   const auth = await authorize();
   if (!auth.ok) return auth.res;
+  const rl = await limitFor("repost", auth.userId);
+  if (!rl.allowed) return tooManyRequests(rl, REPOST_TOO_FAST);
 
   // Reposting puts someone else's post in front of your followers, so it is
   // a publishing surface: Terms, a verified school email, no restriction in
@@ -180,6 +192,8 @@ export async function PATCH(req: Request, ctx: RouteContext) {
   }
   const auth = await authorize();
   if (!auth.ok) return auth.res;
+  const rl = await limitFor("repost", auth.userId);
+  if (!rl.allowed) return tooManyRequests(rl, REPOST_TOO_FAST);
 
   const publishGate = await requireCanPublish(auth.userId);
   if (publishGate) return publishGate;
@@ -211,7 +225,8 @@ export async function PATCH(req: Request, ctx: RouteContext) {
 
 /** Un-repost. Idempotent — deleting zero rows is success. Never checks the
  *  post, like unlike and unsave: taking your own repost back always works,
- *  even on a club that has since been hidden. */
+ *  even on a club that has since been hidden. It does count against the
+ *  `repost` budget, so a script can't loop repost and un-repost. */
 export async function DELETE(_req: Request, ctx: RouteContext) {
   const { id } = await ctx.params;
   if (!id) {
@@ -219,6 +234,8 @@ export async function DELETE(_req: Request, ctx: RouteContext) {
   }
   const auth = await authorize();
   if (!auth.ok) return auth.res;
+  const rl = await limitFor("repost", auth.userId);
+  if (!rl.allowed) return tooManyRequests(rl, REPOST_TOO_FAST);
 
   const { error } = await auth.supabase
     .from("post_reposts")

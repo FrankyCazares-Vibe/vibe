@@ -9,6 +9,7 @@ import {
 import { isSchoolVerifySecretConfigured } from "@/lib/auth/school-email-token";
 import { isMissingColumnError } from "@/lib/db/missing-column";
 import { sendPersonalEmailCodeEmail } from "@/lib/email/resend-transactional";
+import { limitFor } from "@/lib/limits/budgets";
 import { clientNetworkCode, rateLimit, tooManyRequests, type RateLimitResult } from "@/lib/rate-limit";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseServiceClient, isSupabaseServiceConfigured } from "@/lib/supabase/service";
@@ -199,9 +200,17 @@ export async function PUT(req: Request) {
   return json({ ok: true, personal_email: email });
 }
 
+/**
+ * Removing the address counts against the `prefs` budget
+ * (src/lib/limits/budgets.ts) before the write. Unlike the code limits above
+ * it lets through when the limiter can't count: removing your own address
+ * sends nothing and guesses nothing.
+ */
 export async function DELETE() {
   const user = await signedIn();
   if (!user) return fail(401, "unauthorized", "Unauthorized");
+  const rl = await limitFor("prefs", user.id);
+  if (!rl.allowed) return tooManyRequests(rl, "Too many changes at once. Try again in a few minutes.");
   if (!isSupabaseServiceConfigured()) return fail(503, "not_available", NOT_YET);
   const { error } = await createSupabaseServiceClient()
     .from("users")

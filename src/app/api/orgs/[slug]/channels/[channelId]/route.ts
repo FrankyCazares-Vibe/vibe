@@ -4,9 +4,14 @@ import { isPostPolicy } from "@/lib/chat/room-rules";
 import { isMissingChatSchema } from "@/lib/chat/schema";
 import { refusalBody } from "@/lib/chat/types";
 import { isCoreRoomKind, isCoreRoomName, loadClubOfficer } from "@/lib/club-routes/officer-guard";
+import { limitFor } from "@/lib/limits/budgets";
 import { contentBlockedResponse, requireNotRestricted } from "@/lib/moderation/access";
 import { checkChangedText } from "@/lib/moderation/text-filter";
+import { tooManyRequests } from "@/lib/rate-limit";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+
+/** The `orgOfficer` refusal, the same line on every club officer route. */
+const OFFICER_BUSY = "Too many club changes at once. Try again in a few minutes.";
 
 const CHANNEL_NAME_RE = /^[a-z0-9][a-z0-9_-]{1,30}$/;
 const MIN_POSITION = 0;
@@ -93,6 +98,10 @@ export async function PATCH(req: Request, { params }: Params) {
   if (!user) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
+
+  // Before the staff guard, so a refused caller costs no database read (limits wave 3).
+  const rl = await limitFor("orgOfficer", user.id);
+  if (!rl.allowed) return tooManyRequests(rl, OFFICER_BUSY);
 
   const guard = await requireStaff(slug, channelId, user.id);
   if ("response" in guard) return guard.response;
@@ -275,6 +284,9 @@ export async function DELETE(_req: Request, { params }: Params) {
   if (!user) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
+
+  const rl = await limitFor("orgOfficer", user.id);
+  if (!rl.allowed) return tooManyRequests(rl, OFFICER_BUSY);
 
   const guard = await requireStaff(slug, channelId, user.id);
   if ("response" in guard) return guard.response;

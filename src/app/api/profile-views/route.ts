@@ -1,15 +1,28 @@
 import { NextResponse } from "next/server";
 
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createSupabaseServiceClient } from "@/lib/supabase/service";
 
 /**
  * POST /api/profile-views — record that the signed-in user viewed a
  * profile. Body: `{ profile_user_id?: string, handle?: string }`.
  *
- * Per-viewer-per-day dedupe enforced by `record_profile_view` (SECURITY
+ * Per-viewer-per-day dedupe enforced by `record_profile_view_as` (SECURITY
  * DEFINER) — refreshing the same profile in a day is a no-op. Self-views
  * are intentionally skipped server-side. Anonymous viewers no-op without
  * a 401 so the client can fire-and-forget without branching on auth.
+ *
+ * WHY THE SERVICE ROLE (20261016120000). `record_profile_view_as` takes the
+ * viewer from here: the id the sign-in server verified (`getUser()`), never
+ * from the body. It refuses anon and authenticated inside (42501), so no
+ * browser can call it and count views as anyone. The old
+ * `record_profile_view` ran with the person's own sign-in; after the deploy
+ * it answers false for everyone (20261016130000).
+ *
+ * Past the day cap (1,000 profiles a UTC day, counted in the database from
+ * that day's view rows) the answer is `counted: false`, like a repeat. No
+ * limiter key here: it would keep a record of when each person was viewing
+ * (Privacy Policy 3d).
  */
 export async function POST(req: Request) {
   let body: { profile_user_id?: unknown; handle?: unknown };
@@ -48,14 +61,21 @@ export async function POST(req: Request) {
 
   // The page the viewer came from is no longer stored (Privacy Policy 3d,
   // Oct 7 2026): nothing read it. A `referrer` an old tab still sends is
-  // dropped here.
-  const { data, error } = await supabase.rpc("record_profile_view", {
-    p_profile_user_id: profileId,
-    p_referrer: null,
-  });
-  if (error) {
-    console.error("[profile-views POST]", error);
+  // dropped here, and the function has no place for one.
+  let data: unknown;
+  let error: { code?: string; message?: string } | null;
+  try {
+    ({ data, error } = await createSupabaseServiceClient().rpc("record_profile_view_as", {
+      p_viewer: user.id,
+      p_profile_user_id: profileId,
+    }));
+  } catch (err) {
+    console.error("[profile-views POST]", err instanceof Error ? err.message : String(err));
     return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
   }
-  return NextResponse.json({ ok: true, counted: !!data });
+  if (error) {
+    console.error("[profile-views POST]", error.code ?? "unknown", error.message);
+    return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
+  }
+  return NextResponse.json({ ok: true, counted: data === true });
 }

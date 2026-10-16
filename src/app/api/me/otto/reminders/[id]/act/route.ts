@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 
+import { limitFor } from "@/lib/limits/budgets";
+import { tooManyRequests } from "@/lib/rate-limit";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 /**
@@ -21,6 +23,9 @@ export async function POST(_req: Request, ctx: { params: Promise<{ id: string }>
   if (authErr || !user) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
+  // The `prefs` budget (src/lib/limits/budgets.ts), before the write.
+  const rl = await limitFor("prefs", user.id);
+  if (!rl.allowed) return tooManyRequests(rl, "Too many changes at once. Try again in a few minutes.");
 
   const now = new Date().toISOString();
   const { error } = await supabase

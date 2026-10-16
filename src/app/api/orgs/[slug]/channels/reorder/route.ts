@@ -3,14 +3,18 @@ import { NextResponse } from "next/server";
 import { isMissingChatSchema, warnMissingChatSchemaOnce } from "@/lib/chat/schema";
 import { refusalBody } from "@/lib/chat/types";
 import { loadClubOfficer } from "@/lib/club-routes/officer-guard";
+import { limitFor } from "@/lib/limits/budgets";
 import { requireNotRestricted } from "@/lib/moderation/access";
 import { isUuid } from "@/lib/pgrest";
+import { tooManyRequests } from "@/lib/rate-limit";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 type Params = { params: Promise<{ slug: string }> };
 type Body = { channel_ids?: unknown };
 
 const MAX_IDS = 200;
+/** The `orgOfficer` refusal, the same line on every club officer route. */
+const OFFICER_BUSY = "Too many club changes at once. Try again in a few minutes.";
 
 /**
  * POST /api/orgs/[slug]/channels/reorder
@@ -37,6 +41,11 @@ export async function POST(req: Request, { params }: Params) {
   if (!user) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
+
+  // One count per reorder, however many ids it moves; before the staff guard,
+  // so a refused caller costs no database read (limits wave 3).
+  const rl = await limitFor("orgOfficer", user.id);
+  if (!rl.allowed) return tooManyRequests(rl, OFFICER_BUSY);
 
   let body: Body;
   try {

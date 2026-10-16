@@ -1,8 +1,10 @@
 import { NextResponse } from "next/server";
 
 import { requireTermsAccepted } from "@/lib/legal/require-terms";
+import { limitFor } from "@/lib/limits/budgets";
 import { expireStaleInvites } from "@/lib/orgs/membership";
 import { isUuid } from "@/lib/pgrest";
+import { tooManyRequests } from "@/lib/rate-limit";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 
@@ -29,6 +31,9 @@ import { requireInviteOfficer } from "../route";
 
 type Params = { params: Promise<{ slug: string; id: string }> };
 
+/** The `orgOfficer` refusal, the same line on every club officer route. */
+const OFFICER_BUSY = "Too many club changes at once. Try again in a few minutes.";
+
 function fail(status: number, code: string, error: string): NextResponse {
   return NextResponse.json({ ok: false, error, code }, { status });
 }
@@ -40,6 +45,7 @@ function fail(status: number, code: string, error: string): NextResponse {
  * 401 `unauthorized` · 403 `officers_only` / `terms_required`
  * 404 `not_found` (org) · `invite_not_found`
  * 409 `invite_not_pending` (accepted, declined or expired)
+ * 429 the officer's `orgOfficer` budget is spent (limits wave 3)
  * 500 `request_failed`
  */
 export async function DELETE(_req: Request, { params }: Params) {
@@ -49,6 +55,11 @@ export async function DELETE(_req: Request, { params }: Params) {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return fail(401, "unauthorized", "Unauthorized");
+
+  // Before the Terms read and the officer gate, so a refused caller costs no
+  // database read. A take-back is an officer action like any other here.
+  const rl = await limitFor("orgOfficer", user.id);
+  if (!rl.allowed) return tooManyRequests(rl, OFFICER_BUSY);
 
   const termsGate = await requireTermsAccepted(user.id);
   if (termsGate) return termsGate;

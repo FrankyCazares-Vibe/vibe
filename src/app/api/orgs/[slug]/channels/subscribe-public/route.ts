@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 
+import { limitFor } from "@/lib/limits/budgets";
+import { tooManyRequests } from "@/lib/rate-limit";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 
@@ -19,6 +21,10 @@ type Params = { params: Promise<{ slug: string }> };
  * Requires the viewer to already be an org member. Returns the count
  * of newly-created subscriptions so the UI can render a meaningful
  * confirmation ("Joined 3 channels").
+ *
+ * Limited per account (`orgSubscribe`, limits wave 3), before the first
+ * read: a member taps this a handful of times; a script can't walk every
+ * club with it.
  */
 export async function POST(_req: Request, { params }: Params) {
   const { slug } = await params;
@@ -30,6 +36,9 @@ export async function POST(_req: Request, { params }: Params) {
   if (authErr || !user) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
+
+  const rl = await limitFor("orgSubscribe", user.id);
+  if (!rl.allowed) return tooManyRequests(rl, "Too many tries. Try again in a few minutes.");
 
   const { data: org } = await supabase
     .from("orgs")

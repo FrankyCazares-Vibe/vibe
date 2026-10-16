@@ -1,8 +1,13 @@
 import { NextResponse } from "next/server";
 
+import { limitFor } from "@/lib/limits/budgets";
+import { tooManyRequests } from "@/lib/rate-limit";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 type RouteCtx = { params: Promise<{ id: string }> };
+
+/** What a refusal on the `threadSettings` budget says: the same line on every route that shares it (the numbers are in src/lib/limits/budgets.ts). */
+const SETTINGS_TOO_FAST = "You're changing chat settings too fast. Try again in a few minutes.";
 
 /**
  * Clear the viewer's history for this channel. Stamps
@@ -23,6 +28,8 @@ export async function POST(_req: Request, ctx: RouteCtx) {
   if (authErr || !user) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
+  const rl = await limitFor("threadSettings", user.id);
+  if (!rl.allowed) return tooManyRequests(rl, SETTINGS_TOO_FAST);
 
   const { error } = await supabase
     .from("channel_members")

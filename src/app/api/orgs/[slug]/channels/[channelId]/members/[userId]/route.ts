@@ -1,10 +1,15 @@
 import { NextResponse } from "next/server";
 
 import { loadClubOfficer } from "@/lib/club-routes/officer-guard";
+import { limitFor } from "@/lib/limits/budgets";
 import { requireNotRestricted } from "@/lib/moderation/access";
+import { tooManyRequests } from "@/lib/rate-limit";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 type Params = { params: Promise<{ slug: string; channelId: string; userId: string }> };
+
+/** The `orgOfficer` refusal, the same line on every club officer route. */
+const OFFICER_BUSY = "Too many club changes at once. Try again in a few minutes.";
 
 /**
  * DELETE /api/orgs/[slug]/channels/[channelId]/members/[userId]
@@ -20,6 +25,10 @@ export async function DELETE(_req: Request, { params }: Params) {
   if (!user) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
+
+  // Before the staff guard, so a refused caller costs no database read (limits wave 3).
+  const rl = await limitFor("orgOfficer", user.id);
+  if (!rl.allowed) return tooManyRequests(rl, OFFICER_BUSY);
 
   const restricted = await requireNotRestricted(user.id);
   if (restricted) return restricted;

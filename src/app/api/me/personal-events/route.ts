@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 
 import { requireTermsAccepted } from "@/lib/legal/require-terms";
+import { limitFor } from "@/lib/limits/budgets";
+import { tooManyRequests } from "@/lib/rate-limit";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 const MAX_TITLE = 120;
@@ -57,7 +59,10 @@ export async function GET(req: Request) {
   return NextResponse.json({ ok: true, events: data ?? [] });
 }
 
-/** Create a personal event. */
+/**
+ * Create a personal event. Counts against the `personalEventCreate` budget
+ * (src/lib/limits/budgets.ts) right after sign-in, before the Terms read.
+ */
 export async function POST(req: Request) {
   const supabase = await createSupabaseServerClient();
   const {
@@ -66,6 +71,10 @@ export async function POST(req: Request) {
   } = await supabase.auth.getUser();
   if (authErr || !user) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+  }
+  const rl = await limitFor("personalEventCreate", user.id);
+  if (!rl.allowed) {
+    return tooManyRequests(rl, "You've added a lot of events this hour. Try again later.");
   }
 
   const termsGate = await requireTermsAccepted(user.id);

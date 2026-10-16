@@ -1,11 +1,21 @@
 import { NextResponse } from "next/server";
 
 import { blockedIdsFor } from "@/lib/chat/blocks";
+import { limitFor } from "@/lib/limits/budgets";
 import { isAllowedReactionEmoji } from "@/lib/messages/reaction-emoji";
+import { tooManyRequests } from "@/lib/rate-limit";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 type RouteCtx = { params: Promise<{ id: string; messageId: string }> };
 type Body = { emoji?: unknown };
+
+/**
+ * Adding and taking back both count against the account's `react` budget
+ * (src/lib/limits/budgets.ts; rate limits, wave 3), right after sign-in and
+ * before the body or any read: a script toggling one emoji is a notice to
+ * the author each time.
+ */
+const REACT_TOO_FAST = "You're reacting too fast. Try again in a few minutes.";
 
 async function authorize(): Promise<
   | { ok: true; userId: string; supabase: Awaited<ReturnType<typeof createSupabaseServerClient>> }
@@ -57,7 +67,8 @@ function parseEmoji(body: Body): { ok: true; emoji: string } | { ok: false; res:
  * both ways"): no new reaction on a message by someone blocked either way,
  * in any chat. A reaction is a notice to its author, and in a club room the
  * message itself is hidden from the viewer. Taking a reaction back (DELETE)
- * is never refused.
+ * is never refused over a block; only the shared budget above can turn it
+ * away.
  */
 export async function POST(req: Request, ctx: RouteCtx) {
   const { messageId } = await ctx.params;
@@ -66,6 +77,8 @@ export async function POST(req: Request, ctx: RouteCtx) {
   }
   const auth = await authorize();
   if (!auth.ok) return auth.res;
+  const rl = await limitFor("react", auth.userId);
+  if (!rl.allowed) return tooManyRequests(rl, REACT_TOO_FAST);
 
   let body: Body = {};
   try {
@@ -124,6 +137,8 @@ export async function DELETE(req: Request, ctx: RouteCtx) {
   }
   const auth = await authorize();
   if (!auth.ok) return auth.res;
+  const rl = await limitFor("react", auth.userId);
+  if (!rl.allowed) return tooManyRequests(rl, REACT_TOO_FAST);
 
   let body: Body = {};
   try {

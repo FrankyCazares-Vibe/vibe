@@ -1195,19 +1195,18 @@
     paintMessages();
     state.pendingReactions = (state.pendingReactions || 0) + 1;
     try {
-      const res = await fetch(`/api/me/threads/${encodeURIComponent(cid)}/messages/${encodeURIComponent(messageId)}/react`, {
+      // vibeRequest shows the refusal (a 429 says when to try again), so a
+      // reaction taken back never just vanishes, as on messages.html.
+      const r = await window.vibeRequest(`/api/me/threads/${encodeURIComponent(cid)}/messages/${encodeURIComponent(messageId)}/react`, {
         method: nextActive ? "POST" : "DELETE",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ emoji }),
+        json: { emoji },
+        failure: nextActive ? "Couldn't add your reaction." : "Couldn't remove your reaction.",
       });
-      if (!res.ok) throw new Error("react " + res.status);
+      if (!r.ok) console.error("[mini.react]", r.status, r.error);
       // Refetch (direct, not from-poll) so the chip is sourced from server
-      // truth before the next 2s poll cycle. The pending guard keeps
-      // any racing poll from clobbering us in the meantime.
-      await loadMessages();
-    } catch (e) {
-      console.error("[mini.react]", e);
+      // truth before the next 2s poll cycle, which also takes a refused
+      // reaction back. The pending guard keeps any racing poll from
+      // clobbering us in the meantime.
       await loadMessages();
     } finally {
       state.pendingReactions = Math.max(0, (state.pendingReactions || 0) - 1);

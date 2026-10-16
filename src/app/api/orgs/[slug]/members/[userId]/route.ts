@@ -1,10 +1,12 @@
 import { NextResponse } from "next/server";
 
+import { limitFor } from "@/lib/limits/budgets";
 import { requireNotRestricted } from "@/lib/moderation/access";
 import { officerGate } from "@/lib/orgs/hidden-gate";
 import { isOrgRole, type OrgRole } from "@/lib/orgs/join-state";
 import { forgetOrgRemoval, recordOrgRemoval } from "@/lib/orgs/membership";
 import { isUuid } from "@/lib/pgrest";
+import { tooManyRequests } from "@/lib/rate-limit";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 
@@ -12,6 +14,9 @@ type Params = { params: Promise<{ slug: string; userId: string }> };
 type PatchBody = { role?: unknown };
 
 const VALID_ROLES = ["admin", "mod", "member"] as const;
+
+/** The `orgOfficer` refusal, the same line on every club officer route. */
+const OFFICER_BUSY = "Too many club changes at once. Try again in a few minutes.";
 
 /** Who may change roles or remove members here (the route's own rule). */
 const STAFF_ROLES: readonly OrgRole[] = ["owner", "admin"];
@@ -101,6 +106,12 @@ export async function PATCH(req: Request, { params }: Params) {
   if (!user) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
+
+  // One person per call, so a chapter's setup is many calls: `orgOfficer` is
+  // sized for that. Before the staff guard, so a refused caller costs no
+  // database read (limits wave 3).
+  const rl = await limitFor("orgOfficer", user.id);
+  if (!rl.allowed) return tooManyRequests(rl, OFFICER_BUSY);
 
   // The org_members policies refuse a suspended or banned officer
   // (NOT is_restricted_now()), but this route writes with the service role,
@@ -214,6 +225,9 @@ export async function DELETE(_req: Request, { params }: Params) {
   if (!user) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
+
+  const rl = await limitFor("orgOfficer", user.id);
+  if (!rl.allowed) return tooManyRequests(rl, OFFICER_BUSY);
 
   // Same reason as PATCH: the service-role write skips the policy's
   // NOT is_restricted_now().
