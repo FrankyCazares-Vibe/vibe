@@ -16,6 +16,13 @@ import {
 } from "@/components/mobile/people-suggestion-groups";
 import { useMobileTour } from "@/components/mobile/use-mobile-tour";
 import { vibeRequest } from "@/lib/feedback/request";
+import {
+  CONNECTED_MEANING,
+  followButtonFor,
+  followFailureLine,
+  followStateAfterTap,
+  personName,
+} from "@/lib/people/follow-label";
 import { currentTheme, THEME_EVENT } from "@/lib/theme/theme";
 
 /**
@@ -841,11 +848,10 @@ function SearchPane({
 }
 
 /**
- * One person with a follow button. An unfollowed row says "Follow" (a follow
- * is one-way); "Follow back" and "Following ✓" as before, and "Connected ✓"
- * stays for mutuals. Also rendered by MutualsSheet and PostAudienceSheet,
- * which pick up the same labels. Desktop still says Connect (UserCard,
- * campus-home search, profile.html) until its own batches change it.
+ * One person with a follow button: Follow / Following ✓ / Follow back /
+ * Connected ✓, the four words every screen uses for people
+ * (src/lib/people/follow-label.ts). Also rendered by MutualsSheet and
+ * PostAudienceSheet, which pick up the same labels.
  */
 export function UserRow({
   user,
@@ -865,24 +871,22 @@ export function UserRow({
 }) {
   const [busy, setBusy] = useState(false);
   const state: FollowState = user.follow_state ?? "none";
-  const isFollowing = state === "following" || state === "connected";
-  const label = isFollowing
-    ? state === "connected"
-      ? "Connected ✓"
-      : "Following ✓"
-    : state === "followed_by"
-      ? "Follow back"
-      : "Follow";
+  const copy = followButtonFor(state);
+  const isFollowing = copy.tap === "unfollow";
+  const label = copy.label;
 
   const toggle = async () => {
     if (busy || !user.handle) return;
-    const next: FollowState = isFollowing
-      ? state === "connected"
-        ? "followed_by"
-        : "none"
-      : state === "followed_by"
-        ? "connected"
-        : "following";
+    // Connected ✓ opens the chat on desktop, so a tap here that drops the
+    // mutual asks first, as the profile's own button does (ProfileMobile
+    // toggleFollow). Following ✓ stays one tap, as before.
+    if (
+      copy.state === "connected" &&
+      typeof window !== "undefined" &&
+      !window.confirm(`Unfollow @${user.handle}?`)
+    )
+      return;
+    const next: FollowState = followStateAfterTap(state);
     setBusy(true);
     onStateChange(user.id, next);
     try {
@@ -891,7 +895,7 @@ export function UserRow({
       const r = await vibeRequest<{ ok?: boolean }>("/api/me/follow", {
         method: isFollowing ? "DELETE" : "POST",
         json: { target_handle: user.handle },
-        failure: isFollowing ? "Couldn't unfollow them." : "Couldn't follow them.",
+        failure: followFailureLine(copy.tap, personName(user)),
       });
       if (!r.ok || r.data?.ok !== true) onStateChange(user.id, state);
     } finally {
@@ -954,6 +958,7 @@ export function UserRow({
         type="button"
         onClick={toggle}
         disabled={busy}
+        aria-label={copy.state === "connected" ? `Connected. ${CONNECTED_MEANING} Unfollow` : undefined}
         style={{
           flexShrink: 0,
           padding: "7px 14px",
@@ -965,14 +970,14 @@ export function UserRow({
           opacity: busy ? 0.6 : 1,
           background: isFollowing
             ? "rgba(255,255,255,0.78)"
-            : state === "followed_by"
+            : copy.tone === "back"
               ? "#FF5C35"
               : "#1C1C1E",
-          // "Follow back" sits on orange: dark words there (6.3:1; white
+          // Follow back sits on orange: dark words there (6.3:1; white
           // was 3.1:1). White stays on the charcoal "Follow" pill.
           color: isFollowing
             ? "#1C1C1E"
-            : state === "followed_by"
+            : copy.tone === "back"
               ? "var(--on-coral, #160A06)"
               : "#fff",
           border: isFollowing

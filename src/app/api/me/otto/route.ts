@@ -341,7 +341,7 @@ export async function GET() {
   //
   // This list filters on BLOCKS only — not mutes — and the two controls'
   // own copy is why. Block says you don't see each other; offering a
-  // [Connect] button for someone the viewer blocked, or who blocked them,
+  // [Follow back] button for someone the viewer blocked, or who blocked them,
   // contradicts that (and the follow would be refused anyway). Mute's own
   // copy is "You won't see their posts in your feed or get notifications
   // from them. They won't know." — both halves are kept by `hiddenIds` on

@@ -163,12 +163,13 @@
       .then((r) => r.json())
       .then((j) => {
         if (j && j.ok) {
-          // Block tears down any existing follow edges (server side).
-          // Surface that in the toast so the user knows they'll need to
-          // re-Connect if they unblock later. Also reset the on-page
-          // Connect button if there is one (profile viewer mode).
+          // Block tears down any follow between the two of you, either
+          // direction (server side). Surface that in the toast so the user
+          // knows they'll need to follow again if they unblock later. Also
+          // reset the on-page Follow button if there is one (profile viewer
+          // mode). Twin of ProfileMobile.tsx's block toast.
           if (j.removed_connection) {
-            showToast("Blocked " + name + " — connection removed");
+            showToast("Blocked " + name + ". Follows between you were removed.");
             if (typeof window.setVibeRelState === "function") {
               window.setVibeRelState("none");
             }

@@ -154,8 +154,9 @@ export async function GET(req: Request, ctx: RouteContext) {
 
   const total = filteredIds.length;
   const pageIds = filteredIds.slice(offset, offset + limit);
-  // Hydration runs from the VIEWER's perspective so Connect / Follow / Message
-  // read correctly for the signed-in user, not for the profile being visited.
+  // Hydration runs from the VIEWER's perspective so Follow / Following ✓ /
+  // Follow back / Connected ✓ read correctly for the signed-in user, not for
+  // the profile being visited.
   const users = await hydrateUserCards(supabase, viewer.id, pageIds);
 
   return NextResponse.json({

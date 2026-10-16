@@ -48,8 +48,8 @@ warmScreen({ phone: () => import("@/components/mobile/ProfileMobile") });
  *            forwardedProfileParams). The static page renders viewer mode,
  *            then puts /profile/<handle> back in the address bar.
  * Mobile   → MobileShell + ProfileMobile rendered in visitor mode
- *            (handle prop set). Owner chrome hides, Connect / Follow
- *            CTA appears in place of Edit, Posts / Clips / Portfolio
+ *            (handle prop set). Owner chrome hides, the Follow
+ *            button appears in place of Edit, Posts / Clips / Portfolio
  *            tabs all read from the public per-handle endpoints. The
  *            exception is your own handle, which hands off to /profile
  *            (your own profile, behind that route's Terms, school-email
@@ -148,7 +148,7 @@ export function ProfileHandleSwitch({ handle, query = "", firstGuessPhone = fals
 
   if (isMobile) {
     // Hold the profile until the self-check answers, so your own link
-    // never flashes the visitor view (a Connect button on yourself) first,
+    // never flashes the visitor view (a Follow button on yourself) first,
     // and stays blank while it hands off to /profile.
     const held = viewerHandle === undefined || isSelf;
     return (

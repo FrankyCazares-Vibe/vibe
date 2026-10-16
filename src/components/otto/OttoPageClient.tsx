@@ -11,6 +11,7 @@ import type {
   UpcomingRow,
 } from "@/app/api/me/otto/route";
 import { vibeRequest } from "@/lib/feedback/request";
+import { followFailureLine, personName } from "@/lib/people/follow-label";
 
 import { OttoActivity } from "./OttoActivity";
 import { OttoHero } from "./OttoHero";
@@ -96,7 +97,7 @@ export function OttoPageClient({ initial }: Props) {
   const unreadDmRow = asking.find((r) => r.kind === "unread_dms");
   const unreadCount = unreadDmRow?.kind === "unread_dms" ? unreadDmRow.count : 0;
 
-  // Done / Dismiss / Connect remove the row first. Each snapshots the row and
+  // Done / Dismiss / Follow back remove the row first. Each snapshots the row and
   // its index beforehand and puts it back there if the server refuses
   // (vibeRequest has already toasted why). A refetch is never the rollback.
   const removeReminder = useCallback(
@@ -147,7 +148,7 @@ export function OttoPageClient({ initial }: Props) {
       const res = await vibeRequest("/api/me/follow", {
         method: "POST",
         json: { target_id: userId },
-        failure: "Couldn't connect with them.",
+        failure: followFailureLine("follow", row?.kind === "follower" ? personName(row) : null),
       });
       if (!res.ok && row) setAsking((a) => reinsertAt(a, index, row, isRow));
     },

@@ -5,6 +5,13 @@ import { useMemo, useState } from "react";
 
 import { vibeRequest } from "@/lib/feedback/request";
 import { toast } from "@/lib/feedback/toast";
+import {
+  CONNECTED_MEANING,
+  followButtonFor,
+  followFailureLine,
+  followStateAfterTap,
+  personName,
+} from "@/lib/people/follow-label";
 import { resolveCoverThemeCss } from "@/lib/profile/cover-themes";
 
 export type UserCardProps = {
@@ -382,6 +389,7 @@ export function UserCard(props: UserCardProps) {
       {follow_state !== "self" ? (
         <ActionButton
           targetId={id}
+          name={name}
           handle={handle}
           state={follow_state}
           onStateChange={onStateChange}
@@ -393,11 +401,14 @@ export function UserCard(props: UserCardProps) {
 
 function ActionButton({
   targetId,
+  name,
   handle,
   state,
   onStateChange,
 }: {
   targetId: string;
+  /** For the failure line ("Couldn't follow Sam."). */
+  name: string | null;
   handle: string | null;
   state: "none" | "following" | "followed_by" | "connected" | "self";
   onStateChange?: (next: UserCardProps["follow_state"]) => void;
@@ -405,21 +416,19 @@ function ActionButton({
   const [busy, setBusy] = useState(false);
   const [hovered, setHovered] = useState(false);
 
-  // Connect / Connect back / Unfollow flip the button only once the server
+  // Follow / Follow back / Unfollow flip the button only once the server
   // confirms, so a refusal needs no rollback: vibeRequest's toast says why
   // (signed out, blocked, going too fast…) and the button re-enables.
+  const who = personName({ name, handle });
   const follow = async () => {
     if (busy) return;
     setBusy(true);
     const r = await vibeRequest("/api/me/follow", {
       method: "POST",
       json: { target_id: targetId },
-      failure: "Couldn't connect with them.",
+      failure: followFailureLine("follow", who),
     });
-    if (r.ok) {
-      const next = state === "followed_by" ? "connected" : "following";
-      onStateChange?.(next);
-    }
+    if (r.ok) onStateChange?.(followStateAfterTap(state));
     setBusy(false);
   };
 
@@ -429,12 +438,9 @@ function ActionButton({
     const r = await vibeRequest("/api/me/follow", {
       method: "DELETE",
       json: { target_id: targetId },
-      failure: "Couldn't unfollow them.",
+      failure: followFailureLine("unfollow", who),
     });
-    if (r.ok) {
-      const next = state === "connected" ? "followed_by" : "none";
-      onStateChange?.(next);
-    }
+    if (r.ok) onStateChange?.(followStateAfterTap(state));
     setBusy(false);
   };
 
@@ -480,27 +486,27 @@ function ActionButton({
     border: "1px solid rgba(220,60,60,0.35)",
   };
 
-  let label = "";
-  let onClick: () => void = () => {};
-  let style: React.CSSProperties = ORANGE_FILLED;
+  // Follow / Following ✓ / Follow back / Connected ✓ at rest, the words
+  // every screen uses for people (src/lib/people/follow-label.ts). Hover
+  // says what a click does: Unfollow on Following ✓, Message on Connected ✓
+  // (a mutual's DMs go straight to the inbox, so the click opens the chat).
+  const copy = followButtonFor(state);
+  let hoverLabel: string | null = null;
+  let onClick: () => void = follow;
+  let style: React.CSSProperties = copy.tone === "back" ? GOLD_OUTLINE : ORANGE_FILLED;
+  let title: string | undefined;
 
-  if (state === "connected") {
-    label = "Message";
+  if (copy.state === "connected") {
+    hoverLabel = "Message";
     onClick = message;
     style = GHOST;
-  } else if (state === "following") {
-    label = hovered ? "Unfollow" : "Following";
+    title = CONNECTED_MEANING;
+  } else if (copy.state === "following") {
+    hoverLabel = "Unfollow";
     onClick = unfollow;
     style = hovered ? DANGER : GHOST;
-  } else if (state === "followed_by") {
-    label = "Connect back";
-    onClick = follow;
-    style = GOLD_OUTLINE;
-  } else {
-    label = "Connect";
-    onClick = follow;
-    style = ORANGE_FILLED;
   }
+  const showHover = hovered && hoverLabel !== null;
 
   return (
     <button
@@ -513,6 +519,8 @@ function ActionButton({
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       disabled={busy}
+      title={title}
+      aria-label={copy.state === "connected" ? "Connected. Message" : undefined}
       style={{
         ...style,
         padding: "8px 14px",
@@ -527,7 +535,16 @@ function ActionButton({
         transition: "background 120ms ease, color 120ms ease, border 120ms ease",
       }}
     >
-      {label}
+      {/* Both words share one grid cell, so the pill keeps the wider one's
+          width on hover. A pill that shrank on hover slid out from under a
+          cursor near its left edge, which flipped the word back, widened
+          the pill again, and looped. */}
+      <span style={{ display: "inline-grid", justifyItems: "center" }}>
+        <span style={{ gridArea: "1 / 1", visibility: showHover ? "hidden" : "visible" }}>{copy.label}</span>
+        {hoverLabel !== null ? (
+          <span style={{ gridArea: "1 / 1", visibility: showHover ? "visible" : "hidden" }}>{hoverLabel}</span>
+        ) : null}
+      </span>
     </button>
   );
 }

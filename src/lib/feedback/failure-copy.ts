@@ -192,7 +192,7 @@ export function describeFailure(
   }
   if (status === 403) {
     // "Unavailable" is the block check (either direction) on follows and DMs.
-    if (error === "Unavailable") return { message: "You can't connect with this person." };
+    if (error === "Unavailable") return { message: "You can't follow or message this person." };
     if (isHumanSentence(error)) return { message: error.trim() };
     // "Forbidden", "Request failed", "Admin only"… A 403 with no JSON error
     // at all falls through to the non-JSON line at the bottom.

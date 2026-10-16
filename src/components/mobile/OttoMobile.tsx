@@ -19,6 +19,7 @@ import { OttoUpcoming } from "@/components/otto/OttoUpcoming";
 import { PushAsk } from "@/components/push/PushAsk";
 import { OttoOrb } from "@/components/the-map/OttoOrb";
 import { vibeRequest } from "@/lib/feedback/request";
+import { followFailureLine, personName } from "@/lib/people/follow-label";
 
 type Tab = "today" | "stats";
 const TAB_ORDER: Tab[] = ["today", "stats"];
@@ -134,8 +135,8 @@ export function OttoMobile({ initial }: { initial: OttoPayload }) {
     [clearReminder],
   );
 
-  // Connect clears the row straight away; a refused follow (a block, the
-  // rate limit) puts it back where it was so Connect can be tapped again.
+  // Follow back clears the row straight away; a refused follow (a block,
+  // the rate limit) puts it back where it was so it can be tapped again.
   const followBack = useCallback(
     async (userId: string) => {
       const isIt = (r: AskingRow) =>
@@ -146,7 +147,7 @@ export function OttoMobile({ initial }: { initial: OttoPayload }) {
       const res = await vibeRequest("/api/me/follow", {
         method: "POST",
         json: { target_id: userId },
-        failure: "Couldn't connect with them.",
+        failure: followFailureLine("follow", row?.kind === "follower" ? personName(row) : null),
       });
       if (!res.ok && row) setAsking((a) => restoreAt(a, row, index));
     },

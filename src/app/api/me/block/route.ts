@@ -163,7 +163,8 @@ export async function POST(req: Request) {
 
   // Tear down any follow edges in either direction. A block ends the
   // relationship; an unblock later does NOT auto-restore it, so the user
-  // has to re-Connect deliberately. `removed_connection` is reflected in
+  // has to follow again deliberately. `removed_connection` (true when a
+  // follow in EITHER direction went, not only a mutual) is reflected in
   // the response so the client can phrase the confirmation toast.
   //
   // The viewer's own follow (viewer → target) goes through the session:

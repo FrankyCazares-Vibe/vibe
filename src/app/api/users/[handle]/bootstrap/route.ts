@@ -81,9 +81,9 @@ async function readViewerVerified(service: SupabaseClient, viewerId: string): Pr
  * code path that paints the owner's data also paints visited users.
  * Counts come from `getCountsFor`; the viewer's connection state to
  * the visited user (none / following / followed_by / connected / self)
- * is included so the Connect button can initialize correctly without
+ * is included so the Follow button can initialize correctly without
  * a second roundtrip (P1-013). Logged-out visitors get follow state
- * `none` — Connect still 401s until they sign in.
+ * `none` — a follow still 401s until they sign in.
  *
  * The profile row is ALWAYS read with the service-role client against
  * the public column list above: `users` RLS is authenticated-only (so

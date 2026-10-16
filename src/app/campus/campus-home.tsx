@@ -108,6 +108,7 @@ import {
   whoCanJoinFact,
 } from "@/lib/orgs/join-copy";
 import type { JoinPolicy, JoinState, OrgAudience } from "@/lib/orgs/join-state";
+import { followButtonFor } from "@/lib/people/follow-label";
 import {
   checkPostEdit,
   EDITED_LABEL,
@@ -5882,15 +5883,7 @@ function CampusSearchBar({
                     handle={r.handle}
                     avatar={r.avatar}
                     av={r.av || initials(r.name || r.handle || "?")}
-                    action={
-                      r.rel === "connected"
-                        ? "Message"
-                        : r.rel === "following"
-                          ? "Pending"
-                          : r.rel === "followed_by"
-                            ? "Connect back"
-                            : "Connect"
-                    }
+                    action={followButtonFor(r.rel).label}
                     onClick={() => goPerson(r.handle, r)}
                     onRemove={() => removeRecent(r.handle)}
                     isRecent
@@ -5921,14 +5914,10 @@ function CampusSearchBar({
                   <div style={ddSectionLabel}>People</div>
                   {users.map((u) => {
                     const role = [u.major, u.year].filter(Boolean).join(" · ") || u.school || "";
-                    const action =
-                      u.rel === "connected"
-                        ? "Message"
-                        : u.rel === "following"
-                          ? "Pending"
-                          : u.rel === "followed_by"
-                            ? "Connect back"
-                            : "Connect";
+                    // Follow / Following ✓ / Follow back / Connected ✓: the
+                    // four words every screen uses for people. PersonRow shows
+                    // it as a label; a click on the row opens the profile.
+                    const action = followButtonFor(u.rel).label;
                     const display = u.name || (u.handle ? `@${u.handle}` : "");
                     return (
                       <PersonRow
@@ -6083,7 +6072,10 @@ function PersonRow(props: {
           {props.role}
         </div>
       </div>
-      <button
+      {/* Where you stand with them (Follow / Following ✓ / Follow back /
+          Connected ✓), as a label, not a button: it never had a click of
+          its own, so a click anywhere on the row opens the profile. */}
+      <span
         style={{
           fontSize: 11,
           fontWeight: 700,
@@ -6094,11 +6086,11 @@ function PersonRow(props: {
           borderRadius: 100,
           padding: "3px 10px",
           flexShrink: 0,
-          cursor: "pointer",
+          whiteSpace: "nowrap",
         }}
       >
         {props.action}
-      </button>
+      </span>
       {props.isRecent && props.onRemove ? (
         <button
           onClick={(e) => {
@@ -8450,7 +8442,7 @@ function FeedRow({
  * (src/app/api/me/posts/[id]/viewers/route.ts).
  *
  * Rows go through <UserCard compact>, the same card /otto?tab=stats uses for
- * "Who viewed you", so the meta line and the Connect / Following button behave
+ * "Who viewed you", so the meta line and the Follow / Following ✓ button behave
  * the way they do everywhere else. `compact` because the full card carries a
  * fixed 360px banner, wider than this column.
  *

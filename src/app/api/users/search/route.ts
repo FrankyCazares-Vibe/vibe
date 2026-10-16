@@ -202,7 +202,8 @@ export async function GET(req: Request) {
   }
 
   // Annotate each result with the viewer's relationship state so the
-  // dropdown can render Connect / Pending / Message correctly.
+  // dropdown can render Follow / Following ✓ / Follow back / Connected ✓
+  // correctly.
   // Two batched queries — outgoing (viewer→target) and incoming
   // (target→viewer) — combine to none / following / followed_by /
   // connected. Cheaper than N separate getFollowState calls.

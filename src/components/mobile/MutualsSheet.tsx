@@ -15,7 +15,7 @@ import { vibeRequest } from "@/lib/feedback/request";
 /**
  * "You both follow" — the phone half of Screen D (wave plan,
  * handoffs/2026-09-14-wave-plan-metrics-screens.md, contract C6). It opens from
- * the "N you both follow" pill above the Connect button on a visited profile
+ * the "N you both follow" pill above the Follow button on a visited profile
  * (src/components/mobile/ProfileMobile.tsx) and lists exactly the people that
  * number counts: GET /api/users/<handle>/mutuals, whose ids come from the same
  * `loadMutualIds` the pill's count is defined as, so the pill and the sheet can
@@ -25,7 +25,7 @@ import { vibeRequest } from "@/lib/feedback/request";
  * pill and a mount, nothing more.
  *
  * Rows are NetworkMobile's exported `UserRow`, not a second people row, so the
- * avatar link, the "@handle · major · N mutuals" meta and the Connect / Following
+ * avatar link, the "@handle · major · N mutuals" meta and the Follow / Following ✓
  * button behave exactly as they do on /network. A follow from inside the sheet
  * updates that row in place rather than refetching the page underneath it.
  *

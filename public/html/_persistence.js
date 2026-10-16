@@ -254,7 +254,7 @@ function _vibeTopHere() {
     // src/lib/feedback/failure-copy.ts; change both together.
     if (st === 429 && sig.code === 'anon_read_limited') return { message: "Vibe is getting a lot of visits from people who aren't signed in. Try again later, or sign in.", action: { label: 'Sign in', href: '/auth/login?next=' + next } };
     if (st === 429) return { message: "You're going a little fast. " + retryLine(sig.retryAfterSec) };
-    if (st === 403 && err === 'Unavailable') return { message: "You can't connect with this person." };
+    if (st === 403 && err === 'Unavailable') return { message: "You can't follow or message this person." };
     if (st === 403 && isSentence(err)) return { message: err.trim() };
     if (st === 403 && err) return { message: "You don't have access to do that." };
     // The word filter (422). Without a branch of its own this landed on the

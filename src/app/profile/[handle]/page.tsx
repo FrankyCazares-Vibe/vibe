@@ -125,7 +125,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
  * `/profile/<handle>` route — public profile view, then a client-side
  * viewport fork (started from the server's phone-or-not guess).
  *
- * Mobile: renders ProfileMobile in visitor mode (Connect/Follow CTA,
+ * Mobile: renders ProfileMobile in visitor mode (the Follow button,
  * Posts/Clips/Portfolio tabs read from the per-handle public APIs).
  * Desktop: hops client-side to /html/profile.html?app=1&handle=<handle>,
  * carrying ?post / ?welcome, where the static page renders viewer mode
@@ -135,7 +135,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
  *
  * Intentionally not campus-gated: share links have to work from
  * iMessage's in-app browser (no cookies) and from logged-out visitors.
- * Connect / Follow still require a session on the API.
+ * Follow / unfollow still require a session on the API.
  */
 export default async function ProfileByHandlePage({
   params,

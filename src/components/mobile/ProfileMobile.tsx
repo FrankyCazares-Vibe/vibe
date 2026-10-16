@@ -25,6 +25,13 @@ import { vibeRequest } from "@/lib/feedback/request";
 import { toast } from "@/lib/feedback/toast";
 import { allowedCampusId, isSchoolSystem, type SchoolSystem } from "@/lib/iu/campuses";
 import { majorsForCampus } from "@/lib/iu/majors";
+import {
+  CONNECTED_MEANING,
+  FOLLOW_LABELS,
+  followButtonFor,
+  followFailureLine,
+  followStateAfterTap,
+} from "@/lib/people/follow-label";
 import type { EditedPost } from "@/lib/posts/edit";
 import { DEFAULT_COVER_THEME_CSS, resolveCoverThemeCss } from "@/lib/profile/cover-themes";
 import {
@@ -154,8 +161,8 @@ type VibeUser = {
    *  visited user, not the signed-in viewer. */
   _isViewerMode?: boolean;
   /** Set alongside _isViewerMode. "none" | "following" | "followed_by"
-   *  | "connected" | "self" — drives the Connect / Follow / Following
-   *  pill state in visitor mode. */
+   *  | "connected" | "self" — drives the Follow / Following ✓ / Follow
+   *  back / Connected ✓ button in visitor mode. */
   _viewerFollowState?: FollowState;
   /** Bootstrap short-circuit: target has blocked the viewer. Only
    *  minimal identity (name, handle, avatarPhoto) is included on the
@@ -442,7 +449,7 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
   const [searchOpen, setSearchOpen] = useState(false);
   // Visitor ⋯ menu (Report / Mute / Block). Mounted only while open.
   const [safetyOpen, setSafetyOpen] = useState(false);
-  // "You both follow" list, opened from the pill above the Connect button.
+  // "You both follow" list, opened from the pill above the Follow button.
   // Mounted only while open, like every other sheet on this screen.
   const [mutualsOpen, setMutualsOpen] = useState(false);
   // The live size of that set, once the sheet has actually counted it (and as
@@ -524,7 +531,7 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
    *  server-computed `is_owner` still covers your own post there). */
   const [openPost, setOpenPost] = useState<{ id: string; mine: boolean } | null>(null);
   /** Visitor-mode follow state; mirrors the server value initially then
-   *  flips optimistically when the user taps Connect / Follow. */
+   *  flips optimistically when the user taps Follow / Follow back. */
   const [followState, setFollowState] = useState<FollowState>("none");
   const [followBusy, setFollowBusy] = useState(false);
   // Owner inline-edit mode. `editMode` flips the identity stack into
@@ -765,17 +772,14 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
   // updates instantly; reverts on server error.
   const toggleFollow = async () => {
     if (!isVisitor || !targetHandle || followBusy) return;
-    const wasFollowing = followState === "following" || followState === "connected";
+    const wasFollowing = followButtonFor(followState).tap === "unfollow";
     // Dropping a follow or a connection is never one silent tap (feature
     // report 3, #3): the same confirm the file uses for a delete.
     if (wasFollowing && typeof window !== "undefined" && !window.confirm(`Unfollow @${targetHandle}?`)) return;
-    const next: FollowState = wasFollowing
-      ? followState === "connected"
-        ? "followed_by"
-        : "none"
-      : followState === "followed_by"
-        ? "connected"
-        : "following";
+    // Only my side changes: Follow back → Connected ✓, and unfollowing a
+    // mutual leaves Follow back (src/lib/people/follow-label.ts).
+    const next: FollowState = followStateAfterTap(followState);
+    const who = pick(user?.name) ?? `@${targetHandle}`;
     setFollowBusy(true);
     setFollowState(next);
     try {
@@ -785,7 +789,7 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
         method: wasFollowing ? "DELETE" : "POST",
         json: { target_handle: targetHandle },
         quiet: true,
-        failure: wasFollowing ? "Couldn't unfollow them." : "Couldn't follow them.",
+        failure: followFailureLine(wasFollowing ? "unfollow" : "follow", who),
       });
       if (!r.ok && r.status === 401) {
         window.location.href = `/auth/login?next=${encodeURIComponent(`/profile/${targetHandle}`)}`;
@@ -1491,7 +1495,7 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
   const counts = user.counts ?? {};
   const followers = String(counts.followers ?? "0");
   const connections = String(counts.connections ?? "0");
-  // Viewer-relative, so it belongs beside the Connect button rather than in
+  // Viewer-relative, so it belongs beside the Follow button rather than in
   // the stats row (those are the visited user's own numbers). The bootstrap
   // sends it as a string; a missing or unparseable value means "unknown", and
   // an unknown count hides the pill rather than painting "0 you both follow".
@@ -2229,7 +2233,7 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
         ) : null}
 
         {/* Owner: edit affordance lives in the cover top-right.
-            Visitor: Connect / Follow CTA goes here, full-width and
+            Visitor: the Follow button goes here, full-width and
             prominent (the primary call-to-action on someone else's
             profile). */}
         {isVisitor ? (
@@ -5656,15 +5660,10 @@ function FollowButton({
   /** The visited person's handle: the Message link needs it. */
   handle?: string | null;
 }) {
-  const isFollowing = state === "following" || state === "connected";
-  const label =
-    state === "connected"
-      ? "Connected"
-      : state === "following"
-        ? "Following"
-        : state === "followed_by"
-          ? "Follow back"
-          : "Connect";
+  // Follow / Following ✓ / Follow back / Connected ✓, the same four words
+  // on every screen (src/lib/people/follow-label.ts).
+  const copy = followButtonFor(state);
+  const isFollowing = copy.tap === "unfollow";
   const filled = !isFollowing;
   // Connected: the desktop profile's button becomes "Message" here
   // (profile.html, state-message); the phone does the same, with the
@@ -5679,11 +5678,11 @@ function FollowButton({
     padding: "11px 16px",
     borderRadius: 14,
     background: primaryFilled
-      ? state === "followed_by"
+      ? copy.tone === "back"
         ? "#FF5C35"
         : "var(--charcoal)"
       : "var(--paper-70)",
-    color: primaryFilled ? (state === "followed_by" ? ON_CORAL : "var(--paper)") : "var(--charcoal)",
+    color: primaryFilled ? (copy.tone === "back" ? ON_CORAL : "var(--paper)") : "var(--charcoal)",
     border: primaryFilled
       ? "1px solid rgba(0,0,0,0.06)"
       : "1px solid rgba(var(--scrim-rgb),0.18)",
@@ -5709,7 +5708,7 @@ function FollowButton({
           type="button"
           onClick={onTap}
           disabled={busy}
-          aria-label="Connected. Unfollow"
+          aria-label={`Connected. ${CONNECTED_MEANING} Unfollow`}
           style={{
             display: "block",
             width: "100%",
@@ -5725,14 +5724,14 @@ function FollowButton({
             WebkitTapHighlightColor: "transparent",
           }}
         >
-          Connected ✓ · <span style={{ textDecoration: "underline", textUnderlineOffset: 3 }}>Unfollow</span>
+          {FOLLOW_LABELS.connected} · <span style={{ textDecoration: "underline", textUnderlineOffset: 3 }}>Unfollow</span>
         </button>
       </div>
     );
   }
   return (
     <button type="button" onClick={onTap} disabled={busy} style={primary}>
-      {isFollowing ? `${label} ✓` : label}
+      {copy.label}
     </button>
   );
 }
@@ -5754,7 +5753,7 @@ function BlockedByTargetView({ user }: { user: VibeUser }) {
     ? `You blocked ${firstName}`
     : "Profile unavailable";
   const bodyText = viewerHasBlocked
-    ? "Unblock to see their content. You won’t be reconnected — you’ll need to Connect again."
+    ? "Unblock to see their content. Follows don’t come back on their own — you’ll need to follow them again."
     : "This account has restricted you. You can’t see their profile or message them.";
   const [busy, setBusy] = useState(false);
   const onUnblock = async () => {
@@ -6014,8 +6013,10 @@ function ProfileSafetySheet({
       return;
     }
     toast(
+      // removed_connection is any follow, either way, not only a mutual
+      // (Connected ✓), so the toast says follows. Twin: _safetyActions.js.
       r.data.removed_connection
-        ? `Blocked ${name} — connection removed`
+        ? `Blocked ${name}. Follows between you were removed.`
         : `Blocked ${name}`,
     );
     onBlocked();
@@ -6478,7 +6479,7 @@ const sheetNoteStyle: React.CSSProperties = {
 };
 
 /** Matches profile.html's .profile-mutual-pill: a quiet, lowercase count that
- *  reads as information, not as the screen's call to action — the Connect
+ *  reads as information, not as the screen's call to action — the Follow
  *  button directly under it is that. */
 const mutualPillStyle: React.CSSProperties = {
   display: "inline-flex",
@@ -6486,7 +6487,7 @@ const mutualPillStyle: React.CSSProperties = {
   gap: 6,
   marginBottom: 10,
   // 36px tall with the 11px type: the smallest this can be and still be aimed
-  // at with a thumb, given the full-width Connect button 10px underneath it.
+  // at with a thumb, given the full-width Follow button 10px underneath it.
   minHeight: 36,
   padding: "9px 14px",
   borderRadius: 999,

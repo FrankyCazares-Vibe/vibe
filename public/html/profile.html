@@ -424,7 +424,7 @@ body.edit-mode .cover-edit-btn { opacity:1; }
 .avatar-row {
   display:flex;align-items:flex-end;justify-content:space-between;
   /* -50 (was -70) so the row sits closer to the bottom of the cover —
-     keeps the right-column actions (Connect / Pending / Mutual) from
+     keeps the right-column actions (Follow / Mutual) from
      creeping up into the banner gradient. */
   margin-top:-50px;position:relative;z-index:10;
   padding-bottom:20px;
@@ -967,7 +967,7 @@ body.edit-mode .vibe-add-thumb { display:flex; }
 .avail-dot { width:7px;height:7px;border-radius:50%;background:var(--green);animation:pulse 2s infinite; }
 @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.5;transform:scale(1.4)} }
 
-/* Connect button */
+/* Full-width follow button (the old at-a-glance card; hidden) */
 .connect-full {
   width:100%;padding:14px;border-radius:16px;
   background:var(--accent);color:var(--on-coral, #160A06);
@@ -1927,7 +1927,7 @@ body.edit-mode .vibe-grid-play { display:none; }
 .post-thumb-cell.theme-sky      { background:#E5F4FF;color:#1A6FB5; }
 .post-thumb-cell.theme-lavender { background:#F3EAFF;color:#7C3FE0; }
 
-/* ── Avatar-row right column: stats on top, Connect+Mutual below.
+/* ── Avatar-row right column: stats on top, Follow+Mutual below.
    Sits inside .avatar-row so the row's bottom border draws under the
    action pills. Action pills are at the bottom of the column so they
    never reach up into the banner gradient. */
@@ -1970,7 +1970,7 @@ body.viewer-mode .avatar-row-actions .action-btn {
   color:var(--tag-ink);font-size:28px;
 }
 
-/* ── Mutual pill — sits to the right of the Connect button ──
+/* ── Mutual pill — sits to the right of the Follow button ──
    Hidden by default and revealed by adding .is-shown. The default used to
    be an inline style="display:none" in the markup (S55, when the number was
    hardcoded); the decision now belongs to updateMutualPillVisibility() in
@@ -2169,7 +2169,8 @@ body.viewer-mode .layout-toggle { display:flex; }
 .ppost-pin-btn.pinned-active { color:var(--tag-ink);font-weight:800; }
 body.edit-mode:not(.viewer-mode) .ppost-pin-btn { display:block; }
 
-/* ── Smart Connect Button ── */
+/* ── The Follow button: Follow / Following ✓ / Follow back, and Message
+   once you follow each other (setVibeRelState). ── */
 .vibe-connect-btn {
   display: flex; align-items: center; gap: 7px;
   padding: 10px 22px; border-radius: 100px;
@@ -2177,12 +2178,19 @@ body.edit-mode:not(.viewer-mode) .ppost-pin-btn { display:block; }
   transition: all .2s;
   min-width: 130px; justify-content: center;
 }
-.vibe-connect-btn.state-pending {
-  background: var(--cream); color: var(--muted);
+/* Following ✓: quiet, and a click unfollows. */
+.vibe-connect-btn.state-following {
+  background: var(--cream); color: var(--charcoal);
   border: 1.5px solid var(--border);
-  pointer-events: none;
 }
-.vibe-connect-btn.state-pending svg { display: none; }
+.vibe-connect-btn.state-following:hover { border-color: var(--charcoal); }
+/* Follow back: they already follow you (UserCard's gold, the Connections
+   list's .connect-back). */
+.vibe-connect-btn.state-back {
+  background: var(--wash-gold); color: var(--amber-ink);
+  border: 1.5px solid var(--amber-ink);
+}
+.vibe-connect-btn.state-back:hover { transform: translateY(-1px); }
 .vibe-connect-btn.state-message {
   background: var(--charcoal); color: var(--on-ink); border: none;
 }
@@ -2193,16 +2201,7 @@ body.edit-mode:not(.viewer-mode) .ppost-pin-btn { display:block; }
 .vibe-connect-btn.state-message svg path {
   /* swap + to message icon via CSS — icon swapped in JS */
 }
-.vibe-soft-follow {
-  font-size: 12px; font-weight: 600; color: var(--muted);
-  background: none; border: none; cursor: none;
-  padding: 0; transition: color .15s; text-decoration: underline;
-  text-underline-offset: 2px;
-}
-.vibe-soft-follow:hover { color: var(--charcoal); }
-.vibe-soft-follow.following { color: var(--tag-ink); text-decoration: none; }
-
-/* Connected badge under stats */
+/* Connected ✓ badge under stats */
 .connected-badge {
   display: none; align-items: center; gap: 5px;
   font-size: 11px; font-weight: 700; color: var(--ok-ink);
@@ -3478,7 +3477,7 @@ body.empty-profile-mode #profileEmpty { display: flex !important; }
     </div>
 
     <!-- Right side of the avatar row: stats on TOP (always visible),
-         Connect+Mutual BELOW (viewer-only). Putting actions at the
+         Follow+Mutual BELOW (viewer-only). Putting actions at the
          bottom of the column anchors them to the avatar's bottom edge,
          so they can't drift up into the banner gradient. -->
     <div class="avatar-row-right">
@@ -3496,17 +3495,14 @@ body.empty-profile-mode #profileEmpty { display: flex !important; }
         </a>
       </div>
 
-      <!-- Viewer-only: Connect button + Soft Follow + Mutual pill, side
+      <!-- Viewer-only: Follow button + Mutual pill, side
            by side. Sits BELOW stats so the column's bottom edge holds
            the action pills against the avatar's bottom — no chance of
            drifting into the cover gradient. -->
       <div class="avatar-row-actions" id="profileViewerActions">
         <button class="action-btn primary vibe-connect-btn" id="vibeConnectBtn" onclick="handleVibConnect()">
           <svg width="13" height="13" viewBox="0 0 13 13" fill="none" style="flex-shrink:0"><path d="M6.5 1v11M1 6.5h11" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
-          Connect
-        </button>
-        <button class="vibe-soft-follow" id="vibeSoftFollow" onclick="handleSoftFollow()" style="display:none">
-          Follow instead
+          Follow
         </button>
         <!-- The label says what the number actually is. getMutualIds
              (src/lib/connections/queries.ts) returns people the VISITED
@@ -3534,10 +3530,9 @@ body.empty-profile-mode #profileEmpty { display: flex !important; }
         </div>
       </div>
 
-      <div class="connected-badge" id="connectedBadge">
-        <svg width="11" height="11" viewBox="0 0 11 11" fill="none"><path d="M1.5 5.5L4 8L9.5 2.5" stroke="#1A9E5B" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        Connected &middot; DMs open
-      </div>
+      <!-- Connected ✓: you follow each other. Words and title come from
+           VIBE_FOLLOW_LABELS in setVibeRelState. -->
+      <div class="connected-badge" id="connectedBadge"></div>
     </div>
 </div>
 
@@ -3902,7 +3897,7 @@ body.empty-profile-mode #profileEmpty { display: flex !important; }
 
     <!-- "At a glance" stat card removed — Otto status hero (above) +
          the avatar-row stats (Followers / Following / Connections) cover
-         the same surface. Connect lives in the avatar-row actions. -->
+         the same surface. Follow lives in the avatar-row actions. -->
 
 
 <div class="stat-card fade-in shared-section" data-widget="working_on" style="animation-delay:.15s">
@@ -6752,15 +6747,52 @@ function _publishProfilePostLocal(text, serverPost) {
 }
 
 
-// ══ CONNECTION SYSTEM ══════════════════════════════════════
-// ══ VIBE CONNECT — single smart button ══════════════════════════════════
-// States: none → pending → connected (→ message)
-// If request ignored: soft-follow option appears
-// Once connected: DMs automatically unlocked, button becomes Message
+// ══ FOLLOW BUTTON (people) ═══════════════════════════════════════════════
+// One follow button, no approval step: a follow takes effect on the click.
+//   none         Follow        (click follows)
+//   following    Following ✓   (click unfollows)
+//   followed_by  Follow back   (click follows, and you're connected)
+//   connected    Message, with the Connected ✓ badge beside it; Unfollow
+//                lives in the ⋯ menu
+//
+// VIBE_FOLLOW_LABELS is the static twin of FOLLOW_LABELS in
+// src/lib/people/follow-label.ts: the same four words on every screen.
+// follow-label.test.ts checks the two match. Change both together.
+const VIBE_FOLLOW_LABELS = Object.freeze({
+  none: 'Follow',
+  following: 'Following ✓',
+  followed_by: 'Follow back',
+  connected: 'Connected ✓',
+});
+const VIBE_CONNECTED_MEANING = 'You follow each other. DMs go straight to the inbox.';
+// Swap a pill's word on hover (Connected ✓ → Message) without changing its
+// width. Message is narrower, and a right-aligned pill that shrinks slides
+// out from under a cursor near its left edge: the word flips back, the
+// pill widens under the cursor, and the two loop. Holding the resting
+// width while hovered stops that (UserCard.tsx does the same). Rounded up,
+// never down, so the hovered pill is never a fraction narrower.
+function vibeHoverWord(btn, word, on) {
+  if (on) btn.style.minWidth = Math.ceil(btn.getBoundingClientRect().width) + 'px';
+  btn.textContent = word;
+  if (!on) btn.style.minWidth = '';
+}
+// Any server follow_state as one of the four ('self' and unknowns → 'none').
+function vibeFollowStateOf(state) {
+  return state === 'following' || state === 'followed_by' || state === 'connected' ? state : 'none';
+}
+// After a click the server accepted: only my side changes, so Follow back →
+// connected, and unfollowing someone I'm connected with leaves Follow back.
+function vibeFollowStateAfterTap(state) {
+  switch (vibeFollowStateOf(state)) {
+    case 'none':        return 'following';
+    case 'following':   return 'none';
+    case 'followed_by': return 'connected';
+    default:            return 'followed_by';
+  }
+}
 
-let vibeRelState = 'none'; // 'none' | 'pending' | 'connected' | 'following'
-// One follow request at a time from this header: the Connect button and
-// the "Following ✓" pill write the same follow edge.
+let vibeRelState = 'none'; // 'none' | 'following' | 'followed_by' | 'connected'
+// One follow request at a time from this header.
 let _vibeFollowBusy = false;
 
 const ICONS = {
@@ -6769,59 +6801,43 @@ const ICONS = {
 };
 
 function setVibeRelState(state) {
+  state = vibeFollowStateOf(state);
   vibeRelState = state;
   const btn  = document.getElementById('vibeConnectBtn');
-  const soft = document.getElementById('vibeSoftFollow');
   const badge = document.getElementById('connectedBadge');
   if (!btn) return;
 
   // Reset
   btn.className = 'action-btn vibe-connect-btn';
   btn.disabled  = false;
-  if (soft)  soft.style.display = 'none';
+  btn.removeAttribute('title');
   if (badge) badge.classList.remove('show');
 
   switch (state) {
-
     case 'none':
-      btn.innerHTML = ICONS.connect + ' Connect';
-      btn.className += ' primary';
+    case 'followed_by':
+      btn.innerHTML = ICONS.connect + ' ' + VIBE_FOLLOW_LABELS[state];
+      // Follow is the coral call to action; Follow back is the warm gold
+      // the other desktop screens use for "they already follow you".
+      btn.className += state === 'followed_by' ? ' state-back' : ' primary';
       break;
 
-    case 'pending':
-      btn.innerHTML = '&#8987; Pending';
-      btn.className += ' state-pending';
-      btn.disabled = true;
-      // Sending Connect implies follow — surface that immediately so the user
-      // can see they're following AND awaiting acceptance.
-      if (soft) {
-        soft.style.display = 'block';
-        soft.textContent = 'Following ✓';
-        soft.classList.add('following');
-      }
+    case 'following':
+      btn.textContent = VIBE_FOLLOW_LABELS.following;
+      btn.className += ' state-following';
+      btn.title = 'Unfollow';
       break;
 
     case 'connected':
       btn.innerHTML = ICONS.message + ' Message';
       btn.className += ' state-message';
-      if (badge) badge.classList.add('show');
+      if (badge) {
+        badge.textContent = VIBE_FOLLOW_LABELS.connected;
+        badge.title = VIBE_CONNECTED_MEANING;
+        badge.classList.add('show');
+      }
       // Stats already painted from the visited user's bootstrap counts —
       // don't overwrite with a hardcoded number.
-      break;
-
-    case 'following':
-      // I follow them, they don't follow me back yet — render the same
-      // "Pending" affordance as the connection-request flow. The button
-      // stays clickable so a second tap unfollows (handleVibConnect
-      // routes the click to DELETE /api/me/follow when state is
-      // 'following' or 'pending' on a real user).
-      btn.innerHTML = '&#8987; Pending';
-      btn.className += ' state-pending';
-      if (soft) {
-        soft.style.display = 'block';
-        soft.textContent = 'Following ✓';
-        soft.classList.add('following');
-      }
       break;
   }
 }
@@ -6899,14 +6915,17 @@ async function paintVibeMoreMenu() {
 }
 
 // Drop the follow edge from the kebab menu. Distinct from the main
-// Connect button's toggle so the "connected → message" semantics on the
-// primary button stay intact. After unfollow, the connection (mutual
-// follow) is no longer satisfied, so the primary button reverts from
-// "Message" to either "Connect" or "Follow back" depending on whether
-// the other party still follows the viewer.
+// Follow button's toggle so the "connected → message" semantics on the
+// primary button stay intact. After unfollow the two of you are no longer
+// connected, so the primary button goes from "Message" to "Follow back"
+// (they still follow you) or "Follow".
 window.vibeUnfollowFromMenu = async function (targetId, displayName) {
   if (!targetId) return;
+  // One follow request at a time with the header button: both write the
+  // same follow edge.
+  if (_vibeFollowBusy) return;
   const name = displayName || 'this person';
+  _vibeFollowBusy = true;
   try {
     const r = await fetch('/api/me/follow', {
       method: 'DELETE',
@@ -6916,16 +6935,18 @@ window.vibeUnfollowFromMenu = async function (targetId, displayName) {
     });
     const j = await r.json().catch(() => ({}));
     if (!r.ok || !j.ok) throw new Error((j && j.error) || 'Unfollow failed');
-    // After unfollow, follow_state can only be 'followed_by' (they still
-    // follow us) or 'none'. We don't know which from the response alone,
-    // so default to 'none'; if they follow back the next view refresh
-    // will flip it. Most importantly it leaves "Connected" behind.
-    if (typeof setVibeRelState === 'function') setVibeRelState('none');
+    // Only my side changed, and it is now "I don't follow them": Follow
+    // back if they still follow me, else Follow. Set outright, not flipped,
+    // so it can never land on Following ✓.
+    const followsMe = vibeRelState === 'connected' || vibeRelState === 'followed_by';
+    if (typeof setVibeRelState === 'function') setVibeRelState(followsMe ? 'followed_by' : 'none');
     if (typeof showToast === 'function') showToast('Unfollowed ' + name);
   } catch (e) {
     if (typeof showToast === 'function') {
       showToast(e && e.message ? e.message : 'Could not unfollow');
     }
+  } finally {
+    _vibeFollowBusy = false;
   }
 };
 window.toggleVibeMoreMenu = toggleVibeMoreMenu;
@@ -6945,65 +6966,37 @@ async function handleVibConnect() {
   const real = window.viewingRealUser;
 
   // No real user id: the visited profile never finished loading, so there
-  // is nothing to ask the server. The old fallback faked Pending and then
-  // a timer faked "accepted" 3s later; say what happened instead.
+  // is nothing to ask the server. Say what happened instead.
   if (!real || !real.id) {
     window.vibeToast("This profile didn't finish loading. Refresh and try again.", { tone: 'error' });
     return;
   }
   if (_vibeFollowBusy) return;
 
-  // Real Supabase user → call the follow API directly. P1-013: a follow
-  // creates a connections row; if both sides have followed each other the
-  // visitor sees "connected" instead of "following" on next reload.
-  // Toggle: if already following/pending, the click means "undo". The
-  // button repaints from the server's answer, not before it.
-  const undo = vibeRelState === 'following' || vibeRelState === 'pending';
+  // Follow, Follow back, or (on Following ✓) unfollow. No approval step:
+  // the follow takes effect at once, and if they already follow me we're
+  // connected. The button repaints from the server's answer, not before it.
+  const was = vibeRelState;
+  const undo = was === 'following';
+  // Dropping a follow is never one silent click: the phone asks the same
+  // question (ProfileMobile.tsx toggleFollow).
+  if (undo && !window.confirm('Unfollow ' + (real.handle ? '@' + real.handle : name) + '?')) return;
   const btn = document.getElementById('vibeConnectBtn');
   _vibeFollowBusy = true;
   if (btn) btn.disabled = true;
   const r = await window.vibeRequest('/api/me/follow', {
     method: undo ? 'DELETE' : 'POST',
     json: { target_id: real.id },
-    failure: undo ? `Couldn't unfollow ${name}.` : `Couldn't send your connection request to ${name}.`,
+    failure: undo ? `Couldn't unfollow ${name}.` : `Couldn't follow ${name}.`,
   });
   _vibeFollowBusy = false;
   if (!r.ok) {
     setVibeRelState(vibeRelState); // unchanged; just gives the button back
     return;
   }
-  setVibeRelState(undo ? 'none' : 'following');
-  showToast(undo ? `Unfollowed ${name}` : `Connection pending with ${name}`);
-}
-
-// The "Following ✓" pill beside Connect. setVibeRelState only shows it
-// while I follow them (pending / following), so a click unfollows. It
-// writes the same follow edge as the main button, so both repaint through
-// setVibeRelState, and only after the server answers. (It used to flip
-// its own label and toast first, never read the response, and leave the
-// main button reading Pending after an unfollow.)
-async function handleSoftFollow() {
-  const real = window.viewingRealUser;
-  if (!real || !real.id) {
-    window.vibeToast("This profile didn't finish loading. Refresh and try again.", { tone: 'error' });
-    return;
-  }
-  if (_vibeFollowBusy) return;
-  const name = _viewedName();
-  const unfollow = vibeRelState === 'pending' || vibeRelState === 'following';
-  const soft = document.getElementById('vibeSoftFollow');
-  _vibeFollowBusy = true;
-  if (soft) soft.disabled = true;
-  const r = await window.vibeRequest('/api/me/follow', {
-    method: unfollow ? 'DELETE' : 'POST',
-    json: { target_id: real.id },
-    failure: unfollow ? `Couldn't unfollow ${name}.` : `Couldn't follow ${name}.`,
-  });
-  _vibeFollowBusy = false;
-  if (soft) soft.disabled = false;
-  if (!r.ok) return;
-  setVibeRelState(unfollow ? 'none' : 'following');
-  showToast(unfollow ? `Unfollowed ${name}` : `Following ${name}`);
+  const next = vibeFollowStateAfterTap(was);
+  setVibeRelState(next);
+  showToast(undo ? `Unfollowed ${name}` : next === 'connected' ? `Connected with ${name}` : `Following ${name}`);
 }
 
 // ── The "N you both follow" pill (markup ~3324) ───────────────────────────
@@ -7032,11 +7025,11 @@ function updateMutualPillVisibility() {
 }
 window.updateMutualPillVisibility = updateMutualPillVisibility;
 
-// Connect button visibility is now handled by .viewer-only CSS on the
-// wrapper (#profileActionBtns). The connection state is initialized by
+// Follow button visibility is now handled by .viewer-only CSS on the
+// wrapper (#profileActionBtns). The follow state is initialized by
 // setVibeRelState() with the server-side follow state in the ?handle= branch.
 //
-// P1-013 (live): handleVibConnect / handleSoftFollow above route through
+// P1-013 (live): handleVibConnect above routes through
 // POST/DELETE /api/me/follow when window.viewingRealUser.id is set.
 
 
@@ -7098,8 +7091,8 @@ function runProfSearch(q) {
 
 // Map a Supabase users row to the search-dropdown row shape. The
 // `rel` field comes from the search API's batched connections check
-// so the action button can render Connect / Pending / Message
-// without a second roundtrip.
+// so the action button can render Follow / Following ✓ / Follow back /
+// Connected ✓ without a second roundtrip.
 function _profSearchUserToRow(u) {
   var role = [u.major, u.year].filter(Boolean).join(' · ');
   var initials = (u.name || u.handle || '?').split(/\s+/)
@@ -7254,7 +7247,7 @@ function renderProfDefault() {
       + recent.slice(0,5).map(function(r){ return renderProfSR(r, true); }).join('');
     // Recently-searched rows carry a stale `rel` from when the chip was
     // first pushed. A block/unblock/follow/unfollow between then and now
-    // would leave "Connect back" on a row that should read "Message" (and
+    // would leave "Follow back" on a row that should read "Connected ✓" (and
     // vice versa). Fire one batch refresh and rewrite the action labels
     // in place. Stays best-effort: failure leaves the cached labels.
     setTimeout(function () { _refreshRecentSearchRel(recent.slice(0, 5)); }, 0);
@@ -7343,10 +7336,8 @@ function renderProfSR(r, isRecent) {
   // Action button by kind.
   var action;
   if (r.type === 'person') {
-    if      (r.rel === 'connected')   action = 'Message';
-    else if (r.rel === 'following')   action = 'Pending';
-    else if (r.rel === 'followed_by') action = 'Connect back';
-    else                              action = 'Connect';
+    // Follow / Following ✓ / Follow back / Connected ✓ (VIBE_FOLLOW_LABELS).
+    action = VIBE_FOLLOW_LABELS[vibeFollowStateOf(r.rel)];
   } else if (r.type === 'org') {
     action = 'View';
   } else if (r.type === 'event') {
@@ -7386,15 +7377,18 @@ function renderProfSR(r, isRecent) {
   }
   // The pill does what it says. It used to be a bare <button>, so every
   // click fell through to the row and just opened the profile. Person rows
-  // carry id / handle / rel for _profSRAction; View, Open and Pending need
-  // nothing beyond the row, so their click still reaches the row's own
+  // carry id / handle / rel for _profSRAction; View, Open and Following ✓
+  // need nothing beyond the row, so their click still reaches the row's own
   // navigation. mousedown is cancelled so the search input keeps focus and
   // its blur doesn't close the dropdown while a follow is in flight.
   var actionAttr = '';
   if (r.real && r.type === 'person' && r.id) {
     actionAttr = ' data-sr-id="' + _esc(r.id) + '" data-sr-handle="' + _esc(r.handle || '') + '"'
+      + ' data-sr-name="' + _esc(r.name || '') + '"'
       + ' data-sr-rel="' + _esc(r.rel || 'none') + '"'
-      + ' onmousedown="event.preventDefault()" onclick="_profSRAction(this, event)"';
+      + (vibeFollowStateOf(r.rel) === 'connected' ? ' title="' + _esc(VIBE_CONNECTED_MEANING) + '"' : '')
+      + ' onmousedown="event.preventDefault()" onclick="_profSRAction(this, event)"'
+      + ' onmouseenter="_profSRHover(this, true)" onmouseleave="_profSRHover(this, false)"';
   }
   // Orgs + companies + events get a rounded-square logo (8px); persons
   // keep the more-rounded 11px square.
@@ -7407,9 +7401,14 @@ function renderProfSR(r, isRecent) {
     +'</div>';
 }
 
-// Search-row pill (see renderProfSR). Message opens the DM at the top
-// level; Connect / Connect back follow in place. Anything else (Pending)
+// Search-row pill (see renderProfSR). Connected ✓ opens the DM at the top
+// level (a mutual's DMs go straight to the inbox; hover says Message);
+// Follow / Follow back follow in place. Anything else (Following ✓)
 // returns without stopping the click, so the row opens the profile.
+function _profSRHover(btn, on) {
+  if (btn.dataset.srRel !== 'connected' || btn.disabled) return;
+  vibeHoverWord(btn, on ? 'Message' : VIBE_FOLLOW_LABELS.connected, on);
+}
 function _profSRAction(btn, ev) {
   var rel = btn.dataset.srRel;
   if (rel === 'connected' && btn.dataset.srHandle) {
@@ -7424,18 +7423,20 @@ function _profSRAction(btn, ev) {
 async function _profSRFollow(btn) {
   var id = btn.dataset.srId;
   if (!id || btn.disabled) return;
-  var back = btn.dataset.srRel === 'followed_by';
+  var who = btn.dataset.srName || (btn.dataset.srHandle ? '@' + btn.dataset.srHandle : 'them');
   btn.disabled = true;
   var r = await window.vibeRequest('/api/me/follow', {
     method: 'POST',
     json: { target_id: id },
-    failure: "Couldn't send your connection request.",
+    failure: "Couldn't follow " + who + ".",
   });
   btn.disabled = false;
   if (!r.ok) return;
-  // Following back makes it mutual; otherwise it's a pending request.
-  btn.dataset.srRel = back ? 'connected' : 'following';
-  btn.textContent = back ? 'Message' : 'Pending';
+  // Following back makes it mutual (Connected ✓); otherwise Following ✓.
+  var next = vibeFollowStateAfterTap(btn.dataset.srRel);
+  btn.dataset.srRel = next;
+  btn.textContent = VIBE_FOLLOW_LABELS[next];
+  if (next === 'connected') btn.title = VIBE_CONNECTED_MEANING;
 }
 function openProfSearch() {
   var dd = document.getElementById('profSearchDropdown');
@@ -8290,7 +8291,7 @@ function _afterCampusSync(sent, err) {
   // /profile/<handle> route redirects here with ?handle=<handle>. We fetch
   // /api/users/[handle]/bootstrap (public fields only) and render the same
   // way the owner branch does, just in viewer-mode and with the connection
-  // state seeded so the Connect button matches reality (P1-011b + P1-013).
+  // state seeded so the Follow button matches reality (P1-011b + P1-013).
   if (viewingHandle) {
     document.body.classList.add('viewer-mode');
     document.body.classList.remove('owner-mode');
@@ -8362,11 +8363,12 @@ function _afterCampusSync(sent, err) {
         renderUserSections(v);
         renderStudentBadge(v, /*isOwn=*/false);
         if (typeof showViewerBackBanner === 'function') showViewerBackBanner(v.name);
-        // Seed the Connect button from server-side follow state so the user
-        // doesn't see a flash of "Connect" before it flips to "Following".
+        // Seed the Follow button from server-side follow state so the user
+        // doesn't see a flash of "Follow" before it flips to "Following ✓".
         if (typeof setVibeRelState === 'function') {
-          if (v._viewerFollowState === 'connected')      setVibeRelState('connected');
-          else if (v._viewerFollowState === 'following') setVibeRelState('following');
+          if (v._viewerFollowState === 'connected')        setVibeRelState('connected');
+          else if (v._viewerFollowState === 'following')   setVibeRelState('following');
+          else if (v._viewerFollowState === 'followed_by') setVibeRelState('followed_by');
           else if (v._viewerFollowState === 'self') {
             // Visiting your own /profile/<handle> — bounce to /profile,
             // keeping a ?post or ?welcome still to be acted on there.
@@ -8602,7 +8604,7 @@ function renderBlockedByTargetView(v) {
   const viewerHasBlocked = !!v._viewerHasBlocked;
   const heading = viewerHasBlocked ? `You blocked ${firstName}` : 'Profile unavailable';
   const body = viewerHasBlocked
-    ? `Unblock to see their content. You won't be reconnected — you'll need to Connect again.`
+    ? `Unblock to see their content. Follows don't come back on their own — you'll need to follow them again.`
     : `This account has restricted you. You can't see their profile or message them.`;
   const actionHtml = viewerHasBlocked
     ? `<button id="vibeBlockedUnblockBtn" style="display:inline-block;padding:10px 22px;border-radius:100px;background:var(--charcoal);color:var(--on-ink);text-decoration:none;font-size:13px;font-weight:700;border:none;cursor:pointer">Unblock ${_esc(firstName)}</button>`
@@ -10565,7 +10567,7 @@ function clearFreshUserExtras() {
     }
   });
 
-  // ── Connect CTA in the at-a-glance card ──────────────────────────────
+  // ── Follow CTA in the at-a-glance card ───────────────────────────────
   const connectFull = document.querySelector('.connect-full');
   if (connectFull) connectFull.style.display = 'none';
 
@@ -11247,7 +11249,7 @@ function showWelcomeBanner() {
   // A fourth kind, 'mutuals', backs the "You both follow" tab and the mutual
   // pill. It is a mode of this IIFE rather than its own modal on purpose: the
   // search box, the paging, the inline-error-with-Retry on a failed first
-  // page and the Connect/Message buttons are all here already, and the rows
+  // page and the Follow / Connected ✓ buttons are all here already, and the rows
   // come back in the same UserCardData shape from
   // GET /api/users/<handle>/mutuals. That route's ids come from getMutualIds,
   // the same function the pill's number is computed from, so the pill and the
@@ -11333,14 +11335,14 @@ function showWelcomeBanner() {
       return parts.join(' · ');
     }
 
+    // Follow / Following ✓ / Follow back / Connected ✓ (VIBE_FOLLOW_LABELS,
+    // the twin of src/lib/people/follow-label.ts). Connected ✓ opens the
+    // chat and says Message on hover; Following ✓ unfollows.
     function actionFor(u) {
-      switch (u.follow_state) {
-        case 'self':       return null;
-        case 'connected':  return { label: 'Message', cls: '' };
-        case 'following':  return { label: 'Following', cls: '' };
-        case 'followed_by':return { label: 'Connect back', cls: 'connect-back' };
-        default:           return { label: 'Connect', cls: 'connect' };
-      }
+      if (u.follow_state === 'self') return null;
+      const state = vibeFollowStateOf(u.follow_state);
+      const cls = state === 'none' ? 'connect' : state === 'followed_by' ? 'connect-back' : '';
+      return { label: VIBE_FOLLOW_LABELS[state], cls };
     }
 
     function rowHTML(u) {
@@ -11351,7 +11353,7 @@ function showWelcomeBanner() {
       const handleSpan = u.handle ? `<span class="conn-handle">@${escapeHTML(u.handle)}</span>` : '';
       const meta = metaLine(u);
       const actionBtn = action
-        ? `<button class="conn-action ${action.cls}" data-act-id="${escapeHTML(u.id)}" data-act-handle="${escapeHTML(u.handle || '')}" data-act-state="${escapeHTML(u.follow_state)}">${action.label}</button>`
+        ? `<button class="conn-action ${action.cls}" data-act-id="${escapeHTML(u.id)}" data-act-handle="${escapeHTML(u.handle || '')}" data-act-name="${escapeHTML(u.name || '')}" data-act-state="${escapeHTML(u.follow_state)}">${action.label}</button>`
         : '';
       const profileHref = u.handle ? `/profile/${encodeURIComponent(u.handle)}` : '#';
       return `<a class="conn-row" href="${profileHref}">
@@ -11389,6 +11391,11 @@ function showWelcomeBanner() {
           e.preventDefault(); e.stopPropagation();
           handleAction(btn);
         };
+        if (btn.dataset.actState === 'connected') {
+          btn.title = VIBE_CONNECTED_MEANING;
+          btn.onmouseenter = () => vibeHoverWord(btn, 'Message', true);
+          btn.onmouseleave = () => vibeHoverWord(btn, VIBE_FOLLOW_LABELS.connected, false);
+        }
       });
     }
 
@@ -11414,18 +11421,18 @@ function showWelcomeBanner() {
         return;
       }
       const isFollow = (state === 'none' || state === 'followed_by');
+      const who = btn.dataset.actName || (handle ? '@' + handle : 'this person');
       const r = await window.vibeRequest('/api/me/follow', {
         method: isFollow ? 'POST' : 'DELETE',
         json: { target_id: id },
-        failure: isFollow ? "Couldn't follow this person." : "Couldn't unfollow this person.",
+        failure: isFollow ? `Couldn't follow ${who}.` : `Couldn't unfollow ${who}.`,
       });
       btn.disabled = false;
       if (!r.ok) return;
       // Update local state + repaint, now that the server has it
       const u = activeUsers.find(x => x.id === id);
       if (u) {
-        if (isFollow) u.follow_state = (state === 'followed_by') ? 'connected' : 'following';
-        else          u.follow_state = (state === 'connected') ? 'followed_by' : 'none';
+        u.follow_state = vibeFollowStateAfterTap(state);
         paint();
       }
     }

@@ -25,7 +25,7 @@ import {
  * lives in <PostAudienceList>; this file is the chrome and the people row.
  *
  * Rows go through NetworkMobile's exported <UserRow>, so the avatar, the meta
- * line and the Connect / Following buttons are the same ones the Network tab
+ * line and the Follow / Following ✓ buttons are the same ones the Network tab
  * shows. Follow taps are kept here as an override map rather than pushed back
  * into the list: <PostAudienceList> owns the rows it fetched, and the tidiest
  * way for a caller to react to a tap in its own row is to re-render with a

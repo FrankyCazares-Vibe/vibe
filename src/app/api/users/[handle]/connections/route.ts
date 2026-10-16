@@ -25,7 +25,8 @@ const failed = () =>
  * required — no anonymous browsing of someone else's network.
  *
  * Hydration runs from the *viewer's* perspective, so action buttons read
- * Connect/Follow/Message correctly relative to the signed-in user.
+ * Follow / Following ✓ / Follow back / Connected ✓ correctly relative to
+ * the signed-in user.
  *
  * T1: policy `connections_select_either_party` shows a user client only the
  * edges it is part of, so the target's edges, both directions, are read with

@@ -5,6 +5,7 @@ import Link from "next/link";
 
 import type { AskingRow } from "@/app/api/me/otto/route";
 import { LoadFailed } from "@/components/feedback/LoadFailed";
+import { FOLLOW_LABELS } from "@/lib/people/follow-label";
 
 import { OttoSection } from "./OttoSection";
 
@@ -82,7 +83,7 @@ export function OttoRequests({
                   </span>
                   <div className="otto-room-row-body">
                     <p className="otto-room-row-title">
-                      {r.name || (r.handle ? `@${r.handle}` : "Someone")} wants to connect
+                      {r.name || (r.handle ? `@${r.handle}` : "Someone")} followed you
                     </p>
                     {r.handle ? (
                       <p className="otto-room-row-meta">@{r.handle}</p>
@@ -96,7 +97,7 @@ export function OttoRequests({
                         void onFollowBack(r.user_id);
                       }}
                     >
-                      Connect
+                      {FOLLOW_LABELS.followed_by}
                     </button>
                     <button
                       type="button"
