@@ -14,19 +14,26 @@ export function Sections5fTo5g() {
       <LegalUL bullets>
         <li>
           <strong>Every member</strong> sees the club&apos;s member list: name,
-          handle, photo, role and join date.
+          handle, photo, role, title and join date.
         </li>
         <li>
           <strong>The club&apos;s owner and admins</strong> see four more lists:
           <LegalUL bullets>
-            <li>followers, with the date each first followed;</li>
+            <li>
+              followers, with the date each first followed. You are on it from
+              the moment you ask to join, unless one of you blocked the other;
+            </li>
             <li>invites and their outcome;</li>
             <li>who RSVP&apos;d to the club&apos;s events;</li>
             <li>the people added to a room, with the date each was added.</li>
           </LegalUL>
           <LegalP>
-            They can drop a follower without that person being told, and delete
-            any post made as the club.
+            They can give a member a title, which shows on that member&apos;s
+            profile unless the member hides the club or the title. They can stop
+            followers reading the Board. They can remove a follower without that
+            person being told: that person can follow again, but cannot read the
+            Board until they join. And they can delete any post made as the
+            club.
           </LegalP>
         </li>
         <li>
@@ -38,7 +45,8 @@ export function Sections5fTo5g() {
           author, not deleted, and we record who removed it.
         </li>
         <li>
-          Nobody who runs a club is shown email addresses or reports. If they
+          Nobody who runs a club is shown email addresses, reports or who muted
+          the club&apos;s posts. If they
           try to remove a message that has an open report, the app tells them
           one is open.
         </li>
@@ -50,7 +58,15 @@ export function Sections5fTo5g() {
         <li>drafts and saved posts;</li>
         <li>personal calendar entries;</li>
         <li>your notifications;</li>
-        <li>your mute list and the suggested people you dismissed;</li>
+        <li>
+          your mute list, including clubs whose posts you muted, and the
+          suggested people you dismissed;
+        </li>
+        <li>
+          the clubs you hid from your profile (the club&apos;s members still see
+          you in its member list) and your list of the clubs you follow (a
+          club&apos;s owner and admins still see that you follow it);
+        </li>
         <li>Otto settings and reminders;</li>
         <li>
           your redaction bars, your list of hidden profile parts and your

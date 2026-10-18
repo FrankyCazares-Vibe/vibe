@@ -16,7 +16,8 @@ const SETTINGS_TOO_FAST = "You're changing chat settings too fast. Try again in 
  * copy is untouched — same model as iMessage / Telegram "Clear chat."
  *
  * No-op for channels the viewer isn't a member of (org channels without
- * an explicit channel_members row are silently ignored).
+ * an explicit channel_members row are silently ignored). That includes a
+ * follower reading a club's Board (Franky, Oct 16): no row, nothing stored.
  */
 export async function POST(_req: Request, ctx: RouteCtx) {
   const { id: channelId } = await ctx.params;

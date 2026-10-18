@@ -171,7 +171,12 @@ function cookieClient(page: MessageRow[], over?: (table: string, calls: Call[]) 
 
 /** The service: the roles, the reply counts, one poll's side tables. */
 function serviceAnswers(table: string, calls: Call[]): Answer {
-  if (table === "org_members") return { data: ((arg(calls, "in", "user_id") as string[]) ?? []).map((id) => ({ user_id: id, role: ROLES[id] ?? "member" })) };
+  if (table === "org_members") {
+    // The page's roles read (`in`), or the Board's one-person role read (`eq`, club model).
+    const one = arg(calls, "eq", "user_id") as string | undefined;
+    const ids = (arg(calls, "in", "user_id") as string[] | undefined) ?? (one ? [one] : []);
+    return { data: ids.map((id) => ({ user_id: id, role: ROLES[id] ?? "member" })) };
+  }
   if (table === "rpc:chat_reply_counts") return { data: [] };
   if (table === "chat_polls") return { data: ((arg(calls, "in", "message_id") as string[]) ?? []).map((id) => ({ message_id: id, mode: "poll", question: "Q?", anonymous: false, multi: false, closes_at: null })) };
   if (table === "chat_poll_options") return { data: ((arg(calls, "in", "poll_id") as string[]) ?? []).map((id, i) => ({ id: `${OPT.slice(0, -1)}${i}`, poll_id: id, position: 0, label: "A", capacity: null })) };

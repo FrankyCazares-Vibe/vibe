@@ -122,8 +122,17 @@ test("profile.html keeps the same four labels and meaning", () => {
   for (const label of [FOLLOW_LABELS.following, FOLLOW_LABELS.followed_by, FOLLOW_LABELS.connected]) {
     assert.equal(code.match(quoted(label))?.length ?? 0, 1, `${label} typed outside VIBE_FOLLOW_LABELS`);
   }
-  // The old words, without the ✓, are gone as labels too.
-  assert.equal(code.match(quoted("Following"))?.length ?? 0, 0, "a bare 'Following' label in profile.html");
+  // The old words, without the ✓, are gone as labels too. One exception, in
+  // the open: the Clubs section's heading over the clubs you follow
+  // (VIBE_CLUBS_COPY.following, a twin of CLUBS_COPY.following), never a
+  // person's button. It is the block's only 'Following', and the block is
+  // left out of the count below.
+  const clubsCopy = /const VIBE_CLUBS_COPY = Object\.freeze\(\{[\s\S]*?\n\}\);/.exec(code);
+  assert.ok(clubsCopy, "VIBE_CLUBS_COPY is missing from profile.html");
+  assert.equal(clubsCopy[0].match(quoted("Following"))?.length ?? 0, 1);
+  assert.match(clubsCopy[0], /\n {2}following: 'Following',\n/);
+  const outsideClubsCopy = code.replace(clubsCopy[0], "");
+  assert.equal(outsideClubsCopy.match(quoted("Following"))?.length ?? 0, 0, "a bare 'Following' label in profile.html");
   assert.equal(code.match(quoted("Connected"))?.length ?? 0, 0, "a bare 'Connected' label in profile.html");
 });
 

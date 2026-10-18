@@ -21,6 +21,13 @@
  * `visible` (a sign-up); `voters_more` = what a poll left out. `anonymous`
  * → `voters: []`, `voters_more: 0` for everyone, the creator included.
  *
+ * A FOLLOWER READING THE BOARD (club model, Oct 16; critique #2): the
+ * caller passes `countsOnly`, and every option goes out with its counts and
+ * `voters: []`, `voters_more: 0`, as if anonymous, without a single voter
+ * being read. Members voted and signed up thinking only members would see
+ * their names; a follower never does. `mine` stays the follower's own pick
+ * (a past one, from before they left the club).
+ *
  * `null` = a read failed (logged); the caller answers 503 `try_again`,
  * never a page with a card-less poll. On a database without migration B
  * (`isMissingChatSchema`): an empty map, warned once (3.10).
@@ -42,7 +49,17 @@ type ServerClient = Awaited<ReturnType<typeof createSupabaseServerClient>>;
 
 export type CardRow = { id: string; kind: MessageKind; user_id: string; card_event_id: string | null };
 
-export type HydrateOpts = { room: Room | null; blocked: ReadonlySet<string>; now?: Date };
+export type HydrateOpts = {
+  room: Room | null;
+  blocked: ReadonlySet<string>;
+  now?: Date;
+  /**
+   * True for a viewer who is not a member (a follower reading the Board):
+   * counts only, no voter named and none read. Absent: names, by the rule
+   * above (a member, and the vote route, whose voters are members).
+   */
+  countsOnly?: boolean;
+};
 
 const TAG = "chat/cards.hydrate";
 
@@ -151,6 +168,8 @@ function toPollCard(
   now: Date,
 ): PollCard {
   const anonymous = poll.anonymous === true;
+  // A follower is told the counts and nobody's name, as on an anonymous poll.
+  const nameless = anonymous || opts.countsOnly === true;
   const type = poll.mode === "signup" ? "signup" : "poll";
   const votesByOption = groupBy(votes, (vote) => vote.option_id);
   const room = opts.room;
@@ -168,8 +187,8 @@ function toPollCard(
         const person = people.get(vote.user_id);
         if (person) visible.push(person);
       }
-      const voters = anonymous ? [] : type === "poll" ? visible.slice(0, POLL_VOTERS_SHOWN) : visible;
-      const votersMore = anonymous || type !== "poll" ? 0 : visible.length - voters.length;
+      const voters = nameless ? [] : type === "poll" ? visible.slice(0, POLL_VOTERS_SHOWN) : visible;
+      const votersMore = nameless || type !== "poll" ? 0 : visible.length - voters.length;
       const capacity = typeof option.capacity === "number" ? option.capacity : null;
       return {
         id: option.id,
@@ -256,9 +275,12 @@ export async function hydrateCards(
 
   // The voters, on the viewer's client (a person the viewer cannot read is
   // left out), and the Event cards' events, side by side. An anonymous
-  // poll names nobody, so its voters are not asked for.
+  // poll names nobody, so its voters are not asked for; nor are any for a
+  // follower (`countsOnly`), who is never told who picked what.
   const anonymousPolls = new Set(polls.filter((poll) => poll.anonymous === true).map((poll) => poll.message_id));
-  const voterIds = Array.from(new Set(votes.filter((vote) => !anonymousPolls.has(vote.poll_id)).map((vote) => vote.user_id)));
+  const voterIds = opts.countsOnly === true
+    ? []
+    : Array.from(new Set(votes.filter((vote) => !anonymousPolls.has(vote.poll_id)).map((vote) => vote.user_id)));
   const [people, refs] = await Promise.all([
     readAll<unknown>("voters", voterIds, (chunk) =>
       client.from("users").select("id, handle, name, avatar_url").in("id", chunk),

@@ -6,6 +6,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { LoadFailed } from "@/components/feedback/LoadFailed";
 import { MobileTabBar } from "@/components/mobile/MobileTabBar";
 import { OrgInviteBanner } from "@/components/orgs/OrgInviteBanner";
+import { OrgMenu } from "@/components/orgs/OrgMenu";
 import { visibleClubPosts } from "@/lib/club-routes/club-posts";
 import {
   loadRestrictedAuthors,
@@ -15,12 +16,15 @@ import { rsvpCampusDecision } from "@/lib/iu/campus-request";
 import { campusRowById, isSharedCampus } from "@/lib/iu/campuses";
 import { requireNotRestricted } from "@/lib/moderation/access";
 import { orgAssetProxyUrl } from "@/lib/org-asset-url";
-import { loadFollowerCount, loadViewerFollow } from "@/lib/orgs/following";
+import { NO_BOARD, loadBoardFacts } from "@/lib/orgs/board-facts";
+import { loadFollowerCount, loadViewerFollow, publicMemberCount } from "@/lib/orgs/following";
 import {
   ORG_COPY,
   audienceChip,
+  boardCardView,
   followerCountText,
   joinPolicyNotice,
+  keepFollowingDefault,
   memberCountText,
   openToFact,
   policyChip,
@@ -38,6 +42,7 @@ import {
   type OrgAudience,
 } from "@/lib/orgs/join-state";
 import { loadViewerOrgContext } from "@/lib/orgs/membership";
+import { loadMutedOrgSet } from "@/lib/orgs/org-mutes";
 import { withPostMediaUrls } from "@/lib/post-media-url";
 import { isClubPostDeleteRole } from "@/lib/posts/viewer-can-delete";
 import { loadHiddenUsers } from "@/lib/safety/hidden-users";
@@ -45,7 +50,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 
 import { OrgProfileAdminBar } from "./admin-actions";
-import { ChannelsSection } from "./ChannelsSection";
+import { BoardSection, ChannelsSection } from "./ChannelsSection";
 import { OrgContent } from "./OrgContent";
 import { OrgEventsSection } from "./OrgEventsSection";
 import { type OrgPostItem, OrgPostsList } from "./OrgPostsList";
@@ -90,7 +95,11 @@ type OrgProfile = {
   links: Array<{ label: string; url: string }> | null;
   philanthropy: string;
   last_activity_at: string | null;
-  /** Null when the count read failed: omitted, never rendered as 0 (C27). */
+  /**
+   * Null when the count read failed: omitted, never rendered as 0 (C27).
+   * Also null below 5 for anyone outside the club (`publicMemberCount`,
+   * counts public from 5 up); members see the exact number.
+   */
   member_count: number | null;
   /**
    * The raw count, null when the read failed. Rendered only through
@@ -278,7 +287,7 @@ export default async function OrgProfilePage({ params }: Params) {
   // same role rule and restriction check DELETE /api/posts/[id] makes
   // (clubOfficerMayDelete), so the button and the route agree. Only an owner
   // or admin pays for the read; a failed one shows no button.
-  const [memberRes, followerCount, clubPosts, invitedByName, officerMayDeletePosts] = await Promise.all([
+  const [memberRes, followerCount, clubPosts, invitedByName, officerMayDeletePosts, boardFacts, mutedRes] = await Promise.all([
     service
       .from("org_members")
       .select("user_id", { count: "exact", head: true })
@@ -305,6 +314,21 @@ export default async function OrgProfilePage({ params }: Params) {
           () => false,
         )
       : Promise.resolve(false),
+    // The Board card's facts (club model). Nothing to ask while the
+    // membership read failed: that page shows no card and no menu.
+    relation
+      ? loadBoardFacts(service, supabase, {
+          orgId,
+          hidden: !!hiddenAt,
+          viewerId: user?.id ?? null,
+          isMember: !!viewerRole,
+          following: relation.following,
+          removed: !!ctx?.removed,
+        })
+      : Promise.resolve(NO_BOARD),
+    // The ⋯ menu's Mute / Unmute. A failed read reads as not muted: a second
+    // mute is harmless (the route answers `already`).
+    user && ctx?.ok ? loadMutedOrgSet(supabase, user.id, [orgId]) : Promise.resolve(null),
   ]);
   const { posts: postsRes, blocked: blockedAuthors } = clubPosts;
   if (memberRes.error) {
@@ -340,7 +364,7 @@ export default async function OrgProfilePage({ params }: Params) {
       : [],
     philanthropy: (orgRaw.philanthropy as string) ?? "",
     last_activity_at: (orgRaw.last_activity_at as string | null) ?? null,
-    member_count: memberRes.error ? null : (memberRes.count ?? null),
+    member_count: memberRes.error ? null : publicMemberCount(memberRes.count, viewerRole),
     follower_count: followerCount,
     dormant,
   };
@@ -386,6 +410,35 @@ export default async function OrgProfilePage({ params }: Params) {
   const backdrop =
     BACKDROP_PRESETS[org.backdrop_preset] ?? BACKDROP_PRESETS["sand-purple"];
 
+  // The Announcement Board card: Open, Read the Board, Follow to read the
+  // Board, Verify school email, or nothing (club model; `boardCardView`).
+  const boardCard = relation
+    ? boardCardView({
+        state: relation.state,
+        following: relation.following,
+        boardId: boardFacts.boardId,
+        boardReadable: boardFacts.boardReadable,
+        followWouldRead: boardFacts.followWouldRead,
+        verifyToRead: boardFacts.verifyToRead,
+        orgName: org.name,
+      })
+    : null;
+  // The ⋯ menu, for a signed-in viewer whose standing loaded. Not on a hidden
+  // club seen from outside (a platform admin): there is nothing to mute.
+  const menu =
+    user && ctx?.ok && relation && relation.state !== "hidden" ? (
+      <OrgMenu
+        orgHandle={org.handle}
+        orgName={org.name}
+        role={viewerRole}
+        muted={!!mutedRes?.ok && mutedRes.ids.has(orgId.toLowerCase())}
+        keepFollowing={keepFollowingDefault(followRes?.ok ? followRes.row?.source : null)}
+        // The club's switch, for members only (never next to a follower's
+        // missing Board card: wave-2 repair, finding 15).
+        boardReadersOn={viewerRole && boardFacts.boardId ? boardFacts.readersOn : null}
+      />
+    ) : null;
+
   return (
     <main
       className={user ? "vibe-tabbar-page vibe-mobile-safe-top" : "vibe-mobile-safe-top"}
@@ -418,7 +471,7 @@ export default async function OrgProfilePage({ params }: Params) {
         ) : null}
 
         <Banner org={org} />
-        <Header org={org} invited={relation?.state === "invited"}>
+        <Header org={org} invited={relation?.state === "invited"} menu={menu}>
           {relation ? (
             <OrgProfileJoinButton
               relation={relation}
@@ -446,6 +499,7 @@ export default async function OrgProfilePage({ params }: Params) {
           </div>
         ) : null}
         {org.description ? <Description text={org.description} /> : null}
+        {boardCard && relation ? <BoardSection card={boardCard} relation={relation} /> : null}
 
         <OrgContent
           mainColumn={
@@ -636,11 +690,14 @@ function Banner({ org }: { org: OrgProfile }) {
 function Header({
   org,
   invited,
+  menu,
   children,
 }: {
   org: OrgProfile;
   /** The viewer has a live invite: the "Invited you" chip. */
   invited: boolean;
+  /** The club's ⋯ menu (Mute posts, Leave club), beside the name. */
+  menu?: React.ReactNode;
   children?: React.ReactNode;
 }) {
   const policy = policyChip(org.join_policy);
@@ -713,19 +770,25 @@ function Header({
           gap: 8,
         }}
       >
-        <h1
-          style={{
-            margin: 0,
-            fontFamily: "Fraunces, serif",
-            fontSize: "clamp(20px, 5.2vw, 36px)",
-            fontWeight: 900,
-            letterSpacing: "-0.6px",
-            lineHeight: 1.15,
-            overflowWrap: "break-word",
-          }}
-        >
-          {org.name}
-        </h1>
+        {/* The name, with the ⋯ menu at its end on phone and desktop alike. */}
+        <div style={{ display: "flex", alignItems: "flex-start", gap: 8, minWidth: 0 }}>
+          <h1
+            style={{
+              margin: 0,
+              flex: 1,
+              minWidth: 0,
+              fontFamily: "Fraunces, serif",
+              fontSize: "clamp(20px, 5.2vw, 36px)",
+              fontWeight: 900,
+              letterSpacing: "-0.6px",
+              lineHeight: 1.15,
+              overflowWrap: "break-word",
+            }}
+          >
+            {org.name}
+          </h1>
+          {menu}
+        </div>
         {/* Chip row: Verified · policy · audience? · Hidden? · Invited you?
             · Dormant? flex-wrap so the row breaks AFTER chips overflow,
             not in the middle of a chip. */}

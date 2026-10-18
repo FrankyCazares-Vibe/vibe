@@ -972,8 +972,10 @@ const ORG_COPY = Object.freeze({
   subs: Object.freeze({
     membersFollow: "Members follow automatically",
     hidden: "Hidden by Vibe. Only members can see it.",
-    requestPolicy: "Officers approve requests",
-    requestVisiting: "You're visiting, so officers approve requests",
+    // Asking to join also follows the club (club model), and officers can see
+    // who follows: the sub says so before the tap.
+    requestPolicy: "Officers approve requests. Asking also follows the club.",
+    requestVisiting: "You're visiting, so officers approve requests. Asking also follows the club.",
     inviteOnly: "Officers invite members",
     audienceIu: "{org} is open to IU students only.",
     audiencePurdue: "{org} is open to Purdue students only.",
@@ -989,6 +991,7 @@ const ORG_COPY = Object.freeze({
     iuOnly: "IU only",
     purdueOnly: "Purdue only",
     hidden: "Hidden",
+    removedBefore: "Removed before",
   }),
   policyChips: Object.freeze({
     open: "Open",
@@ -1058,6 +1061,13 @@ const ORG_COPY = Object.freeze({
     memberFollows: "Members follow automatically.",
     orgHidden: "This org is hidden, so nobody new can join it.",
     inviteClosed: "This invite is no longer open.",
+    joinUnavailable: "You can't join this club right now.",
+    approveUnavailable: "You can't approve this request right now.",
+    removedNeedsAdmin: "Only the owner or an officer can let back someone who was removed.",
+  }),
+  // Only the line orgErrorCopy reads: onboarding has no ⋯ menu.
+  menu: Object.freeze({
+    ownerCantLeave: "Owners can't leave. Hand the club to another officer first.",
   }),
   control: Object.freeze({
     followFailed: "Couldn't follow this club.",
@@ -1181,6 +1191,9 @@ function fillCampus(t, campus, fallback) {
 /** Said near Follow on any club not known to be open (join-copy.ts). */
 const FOLLOW_DISCLOSURE = "Officers can see who follows this club.";
 
+/** Said instead next to a Request that would also follow (asking follows). */
+const REQUEST_DISCLOSURE = "Asking to join also follows the club. Officers can see who follows it.";
+
 /** `{key}` placeholders in one pass; unknown keys stay as written. */
 function fillCopy(template, vars) {
   return template.replace(/\{(\w+)\}/g, (whole, key) =>
@@ -1219,15 +1232,15 @@ function orgSignInAction(handle) {
   });
 }
 
-/** Any club not known to be open (`joinPolicy !== "open"`) says officers see followers. */
-function orgWantsDisclosure(rel, showsFollow) {
-  return (
-    rel.joinPolicy !== "open" &&
-    showsFollow &&
-    rel.state !== "member" &&
-    rel.state !== "hidden" &&
-    rel.state !== "signed_out"
-  );
+/**
+ * Any club not known to be open (`joinPolicy !== "open"`) says officers see
+ * followers next to Follow. A Request gets the line whatever the policy:
+ * asking follows the club, so the officers who read the request see the follow.
+ */
+function orgWantsDisclosure(rel, actions) {
+  if (rel.state === "member" || rel.state === "hidden" || rel.state === "signed_out") return false;
+  if (actions.some((a) => a.kind === "request")) return true;
+  return rel.joinPolicy !== "open" && actions.some((a) => a.kind === "follow" || a.kind === "unfollow");
 }
 
 function orgRowMeta(rel) {
@@ -1243,8 +1256,9 @@ function orgRowMeta(rel) {
 
 /**
  * orgRowView(rel, "onboarding"): one or two controls, a chip that never
- * repeats a control, meta labels. Onboarding never offers Request, and an
- * open club puts Follow and Join side by side (`line`).
+ * repeats a control, meta labels. An open club puts Follow and Join side by
+ * side (`line`), a by-request club Follow and Request: asking needs no follow
+ * first, and asking follows (club model, Oct 16: one request flow everywhere).
  */
 function orgRowViewOnboarding(rel) {
   let actions;
@@ -1280,9 +1294,17 @@ function orgRowViewOnboarding(rel) {
       layout = "line";
       break;
     case "can_request":
+      // Like Follow and Join: once they follow, Request is the one filled control.
       actions = rel.following
-        ? [orgAction("unfollow", ORG_COPY.buttons.following, "quiet")]
-        : [orgAction("follow", ORG_COPY.buttons.follow, "filled")];
+        ? [
+            orgAction("unfollow", ORG_COPY.buttons.following, "quiet"),
+            orgAction("request", ORG_COPY.buttons.request, "filled"),
+          ]
+        : [
+            orgAction("follow", ORG_COPY.buttons.follow, "filled"),
+            orgAction("request", ORG_COPY.buttons.request, "outline"),
+          ];
+      layout = "line";
       break;
     case "requested":
     case "invite_only":
@@ -1292,12 +1314,14 @@ function orgRowViewOnboarding(rel) {
       break;
   }
 
-  const showsFollow = actions.some((a) => a.kind === "follow" || a.kind === "unfollow");
+  const asks = actions.some((a) => a.kind === "request");
   return {
     chip,
     actions,
     layout,
-    disclosure: orgWantsDisclosure(rel, showsFollow) ? FOLLOW_DISCLOSURE : null,
+    disclosure: orgWantsDisclosure(rel, actions)
+      ? (!rel.following && asks ? REQUEST_DISCLOSURE : FOLLOW_DISCLOSURE)
+      : null,
     meta: orgRowMeta(rel),
     sub,
   };
@@ -1327,6 +1351,14 @@ function orgErrorCopy(code) {
     case "invite_not_found":
     case "invite_not_pending":
       return ORG_COPY.errors.inviteClosed;
+    case "join_unavailable":
+      return ORG_COPY.errors.joinUnavailable;
+    case "approve_unavailable":
+      return ORG_COPY.errors.approveUnavailable;
+    case "removed_needs_admin":
+      return ORG_COPY.errors.removedNeedsAdmin;
+    case "owner_cannot_leave":
+      return ORG_COPY.menu.ownerCantLeave;
     default:
       return null;
   }
@@ -1349,8 +1381,9 @@ function changeAfter(rel, kind) {
     case "join":
     case "accept":
       return { state: "member", following: true, role: rel.role ?? "member" };
+    // Asking follows the club (the join route writes it, source `request`).
     case "request":
-      return { state: "requested", following: rel.following, role: rel.role };
+      return { state: "requested", following: true, role: rel.role };
     case "decline":
       return {
         state: stateAfterDecline(rel.joinPolicy),
@@ -1368,12 +1401,50 @@ function isOrgRole(value) {
   return value === "owner" || value === "admin" || value === "mod" || value === "member";
 }
 
-/** OrgJoinControl.tsx: `audience_mismatch` names the university only in its sentence. */
+/** `audience_mismatch` names the university only in its sentence. */
 function audienceFromRefusal(error, fallback) {
   const text = typeof error === "string" ? error : "";
   if (/open to Purdue students only\.?$/.test(text)) return "purdue";
   if (/open to IU students only\.?$/.test(text)) return "iu";
   return fallback;
+}
+
+/** vibeRequest's fallback line for each tap through the join door. */
+function joinPressFailure(kind) {
+  if (kind === "accept") return ORG_COPY.control.acceptFailed;
+  return kind === "request" ? ORG_COPY.control.requestFailed : ORG_COPY.control.joinFailed;
+}
+
+/**
+ * What a Join, Request or Accept answered (join-copy.ts joinOutcome):
+ * `change` (the standing to show, the welcome only for an accepted invite),
+ * `unclear` (a 2xx that says neither joined nor pending) or `refused`. Whether
+ * asking followed is the server's `org_follow_state`; an older server that
+ * doesn't say leaves it as it was.
+ */
+function joinOutcome(rel, kind, r) {
+  const keep = (state, audience = rel.audience) => ({
+    kind: "change",
+    next: { state, following: rel.following, role: rel.role },
+    audience,
+    welcome: false,
+  });
+  if (r.ok) {
+    if (r.data.joined === true) {
+      const role = isOrgRole(r.data.role) ? r.data.role : "member";
+      return { kind: "change", next: { state: "member", following: true, role }, audience: rel.audience, welcome: kind === "accept" };
+    }
+    if (r.data.pending === true) {
+      const f = r.data.org_follow_state;
+      const following = f === "following" ? true : f === "not_following" ? false : rel.following;
+      return { kind: "change", next: { state: "requested", following, role: rel.role }, audience: rel.audience, welcome: false };
+    }
+    return { kind: "unclear", message: joinPressFailure(kind) + " Try again." };
+  }
+  if (r.code === "invite_only") return keep("invite_only");
+  if (r.code === "school_unverified") return keep("unverified");
+  if (r.code === "audience_mismatch") return keep("audience_blocked", audienceFromRefusal(r.error, rel.audience));
+  return { kind: "refused" };
 }
 
 // ── social-steps.ts: the clubs and people steps' pure half ────────────────
@@ -1478,7 +1549,7 @@ function relationFor(r, local) {
   };
 }
 
-/** True when any row, with this step's taps applied, is followed or joined. */
+/** True when any row, with this step's taps applied, is followed or joined. A request counts: asking follows. */
 function anyClubFollowed(rows, local) {
   return rows.some((r) => relationFor(r, local[r.id]).following);
 }
@@ -3115,7 +3186,10 @@ async function onPhotoPicked(e) {
 // ── Step 5: follow clubs ──────────────────────────────────────────────────
 // The student's campus clubs from discover, Follow first. Which buttons a row
 // shows and every word on them come from orgRowViewOnboarding / ORG_COPY, the
-// same table as every other club surface. Club controls wait for the server
+// same table as every other club surface: Follow next to Join on an open
+// club, Follow next to Request on a by-request one. Asking needs no follow
+// first, and the join route follows the club when it files the request, so
+// the row reads Following with the answer. Club controls wait for the server
 // ('…', aria-busy); nothing flips optimistically. Replay sends nothing.
 
 const CLUBS_SEARCH_THRESHOLD = 8;
@@ -3446,7 +3520,8 @@ function setClubBusy(row, index) {
 /** OrgJoinControl's refuse(): 429, a gone club, a club code, else the mapped line with its action. */
 function refuseClub(row, r) {
   if (r.status === 429) {
-    window.vibeToast(ORG_COPY.errors.tooMany, { tone: 'error' });
+    // vibeRequest's line carries the route's own wait ("Try again in 8 minutes").
+    window.vibeToast(r.message || ORG_COPY.errors.tooMany, { tone: 'error' });
     return;
   }
   if (r.code === 'not_found') {
@@ -3498,49 +3573,29 @@ async function pressClub(row, a, index) {
     return;
   }
 
-  // join, request and accept all go through the one door (join/route.ts).
-  const failure = a.kind === 'accept'
-    ? ORG_COPY.control.acceptFailed
-    : a.kind === 'request'
-      ? ORG_COPY.control.requestFailed
-      : ORG_COPY.control.joinFailed;
+  // join, request and accept all go through the one door (join/route.ts),
+  // with no follow first; what its answer means is joinOutcome's (the same
+  // rules as OrgJoinControl.tsx). A request that filed comes back with the
+  // server's org_follow_state, so the row flips to Following with it.
+  if (a.kind !== 'join' && a.kind !== 'request' && a.kind !== 'accept') return;
   setClubBusy(row, index);
   const r = await window.vibeRequest('/api/orgs/' + handle + '/join', {
     method: 'POST',
     json: {},
     quiet: true,
-    failure,
+    failure: joinPressFailure(a.kind),
   });
   if (stale()) return;
   setClubBusy(row, null);
-  if (r.ok) {
-    if (r.data.joined === true) {
-      applyClub(row, { state: 'member', following: true, role: isOrgRole(r.data.role) ? r.data.role : 'member' });
-      if (a.kind === 'accept') window.vibeToast(fillCopy(ORG_COPY.control.welcome, { org: orgName }));
-    } else if (r.data.pending === true) {
-      applyClub(row, { state: 'requested', following: rel.following, role: rel.role });
-    } else {
-      // A 2xx that says neither: nothing is known to have changed.
-      window.vibeToast(failure + ' Try again.', { tone: 'error' });
-    }
-    return;
-  }
-  switch (r.code) {
-    case 'invite_only':
-      applyClub(row, { state: 'invite_only', following: rel.following, role: rel.role });
-      return;
-    case 'audience_mismatch':
-      applyClub(
-        row,
-        { state: 'audience_blocked', following: rel.following, role: rel.role },
-        audienceFromRefusal(r.error, rel.audience),
-      );
-      return;
-    case 'school_unverified':
-      applyClub(row, { state: 'unverified', following: rel.following, role: rel.role });
-      return;
-    default:
-      refuseClub(row, r);
+  const out = joinOutcome(rel, a.kind, r);
+  if (out.kind === 'change') {
+    applyClub(row, out.next, out.audience);
+    if (out.welcome) window.vibeToast(fillCopy(ORG_COPY.control.welcome, { org: orgName }));
+  } else if (out.kind === 'unclear') {
+    // A 2xx that says neither: nothing is known to have changed.
+    window.vibeToast(out.message, { tone: 'error' });
+  } else if (!r.ok) {
+    refuseClub(row, r);
   }
 }
 

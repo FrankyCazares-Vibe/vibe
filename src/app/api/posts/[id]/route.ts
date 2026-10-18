@@ -240,6 +240,27 @@ export async function GET(_req: Request, ctx: RouteContext) {
         )
       : Promise.resolve(false);
 
+  // The post's club, for "Mute <club>'s posts" in the viewer's ⋯ wherever it
+  // opens (a profile, /posts/[id]; wave-2 repair, finding 11): its handle and
+  // name, the club card's public words. Only on someone else's post of a club
+  // that isn't hidden; a failed read is no club (no Mute row), never a 500.
+  const clubRead: Promise<{ handle: string; name: string } | null> =
+    orgId && !isAuthor && !hiddenClub && isSupabaseServiceConfigured()
+      ? Promise.resolve(
+          createSupabaseServiceClient().from("orgs").select("handle,name").eq("id", orgId).is("hidden_at", null).maybeSingle(),
+        ).then(
+          ({ data, error: clubErr }) => {
+            if (clubErr) console.error("[posts/:id GET club name]", clubErr);
+            const c = data as { handle?: unknown; name?: unknown } | null;
+            return c && typeof c.handle === "string" ? { handle: c.handle, name: typeof c.name === "string" ? c.name : c.handle } : null;
+          },
+          (e: unknown) => {
+            console.error("[posts/:id GET club name]", e);
+            return null;
+          },
+        )
+      : Promise.resolve(null);
+
   // Counts + viewer state in parallel — small queries, cheap to fan out.
   // Likes and reposts come from the count RPC (see the docblock): the viewer
   // is `auth.uid()` there, so this must stay the cookie client.
@@ -251,6 +272,7 @@ export async function GET(_req: Request, ctx: RouteContext) {
     viewRows,
     saveCount,
     clubOfficer,
+    club,
   ] = await Promise.all([
     loadPostEngagementCounts(supabase, [id]),
     supabase
@@ -271,6 +293,7 @@ export async function GET(_req: Request, ctx: RouteContext) {
     loadHonestViewRows([id], new Map([[id, authorId]])),
     loadSaveCount(id, authorId),
     officerCheck,
+    clubRead,
   ]);
 
   // `null` from the ledger means "we could not read it", not "nobody looked".
@@ -294,6 +317,7 @@ export async function GET(_req: Request, ctx: RouteContext) {
     post: withPostMediaUrls(post),
     is_owner: isAuthor,
     viewer_can_delete: viewerCanDeletePost({ removed, isAuthor, clubOfficer }),
+    club,
     counts: {
       likes:    postCounts.likes,
       comments: commentCountRes.count ?? 0,

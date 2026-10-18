@@ -48,6 +48,12 @@ function fail(status: number, code: string, error: string) {
  * own recency: a refollow moves a club back to the top); officers never see
  * this order.
  *
+ * The paged list behind the profile's private "Following" (club model spec
+ * E3): `/api/me/clubs` returns the first page, and its
+ * `following_next_cursor` continues here. Rows with a `member_role` are
+ * clubs I'm in; the Following list drops them. `muted` says whether I muted
+ * the club's posts (`org_post_mutes`, my own rows, read on my client).
+ *
  * Hidden and deleted clubs are dropped AFTER paging, so a page can come back
  * short, or empty with a `next_cursor`. Clients keep paging until
  * `next_cursor` is null. There is no `join_state` here: a surface with a Join
@@ -55,8 +61,8 @@ function fail(status: number, code: string, error: string) {
  *
  * RESPONSES
  *   200 {ok, orgs:[{id, handle, name, logo_url, verified, join_policy,
- *        audience, campus_id, followed_at, org_follow_source, member_role}],
- *        next_cursor}
+ *        audience, campus_id, followed_at, org_follow_source, member_role,
+ *        muted}], next_cursor}
  *   400 invalid_cursor · 401 unauthorized · 429 · 500 request_failed
  */
 export async function GET(req: Request) {
@@ -99,7 +105,7 @@ export async function GET(req: Request) {
   }
 
   const service = createSupabaseServiceClient();
-  const [orgsRes, rolesRes] = await Promise.all([
+  const [orgsRes, rolesRes, mutesRes] = await Promise.all([
     service
       .from("orgs")
       .select("id, handle, name, logo_url, verified, join_policy, audience, campus_id")
@@ -110,11 +116,18 @@ export async function GET(req: Request) {
       .select("org_id, role")
       .eq("user_id", user.id)
       .in("org_id", orgIds),
+    // My own mutes, on MY client (own rows only), for this page's clubs.
+    supabase
+      .from("org_post_mutes")
+      .select("org_id")
+      .eq("user_id", user.id)
+      .in("org_id", orgIds),
   ]);
-  if (orgsRes.error || rolesRes.error) {
-    console.error("[me/followed-orgs hydrate]", orgsRes.error ?? rolesRes.error);
+  if (orgsRes.error || rolesRes.error || mutesRes.error) {
+    console.error("[me/followed-orgs hydrate]", orgsRes.error ?? rolesRes.error ?? mutesRes.error);
     return fail(500, "request_failed", "Request failed");
   }
+  const muted = new Set(((mutesRes.data ?? []) as { org_id: string }[]).map((m) => m.org_id));
 
   const orgById = new Map<string, OrgRow>();
   for (const org of (orgsRes.data ?? []) as OrgRow[]) orgById.set(org.id, org);
@@ -139,6 +152,7 @@ export async function GET(req: Request) {
         followed_at: row.created_at,
         org_follow_source: isFollowSource(row.source) ? row.source : null,
         member_role: roleByOrg.get(row.org_id) ?? null,
+        muted: muted.has(row.org_id),
       },
     ];
   });

@@ -25,6 +25,12 @@ const STILL_FRESH_SEC = 4;
  * Vibe, which Privacy Policy 3d rules out. The write is conditional instead,
  * in the same single update: it only lands when `typing_until` is empty or
  * runs out within STILL_FRESH_SEC. A skipped ping still answers ok.
+ *
+ * A follower reading a club's Board (Franky, Oct 16) never shows as typing:
+ * they hold no `channel_members` row, so the update matches nothing and
+ * nothing is stored. That silent no-op is the refusal on purpose: telling
+ * them apart would cost a read on every member's ping, and their screen has
+ * no composer to ping from.
  */
 export async function POST(_req: Request, ctx: RouteCtx) {
   const { id: channelId } = await ctx.params;

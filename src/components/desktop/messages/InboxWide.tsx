@@ -4,7 +4,9 @@ import Link from "next/link";
 import { useId, useMemo, useRef, useState } from "react";
 
 import { LoadFailed, type LoadFailure } from "@/components/feedback/LoadFailed";
+import { boardsMatching } from "@/components/mobile/messages/club/helpers";
 import { ClubRow } from "@/components/mobile/messages/home/ClubRow";
+import { FollowedBoards } from "@/components/mobile/messages/home/FollowedBoardsRow";
 import { HomeEmpty } from "@/components/mobile/messages/home/HomeEmpty";
 import { allBadgeCount, badgeText, HOME_FILTERS, type HomeRow, mergeHomeRows } from "@/components/mobile/messages/home/home-rules";
 import { FILTER_LABEL, HomeSkeleton, LIST_LABEL } from "@/components/mobile/messages/home/MessagesHome";
@@ -34,6 +36,12 @@ import { searchRows } from "./desktop-rules";
  *
  * The root is the body row's flex item (3.2: `flex 0 1 520`, `min-width
  * 360`): mount it straight in that row.
+ *
+ * Club model (Franky's calls of Oct 16): the Boards I read as a follower
+ * (`data.boards`, the shell's same read) are the phone's `Boards you follow`
+ * group, under the clubs in All and Clubs, cut by the search like the rows
+ * (`boardsMatching`). A click opens the club on its Board (`onOpenClub`),
+ * which `ClubPane` draws read only. Not there until the read answers.
  */
 
 /** 6.5: the wide list's own line where the phone draws `EmptyState tab="all"`, whose sentence is worded for a phone. The word `Network` is the link. */
@@ -93,6 +101,22 @@ export function InboxWide({ data: d, filter, night, onFilter, onOpenClub, onOpen
   );
   const noMatches = quietLine(`No matches for "${query}"`);
 
+  // The Boards I follow, under the search; `withBoards` puts them under a club filter's list, and a
+  // search that matches only a Board shows the Board without the no-match line above it.
+  const boards = boardsMatching(d.boards ?? [], query);
+  const followed = boards.length > 0 ? <FollowedBoards boards={boards} now={d.now} onOpen={(b) => onOpenClub(b.org.handle, b.room_id, "board")} /> : null;
+  const withBoards = (all: HomeRow[], node: React.ReactNode) => {
+    if (!followed) return node;
+    // No rows of the filter (its empty block), or none left by the search (the no-match line): the Boards alone.
+    const nothingAbove = searchRows(all, query).length === 0;
+    return (
+      <>
+        {nothingAbove ? null : node}
+        {followed}
+      </>
+    );
+  };
+
   // One list for every filter: the rows of the filter, cut by the search, drawn by the phone's row of each kind.
   const rowList = (rows: HomeRow[], requests: boolean) => (
     <ul style={LIST_STYLE}>
@@ -127,14 +151,21 @@ export function InboxWide({ data: d, filter, night, onFilter, onOpenClub, onOpen
     list = d.threadsErr ? failedBox(d.threadsErr) : listOf(all, noChats);
   } else if (filter === "clubs") {
     const all = (d.clubs ?? []).map((club): HomeRow => ({ kind: "club", club }));
-    list = d.clubsErr ? failedBox(d.clubsErr) : listOf(all, <HomeEmpty />);
+    list = d.clubsErr ? (
+      <>
+        {failedBox(d.clubsErr)}
+        {followed}
+      </>
+    ) : (
+      withBoards(all, listOf(all, <HomeEmpty />))
+    );
   } else {
     const all = mergeHomeRows(d.clubs ?? [], d.threads ?? []);
     list = (
       <>
         {d.clubsErr ? failedBox(d.clubsErr) : null}
         {d.threadsErr ? failedBox(d.threadsErr) : null}
-        {listOf(all, !d.threadsErr && !d.clubsErr ? noChats : null)}
+        {withBoards(all, listOf(all, !d.threadsErr && !d.clubsErr ? noChats : null))}
       </>
     );
   }

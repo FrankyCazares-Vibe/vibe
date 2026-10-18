@@ -714,7 +714,7 @@ test("roster: without visible it is today's list, everyone in it, and no block r
   assert.equal(res.status, 200);
   assert.deepEqual(ids(res), [ME, ANN, BEN, CAT], "owner, admin, then members by the day they joined");
   assert.deepEqual((res.body.members as unknown[])[3], {
-    user_id: CAT, role: "member", joined_at: day(9), name: "Cat", handle: "cat", avatar_url: null, school_verified: false,
+    user_id: CAT, role: "member", joined_at: day(9), title: null, name: "Cat", handle: "cat", avatar_url: null, school_verified: false,
   });
   assert.equal(blockReads(state).length, 0);
 });
@@ -725,7 +725,7 @@ test("roster: visible=1 leaves out the people in a block with the viewer, either
   assert.equal(res.status, 200);
   assert.deepEqual(ids(res), [ME, ANN], "Ben (blocked by me) and Cat (who blocked me) are gone; I am not");
   assert.deepEqual((res.body.members as unknown[])[1], {
-    user_id: ANN, role: "admin", joined_at: day(3), name: "Ann", handle: "ann", avatar_url: null, school_verified: true,
+    user_id: ANN, role: "admin", joined_at: day(3), title: null, name: "Ann", handle: "ann", avatar_url: null, school_verified: true,
   }, "the row shape does not change");
   const [blocks, ...rest] = blockReads(state);
   assert.equal(rest.length, 0, "one block read, on the viewer's own client");

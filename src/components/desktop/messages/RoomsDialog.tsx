@@ -3,6 +3,7 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 
 import { asLoadFailure, LoadFailed, type LoadFailure } from "@/components/feedback/LoadFailed";
+import { Switch } from "@/components/mobile/messages/compose/CardSheet";
 import { HomeSkeleton } from "@/components/mobile/messages/home/MessagesHome";
 import { chatRefusalLine } from "@/components/mobile/messages/send-failure";
 import { palette, type Palette } from "@/components/mobile/messages/v2-tokens";
@@ -15,8 +16,16 @@ import { DesktopDialog } from "./DesktopDialog";
 import { RoomPeople } from "./RoomPeople";
 import {
   answeredPolicy,
+  BOARD_FOLLOWERS_LABEL,
+  BOARD_SETTING_LOAD_LINE,
+  BOARD_SETTING_SAVE_LINE,
+  boardFollowersHelp,
+  boardSettingBody,
+  boardSettingOf,
+  boardSettingSavedLine,
   capLine,
   checkForm,
+  clubUrl,
   createBody,
   deleteConfirmLine,
   effectivePolicy,
@@ -38,6 +47,7 @@ import {
   roomUrl,
   rosterUrl,
   saveBody,
+  savedBoardSetting,
   savedAsLine,
   SEE_OPTIONS,
   toRoomRows,
@@ -57,7 +67,9 @@ import {
  * the club panel, both drawn for owner and admin only; the routes refuse
  * everyone else whatever a screen draws.
  *
- * - Board, Lounge: shown with their line, nothing to edit, no field.
+ * - Board, Lounge: shown with their line, nothing to edit, no field. Under
+ *   the Board, one switch (club model, Franky, Oct 16): `Followers can read
+ *   the Board` (`BoardFollowers`), on unless an officer turns it off.
  * - Officers: its people list only (`Also in this room`). Officers are in it
  *   by their role; the list is the people added by name.
  * - An extra room: Name, What it's for, Who can see it, Who can post, the
@@ -209,6 +221,82 @@ function Confirm({ line, yes, danger = false, busy, t, onYes, onNo }: { line: st
           {yes}
         </button>
       </div>
+    </div>
+  );
+}
+
+/**
+ * Under the Board (club model, Franky, Oct 16): may the club's followers read
+ * it? On unless an officer turns it off. Read from the club (`clubUrl`) as the
+ * dialog opens; a press saves at once (`boardSettingBody`), and a refusal
+ * toasts why and leaves the switch as it was. Nothing is drawn while the
+ * setting is unknown (still loading, or a server without it); a read that
+ * failed says so, with Retry. Who may read is the database's rule (a verified
+ * follower, not removed or blocked): this switch is only the club's say.
+ */
+function BoardFollowers({ orgHandle, night }: { orgHandle: string; night: boolean }) {
+  const t = palette(night);
+  const labelId = useId();
+  const helpId = useId();
+  const [on, setOn] = useState<boolean | null>(null);
+  const [failure, setFailure] = useState<LoadFailure | null>(null);
+  // Retry on a failed read bumps this: the setting is read again.
+  const [seq, setSeq] = useState(0);
+  const savingRef = useRef(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    const run = async () => {
+      const r = await vibeRequest<unknown>(clubUrl(orgHandle), { cache: "no-store", quiet: true, failure: BOARD_SETTING_LOAD_LINE });
+      if (cancelled) return;
+      setOn(r.ok ? boardSettingOf(r.data) : null);
+      setFailure(r.ok ? null : asLoadFailure(r, BOARD_SETTING_LOAD_LINE));
+    };
+    void run();
+    return () => {
+      cancelled = true;
+    };
+  }, [orgHandle, seq]);
+
+  const toggle = async () => {
+    if (on === null || savingRef.current) return;
+    savingRef.current = true;
+    const next = !on;
+    const r = await vibeRequest<unknown>(clubUrl(orgHandle), { method: "PATCH", json: boardSettingBody(next), failure: BOARD_SETTING_SAVE_LINE });
+    savingRef.current = false;
+    if (!r.ok) return;
+    const saved = savedBoardSetting(r.data, next);
+    setOn(saved);
+    toast({ message: boardSettingSavedLine(saved), tone: "info" });
+  };
+
+  if (failure) {
+    return (
+      <div style={{ padding: "0 20px 12px" }}>
+        <LoadFailed
+          failure={failure}
+          tone={night ? "dark" : "light"}
+          compact
+          onRetry={() => {
+            setFailure(null);
+            setSeq((n) => n + 1);
+          }}
+        />
+      </div>
+    );
+  }
+  if (on === null) return null;
+  return (
+    <div style={{ padding: "0 20px 10px", display: "flex", alignItems: "center", gap: 12 }}>
+      <span style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 2 }}>
+        <span id={labelId} style={{ fontSize: 13.5, fontWeight: 700, lineHeight: 1.3, color: t.ink }}>
+          {BOARD_FOLLOWERS_LABEL}
+        </span>
+        <span id={helpId} style={{ fontSize: 12.5, fontWeight: 500, lineHeight: 1.4, color: t.secondary }}>
+          {boardFollowersHelp(on)}
+        </span>
+      </span>
+      <Switch on={on} labelledBy={labelId} describedBy={helpId} night={night} onToggle={() => void toggle()} />
     </div>
   );
 }
@@ -398,10 +486,13 @@ export function RoomsDialog({ orgHandle, clubName, night, onClose, onChanged }: 
               return (
                 <li key={room.id} style={{ borderTop: i > 0 ? `1px solid ${t.hairline}` : "none" }}>
                   {section === "fixed" ? (
-                    // The Board and the Lounge: their lines, and nothing to press or fill in.
-                    <div style={rowStyle}>
-                      <RoomLines room={room} t={t} fixed />
-                    </div>
+                    // The Board and the Lounge: their lines, and nothing to fill in. Under the Board, its followers switch.
+                    <>
+                      <div style={rowStyle}>
+                        <RoomLines room={room} t={t} fixed />
+                      </div>
+                      {room.kind === "board" ? <BoardFollowers orgHandle={orgHandle} night={night} /> : null}
+                    </>
                   ) : (
                     <>
                       <button

@@ -9,7 +9,8 @@ import {
   isDiscoverableAccount,
 } from "@/lib/iu/community-scope";
 import { orgAssetProxyUrl } from "@/lib/org-asset-url";
-import type { JoinPolicy, OrgAudience } from "@/lib/orgs/join-state";
+import { flattenCountEmbed, loadViewerOrgRoles, publicMemberCount } from "@/lib/orgs/following";
+import type { JoinPolicy, OrgAudience, OrgRole } from "@/lib/orgs/join-state";
 import { ilikeOrFilter, ilikePrefixOrFilter } from "@/lib/pgrest";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
@@ -69,6 +70,10 @@ const FILTER_HEADROOM = 10;
  *   leaving out events the param isn't read at all.
  * - Orgs returned via service role so private orgs the viewer isn't a
  *   member of still surface (matches /api/orgs?filter=discover).
+ * - An org's `member_count` is null below 5 unless the viewer is a member
+ *   (counts public from 5 up, `publicMemberCount`), and null when it couldn't
+ *   be read. The viewer's memberships are read beside the search, so this
+ *   costs no extra round trip; if that read fails every count is floored.
  */
 export async function GET(req: Request) {
   const supabase = await createSupabaseServerClient();
@@ -196,7 +201,7 @@ export async function GET(req: Request) {
   // rows; `school_verified` is filtered here because it's cheap and granted,
   // while the rest of that test needs a private column.
   const fetchLimit = limit + FILTER_HEADROOM;
-  const [usersPrefixRes, usersContainsRes, orgsRes, eventsRes, blockRowsRes] = await Promise.all([
+  const [usersPrefixRes, usersContainsRes, orgsRes, eventsRes, blockRowsRes, myRolesRes] = await Promise.all([
     wantUsers
       ? supabase
           .from("users")
@@ -234,6 +239,9 @@ export async function GET(req: Request) {
           .select("blocker_id, blocked_id")
           .or(`blocker_id.eq.${user.id},blocked_id.eq.${user.id}`)
       : Promise.resolve({ data: [], error: null } as const),
+    // The viewer's own memberships (a handful), so a member sees their
+    // club's exact count: one read beside the rest, not after it.
+    wantOrgs ? loadViewerOrgRoles(service, user.id) : Promise.resolve(null),
   ]);
 
   if (campusRefused) {
@@ -349,10 +357,13 @@ export async function GET(req: Request) {
     verified: boolean;
     join_policy: JoinPolicy;
     audience: OrgAudience;
-    member_count: number;
+    member_count: number | null;
   }> = [];
   if (wantOrgs) {
     const orgRows = (orgsRes.data ?? []) as unknown as OrgRow[];
+    // A failed read was logged by the loader; with no roles every count is
+    // floored, never shown exact to someone outside the club.
+    const myRoles: ReadonlyMap<string, OrgRole> = myRolesRes?.ok ? myRolesRes.byOrg : new Map();
     for (const o of orgRows) {
       orgsOut.push({
         id: o.id,
@@ -365,7 +376,9 @@ export async function GET(req: Request) {
         verified: o.verified,
         join_policy: o.join_policy,
         audience: o.audience,
-        member_count: o.members?.[0]?.count ?? 0,
+        // Null, never 0, when the count couldn't be read; null below 5 for
+        // anyone outside the club (counts public from 5 up).
+        member_count: publicMemberCount(flattenCountEmbed(o.members), myRoles.get(o.id) ?? null),
       });
     }
   }

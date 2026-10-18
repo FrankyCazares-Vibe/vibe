@@ -22,7 +22,9 @@ function getServerSnapshot(): ToastItem | null {
  *
  * Fixed bottom-center at z 12000 (the highest React layer elsewhere is 11000;
  * the custom cursor stays above). At mobile widths it sits 76px up so
- * `.vibe-mobile-tabbar` never covers it. Tap to dismiss. It can't reach into
+ * `.vibe-mobile-tabbar` never covers it, or `--vibe-toast-lift` up when a
+ * screen's floating button would sit under it (the feed's "+" sets it while
+ * mounted; wave-2 repair, finding 13). Tap to dismiss. It can't reach into
  * the static-page iframes; those use window.vibeToast from
  * public/html/_persistence.js.
  */
@@ -37,7 +39,7 @@ export function ToastHost() {
         position: "fixed",
         left: 16,
         right: 16,
-        bottom: isMobile ? "calc(env(safe-area-inset-bottom, 0px) + 76px)" : 24,
+        bottom: isMobile ? "calc(env(safe-area-inset-bottom, 0px) + var(--vibe-toast-lift, 76px))" : 24,
         zIndex: 12000,
         display: "flex",
         flexDirection: "column",
@@ -66,10 +68,11 @@ export function ToastHost() {
   );
 }
 
-/** Dark DM Sans pill; failures get a coral dot and border, actions a coral button. */
+/** Dark DM Sans pill; failures get a coral dot and border, actions and buttons a coral button. */
 function ToastPill({ item }: { item: ToastItem }) {
   const isError = item.tone === "error";
   const action = item.action;
+  const button = item.button;
 
   return (
     <div
@@ -82,7 +85,7 @@ function ToastPill({ item }: { item: ToastItem }) {
         gap: 10,
         maxWidth: 520,
         boxSizing: "border-box",
-        padding: action ? "7px 7px 7px 16px" : "11px 18px",
+        padding: action || button ? "7px 7px 7px 16px" : "11px 18px",
         borderRadius: 22,
         background: "#1C1C1E",
         border: isError
@@ -114,14 +117,15 @@ function ToastPill({ item }: { item: ToastItem }) {
         />
       ) : null}
       <span style={{ minWidth: 0, overflowWrap: "anywhere" }}>{item.message}</span>
-      {action ? (
+      {action || button ? (
         <button
           type="button"
           onClick={(e) => {
             e.stopPropagation();
             dismissToast();
+            if (button) button.onPress();
             // Full navigation, so the server-side gates on the target run.
-            window.location.assign(action.href);
+            else if (action) window.location.assign(action.href);
           }}
           style={{
             flexShrink: 0,
@@ -139,7 +143,7 @@ function ToastPill({ item }: { item: ToastItem }) {
             cursor: "pointer",
           }}
         >
-          {action.label}
+          {(action ?? button)?.label}
         </button>
       ) : null}
     </div>

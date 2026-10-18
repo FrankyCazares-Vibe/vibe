@@ -6,7 +6,7 @@ import { chatV2For } from "@/lib/chat/flag-server";
 import { roomOf } from "@/lib/chat/message-read";
 import { clubRole } from "@/lib/chat/rooms";
 import { isMissingChatSchema, warnMissingChatSchemaOnce } from "@/lib/chat/schema";
-import { refusalBody, type InvalidCardRefusal, type RefusalCode, type VoteResponse } from "@/lib/chat/types";
+import { refusalBody, type ClubRole, type InvalidCardRefusal, type RefusalCode, type VoteResponse } from "@/lib/chat/types";
 import { ensureMember } from "@/lib/messages/channel-access";
 import { requireNotRestricted } from "@/lib/moderation/access";
 import { isUuid } from "@/lib/pgrest";
@@ -14,11 +14,20 @@ import { rateLimit, tooManyRequests } from "@/lib/rate-limit";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseServiceClient, isSupabaseServiceConfigured } from "@/lib/supabase/service";
 
+import { membersOnly } from "../../../_lib/club-follower";
 import { rpcRefusal } from "../../_lib/rpc-refusal";
 
 type RouteCtx = { params: Promise<{ id: string; messageId: string }> };
 
 const LOG = "cards.vote";
+
+/** The two refusals of `chat_cast_vote` a follower can meet: can't take part (P0C21), closed (P0C25). */
+const FOLLOWER_SQLSTATES: ReadonlySet<string> = new Set(["P0C21", "P0C25"]);
+
+/** An RPC error's SQLSTATE as rpcRefusal reads it. */
+function sqlState(error: { code?: unknown }): string {
+  return typeof error.code === "string" ? error.code.trim().toUpperCase() : "";
+}
 
 /** A refusal from the contract's table (section 1.3): the sentence and its code. */
 function refuse(code: RefusalCode, status: number) {
@@ -40,6 +49,10 @@ function invalidCard(field: "option_id" | "on") {
  * room rule with the service role; the card comes back through
  * `hydrateCards` with the viewer's block set (5.2), never with a name the
  * viewer may not see.
+ *
+ * A follower reading a club's Board reads its polls and never votes
+ * (Franky, Oct 16): the database refuses, and this route answers that
+ * refusal as 403 `members_only` (../../../_lib/club-follower.ts).
  */
 export async function PUT(req: Request, ctx: RouteCtx) {
   const { id: channelId, messageId } = await ctx.params;
@@ -132,12 +145,19 @@ export async function PUT(req: Request, ctx: RouteCtx) {
     p_on: on,
   });
   if (rpcError) {
-    const refused = await rpcRefusal(rpcError, {
-      room,
-      roleOf: () => clubRole(member.orgId, user.id),
-      invalidField: "option_id",
-      log: LOG,
-    });
+    // The role is read at most once, here or by rpcRefusal's P0C21.
+    let role: ClubRole | null | undefined;
+    const roleOf = async () => (role === undefined ? (role = await clubRole(member.orgId, user.id)) : role);
+    // A follower reading the Board never votes (Franky, Oct 16). What they
+    // get today is step 9's 404 `not_found`: since 20261017110000 a
+    // follower reads no club message on their own client, and the follower's
+    // Board offers no vote (FollowerBoard.tsx). This is a BACKSTOP for the
+    // day that read widens (wave-3 review, finding 10): the vote rule refuses
+    // them as "closed" (P0C25) or "can't post" (P0C21); with no role in the
+    // club, the answer is `members_only`, not "This one is closed". Asked
+    // only after the database said no, so a member's vote costs nothing more.
+    if (FOLLOWER_SQLSTATES.has(sqlState(rpcError)) && (await roleOf()) === null) return membersOnly();
+    const refused = await rpcRefusal(rpcError, { room, roleOf, invalidField: "option_id", log: LOG });
     return NextResponse.json(refused.body, { status: refused.status });
   }
 

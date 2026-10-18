@@ -49,6 +49,9 @@ function failed(error: string) {
  * than the viewer's "Clear chat" stamp. Deleted messages are hard-deleted,
  * so they miss by construction; blocks aren't a read filter in the thread
  * view either, so they aren't one here.
+ *
+ * A follower reading a club's Board (Franky, Oct 16) passes this gate for
+ * the Board only, the same rule as reading its messages.
  */
 export async function GET(_req: Request, ctx: RouteCtx) {
   const { id: channelId, messageId } = await ctx.params;

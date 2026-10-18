@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type CSSProperties } from "react";
 
 import {
   asLoadFailure,
@@ -11,7 +11,7 @@ import {
 } from "@/components/feedback/LoadFailed";
 import { OrgJoinControl } from "@/components/orgs/OrgJoinControl";
 import { vibeRequest } from "@/lib/feedback/request";
-import { channelsGateCopy, type OrgRelation } from "@/lib/orgs/join-copy";
+import { channelsGateCopy, type BoardCard, type OrgRelation } from "@/lib/orgs/join-copy";
 
 type Channel = {
   id: string;
@@ -442,5 +442,134 @@ function Skeleton() {
         />
       ))}
     </div>
+  );
+}
+
+/**
+ * The club's Announcement Board card (club model, Franky's calls of Oct 16).
+ * The page decides which card, if any, with `boardCardView`: members get
+ * Open, followers the database lets in get Read the Board, a visitor whom
+ * following would let in gets Follow to read the Board, and one whose school
+ * email is all that's missing gets Verify school email. Nobody else
+ * gets this card at all, so a follower who was barred sees nothing different
+ * from a club that keeps its Board to members.
+ *
+ * Open and Read go to `/messages?channel=<board>`, which opens a club room on
+ * phone and desktop alike. Follow is the shared follow control (the header's
+ * own, with this card's words), so it waits for the server and the page
+ * refresh swaps the card for Read the Board. Verify links to
+ * `/auth/school-email`.
+ *
+ * Laid out as one row that wraps: the words take the space, and when the
+ * button can't fit beside them it drops to its own line (375 px phones).
+ */
+export function BoardSection({ card, relation }: { card: BoardCard; relation: OrgRelation }) {
+  const router = useRouter();
+  return (
+    <section
+      aria-label={card.title}
+      style={{
+        marginTop: 16,
+        padding: "12px 14px",
+        borderRadius: 16,
+        background: "rgba(255,255,255,0.05)",
+        border: "1px solid rgba(255,255,255,0.1)",
+        boxShadow: "inset 0 1px 0 rgba(255,255,255,0.14)",
+        display: "flex",
+        flexWrap: "wrap",
+        alignItems: "center",
+        gap: 12,
+      }}
+    >
+      <div style={{ flex: "999 1 240px", minWidth: 0, display: "flex", alignItems: "center", gap: 12 }}>
+        <span
+          aria-hidden
+          style={{
+            width: 36,
+            height: 36,
+            borderRadius: 10,
+            flexShrink: 0,
+            display: "inline-flex",
+            alignItems: "center",
+            justifyContent: "center",
+            color: "#FFB59E",
+            background: "rgba(255,92,53,0.16)",
+            border: "1px solid rgba(255,92,53,0.32)",
+          }}
+        >
+          <MegaphoneGlyph />
+        </span>
+        <div style={{ minWidth: 0 }}>
+          <div
+            style={{
+              fontSize: 10.5,
+              fontWeight: 700,
+              letterSpacing: "0.16em",
+              textTransform: "uppercase",
+              color: "rgba(255,255,255,0.55)",
+            }}
+          >
+            {card.title}
+          </div>
+          <div style={{ marginTop: 2, fontSize: 13.5, lineHeight: 1.45, color: "rgba(255,255,255,0.88)" }}>
+            {card.line}
+          </div>
+        </div>
+      </div>
+      <div style={{ flex: "1 1 auto", minWidth: 0, display: "flex", justifyContent: "flex-end" }}>
+        {card.kind === "follow" ? (
+          <OrgJoinControl
+            variant="header"
+            axis="follow"
+            followLabel={card.cta}
+            source="profile"
+            relation={relation}
+            onChange={() => router.refresh()}
+          />
+        ) : card.href ? (
+          <Link href={card.href} style={boardLinkStyle}>
+            {card.cta}
+          </Link>
+        ) : null}
+      </div>
+    </section>
+  );
+}
+
+/** The org page's coral glass pill (`OrgJoinControl`'s filled header look). */
+const boardLinkStyle: CSSProperties = {
+  flex: "1 1 auto",
+  maxWidth: 280,
+  minHeight: 44,
+  padding: "0 18px",
+  boxSizing: "border-box",
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  borderRadius: 12,
+  color: "#fff",
+  background: "linear-gradient(180deg, rgba(255,92,53,0.55) 0%, rgba(255,92,53,0.22) 100%)",
+  border: "1px solid rgba(255,180,150,0.5)",
+  boxShadow: "inset 0 1px 0 rgba(255,255,255,0.22)",
+  fontFamily: "DM Sans, sans-serif",
+  fontSize: 13.5,
+  fontWeight: 700,
+  textDecoration: "none",
+  whiteSpace: "nowrap",
+  WebkitTapHighlightColor: "transparent",
+};
+
+function MegaphoneGlyph() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 20 20" fill="none" aria-hidden>
+      <path
+        d="M3 8.5v3a1 1 0 0 0 1 1h2l6 3.5v-12L6 7.5H4a1 1 0 0 0-1 1Z"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinejoin="round"
+      />
+      <path d="M6.5 12.5 7.5 17h2l-.8-3.4" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
+      <path d="M15 7.5a3.5 3.5 0 0 1 0 5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+    </svg>
   );
 }

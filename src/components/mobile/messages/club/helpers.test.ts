@@ -131,6 +131,9 @@ test("upNextLine / upNextAriaLabel / eventTimeSpoken", () => {
   const live = { title: "Fall Formal", viewer_status: null, ...ev(local(2026, 9, 8, 19, 0), local(2026, 9, 8, 23, 0), "live") };
   assert.equal(h.upNextLine(live, NOW), "Live now");
   assert.equal(h.upNextAriaLabel(live, NOW), "Fall Formal room, live now");
+  // No chat to enter (a follower's tile): the tile opens the event, and says so.
+  assert.equal(h.upNextAriaLabel({ ...live, room_id: null }, NOW), "Fall Formal event, live now");
+  assert.equal(h.upNextAriaLabel({ ...live, room_id: "r1" }, NOW), "Fall Formal room, live now");
   assert.equal(h.eventTimeSpoken(iso(local(2026, 10, 20, 19, 30)), NOW), "November 20 7:30 PM");
   assert.equal(h.eventTimeSpoken(iso(local(2026, 9, 9, 9, 0)), NOW), "tomorrow 9 AM");
 });
@@ -212,4 +215,102 @@ test("refusedSend: which refusals turn the composer into the tile, and the one t
   assert.deepEqual(h.refusedSend("content_blocked"), { tile: false, reread: false });
   assert.deepEqual(h.refusedSend(null), { tile: false, reread: false });
   assert.deepEqual(h.refusedSend(undefined), { tile: false, reread: false });
+});
+
+// ── Followers (club model, Oct 16): a follower reads the Board and nothing else ──
+
+test("isFollower: only a viewer that says standing follower", () => {
+  assert.equal(h.isFollower({ standing: "follower" }), true);
+  assert.equal(h.isFollower({ role: "member" }), false);
+  assert.equal(h.isFollower({ standing: "member" }), false);
+  assert.equal(h.isFollower(null), false);
+  assert.equal(h.isFollower(undefined), false);
+});
+
+test("followerHatLine: the count from 5 up, never `null members`", () => {
+  assert.equal(h.followerHatLine(12), "Following · 12 members");
+  assert.equal(h.followerHatLine(5), "Following · 5 members");
+  assert.equal(h.followerHatLine(null), "Following");
+  assert.equal(h.followerHatLine(undefined), "Following");
+  assert.equal(h.followerHatLine(Number.NaN), "Following");
+});
+
+test("follower lines: the Board's intro, a post's label, a reaction as a count", () => {
+  assert.equal(h.FOLLOWER_POST_LINE, "Only members post here.");
+  assert.equal(h.followerBoardIntro("SAE"), "News from SAE's officers.");
+  assert.equal(h.followerBoardIntro("  "), "News from the club's officers.");
+  assert.equal(h.followerPostLabel("SAE", "8:44 PM"), "Board post from SAE, 8:44 PM");
+  assert.equal(h.followerPostLabel("", ""), "Board post from the club");
+  assert.equal(h.reactionCountLabel("🎉", 3), "3 reactions with 🎉");
+  assert.equal(h.reactionCountLabel("🔥", 1), "1 reaction with 🔥");
+});
+
+test("followedBoardLabel: the club, that I follow it, the latest post and its time; never an author", () => {
+  const org = { id: "o1", handle: "sae", name: "SAE", logo_url: null, banner_url: null, verified: false };
+  const latest = { id: "m1", text: "Chapter at 7", author_name: "", created_at: iso(local(2026, 9, 8, 20, 44)), kind: "text" as const };
+  assert.equal(h.followedBoardLabel({ org, latest }, NOW), "SAE Board, you follow this club, latest: Chapter at 7, 8:44 PM");
+  assert.equal(h.followedBoardLabel({ org, latest: null }, NOW), "SAE Board, you follow this club, nothing on the Board yet");
+  assert.equal(h.followedBoardLabel({ org, latest }, NOW, true), "SAE Board, you follow this club, new post, latest: Chapter at 7, 8:44 PM");
+  // New: later than the newest post this browser showed; never seen, any post.
+  assert.equal(h.boardHasNew(latest.created_at, null), true);
+  assert.equal(h.boardHasNew(latest.created_at, latest.created_at), false);
+  assert.equal(h.boardHasNew(latest.created_at, "2000-01-01T00:00:00Z"), true);
+  assert.equal(h.boardHasNew(null, null), false, "an empty Board is never new");
+  assert.equal(h.boardHasNew("2000-01-01T00:00:00Z", latest.created_at), false);
+});
+
+test("followerRelation: the club GET's org as the phone Orgs tab reads it; null on anything unknown", () => {
+  const body = {
+    handle: "sae",
+    name: "SAE",
+    join_state: "can_request",
+    org_follow_state: "following",
+    viewer_role: null,
+    join_reason: "policy",
+    audience: "iu",
+    join_policy: "request",
+  };
+  assert.deepEqual(h.followerRelation(body), {
+    handle: "sae",
+    orgName: "SAE",
+    state: "can_request",
+    following: true,
+    role: null,
+    reason: "policy",
+    audience: "iu",
+    joinPolicy: "request",
+  });
+  // Not following yet, an open club, odd fields read as their safe defaults.
+  const open = h.followerRelation({ ...body, join_state: "can_join", org_follow_state: "not_following", join_reason: "?", audience: 7, join_policy: "open" });
+  assert.equal(open?.following, false);
+  assert.equal(open?.reason, null);
+  assert.equal(open?.audience, "both");
+  assert.equal(open?.joinPolicy, "open");
+  // A member always follows.
+  assert.equal(h.followerRelation({ ...body, join_state: "member", org_follow_state: "not_following", viewer_role: "member" })?.following, true);
+  // Nothing to build a button from.
+  assert.equal(h.followerRelation(null), null);
+  assert.equal(h.followerRelation("sae"), null);
+  assert.equal(h.followerRelation({ ...body, join_state: "owner" }), null);
+  assert.equal(h.followerRelation({ ...body, handle: "" }), null);
+});
+
+test("memberSpace: a member's space as it is; a follower's, or none, is null", () => {
+  const org = { id: "o1", handle: "sae", name: "SAE", logo_url: null, banner_url: null, verified: false };
+  const member = { ok: true as const, org: { ...org, member_count: 3 }, viewer: { role: "member" as const, can_moderate: false }, rooms: [], board_latest: null, up_next: [] };
+  const follower = { ok: true as const, org: { ...org, member_count: null }, viewer: { role: null, standing: "follower" as const, can_moderate: false as const }, rooms: [], board_latest: null, up_next: [] };
+  assert.equal(h.memberSpace(member), member);
+  assert.equal(h.memberSpace(follower), null);
+  assert.equal(h.memberSpace(null), null);
+  assert.equal(h.memberSpace(undefined), null);
+});
+
+test("boardsMatching: the club's name or handle, whatever the case; all of them for no query", () => {
+  const ref = (name: string, handle: string) => ({ org: { id: handle, handle, name, logo_url: null, banner_url: null, verified: false } });
+  const boards = [ref("Sigma Alpha Epsilon", "sae"), ref("Chess Club", "chess_club")];
+  assert.deepEqual(h.boardsMatching(boards, "").map((b) => b.org.handle), ["sae", "chess_club"]);
+  assert.deepEqual(h.boardsMatching(boards, "  ").map((b) => b.org.handle), ["sae", "chess_club"]);
+  assert.deepEqual(h.boardsMatching(boards, "ALPHA").map((b) => b.org.handle), ["sae"]);
+  assert.deepEqual(h.boardsMatching(boards, "chess_").map((b) => b.org.handle), ["chess_club"]);
+  assert.deepEqual(h.boardsMatching(boards, "zzz"), []);
 });

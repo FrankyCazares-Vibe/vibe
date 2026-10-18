@@ -21,6 +21,9 @@ import {
   type DocBar,
 } from "@/components/mobile/ResumeViewerMobile";
 import { useMobileTour } from "@/components/mobile/use-mobile-tour";
+import { ClubFlairChips } from "@/components/profile/ClubFlair";
+import { ClubsSection, useMyClubs } from "@/components/profile/ClubsSection";
+import { readPublicClubs, type ShownClub } from "@/components/profile/clubs-model";
 import { vibeRequest } from "@/lib/feedback/request";
 import { toast } from "@/lib/feedback/toast";
 import { allowedCampusId, isSchoolSystem, type SchoolSystem } from "@/lib/iu/campuses";
@@ -550,13 +553,19 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
   // only carries the rendered badge text). Owner only: the visitor bootstrap
   // sends none of them, and visitors can't edit anyway.
   const [ownCampus, setOwnCampus] = useState<OwnCampus>(NO_OWN_CAMPUS);
+  // Clubs (batch 2E, club model spec D). A visitor reads the clubs this
+  // person shows from the same bootstrap (`?clubs=1`); null draws no Clubs
+  // section. Your own profile reads `/api/me/clubs` instead, which also
+  // carries the hidden ones and the Following list only you see.
+  const [visitorClubs, setVisitorClubs] = useState<ShownClub[] | null>(null);
+  const myClubs = useMyClubs(!isVisitor);
   const [savingEdit, setSavingEdit] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
     const endpoint = isVisitor
-      ? `/api/users/${encodeURIComponent(targetHandle!)}/bootstrap`
+      ? `/api/users/${encodeURIComponent(targetHandle!)}/bootstrap?clubs=1`
       : "/api/me/profile-bootstrap";
     const line = isVisitor
       ? "Couldn't load this profile."
@@ -570,6 +579,7 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
         campusId?: unknown;
         campusChangeAvailableAt?: unknown;
         campusConfirmed?: unknown;
+        clubs?: unknown;
       }>(
         endpoint,
         { cache: "no-store", failure: line, quiet: true },
@@ -581,6 +591,7 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
       }
       const u = r.data.vibeUser;
       setUser(u);
+      setVisitorClubs(isVisitor ? readPublicClubs(r.data.clubs) : null);
       setOwnCampus(isVisitor ? NO_OWN_CAMPUS : readOwnCampus(r.data));
       if (isVisitor && u._viewerFollowState) {
         setFollowState(u._viewerFollowState);
@@ -1555,7 +1566,11 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
   // (src/lib/build/page-snapshot.ts). Edit mode with nothing changed is not
   // held: the reload only closes it.
   const holdsReload =
-    (editMode && draft !== null) || savingEdit || uploadingKind !== null || barSavesPending > 0;
+    (editMode && draft !== null) ||
+    savingEdit ||
+    uploadingKind !== null ||
+    barSavesPending > 0 ||
+    myClubs.busy;
 
   return (
     <div
@@ -1926,6 +1941,11 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
             @{handle}
           </div>
         ) : null}
+
+        {/* Club flair: up to 3 chips, titled clubs first, no dates
+            ("President · SAE"). What a visitor sees, on your own profile
+            too: hidden clubs and hidden titles stay off. */}
+        <ClubFlairChips clubs={isVisitor ? (visitorClubs ?? []) : myClubs.shown} />
 
         {/* Tagline */}
         {editMode && effectiveDraft ? (
@@ -2300,6 +2320,16 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
           </p>
         </Section>
       ) : null}
+
+      {/* Clubs — between Bio and the tab strip (club model spec D).
+          Visitors: "Member of", only the clubs this person shows, nothing
+          when none. Owner: every club with its ⋯ choices, then Following,
+          which only they see. */}
+      {isVisitor ? (
+        <ClubsSection mode="visitor" clubs={visitorClubs} />
+      ) : (
+        <ClubsSection mode="owner" store={myClubs} />
+      )}
 
       {/* Tab strip — Instagram-style. Posts + Portfolio (experience +
           portfolio + resume PDF). */}

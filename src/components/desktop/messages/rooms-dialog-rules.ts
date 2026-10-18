@@ -1,12 +1,14 @@
 /**
  * The Rooms dialog's pure rules (handoffs/chat-redesign/wave-3-desktop/
- * contract.md 4c.2, 4c.5; W3-5-rooms): the three addresses the dialog asks,
- * a row of the room list as the dialog reads it, the line under each room,
- * which "who can post" options are offered, the form's validity, the body of
- * a create and of a save, and the sentences the dialog shows.
+ * contract.md 4c.2, 4c.5; W3-5-rooms): the addresses the dialog asks, a row
+ * of the room list as the dialog reads it, the line under each room, which
+ * "who can post" options are offered, the form's validity, the body of a
+ * create and of a save, the sentences the dialog shows, and (club model,
+ * Oct 16) the Board's "Followers can read the Board" switch, which the club's
+ * Settings → Followers shares.
  * No React, no DOM: `room-names.ts`, `room-rules.ts`, the phone's
- * `club/helpers.ts` and `types.ts` only, so `node --test` loads it
- * (rooms-dialog-rules.test.ts).
+ * `club/helpers.ts`, `types.ts` and `join-copy.ts` (the Board's words live in
+ * `ORG_COPY.board`) only, so `node --test` loads it (rooms-dialog-rules.test.ts).
  *
  * THE DATABASE IS THE WALL (4c.2). Nothing here lets anyone in or keeps
  * anyone out: the routes and `can_post_org_channel` decide. These rules only
@@ -19,8 +21,9 @@ import { chipLabel } from "@/components/mobile/messages/club/helpers";
 import { roomDisplayName, roomSlug } from "@/lib/chat/room-names";
 import { EXTRA_ROOM_CAP, isPostPolicy, isRoomKind } from "@/lib/chat/room-rules";
 import { REFUSAL_SENTENCES, type PostPolicy, type RoomKind } from "@/lib/chat/types";
+import { ORG_COPY } from "@/lib/orgs/join-copy";
 
-// ── The routes (4c.5: the dialog asks these three and nothing else) ──────────
+// ── The routes (4c.5's three, plus `clubUrl` for the Board switch) ───────────
 
 /** `GET` the club's rooms, `POST` a new one. */
 export function roomsUrl(orgHandle: string): string {
@@ -350,4 +353,63 @@ export function writeFailureLine(failure: WriteFailure): string {
 export function refusedField(failure: WriteFailure): "name" | "topic" | null {
   if (nameTaken(failure) || failure.field === "name") return "name";
   return failure.field === "topic" ? "topic" : null;
+}
+
+// ── The Board for followers (club model, Franky, Oct 16) ─────────────────────
+
+/**
+ * The club itself: `GET` reads `org.followers_read_board`, `PATCH` changes it
+ * (owner or admin only; the route refuses everyone else whatever a screen
+ * draws). The fourth address the dialog asks.
+ */
+export function clubUrl(orgHandle: string): string {
+  return `/api/orgs/${encodeURIComponent(orgHandle)}`;
+}
+
+/** The switch's name, under the Board (here) and in the club's Settings → Followers. */
+export const BOARD_FOLLOWERS_LABEL: string = ORG_COPY.board.readersLabel;
+
+/**
+ * Under the switch. Followers read officers' posts and nothing members wrote:
+ * no replies, no reactions or votes, and never who made them (the read path
+ * and the database's rule). Only members post and reply, either way.
+ */
+export function boardFollowersHelp(on: boolean): string {
+  return on ? ORG_COPY.board.readersOnHelp : ORG_COPY.board.readersOffHelp;
+}
+
+/** A hidden club's followers read nothing, whatever the switch says (the database's rule). */
+export const BOARD_FOLLOWERS_HIDDEN_LINE: string = ORG_COPY.board.readersHidden;
+
+/** A read of the setting that failed. */
+export const BOARD_SETTING_LOAD_LINE: string = ORG_COPY.board.readersLoadFailed;
+/** A save of the setting that failed (vibeRequest's fallback line). */
+export const BOARD_SETTING_SAVE_LINE: string = ORG_COPY.board.readersFailed;
+
+/**
+ * The setting from `GET /api/orgs/<handle>`: true or false, or null when it
+ * can't be known (no `org`, or a server without the column, which answers
+ * null). A screen draws no switch for null rather than a wrong one.
+ */
+export function boardSettingOf(data: unknown): boolean | null {
+  if (data === null || typeof data !== "object") return null;
+  const org = (data as { org?: unknown }).org;
+  if (org === null || typeof org !== "object") return null;
+  const value = (org as { followers_read_board?: unknown }).followers_read_board;
+  return typeof value === "boolean" ? value : null;
+}
+
+/** `PATCH /api/orgs/<handle>`: the setting alone, never any other field. */
+export function boardSettingBody(on: boolean): { followers_read_board: boolean } {
+  return { followers_read_board: on };
+}
+
+/** What a save that went through stored: the answer's own value, else what was asked. */
+export function savedBoardSetting(data: unknown, asked: boolean): boolean {
+  return boardSettingOf(data) ?? asked;
+}
+
+/** The toast after a save. */
+export function boardSettingSavedLine(on: boolean): string {
+  return on ? ORG_COPY.board.readersOn : ORG_COPY.board.readersOff;
 }

@@ -23,6 +23,7 @@ import {
   flattenCountEmbed,
   loadViewerFollowedOrgIds,
   publicFollowerCount,
+  publicMemberCount,
   type OrgFollowState,
 } from "@/lib/orgs/following";
 import {
@@ -142,7 +143,11 @@ function audienceExcludesOwnerMessage(system: SchoolSystem | null): string {
  * "not_following"; never the PERSON `follow_state`), `follower_count` (null
  * below `FOLLOWER_COUNT_FLOOR` unless the viewer is that club's owner or
  * admin, and null when the count couldn't be read — never a fake 0), and
- * `member_count` (null when the count couldn't be read).
+ * `member_count` (null when the count couldn't be read, and null below
+ * `FOLLOWER_COUNT_FLOOR` unless the viewer is a member of that club:
+ * `publicMemberCount`, counts public from 5 up). The role comes from the
+ * viewer's own membership rows; when that read fails every count is floored,
+ * never shown exact to someone outside the club.
  *
  * All return `viewerCampus` (legacy label, now derived from `campus_id`),
  * `viewerCampusId`, `viewerSystem` and `campusScope` (always "all" for mine
@@ -551,8 +556,9 @@ export async function GET(req: Request) {
       ...rest,
       logo_url: orgAssetProxyUrl(o.handle, o.logo_url, "logo"),
       banner_url: orgAssetProxyUrl(o.handle, o.banner_url, "banner"),
-      // Null, never 0, when the count couldn't be read (critic C27).
-      member_count: members?.[0]?.count ?? null,
+      // Null, never 0, when the count couldn't be read (critic C27); null
+      // below 5 for anyone outside the club (counts public from 5 up).
+      member_count: publicMemberCount(flattenCountEmbed(members), role),
       // Officers see the raw number; everyone else sees null below the floor.
       follower_count: publicFollowerCount(flattenCountEmbed(followers), role),
       org_follow_state: orgFollowState,

@@ -24,6 +24,18 @@
  * The service role reads only what is a fact about the room and not about
  * the viewer: the authors' roles, the reply counts, an event's counts.
  *
+ * FOLLOWERS (club model, Franky's calls of Oct 16). Only members type in a
+ * club's chats; a follower the database lets in (`can_view_org_channel`'s
+ * follower arm) reads the club's Board and nothing else. Their page is the
+ * members' page with these taken out: no author (each post is shown as the
+ * club's: `users` null, `user_id` "", `author_role` null), no voter or
+ * sign-up names (the cards carry counts), no reply counts and no `?root=`
+ * replies (403 `members_only`), no quotes; and the reaction counts are read
+ * with the service role, because the database shows a non-member only their
+ * own reaction rows. Their viewer is `followerInRoom`. The club's ref falls
+ * back to the service role when the viewer's client cannot read a private
+ * club's row.
+ *
  * ON A DATABASE WITHOUT THE CHAT ROOMS SCHEMA (section 3.10) the read
  * answers today's data with every new field at its default.
  */
@@ -49,7 +61,8 @@ import { blockedIdsFor } from "./blocks";
 import { hydrateCards, type CardRow } from "./cards/hydrate";
 import { OFFICER_REMOVED_REASON, canModerate, isClubRole, postRuleLine } from "./room-rules";
 import { roomState } from "./room-state";
-import { canPostAnswer, clubRole, loadRoom } from "./rooms";
+import { canPostAnswer, clubRoleAnswer, loadRoom } from "./rooms";
+import { readFollowerBoardPage } from "./follower-board";
 import { isMissingChatSchema, warnMissingChatSchemaOnce } from "./schema";
 import { asStub, isHiddenFrom } from "./stub";
 import {
@@ -57,6 +70,7 @@ import {
   type Card,
   type ChatMessage,
   type ClubRole,
+  type ClubStanding,
   type MessageKind,
   type OrgRef,
   type Person,
@@ -72,9 +86,13 @@ import {
 const MESSAGE_COLUMNS =
   "id, content, created_at, user_id, attachment_id, attachment_kind, media_url, media_kind, parent_message_id";
 
+/** A shared post as the screens draw it: the post and its author's public face. */
+const ATTACHMENT_COLUMNS =
+  "id, type, content, media_url, media_thumbnail_url, user_id, author:users!posts_user_id_fkey(id, handle, name, avatar_url)";
+
 const MESSAGE_JOINS =
   "users:users!messages_user_id_fkey(id, handle, name, avatar_url), " +
-  "attachment:posts!messages_attachment_id_fkey(id, type, content, media_url, media_thumbnail_url, user_id, author:users!posts_user_id_fkey(id, handle, name, avatar_url))";
+  `attachment:posts!messages_attachment_id_fkey(${ATTACHMENT_COLUMNS})`;
 
 /**
  * What a message read selects. `removed_at`, `removed_reason` and
@@ -83,6 +101,16 @@ const MESSAGE_JOINS =
  */
 export const MESSAGE_SELECT =
   `${MESSAGE_COLUMNS}, kind, thread_root_id, card_event_id, removed_at, removed_reason, ` + MESSAGE_JOINS;
+
+/**
+ * A FOLLOWER's Board page, read with the service role (`readFollowerPage`):
+ * no embeds. The users embed is blanked for a follower anyway, and the posts
+ * embed would skip the posts rules (published, not removed, author not
+ * restricted, no block either way), so a shared post is read again on the
+ * follower's own login (`attachmentsSeenBy`) and only what that shows goes out.
+ */
+export const MESSAGE_SELECT_FOLLOWER =
+  `${MESSAGE_COLUMNS}, kind, thread_root_id, card_event_id, removed_at, removed_reason`;
 
 /** MESSAGE_SELECT as it was before the chat rooms migration, for a database without its columns. */
 export const MESSAGE_SELECT_BEFORE_ROOMS = `${MESSAGE_COLUMNS}, ` + MESSAGE_JOINS;
@@ -144,15 +172,26 @@ export type ParentPreview = {
  * Batch-fetch reactions for the given messages and attach a grouped
  * `reactions: [{emoji, count, viewer_reacted}]` array to each row. Stale
  * deploys: degrade silently if the table doesn't exist yet.
+ *
+ * `countsFromService` (a follower reading the Board; club model, critique
+ * #1): the database shows a non-member only their OWN reaction rows, so the
+ * counts are read with the service role instead. Safe because `rows` came
+ * out of a viewer-scoped read (only messages the viewer may see), and
+ * because what leaves this function is per emoji: a count and whether the
+ * viewer is in it, never who reacted. No service role: no reactions, as a
+ * failed read has always been.
  */
 export async function hydrateReactions(
   supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>,
   rows: MessageRow[],
   viewerId: string,
+  opts: { countsFromService?: boolean } = {},
 ): Promise<void> {
   const ids = rows.map((r) => r.id);
   if (ids.length === 0) return;
-  const { data, error } = await supabase
+  const reader = opts.countsFromService ? serviceOrNull("messages.hydrateReactions") : supabase;
+  if (!reader) return;
+  const { data, error } = await reader
     .from("message_reactions")
     .select("message_id,emoji,user_id")
     .in("message_id", ids);
@@ -519,7 +558,29 @@ type Built = {
   complete: boolean;
   /** The roles that were read (authors and `alsoRoleOf`); null for a dm, a group, or a read that failed. */
   roles: Map<string, ClubRole> | null;
+  /** The viewer's standing in the room's club (`standingOf`). */
+  standing: Standing;
 };
+
+/**
+ * Where the viewer stands in a page's club, from the roles read with the
+ * page (the viewer is always in that read in a club room):
+ *   "outside"  a dm or a group (no club), or a database without the schema
+ *   "member"   holds a role in the room's club
+ *   "follower" holds none: they passed the database's rule for this room
+ *              (`can_view_org_channel`, whose only door for a non-member is
+ *              a follower reading the Board), or they left the club a
+ *              moment ago. Both get the stricter treatment: counts only.
+ *   "unknown"  the roles could not be read: the page is not complete (503),
+ *              and nothing that names people is read on a guess.
+ */
+type Standing = "outside" | "member" | "follower" | "unknown";
+
+function standingOf(room: Room | null, roles: Map<string, ClubRole> | null, viewerId: string): Standing {
+  if (room === null) return "outside";
+  if (roles === null) return "unknown";
+  return roles.has(viewerId) ? "member" : "follower";
+}
 
 function messageKind(value: unknown): MessageKind {
   return value === "poll" || value === "event_card" ? value : "text";
@@ -614,6 +675,9 @@ async function buildChatMessages(client: ServerClient, rows: MessageRow[], ctx: 
     : [];
   const roleIds = shown.map((row) => row.user_id);
   if (ctx.alsoRoleOf) roleIds.push(ctx.alsoRoleOf);
+  // The viewer's own role rides on the same read in every club room, so the
+  // page always knows whether a member or a follower is reading it.
+  if (room !== null && ctx.alsoRoleOf !== viewerId) roleIds.push(viewerId);
   // The cards of the page (wave-2 contract 5.2, 9.1): `shown` is a
   // viewer-scoped read, so its side tables may be read with the service
   // role. A removed message is never given to it (5.2, 6.2): the viewer's
@@ -625,15 +689,40 @@ async function buildChatMessages(client: ServerClient, rows: MessageRow[], ctx: 
   const cardRows: CardRow[] = shown
     .filter((row) => !row.removed_at && messageKind(row.kind) !== "text")
     .map((row) => ({ id: row.id, kind: messageKind(row.kind), user_id: row.user_id, card_event_id: row.card_event_id ?? null }));
-  const [roles, replyCounts, cards] = await Promise.all([
-    room ? readRoles(room.org_id, roleIds) : Promise.resolve(null),
+  //
+  // FOLLOWERS (club model, Oct 16; critique #1, #2). Who reads decides how,
+  // and the roles read says who reads. The cards wait for it: a member gets
+  // the voters' names, a follower counts only (no voter read at all); when
+  // the roles could not be read no card is hydrated (the page is 503
+  // anyway). The reactions are read at once on the viewer's own client, so
+  // a member's page waits for nothing new; for a follower they are read
+  // again, after, with the service role (the database shows a non-member
+  // only their own rows) and the counts replace the first ones.
+  const rolesRead = room ? readRoles(room.org_id, roleIds) : Promise.resolve(null);
+  const standingRead = rolesRead.then((read) => standingOf(room, read, viewerId));
+  const reactionsAsViewer = ctx.skipReactions ? Promise.resolve() : hydrateReactions(client, shown, viewerId);
+  const [roles, standing, replyCounts, cards] = await Promise.all([
+    rolesRead,
+    standingRead,
     postIds.length > 0 ? readReplyCounts(channelId, postIds, viewerId) : Promise.resolve(new Map<string, number>()),
     cardRows.length > 0 && blocksRead
-      ? hydrateCards(client, cardRows, viewerId, { room, blocked })
+      ? standingRead.then((who) =>
+          who === "unknown"
+            ? null
+            : hydrateCards(client, cardRows, viewerId, { room, blocked, countsOnly: who === "follower" }),
+        )
       : Promise.resolve(new Map<string, Card>()),
-    ctx.skipReactions ? Promise.resolve() : hydrateReactions(client, shown, viewerId),
+    ctx.skipReactions
+      ? Promise.resolve()
+      : Promise.all([reactionsAsViewer, standingRead]).then(([, who]) => {
+          if (who !== "follower") return;
+          // Never their own rows passed off as the counts: none, unless the service read answers.
+          for (const row of shown) row.reactions = [];
+          return hydrateReactions(client, shown, viewerId, { countsFromService: true });
+        }),
     hydrateParentPreviews(client, shown),
   ]);
+  const follower = standing === "follower";
   // After hydration, so the empty defaults only fill what hydration left.
   prepareForClient(shown, channelId);
 
@@ -642,23 +731,28 @@ async function buildChatMessages(client: ServerClient, rows: MessageRow[], ctx: 
     if (isHiddenFrom(row, blocked, room, authorRole)) return asStub(row);
     const topLevel = !row.thread_root_id;
     let replyCount: number | null = null;
-    if (board && topLevel) {
+    // A follower reads the posts, never the replies: no count to open.
+    if (board && topLevel && !follower) {
       if (ctx.skipReplyCounts) replyCount = 0;
       else replyCount = replyCounts ? (replyCounts.get(row.id) ?? 0) : null;
     }
     const preview = row.parent_preview ?? null;
-    const quoteShown = blocksRead && (preview === null || !blocked.has(preview.user_id));
+    const quoteShown = blocksRead && !follower && (preview === null || !blocked.has(preview.user_id));
+    // A follower is shown a Board post as the CLUB's (no member names to
+    // non-members; 20261017110000's "what the app owes"): no author, no
+    // author id, no role. The screens draw the club (`room.org`) in their
+    // place. The stub rule above already ran on the real author.
     return {
       id: row.id,
       content: row.content,
       created_at: row.created_at,
-      user_id: row.user_id,
+      user_id: follower ? "" : row.user_id,
       attachment_id: row.attachment_id ?? null,
       attachment_kind: row.attachment_kind ?? null,
       media_url: row.media_url ?? null,
       media_kind: row.media_kind ?? null,
       parent_message_id: row.parent_message_id ?? null,
-      users: toPerson(row.users),
+      users: follower ? null : toPerson(row.users),
       attachment: row.attachment ?? null,
       parent_preview: quoteShown ? preview : null,
       reactions: row.reactions ?? [],
@@ -666,7 +760,7 @@ async function buildChatMessages(client: ServerClient, rows: MessageRow[], ctx: 
       thread_root_id: row.thread_root_id ?? null,
       card: cards ? (cards.get(row.id) ?? null) : null,
       reply_count: replyCount,
-      author_role: authorRole,
+      author_role: follower ? null : authorRole,
       hidden: false,
       removed: removedInfo(row, viewerId),
     };
@@ -675,6 +769,7 @@ async function buildChatMessages(client: ServerClient, rows: MessageRow[], ctx: 
     messages,
     complete: (room === null || roles !== null) && blocksRead && cards !== null,
     roles,
+    standing,
   };
 }
 
@@ -735,6 +830,13 @@ export type ReadMessagesResult =
        * the schema, or a viewer who is no longer in the club.
        */
       viewerRole: ClubRole | null;
+      /**
+       * Club model (Oct 16): "member" for a viewer with a role, "follower"
+       * for one who read the room without one (the database lets a follower
+       * read the Board and nothing else); null for a dm, a group, or a
+       * database without the schema. A follower's page carries counts only.
+       */
+      viewerStanding: ClubStanding | null;
     }
   | ReadFailure;
 
@@ -841,6 +943,20 @@ export async function readChatMessages(
     room = found.room;
   }
 
+  // A FOLLOWER on a Board (club model; repair of review finding 1): the
+  // database said they may read it (`ensureMember` asked
+  // `can_view_org_channel` as them) but shows them no message row, so their
+  // page is read with the service role (`readFollowerBoardPage`: top-level,
+  // live posts by the club's current owners and admins only). The replies
+  // are members' words: `?root=` is refused before anything is read.
+  let follower = false;
+  if (access.isOrgChannel && room?.kind === "board") {
+    const role = await clubRoleAnswer(room.org_id, viewerId);
+    if (role === "failed") return tryAgain();
+    follower = role === null;
+    if (follower && root !== undefined) return refusal("members_only", 403);
+  }
+
   if (root !== undefined) {
     const state = await rootState(client, channelId, room, root);
     if (state === "failed") return tryAgain();
@@ -861,6 +977,7 @@ export async function readChatMessages(
 
   // The full select first. A database without the chat rooms columns reads
   // again as before the migration; after that, the route's old bare retry.
+  if (follower) return readFollowerPage(client, channelId, room!, { limit, before, after, oldestFirst, viewerId, known });
   let rooms = true;
   let { data, error } = await run(MESSAGE_SELECT, rooms);
   if (error && isMissingChatSchema(error)) {
@@ -894,6 +1011,10 @@ export async function readChatMessages(
   // A club room whose authors' roles could not be read: never a page that
   // says everyone left the club.
   if (!built.complete) return tryAgain();
+  // The replies under a Board post are members' words: a follower reads the
+  // posts only (club model, Oct 16). Refused after the read because only
+  // the read knows who is reading; the rows read go nowhere.
+  if (root !== undefined && built.standing === "follower") return refusal("members_only", 403);
   const messages = built.messages;
   if (!oldestFirst) messages.reverse();
   return {
@@ -901,7 +1022,80 @@ export async function readChatMessages(
     messages,
     room: readRoom,
     viewerRole: readRoom && built.roles ? (built.roles.get(viewerId) ?? null) : null,
+    viewerStanding: built.standing === "member" || built.standing === "follower" ? built.standing : null,
   };
+}
+
+/**
+ * A follower's page of a Board (repair of review finding 1): the rows with
+ * the service role (`readFollowerBoardPage`: top-level, live, by a current
+ * owner or admin), then built exactly as a member's page and stripped of
+ * every name by `buildChatMessages` (standing "follower"). Any read that
+ * fails is 503 `try_again`, never an empty Board passed off as the truth.
+ */
+async function readFollowerPage(
+  client: ServerClient,
+  channelId: string,
+  room: Room,
+  o: { limit: number; before?: string; after?: string; oldestFirst: boolean; viewerId: string; known?: ReadKnown },
+): Promise<ReadMessagesResult> {
+  const tag = "chat/message-read follower";
+  const service = serviceOrNull(tag);
+  if (!service) return tryAgain();
+  const page = await readFollowerBoardPage(
+    service,
+    { channelId, orgId: room.org_id, select: MESSAGE_SELECT_FOLLOWER, limit: o.limit, before: o.before, after: o.after, oldestFirst: o.oldestFirst },
+    tag,
+  );
+  if (page.error || page.data === null) {
+    if (page.error) console.error(`[${tag}]`, page.error.code, page.error.message);
+    return tryAgain();
+  }
+  const rows = page.data as unknown as MessageRow[];
+  // A shared post only as the follower's own login shows it (a draft, a post
+  // Vibe took down, a restricted author or a block reads as no post).
+  const seen = await attachmentsSeenBy(client, rows, tag);
+  if (seen === null) return tryAgain();
+  for (const r of rows) r.attachment = r.attachment_id ? (seen.get(r.attachment_id) ?? null) : null;
+  const built = await buildChatMessages(client, rows, {
+    channelId,
+    viewerId: o.viewerId,
+    room,
+    skipReplyCounts: false,
+    alsoRoleOf: o.viewerId,
+    blocked: o.known?.blocked,
+  });
+  if (!built.complete) return tryAgain();
+  // The roles read with the page must agree: a viewer who became a member
+  // between the two reads gets a fresh read, never a member's page built as
+  // a follower's.
+  if (built.standing !== "follower") return tryAgain();
+  const messages = built.messages;
+  if (!o.oldestFirst) messages.reverse();
+  return { ok: true, messages, room, viewerRole: null, viewerStanding: "follower" };
+}
+
+/**
+ * The posts shared on `rows`, read on the viewer's own client so the posts
+ * rules decide (RLS: published, not removed, `user_visible`, blocks). A post
+ * that read leaves out maps to nothing. Null when the read fails.
+ */
+async function attachmentsSeenBy(
+  client: ServerClient,
+  rows: readonly MessageRow[],
+  tag: string,
+): Promise<Map<string, AttachmentRow> | null> {
+  const seen = new Map<string, AttachmentRow>();
+  const ids = Array.from(new Set(rows.map((r) => r.attachment_id).filter((id): id is string => typeof id === "string" && id !== "")));
+  for (let start = 0; start < ids.length; start += IDS_PER_READ) {
+    const { data, error } = await client.from("posts").select(ATTACHMENT_COLUMNS).in("id", ids.slice(start, start + IDS_PER_READ));
+    if (error) {
+      console.error(`[${tag} attachments]`, error.code, error.message);
+      return null;
+    }
+    for (const p of (data ?? []) as unknown as AttachmentRow[]) if (p && typeof p.id === "string") seen.set(p.id, p);
+  }
+  return seen;
 }
 
 /**
@@ -959,16 +1153,37 @@ export const VIEWER_OUTSIDE_ROOMS: ViewerInRoom = Object.freeze({
   can_moderate: false,
 });
 
-/** The club behind a room, read on the viewer's client (a member reads their club). */
+/** What `readOrgRef` selects of a club. */
+const ORG_REF_COLUMNS = "id, handle, name, logo_url, banner_url, verified";
+
+/**
+ * The club behind a room. Read on the viewer's client first: a member reads
+ * their club, and so does anyone reading a club anyone can see.
+ *
+ * Club model (Oct 16): a FOLLOWER of a club that is not public (SAE) cannot
+ * read its `orgs` row (`orgs_select` keeps it to members), yet the database
+ * let them read this room (its Board). The club's name and pictures are a
+ * fact about the room, not about the viewer, and they are on the club's
+ * public page already, so the row the viewer's client did not return is
+ * read with the service role, a club that is hidden left out. Every caller
+ * has passed `ensureMember` for a room of this club first.
+ */
 async function readOrgRef(client: ServerClient, orgId: string): Promise<OrgRef | null> {
-  const { data, error } = await client
-    .from("orgs")
-    .select("id, handle, name, logo_url, banner_url, verified")
-    .eq("id", orgId)
-    .maybeSingle();
+  const { data: seen, error } = await client.from("orgs").select(ORG_REF_COLUMNS).eq("id", orgId).maybeSingle();
   if (error) {
     console.error("[chat/message-read.org]", error.code, error.message);
     return null;
+  }
+  let data: unknown = seen;
+  if (!data) {
+    const service = serviceOrNull("chat/message-read.org");
+    if (!service) return null;
+    const read = await service.from("orgs").select(ORG_REF_COLUMNS).eq("id", orgId).is("hidden_at", null).maybeSingle();
+    if (read.error) {
+      console.error("[chat/message-read.org service]", read.error.code, read.error.message);
+      return null;
+    }
+    data = read.data;
   }
   const row = data as {
     id: string;
@@ -1167,12 +1382,12 @@ export async function describeRoom(
 }
 
 /**
- * `viewer` in a club room, or null when the viewer has no role in its club.
- * Everyone who passed `ensureMember` for a club room is a member of the club
- * (`can_view_org_channel` asks that first), so no role means a read that
- * failed or someone who left a moment ago: the route answers 503
- * `try_again`, never `role: null`, which section 6.0 keeps for a dm or a
- * group.
+ * `viewer` in a club room for a MEMBER, or null when the viewer has no role
+ * in its club. Since the club model (Oct 16) a follower may read the club's
+ * Board too (`can_view_org_channel`'s follower arm): a caller that read no
+ * role asks `followerInRoom` for a Board. Anywhere else no role means a read
+ * that failed or someone who left a moment ago: the route answers 503
+ * `try_again`, never a member's viewer with `role: null`.
  *
  * `post_line` (wave-3 contract 4c.3) is the room's rule in words, set only
  * for a viewer the database refused in an extra room whose `post_policy` is
@@ -1197,10 +1412,26 @@ export function viewerInRoom(room: Room, role: ClubRole | null, mayPost: boolean
 }
 
 /**
+ * `viewer` for a FOLLOWER reading a club's Board (club model, Oct 16: only
+ * members type; a follower reads the Board and nothing else): no role, no
+ * composer, no replies, no moderation, `standing: "follower"`. Null for any
+ * other kind of room: the database lets a follower read the Board only, so
+ * a reader with no role anywhere else left the club a moment ago (or a read
+ * raced it) and the route answers 503 `try_again`, as `viewerInRoom` says.
+ * `can_post` is false whatever the database said: the send is refused for
+ * anyone without a role (the send route), so no screen offers a composer.
+ */
+export function followerInRoom(room: Room): ViewerInRoom | null {
+  if (room.kind !== "board") return null;
+  return { role: null, can_post: false, can_reply: false, can_moderate: false, standing: "follower" };
+}
+
+/**
  * `room` and `viewer` together, for a caller that has not read the viewer's
  * role (the thread GET gets it with the page instead). It reads the block
  * set itself (wave-2 contract 9.1). Null when anything cannot be read: 503
- * `try_again`.
+ * `try_again`. A reader with no role on a Board is a follower
+ * (`followerInRoom`): `ensureMember` was asked for this room first.
  */
 export async function readThreadRoom(
   client: ServerClient,
@@ -1211,9 +1442,9 @@ export async function readThreadRoom(
   if (!blocked) return null;
   const [described, role] = await Promise.all([
     describeRoom(client, room, viewerId, blocked),
-    clubRole(room.org_id, viewerId),
+    clubRoleAnswer(room.org_id, viewerId),
   ]);
-  if (!described) return null;
-  const viewer = viewerInRoom(room, role, described.mayPost);
+  if (!described || role === "failed") return null;
+  const viewer = role === null ? followerInRoom(room) : viewerInRoom(room, role, described.mayPost);
   return viewer ? { room: described.room, viewer } : null;
 }

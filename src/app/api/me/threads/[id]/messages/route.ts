@@ -8,6 +8,7 @@ import {
   cleanAfterParam,
   clampReadLimit,
   describeRoom,
+  followerInRoom,
   readChatMessages,
   roomOf,
   toChatMessages,
@@ -15,10 +16,11 @@ import {
   type MessageRow,
 } from "@/lib/chat/message-read";
 import { postRefusal } from "@/lib/chat/room-rules";
-import { canPostAnswer, clubRole, filterRoomReaders } from "@/lib/chat/rooms";
+import { canPostAnswer, clubRoleAnswer, filterRoomReaders } from "@/lib/chat/rooms";
 import { isMissingChatSchema, warnMissingChatSchemaOnce } from "@/lib/chat/schema";
 import {
   refusalBody,
+  type ClubRole,
   type PostRefusalCode,
   type RefusalCode,
   type ThreadMessagesResponse,
@@ -87,6 +89,13 @@ const POST_REFUSAL_STATUS: Record<PostRefusalCode, number> = {
  * and to the room's description (the stubs of section 8, the quotes, the
  * people going); an `after` that is not a timestamp answers 400
  * `invalid_after`.
+ *
+ * Club model (Franky's calls of Oct 16): a FOLLOWER the database lets read
+ * a club's Board (`can_view_org_channel`'s follower arm) gets the Board's
+ * page as followers get it (counts only on cards and reactions, no reply
+ * counts, no `?root=`: message-read.ts) and `viewer` = `followerInRoom`:
+ * no role, nothing to post, `standing: "follower"`. Who reads is known from
+ * the page's own roles read (`viewerStanding`), so nothing is asked twice.
  */
 export async function GET(req: Request, ctx: RouteCtx) {
   const { id: channelId } = await ctx.params;
@@ -158,7 +167,13 @@ export async function GET(req: Request, ctx: RouteCtx) {
     let room: ThreadRoom | null = null;
     let viewer: ViewerInRoom = VIEWER_OUTSIDE_ROOMS;
     if (found.room) {
-      const inRoom = described ? viewerInRoom(found.room, read.viewerRole, described.mayPost) : null;
+      // A follower's viewer comes from the room alone (the Board, or 503);
+      // a member's from their role and the database's answer to "may I post".
+      const inRoom = !described
+        ? null
+        : read.viewerStanding === "follower"
+          ? followerInRoom(found.room)
+          : viewerInRoom(found.room, read.viewerRole, described.mayPost);
       if (!described || !inRoom) return refuse("try_again", 503);
       room = described.room;
       viewer = inRoom;
@@ -366,6 +381,20 @@ export async function POST(req: Request, ctx: RouteCtx) {
   // No photos or videos in club rooms in v1.
   if (member.isOrgChannel && mediaUrlRaw) return refuse("club_media_off", 400);
 
+  // ONLY MEMBERS TYPE (club model, Franky's call of Oct 16). A follower may
+  // read a club's Board, so `ensureMember` lets them this far; a send by
+  // anyone without a role in the club stops here, before the gate, the
+  // insert and the mention fan-out (critique #3). The database refuses it
+  // too (`can_post_org_channel`, the insert policy). A role that could not
+  // be read is a read that failed, never "Members only.".
+  let senderRole: ClubRole | null = null;
+  if (member.isOrgChannel) {
+    const answer = await clubRoleAnswer(member.orgId, user.id);
+    if (answer === "failed") return refuse("try_again", 503);
+    if (answer === null) return refuse("members_only", 403);
+    senderRole = answer;
+  }
+
   // `thread_root_id`, cleaned ONCE: the same value goes to the gate, to
   // `postRefusal` and to the insert. Blank is no root. There but not text
   // (a number, a list) is a root that can never name a post.
@@ -392,8 +421,8 @@ export async function POST(req: Request, ctx: RouteCtx) {
     // The question could not be asked: nobody was refused.
     if (answer === "failed") return refuse("try_again", 503);
     if (answer === "no") {
-      const role = await clubRole(member.orgId, user.id);
-      const code = postRefusal(room, rootId, role);
+      // The role was read a moment ago, for the members-only rule above.
+      const code = postRefusal(room, rootId, senderRole);
       return refuse(code, POST_REFUSAL_STATUS[code]);
     }
   }
@@ -506,8 +535,10 @@ export async function POST(req: Request, ctx: RouteCtx) {
       // the code of what changed.
       const again = await canPostAnswer(supabase, channelId, user.id, rootId);
       if (again === "no") {
-        const role = await clubRole(member.orgId, user.id);
-        const code = postRefusal(room, rootId, role);
+        const role = await clubRoleAnswer(member.orgId, user.id);
+        // They left the club in between: only members type.
+        if (role === null) return refuse("members_only", 403);
+        const code = postRefusal(room, rootId, role === "failed" ? null : role);
         return refuse(code, POST_REFUSAL_STATUS[code]);
       }
       // The gate still says yes (or cannot be asked) while the policy says
@@ -557,10 +588,12 @@ export async function POST(req: Request, ctx: RouteCtx) {
   // @mention fan-out — only notifies people who can actually see this
   // channel, so a stray @somebody outside the chat doesn't ping strangers.
   // For DM/group: members come from channel_members. For a club's room: the
-  // people who can read THAT room (`can_view_org_channel`, one by one), so a
-  // mention in Officers or in an event's chat never reaches a member who
-  // cannot open it. A mention inside a Board reply notifies that one person
-  // like any other; nothing else is written for Board posts or replies.
+  // club's MEMBERS who can read THAT room (`can_view_org_channel`, one by
+  // one), so a mention in Officers or in an event's chat never reaches a
+  // member who cannot open it, and a follower reading the Board is never
+  // mentioned or pushed (club model, Oct 16). A mention inside a Board reply
+  // notifies that one person like any other; nothing else is written for
+  // Board posts or replies.
   // Best-effort; failures don't block the send.
   if (content) {
     const handles = extractMentionHandles(content);
@@ -570,7 +603,7 @@ export async function POST(req: Request, ctx: RouteCtx) {
         if (ids.length > 0) {
           let validTargets: string[] = [];
           if (member.isOrgChannel) {
-            validTargets = await filterRoomReaders(channelId, ids);
+            validTargets = await filterRoomReaders(channelId, ids, member.orgId);
           } else {
             const { data: chMembers } = await supabase
               .from("channel_members")

@@ -36,7 +36,17 @@ function fail(status: number, code: string, error: string) {
  * POST /api/orgs/[slug]/follow {source?} — follow a club (wave plan §4.2,
  * batch F1). Anyone can follow any club they can see: there is deliberately
  * NO audience, school-verification, campus or block check (Franky,
- * 2026-09-16). Following isn't membership and unlocks no chat.
+ * 2026-09-16).
+ *
+ * FOLLOWING ISN'T MEMBERSHIP (club model, Franky, Oct 16). A follower may
+ * READ the club's Announcement Board, unless its officers turned that off
+ * (`orgs.followers_read_board`) or an officer removed them as a follower
+ * (`org_board_bars`, written by followers/[userId]; following again does not
+ * lift it, joining does). They never type, react or vote in any club chat:
+ * only members do. The database decides who reads the Board
+ * (`can_view_org_channel`); this route only writes the follow, and its
+ * answer never says whether the Board is open to them, so a barred follower
+ * is not told. Clubs never follow people: a follow is always the student's.
  *
  * ORDER: auth → rate limit → Terms → SERVICE-ROLE org load → hidden gate →
  * insert. The org is loaded with the service client because `orgs_select`
@@ -47,8 +57,9 @@ function fail(status: number, code: string, error: string) {
  * and `first_followed_at` belong to the database (the stamp trigger keeps the
  * first-follow date across unfollow/refollow; a client-supplied timestamp
  * could backdate it for good). A second follow hits the unique key and comes
- * back `already:true` WITHOUT touching the row, so a `join` follow is never
- * relabelled as one the student tapped (open question Q3).
+ * back `already:true` WITHOUT touching the row, so a `join` or `request`
+ * follow is never relabelled as one the student tapped (open question Q3).
+ * A client can't send either source (`normalizeFollowSource`).
  *
  * No notification is sent: there is no "X followed your club" in v1.
  *
@@ -126,7 +137,11 @@ export async function POST(req: Request, { params }: Params) {
  *
  * MEMBERS CAN'T UNFOLLOW (409 `member_follows`). Membership implies following
  * (the `org_members_imply_follow` trigger), so a member's only way out of the
- * club's posts is to leave, and leaving drops a follow that joining made.
+ * club's posts is to leave, and leaving drops a follow that joining or a
+ * request to join made (`source` 'join' or 'request').
+ *
+ * Unfollowing also ends reading the club's Board at once: the database's
+ * rule asks for a follow row on every read.
  *
  * No Terms gate: stopping something must never need a consent screen. The
  * rate-limit key is POST's, on purpose.

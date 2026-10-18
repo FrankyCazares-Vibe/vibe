@@ -33,9 +33,12 @@ import { COLORS, h2Style, inputStyle, subIntroStyle } from "./onb-theme";
  * The student's campus clubs from `GET /api/orgs?filter=discover`, Follow
  * first. Which buttons a row shows, and every word on them, come from F5a:
  * `orgRowView(rel, "onboarding")` and `<OrgJoinControl variant="onboarding">`
- * (so an open club shows Follow and Join together, invite-only shows Follow
- * plus "Officers can see who follows this club.", and onboarding never shows
- * Request). This file only lays the rows out.
+ * (so an open club shows Follow and Join together, a by-request club Follow
+ * and Request together, and invite-only Follow plus "Officers can see who
+ * follows this club."). Asking needs no follow first and follows the club
+ * (club model, Oct 16: one request flow everywhere), so a request row flips
+ * to Following with the answer. This file only lays the rows out: a `line`
+ * row puts its two pills on their own full-width row under the text.
  *
  * STATE LIVES IN THE PARENT (`OnboardingMobile`, B12): it passes `state` /
  * `setState`, caches the list across Back/Continue, and resets it to
@@ -189,8 +192,9 @@ function firstWord(name: string | null | undefined): string | null {
 
 /**
  * One club. The body is not a link: onboarding keeps the student on the step,
- * and the only taps are the control's. `layout: "line"` (an open club) puts
- * Follow and Join on their own full-width row under the text.
+ * and the only taps are the control's. `layout: "line"` (an open or
+ * by-request club) puts Follow and Join, or Follow and Request, on their own
+ * full-width row under the text.
  */
 function OrgPickRow({
   row,

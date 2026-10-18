@@ -10,7 +10,7 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { anchorIssues, boldIssues, countMentions, dateIssues, mentionIssues, structureIssues, tableIssues } from "./checks.mjs";
+import { anchorIssues, boldIssues, countMentions, dateIssues, effectiveDateOf, effectiveIsPast, mentionIssues, structureIssues, tableIssues } from "./checks.mjs";
 import { findDifferences, toSentences, wordDiff } from "./compare.mjs";
 import { extractInPage } from "./extract-page.mjs";
 import { parseMd } from "./parse-md.mjs";
@@ -142,8 +142,16 @@ for (const s of structureIssues(same)) {
     `${where(s.md)}: ${s.what}`, s.md.key, s.page.key, "Use the same block as the text (paragraph, list item, table cell).");
 }
 for (const t of tableIssues(md.tableShapes, pageData.tableShapes)) add("high", "table differs", "tables", null, t, null, null, "Match the table to the text.");
-const dates = dateIssues(md.blocks, pageData.blocks);
-for (const t of dates.issues) add("high", "date", "dates", "page.tsx", t, null, null, "Published October 5, 2026; only the counts-only rule keeps October 4, 2026.");
+// The date at the top, as page.tsx sets it: the text's top line must match.
+const EFFECTIVE = (() => {
+  try {
+    return effectiveDateOf(readFileSync(join(SRC, "page.tsx"), "utf8"));
+  } catch {
+    return null;
+  }
+})();
+const dates = dateIssues(md.blocks, pageData.blocks, EFFECTIVE);
+for (const t of dates.issues) add("high", "date", "dates", "page.tsx", t, null, null, "Set EFFECTIVE_DATE in page.tsx and the text's top line to the day the policy goes live; only the counts-only rule keeps October 4, 2026.");
 for (const a of anchorIssues(pageData)) add("high", "anchor or link", "anchors", a.id || a.link ? "parts.tsx" : null, a.what, null, null, "Every id once; every #link to an id that exists.");
 if (!pageData.waitlistHoldsSection11) add("high", "anchor or link", "anchors", "parts.tsx", "#waitlist does not hold the section 11 heading", null, null, "Wrap section 11 in <WaitlistSection>.");
 const mentions = mentionIssues(pageData.blocks);
@@ -162,6 +170,10 @@ lines.push(`page: ${URL_}`);
 lines.push(`text: ${MD}`);
 lines.push(`sentences: ${mdS.length} in the text, ${pageS.length} on the page, ${same.length} the same and in the same order`);
 lines.push(`blocks: ${md.blocks.length} in the text, ${pageData.blocks.length} on the page; tables: ${md.tableShapes.length} / ${pageData.tableShapes.length}`);
+lines.push(`date at the top (page.tsx EFFECTIVE_DATE): ${EFFECTIVE ?? "(not found)"}`);
+if (EFFECTIVE && effectiveIsPast(EFFECTIVE)) {
+  lines.push(`WARNING: ${EFFECTIVE} is before today. If this is not live yet, set the day it goes live in page.tsx and the text's top line, then run this again.`);
+}
 lines.push(`dates on the page: ${JSON.stringify(dates.pageDates)}; "section N" mentions: ${mentions.total} on the page, ${mentions.total - mentions.issues.length} of them links`);
 lines.push(`left out of the page text on purpose: ${pageData.skipped.join("; ") || "nothing"}`);
 lines.push(`RESULT: ${pass ? "PASS, the page and the text are the same" : `FAIL, ${gating.length} difference(s)`}${issues.length - gating.length ? ` (+${issues.length - gating.length} note(s) not counted: bold only, or accepted by a flag)` : ""}`);

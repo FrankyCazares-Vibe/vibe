@@ -11,6 +11,9 @@ type Params = { params: Promise<{ slug: string; userId: string }> };
 /** Removing followers one tap at a time, not clearing the list by script. */
 const REMOVE_LIMIT = { limit: 30, windowSec: 600 };
 
+/** Who may not read a club's Board until they join (migration 20261017100000). */
+const BOARD_BARS_TABLE = "org_board_bars";
+
 /** The error shape every org route speaks (`join/route.ts`). */
 function fail(status: number, code: string, error: string) {
   return NextResponse.json({ ok: false, error, code }, { status });
@@ -26,10 +29,15 @@ function fail(status: number, code: string, error: string) {
  * check. So the route authorises against the officer's role and then deletes
  * with the service client.
  *
- * A MUTE, NOT A BAN (open question Q1). The student can follow again, and
- * `org_follow_firsts` is left alone, so they come back with their original
- * first-follow date rather than looking like somebody new. The student isn't
- * notified.
+ * A BAR FROM THE BOARD, NOT FROM FOLLOWING (Franky, Oct 16; spec H2(a)).
+ * Followers read a club's Board, so removing one also writes an
+ * `org_board_bars` row: they can't read the Board again until they join
+ * (joining clears it, in the database). Following itself stays open: they
+ * can follow again and see the club's posts, and `org_follow_firsts` is left
+ * alone, so they come back with their original first-follow date rather
+ * than looking like somebody new. The student isn't notified, and nothing
+ * they can read says they were barred: their Board simply isn't offered.
+ * Someone who doesn't follow is not barred (`removed: false`, as before).
  *
  * MEMBERS AREN'T REMOVABLE HERE (409 `member_follows`), the officer themself
  * and the owner included: a member follows because they're a member, so the
@@ -70,7 +78,7 @@ export async function DELETE(_req: Request, { params }: Params) {
   }
   if (org.hidden_at && !viewerRes.role) return fail(404, "not_found", "Not found");
   if (!canSeeFollowers(viewerRes.role)) {
-    return fail(403, "officers_only", "Only owners and admins can remove followers.");
+    return fail(403, "officers_only", "Only the owner and officers can remove followers.");
   }
 
   const targetRes = await loadOrgRole(service, org.id, userId);
@@ -85,16 +93,69 @@ export async function DELETE(_req: Request, { params }: Params) {
     );
   }
 
-  const { error: deleteErr, count } = await service
+  // Only someone who follows is barred: an officer can't file a bar against
+  // any account id they like, and "didn't follow" keeps today's answer.
+  const { data: followRow, error: followErr } = await service
     .from("org_followers")
-    .delete({ count: "exact" })
+    .select("user_id")
     .eq("org_id", org.id)
-    .eq("user_id", userId);
-  if (deleteErr) {
-    console.error("[orgs/[slug]/followers/[userId] delete]", deleteErr);
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (followErr) {
+    console.error("[orgs/[slug]/followers/[userId] read follow]", followErr.code, followErr.message);
     return fail(500, "remove_failed", "Couldn't remove this follower. Try again.");
+  }
+
+  let count: number | null = 0;
+  if (followRow) {
+    // THE BAR FIRST: a bar that didn't land leaves the follow in place, so
+    // the officer's retry does both; never a removal they could undo by
+    // following again.
+    const barred = await writeBoardBar(service, org.id, userId, user.id);
+    if (!barred) return fail(500, "remove_failed", "Couldn't remove this follower. Try again.");
+
+    const deleted = await service
+      .from("org_followers")
+      .delete({ count: "exact" })
+      .eq("org_id", org.id)
+      .eq("user_id", userId);
+    if (deleted.error) {
+      console.error("[orgs/[slug]/followers/[userId] delete]", deleted.error);
+      return fail(500, "remove_failed", "Couldn't remove this follower. Try again.");
+    }
+    count = deleted.count;
   }
 
   const follower_count = await loadFollowerCount(service, org.id);
   return NextResponse.json({ ok: true, removed: (count ?? 0) > 0, follower_count });
+}
+
+/**
+ * The Board bar (`org_board_bars`, migration 20261017100000): the removed
+ * follower can't read the club's Board until they join, even if they follow
+ * again. Service role only, like the table; one row per club and person, a
+ * second removal refreshing who did it and when (an upsert only writes the
+ * columns it sends, so `barred_at` is sent). True when the bar is in place,
+ * or when this database has no such table yet: before that migration no
+ * follower reads any Board, so there is nothing to bar.
+ */
+async function writeBoardBar(
+  service: ReturnType<typeof createSupabaseServiceClient>,
+  orgId: string,
+  userId: string,
+  officerId: string,
+): Promise<boolean> {
+  const { error } = await service
+    .from(BOARD_BARS_TABLE)
+    .upsert(
+      { org_id: orgId, user_id: userId, barred_by: officerId, barred_at: new Date().toISOString() },
+      { onConflict: "org_id,user_id" },
+    );
+  if (!error) return true;
+  if (error.code === "42P01" || error.code === "PGRST205") {
+    console.error(`[orgs/[slug]/followers/[userId] bar] ${BOARD_BARS_TABLE} is not in this database yet`);
+    return true;
+  }
+  console.error("[orgs/[slug]/followers/[userId] bar]", error.code, error.message);
+  return false;
 }

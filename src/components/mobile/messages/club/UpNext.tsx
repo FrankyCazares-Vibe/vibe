@@ -25,7 +25,11 @@ import { isHot, rsvpWord, upNextAriaLabel, upNextLine } from "./helpers";
  * chrome only on `state === "live"` or `isSoon` (SCREENS-M2); the `Soon`
  * ring only when `isSoon`; every other card the quiet chrome. The bloom
  * behind the block only when a DRAWN card is hot. A tap opens the event chat
- * layer when `room_id !== null`, else nothing. No right text (MK:16.6).
+ * layer when `room_id !== null`; otherwise (a follower, who never enters an
+ * event chat, or a member who hasn't RSVP'd) it opens the event's own card
+ * on the Events tab (`eventCardHref`), where the time, the place and the
+ * RSVP are, and the tile is named an event, not a room (wave-2 repair,
+ * finding 4). No right text (MK:16.6).
  *
  * The block is left out when `up_next` is empty and the viewer is a member;
  * the officer's brand new club (`officerEmpty`) shows the dashed
@@ -40,6 +44,11 @@ export type UpNextProps = {
   officerEmpty: boolean;
   onOpenEvent: (roomId: string) => void;
 };
+
+/** The event's card on the Events tab (`/campus?tab=events&event=<id>`, the search bar's own link). */
+export function eventCardHref(eventId: string): string {
+  return `/campus?tab=events&event=${encodeURIComponent(eventId)}`;
+}
 
 function Check({ color }: { color: string }) {
   return (
@@ -156,9 +165,9 @@ export function UpNext({ clubName, events, night, now, officerEmpty, onOpenEvent
               {inner}
             </button>
           ) : (
-            <div key={e.id} role="group" aria-label={label} style={style}>
+            <Link key={e.id} href={eventCardHref(e.id)} aria-label={label} style={{ ...style, cursor: "pointer", textDecoration: "none" }}>
               {inner}
-            </div>
+            </Link>
           );
         })}
       </div>

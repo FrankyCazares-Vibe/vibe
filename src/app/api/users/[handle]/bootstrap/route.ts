@@ -5,7 +5,16 @@ import { requirePlatformAdmin } from "@/lib/auth/require-platform-admin";
 import { getCountsFor, getFollowState, getMutualCount } from "@/lib/connections/queries";
 import { M1_USER_COLUMNS, isMissingColumnError } from "@/lib/db/missing-column";
 import { getActiveRestriction } from "@/lib/moderation/access";
+import { orgAssetProxyUrl } from "@/lib/org-asset-url";
+import { loadVisibleOrgCards } from "@/lib/orgs/following";
 import { buildVibeUserV1FromProfile } from "@/lib/profile/build-vibe-user-v1";
+import {
+  MAX_PROFILE_CLUBS,
+  buildPublicProfileClubs,
+  type ProfileClubCard,
+  type PublicProfileClub,
+  type ShownClubRow,
+} from "@/lib/profile/club-flair";
 import {
   blankHiddenWidgets,
   hasResume,
@@ -73,6 +82,59 @@ async function readViewerVerified(service: SupabaseClient, viewerId: string): Pr
 }
 
 /**
+ * The clubs a person shows on their profile ("Member of"; club model spec D,
+ * Franky's calls Oct 16). SERVICE client: `org_members_select` would hide the
+ * roster of a club the viewer isn't in, and a signed-out visitor has no
+ * client at all. What keeps it narrow is the query, not RLS:
+ *   - only this person's rows, and only `show_on_profile = true` (on by
+ *     default; they hide clubs one by one);
+ *   - only clubs Vibe hasn't hidden (`loadVisibleOrgCards` filters
+ *     `hidden_at` and never selects it, so hidden and deleted look the same);
+ *   - out goes the club's name, handle, logo and badge, the title the
+ *     officers gave (unless the member hid it, `show_title`), and the MONTH
+ *     they joined. Never the role, never an id, never the exact join time,
+ *     never the clubs they follow.
+ *
+ * Null when a read failed: the profile still loads and draws no Clubs
+ * section, rather than a wrong one. Read in the person's own order, so the
+ * limit keeps the clubs they put first.
+ */
+async function loadShownClubs(
+  service: SupabaseClient,
+  userId: string,
+): Promise<PublicProfileClub[] | null> {
+  const { data, error } = await service
+    .from("org_members")
+    .select("org_id, title, show_title, profile_rank, joined_at")
+    .eq("user_id", userId)
+    .eq("show_on_profile", true)
+    .order("profile_rank", { ascending: true, nullsFirst: false })
+    .order("joined_at", { ascending: true })
+    .limit(MAX_PROFILE_CLUBS * 2);
+  if (error) {
+    console.error("[users/:handle/bootstrap clubs]", error.message);
+    return null;
+  }
+  const rows = (data ?? []) as ShownClubRow[];
+  if (rows.length === 0) return [];
+  const cards = await loadVisibleOrgCards(
+    service,
+    rows.map((r) => r.org_id),
+  );
+  if (!cards.ok) return null;
+  const proxied = new Map<string, ProfileClubCard>();
+  for (const [id, c] of cards.byId) {
+    proxied.set(id, {
+      handle: c.handle,
+      name: c.name,
+      logo_url: orgAssetProxyUrl(c.handle, c.logo_url, "logo"),
+      verified: c.verified,
+    });
+  }
+  return buildPublicProfileClubs(rows, proxied);
+}
+
+/**
  * Public profile bootstrap by handle. Powers the static prototype's
  * viewer-mode render at `/html/profile.html?handle=<handle>` (P1-011b)
  * and logged-out share-link visits (iMessage in-app browser, etc).
@@ -97,6 +159,10 @@ async function readViewerVerified(service: SupabaseClient, viewerId: string): Pr
  * banned student's profile from the rest of campus — RLS cannot do it here.
  * See the restriction check below, right after the row is found and before any
  * of it is spoken out loud.
+ *
+ * `?clubs=1` adds the clubs the person shows ({@link loadShownClubs}). They
+ * come after the restriction and block checks like everything else, so a
+ * blocked or restricted profile never lists them.
  */
 export async function GET(req: Request, ctx: RouteContext) {
   const { handle: rawHandle } = await ctx.params;
@@ -350,7 +416,11 @@ export async function GET(req: Request, ctx: RouteContext) {
   const vibeUser = buildVibeUserV1FromProfile(profile, { appShell: false });
 
   const targetId = profile.id;
-  const [counts, follow, mutual] = await Promise.all([
+  // Clubs only when asked (`?clubs=1`, review item 30): this route is also
+  // every hover card and @mention preview, which never draw clubs. Signed-out
+  // visitors may ask too, because a profile is public (Privacy Policy 5a).
+  const wantClubs = new URL(req.url).searchParams.get("clubs") === "1";
+  const [counts, follow, mutual, clubs] = await Promise.all([
     // Service client (T1): policy `connections_select_either_party` shows the
     // viewer's own client only edges they are part of, so the target's
     // follower / following / connection counts need service. Safe here:
@@ -369,6 +439,7 @@ export async function GET(req: Request, ctx: RouteContext) {
     viewer
       ? getMutualCount(service, viewer.id, targetId)
       : Promise.resolve(0),
+    wantClubs ? loadShownClubs(service, targetId) : Promise.resolve(undefined),
   ]);
 
   vibeUser.counts = {
@@ -397,5 +468,12 @@ export async function GET(req: Request, ctx: RouteContext) {
   }
   vibeUser.pinnedPostId = pinnedPostId;
 
-  return NextResponse.json({ ok: true, vibeUser });
+  // `clubs` sits beside `vibeUser`, not in it, so the vibe_user_v1 shape stays
+  // exactly what the builder makes. Absent without `?clubs=1`; null when the
+  // read failed (draw no Clubs section). Each entry is a PublicProfileClub
+  // (lib/profile/club-flair.ts): {handle, name, logo_url, verified, title,
+  // since: "2026-09"}, in the person's order.
+  return NextResponse.json(
+    clubs === undefined ? { ok: true, vibeUser } : { ok: true, vibeUser, clubs },
+  );
 }

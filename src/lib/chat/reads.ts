@@ -10,7 +10,18 @@
  */
 
 import { BOARD_POSTER_ROLES } from "./room-rules";
-import type { ClubRole, EventRef, InboxClub, MessageKind, PostPolicy, Preview, RoomKind, RoomState, SpaceRoom } from "./types";
+import type {
+  ClubRole,
+  EventRef,
+  FollowedBoard,
+  InboxClub,
+  MessageKind,
+  PostPolicy,
+  Preview,
+  RoomKind,
+  RoomState,
+  SpaceRoom,
+} from "./types";
 
 // ── Previews (7.1.4) ─────────────────────────────────────────────────────────
 
@@ -293,4 +304,54 @@ export function unreadLeftOut(blocked: ReadonlySet<string>, roomKind: string | n
 /** The `not in` list PostgREST reads: `(a,b)`. The ids are uuids from the database. */
 export function notInList(ids: readonly string[]): string {
   return `(${ids.join(",")})`;
+}
+
+// ── Followers (club model, Franky's calls of Oct 16) ─────────────────────────
+// A follower reads the club's Board and nothing else: no Lounge, no
+// Officers, no extra rooms, no event chats, and never a member's name in a
+// list. Counts are public from 5 up.
+
+/**
+ * Below this a count is not shown to anyone outside the club. The same 5 as
+ * `FOLLOWER_COUNT_FLOOR` (src/lib/orgs/following.ts); kept here because this
+ * file imports nothing but `room-rules.ts` and types (batch 2A's
+ * `publicMemberCount` is the same rule for the other surfaces).
+ */
+export const MEMBER_COUNT_FLOOR = 5;
+
+/**
+ * The member count a follower is shown: the exact number from 5 up, null
+ * below 5 or when it could not be read (never 0 on a failed count: that
+ * would be a number that is not true).
+ */
+export function followerMemberCount(count: number | null | undefined): number | null {
+  if (typeof count !== "number" || !Number.isFinite(count)) return null;
+  return count >= MEMBER_COUNT_FLOOR ? count : null;
+}
+
+/**
+ * The Board as a follower's space lists it: the only room, nothing to post,
+ * no unread dot (a follower holds no `channel_members` row), public, the
+ * Board's own rule.
+ */
+export function followerBoardRoom(board: { id: string; name: string | null }): SpaceRoom {
+  return {
+    id: board.id,
+    kind: "board",
+    name: typeof board.name === "string" ? board.name : "",
+    unread: false,
+    can_post: false,
+    event: null,
+    locked: false,
+    post_policy: "everyone",
+  };
+}
+
+/** `FollowedBoardsResponse`'s order: newest `latest` first, a Board with none last, then `org.name`. */
+export function orderFollowedBoards(boards: FollowedBoard[]): FollowedBoard[] {
+  return [...boards].sort((a, b) => {
+    const byLatest = byNewest(a.latest?.created_at ?? null, b.latest?.created_at ?? null);
+    if (byLatest !== 0) return byLatest;
+    return a.org.name.localeCompare(b.org.name);
+  });
 }

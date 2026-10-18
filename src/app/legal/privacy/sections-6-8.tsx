@@ -122,6 +122,18 @@ export function Sections6To8() {
             "Join requests and invites",
             "The club or your account is deleted",
           ],
+          [
+            "A title a club gave you",
+            "An owner or admin changes or removes it, you leave or are taken out of the club, or the club or your account is deleted",
+          ],
+          [
+            "A mute on a club's posts",
+            "You unmute it, or the club or your account is deleted",
+          ],
+          [
+            "A club removing you as a follower",
+            "You join the club, or the club or your account is deleted",
+          ],
         ]}
       />
       <DeleteOneThing />

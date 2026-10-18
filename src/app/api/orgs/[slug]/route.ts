@@ -11,6 +11,7 @@ import {
 } from "@/lib/iu/campuses";
 import { campusScopeError } from "@/lib/iu/community-scope";
 import { hasBlockedNewLinkLabel } from "@/lib/club-routes/link-labels";
+import { isMissingColumnError } from "@/lib/db/missing-column";
 import { limitFor } from "@/lib/limits/budgets";
 import {
   contentBlockedResponse,
@@ -23,6 +24,7 @@ import {
   loadFollowerCount,
   loadViewerFollow,
   publicFollowerCount,
+  publicMemberCount,
   type OrgFollowState,
 } from "@/lib/orgs/following";
 import {
@@ -36,6 +38,8 @@ import {
   type OrgAudience,
 } from "@/lib/orgs/join-state";
 import { officerGate } from "@/lib/orgs/hidden-gate";
+import { loadBoardReadable } from "@/lib/orgs/board-facts";
+import { MOD_READONLY } from "@/lib/orgs/join-copy";
 import { loadViewerOrgContext } from "@/lib/orgs/membership";
 import {
   purgeDeletedClubMedia,
@@ -72,6 +76,7 @@ type UpdateBody = {
   philanthropy?: unknown;
   campus?: unknown;
   campus_id?: unknown;
+  followers_read_board?: unknown;
 };
 
 type LinkRow = { label: string; url: string };
@@ -81,6 +86,19 @@ const ORG_SELECT =
   "id, handle, name, description, logo_url, banner_url, is_public, backdrop_preset, verified, last_activity_at, links, philanthropy, school, campus_id, join_policy, audience";
 
 const URL_RE = /^https?:\/\/[^\s]{3,}$/i;
+
+/**
+ * `orgs.followers_read_board` (club model, Franky, Oct 16; migration
+ * 20261017100000): may the club's followers read its Board? On unless the
+ * club's owner or an admin turns it off. A hidden club's Board is never
+ * read by followers, whatever this says (the database's rule).
+ */
+const BOARD_SETTING = "followers_read_board";
+
+/** The setting as the routes send it: true or false, null when this database has no such column. */
+function boardSetting(value: unknown): boolean | null {
+  return typeof value === "boolean" ? value : null;
+}
 
 /** The error shape every org route now speaks (spec §4 conventions). */
 function fail(
@@ -230,7 +248,11 @@ async function revokeAudienceIneligibleInvites(
  * "not_following"), `org_follow_source` (how the viewer's follow was made, or
  * null) and `follower_count` (null below `FOLLOWER_COUNT_FLOOR` unless the
  * viewer is this club's owner or admin, and null when the count couldn't be
- * read). `member_count` is null, never a fake 0, when its read failed.
+ * read). `member_count` is null, never a fake 0, when its read failed, and
+ * null below 5 for a viewer outside the club (`publicMemberCount`).
+ * `board_readable` (club model) says whether THIS viewer may read the Board
+ * now: a screen takes a follower's Board card from it, never from
+ * `org_follow_state` plus `followers_read_board` (`loadBoardReadable`).
  *
  * The follow reads run alongside the context read, but a failed follow read
  * is only reported AFTER the hidden-club 404: otherwise a DB hiccup would
@@ -247,15 +269,20 @@ export async function GET(_req: Request, { params }: Params) {
   }
 
   const service = createSupabaseServiceClient();
-  const { data: orgRow, error } = await service
-    .from("orgs")
-    // No `owner_id`: this route now reads with the SERVICE client, so RLS no
-    // longer withholds a private org's row from non-members, and naming a
-    // one-member club's owner to every signed-in student is exactly what
-    // critic A4 kept out of the RLS policy. Nothing reads it here.
-    .select(`${ORG_SELECT}, hidden_at, created_at`)
-    .eq("handle", slug)
-    .maybeSingle();
+  // No `owner_id`: this route now reads with the SERVICE client, so RLS no
+  // longer withholds a private org's row from non-members, and naming a
+  // one-member club's owner to every signed-in student is exactly what
+  // critic A4 kept out of the RLS policy. Nothing reads it here.
+  const readOrg = (withBoardSetting: boolean) =>
+    service
+      .from("orgs")
+      .select(`${ORG_SELECT}, ${withBoardSetting ? `${BOARD_SETTING}, ` : ""}hidden_at, created_at`)
+      .eq("handle", slug)
+      .maybeSingle();
+  let { data: orgRow, error } = await readOrg(true);
+  // A database without the Board setting yet (migration 20261017100000)
+  // reads the club as before; the setting then answers null.
+  if (error && isMissingColumnError(error, [BOARD_SETTING])) ({ data: orgRow, error } = await readOrg(false));
   if (error) {
     console.error("[orgs/[slug] GET]", error);
     return fail(500, "load_failed", "Failed to load org");
@@ -274,7 +301,7 @@ export async function GET(_req: Request, { params }: Params) {
     campus_id: string | null;
   } & Record<string, unknown>;
 
-  const [ctx, memberCountRes, followRes, rawFollowerCount] = await Promise.all([
+  const [ctx, memberCountRes, followRes, rawFollowerCount, boardReadable] = await Promise.all([
     loadViewerOrgContext(service, org.id, user.id),
     service
       .from("org_members")
@@ -282,6 +309,7 @@ export async function GET(_req: Request, { params }: Params) {
       .eq("org_id", org.id),
     loadViewerFollow(service, org.id, user.id),
     loadFollowerCount(service, org.id),
+    loadBoardReadable(supabase, service, org.id, user.id),
   ]);
   if (memberCountRes.error) {
     console.error("[orgs/[slug] GET member count]", memberCountRes.error);
@@ -342,8 +370,19 @@ export async function GET(_req: Request, { params }: Params) {
       ...rest,
       logo_url: orgAssetProxyUrl(org.handle, org.logo_url, "logo"),
       banner_url: orgAssetProxyUrl(org.handle, org.banner_url, "banner"),
-      // Null, never 0, when the count couldn't be read (critic C27).
-      member_count: memberCountRes.error ? null : (memberCountRes.count ?? null),
+      // A club setting, for its members and officers only (Settings and the
+      // leave line read it): next to a follower's own `board_readable` it
+      // would tell a barred or blocked follower what happened (wave-2 repair,
+      // finding 15). Null for anyone else, and on a database without it.
+      followers_read_board: ctx.role ? boardSetting(org.followers_read_board) : null,
+      // May THIS viewer read the Board now (repair of review findings 4 and
+      // 9): the database's own answer, so a follower an officer removed or
+      // blocked gets the same false as a club with the switch off, and no
+      // screen offers them a Board that answers 403. Null when unknown.
+      board_readable: boardReadable,
+      // Null, never 0, when the count couldn't be read (critic C27); null
+      // below 5 for anyone outside the club (counts public from 5 up).
+      member_count: memberCountRes.error ? null : publicMemberCount(memberCountRes.count, ctx.role),
       org_follow_state: orgFollowState,
       org_follow_source: followRes.row?.source ?? null,
       // Officers see the raw number; everyone else sees null below the floor.
@@ -366,8 +405,9 @@ export async function GET(_req: Request, { params }: Params) {
 }
 
 /**
- * PATCH /api/orgs/[slug] — update org metadata, join policy, audience and
- * campus. Owner or admin only ("settings officers", spec §3.1).
+ * PATCH /api/orgs/[slug] — update org metadata, join policy, audience,
+ * campus and `followers_read_board` (may followers read the Board; club
+ * model, Oct 16). Owner or admin only ("settings officers", spec §3.1).
  *
  * FOUR THINGS CHANGED HERE (spec §4.2, critic A3 + B4):
  *  0. It is RATE LIMITED (`org-settings:<uid>`, 30 / 10 min), like every other
@@ -485,7 +525,7 @@ export async function PATCH(req: Request, { params }: Params) {
     if (roleGate === "not_found") return fail(404, "not_found", "Not found");
     if (memberErr) return fail(500, "load_failed", "Failed to update");
     if (roleGate === "forbidden") {
-      return fail(403, "settings_officers_only", "Only owners and admins can change this.");
+      return fail(403, "settings_officers_only", MOD_READONLY);
     }
   }
 
@@ -679,19 +719,40 @@ export async function PATCH(req: Request, { params }: Params) {
     if (!checkChangedText(v, org.philanthropy).ok) return contentBlockedResponse("philanthropy");
     patch.philanthropy = v;
   }
+
+  // ── The Board for followers ──────────────────────────────────────────────
+  // Club model (Franky, Oct 16): followers read the club's Board unless its
+  // owner or an admin turns that off here (the officer gate above). A
+  // boolean, or the field left out. Stored on a hidden club too: it changes
+  // nothing while the club is hidden, since a hidden club's Board is never
+  // read by followers (the database's rule), and turning it off must work
+  // whenever an officer wants it off.
+  if (body.followers_read_board !== undefined) {
+    if (typeof body.followers_read_board !== "boolean") {
+      return fail(400, "invalid_followers_read_board", "Choose whether followers can read the Board.");
+    }
+    patch.followers_read_board = body.followers_read_board;
+  }
   patch.updated_at = new Date().toISOString();
 
   if (Object.keys(patch).length === 1) {
     return fail(400, "nothing_to_update", "Nothing to update");
   }
 
+  // The setting comes back only when this save changed it: every other save
+  // reads what it always did, so it works on a database without the column.
+  const boardChanged = BOARD_SETTING in patch;
+  const updateSelect: string = boardChanged ? `${ORG_SELECT}, ${BOARD_SETTING}` : ORG_SELECT;
   const { data: updated, error } = await service
     .from("orgs")
     .update(patch)
     .eq("id", org.id)
-    .select(ORG_SELECT)
+    .select(updateSelect)
     .single();
   if (error || !updated) {
+    if (boardChanged && isMissingColumnError(error, [BOARD_SETTING])) {
+      return fail(503, "board_setting_unavailable", "This setting isn't ready yet. Try again later.");
+    }
     console.error("[orgs/[slug] PATCH]", error);
     return fail(500, "update_failed", "Failed to update");
   }
@@ -700,12 +761,14 @@ export async function PATCH(req: Request, { params }: Params) {
     await revokeAudienceIneligibleInvites(service, org.id, nextAudience, user.id);
   }
 
+  // Cast: the select is a string chosen above, which the client can't type.
+  const saved = updated as unknown as { handle: string; logo_url: string | null; banner_url: string | null } & Record<string, unknown>;
   return NextResponse.json({
     ok: true,
     org: {
-      ...updated,
-      logo_url: orgAssetProxyUrl(updated.handle, updated.logo_url, "logo"),
-      banner_url: orgAssetProxyUrl(updated.handle, updated.banner_url, "banner"),
+      ...saved,
+      logo_url: orgAssetProxyUrl(saved.handle, saved.logo_url, "logo"),
+      banner_url: orgAssetProxyUrl(saved.handle, saved.banner_url, "banner"),
       hidden: !!org.hidden_at,
     },
   });

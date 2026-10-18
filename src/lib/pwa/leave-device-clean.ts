@@ -53,6 +53,14 @@ const ACCOUNT_KEYS = [
   "vibe_push_ask_v1",
   "vibe_first_dm_ask_v1",
   PUSH_SYNC_FAIL_KEY,
+  // The club model's per-account notes (wave-3 review, finding 4): your club
+  // titles by club (ClubsSection.tsx and the static profile's twin), and the
+  // Boards of the clubs you follow (messages/home/board-seen.ts). The Privacy
+  // Policy (section 7, "Kept in your browser") counts them as your own
+  // information, cleared here. Typed, not imported: this file imports only
+  // device-push (see the top). leave-device-clean.test.ts pins the names.
+  "vibe.club-titles-seen.v1",
+  "vibe.followed-board-seen.v1",
 ] as const;
 
 /**

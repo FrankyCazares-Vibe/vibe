@@ -90,7 +90,19 @@ export type ViewerInRoom = {
    * The screens print it in place of the composer.
    */
   post_line?: string;
+  /**
+   * Set only for a FOLLOWER reading a club's Board (club model, Franky's
+   * call of Oct 16: only members type; a follower reads the Board and
+   * nothing else). Then `role` is null and `can_post`, `can_reply` and
+   * `can_moderate` are false, with no `post_line`: there is no composer.
+   * The key is absent for a member, a dm and a group, so a member's viewer
+   * keeps its exact shape.
+   */
+  standing?: "follower";
 };
+
+/** The `standing` of a reader of a club room: a member, or a follower reading the Board. */
+export type ClubStanding = "member" | "follower";
 
 // ── 6.0 Refusals ─────────────────────────────────────────────────────────────
 
@@ -118,7 +130,12 @@ export type RefusalCode =
   | "poll_closed" // 409: a vote past closes_at, or in a closed event chat
   | "slot_full" // 409: a sign-up slot at capacity
   | "cards_club_rooms_only" // 400: a card sent to a dm or a group
-  | "members_only" // 403: GET /api/orgs/[slug]/space by a non-member of a visible club
+  // 403: GET /api/orgs/[slug]/space by a non-member who may not read the
+  // club's Board (not following, barred, blocked, or the club turned it off:
+  // one answer, so nobody is told which); and, club model (Oct 16), anything
+  // a follower tries beyond reading: a send, a reply, a reaction, a vote, a
+  // card, `?root=` replies. Only members type.
+  | "members_only"
   | "create_failed" // 500: club creation (the wave-1 route keeps its own text)
   | "invalid_after" // 400: ?after= that is not a timestamp the server could have sent
   // Wave 3, section 4.3 (handoffs/chat-redesign/wave-3-desktop/contract.md).
@@ -252,9 +269,13 @@ export type PollCardOption = {
   full: boolean;
   /** The viewer's own pick, always returned. */
   mine: boolean;
-  /** [] when anonymous; ALL of them for a sign-up; the first 12 by vote time for a poll. */
+  /**
+   * [] when anonymous; ALL of them for a sign-up; the first 12 by vote time
+   * for a poll. Always [] for a follower reading the Board: they get the
+   * counts, never who picked what (club model, critique #2).
+   */
   voters: Person[];
-  /** How many more a poll has beyond the 12. */
+  /** How many more a poll has beyond the 12; 0 for a follower. */
   voters_more: number;
 };
 
@@ -327,19 +348,34 @@ export type ChatMessage = {
   media_url: string | null;
   media_kind: string | null;
   parent_message_id: string | null;
-  /** The author; null when their row is not readable. */
+  /**
+   * The author; null when their row is not readable. Null for a follower
+   * too, with `user_id` "" and `author_role` null: a follower is shown each
+   * Board post as the club's (`room.org`), never a member's name.
+   */
   users: Person | null;
   attachment: AttachmentRow | null;
   parent_preview: ParentPreview | null;
+  /**
+   * Counts only, for everyone. A follower's are read with the service role
+   * (the database shows a non-member only their own reaction rows) and carry
+   * no person, as for a member.
+   */
   reactions: ReactionGroup[];
   // New in wave 1.
   kind: MessageKind;
   thread_root_id: string | null;
   /** Null on a text message and on a stub; hydrated by `hydrateCards` (wave 2) on a card. */
   card: Card | null;
-  /** Board top-level posts only, else null. */
+  /**
+   * Board top-level posts only, else null. Null for a follower too: they
+   * read the posts, never the replies (members write those).
+   */
   reply_count: number | null;
-  /** Club rooms; null = no longer a member, and null in a dm or a group. */
+  /**
+   * Club rooms; null = no longer a member, and null in a dm or a group.
+   * Always null on a follower's page (the post is the club's).
+   */
   author_role: ClubRole | null;
   /**
    * Blocking in club rooms, both ways (wave-2 contract section 8): when
@@ -442,6 +478,29 @@ export type InboxClub = {
 export type InboxResponse = { ok: true; clubs: InboxClub[] };
 
 /**
+ * One club whose Board the viewer reads as a FOLLOWER (club model, Oct 16),
+ * for the Messages home list beside the inbox (batch 1C's route, 2C's
+ * screens). A follower holds no `channel_members` row, so there is no
+ * unread dot, mute or pin. Only clubs the viewer is not a member of, that
+ * are not hidden, and whose Board the database lets them read (critique
+ * #7): the route reads the Boards on the VIEWER's client, and the policy on
+ * that read (`channels_select_org_member`) is `can_view_org_channel`
+ * itself, so the rule is never re-coded in TypeScript. `latest` is read
+ * with the service role (the database shows a follower no message row):
+ * only a live top-level post by one of the club's current owners and
+ * admins, with `author_name` always "" (the Board speaks for the club).
+ */
+export type FollowedBoard = {
+  org: OrgRef;
+  /** The Board's channel id: `/messages?channel=<room_id>` opens it. */
+  room_id: string;
+  latest: Preview | null;
+};
+
+/** The follower list of Boards, newest `latest` first (nulls last), then `org.name`. */
+export type FollowedBoardsResponse = { ok: true; boards: FollowedBoard[] };
+
+/**
  * The three new fields on a `kind: "rsvp"` entry of `GET /api/me/calendar`.
  * All three are null with the flag off for the caller or the schema missing.
  * `room_id` is set only when I may enter the room.
@@ -467,10 +526,15 @@ export type SpaceRoom = {
   post_policy: PostPolicy;
 };
 
-/** `GET /api/orgs/[slug]/space`. */
+/**
+ * `GET /api/orgs/[slug]/space` for a MEMBER. A follower gets
+ * `SpaceFollowerResponse` instead; a screen that may open either reads
+ * `SpaceAnswer` and tells them apart by `viewer.standing`.
+ */
 export type SpaceResponse = {
   ok: true;
   org: OrgRef & { member_count: number };
+  /** No `standing` key: a member's viewer keeps its exact shape. */
   viewer: { role: ClubRole; can_moderate: boolean };
   /**
    * Order: lounge, board, officers (only if I can enter), event rooms not
@@ -493,6 +557,32 @@ export type SpaceResponse = {
    */
   board_recent?: ChatMessage[];
 };
+
+/**
+ * `GET /api/orgs/[slug]/space` for a FOLLOWER the database lets read the
+ * club's Board (club model, Oct 16; critique #6): the Board and nothing
+ * else. `rooms` holds the Board alone (`can_post` false, `unread` false: a
+ * follower holds no row on it). `board_latest`, and `board_recent` with
+ * `?panel=1`, come from the Board page as a follower reads it (counts only
+ * on cards and reactions, no reply counts). `up_next` and `upcoming` are
+ * the club's event listings as the club page shows them, `room_id` null on
+ * every one (a follower never enters an event's chat). No member's face or
+ * name anywhere.
+ */
+export type SpaceFollowerResponse = {
+  ok: true;
+  /** `member_count` from 5 up; null below 5 or when the count could not be read. */
+  org: OrgRef & { member_count: number | null };
+  viewer: { role: null; standing: "follower"; can_moderate: false };
+  rooms: SpaceRoom[];
+  board_latest: ChatMessage | null;
+  up_next: EventRef[];
+  upcoming?: EventRef[];
+  board_recent?: ChatMessage[];
+};
+
+/** Every answer of `GET /api/orgs/[slug]/space`: a member's or a follower's. */
+export type SpaceAnswer = SpaceResponse | SpaceFollowerResponse;
 
 // ── Wave 3: pinned messages and Shared (dms and groups) ──────────────────────
 // handoffs/chat-redesign/wave-3-desktop/contract.md 4.3. These pin a MESSAGE

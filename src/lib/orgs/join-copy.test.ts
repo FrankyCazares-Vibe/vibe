@@ -21,11 +21,14 @@ const {
   AUDIENCE_HELP,
   FOLLOWER_COUNT_FLOOR,
   FOLLOW_DISCLOSURE,
+  LEAVE_DROPS_FOLLOW_SOURCES,
+  REQUEST_DISCLOSURE,
   MOD_READONLY,
   OFFICER_FOLLOW_HELP,
   ORG_COPY,
   WHO_CAN_JOIN_OPTIONS,
   audienceChip,
+  boardCardView,
   changeAfter,
   channelsGateCopy,
   fillCopy,
@@ -33,16 +36,23 @@ const {
   followsSinceText,
   inviteRowButton,
   inviteSubText,
+  joinOutcome,
   joinPolicyNotice,
+  joinPressFailure,
+  keepFollowingDefault,
   memberCountText,
+  memoryFor,
   openToFact,
   openToOptions,
   orgErrorCopy,
   orgHeaderView,
+  orgMenuItems,
   orgRowView,
   pendingInviteText,
   policyChip,
+  relationKey,
   relativeAgoText,
+  shownRelation,
   stateAfterDecline,
   whoCanJoinFact,
 } = (await import(specifier)) as typeof import("./join-copy");
@@ -124,26 +134,30 @@ test("row views: no follow control for members, hidden clubs or signed-out viewe
   }
 });
 
-test("row views: line layout only for an open club on phone rows and onboarding", () => {
+test("row views: line layout for Follow + Join and Follow + Request, on phone rows and onboarding", () => {
   for (const r of combos()) {
     for (const surface of SURFACES) {
-      const expected = r.state === "can_join" && surface !== "card" ? "line" : "slot";
+      const twoDoors = r.state === "can_join" || r.state === "can_request";
+      const expected = twoDoors && surface !== "card" ? "line" : "slot";
       assert.equal(orgRowView(r, surface).layout, expected, `${label(r)} on ${surface}`);
     }
   }
 });
 
-test("row views: the disclosure shows iff a club not known to be open renders a follow control", () => {
+/** The disclosure rule: near a follow control on a club not known to be open, and near any Request. */
+function expectsDisclosure(r: Relation, actions: Action[]): boolean {
+  if (r.state === "member" || r.state === "hidden" || r.state === "signed_out") return false;
+  if (actions.some((a) => a.kind === "request")) return true;
+  return r.joinPolicy !== "open" && actions.some(isFollowKind);
+}
+
+test("row views: the disclosure shows near Follow on a club not known to be open, and near every Request", () => {
   for (const r of combos()) {
     for (const surface of SURFACES) {
       const view = orgRowView(r, surface);
-      const expected =
-        r.joinPolicy !== "open" &&
-        view.actions.some(isFollowKind) &&
-        r.state !== "member" &&
-        r.state !== "hidden" &&
-        r.state !== "signed_out";
-      assert.equal(view.disclosure, expected ? FOLLOW_DISCLOSURE : null, `${label(r)} on ${surface}`);
+      const expected = expectsDisclosure(r, view.actions);
+      const asking = !r.following && view.actions.some((a) => a.kind === "request");
+      assert.equal(view.disclosure, expected ? (asking ? REQUEST_DISCLOSURE : FOLLOW_DISCLOSURE) : null, `${label(r)} on ${surface}`);
     }
   }
 });
@@ -161,15 +175,25 @@ test("row views: the chip never repeats a control, and there is no Joined chip",
   }
 });
 
-test("row views: onboarding never offers Request, and only members get a sub", () => {
+test("row views: Request needs no follow first, on every surface, and only members get a sub", () => {
   for (const r of combos()) {
     for (const surface of SURFACES) {
       const view = orgRowView(r, surface);
       const where = `${label(r)} on ${surface}`;
-      if (surface === "onboarding") assert.ok(!view.actions.some((a) => a.kind === "request"), where);
+      // One request flow everywhere (club model): lists, onboarding and the
+      // page all offer Request whether or not they follow yet.
+      assert.equal(view.actions.some((a) => a.kind === "request"), r.state === "can_request", where);
       const wantsSub = surface === "onboarding" && r.state === "member";
       assert.equal(view.sub, wantsSub ? "Members follow automatically" : null, where);
     }
+  }
+});
+
+test("header: Request needs no follow first either", () => {
+  for (const r of combos()) {
+    if (r.state !== "can_request") continue;
+    const view = orgHeaderView(r);
+    assert.ok(view.membership.some((a) => a.kind === "request"), label(r));
   }
 });
 
@@ -190,26 +214,38 @@ test("open club, following: Join becomes the filled control", () => {
   assert.equal(view.layout, "slot");
 });
 
-test("request club: follow first, then each surface's next step", () => {
+test("request club: Follow + Request together, the same shape as Follow + Join", () => {
   const notFollowing = rel({ state: "can_request", joinPolicy: "request", reason: "policy" });
-  for (const surface of SURFACES) {
-    assert.deepEqual(labels(orgRowView(notFollowing, surface).actions), ["follow:Follow:filled"]);
+  for (const surface of ["phone_row", "onboarding"] as const) {
+    const view = orgRowView(notFollowing, surface);
+    assert.deepEqual(labels(view.actions), ["follow:Follow:filled", "request:Request:outline"], surface);
+    assert.equal(view.layout, "line", surface);
+    assert.equal(view.chip, null, surface);
+    assert.equal(view.disclosure, REQUEST_DISCLOSURE, surface);
   }
-  const following = { ...notFollowing, following: true };
-  const phone = orgRowView(following, "phone_row");
-  assert.deepEqual(labels(phone.actions), ["request:Request:filled"]);
-  assert.equal(phone.chip, "Following");
-  assert.equal(phone.disclosure, null);
-  const card = orgRowView(following, "card");
-  assert.deepEqual(labels(card.actions), [
-    "unfollow:Following ✓:quiet",
+  assert.deepEqual(labels(orgRowView(notFollowing, "card").actions), [
+    "follow:Follow:filled",
     "request:Request to join:outline",
   ]);
-  assert.equal(card.chip, null);
+
+  const following = { ...notFollowing, following: true };
+  for (const surface of ["phone_row", "onboarding"] as const) {
+    const view = orgRowView(following, surface);
+    assert.deepEqual(labels(view.actions), ["unfollow:Following ✓:quiet", "request:Request:filled"], surface);
+    assert.equal(view.chip, null, surface);
+  }
+  const card = orgRowView(following, "card");
+  assert.deepEqual(labels(card.actions), ["unfollow:Following ✓:quiet", "request:Request to join:filled"]);
+  assert.equal(card.layout, "slot");
   assert.equal(card.disclosure, FOLLOW_DISCLOSURE);
-  assert.deepEqual(labels(orgRowView(following, "onboarding").actions), [
-    "unfollow:Following ✓:quiet",
-  ]);
+});
+
+test("visiting an open club: asking follows, so the disclosure shows by the Request", () => {
+  const visiting = rel({ state: "can_request", joinPolicy: "open", reason: "visiting" });
+  for (const surface of SURFACES) assert.equal(orgRowView(visiting, surface).disclosure, REQUEST_DISCLOSURE, surface);
+  assert.equal(orgHeaderView(visiting).disclosure, FOLLOW_DISCLOSURE);
+  // An open club you can simply join still needs no line.
+  assert.equal(orgRowView(rel({ state: "can_join" }), "phone_row").disclosure, null);
 });
 
 test("invited: Accept (and Decline on cards), chipped 'Invited you'", () => {
@@ -266,13 +302,7 @@ test("header: every state has labelled controls and a membership column of at mo
     if (r.state === "member" || r.state === "hidden" || r.state === "signed_out") {
       assert.ok(!(view.follow && isFollowKind(view.follow)), where);
     }
-    const expected =
-      r.joinPolicy !== "open" &&
-      view.follow !== null &&
-      isFollowKind(view.follow) &&
-      r.state !== "member" &&
-      r.state !== "hidden" &&
-      r.state !== "signed_out";
+    const expected = expectsDisclosure(r, all);
     assert.equal(view.disclosure, expected ? FOLLOW_DISCLOSURE : null, where);
   }
 });
@@ -309,9 +339,9 @@ test("header: a member follows automatically and can't unfollow", () => {
 test("header: request subs name the reason; audience subs name the club", () => {
   const policy = orgHeaderView(rel({ state: "can_request", joinPolicy: "request", reason: "policy" }));
   assert.equal(policy.membership[0]!.label, "Request to join");
-  assert.equal(policy.membership[0]!.sub, "Officers approve requests");
+  assert.equal(policy.membership[0]!.sub, "Officers approve requests. Asking also follows the club.");
   const visiting = orgHeaderView(rel({ state: "can_request", reason: "visiting" }));
-  assert.equal(visiting.membership[0]!.sub, "You're visiting, so officers approve requests");
+  assert.equal(visiting.membership[0]!.sub, "You're visiting, so officers approve requests. Asking also follows the club.");
   const purdue = orgHeaderView(rel({ state: "audience_blocked", audience: "purdue", orgName: "Purdue Club" }));
   assert.equal(purdue.membership[0]!.label, "Purdue students only");
   assert.equal(purdue.membership[0]!.sub, "Purdue Club is open to Purdue students only.");
@@ -399,7 +429,7 @@ test("chips, facts and settings options", () => {
   ]);
   assert.equal(OFFICER_FOLLOW_HELP, "Anyone can follow your club. This only sets who becomes a member.");
   assert.equal(AUDIENCE_HELP, "Checked against each student's verified school email when they join.");
-  assert.equal(MOD_READONLY, "Only owners and admins can change this.");
+  assert.equal(MOD_READONLY, "Only the owner and officers can change this.");
 });
 
 test("join policy notice: hidden first, silent for members and open clubs", () => {
@@ -506,11 +536,14 @@ test("changes: follow toggles, join/accept make a following member, decline foll
   assert.deepEqual(changeAfter({ ...r, following: true }, "unfollow"), { state: "invited", following: false, role: null });
   assert.deepEqual(changeAfter(r, "accept"), { state: "member", following: true, role: "member" });
   assert.deepEqual(changeAfter(rel({ state: "can_join" }), "join"), { state: "member", following: true, role: "member" });
-  assert.deepEqual(changeAfter(rel({ state: "can_request", following: true }), "request"), {
-    state: "requested",
-    following: true,
-    role: null,
-  });
+  // Asking follows the club, whether or not they followed before.
+  for (const following of [true, false]) {
+    assert.deepEqual(changeAfter(rel({ state: "can_request", following }), "request"), {
+      state: "requested",
+      following: true,
+      role: null,
+    });
+  }
   assert.deepEqual(changeAfter(r, "decline"), { state: "invite_only", following: false, role: null, declined: true });
   assert.equal(changeAfter(r, "status"), null);
   assert.equal(changeAfter(r, "sign_in"), null);
@@ -568,4 +601,263 @@ test("S67 sec wave 2: the new refusal codes map to their neutral copy", () => {
   assert.equal(orgErrorCopy("join_unavailable"), ORG_COPY.errors.joinUnavailable);
   assert.equal(orgErrorCopy("approve_unavailable"), ORG_COPY.errors.approveUnavailable);
   assert.equal(orgErrorCopy("removed_needs_admin"), ORG_COPY.errors.removedNeedsAdmin);
+});
+
+// ── Club model: the Board card and the ⋯ menu ───────────────────────────────
+
+const BOARD = "11111111-1111-4111-8111-111111111111";
+
+function board(over: Partial<Parameters<typeof boardCardView>[0]>) {
+  return boardCardView({
+    state: "can_join",
+    following: false,
+    boardId: BOARD,
+    boardReadable: null,
+    followWouldRead: false,
+    orgName: "SAE",
+    ...over,
+  });
+}
+
+test("board card: members Open, readable followers Read, would-be followers Follow", () => {
+  const open = board({ state: "member", following: true, boardReadable: true });
+  assert.equal(open?.kind, "open");
+  assert.equal(open?.cta, "Open");
+  assert.equal(open?.href, `/messages?channel=${BOARD}`);
+  assert.equal(open?.title, "Announcement Board");
+
+  const read = board({ state: "invite_only", following: true, boardReadable: true });
+  assert.equal(read?.kind, "read");
+  assert.equal(read?.cta, "Read the Board");
+  assert.equal(read?.href, `/messages?channel=${BOARD}`);
+  // A request follows, so a waiting request reads like any follower.
+  assert.equal(board({ state: "requested", following: true, boardReadable: true })?.kind, "read");
+
+  const follow = board({ state: "can_request", followWouldRead: true });
+  assert.equal(follow?.kind, "follow");
+  assert.equal(follow?.cta, "Follow to read the Board");
+  assert.equal(follow?.href, null);
+  // Signed out: no card, so a private window never shows a card the same
+  // student, barred, doesn't get (wave-2 repair, finding 15).
+  assert.equal(board({ state: "signed_out", followWouldRead: true }), null);
+  assert.equal(board({ state: "signed_out", following: true, boardReadable: true, verifyToRead: true }), null);
+});
+
+test("board card: only the school email missing says Verify, follower or not; a readable Board never does", () => {
+  const verify = board({ state: "unverified", verifyToRead: true });
+  assert.equal(verify?.kind, "verify");
+  assert.equal(verify?.cta, "Verify school email");
+  assert.equal(verify?.href, "/auth/school-email");
+  assert.equal(verify?.line, "SAE's officers post news here. Verify your school email to read it.");
+  assert.equal(board({ state: "unverified", following: true, boardReadable: false, verifyToRead: true })?.kind, "verify");
+  assert.equal(board({ state: "can_join", following: true, boardReadable: true, verifyToRead: true })?.kind, "read");
+  assert.equal(board({ state: "member", following: true, boardReadable: true, verifyToRead: true })?.kind, "open");
+  assert.equal(board({ state: "unverified", following: true, boardReadable: false }), null, "barred and unverified: nothing");
+});
+
+test("board card: anyone else gets no card, so a bar is never revealed", () => {
+  // A follower the database says no to (removed, blocked, unverified, or the
+  // club turned reading off) looks exactly like a club with no card at all.
+  for (const boardReadable of [false, null]) {
+    assert.equal(board({ state: "can_join", following: true, boardReadable, followWouldRead: true }), null);
+    assert.equal(board({ state: "member", following: true, boardReadable }), null);
+  }
+  // A follower is never told "Follow to read".
+  assert.equal(board({ following: true, boardReadable: false, followWouldRead: true }), null);
+  assert.equal(board({ followWouldRead: false }), null);
+  assert.equal(board({ boardId: null, state: "member", following: true, boardReadable: true }), null);
+  assert.equal(board({ state: "hidden", followWouldRead: true }), null);
+});
+
+test("board card: the copy names the club and never says a club follows anyone", () => {
+  assert.equal(board({ state: "member", following: true, boardReadable: true })?.line, "News from SAE's officers.");
+  // Every sentence fills only {org}; no stray placeholder reaches the page.
+  for (const line of [ORG_COPY.board.memberLine, ORG_COPY.board.followerLine, ORG_COPY.board.visitorLine, ORG_COPY.board.verifyLine, ORG_COPY.board.intro]) {
+    assert.ok(line.includes("{org}"), line);
+    assert.deepEqual(line.match(/\{\w+\}/g), ["{org}"], line);
+  }
+});
+
+test("leave confirm: Keep following starts checked only for a follow they tapped", () => {
+  assert.equal(keepFollowingDefault("profile"), true);
+  assert.equal(keepFollowingDefault("discover"), true);
+  assert.equal(keepFollowingDefault("onboarding"), true);
+  assert.equal(keepFollowingDefault("join"), false);
+  assert.equal(keepFollowingDefault("request"), false);
+  assert.equal(keepFollowingDefault(null), false);
+  assert.equal(keepFollowingDefault(undefined), false);
+});
+
+test("⋯ menu: Mute or Unmute for everyone signed in, Leave for members but the owner", () => {
+  const kinds = (input: Parameters<typeof orgMenuItems>[0]) => orgMenuItems(input).map((i) => i.kind);
+  assert.deepEqual(kinds({ signedIn: false, role: null, muted: false }), []);
+  assert.deepEqual(kinds({ signedIn: true, role: null, muted: false }), ["mute"]);
+  assert.deepEqual(kinds({ signedIn: true, role: null, muted: true }), ["unmute"]);
+  assert.deepEqual(kinds({ signedIn: true, role: "member", muted: false }), ["mute", "leave"]);
+  assert.deepEqual(kinds({ signedIn: true, role: "mod", muted: true }), ["unmute", "leave"]);
+  assert.deepEqual(kinds({ signedIn: true, role: "admin", muted: false }), ["mute", "leave"]);
+  assert.deepEqual(kinds({ signedIn: true, role: "owner", muted: false }), ["mute"]);
+  assert.deepEqual(
+    orgMenuItems({ signedIn: true, role: "member", muted: false }).map((i) => i.label),
+    ["Mute posts", "Leave club"],
+  );
+  assert.equal(orgErrorCopy("owner_cannot_leave"), ORG_COPY.menu.ownerCantLeave);
+});
+
+test("no club copy says a club follows a person", () => {
+  const strings: string[] = [];
+  const walk = (v: unknown) => {
+    if (typeof v === "string") strings.push(v);
+    else if (v && typeof v === "object") for (const child of Object.values(v)) walk(child);
+  };
+  walk(ORG_COPY);
+  for (const s of strings) {
+    assert.ok(!/\{org\}\s+follows|club follows (you|them|people)|follow(s|ed)? you back/i.test(s), s);
+  }
+});
+
+test("joinOutcome: one reading of a Join, Request or Accept answer for every control", () => {
+  const base = { state: "can_request" as const, following: false, role: null, audience: "both" as const };
+  // Joined: the server's role, following, and the welcome only for an accepted invite.
+  const joined = joinOutcome(base, "join", { ok: true, data: { joined: true, role: "admin" } });
+  assert.deepEqual(joined, { kind: "change", next: { state: "member", following: true, role: "admin" }, audience: "both", welcome: false });
+  const accepted = joinOutcome({ ...base, state: "invited" }, "accept", { ok: true, data: { joined: true, role: "nonsense" } });
+  assert.equal(accepted.kind === "change" && accepted.next.role, "member", "an unknown role reads as member");
+  assert.equal(accepted.kind === "change" && accepted.welcome, true);
+  // Pending: whether asking followed is the server's word.
+  const asked = joinOutcome(base, "request", { ok: true, data: { pending: true, org_follow_state: "following" } });
+  assert.deepEqual(asked.kind === "change" && asked.next, { state: "requested", following: true, role: null });
+  const notFollowed = joinOutcome({ ...base, following: true }, "request", { ok: true, data: { pending: true, org_follow_state: "not_following" } });
+  assert.equal(notFollowed.kind === "change" && notFollowed.next.following, false);
+  const older = joinOutcome(base, "request", { ok: true, data: { pending: true } });
+  assert.equal(older.kind === "change" && older.next.following, false, "an older server leaves the follow as it was");
+  // A 2xx that says neither.
+  assert.deepEqual(joinOutcome(base, "request", { ok: true, data: {} }), { kind: "unclear", message: `${joinPressFailure("request")} Try again.` });
+  // Refusals that flip the state, the school named when the sentence names it.
+  const purdue = joinOutcome(base, "join", { ok: false, code: "audience_mismatch", error: "SAE is open to Purdue students only." });
+  assert.deepEqual(purdue, { kind: "change", next: { state: "audience_blocked", following: false, role: null }, audience: "purdue", welcome: false });
+  const unnamed = joinOutcome({ ...base, audience: "iu" }, "join", { ok: false, code: "audience_mismatch", error: "No." });
+  assert.equal(unnamed.kind === "change" && unnamed.audience, "iu");
+  assert.equal(joinOutcome(base, "join", { ok: false, code: "invite_only" }).kind, "change");
+  assert.equal(joinOutcome(base, "join", { ok: false, code: "school_unverified" }).kind, "change");
+  assert.deepEqual(joinOutcome(base, "join", { ok: false, code: "join_unavailable" }), { kind: "refused" });
+  assert.equal(joinPressFailure("accept"), ORG_COPY.control.acceptFailed);
+  assert.equal(joinPressFailure("join"), ORG_COPY.control.joinFailed);
+});
+
+test("the controls read a join answer only through joinOutcome", () => {
+  for (const file of ["../../components/orgs/OrgJoinControl.tsx", "../../components/mobile/messages/club/RoomComposer.tsx"]) {
+    const src = readFileSync(new URL(file, import.meta.url), "utf8");
+    assert.match(src, /joinOutcome\(rel, a\.kind, r\)/, file);
+    assert.ok(!/state: "member", following: true, role: "member"/.test(src), `${file}: no hand-built joined state`);
+    assert.ok(!/(=== |case )"audience_mismatch"/.test(src), `${file}: the refusal codes are joinOutcome's`);
+  }
+});
+
+test("leave and mute words live in ORG_COPY.menu only: desktop Settings, the feed and the profile point at it", () => {
+  const read = (file: string) => readFileSync(new URL(file, import.meta.url), "utf8");
+  const home = read("../../app/campus/campus-home.tsx");
+  for (const literal of ["You'll lose its chats", "Its posts stay in your feed", "You still follow it.", "keepFollowingStartsOn"]) {
+    assert.ok(!home.includes(literal), `campus-home.tsx still spells out: ${literal}`);
+  }
+  assert.match(home, /keepFollowingDefault\(/);
+  const feed = read("../posts/feed-actions.ts");
+  assert.match(feed, /fillCopy\(ORG_COPY\.menu\.muted, \{ org: club\.name \}\)/);
+  assert.ok(!feed.includes("You won't see"), "feed-actions builds its lines from ORG_COPY.menu");
+  const clubs = read("../../components/profile/clubs-model.ts");
+  for (const key of ["muted", "mutedMember", "unmuted", "muteFailed", "unmuteFailed"]) {
+    assert.match(clubs, new RegExp(`  ${key}: ORG_COPY\\.menu\\.${key},`), key);
+  }
+  // Every mute confirmation says the club isn't told.
+  for (const line of [ORG_COPY.menu.muted, ORG_COPY.menu.mutedMember]) assert.match(line, /the club isn't told\.$/i, line);
+  // One list of follows a leave drops, read by the default and the join route.
+  assert.deepEqual([...LEAVE_DROPS_FOLLOW_SOURCES], ["join", "request"]);
+  assert.match(read("../../app/api/orgs/[slug]/join/route.ts"), /LEAVE_DROPS_SOURCES: readonly string\[\] = LEAVE_DROPS_FOLLOW_SOURCES;/);
+});
+
+test("the Announcement Board has one name: no 'announcements' label, and 'admin' never shows to officers", () => {
+  const strings: string[] = [];
+  const walk = (v: unknown) => {
+    if (typeof v === "string") strings.push(v);
+    else if (v && typeof v === "object") for (const child of Object.values(v)) walk(child);
+  };
+  walk(ORG_COPY.board);
+  for (const s of strings) assert.ok(!/\bannouncements\b/i.test(s), s);
+  walk(ORG_COPY);
+  for (const s of [...strings, MOD_READONLY]) assert.ok(!/\badmins?\b/i.test(s), s);
+  const read = (file: string) => readFileSync(new URL(file, import.meta.url), "utf8");
+  for (const file of [
+    "../../components/mobile/messages/club/FollowerBoard.tsx",
+    "../../components/mobile/messages/home/FollowedBoardsRow.tsx",
+    "../../components/mobile/messages/club/helpers.ts",
+  ]) {
+    const src = read(file).split("\n").filter((l) => !/^\s*(\*|\/\/|\/\*)/.test(l)).join("\n");
+    assert.ok(!/["`][^"`]*\b[Aa]nnouncements?\b[^"`]*["`]/.test(src), `${file}: a string says "announcements"`);
+  }
+});
+
+// ── Two controls, one page ──────────────────────────────────────────────────
+
+test("the club page's two Follow controls agree after every refresh: an old answer never comes back", () => {
+  // The header's control and the Board card's both render the page's one
+  // relation; each keeps the server's answer to its own tap until the
+  // refresh (`router.refresh()`) hands it a new relation.
+  type Memory = import("./join-copy").ControlMemory;
+  let page = rel({ state: "can_request", following: false });
+  let header: Memory = { seen: relationKey(page), kept: null };
+  let card: Memory = { seen: relationKey(page), kept: null };
+  const shows = (m: Memory) => shownRelation(page, m).rel.following;
+  // A tap the server answered, kept the way OrgJoinControl keeps it.
+  const tap = (m: Memory, kind: "follow" | "unfollow"): Memory => {
+    const next = changeAfter(shownRelation(page, m).rel, kind);
+    assert.ok(next);
+    const kept: Memory = { seen: m.seen, kept: { ...next, basis: relationKey(page), audience: page.audience, gone: false } };
+    assert.equal(shows(kept), kind === "follow", "the tapped control shows the answer at once");
+    return kept;
+  };
+  const refresh = () => {
+    page = { ...page, following: !page.following };
+    header = memoryFor(header, page);
+    card = memoryFor(card, page);
+  };
+
+  // Header Follow, then the header's Following ✓ (unfollow).
+  header = tap(header, "follow");
+  refresh();
+  assert.deepEqual([shows(header), shows(card)], [true, true]);
+  header = tap(header, "unfollow");
+  refresh();
+  assert.deepEqual([shows(header), shows(card)], [false, false]);
+  // The Board card's Follow refreshes the page to the very relation the
+  // header's Unfollow was tapped on: that answer must stay forgotten.
+  card = tap(card, "follow");
+  refresh();
+  assert.deepEqual([shows(header), shows(card)], [true, true], "the header says Following ✓ after the card's Follow");
+  // And the reverse: the header's Unfollow puts the card back on Follow.
+  header = tap(header, "unfollow");
+  refresh();
+  assert.deepEqual([shows(header), shows(card)], [false, false]);
+  assert.equal(
+    boardCardView({ state: page.state, following: shows(header), boardId: "b1", boardReadable: null, followWouldRead: true, verifyToRead: false, orgName: "SAE" })?.kind,
+    "follow",
+  );
+
+  // Nothing changed: the same memory, so a kept answer survives a re-render.
+  assert.equal(memoryFor(header, { ...page }), header);
+  // A member always follows, whatever was kept.
+  const member = rel({ state: "member", following: false, role: "member" });
+  assert.equal(shownRelation(member, { seen: relationKey(member), kept: null }).rel.following, true);
+});
+
+test("both club-page Follow controls read the kept answer through memoryFor and refresh the page", () => {
+  const read = (file: string) => readFileSync(new URL(file, import.meta.url), "utf8");
+  const control = read("../../components/orgs/OrgJoinControl.tsx");
+  assert.match(control, /memoryFor\(memory, relation\)/);
+  assert.match(control, /shownRelation\(relation, current\)/);
+  assert.ok(!/\.basis === basis/.test(control), "OrgJoinControl.tsx: the live-answer check is shownRelation's");
+  // The header (join-button.tsx) and the Board card (ChannelsSection.tsx):
+  // a tap on either refreshes the page, so the other catches up.
+  assert.match(read("../../app/orgs/[handle]/join-button.tsx"), /onChange=\{\(\) => router\.refresh\(\)\}/);
+  const board = read("../../app/orgs/[handle]/ChannelsSection.tsx").split("export function BoardSection")[1] ?? "";
+  assert.match(board, /axis="follow"[\s\S]*?onChange=\{\(\) => router\.refresh\(\)\}/);
 });

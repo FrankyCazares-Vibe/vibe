@@ -9,16 +9,18 @@ import { clubGradient } from "@/components/mobile/messages/avatar";
 import { BoardStrip } from "@/components/mobile/messages/club/BoardStrip";
 import { BoardView } from "@/components/mobile/messages/club/BoardView";
 import { EventAbout } from "@/components/mobile/messages/club/EventAbout";
-import { hatLine, roleWord } from "@/components/mobile/messages/club/helpers";
+import { FollowerBoard } from "@/components/mobile/messages/club/FollowerBoard";
+import { followerHatLine, hatLine, isFollower, memberSpace, roleWord } from "@/components/mobile/messages/club/helpers";
 import { RoomChips } from "@/components/mobile/messages/club/RoomChips";
 import { RoomComposer, type ReplyTarget } from "@/components/mobile/messages/club/RoomComposer";
 import { RoomThread } from "@/components/mobile/messages/club/RoomThread";
 import { RsvpSheet } from "@/components/mobile/messages/club/RsvpSheet";
+import { UpNext } from "@/components/mobile/messages/club/UpNext";
 import { initialsOf } from "@/components/mobile/messages/format";
 import { chatRefusalLine } from "@/components/mobile/messages/send-failure";
 import { FONT, palette, type Palette, SERIF } from "@/components/mobile/messages/v2-tokens";
 import { BOARD_POSTER_ROLES } from "@/lib/chat/room-rules";
-import type { EventRef, Person, RoomKind, SpaceResponse, SpaceRoom, ThreadMessagesResponse, ThreadRoom } from "@/lib/chat/types";
+import type { EventRef, OrgRef, Person, RoomKind, SpaceAnswer, SpaceRoom, ThreadMessagesResponse, ThreadRoom } from "@/lib/chat/types";
 import { ROOM_FULL_READ_EVERY, ROOM_POLL_MS, useRoomPoll } from "@/lib/chat/use-room-poll";
 import { vibeRequest, type VibeResult } from "@/lib/feedback/request";
 import { toast } from "@/lib/feedback/toast";
@@ -76,6 +78,16 @@ import { RoomsDialog } from "./RoomsDialog";
  * Lounge; a room the thread read refuses and the space does not list is
  * reported lost. A closed event chat opened by link has no chip: it shows
  * its thread and the closed tile.
+ *
+ * A FOLLOWER (club model, Franky's calls of Oct 16): only members type,
+ * react or vote; a follower the database lets in reads the club's Board and
+ * nothing else, as on the phone. The space is `SpaceFollowerResponse`, so:
+ * `Following · N members` (the count from 5 up) and no hat, no chips, no
+ * `+`, no panel and no panel toggle (the panel's faces, count and rooms are
+ * members'), no roster read at all, no Board strip; the room's reader draws
+ * the read-only `FollowerBoard` and the composer's follower tile (`Only
+ * members post here.` and Join / Request to join). Joining from it reads the
+ * room and the space again, as a member's.
  */
 
 const SPACE_LINE = "Couldn't load this club.";
@@ -113,7 +125,7 @@ const CLUB_CSS = `
 
 const NO_ROOMS: SpaceRoom[] = [];
 
-type SpaceState = { data: SpaceResponse | null; failure: LoadFailure | null };
+type SpaceState = { data: SpaceAnswer | null; failure: LoadFailure | null };
 type PanelPref = "1" | "0" | null;
 type RsvpTarget = { eventId: string; current: EventRef["viewer_status"] };
 
@@ -156,7 +168,7 @@ function storePanelPref(value: "1" | "0"): void {
  * 404 `not_found` show the code's own sentence with no Retry; anything else
  * is `asLoadFailure`'s (a 5xx keeps `Couldn't load this club. Try again.`).
  */
-function spaceFailure(r: VibeResult<SpaceResponse>): LoadFailure {
+function spaceFailure(r: VibeResult<SpaceAnswer>): LoadFailure {
   if (!r.ok && (r.status === 403 || r.status === 404)) {
     const line = chatRefusalLine(r);
     if (line) return { message: line, retryable: false };
@@ -203,7 +215,7 @@ export function ClubPane({ orgHandle, roomId, roomKind, initialPage, night, cont
     let live = true;
     const read = async () => {
       if (goneRef.current) return;
-      const r = await vibeRequest<SpaceResponse>(`/api/orgs/${encodeURIComponent(orgHandle)}/space?panel=1`, {
+      const r = await vibeRequest<SpaceAnswer>(`/api/orgs/${encodeURIComponent(orgHandle)}/space?panel=1`, {
         quiet: true,
         failure: SPACE_LINE,
         cache: "no-store",
@@ -255,7 +267,11 @@ export function ClubPane({ orgHandle, roomId, roomKind, initialPage, night, cont
   // The faces (C3): ONE roster read per club open, without the people in a
   // block with the viewer (`?visible=1`); the first five rows that have a
   // handle, as `Person` (3.3). A failure leaves `faces` null and says nothing.
+  // Only once the space says I am a MEMBER (club model, Oct 16): the member
+  // list is members-only, and a follower is shown no member's face or name.
+  const asMember = memberSpace(space.data) !== null;
   useEffect(() => {
+    if (!asMember) return;
     let live = true;
     void (async () => {
       const r = await vibeRequest<Partial<RosterResponse>>(`/api/orgs/${encodeURIComponent(orgHandle)}/members?visible=1`, {
@@ -275,7 +291,7 @@ export function ClubPane({ orgHandle, roomId, roomKind, initialPage, night, cont
     return () => {
       live = false;
     };
-  }, [orgHandle]);
+  }, [orgHandle, asMember]);
 
   // The labels' clock: a minute is enough for `Tonight`, `Soon`, `N more days`.
   useEffect(() => {
@@ -298,12 +314,20 @@ export function ClubPane({ orgHandle, roomId, roomKind, initialPage, night, cont
   // "Officers" is owner and admin (4c.2): `Manage club`, `Manage rooms` and the `+` are theirs, never a mod's.
   const role = data?.viewer.role ?? null;
   const officer = role !== null && BOARD_POSTER_ROLES.includes(role);
+  // A follower (club model, Oct 16): the Board alone, read only. No chips, no
+  // strip, no right panel (its faces, count and rooms are members'), no
+  // `Manage club`; the room's reader draws `FollowerBoard` and the tile. The
+  // club's Up next sits over the Board, as on the phone: a follower sees the
+  // events, never their chats (each tile opens the event's card; wave-2
+  // repair, finding 2).
+  const follower = isFollower(data?.viewer);
+  const member = memberSpace(data);
 
   // Where the right panel is. `panelOn` is the ONE "a panel is on screen"
   // that the hat line, `Manage club`, the Board strip and the event block
   // all read. Until the shell's first measure `contentWidth` is 0 and the
   // answer is "hidden"; nothing is stored from that frame (only a click stores).
-  const mode = panelMode(contentWidth, PANEL_WIDTH, pref, openedHere);
+  const mode = follower ? "hidden" : panelMode(contentWidth, PANEL_WIDTH, pref, openedHere);
   const shownMode = mode === "hidden" ? null : mode;
   const panelOn = shownMode !== null;
   const showPanel = useCallback(() => {
@@ -398,6 +422,8 @@ export function ClubPane({ orgHandle, roomId, roomKind, initialPage, night, cont
 
   const org = data?.org ?? null;
   const boardLatest = data?.board_latest ?? null;
+  // Joined from the follower tile: the space again now (the room reads itself again from the tile).
+  const reloadSpace = useCallback(() => readSpaceRef.current(), []);
 
   return (
     // The one item of the shell's pane box. No ancestor of the thread here
@@ -415,6 +441,7 @@ export function ClubPane({ orgHandle, roomId, roomKind, initialPage, night, cont
           roomId={roomId}
           panelOn={panelOn}
           officer={officer}
+          follower={follower}
           onPick={pickRoom}
           onManageRooms={openRooms}
           onTogglePanel={panelOn ? hidePanel : showPanel}
@@ -433,7 +460,10 @@ export function ClubPane({ orgHandle, roomId, roomKind, initialPage, night, cont
           </div>
         ) : (
           <div style={{ flexGrow: 1, minHeight: 0, boxSizing: "border-box", padding: `0 ${EDGE}px`, display: "flex", flexDirection: "column" }}>
-            {!panelOn && kind !== "board" && boardLatest && board ? (
+            {follower && data && data.up_next.length > 0 ? (
+              <UpNext clubName={org?.name ?? ""} events={data.up_next} night={night} now={now} officerEmpty={false} onOpenEvent={openEventChat} />
+            ) : null}
+            {!follower && !panelOn && kind !== "board" && boardLatest && board ? (
               <BoardStrip latest={boardLatest} unread={board.unread} night={night} onOpen={() => pickRoom(board)} />
             ) : null}
             <RoomView
@@ -444,6 +474,8 @@ export function ClubPane({ orgHandle, roomId, roomKind, initialPage, night, cont
               clubName={org?.name ?? null}
               orgHandle={orgHandle}
               orgId={org?.id ?? null}
+              club={org}
+              onJoined={reloadSpace}
               initialPage={initialPage}
               night={night}
               now={now}
@@ -474,9 +506,9 @@ export function ClubPane({ orgHandle, roomId, roomKind, initialPage, night, cont
             event ? (
               <EventPanel event={event} night={night} now={now} mode={shownMode} onHide={hidePanel} onRsvp={() => openRsvp(event.id, event.viewer_status)} />
             ) : null
-          ) : data ? (
+          ) : member ? (
             <ClubPanel
-              space={data}
+              space={member}
               activeRoomKind={kind}
               night={night}
               now={now}
@@ -504,10 +536,12 @@ type ClubHeaderProps = {
   now: Date;
   orgHandle: string;
   /** Null until the space read answers: bars and discs. */
-  space: SpaceResponse | null;
+  space: SpaceAnswer | null;
   roomId: string;
   panelOn: boolean;
   officer: boolean;
+  /** A follower reading the Board (club model): `Following · N members`, no chips, no panel toggle. */
+  follower: boolean;
   onPick: (room: SpaceRoom) => void;
   onManageRooms: () => void;
   onTogglePanel: () => void;
@@ -532,7 +566,7 @@ type ClubHeaderProps = {
  * link is the plain address `/campus?manage=<handle>` and nothing beside it
  * (a `tab` or a `channel` there would be redirected before the door is read).
  */
-function ClubHeader({ t, night, now, orgHandle, space, roomId, panelOn, officer, onPick, onManageRooms, onTogglePanel, toggleRef }: ClubHeaderProps) {
+function ClubHeader({ t, night, now, orgHandle, space, roomId, panelOn, officer, follower, onPick, onManageRooms, onTogglePanel, toggleRef }: ClubHeaderProps) {
   const org = space?.org ?? null;
   const round: React.CSSProperties = { flexShrink: 0, boxSizing: "border-box", padding: 0, borderRadius: 999, border: `1px solid ${t.fieldBorder}`, color: t.secondary, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" };
   const oneLine: React.CSSProperties = { minWidth: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" };
@@ -559,7 +593,13 @@ function ClubHeader({ t, night, now, orgHandle, space, roomId, panelOn, officer,
                 </Link>
               </h1>
               <div style={{ minWidth: 0, display: "flex", alignItems: "center", fontSize: 12, fontWeight: 600, lineHeight: "15px", color: t.secondary }}>
-                <span style={oneLine}>{panelOn ? `Your hat: ${roleWord(space.viewer.role)}` : hatLine(space.viewer.role, org.member_count)}</span>
+                <span style={oneLine}>
+                  {space.viewer.role === null
+                    ? followerHatLine(org.member_count)
+                    : panelOn || typeof org.member_count !== "number"
+                      ? `Your hat: ${roleWord(space.viewer.role)}`
+                      : hatLine(space.viewer.role, org.member_count)}
+                </span>
                 {!panelOn && officer ? (
                   <>
                     <span aria-hidden="true" style={{ flexShrink: 0, whiteSpace: "pre" }}>{" · "}</span>
@@ -577,7 +617,7 @@ function ClubHeader({ t, night, now, orgHandle, space, roomId, panelOn, officer,
             </div>
           )}
         </div>
-        {space && org ? (
+        {follower ? null : space && org ? (
           // An event chat is the open room like any other: its chip is drawn selected (`RoomChips`, desktop).
           <RoomChips clubName={org.name} rooms={space.rooms} activeRoomId={roomId} night={night} now={now} onPick={onPick} />
         ) : (
@@ -596,24 +636,26 @@ function ClubHeader({ t, night, now, orgHandle, space, roomId, panelOn, officer,
             </svg>
           </button>
         ) : null}
-        <button
-          ref={toggleRef}
-          type="button"
-          className="vibe-club-btn"
-          aria-label={panelOn ? "Hide this panel" : "Show the club panel"}
-          aria-pressed={panelOn}
-          onClick={(e) => {
-            // Not the second click of a double click: the panel's own hide button has just left and the header has widened, so this toggle is under the pointer and would show the panel again.
-            if (e.detail > 1) return;
-            onTogglePanel();
-          }}
-          style={{ ...round, width: 36, height: 36 }}
-        >
-          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <rect x="3" y="4.5" width="18" height="15" rx="3.5" />
-            <path d="M14.5 4.5v15" />
-          </svg>
-        </button>
+        {follower ? null : (
+          <button
+            ref={toggleRef}
+            type="button"
+            className="vibe-club-btn"
+            aria-label={panelOn ? "Hide this panel" : "Show the club panel"}
+            aria-pressed={panelOn}
+            onClick={(e) => {
+              // Not the second click of a double click: the panel's own hide button has just left and the header has widened, so this toggle is under the pointer and would show the panel again.
+              if (e.detail > 1) return;
+              onTogglePanel();
+            }}
+            style={{ ...round, width: 36, height: 36 }}
+          >
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <rect x="3" y="4.5" width="18" height="15" rx="3.5" />
+              <path d="M14.5 4.5v15" />
+            </svg>
+          </button>
+        )}
       </div>
     </header>
   );
@@ -629,6 +671,10 @@ type RoomViewProps = {
   clubName: string | null;
   orgHandle: string;
   orgId: string | null;
+  /** The club from the space: a follower's Board posts are bylined with it (the thread read's `room.org` until then). */
+  club: OrgRef | null;
+  /** A follower joined from the tile under the Board: the pane reads the space again. */
+  onJoined: () => void;
   /** The shell's resolving read of this very room, used as its first page (read once, at the mount). */
   initialPage: ThreadMessagesResponse | null;
   night: boolean;
@@ -656,7 +702,7 @@ type RoomViewProps = {
  * are never off screen on a narrow laptop. With a panel on screen the same
  * block is in `EventPanel` and not here.
  */
-function RoomView({ roomId, kindHint, storedName, clubName, orgHandle, orgId, initialPage, night, now, panelOn, reloadToken, onReport, onOpenEventChat, onRsvp }: RoomViewProps) {
+function RoomView({ roomId, kindHint, storedName, clubName, orgHandle, orgId, club: clubRef, onJoined, initialPage, night, now, panelOn, reloadToken, onReport, onOpenEventChat, onRsvp }: RoomViewProps) {
   const poll = useRoomPoll(roomId, {
     enabled: true,
     initialPage: initialPage ?? undefined,
@@ -694,7 +740,10 @@ function RoomView({ roomId, kindHint, storedName, clubName, orgHandle, orgId, in
 
   return (
     <div style={{ flexGrow: 1, minHeight: 0, position: "relative", display: "flex", flexDirection: "column" }}>
-      {kind === "board" ? (
+      {kind === "board" && isFollower(viewer) ? (
+        // A follower (club model): the Board read only, as on the phone.
+        <FollowerBoard poll={poll} club={clubRef} night={night} now={now} />
+      ) : kind === "board" ? (
         <BoardView poll={poll} roomId={roomId} night={night} now={now} onOpenEventChat={onOpenEventChat} scrollToken={scrollToken} />
       ) : (
         <RoomThread
@@ -726,6 +775,10 @@ function RoomView({ roomId, kindHint, storedName, clubName, orgHandle, orgId, in
         onCancelReply={() => setReplyTo(null)}
         onSent={() => setScrollToken((n) => n + 1)}
         officerLine={kind === "board" && !!viewer?.can_post}
+        onJoined={() => {
+          void reload();
+          onJoined();
+        }}
       />
     </div>
   );

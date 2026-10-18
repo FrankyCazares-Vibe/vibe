@@ -24,7 +24,8 @@
 -- extra rooms (one public, one private), an event chat that is open and one
 -- whose event ended 10 days ago (closed), and a dm.
 -- Cases: C the catalog again (the column, both CHECKs, the three function
--- fingerprints, their attributes and grants, the comments, the recorded
+-- fingerprints as 20261017110000 (the club model: members only) restates
+-- them, the four policies it altered, their attributes and grants, the comments, the recorded
 -- row, and who holds INSERT or UPDATE on channels: the migration header's
 -- PRE-CHECK 6); K the CHECKs by trying, and who may write the column at all,
 -- by an update or by a room born with a rule; P
@@ -345,10 +346,29 @@ begin
     || ' ' || (select count(*) from public.channels c
                 where c.post_policy <> 'everyone' and c.kind is distinct from 'room'),
     'everyone/everyone 0');
-  perform pg_temp.pp_ok('C4 the fingerprints: the two restated functions read as the migration left them, can_view_org_channel as before it',
+  -- The club model's 20261017110000 restates all three (members only: a
+  -- follower reads the Board and never posts, replies or votes), so they
+  -- are pinned as that file leaves them (its step 6's want_md5s).
+  perform pg_temp.pp_ok('C4 the fingerprints: the three functions read as 20261017110000 (club model) left them',
     concat_ws(' ', md5(pg_get_functiondef(post::regprocedure)), md5(pg_get_functiondef(vote::regprocedure)),
               md5(pg_get_functiondef(view::regprocedure))),
-    'ae485a1fb463cfd6f6ace3448d986fb9 0ba4681e8816cecaa5c066ee6b03bedd 747ee06d2e4c3e8a788129f7530ec0ae');
+    '73fa24f050bb574b296b9f16e52e166c 794460bb81986bd638e7c236afcdb66d 09cdfa379e3d374c9f0cd2924cf56357');
+  -- And the four policies that file altered (review #22 of the club model):
+  -- only members read club messages or react, a non-member reads only their
+  -- own reaction rows, and an officer never reads the follow of someone in
+  -- a block pair with them.
+  perform pg_temp.pp_ok('C4b the four policies 20261017110000 altered read as it left them',
+    (select string_agg(p.polname || ' ' || md5(coalesce(pg_get_expr(case when p.polcmd = 'a' then p.polwithcheck else p.polqual end, p.polrelid), '')),
+                       ' | ' order by p.polname collate "C")
+       from pg_policy p
+      where (p.polrelid, p.polname) in (('public.messages'::regclass, 'messages_select_org_member'),
+                                        ('public.message_reactions'::regclass, 'message_reactions_select_member'),
+                                        ('public.message_reactions'::regclass, 'message_reactions_insert_member'),
+                                        ('public.org_followers'::regclass, 'org_followers_select'))),
+    'message_reactions_insert_member 0b38d4e7775fba427d18fb7e90004f36'
+    || ' | message_reactions_select_member 6fc0edb6fb1af666ade0cb8facd3be64'
+    || ' | messages_select_org_member 046a4e83025b53c75039933569f11b3c'
+    || ' | org_followers_select ab843a01700b34039388c85bbe582ab2');
   perform pg_temp.pp_ok('C5 both kept what CREATE OR REPLACE would reset: security definer, volatility, search_path, TimeZone',
     (select string_agg(concat_ws(' ', p.proname, case when p.prosecdef then 'definer' else 'invoker' end,
                                  l.lanname, p.provolatile::text, array_to_string(p.proconfig, ';')),

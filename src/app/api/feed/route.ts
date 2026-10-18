@@ -22,6 +22,14 @@ import {
   loadVisibleOrgCards,
   type OrgCard,
 } from "@/lib/orgs/following";
+import {
+  MUTED_ORG_FILTER_CAP,
+  MUTED_ORG_READ_LIMIT,
+  loadViewerMutedOrgIds,
+  mutedOrgOrFilter,
+  postHiddenByOrgMute,
+  withoutMutedOrgs,
+} from "@/lib/orgs/org-mutes";
 import { isUuid } from "@/lib/pgrest";
 import { withPostMediaUrls } from "@/lib/post-media-url";
 import { loadPostEngagementCounts } from "@/lib/posts/engagement-counts";
@@ -150,6 +158,14 @@ type EngagementCounts = {
  * so a card in the feed never opens to a 404. This replaces open question
  * Q4's default, which showed it to everyone as the author's own post.
  *
+ * A CLUB THE VIEWER MUTED (club model gap 2, Oct 16) sends nothing into
+ * their feed: its posts are left out in the query, before the limit, with a
+ * null-safe filter (personal posts have no `org_id`), and again in
+ * TypeScript on the raw `org_id`. It also loses its off-campus reach and its
+ * ranking boost, because muted clubs leave the followed-club set first. The
+ * viewer's own posts always stay. Muting changes nothing else: the feed is
+ * the only reader of club posts, and the chats don't look at mutes.
+ *
  * A POST THE VIEWER HAS REPORTED leaves their feed from the moment the
  * report is filed, and stays out whatever the moderators decide (store wave
  * S1B; the report sheet tells them so). The reports are read with the
@@ -212,11 +228,11 @@ export async function GET(req: Request) {
   const service = () => (serviceClient ??= createSupabaseServiceClient());
 
   // The viewer's campus, the people they shouldn't see (blocked either way,
-  // muted right now), the posts they reported, who they follow and which
-  // clubs they follow load together. Both follow sets are needed EARLY —
-  // they're part of the lane filter below, not just the ranking pass — so
-  // they're in this round trip.
-  const [meRes, hiddenRes, reportedRes, followingRes, followedOrgsRes] = await Promise.all([
+  // muted right now), the posts they reported, who they follow, which clubs
+  // they follow and which clubs they muted load together. Both follow sets
+  // and the club mutes are needed EARLY — they're part of the query filters
+  // below, not just the ranking pass — so they're in this round trip.
+  const [meRes, hiddenRes, reportedRes, followingRes, followedOrgsRes, mutedOrgsRes] = await Promise.all([
     // `maybeSingle`, not `single`: a viewer whose `public.users` row is
     // missing gets the same feed they get today (no campus, no university →
     // the global lane below), not a hard 500 on the app's home screen. A
@@ -229,6 +245,9 @@ export async function GET(req: Request) {
     // The viewer's own follow rows, so the user client is enough. Newest
     // first and bounded (critic M-6); hidden clubs are dropped below.
     loadViewerFollowedOrgIds(supabase, user.id, { limit: FOLLOWED_ORG_READ_LIMIT }),
+    // The viewer's own club mutes (own rows only, so the user client), newest
+    // first and bounded.
+    loadViewerMutedOrgIds(supabase, user.id, { limit: MUTED_ORG_READ_LIMIT }),
   ]);
   const { data: me, error: meErr } = meRes;
   if (meErr) {
@@ -261,6 +280,20 @@ export async function GET(req: Request) {
   if (!followedOrgsRes.ok) {
     console.error("[feed followed-orgs]", followedOrgsRes.error);
     return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
+  }
+  // Same rule for club mutes: the student was told the club's posts would
+  // leave their feed. (A build without the table reads "nothing muted",
+  // which is the truth there; see `isMissingOrgMutesTable`.)
+  if (!mutedOrgsRes.ok) {
+    console.error("[feed muted-orgs]", mutedOrgsRes.error);
+    return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
+  }
+  const mutedOrgSet: ReadonlySet<string> = new Set(mutedOrgsRes.ids);
+  const mutedOrgFilter = mutedOrgOrFilter(mutedOrgsRes.ids, user.id);
+  if (mutedOrgsRes.ids.length > MUTED_ORG_FILTER_CAP) {
+    // The rest are still dropped by the TypeScript check below; they only
+    // cost slots in the candidate pool.
+    console.warn("[feed] muted orgs truncated", { count: mutedOrgsRes.ids.length });
   }
   const viewerFollowingIds = followingRes.ids;
   const hiddenIds = hiddenRes.hidden.ids;
@@ -298,14 +331,16 @@ export async function GET(req: Request) {
   // (not the raw follow rows) feeds the lane filter, the lane check and the
   // ranking boost. Failing closed matches the reads above. It runs after the
   // campus check, so a bad `?campus=` gets its 400/403 without a service read.
+  // Muted clubs leave first: a mute takes away the reach and the boost too.
+  const unmutedFollowedOrgIds = withoutMutedOrgs(followedOrgsRes.ids, mutedOrgSet);
   let followedOrgIds: string[] = [];
-  if (followedOrgsRes.ids.length > 0) {
-    const visible = await loadVisibleOrgCards(service(), followedOrgsRes.ids);
+  if (unmutedFollowedOrgIds.length > 0) {
+    const visible = await loadVisibleOrgCards(service(), unmutedFollowedOrgIds);
     if (!visible.ok) {
       console.error("[feed followed-org cards]", visible.error);
       return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
     }
-    followedOrgIds = followedOrgsRes.ids.filter((id) => visible.byId.has(id));
+    followedOrgIds = unmutedFollowedOrgIds.filter((id) => visible.byId.has(id));
     if (
       followedOrgsRes.ids.length === FOLLOWED_ORG_READ_LIMIT ||
       followedOrgIds.length > FOLLOWED_ORG_FILTER_CAP
@@ -353,6 +388,12 @@ export async function GET(req: Request) {
     // "nothing to scope to" — a viewer with no verified university.
     if (laneFilter) {
       q = q.or(laneFilter);
+    }
+    // Clubs the viewer muted, null-safe (see `mutedOrgOrFilter`). A second
+    // `.or()` is a second `or=` param, and PostgREST ANDs the two, so this
+    // narrows the lane and never widens it.
+    if (mutedOrgFilter) {
+      q = q.or(mutedOrgFilter);
     }
     if (tagFilter) {
       q = q.contains("tags", [tagFilter]);
@@ -446,12 +487,15 @@ export async function GET(req: Request) {
     }
     seenHiddenClubs = access.orgIds;
   }
+  // The club-mute backup check runs on the RAW `org_id`, so a muted club
+  // stays out even where the filter cap left it out of the query.
   const shownRows = postRows.filter(
     (p) =>
-      !p.org_id ||
-      attribution.byId.has(p.org_id) ||
-      p.user_id === user.id ||
-      seenHiddenClubs.has(p.org_id),
+      !postHiddenByOrgMute(p, mutedOrgSet, user.id) &&
+      (!p.org_id ||
+        attribution.byId.has(p.org_id) ||
+        p.user_id === user.id ||
+        seenHiddenClubs.has(p.org_id)),
   );
   const shownPostIds = shownRows.map((p) => p.id);
 

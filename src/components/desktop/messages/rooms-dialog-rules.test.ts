@@ -370,12 +370,16 @@ test("writeFailureLine and refusedField: the name clash reads in the dialog's wo
 const dialog = readFileSync(new URL("./RoomsDialog.tsx", import.meta.url), "utf8");
 const count = (re: RegExp) => (dialog.match(re) ?? []).length;
 
-test("the dialog asks only the routes of 4c.5, each through its address in the rules", () => {
+test("the dialog asks only the routes of 4c.5 and the club's, each through its address in the rules", () => {
   assert.equal(count(/\/api\//g), 0, "no address is written out in the dialog");
   assert.equal(count(/\bfetch\(/g), 0);
   const calls = count(/\bvibeRequest[<(]/g);
-  assert.equal(calls, 5, "the list, the roster, create, save, delete");
-  assert.equal(count(/\bvibeRequest(?:<[^>]*>)?\((?:roomsUrl|roomUrl|rosterUrl)\(/g), calls, "every request goes to one of the three addresses");
+  assert.equal(calls, 7, "the list, the roster, create, save, delete, and the Board setting's read and save");
+  assert.equal(count(/\bvibeRequest(?:<[^>]*>)?\((?:roomsUrl|roomUrl|rosterUrl|clubUrl)\(/g), calls, "every request goes to one of the four addresses");
+  // The club's address carries the Board switch only (club model, Oct 16): one read, one save of the setting alone.
+  assert.equal(count(/\bvibeRequest(?:<[^>]*>)?\(clubUrl\(/g), 2);
+  assert.match(dialog, /vibeRequest<unknown>\(clubUrl\(orgHandle\), \{ cache: "no-store", quiet: true, failure: BOARD_SETTING_LOAD_LINE \}\)/);
+  assert.match(dialog, /vibeRequest<unknown>\(clubUrl\(orgHandle\), \{ method: "PATCH", json: boardSettingBody\(next\), failure: BOARD_SETTING_SAVE_LINE \}\)/);
   assert.equal(count(/vibeRequest<RosterResponse>\(rosterUrl\(orgHandle\)/g), 1, "ONE roster read (made again only after it failed)");
   assert.match(dialog, /method: "PATCH", json: saveBody\(/);
   assert.match(dialog, /method: "DELETE"/);
@@ -392,13 +396,18 @@ test("the roster is read with no block filter and handed to RoomPeople", () => {
   assert.equal(count(/\/u\//g), 0);
 });
 
-test("Board and Lounge have no input: their branch draws their lines and nothing else", () => {
+test("Board and Lounge have no input: their branch draws their lines, and the Board its followers switch", () => {
   const from = dialog.indexOf('{section === "fixed" ? (');
   const to = dialog.indexOf(") : (", from);
   assert.ok(from > 0 && to > from);
   const branch = dialog.slice(from, to);
   assert.match(branch, /<RoomLines room=\{room\} t=\{t\} fixed \/>/);
   for (const tag of ["<input", "<button", "<RoomEditor", "<RoomPeople", "peopleOf("]) assert.ok(!branch.includes(tag), tag);
+  // Club model (Oct 16): under the Board only, its one control.
+  assert.match(branch, /\{room\.kind === "board" \? <BoardFollowers orgHandle=\{orgHandle\} night=\{night\} \/> : null\}/);
+  const switchAt = dialog.slice(dialog.indexOf("function BoardFollowers("), dialog.indexOf("/** The room list, or why"));
+  assert.equal((switchAt.match(/<Switch /g) ?? []).length, 1, "a switch, never a field");
+  assert.ok(!switchAt.includes("<input"));
   assert.match(dialog, /\{fixed \? <span [^>]*>\{FIXED_ROOM_LINE\}<\/span> : null\}/);
 });
 
@@ -451,4 +460,41 @@ test("Calm: no hex colour and no rgb literal but the scrim tint", () => {
   assert.equal(count(/rgba?\(/g), count(/rgba\(var\(--scrim-rgb\), /g));
   const rulesText = readFileSync(new URL("./rooms-dialog-rules.ts", import.meta.url), "utf8");
   assert.equal((rulesText.match(/#[0-9a-fA-F]{3,8}\b|rgba?\(/g) ?? []).length, 0);
+});
+
+// ── The Board for followers (club model, Franky, Oct 16) ────────────────────
+
+test("the club's address, the switch's body and its read", () => {
+  assert.equal(rules.clubUrl("sae"), "/api/orgs/sae");
+  assert.equal(rules.clubUrl("a b"), "/api/orgs/a%20b");
+  assert.deepEqual(rules.boardSettingBody(true), { followers_read_board: true });
+  assert.deepEqual(rules.boardSettingBody(false), { followers_read_board: false });
+  assert.deepEqual(Object.keys(rules.boardSettingBody(false)), ["followers_read_board"], "never another field");
+  assert.equal(rules.boardSettingOf({ org: { followers_read_board: true } }), true);
+  assert.equal(rules.boardSettingOf({ org: { followers_read_board: false } }), false);
+  // A server without the column answers null: no switch rather than a wrong one.
+  assert.equal(rules.boardSettingOf({ org: { followers_read_board: null } }), null);
+  assert.equal(rules.boardSettingOf({ org: {} }), null);
+  assert.equal(rules.boardSettingOf({}), null);
+  assert.equal(rules.boardSettingOf(null), null);
+  assert.equal(rules.boardSettingOf({ org: { followers_read_board: "true" } }), null);
+});
+
+test("a save keeps the answer's value, else what was asked", () => {
+  assert.equal(rules.savedBoardSetting({ org: { followers_read_board: false } }, true), false);
+  assert.equal(rules.savedBoardSetting({ org: {} }, true), true);
+  assert.equal(rules.savedBoardSetting(null, false), false);
+});
+
+test("the switch's words: what followers read, and what they never see", () => {
+  assert.equal(rules.BOARD_FOLLOWERS_LABEL, "Followers can read the Board");
+  const on = rules.boardFollowersHelp(true);
+  assert.match(on, /officers' posts/);
+  assert.match(on, /can't reply, react or vote/);
+  assert.match(on, /never see who/);
+  assert.match(rules.boardFollowersHelp(false), /^Only members read the Board\./);
+  assert.equal(rules.boardSettingSavedLine(true), "Followers can read the Board.");
+  assert.equal(rules.boardSettingSavedLine(false), "Only members can read the Board now.");
+  // Officer is the word (owner or admin); "admin" never shows.
+  for (const line of [on, rules.boardFollowersHelp(false), rules.BOARD_FOLLOWERS_HIDDEN_LINE]) assert.ok(!/admin/i.test(line), line);
 });

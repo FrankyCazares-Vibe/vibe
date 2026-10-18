@@ -555,6 +555,9 @@
     canDelete: false,
     removed: false,         // removed_at set: no Edit and no Delete anywhere
     clubName: "",           // the prefill's club name, for an officer's confirm
+    // The post's club from the SERVER's answer ({handle, name}, vpvClubOf),
+    // or null: drives the "Mute <club>'s posts" row (club model, Oct 16).
+    club: null,
     inflight: false,        // any toggle/post in progress
     // The owner's inline editor. editSaving is its OWN flag, never inflight:
     // a like still in flight would otherwise make Save return silently. It
@@ -691,6 +694,7 @@
     state.isOwner = false;
     state.canDelete = false;
     state.removed = false;
+    state.club = null;
     // Only a feed row carries its club ({org: {name}}); anywhere else an
     // officer's confirm says "the club".
     state.clubName = (prefill && prefill.org && typeof prefill.org.name === "string")
@@ -846,6 +850,7 @@
     state.isOwner = false;
     state.canDelete = false;
     state.removed = false;
+    state.club = null;
     state.views = null;
     state.saves = null;
     paintOwnerAffordances();
@@ -948,6 +953,9 @@
     // false on a removed post; `removed` is the belt, and gates Edit too.
     state.removed = !!p.removed_at;
     state.canDelete = j.viewer_can_delete === true && !state.removed;
+    // GET /api/posts/[id] sends `club` for a club post wherever it opens
+    // (wave-2 repair, finding 11); someone else's club post can be muted.
+    state.club = vpvClubOf(j.club);
     document.getElementById("vpvLikeCount").textContent = String(state.likes);
     document.getElementById("vpvCommentCount").textContent = String(state.comments);
     document.getElementById("vpvLike").classList.toggle("on", state.liked);
@@ -981,7 +989,14 @@
         const safeAuthor = esc(JSON.stringify(authorId));
         const safeName = esc(JSON.stringify(authorName));
         const firstName = esc(authorName.split(' ')[0] || 'author');
+        // Someone else's club post: mute the club's posts, as the phone's
+        // viewer does (PostViewerMobile, wave-3 review finding 5). The
+        // handler reads state.club, so no name goes into the attribute.
+        const muteClubBtn = state.club && typeof window.vibeRequest === "function"
+          ? `<button type="button" onclick="window.__vpvCloseMenu();window.__vpvMuteClub()">${esc(vpvMuteClubRowLabel(state.club))}</button>`
+          : "";
         menu.innerHTML = `
+          ${muteClubBtn}
           <button type="button" onclick="window.__vpvCloseMenu();window.__vpvReport('post',${safeId})">Report post</button>
           ${authorId ? `<button type="button" onclick="window.__vpvCloseMenu();window.vibeOpenMuteSheet(${safeAuthor},${safeName})">Mute ${firstName}</button>` : ''}
           ${authorId ? `<button type="button" class="danger" onclick="window.__vpvCloseMenu();window.vibeBlock(${safeAuthor},${safeName}, () => window.__vpvClose())">Block ${firstName}</button>` : ''}
@@ -1333,6 +1348,69 @@
   window.__vpvCloseMenu = function () {
     const menu = document.getElementById("vpvMenu");
     if (menu) menu.classList.remove("show");
+  };
+
+  // ── Mute a club's posts (someone else's club post) ────────────────────
+  // club-mute-twin:start
+  // Hand-copied from src/lib/posts/feed-actions.ts (feedClubOf,
+  // clubMuteUrl, muteClubRowLabel, MUTE_UNDO_LABEL, MUTE_UNDO_MS) and the
+  // four ORG_COPY.menu lines its toasts fill (src/lib/orgs/join-copy.ts).
+  // src/lib/posts/static-post-viewer-club-mute.test.ts runs this block
+  // beside them on the same inputs.
+  const VPV_CLUB_MUTE_COPY = Object.freeze({
+    muted: "You won't see {org}'s posts in your feed. The club isn't told.",
+    unmuted: "{org}'s posts are back in your feed.",
+    muteFailed: "Couldn't mute {org}'s posts.",
+    unmuteFailed: "Couldn't unmute {org}'s posts.",
+    undo: "Undo",
+    undoMs: 8000,
+  });
+  function vpvClubOf(org) {
+    if (!org || typeof org.handle !== "string" || !org.handle.trim()) return null;
+    const handle = org.handle.trim();
+    const name = typeof org.name === "string" && org.name.trim() ? org.name.trim() : "@" + handle;
+    return { handle: handle, name: name };
+  }
+  function vpvClubMuteUrl(handle) {
+    return "/api/orgs/" + encodeURIComponent(handle) + "/mute";
+  }
+  function vpvMuteClubRowLabel(club) {
+    return "Mute " + club.name + "'s posts";
+  }
+  function vpvClubLine(line, club) {
+    return line.split("{org}").join(club.name);
+  }
+  // club-mute-twin:end
+
+  // POST mutes; a refusal toasts why (vibeRequest). On a yes the toast says
+  // so with Undo, which DELETEs the mute. The club isn't told. A second tap
+  // while one is out waits for it.
+  let vpvClubMuteOut = false;
+  window.__vpvMuteClub = async function () {
+    const club = state.club;
+    if (!club || vpvClubMuteOut || typeof window.vibeRequest !== "function") return;
+    vpvClubMuteOut = true;
+    const C = VPV_CLUB_MUTE_COPY;
+    const r = await window.vibeRequest(vpvClubMuteUrl(club.handle), {
+      method: "POST",
+      failure: vpvClubLine(C.muteFailed, club),
+    });
+    vpvClubMuteOut = false;
+    if (!r.ok) return;
+    window.vibeToast(vpvClubLine(C.muted, club), {
+      tone: "info",
+      durationMs: C.undoMs,
+      action: {
+        label: C.undo,
+        onPress: () => {
+          void window.vibeRequest(vpvClubMuteUrl(club.handle), {
+            method: "DELETE",
+            failure: vpvClubLine(C.unmuteFailed, club),
+            success: vpvClubLine(C.unmuted, club),
+          });
+        },
+      },
+    });
   };
 
   // ── Edit post (owner only) ────────────────────────────────────────────

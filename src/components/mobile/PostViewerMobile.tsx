@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Drawer } from "vaul";
 
 import { asLoadFailure, LoadFailed, type LoadFailure } from "@/components/feedback/LoadFailed";
@@ -15,9 +15,22 @@ import {
   type ReportTargetRef,
 } from "@/components/safety/ReportSheet";
 import { copyText, vibeRequest } from "@/lib/feedback/request";
+import { toast } from "@/lib/feedback/toast";
 import { nativeShare } from "@/lib/native/bridge";
 import { useAppShell } from "@/lib/native/use-app-shell";
 import { EDITED_LABEL, type EditedPost } from "@/lib/posts/edit";
+import {
+  clubMutedLine,
+  clubMuteUrl,
+  clubUnmutedLine,
+  feedClubOf,
+  muteClubRowLabel,
+  muteFailureLine,
+  MUTE_UNDO_LABEL,
+  MUTE_UNDO_MS,
+  unmuteFailureLine,
+  type FeedClub,
+} from "@/lib/posts/feed-actions";
 
 /**
  * iOS-native mobile post viewer. Opens as a full-screen sheet from the
@@ -44,6 +57,8 @@ import { EDITED_LABEL, type EditedPost } from "@/lib/posts/edit";
  *     isn't moderator-removed), Delete post (shown only when the server says
  *     `viewer_can_delete`: the author, or a current owner / admin of the
  *     post's club — S68 officer tools, C3). A removed post offers neither.
+ *     On someone else's club post, "Mute <club>'s posts" too (club model,
+ *     Oct 16; `useClubMute` below), named by the caller or the post read.
  *     A saved edit patches the body, the #tag chips and the
  *     " · Edited" marker here, then tells the caller through `onEdited`.
  *     Until wave 4 wires `onEdited` into CampusMobile and ProfileMobile,
@@ -129,6 +144,8 @@ export function PostViewerMobile({
   canDelete = false,
   viewerId = null,
   clubName = null,
+  club: callerClub = null,
+  onMuteClub,
   onDeleted,
   onEdited,
   onBlocked,
@@ -143,6 +160,15 @@ export function PostViewerMobile({
   /** The post's club name, when the caller knows it (the feed does). Only
    *  used in an officer's Delete confirm ("Delete this post from {club}?"). */
   clubName?: string | null;
+  /** The post's club, when the caller knows it (the feed does): "Mute
+   *  <club>'s posts" in the ⋯ on someone else's club post. Absent, the
+   *  viewer's own read names it (`club` on /api/posts/[id]), so the row is
+   *  there wherever the post opens: a profile, /posts/[id]. */
+  club?: FeedClub | null;
+  /** The caller's mute (its `useClubMute`), so a mute made here takes the
+   *  club's cards off the feed under the viewer. Without it the viewer mutes
+   *  on its own (the app toast's Undo works either way). */
+  onMuteClub?: ClubMuteFn;
   /** The caller says this is the viewer's own post (ProfileMobile). It keeps
    *  Report / Block away; Delete and Edit key on the server's flags only. */
   canDelete?: boolean;
@@ -176,6 +202,9 @@ export function PostViewerMobile({
   // current owner / admin of the post's club, and never on a removed post.
   // DELETE /api/posts/[id] asks the same check, so the two can't disagree.
   const [viewerCanDelete, setViewerCanDelete] = useState(false);
+  // The post's club as `/api/posts/[id]` names it (wave-2 repair, finding 11).
+  const [readClub, setReadClub] = useState<FeedClub | null>(null);
+  const club = callerClub ?? readClub;
   // What the report sheet is pointed at — the post, or one comment. One sheet
   // serves both, so the reason list and the copy can't drift between them.
   const [reportTarget, setReportTarget] = useState<ReportTargetRef | null>(null);
@@ -209,6 +238,11 @@ export function PostViewerMobile({
   const [editOpen, setEditOpen] = useState(false);
   // Inside the store apps the ⋯ menu also offers the system share sheet.
   const inApp = useAppShell() !== null;
+  // "Mute <club>'s posts": the caller's mute when it has one (the feed), so a
+  // mute made here takes the club's cards off the feed under this viewer;
+  // this screen's own otherwise.
+  const ownMute = useClubMute();
+  const muteClub = onMuteClub ?? ownMute.mute;
   // Whether the latest pointerdown landed on the app toast; the drawer's
   // onPointerDownOutside reads it (see the effect below).
   const toastTapRef = useRef(false);
@@ -284,6 +318,7 @@ export function PostViewerMobile({
         viewer?: Viewer;
         is_owner?: boolean;
         viewer_can_delete?: boolean;
+        club?: unknown;
       }>(`/api/posts/${postId}`, {
         cache: "no-store",
         quiet: true,
@@ -320,6 +355,7 @@ export function PostViewerMobile({
       // affordances off.
       setIsOwner(r.data.is_owner === true);
       setViewerCanDelete(r.data.viewer_can_delete === true);
+      setReadClub(feedClubOf(r.data.club as { handle?: unknown; name?: unknown } | null));
       // The one place this screen can learn who is reading it.
       if (r.data.is_owner === true && r.data.post.author?.id) {
         setSelfId(r.data.post.author.id);
@@ -770,6 +806,18 @@ export function PostViewerMobile({
                     );
                   }}
                 />
+                {/* Club model (Oct 16): someone else's club post. The club's
+                    posts leave the feed (at once, when the feed holds this
+                    mute); nothing else changes, and the club isn't told. */}
+                {!owner && club ? (
+                  <ViewerMenuItem
+                    label={muteClubRowLabel(club)}
+                    onClick={() => {
+                      setMenuOpen(false);
+                      void muteClub(club);
+                    }}
+                  />
+                ) : null}
                 {!owner ? (
                   <ViewerMenuItem
                     label="Report post"
@@ -1248,8 +1296,70 @@ export function PostViewerMobile({
           onBlocked={() => onBlocked?.()}
         />
       ) : null}
+
     </Drawer.Root>
   );
+}
+
+// ── Mute a club's posts (club model, Franky, Oct 16) ─────────────────────────
+
+/** Mute this club's posts; true when it went through (a refusal toasts why). */
+export type ClubMuteFn = (club: FeedClub) => Promise<boolean>;
+
+/** What a screen does with its cards when a mute, or its Undo, went through. */
+export type ClubMuteChange = (club: FeedClub, muted: boolean) => void;
+
+/**
+ * Mute a club's posts. `mute` POSTs `/api/orgs/<handle>/mute` (`clubMuteUrl`);
+ * a refusal toasts why and answers false. On a yes, `onChange(club, true)`
+ * runs (the feed takes the club's cards off the screen at once: wave-2
+ * repair, finding 1) and the app's own toast says what happened with Undo
+ * for `MUTE_UNDO_MS` (its `button`: one toast host, finding 23). Undo DELETEs
+ * the mute, says so, and runs `onChange(club, false)` (the feed reloads, so
+ * the posts come back).
+ *
+ * CampusMobile and the desktop feed (`campus-home.tsx` FeedTabBody) hold one
+ * for all their cards and hand it to the post viewer (`onMuteClub`), so a
+ * mute made in the viewer clears the feed under it; a viewer opened anywhere
+ * else holds its own, with nothing to take off.
+ */
+export function useClubMute(onChange?: ClubMuteChange): { mute: ClubMuteFn } {
+  // A mute is out: a second tap waits for it rather than sending another.
+  const outRef = useRef(false);
+  const changeRef = useRef(onChange);
+  useEffect(() => {
+    changeRef.current = onChange;
+  }, [onChange]);
+  const mute = useCallback<ClubMuteFn>(async (club) => {
+    if (outRef.current) return false;
+    outRef.current = true;
+    const r = await vibeRequest(clubMuteUrl(club.handle), {
+      method: "POST",
+      failure: muteFailureLine(club),
+    });
+    outRef.current = false;
+    if (!r.ok) return false;
+    changeRef.current?.(club, true);
+    toast({
+      message: clubMutedLine(club),
+      tone: "info",
+      durationMs: MUTE_UNDO_MS,
+      button: {
+        label: MUTE_UNDO_LABEL,
+        onPress: () => {
+          void vibeRequest(clubMuteUrl(club.handle), {
+            method: "DELETE",
+            failure: unmuteFailureLine(club),
+            success: clubUnmutedLine(club),
+          }).then((u) => {
+            if (u.ok) changeRef.current?.(club, false);
+          });
+        },
+      },
+    });
+    return true;
+  }, []);
+  return { mute };
 }
 
 /** Row in the 3-dot dropdown menu. Centralizes the menu-item style so

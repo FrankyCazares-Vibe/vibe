@@ -13,7 +13,13 @@ export function Sections9To10() {
         five parts of it: bio, experience, skills, &ldquo;Working on&rdquo; and
         résumé. Your name, handle, photos, tagline, location line, website
         link, interest tags, major, year, campus, verified badge, three counts
-        (followers, following and connections) and posts cannot be hidden.{" "}
+        (followers, following and connections) and posts cannot be hidden.
+        Your clubs show on your profile unless you hide one, and hiding one
+        takes it off at once. You can also hide the title a club gave you, and
+        choose the order your clubs show in. The club&apos;s members still see
+        you in its member list. When you leave a club, you choose whether to
+        keep following it. If you do, you can read its Board as a follower can
+        (<Sec to="5e">section 5e</Sec>).{" "}
         <PageLink href="/settings">Settings</PageLink> shows your sign-in and
         school emails. To change your sign-in email, write to{" "}
         <Mail box="help" /> from your current sign-in email. We reply to that
@@ -21,7 +27,9 @@ export function Sections9To10() {
       </LegalP>
       <LegalP>
         <strong>Block, mute, report.</strong> Block or mute someone from their
-        profile. Any account that has accepted the{" "}
+        profile. Mute a club&apos;s posts from its page or from one of its
+        posts: they leave your feed, you stay in its chats, and the club is not
+        told. Any account that has accepted the{" "}
         <PageLink href="/legal/terms">Terms</PageLink> can report, verified or
         not, unless it is suspended or banned.
       </LegalP>
@@ -88,7 +96,10 @@ export function Sections9To10() {
               both email addresses, your profile and your proof of agreement;
             </li>
             <li>everything you posted, sent, liked, saved or voted on;</li>
-            <li>your follows, club memberships, RSVPs, blocks and mutes;</li>
+            <li>
+              your follows, club memberships and titles, RSVPs, blocks and
+              mutes, club mutes included;
+            </li>
             <li>the records of what you viewed and of who viewed you;</li>
             <li>
               your notifications, and your waitlist entry.
@@ -171,7 +182,8 @@ export function Sections9To10() {
           <strong>
             Club records of things you did as a club owner, admin or mod,
           </strong>{" "}
-          with your name taken off. A club you owned stays, with no owner.
+          such as titles you gave and followers you removed, with your name
+          taken off. A club you owned stays, with no owner.
         </li>
         <li>
           <strong>Our email log,</strong> without the scrambled code or your

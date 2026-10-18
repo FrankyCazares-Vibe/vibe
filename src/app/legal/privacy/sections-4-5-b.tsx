@@ -52,7 +52,7 @@ export function Section5e() {
         rows={[
           [
             "Board",
-            "Every member reads. The club's owner and admins post. Any member can reply under a post",
+            "Every member reads. The club's owner and admins post. Any member can reply under a post. Its followers with a verified school email read the posts too, not the replies, shown as the club's. Not if the club turned that off, removed them as a follower or from the club, or its owner, an admin or a mod blocked them",
           ],
           ["Lounge", "Every member reads and posts"],
           [
@@ -75,15 +75,17 @@ export function Section5e() {
         the club&apos;s owner and admins, not its mods.
       </LegalP>
       <LegalP>
-        New members can read a room&apos;s whole history. In a room where the
-        club chose who can post, you can still read, vote in polls and take a
+        New members can read a room&apos;s whole history. A follower who can
+        read the Board also sees its earlier posts by the club&apos;s current
+        owner and admins. In a room where the club chose who can post, you can still read, vote in polls and take a
         sign-up spot. The room tells you the rule, for example &ldquo;Only
         officers post here.&rdquo; It does not list the people who were picked.
       </LegalP>
       <LegalUL bullets>
         <li>
-          <strong>Polls and sign-ups.</strong> With names on, the room sees who
-          picked what, and sign-ups always show names. In an
+          <strong>Polls and sign-ups.</strong> With names on, the members who
+          can open the room see who picked what, and sign-ups always show them
+          the names. A follower reading the Board sees only the totals. In an
           &ldquo;Anonymous&rdquo; poll nobody in the club can see who voted.
           Your vote is still stored with your account, so the cofounder with
           direct access (<Sec to="1">section 1</Sec>) could see how you voted.
@@ -91,8 +93,10 @@ export function Section5e() {
         <li>
           <strong>Blocks in club rooms.</strong> You each see a blank in place
           of the other&apos;s messages. One exception: a post on the Board by
-          the club&apos;s owner or an admin shows to every member, block or not.
-          The blank only hides messages on screen, so treat what you write in a
+          the club&apos;s owner or an admin shows to every member, and to every
+          follower who can read the Board, block or not. If the club&apos;s
+          owner, an admin or a mod blocks a follower, that follower can no
+          longer read the Board. The blank only hides messages on screen, so treat what you write in a
           club room as readable by every member, including someone you blocked.
         </li>
         <li>

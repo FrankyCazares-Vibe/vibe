@@ -7,6 +7,7 @@ import { readChatMessage, roomOf } from "@/lib/chat/message-read";
 import { clubRole } from "@/lib/chat/rooms";
 import {
   refusalBody,
+  type ClubRole,
   type CreateCardResponse,
   type InvalidCardRefusal,
   type RefusalCode,
@@ -18,6 +19,7 @@ import { rateLimit, tooManyRequests } from "@/lib/rate-limit";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseServiceClient, isSupabaseServiceConfigured } from "@/lib/supabase/service";
 
+import { membersOnly } from "../_lib/club-follower";
 import { rpcRefusal } from "./_lib/rpc-refusal";
 
 type RouteCtx = { params: Promise<{ id: string }> };
@@ -55,6 +57,10 @@ function blockedField(card: CleanCardBody): string | null {
  * viewer's client, so it comes through the same hydration and block set as
  * the thread read (9.1). No push, no mention notification, no
  * `last_read_at` bump.
+ *
+ * A follower reading a club's Board passes `ensureMember` (they can read it)
+ * and never posts (Franky, Oct 16): the RPC's room rule refuses, and this
+ * route answers that as 403 `members_only` (../_lib/club-follower.ts).
  */
 export async function POST(req: Request, ctx: RouteCtx) {
   const { id: channelId } = await ctx.params;
@@ -176,9 +182,18 @@ export async function POST(req: Request, ctx: RouteCtx) {
         });
   const { data: created, error: rpcError } = await rpc;
   if (rpcError) {
+    // The role is read at most once, here or by rpcRefusal's P0C21.
+    let role: ClubRole | null | undefined;
+    const roleOf = async () => (role === undefined ? (role = await clubRole(member.orgId, user.id)) : role);
+    // A follower reading the Board never posts a card (Franky, Oct 16): the
+    // room rule says no (P0C21), and with no role in the club the answer is
+    // `members_only`, not "Only officers post here". Asked only after the
+    // database said no.
+    const code = typeof rpcError.code === "string" ? rpcError.code.trim().toUpperCase() : "";
+    if (code === "P0C21" && (await roleOf()) === null) return membersOnly();
     const refused = await rpcRefusal(rpcError, {
       room,
-      roleOf: () => clubRole(member.orgId, user.id),
+      roleOf,
       // The one shape rule this route cannot pin: the moment may pass
       // between its check and the RPC's; an Event card's RPC checks the note.
       invalidField: card.type === "event" ? "note" : "closes_at",

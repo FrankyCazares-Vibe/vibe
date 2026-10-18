@@ -6,7 +6,7 @@ import { Drawer } from "vaul";
 
 import { asLoadFailure, LoadFailed, type LoadFailure } from "@/components/feedback/LoadFailed";
 import { spaceEntryAfterLayer, spaceEntryNamesLayer } from "@/lib/chat/layer-stack";
-import type { RoomKind, SpaceResponse, SpaceRoom, ThreadMessagesResponse } from "@/lib/chat/types";
+import type { RoomKind, SpaceAnswer, SpaceRoom, ThreadMessagesResponse } from "@/lib/chat/types";
 import { useHideTabBar } from "@/lib/chat/use-hide-tabbar";
 import { clearLayersInto, clearLayersThen, isLayerPop } from "@/lib/chat/use-layer-history";
 import { ROOM_FULL_READ_EVERY, ROOM_POLL_MS, useRoomPoll } from "@/lib/chat/use-room-poll";
@@ -22,7 +22,8 @@ import { BoardStrip } from "./BoardStrip";
 import { BoardView } from "./BoardView";
 import { ClubEmpty } from "./ClubEmpty";
 import { EventChat } from "./EventChat";
-import { countWord, isEmptyRoom, isOfficer, roleWord } from "./helpers";
+import { FollowerBoard } from "./FollowerBoard";
+import { countWord, followerHatLine, isEmptyRoom, isFollower, isOfficer, roleWord } from "./helpers";
 import { RoomChips } from "./RoomChips";
 import { RoomComposer, type ReplyTarget } from "./RoomComposer";
 import { RoomThread } from "./RoomThread";
@@ -75,6 +76,16 @@ import { UpNext } from "./UpNext";
  *   code's toast (`Members only.`; S2-repair.md SEC3 / B2).
  * - The officer's brand new club (11.9.3): `ClubEmpty` in the Lounge's place
  *   and the dashed `Add your first event` in Up next.
+ * - A FOLLOWER (club model, Franky's calls of Oct 16): only members type,
+ *   react or vote; a follower the database lets in reads the club's Board
+ *   and nothing else. The space answers `SpaceFollowerResponse` (the Board
+ *   alone in `rooms`, `viewer.standing: "follower"`, the member count from 5
+ *   up or null) and the room's viewer says the same. So: the header says
+ *   `Following · N members` (no hat), no chips and no Board strip, Up next
+ *   with the club's events (no event chat to open: `room_id` is null), the
+ *   read-only `FollowerBoard` in `BoardView`'s place, and the composer's
+ *   follower tile (`Only members post here.` and Join / Request to join).
+ *   Joining from it reads the room and the space again, as a member's.
  */
 export type ClubSpaceProps = {
   orgHandle: string;
@@ -98,7 +109,7 @@ const SKELETON_DISC = "rgba(var(--scrim-rgb),0.06)";
 const SKELETON_BAR = "rgba(var(--scrim-rgb),0.08)";
 const SKELETON_BAR_SOFT = "rgba(var(--scrim-rgb),0.05)";
 
-type SpaceState = { data: SpaceResponse | null; failure: LoadFailure | null };
+type SpaceState = { data: SpaceAnswer | null; failure: LoadFailure | null };
 
 type HistoryState = { vibeChat?: unknown; depth?: unknown } | null;
 
@@ -159,7 +170,7 @@ function isVisible(): boolean {
  * would map them to its generic lines (S2-repair.md C1). Anything else is
  * `asLoadFailure`'s (a 5xx keeps `Couldn't load this club. Try again.`).
  */
-function spaceFailure(r: VibeResult<SpaceResponse>): LoadFailure {
+function spaceFailure(r: VibeResult<SpaceAnswer>): LoadFailure {
   if (!r.ok && (r.status === 403 || r.status === 404)) {
     const line = chatRefusalLine(r);
     if (line) return { message: line, retryable: false };
@@ -244,7 +255,7 @@ export function ClubSpace({ orgHandle, initialRoomId, initialRoomKind, initialPa
     let live = true;
     const read = async () => {
       if (closedRef.current) return;
-      const r = await vibeRequest<SpaceResponse>(`/api/orgs/${encodeURIComponent(orgHandle)}/space`, {
+      const r = await vibeRequest<SpaceAnswer>(`/api/orgs/${encodeURIComponent(orgHandle)}/space`, {
         quiet: true,
         failure: SPACE_LINE,
         cache: "no-store",
@@ -412,6 +423,16 @@ export function ClubSpace({ orgHandle, initialRoomId, initialRoomKind, initialPa
   const loungeEmpty = officerEmpty && activeRoom?.kind === "lounge" && isEmptyRoom(poll.messages);
   const boardUnread = board?.unread ?? false;
   const boardLatest = space.data?.board_latest ?? null;
+  // A follower (club model, Oct 16): the space holds the Board alone and the
+  // room's viewer says `standing: "follower"`. Either one is enough: the
+  // thread read can answer first on a deep link. Only members type, react or
+  // vote, so: no chips, no strip, the read-only Board, the members-only tile.
+  const follower = isFollower(spaceViewer) || isFollower(poll.viewer);
+  // Joined from that tile: the room and the space read again, now a member's.
+  const reloadAsMember = () => {
+    void poll.reload();
+    setRetryToken((n) => n + 1);
+  };
 
   return (
     <Drawer.Root
@@ -450,13 +471,15 @@ export function ClubSpace({ orgHandle, initialRoomId, initialRoomKind, initialPa
           ) : (
             <>
               <UpNext clubName={org.name} events={space.data.up_next} night={night} now={now} officerEmpty={officerEmpty} onOpenEvent={openEvent} />
-              <RoomChips clubName={org.name} rooms={rooms} activeRoomId={activeRoom?.id ?? null} night={night} now={now} onPick={pickRoom} />
-              {activeRoom?.kind !== "board" && boardLatest && board ? (
+              {follower ? null : <RoomChips clubName={org.name} rooms={rooms} activeRoomId={activeRoom?.id ?? null} night={night} now={now} onPick={pickRoom} />}
+              {!follower && activeRoom?.kind !== "board" && boardLatest && board ? (
                 <BoardStrip latest={boardLatest} unread={boardUnread} night={night} onOpen={() => pickRoom(board)} />
               ) : null}
               {activeRoom ? (
                 <div key={activeRoom.id} style={{ flexGrow: 1, minHeight: 0, position: "relative", display: "flex", flexDirection: "column" }}>
-                  {activeRoom.kind === "board" ? (
+                  {activeRoom.kind === "board" && follower ? (
+                    <FollowerBoard poll={poll} club={org} night={night} now={now} />
+                  ) : activeRoom.kind === "board" ? (
                     <BoardView poll={poll} roomId={activeRoom.id} night={night} now={now} onOpenEventChat={openEvent} scrollToken={scrollToken} paused={eventRoomId !== null} />
                   ) : (
                     <RoomThread
@@ -500,6 +523,7 @@ export function ClubSpace({ orgHandle, initialRoomId, initialRoomKind, initialPa
                     onSent={() => setScrollToken((n) => n + 1)}
                     officerLine={activeRoom.kind === "board" && !!poll.viewer?.can_post}
                     focusToken={focusToken}
+                    onJoined={reloadAsMember}
                   />
                 </div>
               ) : null}
@@ -534,7 +558,7 @@ export function ClubSpace({ orgHandle, initialRoomId, initialRoomKind, initialPa
  * <club>'s page"` → `/orgs/<handle>`; 14.15). Bars and discs while the space
  * read is out. Mockup chrome from `W0_Club:15-27` (MK:0.2).
  */
-function ClubHeader({ night, onClose, orgHandle, space }: { night: boolean; onClose: () => void; orgHandle: string; space: SpaceResponse | null }) {
+function ClubHeader({ night, onClose, orgHandle, space }: { night: boolean; onClose: () => void; orgHandle: string; space: SpaceAnswer | null }) {
   const t = palette(night);
   const circle: React.CSSProperties = {
     width: 44,
@@ -571,8 +595,15 @@ function ClubHeader({ night, onClose, orgHandle, space }: { night: boolean; onCl
           <>
             <h1 style={{ margin: 0, fontFamily: SERIF, fontWeight: 800, fontSize: 20, lineHeight: 1.1, letterSpacing: -0.4, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", color: t.ink }}>{org.name}</h1>
             <div style={{ fontSize: 12, fontWeight: 600, lineHeight: "15px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", color: t.secondary }}>
-              {`Your hat: ${roleWord(space.viewer.role)}`}
-              <span style={{ color: t.muted }}>{` · ${countWord(org.member_count, "member")}`}</span>
+              {space.viewer.role === null ? (
+                // A follower: no hat, the count from 5 up (null below: no `null members`).
+                followerHatLine(org.member_count)
+              ) : (
+                <>
+                  {`Your hat: ${roleWord(space.viewer.role)}`}
+                  {typeof org.member_count === "number" ? <span style={{ color: t.muted }}>{` · ${countWord(org.member_count, "member")}`}</span> : null}
+                </>
+              )}
             </div>
           </>
         ) : (

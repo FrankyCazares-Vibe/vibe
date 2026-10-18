@@ -3,9 +3,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { asLoadFailure, LoadFailed, type LoadFailure } from "@/components/feedback/LoadFailed";
-import type { InboxClub, InboxResponse, RoomKind } from "@/lib/chat/types";
+import type { FollowedBoard, FollowedBoardsResponse, InboxClub, InboxResponse, RoomKind } from "@/lib/chat/types";
 import { clampWeekOffset, sheetStartDay, weekOffsetOf, weekRange, weekRangeAt, type WeekRange } from "@/lib/chat/week";
 import { vibeRequest } from "@/lib/feedback/request";
+import { ORG_COPY } from "@/lib/orgs/join-copy";
 
 import { useNightTheme } from "../theme";
 import { EmptyState, ThreadRow } from "../ThreadList";
@@ -13,6 +14,7 @@ import type { ThreadEntry } from "../types";
 import { FONT, palette, SERIF } from "../v2-tokens";
 
 import { ClubRow } from "./ClubRow";
+import { FollowedBoards } from "./FollowedBoardsRow";
 import { HomeEmpty } from "./HomeEmpty";
 import { allBadgeCount, badgeText, calendarUrl, HOME_FILTERS, type HomeFilter, mergeHomeRows, rsvpEntries, type WeekEntry } from "./home-rules";
 import { MonthSheet } from "./MonthSheet";
@@ -51,6 +53,13 @@ import { YourWeek } from "./YourWeek";
  * its own); `inbox` failing alone → `Couldn't load your clubs.` in the list's
  * club position while threads still list; both failing → one `LoadFailed`;
  * a refetch failure keeps the rows and stays quiet.
+ *
+ * Club model (Franky's calls of Oct 16): with the two lists, and on their
+ * schedule, `GET /api/me/club-boards`, the Boards I read as a follower (the
+ * clubs I follow but am not in). It never holds the list back and never
+ * shows a failure: until it answers, or when it fails, there is simply no
+ * `Boards you follow` group (`FollowedBoardsRow.tsx`) under the clubs in
+ * the All and Clubs filters. A tap opens the club space on that Board.
  */
 
 const LIST_RESYNC_MS = 30_000;
@@ -87,6 +96,8 @@ export function useHomeData(refreshKey: number, onThreads: MessagesHomeProps["on
   const [threadsErr, setThreadsErr] = useState<LoadFailure | null>(null);
   const [clubs, setClubs] = useState<InboxClub[] | null>(null);
   const [clubsErr, setClubsErr] = useState<LoadFailure | null>(null);
+  // The Boards I read as a follower; null until the first answer (no group drawn).
+  const [boards, setBoards] = useState<FollowedBoard[] | null>(null);
   // The weeks read so far, keyed by the week's Monday 00:00 (its `getTime()`).
   const [weeks, setWeeks] = useState<Record<number, WeekSlot>>({});
   // `slide` is the way the last change went (+1 = to a later week), for the strip's slide-in.
@@ -128,6 +139,12 @@ export function useHomeData(refreshKey: number, onThreads: MessagesHomeProps["on
     const seq = ++listSeqRef.current;
     listAtRef.current = Date.now();
     armListTimer();
+    // The Boards I follow: beside the two lists, never awaited with them (a
+    // slow answer must not hold the list back); quiet, and a failure keeps
+    // what was drawn. An answer older than the newest read is dropped.
+    void vibeRequest<FollowedBoardsResponse>("/api/me/club-boards", { cache: "no-store", quiet: true, failure: ORG_COPY.board.followedLoadFailed }).then((br) => {
+      if (seq === listSeqRef.current && br.ok && Array.isArray(br.data?.boards)) setBoards(br.data.boards);
+    });
     const [tr, ir] = await Promise.all([
       vibeRequest<{ threads?: ThreadEntry[]; requests?: ThreadEntry[] }>("/api/me/threads?scope=chats", {
         cache: "no-store",
@@ -292,6 +309,7 @@ export function useHomeData(refreshKey: number, onThreads: MessagesHomeProps["on
     threadsErr,
     clubs,
     clubsErr,
+    boards,
     week: slot?.entries ?? null,
     weekErr: slot?.failure ?? null,
     now,
@@ -347,6 +365,8 @@ export function MessagesHome({ filter, onFilter, refreshKey, onThreads, onOpenCl
     </div>
   );
   const openClub = (club: InboxClub) => (roomId: string, roomKind: RoomKind) => onOpenClub(club.org.handle, roomId, roomKind);
+  // The Boards I follow (club model): under the clubs, in All and Clubs; a tap opens that club's space on its Board.
+  const followed = d.boards && d.boards.length > 0 ? <FollowedBoards boards={d.boards} now={d.now} onOpen={(b) => onOpenClub(b.org.handle, b.room_id, "board")} /> : null;
   // A week card or a plan of the month sheet: the room's id with the club's handle when the entry carries one.
   const openRoom = (e: WeekEntry) => (e.room_id ? onOpenRoom(e.room_id, e.org?.handle ?? null) : undefined);
   // The month sheet (S71 amendment 4): the day it opens on and the control
@@ -398,16 +418,21 @@ export function MessagesHome({ filter, onFilter, refreshKey, onThreads, onOpenCl
     );
   } else if (filter === "clubs") {
     const rows = d.clubs ?? [];
-    list = d.clubsErr ? (
-      failedBox(d.clubsErr)
-    ) : rows.length === 0 ? (
-      <HomeEmpty />
-    ) : (
-      <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column" }}>
-        {rows.map((c) => (
-          <ClubRow key={c.org.id} club={c} now={d.now} onOpen={openClub(c)} />
-        ))}
-      </ul>
+    list = (
+      <>
+        {d.clubsErr ? (
+          failedBox(d.clubsErr)
+        ) : rows.length === 0 ? (
+          followed ? null : <HomeEmpty />
+        ) : (
+          <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column" }}>
+            {rows.map((c) => (
+              <ClubRow key={c.org.id} club={c} now={d.now} onOpen={openClub(c)} />
+            ))}
+          </ul>
+        )}
+        {followed}
+      </>
     );
   } else {
     const rows = mergeHomeRows(d.clubs ?? [], d.threads ?? []);
@@ -416,7 +441,7 @@ export function MessagesHome({ filter, onFilter, refreshKey, onThreads, onOpenCl
         {d.clubsErr ? failedBox(d.clubsErr) : null}
         {d.threadsErr ? failedBox(d.threadsErr) : null}
         {rows.length === 0 && !d.threadsErr && !d.clubsErr ? (
-          <EmptyState tab="all" />
+          followed ? null : <EmptyState tab="all" />
         ) : (
           <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column" }}>
             {rows.map((r) =>
@@ -428,6 +453,7 @@ export function MessagesHome({ filter, onFilter, refreshKey, onThreads, onOpenCl
             )}
           </ul>
         )}
+        {followed}
       </>
     );
   }

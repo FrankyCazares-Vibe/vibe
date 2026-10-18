@@ -12,7 +12,7 @@
  * re-written.
  */
 
-import type { InboxClub, RoomKind } from "@/lib/chat/types";
+import type { FollowedBoard, InboxClub, RoomKind } from "@/lib/chat/types";
 import { threadAvatar, threadTitle } from "@/components/mobile/messages/format";
 import {
   clubHasUnread,
@@ -23,6 +23,7 @@ import {
   type HomeRow,
 } from "@/components/mobile/messages/home/home-rules";
 import type { ThreadEntry } from "@/components/mobile/messages/types";
+import { boardHasNew, followedBoardLabel } from "@/components/mobile/messages/club/helpers";
 
 export type KnownChat = { kind: "dm" } | { kind: "club"; orgHandle: string; roomKind: RoomKind };
 
@@ -226,6 +227,43 @@ export function slimRows(
     }
   }
   return supplied ? [supplied, ...rows] : rows;
+}
+
+/**
+ * The slim list with the Boards I follow under its chats (wave-2 repair,
+ * finding 12): one row per Board, a club row that opens the Board, the coral
+ * dot for a post newer than this browser showed (`seen`, board-seen.ts). The
+ * open Board is its own row in place, never a second supplied row on top.
+ */
+export function withFollowedBoards(
+  rows: SlimRow[],
+  boards: readonly FollowedBoard[],
+  open: OpenChat | null,
+  seen: Readonly<Record<string, string>>,
+  now: Date,
+): SlimRow[] {
+  if (boards.length === 0) return rows;
+  const boardRows = boards.map((b): SlimRow => {
+    const isOpen = open?.kind === "club" && (open.orgId === b.org.id || sameHandle(open.orgHandle, b.org.handle));
+    const isNew = !isOpen && boardHasNew(b.latest?.created_at, seen[b.room_id]);
+    return {
+      key: `club:${b.org.id}`,
+      kind: "club",
+      name: b.org.name,
+      avatarUrl: b.org.logo_url,
+      seed: b.org.id,
+      open: isOpen,
+      dot: isNew ? "coral" : null,
+      label: followedBoardLabel(b, now, isNew),
+      href: chatEntry(b.room_id).url,
+      target: { kind: "club", orgHandle: b.org.handle, roomId: b.room_id, roomKind: "board" },
+    };
+  });
+  const keys = new Set(boardRows.map((r) => r.key));
+  const openBoard = boardRows.find((r) => r.open) ?? null;
+  // A supplied open row for a followed Board gives way to the Board's own row.
+  const kept = rows.filter((r) => !(openBoard && r.open && r.key === openBoard.key) && !(keys.has(r.key) && !r.open));
+  return [...kept, ...boardRows.filter((r) => !kept.some((k) => k.key === r.key))];
 }
 
 /** The names a row can be found by: the club's, the person's, the group's and its members'. */

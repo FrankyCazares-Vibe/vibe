@@ -783,6 +783,17 @@ async function decideMention(
     const { data, error } = await service.rpc("can_view_org_channel", { cid: channel.id, uid: row.recipient_id });
     if (error) return unsure(row);
     if (data !== true) return skip("no_access");
+    // Members only (club model, Oct 16; critique #3, repair of review
+    // findings 6 and 7): since 20261017110000 `can_view_org_channel` also
+    // says yes to a FOLLOWER on the Board, and a club chat never pushes a
+    // non-member its text (a follower mentioned before the send route's
+    // members-only filter shipped, or a member who left keeping the follow
+    // before this row was sent). SECURITY DEFINER, truthful to the service role.
+    const { data: member, error: memberError } = await service.rpc("is_org_member", {
+      oid: channel.org_id, uid: row.recipient_id,
+    });
+    if (memberError) return unsure(row);
+    if (member !== true) return skip("no_access");
     return ready("mention", {
       kind: "mention", where: "club_chat", actor: who, club: org, messageId: msg.id,
       content: { text: msg.content, mediaKind: msg.media_kind, attachmentKind: msg.attachment_kind },

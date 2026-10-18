@@ -48,6 +48,7 @@ const {
   FOLLOWER_COUNT_FLOOR,
   FOLLOWER_LIST_ROLES,
   FOLLOW_SOURCES,
+  MAP_ZONE_SHOWN_COLUMN,
   PAGE_LIMIT_DEFAULT,
   PAGE_LIMIT_MAX,
   canSeeFollowers,
@@ -55,15 +56,20 @@ const {
   encodeFollowCursor,
   flattenCountEmbed,
   followKeysetOrFilter,
+  followMadeByJoining,
   isFollowSource,
   loadFollowerCount,
+  loadMemberCounts,
   loadOrgRole,
   loadViewerFollow,
   loadViewerFollowedOrgIds,
+  loadViewerOrgRoles,
   loadVisibleOrgCards,
+  mapZoneListsMembers,
   normalizeFollowSource,
   parsePageLimit,
   publicFollowerCount,
+  publicMemberCount,
 } = (await import(specifier)) as typeof import("./following");
 
 type Client = Parameters<typeof loadViewerFollowedOrgIds>[0];
@@ -126,12 +132,29 @@ test("only owners and admins see followers", () => {
   assert.equal(canSeeFollowers(undefined), false);
 });
 
-test("the source lists mirror the CHECK, and clients never get join", () => {
-  assert.deepEqual([...FOLLOW_SOURCES], ["join", "profile", "discover", "onboarding"]);
+test("the source lists mirror the CHECK, and clients never get join or request", () => {
+  assert.deepEqual([...FOLLOW_SOURCES], ["join", "request", "profile", "discover", "onboarding"]);
   assert.deepEqual([...CLIENT_FOLLOW_SOURCES], ["profile", "discover", "onboarding"]);
   assert.equal(isFollowSource("join"), true);
+  assert.equal(isFollowSource("request"), true, "a request follow reads as itself, never as profile");
+  assert.equal(normalizeFollowSource("request"), "profile", "a client can't claim it");
   assert.equal(isFollowSource("map"), false);
   assert.equal(isFollowSource(null), false);
+});
+
+test("followMadeByJoining: join and request alike (leaving drops both; the leave confirm starts unchecked)", () => {
+  assert.equal(followMadeByJoining("join"), true);
+  assert.equal(followMadeByJoining("request"), true);
+  for (const source of ["profile", "discover", "onboarding", null, undefined] as const) assert.equal(followMadeByJoining(source), false);
+});
+
+test("publicMemberCount: exact for any member, null below 5 for everyone else, never a fake 0", () => {
+  for (const role of ["owner", "admin", "mod", "member"] as const) assert.equal(publicMemberCount(1, role), 1, role);
+  assert.equal(publicMemberCount(4, null), null);
+  assert.equal(publicMemberCount(FOLLOWER_COUNT_FLOOR, null), FOLLOWER_COUNT_FLOOR);
+  assert.equal(publicMemberCount(0, undefined), null);
+  assert.equal(publicMemberCount(null, "owner"), null);
+  assert.equal(publicMemberCount(Number.NaN, "member"), null);
 });
 
 test("normalizeFollowSource keeps client sources and turns everything else into profile", () => {
@@ -358,4 +381,84 @@ test("loadVisibleOrgCards skips the query with no valid ids and filters hidden c
 
   const failed = fakeClient({ data: null, error: { message: "x" } });
   assert.equal((await quietly(() => loadVisibleOrgCards(failed.client, [ORG]))).ok, false);
+});
+
+// ── Member counts and the Map's club zone (club model batch 2A) ─────────────
+
+const ORG_B = "923896fb-0000-4000-8000-000000000003";
+
+test("mapZoneListsMembers: never a hidden club; members their own; others only a public club anyone can join", () => {
+  const open = { is_public: true, join_policy: "open", hidden_at: null };
+  assert.equal(mapZoneListsMembers(open, false), true);
+  assert.equal(mapZoneListsMembers(open, true), true);
+  for (const club of [
+    { is_public: true, join_policy: "request", hidden_at: null },
+    { is_public: true, join_policy: "invite", hidden_at: null },
+    { is_public: false, join_policy: "open", hidden_at: null },
+    { is_public: "true", join_policy: "open", hidden_at: null },
+    {},
+  ]) {
+    assert.equal(mapZoneListsMembers(club, false), false, JSON.stringify(club));
+    assert.equal(mapZoneListsMembers(club, true), true, `a member sees their own club: ${JSON.stringify(club)}`);
+  }
+  const hidden = { ...open, hidden_at: TS };
+  assert.equal(mapZoneListsMembers(hidden, false), false);
+  assert.equal(mapZoneListsMembers(hidden, true), false, "hidden is off the Map for members too");
+  assert.equal(MAP_ZONE_SHOWN_COLUMN, "show_on_profile");
+});
+
+test("loadViewerOrgRoles: the viewer's own rows only, narrowed roles, and a failure is reported", async () => {
+  const empty = fakeClient({ data: [], error: null });
+  const none = await loadViewerOrgRoles(empty.client, VIEWER, ["junk"]);
+  assert.equal(none.ok && none.byOrg.size, 0);
+  assert.deepEqual(empty.calls, [], "no ids, no read");
+
+  const rows = [
+    { org_id: ORG, role: "member" },
+    { org_id: ORG_B, role: "superuser" },
+  ];
+  const some = fakeClient({ data: rows, error: null });
+  const got = await loadViewerOrgRoles(some.client, VIEWER, [ORG, ORG, ORG_B]);
+  assert.equal(got.ok, true);
+  if (got.ok) assert.deepEqual([...got.byOrg], [[ORG, "member"]], "an unknown role is no role");
+  assert.deepEqual(some.calls, [
+    ["from", "org_members"],
+    ["select", "org_id, role"],
+    ["eq", "user_id", VIEWER],
+    ["in", "org_id", [ORG, ORG_B]],
+  ]);
+
+  const all = fakeClient({ data: rows, error: null });
+  await loadViewerOrgRoles(all.client, VIEWER);
+  assert.deepEqual(all.calls, [["from", "org_members"], ["select", "org_id, role"], ["eq", "user_id", VIEWER]]);
+
+  const failed = fakeClient({ data: null, error: { message: "x" } });
+  assert.equal((await quietly(() => loadViewerOrgRoles(failed.client, VIEWER, [ORG]))).ok, false);
+});
+
+test("loadMemberCounts: one embed read, raw counts by club, a broken embed is no count (never 0)", async () => {
+  const empty = fakeClient({ data: [], error: null });
+  const none = await loadMemberCounts(empty.client, []);
+  assert.equal(none.ok && none.byOrg.size, 0);
+  assert.deepEqual(empty.calls, []);
+
+  const rows = [
+    { id: ORG, members: [{ count: 3 }] },
+    { id: ORG_B, members: null },
+  ];
+  const { client, calls } = fakeClient({ data: rows, error: null });
+  const got = await loadMemberCounts(client, [ORG, ORG_B, "junk"]);
+  assert.equal(got.ok, true);
+  if (got.ok) {
+    assert.equal(got.byOrg.get(ORG), 3, "raw: the floor is the caller's");
+    assert.equal(got.byOrg.has(ORG_B), false);
+  }
+  assert.deepEqual(calls, [
+    ["from", "orgs"],
+    ["select", "id, members:org_members(count)"],
+    ["in", "id", [ORG, ORG_B]],
+  ]);
+
+  const failed = fakeClient({ data: null, error: { message: "x" } });
+  assert.equal((await quietly(() => loadMemberCounts(failed.client, [ORG]))).ok, false);
 });

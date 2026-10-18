@@ -4,8 +4,10 @@ import { isMissingColumnError } from "@/lib/db/missing-column";
 import { mapCampusClosed, resolveCampusRequest, scopeViewerFromRow } from "@/lib/iu/campus-request";
 import { scopeCampusIds } from "@/lib/iu/campus-scope";
 import { campusScopeError } from "@/lib/iu/community-scope";
+import { loadOrgRole, MAP_ZONE_SHOWN_COLUMN, mapZoneListsMembers } from "@/lib/orgs/following";
 import { loadHiddenUsers } from "@/lib/safety/hidden-users";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createSupabaseServiceClient } from "@/lib/supabase/service";
 
 const MAX_BUCKET = 60;
 /** `second_degree_follows` refuses more ids than this in `p_among` (SQLSTATE 22023). */
@@ -50,12 +52,76 @@ type UserRow = {
  * than rostering strangers. Campus-less orgs (every live org until M1b)
  * likewise belong to no map.
  *
+ * WHO THE ORG ZONE LISTS (club model batch 2A, `orgZoneMemberIds`): only the
+ * members who show the club on their profile (`show_on_profile`, on by
+ * default), for every viewer, members included. A hidden club answers what a
+ * missing handle answers. A member sees their own club's zone; anyone else
+ * only a public club anyone can join (`mapZoneListsMembers`), the reach the
+ * database gave before 20261017120000 made member lists members-only. The
+ * members are read with the SERVICE client, so the zone keeps working after
+ * that migration; the club itself is still looked up on the viewer's client,
+ * so `orgs_select` decides which clubs they may know about.
+ *
  * A viewer with no campus keeps today's answer: empty buckets.
  *
  * BLOCKS. Anyone in a block pair with the viewer (either direction) is left
  * out of every bucket, the way /api/me/suggested-connections leaves them out.
  * An unreadable block list is a 500, never "nobody is blocked".
  */
+
+/** The org zone's people, or why there are none to give. */
+type ZoneMembers = { kind: "ids"; ids: string[] } | { kind: "not_found" } | { kind: "failed" };
+
+/**
+ * The ids the org zone may list (see the docblock below). Never the viewer;
+ * never a member who hid the club; a database without the column lists
+ * nobody rather than everyone.
+ */
+async function orgZoneMemberIds(
+  supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>,
+  handle: string,
+  campusIds: readonly string[],
+  viewerId: string,
+): Promise<ZoneMembers> {
+  const { data: org, error } = await supabase
+    .from("orgs")
+    .select("id,campus_id,is_public,join_policy,hidden_at")
+    .eq("handle", handle)
+    .maybeSingle();
+  if (error) {
+    console.error("[campus-map/zone org]", error);
+    return { kind: "failed" };
+  }
+  const club = org as { id: string; campus_id?: unknown; is_public?: unknown; join_policy?: unknown; hidden_at?: unknown } | null;
+  // Hidden is off the Map for everyone: the same 404 as a missing handle.
+  if (!club || club.hidden_at != null) return { kind: "not_found" };
+  // An org on another campus (or none at all) is not a zone of this map.
+  if (typeof club.campus_id !== "string" || !campusIds.includes(club.campus_id)) return { kind: "ids", ids: [] };
+  const service = createSupabaseServiceClient();
+  // Only a club outside the open reach needs the viewer's role.
+  if (!mapZoneListsMembers(club, false)) {
+    const role = await loadOrgRole(service, club.id, viewerId);
+    if (!role.ok) return { kind: "failed" };
+    if (!mapZoneListsMembers(club, role.role !== null)) return { kind: "ids", ids: [] };
+  }
+  const { data: members, error: membersErr } = await service
+    .from("org_members")
+    .select("user_id")
+    .eq("org_id", club.id)
+    .eq(MAP_ZONE_SHOWN_COLUMN, true);
+  if (membersErr) {
+    if (isMissingColumnError(membersErr, [MAP_ZONE_SHOWN_COLUMN])) {
+      console.error("[campus-map/zone] show_on_profile missing; migration 20261017100000 not applied");
+      return { kind: "ids", ids: [] };
+    }
+    console.error("[campus-map/zone members]", membersErr);
+    return { kind: "failed" };
+  }
+  const ids = (members ?? [])
+    .map((r) => (r as { user_id?: unknown }).user_id)
+    .filter((id): id is string => typeof id === "string" && id !== viewerId);
+  return { kind: "ids", ids };
+}
 
 /** Nobody to show. Same shape the client already handles for an empty zone. */
 function emptyBuckets() {
@@ -131,26 +197,14 @@ export async function GET(req: Request) {
     }
     candidateIds = (data ?? []).map((r) => (r as { id: string }).id);
   } else {
-    const { data: org } = await supabase
-      .from("orgs")
-      .select("id,campus_id")
-      .eq("handle", orgHandle)
-      .maybeSingle();
-    if (!org) {
+    const zone = await orgZoneMemberIds(supabase, orgHandle, campusIds, user.id);
+    if (zone.kind === "not_found") {
       return NextResponse.json({ ok: false, error: "Org not found" }, { status: 404 });
     }
-    // An org on another campus (or none at all) is not a zone of this map.
-    const orgCampus = (org as { campus_id?: unknown }).campus_id;
-    if (typeof orgCampus !== "string" || !campusIds.includes(orgCampus)) {
-      return emptyBuckets();
+    if (zone.kind === "failed") {
+      return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
     }
-    const { data: members } = await supabase
-      .from("org_members")
-      .select("user_id")
-      .eq("org_id", org.id);
-    candidateIds = (members ?? [])
-      .map((r) => (r as { user_id: string }).user_id)
-      .filter((id) => id !== user.id);
+    candidateIds = zone.ids;
   }
 
   if (candidateIds.length === 0) {

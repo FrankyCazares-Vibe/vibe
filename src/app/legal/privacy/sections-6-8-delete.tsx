@@ -95,7 +95,10 @@ export function NotDeletedYet() {
           A direct or group chat itself. &ldquo;Clear chat history&rdquo; and
           &ldquo;Delete conversation&rdquo; only clear your view.
         </li>
-        <li>A request to join a club. You cannot take it back.</li>
+        <li>
+          A request to join a club. You cannot take it back. Asking also follows
+          the club. If the club says no, you keep following until you unfollow.
+        </li>
         <li>
           The date you first followed a club. It stays after you unfollow,
           until the club or your account is deleted. While you are not

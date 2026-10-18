@@ -34,6 +34,19 @@ import { VisitingBanner } from "@/components/campus/VisitingBanner";
 import { asLoadFailure, LoadFailed, type LoadFailure } from "@/components/feedback/LoadFailed";
 import { ImageCropperModal } from "@/components/ImageCropperModal";
 import { emitCalendarChanged } from "@/components/LeftNav";
+import {
+  BOARD_FOLLOWERS_HIDDEN_LINE,
+  BOARD_FOLLOWERS_LABEL,
+  BOARD_SETTING_LOAD_LINE,
+  BOARD_SETTING_SAVE_LINE,
+  boardFollowersHelp,
+  boardSettingBody,
+  boardSettingOf,
+  boardSettingSavedLine,
+  clubUrl,
+  savedBoardSetting,
+} from "@/components/desktop/messages/rooms-dialog-rules";
+import { useClubMute, type ClubMuteFn } from "@/components/mobile/PostViewerMobile";
 import { SharePostSheet } from "@/components/mobile/SharePostSheet";
 import { UserCard, type UserCardProps } from "@/components/network/UserCard";
 import { OrgInviteSheet } from "@/components/orgs/OrgInviteSheet";
@@ -93,6 +106,7 @@ import {
   followerCountText,
   followsSinceText,
   inviteSubText,
+  keepFollowingDefault,
   memberCountText,
   MOD_READONLY,
   OFFICER_FOLLOW_HELP,
@@ -116,6 +130,9 @@ import {
   editedPostFrom,
   POST_MAX_CHARS,
 } from "@/lib/posts/edit";
+import { feedClubOf, muteClubRowLabel, type FeedClub, withoutClubPosts } from "@/lib/posts/feed-actions";
+import { CLUB_TITLE_MAX, clubFlairLabel, normalizeClubTitle } from "@/lib/profile/club-flair";
+import { getSupabaseBrowserClient } from "@/lib/supabase/browser";
 import { useIsMobile } from "@/lib/use-is-mobile";
 import { campusStatsLine, type CampusStats } from "@/lib/usage/active-now";
 import { countOpen, touchActivity } from "@/lib/usage/touch-client";
@@ -1392,7 +1409,7 @@ function CreateOrgModal({
           {OFFICER_FOLLOW_HELP}
         </div>
 
-        <Field label="Backdrop" hint="Admins can change later.">
+        <Field label="Backdrop" hint="Officers can change it later.">
           <div style={{ display: "flex", gap: 6 }}>
             {(Object.keys(BACKDROP_PRESETS) as BackdropKey[]).map((key) => {
               const preset = BACKDROP_PRESETS[key];
@@ -1591,7 +1608,7 @@ function CreateChannelModal({
           <div style={{ display: "flex", gap: 8 }}>
             {[
               { v: false, label: "Public", sub: "All members can view" },
-              { v: true, label: "Private", sub: "Owner / admin only" },
+              { v: true, label: "Private", sub: "Officers only" },
             ].map((opt) => {
               const on = isPrivate === opt.v;
               return (
@@ -1769,11 +1786,15 @@ function OrgSettingsModal({
             <SettingsMembers org={org} canManage={canManage} isOwner={isOwner} />
           ) : null}
           {tab === "followers" ? (
-            <SettingsFollowers
-              org={org}
-              canInvite={canInvite}
-              onInvite={() => setTab("invites")}
-            />
+            <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+              {/* Club model (Oct 16): the Board switch, above the list. */}
+              <BoardFollowersSetting org={org} />
+              <SettingsFollowers
+                org={org}
+                canInvite={canInvite}
+                onInvite={() => setTab("invites")}
+              />
+            </div>
           ) : null}
           {/* Mounted per visit, so its followers list refetches after a Remove.
               `inline` is the sheet's dark-glass variant: no panel around it. */}
@@ -2311,6 +2332,10 @@ type MemberRow = {
   user_id: string;
   role: string;
   joined_at: string;
+  /** The title an owner or admin gave them ("President"); null for none, or
+   *  on a server without the column. Members see it whatever the member
+   *  chose for their own profile. */
+  title?: string | null;
   name: string | null;
   handle: string | null;
   avatar_url: string | null;
@@ -2333,6 +2358,26 @@ function SettingsMembers({
   const [busyId, setBusyId] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
   const loadedRef = useRef(false);
+  // Whose title is being edited (club model, Oct 16): one row at a time.
+  const [titleFor, setTitleFor] = useState<string | null>(null);
+  // Who is looking, for an admin's own row: an admin titles mods, members and
+  // themselves (the PATCH route's rule, which decides). Read from the session
+  // already in this browser, no request; null leaves an admin's own row
+  // without the button, never another admin's with it.
+  const [selfId, setSelfId] = useState<string | null>(null);
+  useEffect(() => {
+    if (!canManage || isOwner) return;
+    let cancelled = false;
+    void getSupabaseBrowserClient()
+      .auth.getSession()
+      .then(({ data }) => {
+        if (!cancelled) setSelfId(data.session?.user.id ?? null);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [canManage, isOwner]);
 
   useEffect(() => {
     let cancelled = false;
@@ -2425,115 +2470,341 @@ function SettingsMembers({
           (m.role !== "admin" || isOwner);
         const roleOptions: string[] =
           isOwner ? ["admin", "mod", "member"] : ["mod", "member"];
+        const canTitle = mayTitleMember({ canManage, isOwner, selfId }, m);
+        const title = m.title?.trim() || null;
         return (
           <div
             key={m.user_id}
             style={{
               display: "flex",
-              alignItems: "center",
-              gap: 10,
+              flexDirection: "column",
+              gap: 8,
               padding: "8px 10px",
               borderRadius: 10,
               background: "rgba(255,255,255,0.04)",
               border: "1px solid rgba(255,255,255,0.08)",
             }}
           >
-            <div
-              style={{
-                width: 32,
-                height: 32,
-                borderRadius: 999,
-                background: m.avatar_url
-                  ? `url(${m.avatar_url}) center/cover`
-                  : "rgba(255,255,255,0.1)",
-                color: "#fff",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                fontFamily: "Fraunces, serif",
-                fontWeight: 700,
-                fontSize: 12,
-                flexShrink: 0,
-              }}
-            >
-              {!m.avatar_url ? initialsForOrg(m.name || m.handle || "?") : null}
-            </div>
-            <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
               <div
                 style={{
-                  fontFamily: "DM Sans, sans-serif",
-                  fontSize: 14,
-                  fontWeight: 600,
+                  width: 32,
+                  height: 32,
+                  borderRadius: 999,
+                  background: m.avatar_url
+                    ? `url(${m.avatar_url}) center/cover`
+                    : "rgba(255,255,255,0.1)",
                   color: "#fff",
-                  whiteSpace: "nowrap",
-                  overflow: "hidden",
-                  textOverflow: "ellipsis",
-                }}
-              >
-                {m.name || m.handle || "Unknown"}
-                {m.school_verified ? (
-                  <span style={{ marginLeft: 6, fontSize: 11, color: "#9DD89D" }}>·verified</span>
-                ) : null}
-              </div>
-              <div
-                style={{
-                  fontFamily: "DM Sans, sans-serif",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontFamily: "Fraunces, serif",
+                  fontWeight: 700,
                   fontSize: 12,
-                  color: COLORS.glassMuted,
+                  flexShrink: 0,
                 }}
               >
-                @{m.handle ?? m.user_id.slice(0, 6)}
+                {!m.avatar_url ? initialsForOrg(m.name || m.handle || "?") : null}
               </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div
+                  style={{
+                    fontFamily: "DM Sans, sans-serif",
+                    fontSize: 14,
+                    fontWeight: 600,
+                    color: "#fff",
+                    whiteSpace: "nowrap",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                  }}
+                >
+                  {m.name || m.handle || "Unknown"}
+                  {m.school_verified ? (
+                    <span style={{ marginLeft: 6, fontSize: 11, color: "#9DD89D" }}>·verified</span>
+                  ) : null}
+                </div>
+                <div
+                  style={{
+                    fontFamily: "DM Sans, sans-serif",
+                    fontSize: 12,
+                    color: COLORS.glassMuted,
+                  }}
+                >
+                  @{m.handle ?? m.user_id.slice(0, 6)}
+                  {title ? <span style={{ color: "#fff" }}>{` · ${title}`}</span> : null}
+                </div>
+              </div>
+              {canTouchThisRow ? (
+                <select
+                  value={m.role}
+                  disabled={busyId === m.user_id}
+                  onChange={(e) => updateRole(m, e.target.value)}
+                  style={{
+                    ...inputStyle,
+                    width: "auto",
+                    padding: "6px 8px",
+                    fontSize: 13,
+                  }}
+                >
+                  {/* Always include the current role even if not in the editable
+                      set so the select shows something coherent. */}
+                  {!roleOptions.includes(m.role) ? (
+                    <option value={m.role}>{roleLabel(m.role)}</option>
+                  ) : null}
+                  {roleOptions.map((r) => (
+                    <option key={r} value={r}>
+                      {roleLabel(r)}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <RoleChip role={m.role as Role} />
+              )}
+              {canTitle ? (
+                <button
+                  type="button"
+                  aria-expanded={titleFor === m.user_id}
+                  onClick={() => setTitleFor((cur) => (cur === m.user_id ? null : m.user_id))}
+                  style={{ ...modalCancelStyle, padding: "6px 10px", fontSize: 12 }}
+                >
+                  {title ? "Edit title" : "Add title"}
+                </button>
+              ) : null}
+              {canTouchThisRow ? (
+                <button
+                  type="button"
+                  disabled={busyId === m.user_id}
+                  onClick={() => kick(m)}
+                  style={{
+                    padding: "6px 10px",
+                    borderRadius: 8,
+                    border: "1px solid rgba(232,77,77,0.45)",
+                    background: "rgba(232,77,77,0.18)",
+                    color: "#FFD0CC",
+                    fontFamily: "DM Sans, sans-serif",
+                    fontSize: 12,
+                    fontWeight: 600,
+                    cursor: "pointer",
+                  }}
+                >
+                  Kick
+                </button>
+              ) : null}
             </div>
-            {canTouchThisRow ? (
-              <select
-                value={m.role}
-                disabled={busyId === m.user_id}
-                onChange={(e) => updateRole(m, e.target.value)}
-                style={{
-                  ...inputStyle,
-                  width: "auto",
-                  padding: "6px 8px",
-                  fontSize: 13,
+            {canTitle && titleFor === m.user_id ? (
+              <MemberTitleEditor
+                orgHandle={org.handle}
+                orgName={org.name}
+                member={m}
+                onDone={(saved) => {
+                  setTitleFor(null);
+                  if (saved === undefined) return;
+                  setMembers((prev) =>
+                    prev ? prev.map((x) => (x.user_id === m.user_id ? { ...x, title: saved } : x)) : prev,
+                  );
                 }}
-              >
-                {/* Always include the current role even if not in the editable
-                    set so the select shows something coherent. */}
-                {!roleOptions.includes(m.role) ? (
-                  <option value={m.role}>{m.role}</option>
-                ) : null}
-                {roleOptions.map((r) => (
-                  <option key={r} value={r}>
-                    {r}
-                  </option>
-                ))}
-              </select>
-            ) : (
-              <RoleChip role={m.role as Role} />
-            )}
-            {canTouchThisRow ? (
-              <button
-                type="button"
-                disabled={busyId === m.user_id}
-                onClick={() => kick(m)}
-                style={{
-                  padding: "6px 10px",
-                  borderRadius: 8,
-                  border: "1px solid rgba(232,77,77,0.45)",
-                  background: "rgba(232,77,77,0.18)",
-                  color: "#FFD0CC",
-                  fontFamily: "DM Sans, sans-serif",
-                  fontSize: 12,
-                  fontWeight: 600,
-                  cursor: "pointer",
-                }}
-              >
-                Kick
-              </button>
+              />
             ) : null}
           </div>
         );
       })}
+    </div>
+  );
+}
+
+/** A role as Settings says it: Owner, Officer (an admin), Mod, Member. */
+function roleLabel(role: string): string {
+  return role in ROLE_META ? ROLE_META[role as Role].label : role;
+}
+
+/**
+ * May this viewer give `m` a title? The PATCH route's rule (`members/[userId]`,
+ * which decides): the owner titles anyone, themselves included; an admin
+ * titles mods, members and themselves. `selfId` null: an admin's own row
+ * goes without the button rather than another admin's getting one.
+ */
+function mayTitleMember(
+  viewer: { canManage: boolean; isOwner: boolean; selfId: string | null },
+  m: Pick<MemberRow, "user_id" | "role">,
+): boolean {
+  if (!viewer.canManage) return false;
+  if (viewer.isOwner) return true;
+  if (m.role === "mod" || m.role === "member") return true;
+  return viewer.selfId !== null && m.user_id === viewer.selfId;
+}
+
+/**
+ * Give a member a title, change it or remove it (club model, Franky, Oct 16),
+ * under their row in Settings → Members. The shape is checked here with the
+ * route's own rules (`normalizeClubTitle`: one line, 32 characters, no Vibe,
+ * Admin, Moderator, Verified or Official); the route also runs the word
+ * filter and stamps who set it. The club's members see the title in its
+ * member list; it shows on the member's profile as "President · SAE" unless
+ * they hide the club or the title. `onDone(saved)`: the stored title (null once
+ * removed) after a save, undefined on Cancel.
+ */
+function MemberTitleEditor({
+  orgHandle,
+  orgName,
+  member,
+  onDone,
+}: {
+  orgHandle: string;
+  orgName: string;
+  member: MemberRow;
+  onDone: (saved: string | null | undefined) => void;
+}) {
+  const current = member.title?.trim() || null;
+  const [draft, setDraft] = useState(current ?? "");
+  const [busy, setBusy] = useState(false);
+  // A refusal from the route, in its words.
+  const [line, setLine] = useState<string | null>(null);
+  const checked = normalizeClubTitle(draft);
+  const next = checked.ok ? checked.title : null;
+  const canSave = checked.ok && next !== null && next !== current && !busy;
+  const who = member.name || (member.handle ? `@${member.handle}` : "This member");
+
+  const save = async (value: string | null) => {
+    if (busy) return;
+    setBusy(true);
+    setLine(null);
+    const r = await vibeRequest<{ title?: unknown }>(
+      `/api/orgs/${encodeURIComponent(orgHandle)}/members/${encodeURIComponent(member.user_id)}`,
+      { method: "PATCH", json: { title: value }, quiet: true, failure: "Couldn't save the title." },
+    );
+    setBusy(false);
+    if (!r.ok) {
+      setLine(r.status === 429 ? "Too many tries. Try again in a minute." : r.message);
+      if (r.action) toast({ message: r.message, tone: "error", action: r.action });
+      return;
+    }
+    const saved = typeof r.data.title === "string" && r.data.title.trim() ? r.data.title.trim() : null;
+    toast({ message: saved ? `${who}'s title is now ${saved}.` : `${who}'s title was removed.`, tone: "info" });
+    onDone(saved);
+  };
+
+  const hint =
+    draft.trim() && !checked.ok
+      ? checked.error
+      : next
+        ? `On their profile: ${clubFlairLabel(orgName, next)}, unless they hide it.`
+        : "Like President or Rush Chair. It shows on their profile unless they hide it.";
+
+  return (
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (canSave) void save(next);
+      }}
+      style={{ display: "flex", flexDirection: "column", gap: 6, paddingLeft: 42 }}
+    >
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
+        <input
+          type="text"
+          value={draft}
+          autoFocus
+          // Room past the limit, so a long title gets the "Keep a title to
+          // 32 characters" line instead of being cut off mid-word.
+          maxLength={CLUB_TITLE_MAX * 2}
+          aria-label={`Title for ${who}`}
+          placeholder="Title"
+          onChange={(e) => setDraft(e.target.value)}
+          style={{ ...inputStyle, flex: "1 1 180px", width: "auto", padding: "6px 10px", fontSize: 13 }}
+        />
+        <button type="submit" disabled={!canSave} style={modalSubmitStyle(canSave)}>
+          {busy ? "Saving…" : "Save"}
+        </button>
+        {current ? (
+          <button type="button" disabled={busy} onClick={() => void save(null)} style={modalCancelStyle}>
+            Remove title
+          </button>
+        ) : null}
+        <button type="button" disabled={busy} onClick={() => onDone(undefined)} style={modalCancelStyle}>
+          Cancel
+        </button>
+      </div>
+      <div style={{ fontSize: 11, color: COLORS.glassMuted }}>{hint}</div>
+      {line ? <div style={modalErrorStyle}>{line}</div> : null}
+    </form>
+  );
+}
+
+/**
+ * Settings → Followers, above the list (club model, Franky, Oct 16): may the
+ * club's followers read its Board? The same setting as the switch under the
+ * Board in Messages' Rooms dialog (`rooms-dialog-rules.ts` holds both), read
+ * from the club and saved at once; a refusal toasts why and leaves the choice
+ * as it was. Owners and admins only: the tab is theirs, and the PATCH refuses
+ * everyone else. Nothing shows while the setting is unknown (loading, or a
+ * server without it); a failed read says so, with Retry.
+ */
+function BoardFollowersSetting({ org }: { org: Org }) {
+  const [on, setOn] = useState<boolean | null>(null);
+  const [failure, setFailure] = useState<LoadFailure | null>(null);
+  // Retry on a failed read bumps this.
+  const [seq, setSeq] = useState(0);
+  const savingRef = useRef(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    void vibeRequest<unknown>(clubUrl(org.handle), {
+      cache: "no-store",
+      quiet: true,
+      failure: BOARD_SETTING_LOAD_LINE,
+    }).then((r) => {
+      if (cancelled) return;
+      setOn(r.ok ? boardSettingOf(r.data) : null);
+      setFailure(r.ok ? null : asLoadFailure(r, BOARD_SETTING_LOAD_LINE));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [org.handle, seq]);
+
+  const pick = async (next: boolean) => {
+    if (on === null || next === on || savingRef.current) return;
+    savingRef.current = true;
+    const r = await vibeRequest<unknown>(clubUrl(org.handle), {
+      method: "PATCH",
+      json: boardSettingBody(next),
+      failure: BOARD_SETTING_SAVE_LINE,
+    });
+    savingRef.current = false;
+    if (!r.ok) return;
+    const saved = savedBoardSetting(r.data, next);
+    setOn(saved);
+    toast({ message: boardSettingSavedLine(saved), tone: "info" });
+  };
+
+  if (failure) {
+    return (
+      <LoadFailed
+        tone="dark"
+        compact
+        failure={failure}
+        onRetry={() => {
+          setFailure(null);
+          setSeq((n) => n + 1);
+        }}
+      />
+    );
+  }
+  if (on === null) return null;
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+      <ChoiceField
+        label={BOARD_FOLLOWERS_LABEL}
+        hint={boardFollowersHelp(on)}
+        options={[
+          { value: "on", label: "On", sub: "Followers read officers' posts" },
+          { value: "off", label: "Off", sub: "Members only" },
+        ]}
+        value={on ? "on" : "off"}
+        onChange={(v) => void pick(v === "on")}
+      />
+      {org.hidden ? (
+        <div style={{ fontSize: 11, color: COLORS.glassMuted }}>{BOARD_FOLLOWERS_HIDDEN_LINE}</div>
+      ) : null}
     </div>
   );
 }
@@ -2648,14 +2919,15 @@ function SettingsFollowers({
     toast({ message: failure.message, tone: "error", action: failure.action });
   };
 
-  // A mute, not a ban: they stop getting the club's posts and can follow
-  // again. Nothing leaves the list until the server says so, and nothing is
-  // refetched after.
+  // Not a ban: they stop getting the club's posts and can follow again. It
+  // also keeps them off the Board until they join (club model: the server
+  // writes a bar), and nobody tells them. Nothing leaves the list until the
+  // server says so, and nothing is refetched after.
   const remove = async (row: FollowerRow) => {
     const who = row.name || "@" + row.handle;
     if (
       !window.confirm(
-        `Remove ${who} from ${org.name}'s followers? They'll stop getting its posts. They can follow again.`,
+        `Remove ${who} from ${org.name}'s followers? They'll stop getting its posts and can't read its Board unless they join. They can follow again, and they aren't told.`,
       )
     ) {
       return;
@@ -2741,7 +3013,7 @@ function SettingsFollowers({
           ) : null}
         </div>
         <div style={{ fontSize: 12, color: COLORS.glassMuted, marginTop: 4 }}>
-          Only owners and admins can see this list.
+          Only officers can see this list.
         </div>
         {someUnlisted ? (
           <div style={{ fontSize: 12, color: COLORS.glassMuted, marginTop: 2 }}>
@@ -3122,26 +3394,8 @@ function SettingsDanger({
 }) {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
-
-  const leave = async () => {
-    if (!confirm(`Leave ${org.name}? You'll lose access to its chats. Its posts stop too, unless you followed it before joining.`)) return;
-    setBusy(true);
-    setErr(null);
-    try {
-      const res = await fetch(`/api/orgs/${org.handle}/join`, { method: "DELETE" });
-      const data = await res.json();
-      if (!data?.ok) {
-        setErr(data?.error || "Failed to leave");
-        return;
-      }
-      onOrgRemoved(org.id);
-    } catch (e) {
-      console.error("[campus] leave org", e);
-      setErr("Network error");
-    } finally {
-      setBusy(false);
-    }
-  };
+  // "Leave <club>?" asked in place, with "Keep following" (club model, Oct 16).
+  const [leaving, setLeaving] = useState(false);
 
   const destroy = async () => {
     const confirmed = prompt(
@@ -3173,12 +3427,18 @@ function SettingsDanger({
     <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
       {err ? <div style={modalErrorStyle}>{err}</div> : null}
 
-      {!isOwner ? (
+      {!isOwner && leaving ? (
+        <LeaveClubConfirm
+          org={org}
+          onCancel={() => setLeaving(false)}
+          onLeft={() => onOrgRemoved(org.id)}
+        />
+      ) : !isOwner ? (
         <DangerCard
-          title="Leave this org"
-          desc="You'll lose access to its chats and chat history. Its posts stop too, unless you followed it before joining."
-          actionLabel={busy ? "Leaving…" : "Leave org"}
-          onClick={leave}
+          title={ORG_COPY.menu.leaveIntroTitle}
+          desc={ORG_COPY.menu.leaveIntro}
+          actionLabel={ORG_COPY.menu.leave}
+          onClick={() => setLeaving(true)}
           disabled={busy}
         />
       ) : (
@@ -3210,12 +3470,18 @@ function DangerCard({
   actionLabel,
   onClick,
   disabled,
+  children,
+  onCancel,
 }: {
   title: string;
   desc: string;
   actionLabel: string;
   onClick: () => void;
   disabled?: boolean;
+  /** Between the words and the button (the leave confirm's Keep following). */
+  children?: React.ReactNode;
+  /** A Cancel beside the button, for a question asked in place. */
+  onCancel?: () => void;
 }) {
   return (
     <div
@@ -3241,26 +3507,144 @@ function DangerCard({
       >
         {desc}
       </p>
-      <button
-        type="button"
-        onClick={onClick}
-        disabled={disabled}
-        style={{
-          padding: "8px 14px",
-          borderRadius: 10,
-          border: "1px solid rgba(232,77,77,0.45)",
-          background: "rgba(232,77,77,0.22)",
-          color: "#FFD0CC",
-          fontFamily: "DM Sans, sans-serif",
-          fontWeight: 700,
-          fontSize: 13,
-          cursor: disabled ? "default" : "pointer",
-          opacity: disabled ? 0.55 : 1,
-        }}
-      >
-        {actionLabel}
-      </button>
+      {children}
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+        <button
+          type="button"
+          onClick={onClick}
+          disabled={disabled}
+          style={{
+            padding: "8px 14px",
+            borderRadius: 10,
+            border: "1px solid rgba(232,77,77,0.45)",
+            background: "rgba(232,77,77,0.22)",
+            color: "#FFD0CC",
+            fontFamily: "DM Sans, sans-serif",
+            fontWeight: 700,
+            fontSize: 13,
+            cursor: disabled ? "default" : "pointer",
+            opacity: disabled ? 0.55 : 1,
+          }}
+        >
+          {actionLabel}
+        </button>
+        {onCancel ? (
+          <button type="button" onClick={onCancel} disabled={disabled} style={modalCancelStyle}>
+            Cancel
+          </button>
+        ) : null}
+      </div>
     </div>
+  );
+}
+
+/**
+ * "Leave SAE?" in Settings → Danger (club model, Franky, Oct 16): the desktop
+ * twin of the club page's ⋯ → Leave club, in its words. DELETE `/join` with
+ * `{keep_following}`: ticked, the follow stays (its posts stay in the feed,
+ * and the Board stays readable while the club allows it); unticked, any
+ * follow left goes too. Every word is `ORG_COPY.menu`'s, the club page's ⋯
+ * (wave-2 repair, finding 18). The box starts as `keepFollowingDefault` says
+ * (join-copy.ts, the club page's own rule), from
+ * the club's answer (`org_follow_source`), unticked until that read lands or
+ * if it fails, and the student's own tick always wins. A hidden club asks
+ * nothing about following (nobody new may follow one) and sends no body,
+ * today's leave. A refusal toasts why (the owner can't leave) and the
+ * question stays.
+ */
+function LeaveClubConfirm({
+  org,
+  onCancel,
+  onLeft,
+}: {
+  org: Org;
+  onCancel: () => void;
+  onLeft: () => void;
+}) {
+  const [keep, setKeep] = useState(false);
+  const [boardOn, setBoardOn] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const touchedRef = useRef(false);
+
+  useEffect(() => {
+    if (org.hidden) return;
+    let cancelled = false;
+    void vibeRequest<{ org?: { org_follow_source?: unknown } }>(clubUrl(org.handle), {
+      cache: "no-store",
+      quiet: true,
+      failure: "Couldn't load this club.",
+    }).then((r) => {
+      if (cancelled || !r.ok) return;
+      const source = r.data.org?.org_follow_source;
+      if (!touchedRef.current) setKeep(keepFollowingDefault(typeof source === "string" ? source : null));
+      setBoardOn(boardSettingOf(r.data) === true);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [org.handle, org.hidden]);
+
+  const leave = async () => {
+    if (busy) return;
+    setBusy(true);
+    const r = await vibeRequest<{ org_follow_state?: unknown }>(
+      `/api/orgs/${encodeURIComponent(org.handle)}/join`,
+      {
+        method: "DELETE",
+        ...(org.hidden ? {} : { json: { keep_following: keep } }),
+        failure: fillCopy(ORG_COPY.menu.leaveFailed, { org: org.name }),
+      },
+    );
+    setBusy(false);
+    if (!r.ok) return;
+    toast({
+      message: fillCopy(r.data.org_follow_state === "following" ? ORG_COPY.menu.leftFollowing : ORG_COPY.menu.left, { org: org.name }),
+      tone: "info",
+    });
+    onLeft();
+  };
+
+  return (
+    <DangerCard
+      title={fillCopy(ORG_COPY.menu.leaveTitle, { org: org.name })}
+      desc={ORG_COPY.menu.leaveBody}
+      actionLabel={busy ? ORG_COPY.menu.leaving : ORG_COPY.menu.leaveConfirm}
+      onClick={() => void leave()}
+      disabled={busy}
+      onCancel={onCancel}
+    >
+      {org.hidden ? null : (
+        <label
+          style={{
+            display: "flex",
+            alignItems: "flex-start",
+            gap: 8,
+            margin: "0 0 12px",
+            fontFamily: "DM Sans, sans-serif",
+            fontSize: 13,
+            lineHeight: 1.45,
+            cursor: busy ? "default" : "pointer",
+          }}
+        >
+          <input
+            type="checkbox"
+            checked={keep}
+            disabled={busy}
+            onChange={(e) => {
+              touchedRef.current = true;
+              setKeep(e.target.checked);
+            }}
+            style={{ marginTop: 3, accentColor: COLORS.accent }}
+          />
+          <span>
+            <span style={{ fontWeight: 700 }}>{fillCopy(ORG_COPY.menu.keepFollowing, { org: org.name })}</span>
+            <span style={{ display: "block", fontSize: 12, color: COLORS.glassMuted }}>
+              {boardOn ? ORG_COPY.menu.keepFollowingSubBoard : ORG_COPY.menu.keepFollowingSub}
+            </span>
+          </span>
+        </label>
+      )}
+    </DangerCard>
   );
 }
 
@@ -3553,7 +3937,7 @@ function ChannelOverview({
         <div style={{ display: "flex", gap: 8 }}>
           {[
             { v: false, label: "Public", sub: "All members can view" },
-            { v: true, label: "Private", sub: "Owner / admin + invited members" },
+            { v: true, label: "Private", sub: "Officers + invited members" },
           ].map((opt) => (
             <button
               key={opt.label}
@@ -5467,7 +5851,8 @@ type SearchOrg = {
   // No longer read: the row's meta comes from `join_policy` and `audience`.
   is_public: boolean;
   verified: boolean;
-  member_count: number;
+  /** Null when hidden (below 5 for someone outside the club) or unread. */
+  member_count: number | null;
   join_policy?: JoinPolicy;
   audience?: OrgAudience;
 };
@@ -6634,6 +7019,31 @@ function FeedTabBody({
       toast({ message: "Couldn't refresh the feed. Try again.", tone: "error" });
     }
   }, [feedUrl, reportedPostIdsRef]);
+  // The Undo's refresh, current whichever feed URL is on screen by then.
+  const refreshRef = useRef(refresh);
+  useEffect(() => {
+    refreshRef.current = refresh;
+  }, [refresh]);
+
+  // "Mute <club>'s posts" from a row's ⋯ (club model, Oct 16): one mute for
+  // the whole feed. Its rows leave at once, reposts of its posts too (the
+  // viewer's own stay), so the toast never says "gone" over a row still
+  // there; an Undo refreshes, so they come back (wave-2 repair, finding 1).
+  const onClubMuteChange = useCallback(
+    (club: FeedClub, muted: boolean) => {
+      if (!muted) {
+        void refreshRef.current();
+        return;
+      }
+      setEntries((prev) => {
+        if (!prev) return prev;
+        const kept = new Set(withoutClubPosts(prev.map((e) => e.post), club, viewerId));
+        return prev.filter((e) => kept.has(e.post));
+      });
+    },
+    [viewerId],
+  );
+  const clubMute = useClubMute(onClubMuteChange);
 
   useEffect(() => {
     let cancelled = false;
@@ -6842,6 +7252,7 @@ function FeedTabBody({
               onEdited={applyPostEdit}
               onDeleted={dropDeletedPost}
               onPickTag={onPickTag}
+              onMuteClub={clubMute.mute}
               viewerId={viewerId}
             />
           ))}
@@ -7442,6 +7853,7 @@ function FeedRow({
   onEdited,
   onDeleted,
   onPickTag,
+  onMuteClub,
   viewerId,
 }: {
   entry: FeedEntry;
@@ -7451,6 +7863,8 @@ function FeedRow({
   /** An officer deleted this club post: the feed drops every row showing it. */
   onDeleted: (postId: string) => void;
   onPickTag: (tag: string) => void;
+  /** "Mute <club>'s posts" from the ⋯: the feed's one mute and Undo toast. */
+  onMuteClub: ClubMuteFn;
   viewerId: string | null;
 }) {
   const post = entry.post;
@@ -7459,6 +7873,16 @@ function FeedRow({
   // back to the user too, so we treat author === viewer as ownership
   // regardless of whether the post is org- or person-attributed.
   const viewerOwnsPost = !!viewerId && post.user_id === viewerId;
+  // Someone else's club post offers "Mute <club>'s posts" (`postSheetRows`'
+  // rule on the phone): a mute never hides what you wrote yourself. Memoized
+  // on the two strings: a bare call here reads to the React Compiler as a
+  // value the menu might mutate, and it then skips this whole component.
+  const muteHandle = post.org?.handle;
+  const muteName = post.org?.name;
+  const muteClub = useMemo(
+    () => (viewerOwnsPost ? null : feedClubOf({ handle: muteHandle, name: muteName })),
+    [viewerOwnsPost, muteHandle, muteName],
+  );
   // A club post someone else wrote, and the viewer is a current owner /
   // admin of that club (S68 officer tools, C3/C5). The server decides
   // (`viewer_can_delete`); a removed post never qualifies.
@@ -7889,6 +8313,26 @@ function FeedRow({
             >
               Copy link
             </button>
+            {muteClub ? (
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  setShowMoreMenu(false);
+                  // The feed's Undo toast says what happened; a refusal toasts why.
+                  void onMuteClub(muteClub);
+                }}
+                style={feedRowMenuItemStyle()}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = "var(--cream)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = "transparent";
+                }}
+              >
+                {muteClubRowLabel(muteClub)}
+              </button>
+            ) : null}
             {!viewerOwnsPost ? (
               <button
                 type="button"
@@ -13439,7 +13883,8 @@ type MapOrg = {
   logo_url: string | null;
   verified: boolean;
   is_public: boolean;
-  member_count: number;
+  /** Null when hidden (below 5 for someone outside the club) or unread. */
+  member_count: number | null;
 };
 type MapSummary = {
   ok: boolean;
@@ -14938,9 +15383,13 @@ function OrgCenterCluster({
                   {o.name}
                   {o.verified ? <VerifiedBadge size={10} /> : null}
                 </div>
-                <div style={{ fontSize: 10, color: "rgba(255,255,255,0.55)" }}>
-                  {o.member_count} members
-                </div>
+                {/* Counts are public from 5 up: below that the server sends
+                    null to anyone outside the club, and the line goes. */}
+                {memberCountText(o.member_count) ? (
+                  <div style={{ fontSize: 10, color: "rgba(255,255,255,0.55)" }}>
+                    {memberCountText(o.member_count)}
+                  </div>
+                ) : null}
               </div>
             </button>
           );
@@ -16937,7 +17386,9 @@ const ROLE_META: Record<
   { label: string; color: string; tint: string }
 > = {
   owner: { label: "Owner", color: "#F0C84A", tint: "rgba(240,200,74,0.18)" },
-  admin: { label: "Admin", color: "#FF7355", tint: "rgba(255,115,85,0.18)" },
+  // One word for an admin everywhere (club model, Oct 16): Messages already
+  // says Officer (`roleWord` in club/helpers.ts). The stored role stays `admin`.
+  admin: { label: "Officer", color: "#FF7355", tint: "rgba(255,115,85,0.18)" },
   mod: { label: "Mod", color: "#9B7BFF", tint: "rgba(155,123,255,0.18)" },
   member: { label: "Member", color: "#9DD8FF", tint: "rgba(157,216,255,0.18)" },
 };
@@ -16947,20 +17398,24 @@ const ROLE_PERMS: Record<Role, string[]> = {
     "Edit name, description, who can join, backdrop",
     "Create / rename / delete channels",
     "Promote, demote, and remove anyone",
+    "Give members titles, like President",
     "See followers, remove them, and invite people",
+    "Choose whether followers can read the Board",
     "Approve or deny join requests",
     "Delete the org",
   ],
   admin: [
     "Edit org overview + backdrop",
     "Create / rename / delete channels",
-    "Promote/demote mods + members; remove non-admins",
+    "Promote/demote mods + members; remove mods and members",
+    "Give mods, members and yourself titles",
     "See followers, remove them, and invite people",
+    "Choose whether followers can read the Board",
     "Approve or deny join requests",
   ],
   mod: [
     "Chat in every public channel",
-    "Private channels only when explicitly invited by owner/admin",
+    "Private channels only when an officer adds you",
     "Approve or deny join requests",
     "Can't change channels or roles",
   ],

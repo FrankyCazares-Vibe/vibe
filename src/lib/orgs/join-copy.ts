@@ -20,6 +20,12 @@
  * A member always follows (the join trigger adds the follow, and DELETE
  * /follow answers 409 `member_follows`), so a member never sees an unfollow.
  * Callers derive `following = role != null || org_follow_state === "following"`.
+ *
+ * ONE REQUEST FLOW (club model, Franky, Oct 16). Asking to join needs no
+ * follow first, and asking follows the club (the join route writes it). So a
+ * request club offers Follow and Request side by side on every surface,
+ * onboarding included, the same shape as Follow and Join on an open club.
+ * Clubs never follow people: no line here says a club follows anyone.
  */
 
 import type { JoinState, JoinPolicy, OrgAudience, OrgRole } from "./join-state";
@@ -108,6 +114,13 @@ export const FOLLOWER_COUNT_FLOOR = 5;
 /** Said near Follow on any club not known to be open (critic C14). */
 export const FOLLOW_DISCLOSURE = "Officers can see who follows this club.";
 
+/**
+ * Said instead on a row or card whose Request would also follow (club model:
+ * asking follows; wave-2 repair, finding 9). The header says it in the
+ * Request sub (`ORG_COPY.subs.requestPolicy`).
+ */
+export const REQUEST_DISCLOSURE = "Asking to join also follows the club. Officers can see who follows it.";
+
 /** Officer settings: follow is not a setting (founder decision). */
 export const OFFICER_FOLLOW_HELP =
   "Anyone can follow your club. This only sets who becomes a member.";
@@ -117,7 +130,7 @@ export const AUDIENCE_HELP =
   "Checked against each student's verified school email when they join.";
 
 /** Settings fields a mod sees but can't change. */
-export const MOD_READONLY = "Only owners and admins can change this.";
+export const MOD_READONLY = "Only the owner and officers can change this.";
 
 // ── The strings ─────────────────────────────────────────────────────────────
 
@@ -152,8 +165,10 @@ export const ORG_COPY = freezeDeep({
   subs: {
     membersFollow: "Members follow automatically",
     hidden: "Hidden by Vibe. Only members can see it.",
-    requestPolicy: "Officers approve requests",
-    requestVisiting: "You're visiting, so officers approve requests",
+    // Asking to join also follows the club (club model), and officers can see
+    // who follows: the sub says so before the tap (wave-2 repair, finding 9).
+    requestPolicy: "Officers approve requests. Asking also follows the club.",
+    requestVisiting: "You're visiting, so officers approve requests. Asking also follows the club.",
     inviteOnly: "Officers invite members",
     audienceIu: "{org} is open to IU students only.",
     audiencePurdue: "{org} is open to Purdue students only.",
@@ -226,7 +241,69 @@ export const ORG_COPY = freezeDeep({
     // S67 security wave 2 #15. Never names a block (waveA-build copy rule).
     joinUnavailable: "You can't join this club right now.",
     approveUnavailable: "You can't approve this request right now.",
-    removedNeedsAdmin: "Only the owner or an admin can let back someone who was removed.",
+    removedNeedsAdmin: "Only the owner or an officer can let back someone who was removed.",
+  },
+  // The Announcement Board, by one name: "Announcement Board" in full, "the
+  // Board" after (wave-2 repair, findings 6 and 20). The club page's card:
+  // members open it; followers the database lets in read it; a visitor whom
+  // following would let in is asked to follow. Anyone else sees no card, so
+  // the card never tells a barred follower they were barred. Then the
+  // follower's view, the Messages list and the officers' switch.
+  board: {
+    title: "Announcement Board",
+    memberLine: "News from {org}'s officers.",
+    followerLine: "Posts from {org}'s officers, for members and followers.",
+    visitorLine: "{org}'s officers post news here. Followers can read it.",
+    verifyLine: "{org}'s officers post news here. Verify your school email to read it.",
+    open: "Open",
+    read: "Read the Board",
+    followToRead: "Follow to read the Board",
+    verify: "Verify school email",
+    intro: "News from {org}'s officers.",
+    empty: "Nothing on the Board yet.",
+    onlyMembersPost: "Only members post here.",
+    followedHeading: "Boards you follow",
+    followedEmpty: "Nothing on the Board yet",
+    followedLoadFailed: "Couldn't load the Boards you follow.",
+    readersLabel: "Followers can read the Board",
+    readersOnHelp: "Followers read officers' posts on the Board. They can't reply, react or vote, and never see who did.",
+    readersOffHelp: "Only members read the Board. Followers still see the club's posts and events.",
+    readersHidden: "This club is hidden, so followers can't read the Board either way.",
+    readersOn: "Followers can read the Board.",
+    readersOff: "Only members can read the Board now.",
+    readersLoadFailed: "Couldn't load the Board setting.",
+    readersFailed: "Couldn't change the Board setting.",
+    menuReadersOff: "Stop followers reading the Board",
+    menuReadersOn: "Let followers read the Board",
+  },
+  // The club page's ⋯ menu (club model gaps 1 and 2).
+  menu: {
+    label: "More for {org}",
+    mute: "Mute posts",
+    unmute: "Unmute posts",
+    leave: "Leave club",
+    // Every mute confirmation, on every surface (club page, feed, profile):
+    // one set of words (wave-2 repair, findings 5 and 18).
+    muted: "You won't see {org}'s posts in your feed. The club isn't told.",
+    mutedMember: "You won't see {org}'s posts in your feed. You're still in its chats, and the club isn't told.",
+    unmuted: "{org}'s posts are back in your feed.",
+    muteFailed: "Couldn't mute {org}'s posts.",
+    unmuteFailed: "Couldn't unmute {org}'s posts.",
+    leaveTitle: "Leave {org}?",
+    leaveBody: "You'll lose its chats and their history. Your messages stay.",
+    // Desktop Settings → Danger, before the confirm opens.
+    leaveIntroTitle: "Leave this club",
+    leaveIntro: "You'll lose its chats and their history. Your messages stay. You choose whether to keep following it.",
+    keepFollowing: "Keep following {org}",
+    keepFollowingSub: "Its posts stay in your feed.",
+    keepFollowingSubBoard: "Its posts stay in your feed, and you can still read its Board.",
+    leaving: "Leaving…",
+    leaveConfirm: "Leave",
+    cancel: "Cancel",
+    left: "You left {org}.",
+    leftFollowing: "You left {org}. You still follow it.",
+    leaveFailed: "Couldn't leave {org}.",
+    ownerCantLeave: "Owners can't leave. Hand the club to another officer first.",
   },
   control: {
     followFailed: "Couldn't follow this club.",
@@ -386,15 +463,15 @@ function signInAction(handle: string): OrgAction {
  * is harmless, missing on an invite-only one is not. Only where a follow or
  * unfollow control is actually rendered, and never for members, hidden clubs
  * or signed-out viewers.
+ *
+ * A Request control gets the line too, whatever the policy (a visitor asks to
+ * join an open club): asking follows the club, so the officers who read the
+ * request also see the follow.
  */
-function wantsDisclosure(rel: OrgRelation, showsFollow: boolean): boolean {
-  return (
-    rel.joinPolicy !== "open" &&
-    showsFollow &&
-    rel.state !== "member" &&
-    rel.state !== "hidden" &&
-    rel.state !== "signed_out"
-  );
+function wantsDisclosure(rel: OrgRelation, actions: readonly (OrgAction | null)[]): boolean {
+  if (rel.state === "member" || rel.state === "hidden" || rel.state === "signed_out") return false;
+  if (actions.some((a) => a?.kind === "request")) return true;
+  return rel.joinPolicy !== "open" && actions.some(isFollowAction);
 }
 
 function isFollowAction(a: OrgAction | null): boolean {
@@ -425,25 +502,25 @@ function audienceStatus(rel: OrgRelation): OrgAction {
 export function orgHeaderView(rel: OrgRelation): OrgHeaderView {
   // Accept invite is the header's one filled action, so Follow steps down.
   const F = followToggle(rel.following, rel.state === "invited" ? "outline" : "filled");
-  // Every state past member/hidden/signed_out renders F.
-  const disclosure = wantsDisclosure(rel, isFollowAction(F)) ? FOLLOW_DISCLOSURE : null;
+  // Every state past member/hidden/signed_out renders F; those three never
+  // get the disclosure.
   const view = (membership: OrgAction[]): OrgHeaderView => ({
     follow: F,
     followSub: null,
     membership,
-    disclosure,
+    disclosure: wantsDisclosure(rel, [F, ...membership]) ? FOLLOW_DISCLOSURE : null,
   });
 
   switch (rel.state) {
     case "signed_out":
-      return { follow: signInAction(rel.handle), followSub: null, membership: [], disclosure };
+      return { follow: signInAction(rel.handle), followSub: null, membership: [], disclosure: null };
     case "member":
       // Joining followed them, and a member can't unfollow (409 member_follows).
       return {
         follow: action("status", ORG_COPY.buttons.following, "quiet", { disabled: true }),
         followSub: ORG_COPY.subs.membersFollow,
         membership: [action("status", ORG_COPY.buttons.joined, "quiet", { disabled: true })],
-        disclosure,
+        disclosure: null,
       };
     case "hidden":
       return {
@@ -455,7 +532,7 @@ export function orgHeaderView(rel: OrgRelation): OrgHeaderView {
             sub: ORG_COPY.subs.hidden,
           }),
         ],
-        disclosure,
+        disclosure: null,
       };
     case "invited":
       return view([
@@ -501,11 +578,11 @@ export function orgHeaderView(rel: OrgRelation): OrgHeaderView {
  *
  * The rules this keeps, which `join-copy.test.ts` walks for every state:
  *   - at most one `filled` action;
- *   - `line` layout only for an open club on phone rows and onboarding, where
- *     Follow and Join share a full-width row (critic C16: Join is never hidden
- *     behind Follow);
- *   - onboarding never offers Request — a request is a message to officers,
- *     not a first-run step;
+ *   - `line` layout only where a club offers Follow next to Join or Request,
+ *     on phone rows and onboarding: the two share a full-width row (critic
+ *     C16: the door in is never hidden behind Follow);
+ *   - Request needs no follow first, and onboarding offers it like every
+ *     other surface (club model, Oct 16: one request flow everywhere);
  *   - no 'Joined' chip in v1.
  */
 export function orgRowView(rel: OrgRelation, surface: OrgRowSurface): OrgRowView {
@@ -549,22 +626,18 @@ export function orgRowView(rel: OrgRelation, surface: OrgRowSurface): OrgRowView
           ];
       if (surface !== "card") layout = "line";
       break;
-    case "can_request":
-      // Follow first (Q5). Following → the next step is asking.
-      if (!rel.following) {
-        actions = [action("follow", ORG_COPY.buttons.follow, "filled")];
-      } else if (surface === "phone_row") {
-        actions = [action("request", ORG_COPY.buttons.request, "filled")];
-        chip = ORG_COPY.chips.following;
-      } else if (surface === "card") {
-        actions = [
-          action("unfollow", ORG_COPY.buttons.following, "quiet"),
-          action("request", ORG_COPY.buttons.requestToJoin, "outline"),
-        ];
-      } else {
-        actions = [action("unfollow", ORG_COPY.buttons.following, "quiet")];
-      }
+    case "can_request": {
+      // Follow and Request together, like Follow and Join: asking needs no
+      // follow first, and asking follows (club model, Oct 16). Once they
+      // follow, Request becomes the one filled control. Cards have room for
+      // the long label; a shared line keeps it to one word.
+      const ask = surface === "card" ? ORG_COPY.buttons.requestToJoin : ORG_COPY.buttons.request;
+      actions = rel.following
+        ? [action("unfollow", ORG_COPY.buttons.following, "quiet"), action("request", ask, "filled")]
+        : [action("follow", ORG_COPY.buttons.follow, "filled"), action("request", ask, "outline")];
+      if (surface !== "card") layout = "line";
       break;
+    }
     case "requested":
     case "invite_only":
     case "audience_blocked":
@@ -573,12 +646,15 @@ export function orgRowView(rel: OrgRelation, surface: OrgRowSurface): OrgRowView
       break;
   }
 
-  const showsFollow = actions.some(isFollowAction);
   return {
     chip,
     actions,
     layout,
-    disclosure: wantsDisclosure(rel, showsFollow) ? FOLLOW_DISCLOSURE : null,
+    disclosure: wantsDisclosure(rel, actions)
+      ? !rel.following && actions.some((a) => a?.kind === "request")
+        ? REQUEST_DISCLOSURE
+        : FOLLOW_DISCLOSURE
+      : null,
     meta: rowMeta(rel),
     sub,
   };
@@ -759,6 +835,131 @@ export function channelsGateCopy(
   }
 }
 
+// ── The Announcement Board card ─────────────────────────────────────────────
+
+export type BoardCardInput = {
+  /** The viewer's standing (`OrgRelation.state`). */
+  state: OrgDisplayState;
+  following: boolean;
+  /** The club's Board, or null when it has none (or the read failed). */
+  boardId: string | null;
+  /**
+   * The database's answer for THIS viewer (`can_view_org_channel` on their
+   * own client, as `GET /api/orgs/[slug]` returns `board_readable`). Null
+   * when unknown or not asked.
+   */
+  boardReadable: boolean | null;
+  /**
+   * For a signed-in viewer who doesn't follow: would following let them
+   * read it? The club lets followers read, and nothing the page can see bars
+   * this viewer. False signed out and on any doubt (`board-facts.ts`).
+   */
+  followWouldRead: boolean;
+  /** Everything holds but the viewer's school email (`board-facts.ts`). */
+  verifyToRead?: boolean;
+  orgName: string;
+};
+
+export type BoardCard = {
+  kind: "open" | "read" | "follow" | "verify";
+  title: string;
+  line: string;
+  /** The button's words. "follow" renders the follow control with this label. */
+  cta: string;
+  /** Where "open", "read" and "verify" go; null for "follow". */
+  href: string | null;
+};
+
+/**
+ * The club page's Board card, or null for no card (club model; repair of
+ * review findings 4 and 9). Members get "Open", followers the database lets
+ * in "Read the Board", a visitor whom following would let in "Follow to read
+ * the Board", and one whose school email is the only thing missing "Verify
+ * school email". ANYONE ELSE GETS NOTHING: a follower who was removed or
+ * blocked sees the same empty space as a club that turned follower reading
+ * off, so the card never reveals a bar. The answer
+ * for a member or follower is the database's own (`boardReadable === true`),
+ * never re-derived from follow state plus the club's switch.
+ */
+export function boardCardView(input: BoardCardInput): BoardCard | null {
+  if (!input.boardId || input.state === "hidden") return null;
+  const org = orgLabel(input.orgName);
+  const href = "/messages?channel=" + encodeURIComponent(input.boardId);
+  const card = (kind: BoardCard["kind"], line: string, cta: string, to: string | null): BoardCard => ({
+    kind,
+    title: ORG_COPY.board.title,
+    line: fillCopy(line, { org }),
+    cta,
+    href: to,
+  });
+  if (input.state === "member") {
+    return input.boardReadable === true
+      ? card("open", ORG_COPY.board.memberLine, ORG_COPY.board.open, href)
+      : null;
+  }
+  if (input.state === "signed_out") return null;
+  if (input.verifyToRead && input.boardReadable !== true) {
+    return card("verify", ORG_COPY.board.verifyLine, ORG_COPY.board.verify, "/auth/school-email");
+  }
+  if (input.following) {
+    return input.boardReadable === true
+      ? card("read", ORG_COPY.board.followerLine, ORG_COPY.board.read, href)
+      : null;
+  }
+  return input.followWouldRead
+    ? card("follow", ORG_COPY.board.visitorLine, ORG_COPY.board.followToRead, null)
+    : null;
+}
+
+// ── The ⋯ menu ──────────────────────────────────────────────────────────────
+
+/**
+ * The follows the club's own flow made (joining, asking to join), which a
+ * leave drops unless the student keeps following: the one list the join
+ * route's DELETE, `followMadeByJoining` (following.ts) and the leave
+ * confirms read (wave-2 repair, finding 18).
+ */
+export const LEAVE_DROPS_FOLLOW_SOURCES: readonly string[] = Object.freeze(["join", "request"]);
+
+/**
+ * Whether the leave confirm's "Keep following" box starts checked (spec E1),
+ * on the club page's ⋯ and desktop Settings alike: yes when the student
+ * tapped Follow themselves, no when joining or asking to join made the
+ * follow (`LEAVE_DROPS_FOLLOW_SOURCES`), and no when there is no follow row.
+ */
+export function keepFollowingDefault(source: string | null | undefined): boolean {
+  return typeof source === "string" && !LEAVE_DROPS_FOLLOW_SOURCES.includes(source);
+}
+
+/**
+ * The ⋯ menu's rows, in order. Everyone signed in can mute a club's posts
+ * (its posts reach the whole campus); the owner and officers can turn the
+ * followers' Board reading on or off (`readersOn`, the club's switch, known
+ * only to members), the phone's home for that setting (wave-2 repair,
+ * finding 3); members can also leave, except the owner, who has to hand the
+ * club on first (`join/route.ts` DELETE).
+ */
+export function orgMenuItems(input: {
+  signedIn: boolean;
+  role: OrgRole | null;
+  muted: boolean;
+  readersOn?: boolean | null;
+}): Array<{ kind: "mute" | "unmute" | "readers" | "leave"; label: string }> {
+  if (!input.signedIn) return [];
+  const items: Array<{ kind: "mute" | "unmute" | "readers" | "leave"; label: string }> = [
+    input.muted
+      ? { kind: "unmute", label: ORG_COPY.menu.unmute }
+      : { kind: "mute", label: ORG_COPY.menu.mute },
+  ];
+  if ((input.role === "owner" || input.role === "admin") && typeof input.readersOn === "boolean") {
+    items.push({ kind: "readers", label: input.readersOn ? ORG_COPY.board.menuReadersOff : ORG_COPY.board.menuReadersOn });
+  }
+  if (input.role != null && input.role !== "owner") {
+    items.push({ kind: "leave", label: ORG_COPY.menu.leave });
+  }
+  return items;
+}
+
 /**
  * The toast for a refused club request, by `code` (or HTTP status 429, which
  * `tooManyRequests` sends without a code). Null means "no toast": either the
@@ -787,6 +988,9 @@ export function orgErrorCopy(code: string | number | null | undefined): string |
       return ORG_COPY.errors.approveUnavailable;
     case "removed_needs_admin":
       return ORG_COPY.errors.removedNeedsAdmin;
+    // DELETE /join (leave): the owner hands the club on first.
+    case "owner_cannot_leave":
+      return ORG_COPY.menu.ownerCantLeave;
     default:
       return null;
   }
@@ -951,8 +1155,9 @@ export function changeAfter(
     case "join":
     case "accept":
       return { state: "member", following: true, role: rel.role ?? "member" };
+    // Asking follows the club (the join route writes it, source `request`).
     case "request":
-      return { state: "requested", following: rel.following, role: rel.role };
+      return { state: "requested", following: true, role: rel.role };
     case "decline":
       return {
         state: stateAfterDecline(rel.joinPolicy),
@@ -963,4 +1168,117 @@ export function changeAfter(
     default:
       return null;
   }
+}
+
+// ── What a Join, Request or Accept answered ─────────────────────────────────
+
+/** The taps that go through the one door, `POST /api/orgs/<handle>/join`. */
+export type JoinPressKind = "join" | "request" | "accept";
+
+/** vibeRequest's fallback line for each. */
+export function joinPressFailure(kind: JoinPressKind): string {
+  if (kind === "accept") return ORG_COPY.control.acceptFailed;
+  return kind === "request" ? ORG_COPY.control.requestFailed : ORG_COPY.control.joinFailed;
+}
+
+/** The answer, as vibeRequest hands it over (only the fields read here). */
+export type JoinAnswer =
+  | { ok: true; data: { joined?: unknown; pending?: unknown; role?: unknown; org_follow_state?: unknown } }
+  | { ok: false; code?: string | null; error?: string | null };
+
+/**
+ * What the answer means for the control, in one place for `OrgJoinControl`
+ * and the follower's Board tile (wave-2 repair, finding 17):
+ *   - `change`: the standing to show (`audience` when a refusal named the
+ *     school), with the welcome toast only for an accepted invite (a Join's
+ *     own button says Joined);
+ *   - `unclear`: a 2xx that says neither joined nor pending, toast `message`;
+ *   - `refused`: any other refusal, which the caller toasts its own way.
+ * The role is the server's, and whether asking followed is the server's
+ * `org_follow_state` (an older server that doesn't say leaves it as it was).
+ */
+export function joinOutcome(
+  rel: Pick<OrgRelation, "state" | "following" | "role" | "audience">,
+  kind: JoinPressKind,
+  r: JoinAnswer,
+):
+  | { kind: "change"; next: OrgControlChange; audience: OrgAudience; welcome: boolean }
+  | { kind: "unclear"; message: string }
+  | { kind: "refused" } {
+  const keep = (state: OrgDisplayState, audience: OrgAudience = rel.audience) =>
+    ({ kind: "change", next: { state, following: rel.following, role: rel.role }, audience, welcome: false }) as const;
+  if (r.ok) {
+    if (r.data.joined === true) {
+      const role = typeof r.data.role === "string" && ["owner", "admin", "mod", "member"].includes(r.data.role) ? (r.data.role as OrgRole) : "member";
+      return { kind: "change", next: { state: "member", following: true, role }, audience: rel.audience, welcome: kind === "accept" };
+    }
+    if (r.data.pending === true) {
+      const f = r.data.org_follow_state;
+      const following = f === "following" ? true : f === "not_following" ? false : rel.following;
+      return { kind: "change", next: { state: "requested", following, role: rel.role }, audience: rel.audience, welcome: false };
+    }
+    return { kind: "unclear", message: `${joinPressFailure(kind)} Try again.` };
+  }
+  if (r.code === "invite_only") return keep("invite_only");
+  if (r.code === "school_unverified") return keep("unverified");
+  if (r.code === "audience_mismatch") {
+    const error = r.error ?? "";
+    const audience = /open to Purdue students only\.?$/.test(error) ? "purdue" : /open to IU students only\.?$/.test(error) ? "iu" : rel.audience;
+    return keep("audience_blocked", audience);
+  }
+  return { kind: "refused" };
+}
+
+// ── What a control shows between its tap and the page's refresh ─────────────
+
+/** What the server said to a control's own tap, and the relation it was tapped on. */
+export type KeptAnswer = OrgControlChange & {
+  basis: string;
+  audience: OrgAudience;
+  /** The server said the club is gone (hidden or deleted): every control disables. */
+  gone: boolean;
+};
+
+/** A control's memory: the relation it last rendered (`seen`) and its own tap's answer. */
+export type ControlMemory = { seen: string; kept: KeptAnswer | null };
+
+/** One key per relation a parent can pass: any field that differs is a new relation. */
+export function relationKey(r: OrgRelation): string {
+  return [r.handle, r.state, r.following, r.role, r.reason, r.audience, r.joinPolicy].join("|");
+}
+
+/**
+ * The memory once the parent passes `relation`. A new relation (a refresh
+ * landed, or the parent's own state caught up) forgets the kept answer FOR
+ * GOOD, even when a later refresh brings back the relation it was tapped on.
+ * Two controls on one page both follow (the club page's header and its Board
+ * card), so a header's old Unfollow answer must not come back to life when
+ * the card's Follow refreshes the page to the relation that Unfollow was
+ * tapped on: the two would disagree until a reload. The same object when
+ * nothing changed, so a caller can tell.
+ */
+export function memoryFor(m: ControlMemory, relation: OrgRelation): ControlMemory {
+  const seen = relationKey(relation);
+  return m.seen === seen ? m : { seen, kept: null };
+}
+
+/**
+ * What a control renders: the parent's relation, with the control's own kept
+ * answer laid over it while that answer is for the relation on screen. A
+ * member always follows.
+ */
+export function shownRelation(relation: OrgRelation, m: ControlMemory): { rel: OrgRelation; gone: boolean } {
+  const basis = relationKey(relation);
+  const live = m.seen === basis && m.kept?.basis === basis ? m.kept : null;
+  const state = live?.state ?? relation.state;
+  return {
+    rel: {
+      ...relation,
+      state,
+      following: state === "member" ? true : (live?.following ?? relation.following),
+      role: live ? live.role : relation.role,
+      audience: live?.audience ?? relation.audience,
+    },
+    gone: live?.gone ?? false,
+  };
 }

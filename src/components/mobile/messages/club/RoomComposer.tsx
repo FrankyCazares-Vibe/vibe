@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 
 import { roomDisplayName } from "@/lib/chat/room-names";
@@ -7,6 +8,8 @@ import type { ChatMessage, RoomKind, ViewerInRoom } from "@/lib/chat/types";
 import { useLayerHistory } from "@/lib/chat/use-layer-history";
 import type { RoomPoll } from "@/lib/chat/use-room-poll";
 import { vibeRequest } from "@/lib/feedback/request";
+import { toast } from "@/lib/feedback/toast";
+import { fillCopy, joinOutcome, joinPressFailure, ORG_COPY, orgErrorCopy, orgHeaderView, type OrgAction, type OrgRelation } from "@/lib/orgs/join-copy";
 
 import { CardTray, type CardTrayKind } from "../compose/CardTray";
 import { ComposeSheets } from "../compose/ComposeSheets";
@@ -14,7 +17,7 @@ import { quotedBody } from "../format";
 import { toastSendFailure } from "../send-failure";
 import { useChatSurface } from "../surface";
 import { FONT, palette } from "../v2-tokens";
-import { composerPlaceholder, refusedSend, sendLabel } from "./helpers";
+import { composerPlaceholder, FOLLOWER_POST_LINE, followerRelation, isFollower, refusedSend, sendLabel } from "./helpers";
 
 /**
  * The composer of a club room (handoffs/chat-redesign/wave-2-contracts.md
@@ -62,6 +65,12 @@ import { composerPlaceholder, refusedSend, sendLabel } from "./helpers";
  *   event chat's name is the event's title and is never rewritten.
  * - The "+" is handed to the tray as `anchorRef` (6.3): on the desktop
  *   surface the tray is a popover that opens from it; the phone ignores it.
+ *
+ * - A FOLLOWER (club model, Franky's calls of Oct 16; `viewer.standing`):
+ *   only members type, react or vote, so a follower reading the Board gets
+ *   no composer, no "+" and no tray: `FollowerTile`, the quiet line `Only
+ *   members post here.` and the one membership control the club offers them
+ *   (Join, Request to join, Accept invite; or the state as a quiet word).
  */
 
 export type ReplyTarget = {
@@ -89,6 +98,8 @@ export type RoomComposerProps = {
   officerLine?: boolean;
   /** Bumped by the room to focus the input (ClubEmpty's `Post a welcome on the Board`). */
   focusToken?: number;
+  /** A follower joined from the tile under the Board: the space and the room read again as a member's. */
+  onJoined?: () => void;
 };
 
 const SEND_FAILURE = "Couldn't send your message.";
@@ -163,6 +174,7 @@ export function RoomComposer({
   onSent,
   officerLine = false,
   focusToken = 0,
+  onJoined,
 }: RoomComposerProps) {
   const t = palette(night);
   const [draft, setDraft] = useState("");
@@ -191,6 +203,7 @@ export function RoomComposer({
   useLayerHistory(trayOpen && canPost && !desktop, () => setTrayOpen(false));
 
   if (viewer === null) return null;
+  if (isFollower(viewer)) return <FollowerTile orgHandle={orgHandle} clubName={clubName} night={night} onJoined={onJoined} />;
   if (!canPost) {
     if (roomKind === "board") return <ClosedTile night={night} board text="Only officers post on the Board. You can reply to any post." />;
     // The server's sentence for a room this viewer may read but not post in (4c.4); the lock is the tile's default mark.
@@ -389,5 +402,102 @@ export function RoomComposer({
         returnFocusTo={plusRef}
       />
     </>
+  );
+}
+
+/** The membership control the tile offers: the club page's own (`orgHeaderView`), never Decline (it would need the invite's id). */
+function membershipAction(rel: OrgRelation): OrgAction | null {
+  return orgHeaderView(rel).membership.find((a) => a.kind !== "decline") ?? null;
+}
+
+/**
+ * The footer under a FOLLOWER's Board (club model): `Only members post
+ * here.` and the club's membership control, read from `GET
+ * /api/orgs/<handle>` once (the space read does not carry the join state).
+ * The words are `ORG_COPY`'s through `orgHeaderView`, so the tile says what
+ * the club page says. The tap goes through the one door, `POST
+ * /api/orgs/<handle>/join` (asking to join also follows, which a follower
+ * already does), read by `joinOutcome`, the function `OrgJoinControl` uses:
+ * joined → `onJoined` (the screens read again as a member's; the welcome
+ * toast only for an accepted invite); a request filed → `Requested`;
+ * `invite_only` / `audience_mismatch` / `school_unverified` → that state
+ * (the refusal's school when it names one); anything else toasts its line.
+ * Not `OrgJoinControl` itself:
+ * its pills there are the org page's white glass (unreadable in Light) and
+ * its row form puts the Following toggle beside Join. Until the club read
+ * answers, or if it fails, the line stands alone (the header links to the
+ * club page).
+ */
+function FollowerTile({ orgHandle, clubName, night, onJoined }: { orgHandle: string; clubName: string; night: boolean; onJoined?: () => void }) {
+  const t = palette(night);
+  const [rel, setRel] = useState<OrgRelation | null>(null);
+  const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    let live = true;
+    void (async () => {
+      const r = await vibeRequest<{ org?: unknown }>(`/api/orgs/${encodeURIComponent(orgHandle)}`, { quiet: true, failure: "Couldn't load this club.", cache: "no-store" });
+      if (live && r.ok) setRel(followerRelation(r.data.org));
+    })();
+    return () => {
+      live = false;
+    };
+  }, [orgHandle]);
+
+  const action = rel ? membershipAction(rel) : null;
+  const press = async (a: OrgAction) => {
+    if (!rel || busy || a.disabled || (a.kind !== "join" && a.kind !== "request" && a.kind !== "accept")) return;
+    const failure = joinPressFailure(a.kind);
+    setBusy(true);
+    const r = await vibeRequest<{ joined?: unknown; pending?: unknown; role?: unknown; org_follow_state?: unknown }>(`/api/orgs/${encodeURIComponent(rel.handle)}/join`, { method: "POST", json: {}, quiet: true, failure });
+    setBusy(false);
+    // What the answer means is OrgJoinControl's own (`joinOutcome`).
+    const out = joinOutcome(rel, a.kind, r);
+    if (out.kind === "change") {
+      setRel({ ...rel, ...out.next, audience: out.audience });
+      if (out.welcome) toast({ message: fillCopy(ORG_COPY.control.welcome, { org: rel.orgName.trim() || clubName || "the club" }), tone: "info" });
+      if (out.next.state === "member") onJoined?.();
+      return;
+    }
+    if (out.kind === "unclear") toast({ message: out.message, tone: "error" });
+    else if (r.ok) return;
+    else if (r.status === 429) toast({ message: r.message, tone: "error" });
+    else if (r.code === "not_found") toast({ message: ORG_COPY.errors.notFound, tone: "error" });
+    else {
+      const known = orgErrorCopy(r.code);
+      toast({ message: known ?? r.message, tone: "error", action: known ? undefined : r.action });
+    }
+  };
+
+  const pill: React.CSSProperties = { minHeight: 44, flexShrink: 0, marginLeft: "auto", boxSizing: "border-box", padding: "0 16px", borderRadius: 999, display: "inline-flex", alignItems: "center", justifyContent: "center", fontFamily: FONT, fontSize: 13.5, fontWeight: 700, whiteSpace: "nowrap", textDecoration: "none", WebkitTapHighlightColor: "transparent" };
+  let control: React.ReactNode = null;
+  if (action && action.href) {
+    control = (
+      <Link href={action.href} style={{ ...pill, border: `1px solid ${t.fieldBorder}`, background: t.surface, color: t.ink }}>
+        {action.label}
+      </Link>
+    );
+  } else if (action && action.kind === "status") {
+    control = <span style={{ ...pill, border: `1px solid ${t.hairline}`, background: "rgba(var(--scrim-rgb),0.05)", color: t.secondary }}>{action.label}</span>;
+  } else if (action) {
+    control = (
+      <button type="button" aria-busy={busy || undefined} aria-disabled={busy || undefined} onClick={() => void press(action)} style={{ ...pill, border: "none", background: t.coralButton.bg, color: t.coralButton.ink, cursor: busy ? "default" : "pointer" }}>
+        {busy ? ORG_COPY.buttons.busy : action.label}
+      </button>
+    );
+  }
+
+  return (
+    <footer style={{ flexShrink: 0, boxSizing: "border-box", padding: "10px 12px calc(env(safe-area-inset-bottom, 0px) + 14px)", background: t.page, borderTop: `1px solid ${t.hairline}`, fontFamily: FONT }}>
+      <div style={{ minHeight: 44, boxSizing: "border-box", padding: "8px 8px 8px 14px", borderRadius: 16, border: `1px solid ${t.hairline}`, background: t.surface, display: "flex", flexWrap: "wrap", alignItems: "center", gap: "8px 10px" }}>
+        <div role="note" style={{ flex: "1 1 150px", minWidth: 0, display: "flex", alignItems: "center", gap: 10 }}>
+          <Megaphone color={t.muted} size={15} />
+          <span style={{ minWidth: 0, display: "flex", flexDirection: "column", gap: 2 }}>
+            <span style={{ fontSize: 13, fontWeight: 500, lineHeight: 1.35, color: t.secondary }}>{FOLLOWER_POST_LINE}</span>
+            {action?.sub ? <span style={{ fontSize: 12, fontWeight: 500, lineHeight: 1.35, color: t.muted }}>{action.sub}</span> : null}
+          </span>
+        </div>
+        {control}
+      </div>
+    </footer>
   );
 }

@@ -59,7 +59,7 @@ const {
   relationFor,
 } = await import("./social-steps");
 const { ONB_COPY, fillCampus } = await import("@/components/mobile/onboarding/onb-copy");
-const { FOLLOW_DISCLOSURE, ORG_COPY, orgRowView } = await import("@/lib/orgs/join-copy");
+const { FOLLOW_DISCLOSURE, ORG_COPY, REQUEST_DISCLOSURE, changeAfter, orgRowView } = await import("@/lib/orgs/join-copy");
 
 // ── fixtures ─────────────────────────────────────────────────────────────
 
@@ -227,6 +227,37 @@ test("(f) anyClubFollowed counts local.following and members", () => {
   // A member row counts whatever local.following says.
   const member = club({ id: "m", join_state: "member", role: "owner" });
   assert.equal(anyClubFollowed([open, member], { m: { following: false } }), true);
+});
+
+// ── one request flow (club model, Oct 16) ────────────────────────────────
+
+test("a by-request club offers Follow and Request on one line, no follow needed first", () => {
+  const ask = club({ id: "ask", join_policy: "request", join_state: "can_request", join_reason: "policy" });
+  const view = orgRowView(relationFor(ask, undefined), "onboarding");
+  assert.deepEqual(
+    view.actions.map((a) => `${a.kind}:${a.label}`),
+    [`follow:${ORG_COPY.buttons.follow}`, `request:${ORG_COPY.buttons.request}`],
+  );
+  assert.equal(view.layout, "line");
+  // Asking follows, so the line by the Request says so, and that officers see
+  // who follows (wave-2 repair, finding 9).
+  assert.equal(view.disclosure, REQUEST_DISCLOSURE);
+});
+
+test("asking follows: a replayed or answered request counts as followed", () => {
+  const ask = club({ id: "ask", join_policy: "request", join_state: "can_request", join_reason: "policy" });
+  const next = changeAfter(relationFor(ask, undefined), "request");
+  assert.ok(next);
+  const local = { ask: { state: next.state, following: next.following, role: next.role } };
+  assert.equal(anyClubFollowed([ask], {}), false);
+  assert.equal(anyClubFollowed([ask], local), true);
+  const after = relationFor(ask, local.ask);
+  assert.equal(after.state, "requested");
+  assert.equal(after.following, true);
+  // Requested: the row is the follow toggle again, and Requested is in its meta.
+  const view = orgRowView(after, "onboarding");
+  assert.deepEqual(view.actions.map((a) => a.kind), ["unfollow"]);
+  assert.ok(view.meta.includes(ORG_COPY.meta.requested));
 });
 
 // ── (g) people groups ────────────────────────────────────────────────────

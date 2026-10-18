@@ -21,6 +21,11 @@
  * derived exactly as plan §4.2 says: `org_follow_state === "following"`, or a
  * member (a member always follows). Never the PERSON `follow_state`.
  *
+ * ONE REQUEST FLOW (club model, Franky, Oct 16). A by-request club offers
+ * Follow and Request side by side here too, and asking needs no follow
+ * first: the join route follows the club when it files the request, so a
+ * row that asked counts as followed (`anyClubFollowed`), live or replayed.
+ *
  * PEOPLE. Rows come from `GET /api/me/suggested-connections` (`suggestions`).
  * `groupPeople` buckets them by the server's `reason_v2`. ON PURPOSE (critic
  * L3) this differs from the People screen's groups (B14t, `NetworkMobile`):
@@ -186,7 +191,10 @@ export function relationFor(r: ClubRowInput, local: ClubLocal | undefined): OrgR
   };
 }
 
-/** True when any row, with this step's taps applied, is followed or joined. */
+/**
+ * True when any row, with this step's taps applied, is followed or joined. A
+ * request counts: asking follows the club (`changeAfter("request")`).
+ */
 export function anyClubFollowed(rows: ClubRowInput[], local: Record<string, ClubLocal>): boolean {
   return rows.some((r) => relationFor(r, local[r.id]).following);
 }

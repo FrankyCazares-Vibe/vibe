@@ -3,12 +3,12 @@
   "url": "http://localhost:3000/legal/privacy",
   "md": "/Users/franciscocazares/vibe/handoffs/legal-2026-10-04-privacy-v3/privacy-policy-final.md",
   "counts": {
-    "mdSentences": 1175,
-    "pageSentences": 1175,
-    "same": 1175,
-    "mentions": 99,
+    "mdSentences": 1214,
+    "pageSentences": 1214,
+    "same": 1214,
+    "mentions": 102,
     "dates": {
-      "October 15, 2026": 1,
+      "October 18, 2026": 1,
       "October 5, 2026": 8,
       "October 8, 2026": 2,
       "October 12, 2026": 2,

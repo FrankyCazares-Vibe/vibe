@@ -13,6 +13,10 @@ const SETTINGS_TOO_FAST = "You're changing chat settings too fast. Try again in 
  * Soft-hide a DM thread on the viewer's side. The peer's view is untouched.
  * If the peer sends a new message after this point, the thread re-surfaces
  * for the viewer (handled at the GET /api/me/threads filter step).
+ *
+ * A follower reading a club's Board (Franky, Oct 16) holds no row, so this
+ * is a no-op for them (ok, nothing stored): the Board leaves their list
+ * when they unfollow, not here.
  */
 export async function POST(_req: Request, ctx: RouteCtx) {
   const { id: channelId } = await ctx.params;

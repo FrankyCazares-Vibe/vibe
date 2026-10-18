@@ -170,7 +170,8 @@ function _vibeTopHere() {
 // A refused action must say so in one short line (silent-failure design,
 // handoffs/2026-09-11-silent-failure-design.md). React routes use
 // vibeRequest + <ToastHost />; the static pages get the same helpers here:
-//   window.vibeToast(message, { tone: 'info'|'error', action: { label, href }, durationMs })
+//   window.vibeToast(message, { tone: 'info'|'error', action: { label, href } | { label, onPress }, durationMs })
+//     (onPress: a button that acts on this page, e.g. Undo; href: one that leaves it)
 //   window.vibeRequest(url, { method, json, body, headers, failure, success, quiet })
 //     → Promise<{ ok: true, status, data } | { ok: false, status, code, error, message, action?, field? }>
 //     Never throws; branch on r.ok. `failure` is the caller's own line.
@@ -328,7 +329,7 @@ function _vibeTopHere() {
     lastAt = now;
     const o = opts || {};
     const isError = o.tone === 'error';
-    const action = o.action && o.action.href ? o.action : null;
+    const action = o.action && (o.action.href || typeof o.action.onPress === 'function') ? o.action : null;
     const t = toastEl();
     clearTimeout(clearT);
     t.setAttribute('role', isError ? 'alert' : 'status');
@@ -360,6 +361,8 @@ function _vibeTopHere() {
       btn.addEventListener('click', e => {
         e.stopPropagation();
         hide();
+        // On this page (Undo, the post viewer's club mute).
+        if (typeof action.onPress === 'function') { action.onPress(); return; }
         // Out of the iframe: Terms / Sign in replace the whole shell.
         window.__vibeTopNav(action.href);
       });

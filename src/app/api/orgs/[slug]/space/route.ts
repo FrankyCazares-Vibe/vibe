@@ -7,6 +7,8 @@ import { eventRefsFor, type EventRow } from "@/lib/chat/event-refs";
 import { chatV2For } from "@/lib/chat/flag-server";
 import { readChatMessages } from "@/lib/chat/message-read";
 import {
+  followerBoardRoom,
+  followerMemberCount,
   lastShown,
   notInList,
   orderSpaceRooms,
@@ -21,7 +23,14 @@ import { BOARD_POSTER_ROLES, canModerate, isClubRole, isPostPolicy, isRoomKind }
 import { roomState } from "@/lib/chat/room-state";
 import { loadRoom, notePostPolicyColumnMissing, postPolicyColumnMissing } from "@/lib/chat/rooms";
 import { isMissingChatSchema, warnMissingChatSchemaOnce } from "@/lib/chat/schema";
-import { refusalBody, type ChatMessage, type EventRef, type PostPolicy, type SpaceResponse } from "@/lib/chat/types";
+import {
+  refusalBody,
+  type ChatMessage,
+  type EventRef,
+  type PostPolicy,
+  type SpaceFollowerResponse,
+  type SpaceResponse,
+} from "@/lib/chat/types";
 import { orgAssetProxyUrl } from "@/lib/org-asset-url";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
@@ -109,6 +118,128 @@ async function unreadIn(service: SupabaseClient, channelId: string, viewerId: st
   return (count ?? 0) > 0;
 }
 
+/** The club row the route reads first (service role). */
+type OrgData = {
+  id: string;
+  handle: string;
+  name: string;
+  logo_url: string | null;
+  banner_url: string | null;
+  verified: boolean | null;
+  hidden_at: string | null;
+};
+
+type ServerClient = Awaited<ReturnType<typeof createSupabaseServerClient>>;
+
+const membersOnly = () => NextResponse.json(refusalBody("members_only"), { status: 403 });
+
+/**
+ * The space of a FOLLOWER (club model, Franky's calls of Oct 16; critique
+ * #6, #7): only members type, and a follower reads the club's Board and
+ * nothing else. So: the Board alone in `rooms`, its latest posts as a
+ * follower reads them, the club's event listings, and the member count from
+ * 5 up. No Lounge, Officers, extra rooms or event chats, and no member's
+ * face or name.
+ *
+ * WHO MAY: the database, never TypeScript. The club's Board is found with
+ * the service role (a fact about the club), then `can_view_org_channel` is
+ * asked about it as the viewer, once. Its follower arm holds every rule
+ * (following, the club's `followers_read_board`, not hidden, not removed,
+ * not barred, not blocked by the club's owner, admins or mods). Any no is
+ * the same 403 `members_only` a stranger gets, so a barred follower is
+ * never told they were barred. A database without the function or the
+ * column has no follower arm: also 403.
+ */
+async function followerSpace(
+  req: Request,
+  supabase: ServerClient,
+  service: SupabaseClient,
+  viewerId: string,
+  orgData: OrgData,
+): Promise<Response> {
+  const orgId = orgData.id;
+  const { data: boardRow, error: boardError } = await service
+    .from("channels")
+    .select("id, name")
+    .eq("org_id", orgId)
+    .eq("type", "org_channel")
+    .eq("kind", "board")
+    .limit(1)
+    .maybeSingle();
+  if (boardError) {
+    if (isMissingChatSchema(boardError)) return membersOnly();
+    console.error(`[${TAG} follower board]`, boardError.code, boardError.message);
+    return loadFailed();
+  }
+  const board = boardRow as { id: string; name: string | null } | null;
+  if (!board) return membersOnly();
+
+  const { data: mayRead, error: viewError } = await supabase.rpc("can_view_org_channel", { cid: board.id, uid: viewerId });
+  if (viewError) {
+    if (isMissingChatSchema(viewError)) return membersOnly();
+    console.error(`[${TAG} follower can_view]`, viewError.code, viewError.message);
+    return loadFailed();
+  }
+  if (mayRead !== true) return membersOnly();
+
+  const query = new URL(req.url).searchParams;
+  const wantsUpcoming = query.get("events") === "1";
+  const wantsPanel = query.get("panel") === "1";
+  const [memberCountRes, boardRoom, upNextRows, upcomingRows] = await Promise.all([
+    service.from("org_members").select("user_id", { count: "exact", head: true }).eq("org_id", orgId),
+    loadRoom(board.id),
+    readUpcoming(service, orgId, 3, "up_next"),
+    wantsUpcoming ? readUpcoming(service, orgId, 50, "upcoming") : Promise.resolve([] as EventRow[]),
+  ]);
+  if (memberCountRes.error) {
+    console.error(`[${TAG} follower member count]`, memberCountRes.error.code, memberCountRes.error.message);
+  }
+  if (!boardRoom) return NextResponse.json(refusalBody("try_again"), { status: 503 });
+
+  // The Board's page: the database said yes above, as the viewer; the rows
+  // come with the service role, top-level live posts by the club's current
+  // owners and admins only, shown as the club's, counts only
+  // (message-read.ts `readFollowerPage`; repair of review finding 1). The
+  // event refs carry no `room_id` for a follower (no row, not an officer).
+  const [page, refs] = await Promise.all([
+    readChatMessages(
+      supabase,
+      board.id,
+      { limit: 6 },
+      {
+        viewerId,
+        access: { ok: true, isOrgChannel: true, orgId, accepted_at: null, cleared_at: null, kind: "board", eventId: null },
+        room: boardRoom,
+      },
+    ),
+    eventRefsFor([...upNextRows, ...upcomingRows], viewerId),
+  ]);
+  if (!page.ok) return NextResponse.json(page.body, { status: page.status });
+  if (refs === null) console.error(`[${TAG}] follower event refs could not be built; up_next and upcoming empty`);
+  const refsOf = (list: EventRow[]): EventRef[] =>
+    refs ? list.map((row) => refs.get(row.id)).filter((ref): ref is EventRef => ref !== undefined) : [];
+
+  const body: SpaceFollowerResponse = {
+    ok: true,
+    org: {
+      id: orgData.id,
+      handle: orgData.handle,
+      name: orgData.name,
+      logo_url: orgAssetProxyUrl(orgData.handle, orgData.logo_url, "logo"),
+      banner_url: orgAssetProxyUrl(orgData.handle, orgData.banner_url, "banner"),
+      verified: orgData.verified === true,
+      member_count: memberCountRes.error ? null : followerMemberCount(memberCountRes.count),
+    },
+    viewer: { role: null, standing: "follower", can_moderate: false },
+    rooms: [followerBoardRoom(board)],
+    board_latest: lastShown(page.messages),
+    up_next: refsOf(upNextRows),
+  };
+  if (wantsUpcoming) body.upcoming = refsOf(upcomingRows);
+  if (wantsPanel) body.board_recent = recentShown(page.messages, BOARD_RECENT_MAX);
+  return NextResponse.json(body);
+}
+
 /**
  * GET /api/orgs/[slug]/space — one club's space for the phone
  * (handoffs/chat-redesign/wave-2-contracts.md 7.2): the club, the viewer,
@@ -121,11 +252,15 @@ async function unreadIn(service: SupabaseClient, channelId: string, viewerId: st
  * Announcements, cut from the Board page already read.
  *
  * The gate sweep is the channels list's, copied (`channels/route.ts:41-95`):
- * the org and the viewer's role load on the SERVICE client so a non-member
- * of a visible club gets 403 `members_only` and a hidden club answers 404 to
- * anyone outside it. The rooms read stays on the COOKIE client so
- * `can_view_org_channel` keeps Officers and the event rooms behind their
- * rules.
+ * the org and the viewer's role load on the SERVICE client so a hidden club
+ * answers 404 to anyone outside it. The rooms read stays on the COOKIE
+ * client so `can_view_org_channel` keeps Officers and the event rooms behind
+ * their rules.
+ *
+ * Club model (Franky's calls of Oct 16): a non-member of a visible club is
+ * answered by `followerSpace`: the Board only, when the database lets them
+ * read it as a follower (`SpaceFollowerResponse`), else 403 `members_only`.
+ * A member's answer is unchanged.
  */
 export async function GET(req: Request, { params }: Params) {
   const { slug } = await params;
@@ -153,15 +288,7 @@ export async function GET(req: Request, { params }: Params) {
   if (!orgRow) {
     return NextResponse.json(refusalBody("not_found"), { status: 404 });
   }
-  const orgData = orgRow as unknown as {
-    id: string;
-    handle: string;
-    name: string;
-    logo_url: string | null;
-    banner_url: string | null;
-    verified: boolean | null;
-    hidden_at: string | null;
-  };
+  const orgData = orgRow as unknown as OrgData;
 
   const { data: membership, error: memberError } = await service
     .from("org_members")
@@ -175,9 +302,11 @@ export async function GET(req: Request, { params }: Params) {
   }
   const role = isClubRole(membership?.role) ? membership.role : null;
   if (!role) {
+    // Not a member: a hidden club is not there; anyone else may be a
+    // follower the database lets read the Board (club model, Oct 16).
     return orgData.hidden_at
       ? NextResponse.json(refusalBody("not_found"), { status: 404 })
-      : NextResponse.json(refusalBody("members_only"), { status: 403 });
+      : followerSpace(req, supabase, service, user.id, orgData);
   }
   const orgId = orgData.id;
 

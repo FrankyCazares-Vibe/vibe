@@ -17,8 +17,12 @@ export function Sections5aTo5d() {
           follow who follow you back). Your published posts that were not made
           as a club show too, including which one you pinned. So do your bio,
           experience, skills and &ldquo;Working on&rdquo;, unless you hid them
-          (<Sec to="9">section 9</Sec>). Not shown: either email address,
-          résumés or &ldquo;here for&rdquo; answers.
+          (<Sec to="9">section 9</Sec>). It also lists the clubs you are in,
+          each with any title the club gave you and the month you joined it on
+          Vibe, unless you hid that club or the title. Your role in a club is
+          not shown there. Not shown: either email address, résumés,
+          &ldquo;here for&rdquo; answers, the clubs you hid or your list of the
+          clubs you follow.
         </li>
         <li>
           <strong>Photos and videos:</strong> anyone who has the exact link can
@@ -34,7 +38,7 @@ export function Sections5aTo5d() {
         </li>
         <li>
           <strong>Club pages:</strong> name, description, links, logo, banner,
-          who can join, member count, and follower count once it reaches 5.
+          who can join, and the member and follower counts once each reaches 5.
           Also the 12 newest posts with each author&apos;s name, handle and
           photo, even for clubs you must ask or be invited to join.
         </li>
@@ -64,8 +68,8 @@ export function Sections5aTo5d() {
       </LegalP>
       <LegalUL bullets>
         <li>
-          Everything above, plus your comments and reposts, and the lists of who
-          you follow and who follows you.
+          Everything above, plus your comments and reposts, and the lists of the
+          people you follow and who follows you.
         </li>
         <li>
           Totals of likes, views and saves on each post. The author gets a
@@ -75,8 +79,9 @@ export function Sections5aTo5d() {
         <li>Club events, with Going and Interested totals.</li>
         <li>
           Search finds verified accounts that finished setting up, across both
-          universities. The Map lists people by campus and major, and the
-          members of a club that anyone can join.
+          universities. The Map lists people by campus and major. For a club
+          that anyone can join, it also lists the members who show that club on
+          their profile.
         </li>
         <li>
           For any account: when it was made, when its handle last changed and

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { blockedIdsFor } from "@/lib/chat/blocks";
 import { refusalBody } from "@/lib/chat/types";
+import { isMissingColumnError } from "@/lib/db/missing-column";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 
@@ -11,7 +12,8 @@ type Params = { params: Promise<{ slug: string }> };
  * GET /api/orgs/[slug]/members — list members with role + minimal profile.
  * Any member of the org can see the roster. Non-members get 403.
  *
- * Returns: [{ user_id, role, joined_at, name, handle, avatar_url, school_verified }]
+ * Returns: [{ user_id, role, joined_at, title, name, handle, avatar_url, school_verified }]
+ * (`title` null when none was given, or on a database without the column)
  * sorted by role precedence (owner → admin → mod → member) then joined_at.
  *
  * THE ORG IS LOADED WITH THE SERVICE ROLE (spec §4.2). It used to be read
@@ -92,12 +94,20 @@ export async function GET(req: Request, { params }: Params) {
     );
   }
 
-  const { data, error } = await service
-    .from("org_members")
-    .select(
-      "user_id, role, joined_at, users:user_id(id, name, handle, avatar_url, school_verified)"
-    )
-    .eq("org_id", org.id);
+  // `title` (club model; critique #12, repair of review findings 10 and 14):
+  // the title an owner or admin gave a member ("President"), shown to the
+  // club's members here whatever the member chose for their public profile
+  // (`show_title` is about the profile only, and stays theirs). A database
+  // without the column (20261017100000) lists members as before, title null.
+  const readMembers = (withTitle: boolean) =>
+    service
+      .from("org_members")
+      .select(
+        `user_id, role, joined_at, ${withTitle ? "title, " : ""}users:user_id(id, name, handle, avatar_url, school_verified)`
+      )
+      .eq("org_id", org.id);
+  let { data, error } = await readMembers(true);
+  if (error && isMissingColumnError(error, ["title"])) ({ data, error } = await readMembers(false));
   if (error) {
     console.error("[orgs/[slug]/members GET]", error);
     return NextResponse.json(
@@ -107,7 +117,7 @@ export async function GET(req: Request, { params }: Params) {
   }
 
   const ROLE_RANK: Record<string, number> = { owner: 0, admin: 1, mod: 2, member: 3 };
-  const rows = (data || []).map((r) => {
+  const rows = ((data || []) as unknown as Record<string, unknown>[]).map((r) => {
     const u = r.users as unknown as {
       id: string;
       name: string | null;
@@ -119,6 +129,7 @@ export async function GET(req: Request, { params }: Params) {
       user_id: r.user_id as string,
       role: r.role as string,
       joined_at: r.joined_at as string,
+      title: typeof r.title === "string" && r.title.trim() !== "" ? r.title : null,
       name: u?.name ?? null,
       handle: u?.handle ?? null,
       avatar_url: u?.avatar_url ?? null,

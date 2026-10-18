@@ -23,6 +23,10 @@ const FOREVER_YEARS = 100;
  * Effects (client-side mostly): muted channels don't contribute to the
  * unread badge in the mini messenger and the thread list shows a small
  * mute icon. Messages still arrive — just not flashy.
+ *
+ * A follower reading a club's Board (Franky, Oct 16) holds no row, so both
+ * methods are no-ops for them: nothing is stored. The Board sends a follower
+ * no push and no unread dot, so there is nothing to silence.
  */
 export async function POST(req: Request, ctx: RouteCtx) {
   const { id: channelId } = await ctx.params;

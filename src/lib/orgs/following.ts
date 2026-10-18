@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { LEAVE_DROPS_FOLLOW_SOURCES } from "@/lib/orgs/join-copy";
 import { isOrgRole, type OrgRole } from "@/lib/orgs/join-state";
 import { isUuid } from "@/lib/pgrest";
 
@@ -41,18 +42,37 @@ export function canSeeFollowers(role: OrgRole | null | undefined): boolean {
 
 // ── Where a follow came from ────────────────────────────────────────────────
 
-/** Mirrors `org_followers_source_check` (migration :676-677). */
-export type FollowSource = "join" | "profile" | "discover" | "onboarding";
+/**
+ * Mirrors `org_followers_source_check` (20260916120000:676-677, widened by
+ * 20261017100000 with `request`: asking to join follows the club, club model
+ * critique #8). A `request` follow behaves like a `join` one: leaving drops
+ * it (`LEAVE_DROPS_SOURCES`, and the leave trigger).
+ */
+export type FollowSource = "join" | "request" | "profile" | "discover" | "onboarding";
 
 export const FOLLOW_SOURCES: readonly FollowSource[] = Object.freeze([
   "join",
+  "request",
   "profile",
   "discover",
   "onboarding",
 ]);
 
-/** `join` is written by the membership trigger, never by a client. */
-export type ClientFollowSource = Exclude<FollowSource, "join">;
+/**
+ * `join` is written by the membership trigger and `request` by the join
+ * route, never by a client.
+ */
+export type ClientFollowSource = Exclude<FollowSource, "join" | "request">;
+
+/**
+ * A follow the club's own flow made (joining, or asking to join), not a tap
+ * on Follow. Leaving drops it unless they keep following, so the leave
+ * confirm's "Keep following <club>" starts unchecked for these (spec E1;
+ * `keepFollowingDefault` is its negation, over the same list).
+ */
+export function followMadeByJoining(source: FollowSource | null | undefined): boolean {
+  return typeof source === "string" && LEAVE_DROPS_FOLLOW_SOURCES.includes(source);
+}
 
 export const CLIENT_FOLLOW_SOURCES: readonly ClientFollowSource[] = Object.freeze([
   "profile",
@@ -66,7 +86,7 @@ export function isFollowSource(v: unknown): v is FollowSource {
 
 /**
  * The source a route may write for a client's tap. Anything else, `"join"`
- * included, becomes `"profile"`: a client must not be able to pass its follow
+ * and `"request"` included, becomes `"profile"`: a client must not be able to pass its follow
  * off as a roster row (the leave trigger deletes `join` follows), and a bad
  * value must never reach the CHECK as a 23514 (critic C24).
  */
@@ -100,6 +120,49 @@ export function publicFollowerCount(
   if (typeof raw !== "number" || !Number.isFinite(raw)) return null;
   if (canSeeFollowers(viewerRole)) return raw;
   return raw < FOLLOWER_COUNT_FLOOR ? null : raw;
+}
+
+/**
+ * The member count a viewer may be shown (counts public from 5 up; club
+ * model): a member of the club gets the exact number, everyone else null
+ * below the floor, which `FOLLOWER_COUNT_FLOOR` shares. Null always means
+ * "render nothing", never zero.
+ */
+export function publicMemberCount(
+  raw: number | null | undefined,
+  viewerRole: OrgRole | null | undefined,
+): number | null {
+  if (typeof raw !== "number" || !Number.isFinite(raw)) return null;
+  if (viewerRole != null) return raw;
+  return raw < FOLLOWER_COUNT_FLOOR ? null : raw;
+}
+
+// ── The Map's club zone ─────────────────────────────────────────────────────
+
+/**
+ * The `org_members` column that decides whether the Map's club zone lists a
+ * member: the member's own "show this club on my profile" choice (on by
+ * default; hidden one by one, Franky's club model calls). A member who hid
+ * the club is never on its zone, for anyone, members included.
+ */
+export const MAP_ZONE_SHOWN_COLUMN = "show_on_profile";
+
+/**
+ * May the Map's club zone list this club's members to this viewer at all
+ * (club model batch 2A)? Never for a hidden club. A member: yes, their own
+ * club. Anyone else: only a public club anyone can join, the reach the
+ * open-club branch of `org_members_select` gave before 20261017120000 made
+ * member lists members-only (Privacy Policy 5b, wave 3: "for a club anyone
+ * can join"). The zone then reads with the SERVICE client and keeps only the
+ * members who show the club ({@link MAP_ZONE_SHOWN_COLUMN}).
+ */
+export function mapZoneListsMembers(
+  org: { is_public?: unknown; join_policy?: unknown; hidden_at?: unknown },
+  viewerIsMember: boolean,
+): boolean {
+  if (org.hidden_at != null) return false;
+  if (viewerIsMember) return true;
+  return org.is_public === true && org.join_policy === "open";
 }
 
 /**
@@ -374,4 +437,65 @@ export async function loadVisibleOrgCards(
     });
   }
   return { ok: true, byId };
+}
+
+/**
+ * The viewer's role in each club of `orgIds` (or in every club they are in,
+ * when `orgIds` is left out), keyed by club id. Clubs they aren't in are
+ * simply absent. SERVICE client, and always the viewer's own id: it is a fact
+ * about the viewer, which {@link publicMemberCount} needs to give a member the
+ * exact count. A failed read is reported, never "member of nothing"; a caller
+ * that goes on anyway gets the floored counts, the safe way to be wrong.
+ */
+export async function loadViewerOrgRoles(
+  service: SupabaseClient,
+  viewerId: string,
+  orgIds?: string[],
+): Promise<{ ok: true; byOrg: Map<string, OrgRole> } | { ok: false; error: unknown }> {
+  const byOrg = new Map<string, OrgRole>();
+  const ids = orgIds === undefined ? null : Array.from(new Set(orgIds.filter((id) => isUuid(id))));
+  if (ids !== null && ids.length === 0) return { ok: true, byOrg };
+  let query = service.from("org_members").select("org_id, role").eq("user_id", viewerId);
+  if (ids !== null) query = query.in("org_id", ids);
+  const { data, error } = await query;
+  if (error) {
+    console.error("[orgs/following loadViewerOrgRoles]", error);
+    return { ok: false, error };
+  }
+  for (const row of data ?? []) {
+    const r = row as { org_id?: unknown; role?: unknown };
+    if (typeof r.org_id === "string" && isOrgRole(r.role)) byOrg.set(r.org_id, r.role);
+  }
+  return { ok: true, byOrg };
+}
+
+/**
+ * How many members each club in `orgIds` has, keyed by club id, in ONE read
+ * (a `members:org_members(count)` embed on the club rows). SERVICE client
+ * only: since 20261017120000 the viewer's own client counts nothing in a
+ * club they aren't in. Raw numbers: callers show them through
+ * {@link publicMemberCount}. A club missing from the map (hidden clubs
+ * included, if the caller passed one) has no count; null is never zero.
+ */
+export async function loadMemberCounts(
+  service: SupabaseClient,
+  orgIds: string[],
+): Promise<{ ok: true; byOrg: Map<string, number> } | { ok: false; error: unknown }> {
+  const byOrg = new Map<string, number>();
+  const ids = Array.from(new Set(orgIds.filter((id) => isUuid(id))));
+  if (ids.length === 0) return { ok: true, byOrg };
+  const { data, error } = await service
+    .from("orgs")
+    .select("id, members:org_members(count)")
+    .in("id", ids);
+  if (error) {
+    console.error("[orgs/following loadMemberCounts]", error);
+    return { ok: false, error };
+  }
+  for (const row of data ?? []) {
+    const r = row as { id?: unknown; members?: unknown };
+    const count = flattenCountEmbed(r.members);
+    if (typeof r.id === "string" && count !== null) byOrg.set(r.id, count);
+  }
+  return { ok: true, byOrg };
 }

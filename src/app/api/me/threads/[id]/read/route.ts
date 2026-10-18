@@ -17,6 +17,11 @@ type RouteCtx = { params: Promise<{ id: string }> };
  * skipped because the last one was recent would leave a message that came
  * in between unread for good once the chat goes quiet (limits critique #4).
  * One row, the caller's own.
+ *
+ * A follower reading a club's Board (Franky, Oct 16) leaves no read mark:
+ * they hold no `channel_members` row, so the update matches nothing, and
+ * the answer stays ok so the quiet mark on opening a chat never turns into
+ * an error. Followers have no unread dot to clear.
  */
 export async function POST(_req: Request, ctx: RouteCtx) {
   const { id: channelId } = await ctx.params;

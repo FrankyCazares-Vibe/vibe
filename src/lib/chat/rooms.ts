@@ -317,19 +317,29 @@ export async function canPost(
   return (await canPostAnswer(client, channelId, userId, rootId)) === "yes";
 }
 
+/** Ids sent in one `in (...)` filter: keeps the request line well under the proxy's limit. */
+const IDS_PER_READ = 100;
+
 /**
- * Of `userIds`, the people who can read THIS room (service role). The
- * @mention fan-out notifies only them, so a mention in a private room never
- * reaches a member who cannot open it (section 6.2).
+ * Of `userIds`, the MEMBERS of the room's club who can read THIS room
+ * (service role). The @mention fan-out notifies only them, so a mention in a
+ * private room never reaches a member who cannot open it (section 6.2).
  *
- * The answer is `can_view_org_channel`'s, asked once per person (it is
+ * Members only (club model, Oct 16): a follower reads the Board, and
+ * `can_view_org_channel` says yes for them there, but a room never sends a
+ * follower a mention or a push. So the club's `org_members` rows are read
+ * first and only the people holding one are asked about the room. `orgId`
+ * is the room's club when the caller knows it (the send route does);
+ * absent, it is read from the room.
+ *
+ * The room answer is `can_view_org_channel`'s, asked once per member (it is
  * SECURITY DEFINER and answers the service role truthfully). The ids come
  * back in the order they were given, each once. A person the database could
- * not answer for is left out (logged once): a mention that is not delivered
- * is the safe mistake. For a dm or a group the function answers no for
- * everyone, so this is for club rooms only.
+ * not answer for, or any read that failed, is left out (logged once): a
+ * mention that is not delivered is the safe mistake. For a dm or a group
+ * there is no club, so nobody: this is for club rooms only.
  */
-export async function filterRoomReaders(channelId: string, userIds: string[]): Promise<string[]> {
+export async function filterRoomReaders(channelId: string, userIds: string[], orgId?: string): Promise<string[]> {
   const tag = "chat/rooms.filterRoomReaders";
   if (!isId(channelId) || !Array.isArray(userIds)) return [];
   const asked: string[] = [];
@@ -344,6 +354,8 @@ export async function filterRoomReaders(channelId: string, userIds: string[]): P
   if (asked.length === 0) return [];
   const service = serviceClient(tag);
   if (!service) return [];
+  const members = await clubMembersOf(service, tag, channelId, asked, orgId);
+  if (members.length === 0) return [];
 
   const mayRead = async (userId: string): Promise<boolean> => {
     try {
@@ -360,8 +372,8 @@ export async function filterRoomReaders(channelId: string, userIds: string[]): P
   };
 
   const readers: string[] = [];
-  for (let start = 0; start < asked.length; start += READERS_AT_ONCE) {
-    const group = asked.slice(start, start + READERS_AT_ONCE);
+  for (let start = 0; start < members.length; start += READERS_AT_ONCE) {
+    const group = members.slice(start, start + READERS_AT_ONCE);
     const answers = await Promise.all(group.map(mayRead));
     group.forEach((id, index) => {
       if (answers[index]) readers.push(id);
@@ -371,15 +383,60 @@ export async function filterRoomReaders(channelId: string, userIds: string[]): P
 }
 
 /**
- * This person's role in this club (service role), or null when they are not
- * a member (any more). A read that fails also answers null (logged once):
- * no role is the side with no powers.
+ * Of `ids` (already cleaned, each once), the people who hold a role in the
+ * room's club, in the order given (service role). `orgId` when the caller
+ * knows the club; else it is read from the room. Any read that fails, or a
+ * room with no club, answers nobody (logged once).
  */
-export async function clubRole(orgId: string, userId: string): Promise<ClubRole | null> {
+async function clubMembersOf(
+  service: SupabaseClient,
+  tag: string,
+  channelId: string,
+  ids: string[],
+  orgId?: string,
+): Promise<string[]> {
+  try {
+    let club = isId(orgId) ? orgId : null;
+    if (!club) {
+      const { data, error } = await service.from("channels").select("org_id").eq("id", channelId).maybeSingle();
+      if (error) {
+        logFailureOnce(tag, errorSummary(error));
+        return [];
+      }
+      const found = (data as { org_id?: unknown } | null)?.org_id;
+      club = isId(found) ? found : null;
+    }
+    if (!club) return [];
+    const holders = new Set<string>();
+    for (let start = 0; start < ids.length; start += IDS_PER_READ) {
+      const chunk = ids.slice(start, start + IDS_PER_READ);
+      const { data, error } = await service.from("org_members").select("user_id, role").eq("org_id", club).in("user_id", chunk);
+      if (error) {
+        logFailureOnce(tag, errorSummary(error));
+        return [];
+      }
+      for (const row of (data ?? []) as { user_id?: unknown; role?: unknown }[]) {
+        if (typeof row.user_id === "string" && isClubRole(row.role)) holders.add(row.user_id.toLowerCase());
+      }
+    }
+    return ids.filter((id) => holders.has(id.toLowerCase()));
+  } catch (err) {
+    logFailureOnce(tag, errorSummary(err));
+    return [];
+  }
+}
+
+/**
+ * This person's role in this club (service role), saying a failed read in
+ * words: the role, null when they are not a member (any more), or "failed"
+ * (logged once). A route that must tell "not a member" (a follower: 403
+ * `members_only`) from "the read failed" (503 `try_again`) asks this one.
+ */
+export async function clubRoleAnswer(orgId: string, userId: string): Promise<ClubRole | null | "failed"> {
   const tag = "chat/rooms.clubRole";
   if (!isId(orgId) || !isId(userId)) return null;
   const service = serviceClient(tag);
-  if (!service) return null;
+  if (!service) return "failed";
   try {
     const { data, error } = await service
       .from("org_members")
@@ -389,12 +446,22 @@ export async function clubRole(orgId: string, userId: string): Promise<ClubRole 
       .maybeSingle();
     if (error) {
       logFailureOnce(tag, errorSummary(error));
-      return null;
+      return "failed";
     }
     const role = (data as { role?: unknown } | null)?.role;
     return isClubRole(role) ? role : null;
   } catch (err) {
     logFailureOnce(tag, errorSummary(err));
-    return null;
+    return "failed";
   }
+}
+
+/**
+ * This person's role in this club (service role), or null when they are not
+ * a member (any more). A read that fails also answers null (logged once):
+ * no role is the side with no powers. `clubRoleAnswer` tells the two apart.
+ */
+export async function clubRole(orgId: string, userId: string): Promise<ClubRole | null> {
+  const answer = await clubRoleAnswer(orgId, userId);
+  return answer === "failed" ? null : answer;
 }

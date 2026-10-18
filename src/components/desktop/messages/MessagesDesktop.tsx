@@ -4,6 +4,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 
 import { CALENDAR_CHANGED_EVENT, emitCalendarChanged } from "@/components/LeftNav";
 import { threadAvatar, threadTitle } from "@/components/mobile/messages/format";
+import { useBoardSeen } from "@/components/mobile/messages/home/board-seen";
 import type { WeekEntry } from "@/components/mobile/messages/home/home-rules";
 import { useHomeData } from "@/components/mobile/messages/home/MessagesHome";
 import { ChatSurfaceContext } from "@/components/mobile/messages/surface";
@@ -17,7 +18,7 @@ import { toast } from "@/lib/feedback/toast";
 import { ClubPane } from "./ClubPane";
 import type { ClubPaneProps, LegacyThreadPaneHandle, MessagesDesktopProps } from "./contracts";
 import { desktopLayerOpen } from "./DesktopDialog";
-import { knownChat, type OpenChat, panelMode, slimRows, type SlimRow } from "./desktop-rules";
+import { knownChat, type OpenChat, panelMode, slimRows, type SlimRow, withFollowedBoards } from "./desktop-rules";
 import type { DmPageEvent } from "./dm-bridge";
 import { InboxWide } from "./InboxWide";
 import { LegacyThreadPane } from "./LegacyThreadPane";
@@ -436,9 +437,19 @@ export function MessagesDesktop({ initialHandle, initialChannelId }: MessagesDes
     }
     return null;
   }, [open, data.clubs, data.threads, data.requests, clubOrg, opened]);
+  // The Boards I follow sit under the chats, so a follower moves from one
+  // Board to the next without going home (wave-2 repair, finding 12).
+  const boardSeen = useBoardSeen();
   const rows = useMemo(
-    () => slimRows(data.clubs ?? [], data.threads ?? [], data.requests ?? [], openChat, data.now),
-    [data.clubs, data.threads, data.requests, data.now, openChat],
+    () =>
+      withFollowedBoards(
+        slimRows(data.clubs ?? [], data.threads ?? [], data.requests ?? [], openChat, data.now),
+        data.boards ?? [],
+        openChat,
+        boardSeen,
+        data.now,
+      ),
+    [data.clubs, data.threads, data.requests, data.boards, data.now, openChat, boardSeen],
   );
 
   const [newOpen, setNewOpen] = useState(false);

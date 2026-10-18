@@ -106,8 +106,8 @@ export function Sections1To3() {
       </LegalP>
       <LegalP>
         <strong>Without a verified school email</strong> you cannot post,
-        comment, message or join a club. You can still like, save, follow and
-        report. Verifying does not hide anything from other accounts. An account
+        comment, message or join a club, or read a club&apos;s Board as a
+        follower. You can still like, save, follow and report. Verifying does not hide anything from other accounts. An account
         that has not verified can still read everything in{" "}
         <Sec to="5b">section 5b</Sec>. It cannot open résumés (
         <Sec to="5c">section 5c</Sec>).
@@ -177,6 +177,10 @@ export function Sections1To3() {
         <li>
           the list of profile parts you hid (<Sec to="9">section 9</Sec>);
         </li>
+        <li>
+          which of your clubs show on your profile, in what order, and whether
+          the title a club gave you shows (<Sec to="9">section 9</Sec>);
+        </li>
         <li>your &ldquo;What are you here for?&rdquo; answers.</li>
       </LegalUL>
 
@@ -185,9 +189,11 @@ export function Sections1To3() {
         <li>Posts, drafts, comments, likes, reposts and saves.</li>
         <li>Who you follow and who follows you.</li>
         <li>
-          Clubs: memberships and roles, clubs you follow, requests to join with
-          your message, and invites. If a club&apos;s owner or admin takes you
-          out of the club or adds you to a room, we store who did it and when.
+          Clubs: memberships and roles, the title a club&apos;s owner or admin
+          gave you, clubs you follow, requests to join with your message, and
+          invites. Asking to join a club also follows it. If a club&apos;s owner
+          or admin takes you out of the club, adds you to a room, gives you a
+          title or removes you as a follower, we store who did it and when.
         </li>
         <li>
           Club events, your RSVPs (Going or Interested) and personal calendar
@@ -202,8 +208,8 @@ export function Sections1To3() {
           rooms.
         </li>
         <li>
-          Reports you file, your block and mute lists, and the suggested people
-          you dismissed.
+          Reports you file, your block and mute lists (people, and clubs whose
+          posts you muted), and the suggested people you dismissed.
         </li>
         <li>
           Otto settings, your answers to Otto&apos;s set-up questions, and

@@ -19,6 +19,7 @@ import { initialsOf } from "@/components/mobile/messages/format";
 import { FONT, palette, type Palette, SERIF } from "@/components/mobile/messages/v2-tokens";
 import type { ChatMessage, EventRef, Person } from "@/lib/chat/types";
 import { eventTime, rowTime, rowTimeSpoken } from "@/lib/chat/when";
+import { ORG_COPY } from "@/lib/orgs/join-copy";
 
 import type { ClubPanelProps } from "./contracts";
 import { chatEntry } from "./desktop-rules";
@@ -382,7 +383,7 @@ export function ClubPanel({ space, activeRoomKind, night, now, mode, faces, onHi
                   <span style={{ display: "inline-flex", color: t.secondary }}>
                     <MegaphoneIcon />
                   </span>
-                  Announcements
+                  {ORG_COPY.board.title}
                 </h2>
                 <a {...roomLink(board.id, () => openBoard(board.id))} id={boardAllId} aria-labelledby={`${boardAllId} ${boardId}`} className="vibe-club-panel-word" style={{ ...WORD, color: t.secondary }}>
                   See all

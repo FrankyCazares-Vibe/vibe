@@ -38,7 +38,7 @@ import { campusLoadFailure, MapMobile } from "@/components/mobile/MapMobile";
 import { ConversationView } from "@/components/mobile/MessagesMobile";
 import { ListSkeleton } from "@/components/mobile/messages/ThreadList";
 import { PostComposerMobile } from "@/components/mobile/PostComposerMobile";
-import { PostViewerMobile } from "@/components/mobile/PostViewerMobile";
+import { PostViewerMobile, useClubMute, type ClubMuteFn } from "@/components/mobile/PostViewerMobile";
 import { SharePostSheet } from "@/components/mobile/SharePostSheet";
 import { PENDING_KEY as TOUR_PENDING_KEY, useMobileTour } from "@/components/mobile/use-mobile-tour";
 import { OrgJoinControl } from "@/components/orgs/OrgJoinControl";
@@ -61,7 +61,15 @@ import {
 } from "@/lib/orgs/join-copy";
 import type { JoinPolicy, JoinState, OrgAudience, OrgRole } from "@/lib/orgs/join-state";
 import type { EditedPost } from "@/lib/posts/edit";
-import { deletesAsOfficer, postSheetRows } from "@/lib/posts/feed-actions";
+import {
+  deletesAsOfficer,
+  feedClubOf,
+  muteClubRowLabel,
+  MUTING_LABEL,
+  postSheetRows,
+  type FeedClub,
+  withoutClubPosts,
+} from "@/lib/posts/feed-actions";
 import { countOpen } from "@/lib/usage/touch-client";
 
 /**
@@ -446,7 +454,11 @@ export function CampusMobile() {
   // Visiting, the chips are still the student's own RSVPs, usually at home,
   // so one the visited campus's list doesn't have takes them home first; the
   // card is scrolled to once home's events have loaded (the effect below).
-  const pendingEventRef = useRef<string | null>(null);
+  // Seeded from `?tab=events&event=<id>` (an Up next tile with no chat, the
+  // search bar's event rows), as desktop does: scrolled to once events load.
+  const pendingEventRef = useRef<string | null>(
+    searchParams.get("tab") === "events" ? searchParams.get("event") || null : null,
+  );
   const pickEvent = (id: string) => {
     if (isVisiting && !(events ?? []).some((e) => e.id === id)) {
       pendingEventRef.current = id;
@@ -750,6 +762,23 @@ export function CampusMobile() {
     );
     void refetchFeedRef.current("refresh");
   }, []);
+  // "Mute <club>'s posts" from a card's ⋯ or the post viewer's: one mute for
+  // the whole feed. Its cards leave both lists at once (the viewer's own
+  // stay), so the toast never says "gone" over a card still there; no
+  // refetch then, which would only risk a failure toast over the Undo. An
+  // Undo refetches, so the posts come back (wave-2 repair, finding 1).
+  const onClubMuteChange = useCallback(
+    (club: FeedClub, muted: boolean) => {
+      if (!muted) {
+        void refetchFeedRef.current("refresh");
+        return;
+      }
+      setFeed((prev) => (prev ? withoutClubPosts(prev, club, viewerId) : prev));
+      setTagFeed((prev) => (prev?.posts ? { ...prev, posts: withoutClubPosts(prev.posts, club, viewerId) } : prev));
+    },
+    [viewerId],
+  );
+  const clubMute = useClubMute(onClubMuteChange);
   // `tagFeed` for the effect below, which decides before it asks whether a
   // failure has rows to keep; reading the state there would re-run it on
   // every answer. Declared first, so it has caught up when that effect runs.
@@ -864,6 +893,15 @@ export function CampusMobile() {
       setTagAttempt((n) => n + 1);
     }
   };
+  // The open post's club card, from either list (a post opened from the #tag
+  // list isn't always in the feed): its name for an officer's Delete confirm
+  // (S68 C5), the club for "Mute <club>'s posts".
+  const openPostOrg = openPostId
+    ? ((
+        feed?.find((p) => p.id === openPostId) ??
+        tagFeed?.posts?.find((p) => p.id === openPostId)
+      )?.org ?? null)
+    : null;
 
   // ---------- Render ----------
 
@@ -996,6 +1034,7 @@ export function CampusMobile() {
             // A block made from a card's ⋯ has to take their posts off the
             // screen, or it reads as though nothing happened.
             onBlocked={() => void refetchFeed("refresh")}
+            onMuteClub={clubMute.mute}
             visitingName={visitingName}
           />
         </section>
@@ -1151,12 +1190,11 @@ export function CampusMobile() {
           viewerId={viewerId}
           // Names the club in an officer's Delete confirm (S68 C5).
           // (The #tag list too: a post opened from there isn't always in the feed.)
-          clubName={
-            (
-              feed?.find((p) => p.id === openPostId) ??
-              tagFeed?.posts?.find((p) => p.id === openPostId)
-            )?.org?.name ?? null
-          }
+          clubName={openPostOrg?.name ?? null}
+          // "Mute <club>'s posts" in its ⋯, through this feed's mute so the
+          // Undo toast stays up after the viewer closes.
+          club={feedClubOf(openPostOrg)}
+          onMuteClub={clubMute.mute}
           onClose={() => setOpenPostId(null)}
           onDeleted={() => {
             // The post leaves both lists at once (dropDeletedPost).
@@ -1335,6 +1373,7 @@ function FeedPane({
   onEdited,
   onDeleted,
   onBlocked,
+  onMuteClub,
   visitingName,
 }: {
   posts: FeedPost[] | null;
@@ -1357,6 +1396,8 @@ function FeedPane({
   onDeleted: (postId: string) => void;
   /** A block landed from a card's ⋯: reload so their posts go. */
   onBlocked: () => void;
+  /** "Mute <club>'s posts" from a card's ⋯: the feed's one mute and Undo toast. */
+  onMuteClub: ClubMuteFn;
   /** The campus being looked at when it isn't home; null at home. Its empty
    *  feed can't ask for a first post: the + isn't there and posts go home. */
   visitingName: string | null;
@@ -1407,6 +1448,7 @@ function FeedPane({
           onEdited={onEdited}
           onDeleted={onDeleted}
           onBlocked={onBlocked}
+          onMuteClub={onMuteClub}
         />
       ))}
     </>
@@ -1528,6 +1570,7 @@ function FeedCard({
   onEdited,
   onDeleted,
   onBlocked,
+  onMuteClub,
 }: {
   post: FeedPost;
   onOpen: () => void;
@@ -1541,6 +1584,8 @@ function FeedCard({
   onDeleted: (postId: string) => void;
   /** The author was blocked from the card's ⋯ menu. */
   onBlocked: () => void;
+  /** "Mute <club>'s posts" from the card's ⋯ menu (the feed's one mute). */
+  onMuteClub: ClubMuteFn;
 }) {
   const author = post.author;
   const initials = (author?.name ?? author?.handle ?? "?")
@@ -1772,7 +1817,7 @@ function FeedCard({
             {post.org ? ` · ${post.org.name}` : ""}
           </div>
         </div>
-        {/* 3-dot menu: Send to chats, Copy link, then Edit post and Delete post (your own) or Report post (others'), with Delete post for a club officer too. See postSheetRows. */}
+        {/* 3-dot menu: Send to chats, Copy link, then Edit post and Delete post (your own) or Mute <club>'s posts on a club post and Report post (others'), with Delete post for a club officer too. See postSheetRows. */}
         <button
           type="button"
           onClick={(e) => {
@@ -2194,6 +2239,9 @@ function FeedCard({
           // and a current club owner / admin; missing means no Delete.
           canDelete={post.viewer_can_delete === true && !post.removed_at}
           clubName={post.org?.name ?? null}
+          // A club card offers "Mute <club>'s posts" (not on your own post).
+          club={feedClubOf(post.org)}
+          onMuteClub={onMuteClub}
           initialContent={post.content ?? ""}
           hasMedia={!!post.media_url}
           onEdited={onEdited}
@@ -3546,8 +3594,9 @@ function OrgRow({
         </Link>
         {view.layout === "slot" ? <div style={{ flexShrink: 0 }}>{control}</div> : null}
       </div>
-      {/* Open clubs: Follow and Join share their own full-width line, so the
-          name never gives up its width to two pills at 375px. */}
+      {/* Open and request clubs: Follow and Join (or Request) share their own
+          full-width line, so the name never gives up its width to two pills
+          at 375px. */}
       {view.layout === "line" ? <div style={{ width: "100%" }}>{control}</div> : null}
       {/* Outside the link: next to Follow, and not part of the link's name. */}
       {view.disclosure ? (
@@ -3631,7 +3680,8 @@ function EmptyTab({ title, body }: { title: string; body: string }) {
 
 /** 3-dot menu sheet: slides up from the bottom. Send to chats, Copy link,
  *  then Edit post and Delete post on your own post, or Report post on anyone
- *  else's (plus Delete post for a club officer, as on desktop). Delete moved
+ *  else's (plus Delete post for a club officer, as on desktop, and "Mute
+ *  <club> posts" before Report on a club post: club model, Oct 16). Delete moved
  *  here from the post viewer on Oct 14 2026 at Franky's ask, reversing the
  *  Sept 16 call; the viewer keeps its own. The rows: postSheetRows.
  *
@@ -3648,6 +3698,8 @@ function PostActionsSheet({
   removed = false,
   canDelete,
   clubName,
+  club,
+  onMuteClub,
   initialContent,
   hasMedia,
   onEdited,
@@ -3671,6 +3723,11 @@ function PostActionsSheet({
   canDelete: boolean;
   /** Named in an officer's Delete confirm (S68 C5). */
   clubName?: string | null;
+  /** The card's club (`feedClubOf(post.org)`), null on a personal post: the
+   *  "Mute <club>'s posts" row (club model, Oct 16). */
+  club: FeedClub | null;
+  /** The feed's mute: true once it went through (a refusal toasted why). */
+  onMuteClub: ClubMuteFn;
   initialContent: string;
   hasMedia: boolean;
   onEdited: (p: EditedPost) => void;
@@ -3696,6 +3753,18 @@ function PostActionsSheet({
   const [editOpen, setEditOpen] = useState(false);
   const [blocking, setBlocking] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [muting, setMuting] = useState(false);
+
+  // "Mute <club>'s posts": the sheet stays up while the request is out, then
+  // goes; the feed's Undo toast says what happened. A refusal toasted why and
+  // leaves the sheet open for a retry.
+  const muteClub = useCallback(async () => {
+    if (!club || muting) return;
+    setMuting(true);
+    const ok = await onMuteClub(club);
+    setMuting(false);
+    if (ok) onClose();
+  }, [club, muting, onMuteClub, onClose]);
 
   // "Delete post", the post viewer's flow (PostViewerMobile's handleDelete).
   // An officer deleting a club post someone else wrote is told whose post it
@@ -3731,6 +3800,7 @@ function PostActionsSheet({
     viewerCanDelete: canDelete,
     removed,
     canBlock: !!authorId,
+    clubPost: !!club,
   });
 
   // "Block author" — the phone feed card had Report and no way to stop seeing
@@ -3874,6 +3944,16 @@ function PostActionsSheet({
                 );
               case "copy":
                 return <ActionSheetRow key={row} label="Copy link" onClick={copyLink} />;
+              case "mute":
+                // postSheetRows offers it only with a club; the guard is the belt.
+                return club ? (
+                  <ActionSheetRow
+                    key={row}
+                    label={muting ? MUTING_LABEL : muteClubRowLabel(club)}
+                    onClick={() => void muteClub()}
+                    disabled={muting}
+                  />
+                ) : null;
               case "edit":
                 return (
                   <ActionSheetRow key={row} label="Edit post" onClick={() => setEditOpen(true)} />
@@ -4080,6 +4160,15 @@ const ComposerFab = ({
   ref: React.RefObject<HTMLButtonElement | null>;
   onPost: () => void;
 }) => {
+  // While the + is up, the app's toast sits above it, never over it
+  // (ToastHost reads `--vibe-toast-lift`; wave-2 repair, finding 13).
+  useEffect(() => {
+    const root = document.documentElement;
+    root.style.setProperty("--vibe-toast-lift", "144px");
+    return () => {
+      root.style.removeProperty("--vibe-toast-lift");
+    };
+  }, []);
   return (
     <>
       <button

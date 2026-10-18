@@ -627,6 +627,123 @@ body.edit-mode .tag-remove { display:flex; }
 body.edit-mode .tag-add { display:flex;align-items:center;gap:5px; }
 .tag-add:hover { border-color:var(--accent);color:var(--tag-ink); }
 
+/* ── Clubs on a profile (club model 3A) ───────────────────────────────────
+   The phone's ClubFlair.tsx (chips under the @handle) and ClubsSection.tsx
+   (the Clubs card), drawn by _pclubsPaint. Tokens only, so Night follows;
+   static-profile-clubs.test.ts keeps colour literals out of this block. */
+/* clubs-css:start */
+.pclub-flair {
+  display:flex;flex-wrap:nowrap;gap:6px;min-width:0;max-width:100%;
+  overflow-x:auto;overscroll-behavior-x:contain;scrollbar-width:none;
+  list-style:none;margin:0 0 12px;padding:0;
+}
+.pclub-flair::-webkit-scrollbar { display:none; }
+.pclub-flair[hidden], .pclubs[hidden] { display:none; }
+.pclub-flair > li { flex-shrink:0;list-style:none; }
+.pclub-chip {
+  display:inline-flex;align-items:center;gap:6px;min-height:32px;
+  padding:4px 11px 4px 5px;border-radius:999px;
+  background:var(--paper);border:1px solid var(--hairline);
+  font-size:12px;font-weight:600;color:var(--ink-2);
+  text-decoration:none;white-space:nowrap;cursor:none;
+  transition:border-color .15s,color .15s;
+}
+.pclub-chip:hover { border-color:rgba(var(--scrim-rgb),.22);color:var(--charcoal); }
+.pclub-chip-title, .pclub-chip-name { overflow:hidden;text-overflow:ellipsis; }
+.pclub-chip-title { max-width:120px;color:var(--charcoal); }
+.pclub-chip-name { max-width:160px; }
+.pclub-logo {
+  display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;
+  overflow:hidden;border-radius:50%;box-sizing:border-box;
+  background:var(--avatar-empty);border:1px solid var(--hairline);color:var(--ink-2);
+  font-family:'Fraunces',serif;font-weight:800;line-height:1;
+}
+.pclub-logo img { width:100%;height:100%;object-fit:cover;display:block; }
+.pclub-tick {
+  display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;
+  border-radius:50%;background:var(--ok-ink);color:var(--paper);
+  font-weight:900;line-height:1;
+}
+/* Above the grid's cards, so a row's ⋯ menu never slides under them. */
+.pclubs { position:relative;z-index:3;min-width:0; }
+.pclubs .card-title { margin-bottom:12px; }
+.pclubs-group + .pclubs-group { margin-top:18px; }
+.pclubs-eyebrow {
+  margin:0 0 6px;font-size:11px;font-weight:700;letter-spacing:.08em;
+  text-transform:uppercase;color:var(--ink-muted);
+}
+.pclubs-only-you { font-weight:600;letter-spacing:.02em;text-transform:none; }
+.pclubs-note { margin:0 0 4px;font-size:12.5px;line-height:1.45;color:var(--ink-muted); }
+.pclubs-empty { margin:2px 0 0;font-size:12.5px;line-height:1.45;color:var(--ink-2); }
+.pclubs-list {
+  list-style:none;margin:0;padding:0;display:grid;column-gap:24px;
+  grid-template-columns:repeat(auto-fill,minmax(min(280px,100%),1fr));
+}
+.pclub-row {
+  position:relative;display:flex;align-items:center;gap:8px;min-width:0;
+  padding:8px 0;border-top:1px solid var(--hairline);
+}
+.pclub-link {
+  flex:1;min-width:0;display:flex;align-items:center;gap:12px;
+  color:inherit;text-decoration:none;cursor:none;border-radius:12px;
+}
+.pclub-text { flex:1;min-width:0;display:flex;flex-direction:column;gap:2px; }
+.pclub-name-line { display:flex;align-items:center;gap:6px;min-width:0; }
+.pclub-name {
+  min-width:0;font-size:15px;font-weight:700;line-height:1.3;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;transition:color .15s;
+}
+.pclub-link:hover .pclub-name { color:var(--tag-ink); }
+.pclub-sub { font-size:12.5px;line-height:1.4;color:var(--ink-2);overflow-wrap:anywhere; }
+.pclub-marks { display:flex;flex-wrap:wrap;gap:4px;margin-top:2px; }
+.pclub-mark {
+  padding:1px 7px;border-radius:999px;background:rgba(var(--scrim-rgb),.06);
+  color:var(--ink-muted);font-size:10.5px;font-weight:700;letter-spacing:.02em;white-space:nowrap;
+}
+.pclub-row.is-dim .pclub-logo { opacity:.5; }
+.pclub-row.is-dim .pclub-name { opacity:.6; }
+.pclub-more {
+  flex-shrink:0;width:36px;height:36px;display:inline-flex;align-items:center;justify-content:center;
+  padding:0;border:none;border-radius:999px;background:transparent;color:var(--ink-muted);
+  cursor:none;transition:background .12s,color .12s;
+}
+.pclub-more:hover, .pclub-more[aria-expanded="true"] { background:rgba(var(--scrim-rgb),.06);color:var(--charcoal); }
+.pclub-chip:focus-visible, .pclub-link:focus-visible, .pclub-more:focus-visible,
+.pclubs-more-btn:focus-visible { outline:2px solid var(--accent);outline-offset:2px; }
+/* Inside the menu, whose overflow would clip a ring drawn outside the row. */
+.pclub-menu-item:focus-visible { outline:2px solid var(--accent);outline-offset:-2px; }
+.pclub-menu {
+  position:absolute;top:calc(100% - 4px);right:0;z-index:60;
+  min-width:220px;max-width:min(300px,calc(100vw - 32px));padding:4px 0;
+  background:var(--paper);border:1px solid var(--border);border-radius:12px;
+  box-shadow:var(--shadow-lg);overflow:hidden;
+}
+.pclub-menu-head {
+  padding:9px 14px 5px;font-family:'Fraunces',serif;font-size:14px;font-weight:800;
+  color:var(--charcoal);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.pclub-menu-item {
+  display:block;width:100%;text-align:left;background:none;border:none;
+  padding:10px 14px;font-family:'DM Sans',sans-serif;font-size:13px;line-height:1.4;
+  color:var(--charcoal);text-decoration:none;cursor:none;transition:background .12s;
+}
+.pclub-menu-item:hover { background:var(--cream); }
+.pclub-menu-item[aria-disabled="true"] { opacity:.5; }
+.pclub-menu-note { padding:0 14px 10px;font-size:12px;line-height:1.5;color:var(--ink-muted); }
+.pclubs-more-btn {
+  display:block;width:100%;min-height:40px;margin-top:8px;border-radius:999px;
+  border:1px solid rgba(var(--scrim-rgb),.12);background:transparent;color:var(--charcoal);
+  font-family:inherit;font-size:13px;font-weight:700;cursor:none;
+}
+.pclubs-more-btn[aria-disabled="true"] { opacity:.6; }
+.pclub-skel { display:block;flex-shrink:0;border-radius:6px;background:rgba(var(--scrim-rgb),.08); }
+@media (max-width: 760px) {
+  /* A thumb's target on a phone, as ClubsSection's 44 px ⋯. */
+  .pclub-more { width:44px;height:44px; }
+  .pclub-menu-item { padding:13px 16px;font-size:14px; }
+}
+/* clubs-css:end */
+
 /* Card panels */
 .card {
   background:var(--paper);border-radius:24px;padding:28px;
@@ -3553,6 +3670,9 @@ body.empty-profile-mode #profileEmpty { display: flex !important; }
         <span class="profile-handle-status" id="profileHandleStatus"></span>
       </span>
     </div>
+    <!-- Club flair (club model 3A): up to three chips, ClubFlair.tsx's
+         rules. Painted by _pclubsPaint; stays hidden with none to show. -->
+    <ul class="pclub-flair" id="profileFlairRow" aria-label="Clubs" hidden></ul>
     <p class="profile-tagline" data-edit="true" data-user-field="tagline" data-placeholder="A line that captures how you work" contenteditable="false"></p>
     <div class="profile-meta">
       <span class="meta-item"><span class="meta-label">Location</span><span data-edit="true" data-user-field="location" data-placeholder="City, country" contenteditable="false"></span></span>
@@ -3738,6 +3858,15 @@ body.empty-profile-mode #profileEmpty { display: flex !important; }
     </div>
     <div id="pinnedContent"></div>
   </div>
+
+  <!-- Clubs (club model 3A): ClubsSection.tsx's rules. Not a widget, so it
+       stays outside the two columns (_placeWidgets moves cards by place).
+       Visitors: "Member of", nothing when none. Your own: every club with
+       its ⋯ menu, then Following, which only you see. -->
+  <section class="card pclubs" id="profileClubs" aria-labelledby="profileClubsTitle" hidden>
+    <h2 class="card-title" id="profileClubsTitle"></h2>
+    <div id="profileClubsBody"></div>
+  </section>
 
   <div class="profile-grid">
 
@@ -6320,6 +6449,8 @@ function toggleViewerMode() {
   viewerMode = !viewerMode;
   document.body.classList.toggle('viewer-mode', viewerMode);
   document.body.classList.toggle('owner-mode', !viewerMode);
+  // The Clubs card shows what a visitor gets: shown clubs only, no Following.
+  if (typeof _pclubsOnPreviewToggle === 'function') _pclubsOnPreviewToggle();
   // Empty widgets hide in the preview as they do for visitors, and the
   // subnav follows; read fresh, since the owner may have just added a skill.
   if (typeof _refreshWidgetEmptyFlags === 'function') _refreshWidgetEmptyFlags();
@@ -8283,6 +8414,781 @@ function _afterCampusSync(sent, err) {
   _hydrateMajorPicker(_campusUser());
 }
 
+// ── Clubs on a profile: the phone's rules, copied (club model 3A) ────────
+// Twins of src/components/profile/clubs-model.ts and the flair helpers in
+// src/lib/profile/club-flair.ts. static-profile-clubs.test.ts runs this
+// block beside them, so a change there fails here until it is copied.
+//   - Anyone's profile: "Member of", the clubs they show, from the public
+//     bootstrap (?clubs=1). Role words never show; a title does.
+//   - Your own: /api/me/clubs, every club you're in plus "Following" and
+//     "Muted", which only you see. "Member since" never goes on a chip.
+// clubs-twin:start
+const VIBE_CLUBS_COPY = Object.freeze({
+  title: 'Clubs',
+  memberOf: 'Member of',
+  // The heading over the clubs you follow. The one bare 'Following' on this
+  // page: follow-label.test.ts lets it stand here and nowhere else (a
+  // person's follow button reads VIBE_FOLLOW_LABELS).
+  following: 'Following',
+  onlyYou: 'Only you see this',
+  memberOfNote: 'Anyone can see the clubs you show.',
+  memberSince: 'Member since {month}',
+  titleHidden: '{title} (hidden)',
+  hiddenTag: 'Hidden from profile',
+  mutedTag: 'Muted',
+  newTitleTag: 'New title · shows on your profile',
+  emptyMemberOf: 'Clubs you join show here.',
+  emptyFollowing: 'Clubs you follow show here.',
+  loadFailed: "Couldn't load your clubs.",
+  loadMoreFailed: "Couldn't load more clubs.",
+  showMore: 'Show more',
+  loadingMore: 'Loading…',
+  options: 'Options for {org}',
+  hide: 'Hide from my profile',
+  show: 'Show on my profile',
+  hideTitle: 'Hide my title',
+  showTitle: 'Show my title',
+  moveUp: 'Move up',
+  moveDown: 'Move down',
+  mute: 'Mute posts',
+  unmute: 'Unmute posts',
+  unfollow: 'Unfollow',
+  unfollowFailed: "Couldn't unfollow this club.",
+  unfollowed: 'You unfollowed {org}.',
+  mutedGroup: 'Muted',
+  mutedGroupNote: 'Clubs whose posts you muted. Only you see this.',
+  muteNote: "Muting keeps {org}'s posts out of your feed. The club isn't told.",
+  muteNoteMember: "Muting keeps {org}'s posts out of your feed. You stay in its chats, and the club isn't told.",
+  open: 'Go to club page',
+  cancel: 'Cancel',
+  hideFailed: "Couldn't hide {org} from your profile.",
+  showFailed: "Couldn't show {org} on your profile.",
+  titleFailed: "Couldn't change your title.",
+  orderFailed: "Couldn't save your order.",
+  muteFailed: "Couldn't mute {org}'s posts.",
+  unmuteFailed: "Couldn't unmute {org}'s posts.",
+  muted: "You won't see {org}'s posts in your feed. The club isn't told.",
+  mutedMember: "You won't see {org}'s posts in your feed. You're still in its chats, and the club isn't told.",
+  unmuted: "{org}'s posts are back in your feed.",
+});
+const VIBE_FLAIR_CHIP_MAX = 3;
+const VIBE_CLUB_RANK_MAX = 50;
+const VIBE_CLUB_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+// Fills {key} in one pass; a value is never re-scanned (join-copy's fillCopy).
+function vibeFillClubCopy(template, vars) {
+  return String(template).replace(/\{(\w+)\}/g, (whole, key) =>
+    Object.prototype.hasOwnProperty.call(vars, key) ? String(vars[key]) : whole);
+}
+function _clubObj(raw) { return raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : null; }
+function _clubText(raw) {
+  if (typeof raw !== 'string') return null;
+  const t = raw.trim();
+  return t ? t : null;
+}
+function _clubMonth(raw) { return typeof raw === 'string' && /^\d{4}-(0[1-9]|1[0-2])$/.test(raw) ? raw : null; }
+function _clubCard(o) {
+  const handle = _clubText(o.handle), name = _clubText(o.name);
+  if (!handle || !name) return null;
+  return { handle, name, logo_url: _clubText(o.logo_url), verified: o.verified === true };
+}
+// The bootstrap's `clubs`; null when absent or not a list (draw nothing).
+function vibeReadPublicClubs(raw) {
+  if (!Array.isArray(raw)) return null;
+  const out = [], seen = new Set();
+  for (const item of raw) {
+    const o = _clubObj(item), c = o ? _clubCard(o) : null;
+    if (!o || !c || seen.has(c.handle)) continue;
+    seen.add(c.handle);
+    out.push(Object.assign({}, c, { title: _clubText(o.title), since: _clubMonth(o.since) }));
+  }
+  return out;
+}
+function _clubReadMember(raw) {
+  const o = _clubObj(raw), c = o ? _clubCard(o) : null, orgId = o ? _clubText(o.org_id) : null;
+  if (!o || !c || !orgId) return null;
+  const rank = o.profile_rank;
+  return Object.assign({ org_id: orgId }, c, {
+    title: _clubText(o.title),
+    show_title: o.show_title !== false,
+    since: _clubMonth(o.since),
+    show_on_profile: o.show_on_profile !== false,
+    profile_rank: typeof rank === 'number' && Number.isInteger(rank) ? rank : null,
+    muted: o.muted === true,
+  });
+}
+function _clubReadFollowed(raw, idKey) {
+  const o = _clubObj(raw), c = o ? _clubCard(o) : null, orgId = o ? _clubText(o[idKey]) : null;
+  if (!o || !c || !orgId) return null;
+  return Object.assign({ org_id: orgId }, c, { muted: o.muted === true });
+}
+// /api/me/clubs; null when the body isn't that shape.
+function vibeReadMyClubs(raw) {
+  const o = _clubObj(raw);
+  if (!o || !Array.isArray(o.member_of) || !Array.isArray(o.following)) return null;
+  const member_of = o.member_of.map(_clubReadMember).filter(Boolean);
+  const memberIds = new Set(member_of.map(m => m.org_id));
+  const following = o.following.map(f => _clubReadFollowed(f, 'org_id')).filter(r => r && !memberIds.has(r.org_id));
+  const listed = new Set([...memberIds, ...following.map(f => f.org_id)]);
+  const muted_only = (Array.isArray(o.muted_only) ? o.muted_only : [])
+    .map(f => _clubReadFollowed(f, 'org_id'))
+    .filter(r => r && !listed.has(r.org_id))
+    .map(r => Object.assign({}, r, { muted: true }));
+  return { member_of, following, next_cursor: _clubText(o.following_next_cursor), muted_only };
+}
+// One more page of Following (/api/me/followed-orgs): clubs I'm in and any
+// already on screen stay out. Null on a bad body.
+function vibeReadFollowedPage(raw, have) {
+  const o = _clubObj(raw);
+  if (!o || !Array.isArray(o.orgs)) return null;
+  const seen = new Set(have), following = [];
+  for (const item of o.orgs) {
+    const io = _clubObj(item);
+    if (!io || io.member_role) continue;
+    const r = _clubReadFollowed(io, 'id');
+    if (!r || seen.has(r.org_id)) continue;
+    seen.add(r.org_id);
+    following.push(r);
+  }
+  return { following, next_cursor: _clubText(o.next_cursor) };
+}
+// What a visitor sees of my clubs, in my order: shown clubs, titles I didn't hide.
+function vibeShownFromMine(memberOf) {
+  return memberOf.filter(m => m.show_on_profile).map(m => ({
+    handle: m.handle, name: m.name, logo_url: m.logo_url, verified: m.verified,
+    title: m.show_title ? m.title : null, since: m.since,
+  }));
+}
+// "2026-09" → "Member since Sep 2026"; anything else → "".
+function vibeMemberSinceText(since) {
+  const m = typeof since === 'string' ? /^(\d{4})-(\d{2})$/.exec(since) : null;
+  const name = m ? VIBE_CLUB_MONTHS[Number(m[2]) - 1] : undefined;
+  return m && name ? vibeFillClubCopy(VIBE_CLUBS_COPY.memberSince, { month: name + ' ' + m[1] }) : '';
+}
+function vibeStoredClubTitle(raw) {
+  if (typeof raw !== 'string') return null;
+  const title = raw.trim();
+  return title ? title : null;
+}
+// A chip's words: "President · SAE" with a title, otherwise just "SAE".
+function vibeClubFlairLabel(name, title) {
+  const t = vibeStoredClubTitle(title);
+  return t ? t + ' · ' + name : name;
+}
+// Up to three chips, clubs with a title first, each group in the profile's order.
+function vibeFlairChips(clubs, max) {
+  const cap = max === undefined ? VIBE_FLAIR_CHIP_MAX : max;
+  const titled = clubs.filter(c => vibeStoredClubTitle(c.title) !== null);
+  const plain = clubs.filter(c => vibeStoredClubTitle(c.title) === null);
+  return [...titled, ...plain].slice(0, Math.max(0, cap));
+}
+function vibePatchMember(list, orgId, patch) {
+  return list.map(m => (m.org_id === orgId ? Object.assign({}, m, patch) : m));
+}
+// Whether a club can move one place up (-1) or down (+1) and keep a rank.
+function vibeCanMoveClub(list, orgId, dir) {
+  const i = list.findIndex(m => m.org_id === orgId);
+  const j = i + dir;
+  return i >= 0 && j >= 0 && j < list.length && Math.max(i, j) <= VIBE_CLUB_RANK_MAX;
+}
+// Moves a club one place and numbers the list 0, 1, 2… so the order sticks.
+// `writes` holds only the clubs whose rank changed. Null when it can't move.
+function vibeMoveClub(list, orgId, dir) {
+  if (!vibeCanMoveClub(list, orgId, dir)) return null;
+  const i = list.findIndex(m => m.org_id === orgId);
+  const moved = list.slice();
+  [moved[i], moved[i + dir]] = [moved[i + dir], moved[i]];
+  const writes = [];
+  const next = moved.map((m, k) => {
+    if (k > VIBE_CLUB_RANK_MAX) return m;
+    if (m.profile_rank !== k) writes.push({ org_id: m.org_id, profile_rank: k });
+    return Object.assign({}, m, { profile_rank: k });
+  });
+  return { list: next, writes };
+}
+// The rows of a club's ⋯ menu on my own profile (ClubsSection's sheet).
+function vibeClubMenuActions(list, orgId, standing) {
+  if (standing === 'following') return ['toggle_mute', 'unfollow', 'open'];
+  if (standing === 'muted') return ['toggle_mute', 'open'];
+  const club = list.find(m => m.org_id === orgId);
+  if (!club) return ['open'];
+  const out = ['toggle_show'];
+  if (club.title) out.push('toggle_title');
+  if (vibeCanMoveClub(list, orgId, -1)) out.push('move_up');
+  if (vibeCanMoveClub(list, orgId, 1)) out.push('move_down');
+  out.push('toggle_mute', 'open');
+  return out;
+}
+// A title an officer gave that I haven't opened the ⋯ on yet: it already
+// shows on my public profile, so my own rows mark it.
+function vibeClubTitleIsNew(club, seen) {
+  return club.title !== null && seen[club.org_id] !== club.title;
+}
+// The "New title" mark: only a new title that really shows, never on a club I
+// hid or a title I hid (clubs-model.ts showsNewTitleMark).
+function vibeShowsNewTitleMark(club, seen) {
+  return club.show_on_profile && club.show_title && vibeClubTitleIsNew(club, seen);
+}
+// A row's second line on my own profile: the title (marked when hidden) and the month.
+function vibeMyClubSubline(club) {
+  const parts = [];
+  if (club.title) {
+    parts.push(club.show_title ? club.title : vibeFillClubCopy(VIBE_CLUBS_COPY.titleHidden, { title: club.title }));
+  }
+  const since = vibeMemberSinceText(club.since);
+  if (since) parts.push(since);
+  return parts.join(' · ');
+}
+// A public row's second line: "President · Member since Sep 2026".
+function vibeShownClubSubline(club) {
+  return [club.title == null ? '' : club.title, vibeMemberSinceText(club.since)].filter(Boolean).join(' · ');
+}
+// clubs-twin:end
+
+// clubs-ui:start
+// The title I last opened each club's ⋯ on (vibeClubTitleIsNew), in this
+// browser: the phone's key, so both agree. Blocked storage reads as {}.
+const VIBE_CLUB_TITLES_SEEN_KEY = 'vibe.club-titles-seen.v1';
+function _pclubsReadSeen() {
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(VIBE_CLUB_TITLES_SEEN_KEY) || '{}');
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
+  } catch (_) {
+    return {};
+  }
+}
+const _pclubs = {
+  visitor: null,        // a visited profile's shown clubs (null: draw none)
+  mine: false,          // my own profile, with /api/me/clubs to load
+  data: null,           // vibeReadMyClubs's answer
+  failure: null,        // the first load failed (vibeLoadFailure)
+  loadSeq: 0,
+  pending: new Set(),   // clubs with a write on its way: their rows wait
+  ordering: false,      // a reorder on its way: the Move rows wait
+  loadingMore: false,
+  menu: null,           // { orgId, standing } of the open ⋯
+  wired: false,
+  seen: _pclubsReadSeen(),
+};
+
+function _pclubsUrl(orgId) { return '/api/me/clubs/' + encodeURIComponent(orgId); }
+function _pclubsOrgHref(handle) { return '/orgs/' + encodeURIComponent(handle); }
+function _pclubsEl(tag, cls, text, focusKey) {
+  const el = document.createElement(tag);
+  if (cls) el.className = cls;
+  if (text != null) el.textContent = text;
+  if (focusKey) el.setAttribute('data-pfocus', focusKey);
+  return el;
+}
+// A plain click inside the app's frame leaves it (__vibeTopNav); a
+// modified click keeps the browser's own new-tab behaviour.
+function _pclubsLink(href, cls, focusKey) {
+  const a = _pclubsEl('a', cls, null, focusKey);
+  a.href = href;
+  a.addEventListener('click', e => {
+    if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+    let framed = false;
+    try { framed = window.top !== window.self; } catch (_) { framed = true; }
+    if (!framed || typeof window.__vibeTopNav !== 'function') return;
+    e.preventDefault();
+    window.__vibeTopNav(href);
+  });
+  return a;
+}
+// A round club logo; the name's first letter when there is none or it fails.
+function _pclubsLogo(club, size) {
+  const span = _pclubsEl('span', 'pclub-logo');
+  span.setAttribute('aria-hidden', 'true');
+  span.style.width = size + 'px';
+  span.style.height = size + 'px';
+  span.style.fontSize = Math.round(size * 0.45) + 'px';
+  const initial = club.name.trim().charAt(0).toUpperCase() || '?';
+  if (club.logo_url) {
+    const img = document.createElement('img');
+    img.alt = '';
+    img.loading = 'lazy';
+    img.addEventListener('error', () => { span.textContent = initial; }, { once: true });
+    img.src = club.logo_url;
+    span.appendChild(img);
+  } else {
+    span.textContent = initial;
+  }
+  return span;
+}
+// The club's verified mark: a small green tick, as ClubFlair's VerifiedTick.
+function _pclubsTick(size) {
+  const t = _pclubsEl('span', 'pclub-tick', '✓');
+  t.setAttribute('role', 'img');
+  t.setAttribute('aria-label', 'Verified');
+  t.title = 'Verified';
+  t.style.width = size + 'px';
+  t.style.height = size + 'px';
+  t.style.fontSize = Math.round(size * 0.62) + 'px';
+  return t;
+}
+
+// What visitors see: the visited profile's list, or mine as visitors get it.
+function _pclubsShown() {
+  if (window.viewingRealUser) return _pclubs.visitor || [];
+  return _pclubs.data ? vibeShownFromMine(_pclubs.data.member_of) : [];
+}
+// My own profile in "View as visitor".
+function _pclubsPreviewing() {
+  return !window.viewingRealUser && document.body.classList.contains('viewer-mode');
+}
+
+// The chips under the @handle: no dates here, "Member since" lives in the
+// Clubs card only. The row scrolls sideways inside itself at 375 px.
+function _pclubsPaintFlair() {
+  const row = document.getElementById('profileFlairRow');
+  if (!row) return;
+  const chips = vibeFlairChips(_pclubsShown());
+  row.textContent = '';
+  row.hidden = chips.length === 0;
+  for (const club of chips) {
+    const label = vibeClubFlairLabel(club.name, club.title);
+    // A long title gives way before the club's name does.
+    const title = label === club.name ? null : club.title;
+    const li = document.createElement('li');
+    const a = _pclubsLink(_pclubsOrgHref(club.handle), 'pclub-chip', 'chip:' + club.handle);
+    a.setAttribute('aria-label', label + ". Open the club's page");
+    a.appendChild(_pclubsLogo(club, 20));
+    const parts = title ? [['pclub-chip-title', title], [null, '·']] : [];
+    parts.push(['pclub-chip-name', club.name]);
+    for (const [cls, words] of parts) {
+      const span = _pclubsEl('span', cls, words);
+      span.setAttribute('aria-hidden', 'true');
+      a.appendChild(span);
+    }
+    if (club.verified) a.appendChild(_pclubsTick(12));
+    li.appendChild(a);
+    row.appendChild(li);
+  }
+}
+
+// One row: logo, name and tick, a second line and any marks, opening the
+// club's page; on my own profile, a ⋯ (and its menu when open).
+function _pclubsRow(club, opts) {
+  const li = _pclubsEl('li', 'pclub-row' + (opts.dim ? ' is-dim' : ''));
+  const a = _pclubsLink(_pclubsOrgHref(club.handle), 'pclub-link', 'row:' + (opts.standing || 'shown') + ':' + club.handle);
+  a.appendChild(_pclubsLogo(club, 40));
+  const text = _pclubsEl('span', 'pclub-text');
+  const line = _pclubsEl('span', 'pclub-name-line');
+  line.appendChild(_pclubsEl('span', 'pclub-name', club.name));
+  if (club.verified) line.appendChild(_pclubsTick(14));
+  text.appendChild(line);
+  if (opts.sub) text.appendChild(_pclubsEl('span', 'pclub-sub', opts.sub));
+  const marks = (opts.marks || []).filter(Boolean);
+  if (marks.length) {
+    const box = _pclubsEl('span', 'pclub-marks');
+    for (const m of marks) box.appendChild(_pclubsEl('span', 'pclub-mark', m));
+    text.appendChild(box);
+  }
+  a.appendChild(text);
+  li.appendChild(a);
+  if (!opts.standing) return li;
+  const target = { orgId: club.org_id, standing: opts.standing };
+  const open = !!_pclubs.menu && _pclubs.menu.orgId === club.org_id && _pclubs.menu.standing === opts.standing;
+  const btn = _pclubsEl('button', 'pclub-more', null, 'more:' + opts.standing + ':' + club.org_id);
+  btn.type = 'button';
+  btn.setAttribute('aria-label', vibeFillClubCopy(VIBE_CLUBS_COPY.options, { org: club.name }));
+  btn.setAttribute('aria-haspopup', 'menu');
+  btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+  btn.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>';
+  btn.addEventListener('click', () => {
+    if (open) _pclubsCloseMenu(true);
+    else _pclubsOpenMenu(target);
+  });
+  li.appendChild(btn);
+  if (open) li.appendChild(_pclubsMenu(club, target));
+  return li;
+}
+
+// One club's choices on my own profile (ClubsSection's sheet, as a menu).
+// Moves keep it open, so a club can climb several places; every other
+// choice closes it. A row waiting on the server is aria-disabled, never
+// disabled, so the focus stays on it.
+function _pclubsMenu(club, target) {
+  const C = VIBE_CLUBS_COPY;
+  const member = target.standing === 'member' ? club : null;
+  const busy = _pclubs.pending.has(target.orgId);
+  const menu = _pclubsEl('div', 'pclub-menu');
+  menu.id = 'pclubMenu';
+  menu.setAttribute('role', 'menu');
+  menu.setAttribute('aria-label', club.name);
+  menu.addEventListener('keydown', _pclubsMenuKeys);
+  const head = _pclubsEl('div', 'pclub-menu-head', club.name);
+  head.setAttribute('aria-hidden', 'true');
+  menu.appendChild(head);
+  for (const action of vibeClubMenuActions(_pclubs.data.member_of, target.orgId, target.standing)) {
+    if (action === 'open') {
+      const a = _pclubsLink(_pclubsOrgHref(club.handle), 'pclub-menu-item', 'menu:open');
+      a.setAttribute('role', 'menuitem');
+      a.textContent = C.open;
+      a.addEventListener('click', () => { _pclubs.menu = null; });
+      menu.appendChild(a);
+      continue;
+    }
+    const moving = action === 'move_up' || action === 'move_down';
+    const label =
+      action === 'toggle_show' ? (member.show_on_profile ? C.hide : C.show)
+      : action === 'toggle_title' ? (member.show_title ? C.hideTitle : C.showTitle)
+      : action === 'move_up' ? C.moveUp
+      : action === 'move_down' ? C.moveDown
+      : action === 'unfollow' ? C.unfollow
+      : club.muted ? C.unmute : C.mute;
+    const item = _pclubsEl('button', 'pclub-menu-item', label, 'menu:' + action);
+    item.type = 'button';
+    item.setAttribute('role', 'menuitem');
+    if (moving ? _pclubs.ordering : busy) item.setAttribute('aria-disabled', 'true');
+    item.addEventListener('click', () => _pclubsRun(action, target));
+    menu.appendChild(item);
+    if (action === 'toggle_mute' && !club.muted) {
+      const note = _pclubsEl('div', 'pclub-menu-note', vibeFillClubCopy(member ? C.muteNoteMember : C.muteNote, { org: club.name }));
+      note.id = 'pclubMenuNote';
+      item.setAttribute('aria-describedby', note.id);
+      menu.appendChild(note);
+    }
+  }
+  return menu;
+}
+function _pclubsMenuKeys(e) {
+  const items = Array.from(e.currentTarget.querySelectorAll('[role="menuitem"]'));
+  const i = items.indexOf(document.activeElement);
+  let next = -1;
+  if (e.key === 'ArrowDown') next = i < 0 ? 0 : (i + 1) % items.length;
+  else if (e.key === 'ArrowUp') next = i <= 0 ? items.length - 1 : i - 1;
+  else if (e.key === 'Home') next = 0;
+  else if (e.key === 'End') next = items.length - 1;
+  else if (e.key === 'Tab') { e.preventDefault(); _pclubsCloseMenu(true); return; }
+  if (next < 0 || !items[next]) return;
+  e.preventDefault();
+  items[next].focus();
+}
+function _pclubsOpenMenu(target) {
+  _pclubs.menu = target;
+  // Opening a member's ⋯ marks its title as seen (vibeClubTitleIsNew).
+  const club = target.standing === 'member' && _pclubs.data
+    ? _pclubs.data.member_of.find(m => m.org_id === target.orgId) : null;
+  if (club && club.title && _pclubs.seen[target.orgId] !== club.title) {
+    _pclubs.seen = Object.assign({}, _pclubs.seen, { [target.orgId]: club.title });
+    try {
+      window.localStorage.setItem(VIBE_CLUB_TITLES_SEEN_KEY, JSON.stringify(_pclubs.seen));
+    } catch (_) {
+      // Blocked storage: the mark comes back next visit, nothing worse.
+    }
+  }
+  _pclubsPaint('menu:first');
+  if (_pclubs.wired) return;
+  _pclubs.wired = true;
+  // A click anywhere else closes it. A row's click redraws the menu first,
+  // but its target keeps its (now detached) menu, so closest() still finds it.
+  document.addEventListener('click', e => {
+    const t = e.target;
+    if (!_pclubs.menu || (t && t.closest && t.closest('#pclubMenu, .pclub-more'))) return;
+    _pclubsCloseMenu(false);
+  });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && _pclubs.menu) _pclubsCloseMenu(true); });
+}
+function _pclubsCloseMenu(refocus) {
+  const t = _pclubs.menu;
+  if (!t) return;
+  _pclubs.menu = null;
+  _pclubsPaint(refocus ? 'more:' + t.standing + ':' + t.orgId : undefined);
+}
+function _pclubsRun(action, target) {
+  const moving = action === 'move_up' || action === 'move_down';
+  if (moving ? _pclubs.ordering : _pclubs.pending.has(target.orgId)) return;
+  if (!moving) {
+    _pclubs.menu = null;
+    _pclubsPaint('more:' + target.standing + ':' + target.orgId);
+  }
+  if (action === 'toggle_show') _pclubsToggleShow(target.orgId);
+  else if (action === 'toggle_title') _pclubsToggleTitle(target.orgId);
+  else if (action === 'move_up') _pclubsMove(target.orgId, -1);
+  else if (action === 'move_down') _pclubsMove(target.orgId, 1);
+  else if (action === 'unfollow') _pclubsUnfollow(target.orgId);
+  else _pclubsToggleMute(target.orgId);
+}
+
+function _pclubsList(rows) {
+  const ul = _pclubsEl('ul', 'pclubs-list');
+  for (const r of rows) ul.appendChild(r);
+  return ul;
+}
+function _pclubsGroup(label, note, onlyYou) {
+  const g = _pclubsEl('div', 'pclubs-group');
+  const eyebrow = _pclubsEl('div', 'pclubs-eyebrow', label);
+  if (onlyYou) eyebrow.appendChild(_pclubsEl('span', 'pclubs-only-you', ' · ' + VIBE_CLUBS_COPY.onlyYou));
+  g.appendChild(eyebrow);
+  if (note) g.appendChild(_pclubsEl('p', 'pclubs-note', note));
+  return g;
+}
+function _pclubsSkeleton() {
+  const ul = _pclubsEl('ul', 'pclubs-list');
+  ul.setAttribute('aria-hidden', 'true');
+  for (let i = 0; i < 2; i++) {
+    const li = _pclubsEl('li', 'pclub-row');
+    li.style.opacity = '.6';
+    const dot = _pclubsEl('span', 'pclub-skel');
+    dot.style.cssText = 'width:40px;height:40px;border-radius:50%';
+    const text = _pclubsEl('span', 'pclub-text');
+    const a = _pclubsEl('span', 'pclub-skel');
+    a.style.cssText = 'width:55%;height:13px';
+    const b = _pclubsEl('span', 'pclub-skel');
+    b.style.cssText = 'width:35%;height:10px;margin-top:7px';
+    text.append(a, b);
+    li.append(dot, text);
+    ul.appendChild(li);
+  }
+  return ul;
+}
+
+// Draws the chips and the Clubs card from _pclubs. `focusKey` names the
+// control to focus afterwards ('menu:first' is the open menu's first row);
+// left out, whatever had the focus in here keeps it across the redraw.
+function _pclubsPaint(focusKey) {
+  const act = document.activeElement;
+  const inside = act && act.closest && act.closest('#profileClubs, #profileFlairRow');
+  const want = focusKey || (inside ? act.getAttribute('data-pfocus') : null);
+  _pclubsPaintFlair();
+  const section = document.getElementById('profileClubs');
+  const body = document.getElementById('profileClubsBody');
+  const title = document.getElementById('profileClubsTitle');
+  if (!section || !body) return;
+  if (title) title.textContent = VIBE_CLUBS_COPY.title;
+  // A save on its way holds a newer build's reload (_buildRefresh.js).
+  if (_pclubs.pending.size > 0 || _pclubs.ordering) section.setAttribute('data-holds-reload', 'true');
+  else section.removeAttribute('data-holds-reload');
+  body.textContent = '';
+  if (window.viewingRealUser || _pclubsPreviewing()) {
+    const clubs = _pclubsShown();
+    section.hidden = clubs.length === 0;
+    if (clubs.length) {
+      const g = _pclubsGroup(VIBE_CLUBS_COPY.memberOf);
+      g.appendChild(_pclubsList(clubs.map(c => _pclubsRow(c, { sub: vibeShownClubSubline(c) }))));
+      body.appendChild(g);
+    }
+  } else if (!_pclubs.mine) {
+    section.hidden = true;
+  } else {
+    section.hidden = false;
+    if (!_pclubs.data && _pclubs.failure) {
+      const slot = document.createElement('div');
+      body.appendChild(slot);
+      window.vibeLoadFailed(slot, _pclubs.failure, () => _pclubsLoadMine(), { compact: true });
+    } else if (!_pclubs.data) {
+      body.appendChild(_pclubsSkeleton());
+    } else {
+      _pclubsPaintMine(body, _pclubs.data);
+    }
+  }
+  if (!want) return;
+  const found = want === 'menu:first'
+    ? document.querySelector('#pclubMenu [role="menuitem"]')
+    : Array.from(document.querySelectorAll('[data-pfocus]')).find(el => el.getAttribute('data-pfocus') === want)
+      || (want.indexOf('menu:') === 0 ? document.querySelector('#pclubMenu [role="menuitem"]') : null);
+  if (found) found.focus();
+}
+// My own profile: every club I'm in, then the ones I only follow, then the
+// muted ones, so the Unmute has a home.
+function _pclubsPaintMine(body, data) {
+  const C = VIBE_CLUBS_COPY;
+  const mine = _pclubsGroup(C.memberOf, data.member_of.length ? C.memberOfNote : null);
+  if (data.member_of.length === 0) mine.appendChild(_pclubsEl('p', 'pclubs-empty', C.emptyMemberOf));
+  else mine.appendChild(_pclubsList(data.member_of.map(club => _pclubsRow(club, {
+    sub: vibeMyClubSubline(club),
+    dim: !club.show_on_profile,
+    marks: [
+      club.show_on_profile ? null : C.hiddenTag,
+      club.muted ? C.mutedTag : null,
+      vibeShowsNewTitleMark(club, _pclubs.seen) ? C.newTitleTag : null,
+    ],
+    standing: 'member',
+  }))));
+  body.appendChild(mine);
+
+  const follows = _pclubsGroup(C.following, null, true);
+  if (data.following.length === 0 && !data.next_cursor) follows.appendChild(_pclubsEl('p', 'pclubs-empty', C.emptyFollowing));
+  else follows.appendChild(_pclubsList(data.following.map(club => _pclubsRow(club, {
+    marks: [club.muted ? C.mutedTag : null], standing: 'following',
+  }))));
+  if (data.next_cursor) {
+    const more = _pclubsEl('button', 'pclubs-more-btn', _pclubs.loadingMore ? C.loadingMore : C.showMore, 'showmore');
+    more.type = 'button';
+    if (_pclubs.loadingMore) more.setAttribute('aria-disabled', 'true');
+    more.addEventListener('click', _pclubsLoadMore);
+    follows.appendChild(more);
+  }
+  body.appendChild(follows);
+
+  if (data.muted_only.length > 0) {
+    const muted = _pclubsGroup(C.mutedGroup, C.mutedGroupNote);
+    muted.appendChild(_pclubsList(data.muted_only.map(club => _pclubsRow(club, {
+      marks: [club.muted ? C.mutedTag : null], standing: 'muted',
+    }))));
+    body.appendChild(muted);
+  }
+}
+
+// ── Loading and writing (useMyClubs in ClubsSection.tsx) ──
+function _pclubsSetVisitor(raw) {
+  _pclubs.visitor = vibeReadPublicClubs(raw);
+  _pclubsPaint();
+}
+async function _pclubsLoadMine() {
+  _pclubs.mine = true;
+  const seq = ++_pclubs.loadSeq;
+  _pclubs.failure = null;
+  _pclubsPaint();
+  const line = VIBE_CLUBS_COPY.loadFailed;
+  const r = await window.vibeRequest('/api/me/clubs', { quiet: true, failure: line });
+  if (seq !== _pclubs.loadSeq) return;
+  const parsed = r.ok ? vibeReadMyClubs(r.data) : null;
+  if (!parsed) {
+    _pclubs.failure = window.vibeLoadFailure(r, line);
+  } else {
+    _pclubs.data = parsed;
+    const t = _pclubs.menu;
+    const lists = { member: parsed.member_of, following: parsed.following, muted: parsed.muted_only };
+    if (t && !(lists[t.standing] || []).some(c => c.org_id === t.orgId)) _pclubs.menu = null;
+  }
+  _pclubsPaint();
+}
+// One optimistic write: shows the change now, puts it back if refused.
+async function _pclubsWrite(orgId, body, show, undo, failureLine, success) {
+  if (_pclubs.pending.has(orgId)) return;
+  _pclubs.pending.add(orgId);
+  show();
+  _pclubsPaint();
+  const r = await window.vibeRequest(_pclubsUrl(orgId), { method: 'PATCH', json: body, failure: failureLine, success });
+  if (!r.ok) undo();
+  _pclubs.pending.delete(orgId);
+  _pclubsPaint();
+}
+function _pclubsApplyMember(orgId, patch) {
+  const d = _pclubs.data;
+  if (d) _pclubs.data = Object.assign({}, d, { member_of: vibePatchMember(d.member_of, orgId, patch) });
+}
+function _pclubsApplyFollowed(orgId, muted) {
+  const d = _pclubs.data;
+  if (!d) return;
+  const flip = list => list.map(f => (f.org_id === orgId ? Object.assign({}, f, { muted }) : f));
+  _pclubs.data = Object.assign({}, d, { following: flip(d.following), muted_only: flip(d.muted_only) });
+}
+function _pclubsMember(orgId) {
+  return _pclubs.data ? _pclubs.data.member_of.find(m => m.org_id === orgId) : undefined;
+}
+function _pclubsToggleShow(orgId) {
+  const club = _pclubsMember(orgId);
+  if (!club) return;
+  const next = !club.show_on_profile;
+  _pclubsWrite(orgId, { show_on_profile: next },
+    () => _pclubsApplyMember(orgId, { show_on_profile: next }),
+    () => _pclubsApplyMember(orgId, { show_on_profile: club.show_on_profile }),
+    vibeFillClubCopy(next ? VIBE_CLUBS_COPY.showFailed : VIBE_CLUBS_COPY.hideFailed, { org: club.name }));
+}
+function _pclubsToggleTitle(orgId) {
+  const club = _pclubsMember(orgId);
+  if (!club || !club.title) return;
+  const next = !club.show_title;
+  _pclubsWrite(orgId, { show_title: next },
+    () => _pclubsApplyMember(orgId, { show_title: next }),
+    () => _pclubsApplyMember(orgId, { show_title: club.show_title }),
+    VIBE_CLUBS_COPY.titleFailed);
+}
+function _pclubsToggleMute(orgId) {
+  const d = _pclubs.data;
+  const member = _pclubsMember(orgId);
+  const followed = member || !d ? undefined
+    : (d.following.find(f => f.org_id === orgId) || d.muted_only.find(f => f.org_id === orgId));
+  const club = member || followed;
+  if (!club) return;
+  const C = VIBE_CLUBS_COPY;
+  const next = !club.muted;
+  const vars = { org: club.name };
+  const set = muted => (member ? _pclubsApplyMember(orgId, { muted }) : _pclubsApplyFollowed(orgId, muted));
+  _pclubsWrite(orgId, { muted: next }, () => set(next), () => set(club.muted),
+    vibeFillClubCopy(next ? C.muteFailed : C.unmuteFailed, vars),
+    vibeFillClubCopy(next ? (member ? C.mutedMember : C.muted) : C.unmuted, vars));
+}
+// Unfollow from the Following menu: the club's follow route, the one the
+// club page's Following ✓ uses. Waits for the server; a club whose posts I
+// muted moves to Muted, so the Unmute stays in reach.
+async function _pclubsUnfollow(orgId) {
+  const d0 = _pclubs.data;
+  const club = d0 && d0.following.find(f => f.org_id === orgId);
+  if (!club || _pclubs.pending.has(orgId)) return;
+  _pclubs.pending.add(orgId);
+  _pclubsPaint();
+  const r = await window.vibeRequest('/api/orgs/' + encodeURIComponent(club.handle) + '/follow', {
+    method: 'DELETE',
+    failure: VIBE_CLUBS_COPY.unfollowFailed,
+    success: vibeFillClubCopy(VIBE_CLUBS_COPY.unfollowed, { org: club.name }),
+  });
+  _pclubs.pending.delete(orgId);
+  const d = _pclubs.data;
+  if (r.ok && d) {
+    _pclubs.data = Object.assign({}, d, {
+      following: d.following.filter(f => f.org_id !== orgId),
+      muted_only: club.muted && !d.muted_only.some(f => f.org_id === orgId) ? [club].concat(d.muted_only) : d.muted_only,
+    });
+  }
+  _pclubsPaint();
+}
+// Moves a club one place. The first move numbers every club (0, 1, 2…),
+// later ones change two. A refused write reloads the list, so the page
+// never shows an order the server doesn't have.
+async function _pclubsMove(orgId, dir) {
+  const d = _pclubs.data;
+  if (!d || _pclubs.ordering) return;
+  const res = vibeMoveClub(d.member_of, orgId, dir);
+  if (!res) return;
+  _pclubs.data = Object.assign({}, d, { member_of: res.list });
+  _pclubs.ordering = true;
+  _pclubsPaint();
+  const results = await Promise.all(res.writes.map(w => window.vibeRequest(_pclubsUrl(w.org_id), {
+    method: 'PATCH', json: { profile_rank: w.profile_rank }, failure: VIBE_CLUBS_COPY.orderFailed, quiet: true,
+  })));
+  const refused = results.find(r => !r.ok);
+  if (refused) {
+    window.vibeToast(refused.message, { tone: 'error', action: refused.action });
+    _pclubsLoadMine();
+  }
+  _pclubs.ordering = false;
+  _pclubsPaint();
+}
+// More of Following, from /api/me/followed-orgs; clubs I'm in, and any
+// already listed, stay out.
+async function _pclubsLoadMore() {
+  const d0 = _pclubs.data;
+  const cursor = d0 && d0.next_cursor;
+  if (!cursor || _pclubs.loadingMore) return;
+  _pclubs.loadingMore = true;
+  _pclubsPaint();
+  const r = await window.vibeRequest('/api/me/followed-orgs?cursor=' + encodeURIComponent(cursor), {
+    failure: VIBE_CLUBS_COPY.loadMoreFailed,
+  });
+  _pclubs.loadingMore = false;
+  const page = r.ok ? vibeReadFollowedPage(r.data, new Set()) : null;
+  if (r.ok && !page) window.vibeToast(VIBE_CLUBS_COPY.loadMoreFailed, { tone: 'error' });
+  const d = _pclubs.data;
+  if (page && d) {
+    const have = new Set(d.member_of.concat(d.following).map(c => c.org_id));
+    _pclubs.data = Object.assign({}, d, {
+      following: d.following.concat(page.following.filter(f => !have.has(f.org_id))),
+      next_cursor: page.next_cursor,
+    });
+  }
+  _pclubsPaint();
+}
+// "View as visitor" flips body.viewer-mode: draw what a visitor would see.
+function _pclubsOnPreviewToggle() {
+  _pclubs.menu = null;
+  _pclubsPaint();
+}
+// clubs-ui:end
+
 (function initProfilePage(){
   const params = new URLSearchParams(location.search);
   const viewingHandle = (params.get('handle') || params.get('user') || '').trim().toLowerCase();
@@ -8322,7 +9228,7 @@ function _afterCampusSync(sent, err) {
     (async () => {
       try {
         const r = await window.vibeRequest(
-          `/api/users/${encodeURIComponent(viewingHandle)}/bootstrap`,
+          `/api/users/${encodeURIComponent(viewingHandle)}/bootstrap?clubs=1`,
           { quiet: true, failure: BOOTSTRAP_LINE });
         const v = r.ok && r.data && r.data.vibeUser ? r.data.vibeUser : null;
         if (!v) {
@@ -8362,6 +9268,9 @@ function _afterCampusSync(sent, err) {
         v.posts = [];
         renderUserSections(v);
         renderStudentBadge(v, /*isOwn=*/false);
+        // The clubs this person shows ("Member of"), beside vibeUser in the
+        // answer (?clubs=1 above); absent or null draws no chips and no card.
+        _pclubsSetVisitor(r.data.clubs);
         if (typeof showViewerBackBanner === 'function') showViewerBackBanner(v.name);
         // Seed the Follow button from server-side follow state so the user
         // doesn't see a flash of "Follow" before it flips to "Following ✓".
@@ -8493,6 +9402,10 @@ function _afterCampusSync(sent, err) {
 
   // Render student badge or "verify your status" CTA on own profile.
   renderStudentBadge(user, /*isOwn=*/true);
+
+  // My clubs (club model 3A): every club I'm in, and the ones I follow,
+  // which only I see. A signed-in account only: the route reads the session.
+  if (user._appShell) _pclubsLoadMine();
 
   // Init finished — drop the pre-paint guard so .profile-wrap fades in.
   // requestAnimationFrame ensures the wipe + hydrate paint has landed first.

@@ -521,3 +521,30 @@ test("chatEntry: the phone's state at depth 1 and the address, the id encoded", 
   // The address reads back to the same id.
   assert.equal(new URLSearchParams(rules.chatEntry("a b/c&d").url.split("?")[1]).get("channel"), "a b/c&d");
 });
+
+test("withFollowedBoards: the Boards I follow under the slim rows, the dot for an unseen post, the open Board in place", () => {
+  type FollowedBoard = import("@/lib/chat/types").FollowedBoard;
+  const board = (name: string, latestAt: string | null): FollowedBoard => ({
+    org: { id: `org-${name}`, handle: name.toLowerCase(), name, logo_url: null, banner_url: null, verified: false },
+    room_id: `room-${name}`,
+    latest: latestAt ? { id: `m-${name}`, text: "Chapter at 7", author_name: "", created_at: latestAt, kind: "text" } : null,
+  });
+  const sae = board("SAE", LATER);
+  const chess = board("Chess", EARLIER);
+  const base = rules.slimRows([club({ name: "Finance" })], [], [], null, NOW);
+  const rows = rules.withFollowedBoards(base, [sae, chess], null, { "room-Chess": EARLIER }, NOW);
+  assert.deepEqual(rows.map((r) => r.key), [...base.map((r) => r.key), "club:org-SAE", "club:org-Chess"]);
+  const saeRow = rows.find((r) => r.key === "club:org-SAE")!;
+  assert.equal(saeRow.dot, "coral", "never seen: new");
+  assert.deepEqual(saeRow.target, { kind: "club", orgHandle: "sae", roomId: "room-SAE", roomKind: "board" });
+  assert.equal(saeRow.href, rules.chatEntry("room-SAE").url);
+  assert.match(saeRow.label, /^SAE Board, you follow this club, new post, /);
+  assert.equal(rows.find((r) => r.key === "club:org-Chess")!.dot, null, "seen up to its newest post");
+  // The open Board: the shell's supplied row gives way to the Board's own, open, with no dot.
+  const open: OpenChat = { kind: "club", orgId: "org-SAE", orgHandle: "sae", name: "SAE", logoUrl: null, roomId: "room-SAE" };
+  const supplied = rules.slimRows([], [], [], open, NOW);
+  assert.equal(supplied[0]?.key, "club:org-SAE");
+  const openRows = rules.withFollowedBoards(supplied, [sae], open, {}, NOW);
+  assert.deepEqual(openRows.map((r) => [r.key, r.open, r.dot]), [["club:org-SAE", true, null]]);
+  assert.equal(rules.withFollowedBoards(base, [], null, {}, NOW), base);
+});

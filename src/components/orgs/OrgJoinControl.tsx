@@ -9,15 +9,21 @@ import {
   ORG_COPY,
   changeAfter,
   fillCopy,
+  joinOutcome,
+  joinPressFailure,
+  memoryFor,
   orgErrorCopy,
   orgHeaderView,
   orgRowView,
+  relationKey,
+  shownRelation,
+  type ControlMemory,
   type FollowSource,
   type OrgAction,
   type OrgControlChange,
   type OrgRelation,
 } from "@/lib/orgs/join-copy";
-import { isOrgRole, type OrgAudience } from "@/lib/orgs/join-state";
+import type { OrgAudience } from "@/lib/orgs/join-state";
 
 /**
  * THE club button: follow and membership, on every surface (wave plan
@@ -38,16 +44,27 @@ import { isOrgRole, type OrgAudience } from "@/lib/orgs/join-state";
  * `replay` (onboarding's walkthrough) sends nothing at all: the next state is
  * computed locally with `changeAfter` and reported through `onChange`.
  *
- * The answer is kept locally until the parent passes a relation that differs
- * from the one tapped on (a refresh, or the parent's own state catching up),
- * so a parent that ignores `onChange` still shows what the server said.
+ * ASKING FOLLOWS (club model, Oct 16). A request needs no follow first, and
+ * the join route follows the club when it files one; its `org_follow_state`
+ * is the answer this control reports, so Follow flips to Following with it.
+ *
+ * The answer is kept locally until the parent passes a different relation (a
+ * refresh, or the parent's own state catching up), so a parent that ignores
+ * `onChange` still shows what the server said. A new relation forgets it for
+ * good (`memoryFor`): the club page's header and Board card both follow, and
+ * an old answer must not outlive the other control's tap.
  */
 
 export type OrgJoinControlProps = {
   relation: OrgRelation;
   variant: "header" | "phone_row" | "card" | "onboarding";
-  /** Header only: "membership" drops the follow column (the channels card). */
-  axis?: "both" | "membership";
+  /**
+   * Header only: "membership" drops the follow column (the channels card),
+   * "follow" drops the membership column (the Board card).
+   */
+  axis?: "both" | "membership" | "follow";
+  /** Header only: the words on Follow ("Follow to read the Board"). */
+  followLabel?: string;
   source: FollowSource;
   /** Needed for Decline; without it Decline isn't offered. */
   pendingInviteId?: string | null;
@@ -58,54 +75,35 @@ export type OrgJoinControlProps = {
 /** `equal`: the line layout's two same-width pills. `grow`: fill a header column. */
 type Fill = "none" | "equal" | "grow";
 
-type Local = OrgControlChange & {
-  /** The relation this answer was for; a different relation from the parent wins. */
-  basis: string;
-  audience: OrgAudience;
-  /** The server said the club is gone (hidden or deleted): every control disables. */
-  gone: boolean;
-};
-
-function relationKey(r: OrgRelation): string {
-  return [r.handle, r.state, r.following, r.role, r.reason, r.audience, r.joinPolicy].join("|");
-}
-
-/** `audience_mismatch` names the university only in its sentence (vibeRequest keeps no extras). */
-function audienceFromRefusal(r: VibeFailure, fallback: OrgAudience): OrgAudience {
-  const error = r.error ?? "";
-  if (/open to Purdue students only\.?$/.test(error)) return "purdue";
-  if (/open to IU students only\.?$/.test(error)) return "iu";
-  return fallback;
-}
-
 export function OrgJoinControl({
   relation,
   variant,
   axis = "both",
+  followLabel,
   source,
   pendingInviteId = null,
   replay = false,
   onChange,
 }: OrgJoinControlProps): JSX.Element | null {
   const basis = relationKey(relation);
-  const [local, setLocal] = useState<Local | null>(null);
+  const [memory, setMemory] = useState<ControlMemory>(() => ({ seen: basis, kept: null }));
   /** Which control is waiting on the server, by its position key. */
   const [busyKey, setBusyKey] = useState<string | null>(null);
 
-  const live = local && local.basis === basis ? local : null;
-  const state = live?.state ?? relation.state;
-  const rel: OrgRelation = {
-    ...relation,
-    state,
-    following: state === "member" ? true : (live?.following ?? relation.following),
-    role: live ? live.role : relation.role,
-    audience: live?.audience ?? relation.audience,
-  };
-  const gone = live?.gone ?? false;
+  // A new relation forgets the kept answer before anything renders (React's
+  // "adjust state when a prop changes"), so a refresh back to the relation an
+  // old tap was made on can't bring that answer back.
+  const current = memoryFor(memory, relation);
+  if (current !== memory) setMemory(current);
+  const { rel, gone } = shownRelation(relation, current);
   const palette = PALETTES[variant];
 
+  /** Keep the server's answer for the relation this tap was made on. */
+  const keep = (next: OrgControlChange, audience: OrgAudience, isGone: boolean) =>
+    setMemory((m) => ({ seen: m.seen, kept: { ...next, basis, audience, gone: isGone } }));
+
   const apply = (next: OrgControlChange, audience: OrgAudience = rel.audience) => {
-    setLocal({ ...next, basis, audience, gone: false });
+    keep(next, audience, false);
     onChange?.(next);
   };
 
@@ -118,14 +116,7 @@ export function OrgJoinControl({
     }
     if (r.code === "not_found") {
       toast({ message: ORG_COPY.errors.notFound, tone: "error" });
-      setLocal({
-        state: rel.state,
-        following: rel.following,
-        role: rel.role,
-        basis,
-        audience: rel.audience,
-        gone: true,
-      });
+      keep({ state: rel.state, following: rel.following, role: rel.role }, rel.audience, true);
       return;
     }
     const known = orgErrorCopy(r.code);
@@ -189,48 +180,30 @@ export function OrgJoinControl({
       return;
     }
 
-    // join, request and accept all go through the one door (join/route.ts).
-    const failure =
-      a.kind === "accept"
-        ? ORG_COPY.control.acceptFailed
-        : a.kind === "request"
-          ? ORG_COPY.control.requestFailed
-          : ORG_COPY.control.joinFailed;
+    // join, request and accept all go through the one door (join/route.ts);
+    // what its answer means is `joinOutcome`'s, shared with the follower's
+    // Board tile.
+    if (a.kind !== "join" && a.kind !== "request" && a.kind !== "accept") return;
+    const failure = joinPressFailure(a.kind);
     setBusyKey(key);
-    const r = await vibeRequest<{ joined?: unknown; pending?: unknown; role?: unknown }>(
+    const r = await vibeRequest<{
+      joined?: unknown;
+      pending?: unknown;
+      role?: unknown;
+      org_follow_state?: unknown;
+    }>(
       `/api/orgs/${handle}/join`,
       { method: "POST", json: {}, quiet: true, failure },
     );
     setBusyKey(null);
-    if (r.ok) {
-      if (r.data.joined === true) {
-        apply({ state: "member", following: true, role: isOrgRole(r.data.role) ? r.data.role : "member" });
-        if (a.kind === "accept") {
-          toast({ message: fillCopy(ORG_COPY.control.welcome, { org: orgName }), tone: "info" });
-        }
-      } else if (r.data.pending === true) {
-        apply({ state: "requested", following: rel.following, role: rel.role });
-      } else {
-        // A 2xx that says neither: nothing is known to have changed.
-        toast({ message: `${failure} Try again.`, tone: "error" });
-      }
-      return;
-    }
-    switch (r.code) {
-      case "invite_only":
-        apply({ state: "invite_only", following: rel.following, role: rel.role });
-        return;
-      case "audience_mismatch":
-        apply(
-          { state: "audience_blocked", following: rel.following, role: rel.role },
-          audienceFromRefusal(r, rel.audience),
-        );
-        return;
-      case "school_unverified":
-        apply({ state: "unverified", following: rel.following, role: rel.role });
-        return;
-      default:
-        refuse(r);
+    const out = joinOutcome(rel, a.kind, r);
+    if (out.kind === "change") {
+      apply(out.next, out.audience);
+      if (out.welcome) toast({ message: fillCopy(ORG_COPY.control.welcome, { org: orgName }), tone: "info" });
+    } else if (out.kind === "unclear") {
+      toast({ message: out.message, tone: "error" });
+    } else if (!r.ok) {
+      refuse(r);
     }
   };
 
@@ -253,9 +226,18 @@ export function OrgJoinControl({
 
   if (variant === "header") {
     const view = orgHeaderView(rel);
-    const membership = offered(view.membership);
-    const showFollow = axis === "both" && view.follow !== null;
-    const subs = membership.map((a) => a.sub).filter((s): s is string => !!s);
+    const membership = axis === "follow" ? [] : offered(view.membership);
+    const showFollow = axis !== "membership" && view.follow !== null;
+    const follow =
+      view.follow && followLabel && view.follow.kind === "follow"
+        ? { ...view.follow, label: followLabel }
+        : view.follow;
+    // The disclosure lives in the follow column; without one, a Request
+    // still carries it (asking follows, so officers see the follow).
+    const subs = [
+      ...membership.map((a) => a.sub),
+      !showFollow && membership.some((a) => a.kind === "request") ? view.disclosure : null,
+    ].filter((s): s is string => !!s);
     if (!showFollow && membership.length === 0) return null;
     return (
       // ONE element: globals.css makes `.vibe-org-header-join > *` full width on phones.
@@ -269,11 +251,13 @@ export function OrgJoinControl({
           minWidth: 0,
         }}
       >
-        {showFollow && view.follow ? (
+        {showFollow && follow ? (
           <div style={headerColumnStyle}>
-            {button(view.follow, "follow", { pressed: rel.following })}
+            {button(follow, "follow", { pressed: rel.following })}
             {view.followSub ? <span style={palette.sub}>{view.followSub}</span> : null}
-            {view.disclosure ? <span style={palette.sub}>{view.disclosure}</span> : null}
+            {/* The Board card ("follow" axis) sits under the header, whose
+                own Follow already carries the line: once per page. */}
+            {view.disclosure && axis !== "follow" ? <span style={palette.sub}>{view.disclosure}</span> : null}
           </div>
         ) : null}
         {membership.length > 0 ? (

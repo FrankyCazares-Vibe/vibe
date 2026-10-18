@@ -37,7 +37,7 @@ export type ChannelAccess =
   | { ok: false; status: number };
 
 /**
- * Verify the viewer can read/post in this channel.
+ * Verify the viewer can READ this channel (posting is asked apart).
  * - DM/group channels (channel_members.row exists): returns accepted_at for
  *   the implicit-accept flow.
  * - Org channels (channels.org_id IS NOT NULL): defers to can_view_org_channel,
@@ -45,9 +45,22 @@ export type ChannelAccess =
  * - A channel the caller can't read at all (no such id, or a club channel RLS
  *   hides because they left or were removed): 403, before either branch.
  *
+ * CLUB MODEL (Franky's calls of Oct 16; 20261017110000): an `ok` for a club
+ * room no longer means "a member". `can_view_org_channel` also lets a
+ * FOLLOWER read the club's Board (following, not hidden, the club allows
+ * it, not barred, removed or blocked by its officers), and nothing else.
+ * Only members type, so a route that writes in a club room (send, react,
+ * vote, card, remove) asks the club role too and answers a reader without
+ * one 403 `members_only` (the send route reads it with `clubRoleAnswer`).
+ * A follower holds no `channel_members` row, so a write to the caller's own
+ * row (read, typing, hide, mute, clear) changes nothing for them.
+ *
  * Also the gate for `/api/me/messages-upload-url` and the chat @mention
  * search (`/api/users/search?channel_id=`), so minting an upload URL or
- * reading a roster asks the same question as reading the messages.
+ * reading a roster asks the same question as reading the messages. Both
+ * stay shut to a follower on the Board: the upload route refuses every
+ * club room (`club_media_off`), and the roster read finds no row of theirs
+ * (`can_read_channel_roster` also asks for membership since 20261017110000).
  */
 export async function ensureMember(
   supabase: ServerClient,

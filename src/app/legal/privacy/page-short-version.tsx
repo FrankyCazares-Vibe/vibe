@@ -22,7 +22,9 @@ export function ShortVersion() {
         </li>
         <li>
           <strong>Club pages are public too.</strong> They show the club&apos;s
-          12 newest posts and who wrote each one. What you join, follow and post
+          12 newest posts and who wrote each one. Your profile also lists the
+          clubs you are in, with any title a club gave you and the month you
+          joined it on Vibe, unless you hide one. What you join, follow and post
           can show personal things about you, such as your religion, your
           politics or your health.
         </li>
@@ -30,7 +32,9 @@ export function ShortVersion() {
           <strong>Everyone in a chat sees every message in it.</strong> A person
           added later can read everything sent before they joined. In a club
           room, treat what you write as readable by every member, even one you
-          blocked.
+          blocked. A club&apos;s followers with a verified school email can also
+          read the posts its owner and admins put on its Board, unless the club
+          turns that off. Members&apos; replies stay with members.
         </li>
         <li>
           <strong>Vibe can read messages, and does so only in six cases:</strong>

@@ -1,6 +1,6 @@
 # Vibe Privacy Policy
 
-Effective October 15, 2026
+Effective October 18, 2026
 
 Vibe is a campus social app for people with an Indiana University or Purdue University email address. It is run by **CONNECTVIBE. LLC**, an Indiana limited liability company. In this policy, "we" means that company. Vibe is independent. It is not run or backed by Indiana University, Purdue University, or any campus, school or club.
 
@@ -11,8 +11,8 @@ This page says what Vibe knows about you, who can see it and how to delete it. I
 ## The short version
 
 1. **Your profile and your posts are public.** Anyone on the internet can open most of your profile and read your posts, and search engines can list them. A block does not hide them from someone who is signed out.
-2. **Club pages are public too.** They show the club's 12 newest posts and who wrote each one. What you join, follow and post can show personal things about you, such as your religion, your politics or your health.
-3. **Everyone in a chat sees every message in it.** A person added later can read everything sent before they joined. In a club room, treat what you write as readable by every member, even one you blocked.
+2. **Club pages are public too.** They show the club's 12 newest posts and who wrote each one. Your profile also lists the clubs you are in, with any title a club gave you and the month you joined it on Vibe, unless you hide one. What you join, follow and post can show personal things about you, such as your religion, your politics or your health.
+3. **Everyone in a chat sees every message in it.** A person added later can read everything sent before they joined. In a club room, treat what you write as readable by every member, even one you blocked. A club's followers with a verified school email can also read the posts its owner and admins put on its Board, unless the club turns that off. Members' replies stay with members.
 4. **Vibe can read messages, and does so only in six cases:**
    - when one is reported;
    - when someone in the chat asks us to or agrees;
@@ -70,7 +70,7 @@ When and why we read private messages is in section 5h.
 
 One exception: we can mark a test account that we run ourselves as verified by hand, such as the account an app store's reviewer signs in with. Those accounts are not students.
 
-**Without a verified school email** you cannot post, comment, message or join a club. You can still like, save, follow and report. Verifying does not hide anything from other accounts. An account that has not verified can still read everything in section 5b. It cannot open résumés (section 5c).
+**Without a verified school email** you cannot post, comment, message or join a club, or read a club's Board as a follower. You can still like, save, follow and report. Verifying does not hide anything from other accounts. An account that has not verified can still read everything in section 5b. It cannot open résumés (section 5c).
 
 ## 3. What does Vibe collect about me?
 
@@ -92,18 +92,19 @@ Your profile holds:
 - up to three résumé or portfolio documents. Each is a file or an outside link;
 - the redaction bars you draw on them. These are black bars that cover parts of a résumé;
 - the list of profile parts you hid (section 9);
+- which of your clubs show on your profile, in what order, and whether the title a club gave you shows (section 9);
 - your "What are you here for?" answers.
 
 ### 3c. What about the things I post and do?
 
 - Posts, drafts, comments, likes, reposts and saves.
 - Who you follow and who follows you.
-- Clubs: memberships and roles, clubs you follow, requests to join with your message, and invites. If a club's owner or admin takes you out of the club or adds you to a room, we store who did it and when.
+- Clubs: memberships and roles, the title a club's owner or admin gave you, clubs you follow, requests to join with your message, and invites. Asking to join a club also follows it. If a club's owner or admin takes you out of the club, adds you to a room, gives you a title or removes you as a follower, we store who did it and when.
 - Club events, your RSVPs (Going or Interested) and personal calendar entries.
 - Messages and everything in them.
 - Which messages are pinned in a chat, who pinned each one, and when.
 - Your settings in each chat, and your poll votes and sign-ups in club rooms.
-- Reports you file, your block and mute lists, and the suggested people you dismissed.
+- Reports you file, your block and mute lists (people, and clubs whose posts you muted), and the suggested people you dismissed.
 - Otto settings, your answers to Otto's set-up questions, and reminders. Otto, Vibe's built-in helper, runs on our own software, not an AI service.
 
 **Photo details.** A camera saves hidden details inside a photo or video, such as where it was taken.
@@ -196,18 +197,20 @@ One paid feature lets a person see who looked at them. With Vibe+, they see the 
 | What | Who can see it |
 |---|---|
 | Your profile, and posts you made as yourself | Anyone on the internet, signed in or not |
+| The clubs you are in, each with your title and the month you joined it on Vibe | Anyone on the internet, unless you hide that club or its title |
 | A club's page and its 12 newest posts, with each author's name | Anyone on the internet |
 | Your comments and reposts | Any signed-in account |
-| Who you follow and who follows you | Any signed-in account |
+| The people you follow and who follows you | Any signed-in account |
 | Like, view and save totals on a post | Any signed-in account |
 | Who liked a post | Only the post's author |
 | Who saved a post | No other user |
 | Who viewed a profile or post | Any signed-in account sees the total. The names go only to the person viewed, and only with Vibe+ |
 | Your résumé | Signed-in accounts with a verified school email, unless you hid it or one of you blocked the other |
 | Your messages | Everyone in that chat, including people added later |
-| A club's member list | The club's members. For a club that anyone can join, also any signed-in account (on the Map) |
+| The posts on a club's Board | The club's members. Also its followers with a verified school email, unless the club turned that off. Followers do not see the replies (section 5e) |
+| A club's member list | The club's members. For a club that anyone can join, any signed-in account also sees on the Map the members who show that club on their profile |
 | A club's follower list, and who RSVP'd to its events | The club's owner and admins. The people in an event's chat also see who is in it, and the first few who marked Going (up to 8) |
-| Drafts, saved posts, your mute list, your personal calendar | Only you |
+| Drafts, saved posts, your mute list, your personal calendar, the clubs you hid from your profile and your list of the clubs you follow | Only you. A club's owner and admins still see that you follow it |
 | Your sign-in email, school email and personal email | Only you, except your starter name (section 3a). A short form of your sign-in email can be emailed to your own school or personal inbox (section 4) |
 
 The Vibe team and the cofounder with direct access can see more than this table shows. Sections 1 and 5h say what.
@@ -216,10 +219,10 @@ The Vibe team and the cofounder with direct access can see more than this table 
 
 No account is needed to see these:
 
-- **Your profile page:** your name, handle, photos, tagline, location line, website link, interest tags, major and year, campus and the verified badge. It also shows three counts: your followers, the people you follow, and your connections (people you follow who follow you back). Your published posts that were not made as a club show too, including which one you pinned. So do your bio, experience, skills and "Working on", unless you hid them (section 9). Not shown: either email address, résumés or "here for" answers.
+- **Your profile page:** your name, handle, photos, tagline, location line, website link, interest tags, major and year, campus and the verified badge. It also shows three counts: your followers, the people you follow, and your connections (people you follow who follow you back). Your published posts that were not made as a club show too, including which one you pinned. So do your bio, experience, skills and "Working on", unless you hid them (section 9). It also lists the clubs you are in, each with any title the club gave you and the month you joined it on Vibe, unless you hid that club or the title. Your role in a club is not shown there. Not shown: either email address, résumés, "here for" answers, the clubs you hid or your list of the clubs you follow.
 - **Photos and videos:** anyone who has the exact link can open a profile photo, a cover, a logo, or a photo or video on a post or club page. For most photos that link does not expire.
 - **A post's share link:** you must sign in to open a post from its link, though a post you made as yourself also shows on your public profile. The preview that shows when the link is shared gives the author's name, up to 140 characters of the text, and the photo.
-- **Club pages:** name, description, links, logo, banner, who can join, member count, and follower count once it reaches 5. Also the 12 newest posts with each author's name, handle and photo, even for clubs you must ask or be invited to join.
+- **Club pages:** name, description, links, logo, banner, who can join, and the member and follower counts once each reaches 5. Also the 12 newest posts with each author's name, handle and photo, even for clubs you must ask or be invited to join.
 - **Search engines and link previews:** profile and club pages can appear in search results and in link previews. We cannot pull back those copies.
 
 These need a signed-in account, or more (5b to 5g): your reposts, follower and following lists, chats, RSVP lists and member lists. A club the Vibe team has hidden, or the profile of a suspended or banned account, looks like a page that does not exist.
@@ -230,10 +233,10 @@ These need a signed-in account, or more (5b to 5g): your reposts, follower and f
 
 This means every account, verified or not, at every campus.
 
-- Everything above, plus your comments and reposts, and the lists of who you follow and who follows you.
+- Everything above, plus your comments and reposts, and the lists of the people you follow and who follows you.
 - Totals of likes, views and saves on each post. The author gets a notification naming each liker. Vibe shows nobody else who liked, and shows nobody who saved.
 - Club events, with Going and Interested totals.
-- Search finds verified accounts that finished setting up, across both universities. The Map lists people by campus and major, and the members of a club that anyone can join.
+- Search finds verified accounts that finished setting up, across both universities. The Map lists people by campus and major. For a club that anyone can join, it also lists the members who show that club on their profile.
 - For any account: when it was made, when its handle last changed and its total profile views. No screen shows the department or school an account typed at set-up, but a signed-in account could still read it.
 
 ### 5c. Who can open my résumé?
@@ -265,7 +268,7 @@ Vibe has direct chats, group chats and club rooms.
 
 | Room | Who can read it, and who can post |
 |---|---|
-| Board | Every member reads. The club's owner and admins post. Any member can reply under a post |
+| Board | Every member reads. The club's owner and admins post. Any member can reply under a post. Its followers with a verified school email read the posts too, not the replies, shown as the club's. Not if the club turned that off, removed them as a follower or from the club, or its owner, an admin or a mod blocked them |
 | Lounge | Every member reads and posts |
 | Officers | The club's owner, its admins and people they add. Everyone in it can post |
 | Extra rooms | The club's owner and admins create them and choose who can open each one: every member, or only people they pick. They also choose who can post: everyone who can open it, only the owner and admins, or the owner, admins and people they pick |
@@ -273,26 +276,26 @@ Vibe has direct chats, group chats and club rooms.
 
 In the app, the "only the owner and admins" choice reads "Only officers post". There, "officers" means the club's owner and admins, not its mods.
 
-New members can read a room's whole history. In a room where the club chose who can post, you can still read, vote in polls and take a sign-up spot. The room tells you the rule, for example "Only officers post here." It does not list the people who were picked.
+New members can read a room's whole history. A follower who can read the Board also sees its earlier posts by the club's current owner and admins. In a room where the club chose who can post, you can still read, vote in polls and take a sign-up spot. The room tells you the rule, for example "Only officers post here." It does not list the people who were picked.
 
-- **Polls and sign-ups.** With names on, the room sees who picked what, and sign-ups always show names. In an "Anonymous" poll nobody in the club can see who voted. Your vote is still stored with your account, so the cofounder with direct access (section 1) could see how you voted.
-- **Blocks in club rooms.** You each see a blank in place of the other's messages. One exception: a post on the Board by the club's owner or an admin shows to every member, block or not. The blank only hides messages on screen, so treat what you write in a club room as readable by every member, including someone you blocked.
+- **Polls and sign-ups.** With names on, the members who can open the room see who picked what, and sign-ups always show them the names. A follower reading the Board sees only the totals. In an "Anonymous" poll nobody in the club can see who voted. Your vote is still stored with your account, so the cofounder with direct access (section 1) could see how you voted.
+- **Blocks in club rooms.** You each see a blank in place of the other's messages. One exception: a post on the Board by the club's owner or an admin shows to every member, and to every follower who can read the Board, block or not. If the club's owner, an admin or a mod blocks a follower, that follower can no longer read the Board. The blank only hides messages on screen, so treat what you write in a club room as readable by every member, including someone you blocked.
 - **Your chat settings.** Other members of a chat may be able to tell when you last read it. They may also be able to tell whether you muted it, pinned it to the top of your list, hid it or cleared it.
 
 ### 5f. What can the people who run a club see?
 
 A club is run by its owner, its admins and its mods (moderators the club picks).
 
-- **Every member** sees the club's member list: name, handle, photo, role and join date.
+- **Every member** sees the club's member list: name, handle, photo, role, title and join date.
 - **The club's owner and admins** see four more lists:
-  - followers, with the date each first followed;
+  - followers, with the date each first followed. You are on it from the moment you ask to join, unless one of you blocked the other;
   - invites and their outcome;
   - who RSVP'd to the club's events;
   - the people added to a room, with the date each was added.
 
-  They can drop a follower without that person being told, and delete any post made as the club.
+  They can give a member a title, which shows on that member's profile unless the member hides the club or the title. They can stop followers reading the Board. They can remove a follower without that person being told: that person can follow again, but cannot read the Board until they join. And they can delete any post made as the club.
 - **The club's owner, admins and mods** see pending requests to join, with your message. If the club took you out before, the request carries a "Removed before" mark. Mods can also read the list of people added to a room. Owners, admins and mods can remove a club room message. It is then hidden from everyone but its author, not deleted, and we record who removed it.
-- Nobody who runs a club is shown email addresses or reports. If they try to remove a message that has an open report, the app tells them one is open.
+- Nobody who runs a club is shown email addresses, reports or who muted the club's posts. If they try to remove a message that has an open report, the app tells them one is open.
 
 ### 5g. What can only I see?
 
@@ -301,7 +304,8 @@ No other user is shown these:
 - drafts and saved posts;
 - personal calendar entries;
 - your notifications;
-- your mute list and the suggested people you dismissed;
+- your mute list, including clubs whose posts you muted, and the suggested people you dismissed;
+- the clubs you hid from your profile (the club's members still see you in its member list) and your list of the clubs you follow (a club's owner and admins still see that you follow it);
 - Otto settings and reminders;
 - your redaction bars, your list of hidden profile parts and your "here for" answers.
 
@@ -395,6 +399,9 @@ Vibe does not delete things just because they are old. They stay until you, a cl
 | RSVPs | You take yours back, the club takes you out (upcoming events only), or the event, the club or your account is deleted |
 | Events | An owner or admin cancels the event, or the club or the account that made it is deleted |
 | Join requests and invites | The club or your account is deleted |
+| A title a club gave you | An owner or admin changes or removes it, you leave or are taken out of the club, or the club or your account is deleted |
+| A mute on a club's posts | You unmute it, or the club or your account is deleted |
+| A club removing you as a follower | You join the club, or the club or your account is deleted |
 
 **Deleting one thing.**
 
@@ -420,7 +427,7 @@ Vibe does not delete things just because they are old. They stay until you, a cl
 
   For a comment, or for your messages in a chat or club you have left, you need not delete your account. Write to help@connectvibe.app from your sign-in email. We reply to that address, and once you answer that reply we aim to delete the comment or the messages by hand.
 - A direct or group chat itself. "Clear chat history" and "Delete conversation" only clear your view.
-- A request to join a club. You cannot take it back.
+- A request to join a club. You cannot take it back. Asking also follows the club. If the club says no, you keep following until you unfollow.
 - The date you first followed a club. It stays after you unfollow, until the club or your account is deleted. While you are not following, no other user is shown it. If you follow again, the club's owner and admins see that first date (section 5f).
 - An account that never confirmed its email or never finished setting up. If you cannot sign in to delete it, write to help@connectvibe.app.
 - Our email log, the abuse counts, the sign-in log and emails you send us (section 9).
@@ -430,9 +437,9 @@ Vibe does not delete things just because they are old. They stay until you, a cl
 
 ## 9. How do I see, change or delete my information?
 
-**See and change.** You can edit your profile, and hide five parts of it: bio, experience, skills, "Working on" and résumé. Your name, handle, photos, tagline, location line, website link, interest tags, major, year, campus, verified badge, three counts (followers, following and connections) and posts cannot be hidden. Settings shows your sign-in and school emails. To change your sign-in email, write to help@connectvibe.app from your current sign-in email. We reply to that address, and change it only after you answer that reply.
+**See and change.** You can edit your profile, and hide five parts of it: bio, experience, skills, "Working on" and résumé. Your name, handle, photos, tagline, location line, website link, interest tags, major, year, campus, verified badge, three counts (followers, following and connections) and posts cannot be hidden. Your clubs show on your profile unless you hide one, and hiding one takes it off at once. You can also hide the title a club gave you, and choose the order your clubs show in. The club's members still see you in its member list. When you leave a club, you choose whether to keep following it. If you do, you can read its Board as a follower can (section 5e). Settings shows your sign-in and school emails. To change your sign-in email, write to help@connectvibe.app from your current sign-in email. We reply to that address, and change it only after you answer that reply.
 
-**Block, mute, report.** Block or mute someone from their profile. Any account that has accepted the Terms can report, verified or not, unless it is suspended or banned.
+**Block, mute, report.** Block or mute someone from their profile. Mute a club's posts from its page or from one of its posts: they leave your feed, you stay in its chats, and the club is not told. Any account that has accepted the Terms can report, verified or not, unless it is suspended or banned.
 
 **A copy of your data.** Email hello@connectvibe.app from your sign-in email. There is no export tool. The cofounder with direct access (section 1) puts the copy together by hand, and has to open your records to do it, messages included. We aim to send it within 30 days. We send it only to your sign-in email, never to another address.
 
@@ -451,7 +458,7 @@ What happens, in order:
 3. Your account is deleted from the sign-in system, and with it every record tied to the account:
    - both email addresses, your profile and your proof of agreement;
    - everything you posted, sent, liked, saved or voted on;
-   - your follows, club memberships, RSVPs, blocks and mutes;
+   - your follows, club memberships and titles, RSVPs, blocks and mutes, club mutes included;
    - the records of what you viewed and of who viewed you;
    - your notifications, and your waitlist entry.
 
@@ -475,7 +482,7 @@ If step 1 or 2 fails, the account is not deleted and you can try again. If step 
   A photo already kept as evidence stays, even if the report was dismissed.
 - **The files that deleting your account misses** (section 8).
 - **Messages you pinned.** A message someone else wrote stays pinned. The record of who pinned it is emptied.
-- **Club records of things you did as a club owner, admin or mod,** with your name taken off. A club you owned stays, with no owner.
+- **Club records of things you did as a club owner, admin or mod,** such as titles you gave and followers you removed, with your name taken off. A club you owned stays, with no owner.
 - **Our email log,** without the scrambled code or your account ID. It keeps the reference number Resend gave each message.
 - **The sign-in log.** The sign-in system's log of sign-in activity (section 3d) sits in our database at Supabase. It can hold your email address and IP address. It is not tied to your account, and nothing in Vibe clears it today.
 - **Abuse counts,** until they are cleared.

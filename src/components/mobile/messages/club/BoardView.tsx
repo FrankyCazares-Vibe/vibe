@@ -8,6 +8,7 @@ import type { ChatMessage, RemoveMessageResponse } from "@/lib/chat/types";
 import { useLayerHistory } from "@/lib/chat/use-layer-history";
 import { ROOM_FULL_READ_EVERY, ROOM_POLL_MS, type RoomPoll } from "@/lib/chat/use-room-poll";
 import { vibeRequest } from "@/lib/feedback/request";
+import { ORG_COPY, fillCopy } from "@/lib/orgs/join-copy";
 
 import { toastSendFailure } from "../send-failure";
 import { useChatSurface } from "../surface";
@@ -168,11 +169,11 @@ export function BoardView({ poll, roomId, night, now, onOpenEventChat, scrollTok
         {surface === "desktop" ? <style>{HOVER_ACTIONS_CSS}</style> : null}
         {surface === "desktop" && room?.org.name ? (
           <p style={{ flexShrink: 0, margin: 0, padding: "2px 4px 0", color: t.muted, fontSize: 12.5, fontWeight: 600, lineHeight: 1.4 }}>
-            {`Announcements from ${room.org.name}'s officers. Everyone in the club sees them.`}
+            {`${fillCopy(ORG_COPY.board.intro, { org: room.org.name })} Everyone in the club sees them.`}
           </p>
         ) : null}
         {empty ? (
-          <div style={{ padding: "48px 18px", textAlign: "center", color: t.secondary, fontSize: 13.5, lineHeight: 1.5 }}>Nothing on the Board yet.</div>
+          <div style={{ padding: "48px 18px", textAlign: "center", color: t.secondary, fontSize: 13.5, lineHeight: 1.5 }}>{ORG_COPY.board.empty}</div>
         ) : (
           posts.map((post) => {
             if (post.removed !== null) {

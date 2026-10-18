@@ -13,10 +13,18 @@ import type { ToastAction } from "@/lib/feedback/failure-copy";
  */
 export type ToastTone = "info" | "error";
 
+/**
+ * A button that runs something in the page (an Undo), where `action` only
+ * links. The toast goes as it is pressed; whatever `onPress` does next says
+ * its own result (wave-2 repair, finding 23: one toast host, not two).
+ */
+export type ToastButton = { label: string; onPress: () => void };
+
 export type ToastInput = {
   message: string;
   tone?: ToastTone;
   action?: ToastAction;
+  button?: ToastButton;
   durationMs?: number;
 };
 
@@ -26,6 +34,7 @@ export type ToastItem = {
   message: string;
   tone: ToastTone;
   action?: ToastAction;
+  button?: ToastButton;
   durationMs: number;
 };
 
@@ -42,10 +51,10 @@ function emit() {
   for (const listener of listeners) listener();
 }
 
-/** Info 2.4 s, error 5 s, error with an action 8 s (time to reach the button). */
-function defaultDuration(tone: ToastTone, action?: ToastAction): number {
-  if (tone === "info") return 2_400;
-  return action ? 8_000 : 5_000;
+/** Info 2.4 s, error 5 s; 8 s with a link or a button (time to reach it). */
+function defaultDuration(tone: ToastTone, action?: ToastAction | ToastButton): number {
+  if (action) return 8_000;
+  return tone === "info" ? 2_400 : 5_000;
 }
 
 export function toast(input: string | ToastInput): void {
@@ -61,8 +70,8 @@ export function toast(input: string | ToastInput): void {
   lastShownAt = now;
 
   const tone = t.tone ?? "info";
-  const durationMs = t.durationMs ?? defaultDuration(tone, t.action);
-  current = { id: nextId++, message, tone, action: t.action, durationMs };
+  const durationMs = t.durationMs ?? defaultDuration(tone, t.action ?? t.button);
+  current = { id: nextId++, message, tone, action: t.action, button: t.action ? undefined : t.button, durationMs };
   if (hideTimer) clearTimeout(hideTimer);
   hideTimer = setTimeout(dismissToast, durationMs);
   emit();

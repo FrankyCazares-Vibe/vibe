@@ -5,15 +5,18 @@
  * the date separators rule and the state pill's text.
  *
  * PURE: no React, no DOM. The imports are `when.ts` (1.4), `room-names.ts`
- * (wave-3 desktop contract 4c.3; itself import-free) and types, so
- * `node --test` loads it (helpers.test.ts, through the repo's resolve hook
- * for the "@/" alias). Every string here is 1.2's, word for word; nothing
- * is invented, and every function that reads a clock takes `now`.
+ * (wave-3 desktop contract 4c.3; itself import-free), join-copy.ts (whose
+ * own imports are types) and types, so `node --test` loads it (helpers.test.ts,
+ * through the repo's resolve hook for the "@/" alias). The member screens'
+ * strings are 1.2's, word for word; the follower's (club model, Oct 16) are
+ * `ORG_COPY.board`'s, the club page's own. Every function that reads a clock
+ * takes `now`.
  */
 
 import { roomDisplayName } from "@/lib/chat/room-names";
-import type { ClubRole, EventRef, RoomKind, RoomState, SpaceRoom } from "@/lib/chat/types";
-import { eventTime, eventTimeShort, isSoon, moreDays, rowTime } from "@/lib/chat/when";
+import type { ClubRole, EventRef, FollowedBoard, RoomKind, RoomState, SpaceAnswer, SpaceResponse, SpaceRoom } from "@/lib/chat/types";
+import { eventTime, eventTimeShort, isSoon, moreDays, rowTime, rowTimeSpoken } from "@/lib/chat/when";
+import { ORG_COPY, fillCopy, type OrgRelation } from "@/lib/orgs/join-copy";
 
 /** `org_members.role` → the product's word (1.1 "Your hat"); "" for null. */
 export function roleWord(role: ClubRole | null | undefined): string {
@@ -44,6 +47,114 @@ export function countWord(n: number, one: string, many = `${one}s`): string {
 /** `Your hat: <Owner|Officer|Mod|Member> · <N> members` (1.2). */
 export function hatLine(role: ClubRole | null | undefined, memberCount: number): string {
   return `Your hat: ${roleWord(role)} · ${countWord(memberCount, "member")}`;
+}
+
+// ── Followers (club model, Franky's calls of Oct 16) ─────────────────────────
+// Only members type, react or vote. A follower the database lets in reads
+// the club's Board (its officers' posts, never the replies) and nothing else.
+
+/** The space read as a MEMBER's (a role in `viewer`), else null: a follower's space, or none yet. */
+export function memberSpace(space: SpaceAnswer | null | undefined): SpaceResponse | null {
+  return space && space.viewer.role !== null ? (space as SpaceResponse) : null;
+}
+
+/** The quiet line in the composer's place for a follower on the Board. */
+export const FOLLOWER_POST_LINE: string = ORG_COPY.board.onlyMembersPost;
+
+/** A reader of the room or the space who follows the club but is not in it. */
+export function isFollower(viewer: object | null | undefined): boolean {
+  return (viewer as { standing?: unknown } | null | undefined)?.standing === "follower";
+}
+
+/**
+ * The header's second line for a follower: `Following · 12 members`, or
+ * `Following` alone when the count is null (counts are public from 5 up, so
+ * the space sends null below that, or when it could not be read).
+ */
+export function followerHatLine(memberCount: number | null | undefined): string {
+  return typeof memberCount === "number" && Number.isFinite(memberCount)
+    ? `Following · ${countWord(memberCount, "member")}`
+    : "Following";
+}
+
+/** The line over a follower's Board: whose posts these are. */
+export function followerBoardIntro(clubName: string): string {
+  return fillCopy(ORG_COPY.board.intro, { org: clubName.trim() || "the club" });
+}
+
+/** A follower's Board post is the club's: `Board post from <Club>, <spoken time>`. */
+export function followerPostLabel(clubName: string, spokenTime: string): string {
+  return `Board post from ${clubName.trim() || "the club"}${spokenTime ? `, ${spokenTime}` : ""}`;
+}
+
+/** A reaction a follower sees as a count only: `3 reactions with 🎉`. */
+export function reactionCountLabel(emoji: string, count: number): string {
+  return `${countWord(count, "reaction")} with ${emoji}`;
+}
+
+/**
+ * A Board I follow has a post I haven't seen: its newest post is later than
+ * the newest one this browser showed me (`board-seen.ts`; a follower has no
+ * server read mark). Never seen, any post is new.
+ */
+export function boardHasNew(latestAt: string | null | undefined, seenAt: string | null | undefined): boolean {
+  const latest = latestAt ? Date.parse(latestAt) : Number.NaN;
+  if (!Number.isFinite(latest)) return false;
+  const seen = seenAt ? Date.parse(seenAt) : Number.NaN;
+  return !Number.isFinite(seen) || latest > seen;
+}
+
+/** The row of a Board I follow on the Messages home: `<Club> Board, you follow this club[, new post], latest: <text>, <time>`. */
+export function followedBoardLabel(board: Pick<FollowedBoard, "org" | "latest">, now: Date, isNew = false): string {
+  const parts = [`${board.org.name} Board`, "you follow this club"];
+  if (isNew) parts.push("new post");
+  const text = board.latest?.text.trim();
+  const empty = ORG_COPY.board.followedEmpty;
+  parts.push(text ? `latest: ${text}` : empty.charAt(0).toLowerCase() + empty.slice(1));
+  if (board.latest) {
+    const when = rowTimeSpoken(board.latest.created_at, now);
+    if (when) parts.push(when);
+  }
+  return parts.join(", ");
+}
+
+/** The wide list's search over the Boards I follow: the club's name or handle includes the query, whatever the case. */
+export function boardsMatching<T extends Pick<FollowedBoard, "org">>(boards: readonly T[], query: string): T[] {
+  const q = query.trim().toLowerCase();
+  if (!q) return [...boards];
+  return boards.filter((b) => b.org.name.toLowerCase().includes(q) || b.org.handle.toLowerCase().includes(q));
+}
+
+const JOIN_STATES = ["member", "invited", "requested", "can_join", "can_request", "invite_only", "audience_blocked", "unverified", "hidden"] as const;
+const ROLES = ["owner", "admin", "mod", "member"] as const;
+
+function oneOf<T extends string>(value: unknown, list: readonly T[]): T | null {
+  return typeof value === "string" && (list as readonly string[]).includes(value) ? (value as T) : null;
+}
+
+/**
+ * The viewer's standing with a club, from `GET /api/orgs/<handle>`'s `org`
+ * (the Join or Request control under a follower's Board). The fields are the
+ * phone Orgs tab's (`orgRelationFor`): following = a role, or a follow row.
+ * Null when the body does not hold a club and a known state, so the screen
+ * offers nothing rather than a wrong button.
+ */
+export function followerRelation(org: unknown): OrgRelation | null {
+  if (!org || typeof org !== "object") return null;
+  const o = org as Record<string, unknown>;
+  const state = oneOf(o.join_state, JOIN_STATES);
+  if (typeof o.handle !== "string" || !o.handle || !state) return null;
+  const role = oneOf(o.viewer_role, ROLES);
+  return {
+    handle: o.handle,
+    orgName: typeof o.name === "string" ? o.name : "",
+    state,
+    following: state === "member" || role !== null || o.org_follow_state === "following",
+    role,
+    reason: oneOf(o.join_reason, ["policy", "visiting"] as const),
+    audience: oneOf(o.audience, ["both", "iu", "purdue"] as const) ?? "both",
+    joinPolicy: oneOf(o.join_policy, ["open", "request", "invite"] as const),
+  };
 }
 
 /** The author's name, `Someone` when `users` is null (SCREENS-L11). */
@@ -167,8 +278,9 @@ export function upNextLine(event: EventTimes, now: Date): string {
  * `"<title> room, Tuesday 7 PM, you said maybe"`; `soon` only when `isSoon`,
  * `live now` on `live`, the RSVP clause only when the viewer RSVP'd.
  */
-export function upNextAriaLabel(event: EventTimes & Pick<EventRef, "title" | "viewer_status">, now: Date): string {
-  const parts = [`${event.title} room`];
+export function upNextAriaLabel(event: EventTimes & Pick<EventRef, "title" | "viewer_status"> & { room_id?: string | null }, now: Date): string {
+  // A tile with no chat to enter (a follower's, or before the RSVP) opens the event itself.
+  const parts = [`${event.title} ${event.room_id === null ? "event" : "room"}`];
   if (isSoon(event.starts_at, event.ends_at, now)) parts.push("soon");
   parts.push(event.state === "live" ? "live now" : eventTimeSpoken(event.starts_at, now));
   if (event.viewer_status === "going") parts.push("you're going");
@@ -303,7 +415,7 @@ export function refusedSend(code: string | null | undefined): { tile: boolean; r
 
 /** The empty room's line: `Say hi to <club>.` · `Nothing on the Board yet.` · `Say hi to everyone going.` */
 export function emptyLine(kind: RoomKind, clubName: string): string {
-  if (kind === "board") return "Nothing on the Board yet.";
+  if (kind === "board") return ORG_COPY.board.empty;
   if (kind === "event") return "Say hi to everyone going.";
   return `Say hi to ${clubName}.`;
 }

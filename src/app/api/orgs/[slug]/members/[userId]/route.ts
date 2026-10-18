@@ -1,17 +1,19 @@
 import { NextResponse } from "next/server";
 
 import { limitFor } from "@/lib/limits/budgets";
-import { requireNotRestricted } from "@/lib/moderation/access";
+import { contentBlockedResponse, requireNotRestricted } from "@/lib/moderation/access";
+import { checkChangedText } from "@/lib/moderation/text-filter";
 import { officerGate } from "@/lib/orgs/hidden-gate";
 import { isOrgRole, type OrgRole } from "@/lib/orgs/join-state";
 import { forgetOrgRemoval, recordOrgRemoval } from "@/lib/orgs/membership";
 import { isUuid } from "@/lib/pgrest";
+import { normalizeClubTitle, storedClubTitle } from "@/lib/profile/club-flair";
 import { tooManyRequests } from "@/lib/rate-limit";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 
 type Params = { params: Promise<{ slug: string; userId: string }> };
-type PatchBody = { role?: unknown };
+type PatchBody = { role?: unknown; title?: unknown };
 
 const VALID_ROLES = ["admin", "mod", "member"] as const;
 
@@ -86,9 +88,103 @@ async function requireStaff(slug: string, viewerId: string) {
   return { org, viewerRole: role as "owner" | "admin", service } as const;
 }
 
+type StaffGuard = Extract<Awaited<ReturnType<typeof requireStaff>>, { viewerRole: unknown }>;
+
 /**
- * PATCH /api/orgs/[slug]/members/[userId] — change a member's role.
- * Body: { role: 'admin' | 'mod' | 'member' }
+ * The title half of PATCH: `{title: "President"}` sets one, `{title: null}`
+ * (or blank) clears it (club model spec D; review item 32). A title shows on
+ * the member's public profile next to the club, if they show the club; the
+ * role word never does.
+ *
+ * WHO: the owner titles anyone, themselves included; an admin titles mods,
+ * members and themselves. The same reach as roles ({@link ACTABLE_ROLES}),
+ * plus your own row, and the write filters on it, so a title can't land on
+ * someone whose role moved out of reach meanwhile.
+ *
+ * WHAT: one line, up to 32 characters, not using Vibe, Admin, Moderator,
+ * Verified or Official (`normalizeClubTitle`), and past the word filter.
+ * An unchanged title is let through, the way profile saves are. Who set it
+ * and when is stamped on the row (`org_members_title_stamped` insists). The
+ * member can hide it from their own Clubs settings (`show_title` on
+ * `PATCH /api/me/clubs/[orgId]`), but never write one.
+ */
+async function patchTitle(guard: StaffGuard, actorId: string, userId: string, raw: unknown) {
+  const checked = normalizeClubTitle(raw);
+  if (!checked.ok) {
+    return NextResponse.json(
+      { ok: false, error: checked.error, code: checked.code },
+      { status: 400 },
+    );
+  }
+  if (!isUuid(userId)) return NextResponse.json(MEMBER_NOT_FOUND, { status: 404 });
+
+  const failed = () =>
+    NextResponse.json({ ok: false, error: "Failed to update title" }, { status: 500 });
+  const { data: target, error: targetErr } = await guard.service
+    .from("org_members")
+    .select("role, title")
+    .eq("org_id", guard.org.id)
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (targetErr) {
+    console.error("[orgs/[slug]/members/[userId] PATCH title load target]", targetErr);
+    return failed();
+  }
+  if (!target) return NextResponse.json(MEMBER_NOT_FOUND, { status: 404 });
+
+  const reach: readonly OrgRole[] =
+    userId === actorId ? [guard.viewerRole] : ACTABLE_ROLES[guard.viewerRole];
+  const targetRole: unknown = target.role;
+  if (!isOrgRole(targetRole) || !reach.includes(targetRole)) {
+    const error =
+      targetRole === "owner"
+        ? "Only the owner can change the owner's title"
+        : "Only the owner can change an officer's title";
+    return NextResponse.json({ ok: false, error }, { status: 403 });
+  }
+  if (!checkChangedText(checked.title, storedClubTitle(target.title)).ok) {
+    return contentBlockedResponse("title");
+  }
+
+  const { data: changed, error } = await guard.service
+    .from("org_members")
+    .update({
+      title: checked.title,
+      title_set_by: actorId,
+      title_set_at: new Date().toISOString(),
+    })
+    .eq("org_id", guard.org.id)
+    .eq("user_id", userId)
+    .in("role", [...reach])
+    .select("title");
+  if (error) {
+    // `org_members_title_check` is the backstop for normalizeClubTitle. If
+    // the two ever disagree, say "not allowed", not "something broke".
+    if ((error as { code?: string }).code === "23514") {
+      return NextResponse.json(
+        { ok: false, error: "That title isn't allowed.", code: "title_invalid" },
+        { status: 400 },
+      );
+    }
+    console.error("[orgs/[slug]/members/[userId] PATCH title]", error);
+    return failed();
+  }
+  const row = (changed ?? [])[0] as { title?: unknown } | undefined;
+  if (!row) {
+    const standing = await standingAfterMiss(guard.service, guard.org.id as string, userId);
+    if (standing === "error") return failed();
+    return standing === "gone"
+      ? NextResponse.json(MEMBER_NOT_FOUND, { status: 404 })
+      : NextResponse.json(ROLE_CHANGED, { status: 409 });
+  }
+  return NextResponse.json({ ok: true, title: storedClubTitle(row.title) });
+}
+
+/**
+ * PATCH /api/orgs/[slug]/members/[userId] — change a member's role, OR give
+ * them a title.
+ * Body: { role: 'admin' | 'mod' | 'member' } or { title: string | null }
+ * (one at a time; the title rules are on {@link patchTitle}).
  *
  * Permissions:
  *  - Admin/owner only.
@@ -129,6 +225,18 @@ export async function PATCH(req: Request, { params }: Params) {
     body = (await req.json()) as PatchBody;
   } catch {
     return NextResponse.json({ ok: false, error: "Invalid JSON" }, { status: 400 });
+  }
+  if (!body || typeof body !== "object") {
+    return NextResponse.json({ ok: false, error: "Invalid body" }, { status: 400 });
+  }
+  if ("title" in body) {
+    if ("role" in body) {
+      return NextResponse.json(
+        { ok: false, error: "Change the role or the title, one at a time." },
+        { status: 400 },
+      );
+    }
+    return patchTitle(guard, user.id, userId, body.title);
   }
   const role = typeof body.role === "string" ? body.role : "";
   if (!(VALID_ROLES as readonly string[]).includes(role)) {

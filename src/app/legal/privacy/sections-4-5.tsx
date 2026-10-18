@@ -83,11 +83,15 @@ export function Sections4To5() {
             "Anyone on the internet, signed in or not",
           ],
           [
+            "The clubs you are in, each with your title and the month you joined it on Vibe",
+            "Anyone on the internet, unless you hide that club or its title",
+          ],
+          [
             "A club's page and its 12 newest posts, with each author's name",
             "Anyone on the internet",
           ],
           ["Your comments and reposts", "Any signed-in account"],
-          ["Who you follow and who follows you", "Any signed-in account"],
+          ["The people you follow and who follows you", "Any signed-in account"],
           ["Like, view and save totals on a post", "Any signed-in account"],
           ["Who liked a post", "Only the post's author"],
           ["Who saved a post", "No other user"],
@@ -101,16 +105,24 @@ export function Sections4To5() {
           ],
           ["Your messages", "Everyone in that chat, including people added later"],
           [
+            "The posts on a club's Board",
+            <>
+              The club&apos;s members. Also its followers with a verified school
+              email, unless the club turned that off. Followers do not see the
+              replies (<Sec to="5e">section 5e</Sec>)
+            </>,
+          ],
+          [
             "A club's member list",
-            "The club's members. For a club that anyone can join, also any signed-in account (on the Map)",
+            "The club's members. For a club that anyone can join, any signed-in account also sees on the Map the members who show that club on their profile",
           ],
           [
             "A club's follower list, and who RSVP'd to its events",
             "The club's owner and admins. The people in an event's chat also see who is in it, and the first few who marked Going (up to 8)",
           ],
           [
-            "Drafts, saved posts, your mute list, your personal calendar",
-            "Only you",
+            "Drafts, saved posts, your mute list, your personal calendar, the clubs you hid from your profile and your list of the clubs you follow",
+            "Only you. A club's owner and admins still see that you follow it",
           ],
           [
             "Your sign-in email, school email and personal email",

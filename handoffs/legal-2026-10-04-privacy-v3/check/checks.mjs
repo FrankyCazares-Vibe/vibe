@@ -65,8 +65,14 @@ export function tableIssues(mdShapes, pageShapes) {
 
 const DATE = /(?:January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{1,2},\s+\d{4}/g;
 
-export function dateIssues(mdBlocks, pageBlocks) {
+/**
+ * `effective` is the page's EFFECTIVE_DATE, read from page.tsx by check.mjs
+ * (effectiveDateOf), so a new date is typed in two places only: page.tsx and
+ * the text's top line (wave-3 review, findings 3 and 9).
+ */
+export function dateIssues(mdBlocks, pageBlocks, effective) {
   const out = [];
+  if (!effective) out.push("no EFFECTIVE_DATE could be read from page.tsx");
   const text = (blocks) => blocks.map((b) => norm(b.text)).join("\n");
   const page = text(pageBlocks);
   const md = text(mdBlocks);
@@ -76,7 +82,7 @@ export function dateIssues(mdBlocks, pageBlocks) {
     return c;
   };
   const header = pageBlocks[1] ? norm(pageBlocks[1].text) : "";
-  if (header !== "Effective October 15, 2026") out.push(`the line under the title reads "${header}", not "Effective October 15, 2026"`);
+  if (header !== `Effective ${effective}`) out.push(`the line under the title reads "${header}", not "Effective ${effective}"`);
   for (const phrase of [
     "our release of October 5, 2026",
     "We published this policy on October 5, 2026",
@@ -89,10 +95,24 @@ export function dateIssues(mdBlocks, pageBlocks) {
   const mc = count(md);
   for (const d of new Set([...Object.keys(pc), ...Object.keys(mc)])) {
     if ((pc[d] || 0) !== (mc[d] || 0)) out.push(`"${d}" is ${mc[d] || 0} times in the text and ${pc[d] || 0} times on the page`);
-    if (d !== "October 5, 2026" && d !== "October 4, 2026" && d !== "October 7, 2026" && d !== "October 8, 2026" && d !== "October 12, 2026" && d !== "October 13, 2026" && d !== "October 14, 2026" && d !== "October 15, 2026") out.push(`an unexpected date on the page or in the text: "${d}"`);
+    if (d !== "October 5, 2026" && d !== "October 4, 2026" && d !== "October 7, 2026" && d !== "October 8, 2026" && d !== "October 12, 2026" && d !== "October 13, 2026" && d !== "October 14, 2026" && d !== effective) out.push(`an unexpected date on the page or in the text: "${d}"`);
   }
   if ((pc["October 4, 2026"] || 0) !== 1) out.push(`"October 4, 2026" should be on the page exactly once (the counts-only rule); it is there ${pc["October 4, 2026"] || 0} times`);
   return { issues: out, pageDates: pc, mdDates: mc };
+}
+
+/** `const EFFECTIVE_DATE = "October 18, 2026";` in page.tsx, or null. */
+export function effectiveDateOf(pageTsx) {
+  const m = /const EFFECTIVE_DATE = "([^"]+)";/.exec(pageTsx);
+  return m ? m[1] : null;
+}
+
+/** True when `effective` is a day before `today` (both read as local dates). */
+export function effectiveIsPast(effective, today = new Date()) {
+  const at = new Date(`${effective} 00:00:00`);
+  if (Number.isNaN(at.getTime())) return false;
+  const start = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  return at.getTime() < start.getTime();
 }
 
 export const REQUIRED_IDS = [

@@ -5,7 +5,10 @@ import { mapCampusClosed, resolveCampusRequest, scopeViewerFromRow } from "@/lib
 import { scopeCampusIds } from "@/lib/iu/campus-scope";
 import { campusScopeError, homeCampusIdFor } from "@/lib/iu/community-scope";
 import { orgAssetProxyUrl } from "@/lib/org-asset-url";
+import { loadMemberCounts, loadViewerOrgRoles, publicMemberCount } from "@/lib/orgs/following";
+import type { OrgRole } from "@/lib/orgs/join-state";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createSupabaseServiceClient } from "@/lib/supabase/service";
 
 /**
  * Campus map summary — what powers the Map tab's overview view.
@@ -17,7 +20,9 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
  *      major, and count of "mutuals" (people you share at least one
  *      mutual-follow connection with but aren't connected to yet)
  *   - `orgs`: orgs on that campus, sorted by recent activity, for the
- *      "org center" cluster
+ *      "org center" cluster. Hidden clubs are never on it, members' included.
+ *      `member_count` is null below 5 unless the viewer is a member (counts
+ *      public from 5 up), and null when the count couldn't be read.
  *
  * SCOPE (plan wave 2 B10, §2.4). People and orgs are filtered on
  * `campus_id`, never on the legacy `users.school` label. The campus is the
@@ -248,34 +253,32 @@ export async function GET(req: Request) {
   // 5. Orgs on this campus, for the "org center" cluster. `orgs.campus_id`
   // arrived with M1; a campus-less org shows in no campus list any more
   // (plan §2.8 row 4). RLS still limits this to public orgs plus the ones the
-  // viewer belongs to — the map is a user-client read on purpose.
+  // viewer belongs to — the map is a user-client read on purpose. RLS shows a
+  // member their own HIDDEN club, so `hidden_at` is filtered here too: a
+  // hidden club is off the Map for everyone (club model 2A).
   const { data: orgs, error: orgsErr } = await supabase
     .from("orgs")
     .select("id,handle,name,logo_url,verified,is_public,last_activity_at")
     .in("campus_id", campusIds)
+    .is("hidden_at", null)
     .order("last_activity_at", { ascending: false })
     .limit(20);
   if (orgsErr) {
     console.error("[campus-map orgs]", orgsErr);
   }
 
-  // Member counts per org (for sizing).
-  let orgMembers = new Map<string, number>();
-  if (orgs && orgs.length > 0) {
-    const { data: rows } = await supabase
-      .from("org_members")
-      .select("org_id")
-      .in(
-        "org_id",
-        orgs.map((o) => o.id),
-      );
-    for (const row of rows ?? []) {
-      const id = (row as { org_id: string }).org_id;
-      orgMembers.set(id, (orgMembers.get(id) ?? 0) + 1);
-    }
-  } else {
-    orgMembers = new Map();
-  }
+  // Member counts per org (for sizing), with the SERVICE client: since
+  // 20261017120000 the viewer's own client counts nobody in a club they
+  // aren't in. Shown through `publicMemberCount`: exact for the clubs the
+  // viewer is in, null below 5 for the rest. A failed count is null (logged
+  // by the loader), never 0; a failed role read floors every count.
+  const orgIds = (orgs ?? []).map((o) => o.id as string);
+  const service = orgIds.length > 0 ? createSupabaseServiceClient() : null;
+  const [countsRes, rolesRes] = service
+    ? await Promise.all([loadMemberCounts(service, orgIds), loadViewerOrgRoles(service, me.id, orgIds)])
+    : [null, null];
+  const orgMembers: ReadonlyMap<string, number> = countsRes?.ok ? countsRes.byOrg : new Map();
+  const myRoles: ReadonlyMap<string, OrgRole> = rolesRes?.ok ? rolesRes.byOrg : new Map();
 
   const orgsOut = (orgs ?? []).map((o) => ({
     id: o.id,
@@ -284,7 +287,7 @@ export async function GET(req: Request) {
     logo_url: orgAssetProxyUrl(o.handle, o.logo_url, "logo"),
     verified: !!o.verified,
     is_public: !!o.is_public,
-    member_count: orgMembers.get(o.id) ?? 0,
+    member_count: publicMemberCount(orgMembers.get(o.id), myRoles.get(o.id) ?? null),
   }));
 
   // Real data only. A campus with no peers yet returns empty arrays and the
