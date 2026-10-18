@@ -33,6 +33,34 @@ Policy dated October 15, 2026 (page = text, 1,175 sentences).
 Vercel is on **Hobby** with no firewall rules, so our own limiter is the real
 control (checked with the CLI, read-only).
 
+
+## UPDATE Oct 18: the club model is LIVE (`ddf52e7`)
+
+Franky's decisions (Oct 16), all shipped: only members type, react or vote in
+club chats; **verified** followers read the Announcement Board (officers' live
+top-level posts only, never replies, reactions by name or voters) and see
+events, never event chats; clubs can turn follower reading off (default on);
+removing a follower, or a block by an owner/admin/mod, bars them silently;
+clubs never follow people; clubs show on members' profiles by default (hide
+per club, hide your title); officer titles; "Member since <month>"; Leave club
+(keep following?) on phone and desktop; mute a club's posts; a Clubs section
+(Member of / Following only you); ask to join without following first (asking
+follows, source `request`). Counts public from 5 up; the Map lists only
+members who show a club. Club invites 50/h per officer, 200/day per club.
+
+Production: `20261017100000` (data) and `20261017120000` (member lists
+members-only; members read five columns) before the push, `20261017110000`
+(the follower Board arm, fingerprints matched) after. Step 1's and step 2's
+self-tests passed on production; step 4's was SKIPPED there (no club with a
+plain member and a verified outsider yet) — passed locally (78 cases).
+Privacy Policy dated October 18, 2026. **Franky chose not to send the section
+13 notice to account holders for now** (Oct 18).
+
+Not verified live (needs signed-in accounts): a follower reading SAE's Board,
+a member leaving with "keep following", muting, the profile Clubs section,
+an officer setting a title. Ask Franky to try with a second account.
+Open: following-from-the-Board-card header sync was fixed before release.
+
 ## Not verified (say so if asked)
 
 - The upload-type lock on a real upload (needs Franky's phone; local dev
