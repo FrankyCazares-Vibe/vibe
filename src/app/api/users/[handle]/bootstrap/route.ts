@@ -17,6 +17,7 @@ import {
 } from "@/lib/profile/club-flair";
 import {
   blankHiddenWidgets,
+  clubsVisibleToViewer,
   hasResume,
   resumeVisibleToViewer,
   stripResumeKeys,
@@ -348,7 +349,16 @@ export async function GET(req: Request, ctx: RouteContext) {
   // reads exactly like one never filled in (both surfaces skip an empty
   // widget for visitors). It MUST run before buildVibeUserV1FromProfile: the
   // builder fills an empty tagline from the bio's first line.
-  let profile = blankHiddenWidgets(normalizeProfileView(rowForViewer), { isOwner });
+  const viewed = normalizeProfileView(rowForViewer);
+  // A hidden Clubs widget (Oct 18 2026) is answered here too, from `hidden`
+  // as the owner saved it: the blanking just below empties that list for
+  // non-owners, and the club rows aren't on the ProfileView to blank.
+  // Without `profile_layout` (layoutRead false, the legacy select) nothing
+  // says whether Clubs is hidden, so non-owners get none: fail closed, as
+  // the résumé does below.
+  const clubsShown =
+    isOwner || (layoutRead && clubsVisibleToViewer({ isOwner, layout: viewed.profile_layout }));
+  let profile = blankHiddenWidgets(viewed, { isOwner });
 
   // Résumé keys go only to viewers the proxy will serve (report #5, product
   // call 4): school-verified, the owner not restricted, the résumé not
@@ -439,7 +449,12 @@ export async function GET(req: Request, ctx: RouteContext) {
     viewer
       ? getMutualCount(service, viewer.id, targetId)
       : Promise.resolve(0),
-    wantClubs ? loadShownClubs(service, targetId) : Promise.resolve(undefined),
+    // A hidden Clubs widget reads as no clubs shown, without reading them.
+    !wantClubs
+      ? Promise.resolve(undefined)
+      : clubsShown
+        ? loadShownClubs(service, targetId)
+        : Promise.resolve([] as PublicProfileClub[]),
   ]);
 
   vibeUser.counts = {
@@ -470,7 +485,8 @@ export async function GET(req: Request, ctx: RouteContext) {
 
   // `clubs` sits beside `vibeUser`, not in it, so the vibe_user_v1 shape stays
   // exactly what the builder makes. Absent without `?clubs=1`; null when the
-  // read failed (draw no Clubs section). Each entry is a PublicProfileClub
+  // read failed (draw no Clubs section); `[]` when none are shown or the
+  // owner hid the Clubs widget. Each entry is a PublicProfileClub
   // (lib/profile/club-flair.ts): {handle, name, logo_url, verified, title,
   // since: "2026-09"}, in the person's order.
   return NextResponse.json(

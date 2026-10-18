@@ -639,6 +639,10 @@ body.edit-mode .tag-add { display:flex;align-items:center;gap:5px; }
 }
 .pclub-flair::-webkit-scrollbar { display:none; }
 .pclub-flair[hidden], .pclubs[hidden] { display:none; }
+/* Nothing to draw (a visitor with no clubs shown, my own before it loads).
+   Its own switch, since `hidden` is the layout's eye: the id outranks the
+   edit-mode and Otto-tour rules that reveal a hidden widget. */
+#profileClubs.pclubs-off { display:none !important; }
 .pclub-flair > li { flex-shrink:0;list-style:none; }
 .pclub-chip {
   display:inline-flex;align-items:center;gap:6px;min-height:32px;
@@ -664,9 +668,10 @@ body.edit-mode .tag-add { display:flex;align-items:center;gap:5px; }
   border-radius:50%;background:var(--ok-ink);color:var(--paper);
   font-weight:900;line-height:1;
 }
-/* Above the grid's cards, so a row's ⋯ menu never slides under them. */
+/* Above the side column's other cards, so a row's ⋯ menu never slides
+   under them. */
 .pclubs { position:relative;z-index:3;min-width:0; }
-.pclubs .card-title { margin-bottom:12px; }
+.pclubs .stat-card-title { margin:0 0 12px; }
 .pclubs-group + .pclubs-group { margin-top:18px; }
 .pclubs-eyebrow {
   margin:0 0 6px;font-size:11px;font-weight:700;letter-spacing:.08em;
@@ -690,7 +695,7 @@ body.edit-mode .tag-add { display:flex;align-items:center;gap:5px; }
 .pclub-text { flex:1;min-width:0;display:flex;flex-direction:column;gap:2px; }
 .pclub-name-line { display:flex;align-items:center;gap:6px;min-width:0; }
 .pclub-name {
-  min-width:0;font-size:15px;font-weight:700;line-height:1.3;
+  min-width:0;font-size:14px;font-weight:700;line-height:1.3;
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis;transition:color .15s;
 }
 .pclub-link:hover .pclub-name { color:var(--tag-ink); }
@@ -824,8 +829,8 @@ body.reordering { user-select: none; cursor: grabbing; }
 body.reordering * { user-select: none; }
 
 /* ── Profile widgets: arrange mode (S67) ──
-   The six widget cards carry data-widget="bio|experience|skills|posts|
-   resume|working_on". applyProfileLayout() orders them per
+   The seven widget cards carry data-widget="clubs|bio|experience|skills|
+   posts|resume|working_on". applyProfileLayout() orders them per
    users.profile_layout and marks hidden ones with the `hidden` attribute +
    .widget-hidden (never removed: the DOM is the save source). Each card's
    first child is a 28px control strip, shown in edit mode only, gated
@@ -3859,15 +3864,6 @@ body.empty-profile-mode #profileEmpty { display: flex !important; }
     <div id="pinnedContent"></div>
   </div>
 
-  <!-- Clubs (club model 3A): ClubsSection.tsx's rules. Not a widget, so it
-       stays outside the two columns (_placeWidgets moves cards by place).
-       Visitors: "Member of", nothing when none. Your own: every club with
-       its ⋯ menu, then Following, which only you see. -->
-  <section class="card pclubs" id="profileClubs" aria-labelledby="profileClubsTitle" hidden>
-    <h2 class="card-title" id="profileClubsTitle"></h2>
-    <div id="profileClubsBody"></div>
-  </section>
-
   <div class="profile-grid">
 
     <!-- LEFT -->
@@ -3992,6 +3988,17 @@ body.empty-profile-mode #profileEmpty { display: flex !important; }
 
     <!-- RIGHT -->
     <div class="profile-right">
+    <!-- Clubs (club model 3A; a side widget since Oct 18 2026, Franky: "put
+         it to the side like … currently working on"): ClubsSection.tsx's
+         rules. A layout widget ("clubs" in users.profile_layout) like Resume
+         and Working on (first in the side column unless moved; the eye
+         hides it). Visitors: "Member of", nothing when none (.pclubs-off).
+         Your own: every club with its ⋯ menu, then Following, which only
+         you see. -->
+    <section class="stat-card fade-in pclubs pclubs-off" id="profileClubs" data-widget="clubs" aria-labelledby="profileClubsTitle" style="animation-delay:.04s">
+      <h2 class="stat-card-title" id="profileClubsTitle"></h2>
+      <div id="profileClubsBody"></div>
+    </section>
     <div class="resume-card fade-in" id="resumeCard" data-widget="resume" style="animation-delay:.06s;margin:0 0 16px 0;padding:18px;">
       <div class="resume-card-top">
         <div>
@@ -7906,17 +7913,19 @@ function _onReorderEnd() {
 }
 
 // ══ PROFILE WIDGET LAYOUT (S67) ══════════════════════════════════════════
-// The six widget cards ([data-widget]) follow users.profile_layout:
+// The seven widget cards ([data-widget]) follow users.profile_layout:
 // {v:1, order, hidden, bioSide}. Columns are derived, never stored (C3):
-// LEFT = order minus resume/working_on (minus bio when bioSide); RIGHT =
-// (bio when bioSide) + resume, working_on in `order` order. Both bootstraps
-// hand it over as user.profileLayout; a missing or malformed document is
-// the default (today's markup order, nothing hidden).
+// LEFT = order minus clubs/resume/working_on (minus bio when bioSide);
+// RIGHT = (bio when bioSide) + clubs, resume, working_on in `order` order.
+// Both bootstraps hand it over as user.profileLayout; a missing or
+// malformed document is the default (clubs, then today's markup order,
+// nothing hidden). Clubs joined Oct 18 2026: a layout saved before it has
+// no 'clubs', and a missing one goes first.
 // Mirror of src/lib/profile/profile-layout.ts. Keep in sync.
-const _WIDGET_IDS = ['bio', 'experience', 'skills', 'posts', 'resume', 'working_on'];
-const _WIDGET_SIDE_IDS = ['resume', 'working_on'];
+const _WIDGET_IDS = ['clubs', 'bio', 'experience', 'skills', 'posts', 'resume', 'working_on'];
+const _WIDGET_SIDE_IDS = ['clubs', 'resume', 'working_on'];
 const _WIDGET_LABELS = {
-  bio: 'About me', experience: 'Experience', skills: 'Skills',
+  clubs: 'Clubs', bio: 'About me', experience: 'Experience', skills: 'Skills',
   posts: 'Posts', resume: 'Resume', working_on: 'Working on',
 };
 function _sanitizeProfileLayout(raw) {
@@ -7931,6 +7940,7 @@ function _sanitizeProfileLayout(raw) {
       if (_WIDGET_IDS.includes(id) && id !== 'posts' && !hidden.includes(id)) hidden.push(id);
     });
   }
+  if (!order.includes('clubs')) order.unshift('clubs');
   _WIDGET_IDS.forEach(id => { if (!order.includes(id)) order.push(id); });
   return { v: 1, order, hidden, bioSide: !!(raw && raw.bioSide === true) };
 }
@@ -7941,6 +7951,11 @@ function _widgetCard(id) {
 // server's copy arriving) drop .fade-in from the card they move, since
 // re-inserting a node replays its entry animation.
 let _profileLayoutApplied = false;
+// The layout last painted (the server's copy, or the last arrange change).
+// _readProfileLayoutFromDom keeps its side-card slots: the side column
+// can't say where Clubs, Resume or Working on sit among the main cards,
+// and the phone draws Clubs among them.
+let _profileLayoutLast = null;
 function _placeWidgets(col, ids) {
   ids.forEach((id, i) => {
     const card = _widgetCard(id);
@@ -7962,6 +7977,7 @@ function applyProfileLayout(raw) {
   const left = document.querySelector('.profile-left');
   const right = document.querySelector('.profile-right');
   if (!left || !right) return;
+  _profileLayoutLast = layout;
   const leftIds = layout.order.filter(id => !_WIDGET_SIDE_IDS.includes(id) && !(layout.bioSide && id === 'bio'));
   const rightIds = (layout.bioSide ? ['bio'] : []).concat(layout.order.filter(id => _WIDGET_SIDE_IDS.includes(id)));
   _placeWidgets(left, leftIds);
@@ -7978,6 +7994,8 @@ function applyProfileLayout(raw) {
   });
   _profileLayoutApplied = true;
   _refreshWidgetEmptyFlags();
+  // The chips under the name follow the Clubs eye on my own profile.
+  if (typeof _pclubsPaintFlair === 'function') _pclubsPaintFlair();
 }
 // The layout as the page shows it (the DOM is the desktop save source).
 function _readProfileLayoutFromDom() {
@@ -7986,8 +8004,24 @@ function _readProfileLayoutFromDom() {
   const rightIds = ids('.profile-right');
   const bioSide = rightIds.includes('bio');
   // A docked bio leads `order`: RIGHT puts it first whatever its slot.
-  const order = (bioSide ? ['bio'] : []).concat(leftIds, rightIds.filter(id => id !== 'bio'));
+  // Clubs at the top of the side column (under a docked bio) leads it too,
+  // so the phone keeps it first in Portfolio; moved lower, it sits after
+  // the main column's cards like Resume and Working on.
+  const side = rightIds.filter(id => id !== 'bio');
+  const lead = bioSide ? ['bio'] : [];
   const hidden = Array.from(document.querySelectorAll('[data-widget].widget-hidden')).map(c => c.dataset.widget);
+  // Side cards in the same order as the last paint (a main-column move, an
+  // eye, a dock): each keeps its slot from that layout, so a spot picked on
+  // the phone (Clubs after Experience) survives a desktop change.
+  const isSide = id => _WIDGET_SIDE_IDS.includes(id);
+  const lastRest = _profileLayoutLast ? _profileLayoutLast.order.filter(id => !lead.includes(id)) : null;
+  if (lastRest && lastRest.filter(isSide).join() === side.join() && lastRest.length === side.length + leftIds.length) {
+    let s = 0, m = 0;
+    const rest = lastRest.map(id => isSide(id) ? side[s++] : leftIds[m++]);
+    return _sanitizeProfileLayout({ v: 1, order: lead.concat(rest), hidden, bioSide });
+  }
+  const clubsLead = side[0] === 'clubs';
+  const order = lead.concat(clubsLead ? ['clubs'] : [], leftIds, clubsLead ? side.slice(1) : side);
   return _sanitizeProfileLayout({ v: 1, order, hidden, bioSide });
 }
 // Any arrange-mode change: re-apply the layout the DOM now encodes, then the
@@ -8009,7 +8043,7 @@ const _WIDGET_EYE_SVG = '<svg class="eye-on" width="14" height="14" viewBox="0 0
 // The 28px control strip, first child of every widget card (CSS shows it in
 // edit mode only). Inline onclick like the rest of the page; the grip is a
 // .drag-handle so the column's setupReorderable picks it up. Only the bio
-// switches columns — C3 derives the other five by id — and Posts has no eye.
+// switches columns — C3 derives the other six by id — and Posts has no eye.
 function _ensureWidgetControls(card) {
   if (!card || card.querySelector(':scope > .widget-controls')) return;
   const id = card.dataset.widget;
@@ -8728,8 +8762,12 @@ function _pclubsTick(size) {
 }
 
 // What visitors see: the visited profile's list, or mine as visitors get it.
+// None of mine while the Clubs widget is hidden (its eye), the chips under
+// the name included: the bootstrap then sends a visitor no clubs at all.
 function _pclubsShown() {
   if (window.viewingRealUser) return _pclubs.visitor || [];
+  const card = document.getElementById('profileClubs');
+  if (card && card.classList.contains('widget-hidden')) return [];
   return _pclubs.data ? vibeShownFromMine(_pclubs.data.member_of) : [];
 }
 // My own profile in "View as visitor".
@@ -8771,7 +8809,8 @@ function _pclubsPaintFlair() {
 function _pclubsRow(club, opts) {
   const li = _pclubsEl('li', 'pclub-row' + (opts.dim ? ' is-dim' : ''));
   const a = _pclubsLink(_pclubsOrgHref(club.handle), 'pclub-link', 'row:' + (opts.standing || 'shown') + ':' + club.handle);
-  a.appendChild(_pclubsLogo(club, 40));
+  // Compact: the card lives in the 300 px side column.
+  a.appendChild(_pclubsLogo(club, 32));
   const text = _pclubsEl('span', 'pclub-text');
   const line = _pclubsEl('span', 'pclub-name-line');
   line.appendChild(_pclubsEl('span', 'pclub-name', club.name));
@@ -8961,18 +9000,20 @@ function _pclubsPaint(focusKey) {
   if (_pclubs.pending.size > 0 || _pclubs.ordering) section.setAttribute('data-holds-reload', 'true');
   else section.removeAttribute('data-holds-reload');
   body.textContent = '';
+  // `.pclubs-off`, never `hidden`: the attribute is the layout's eye
+  // (applyProfileLayout), and the two must not undo each other.
   if (window.viewingRealUser || _pclubsPreviewing()) {
     const clubs = _pclubsShown();
-    section.hidden = clubs.length === 0;
+    section.classList.toggle('pclubs-off', clubs.length === 0);
     if (clubs.length) {
       const g = _pclubsGroup(VIBE_CLUBS_COPY.memberOf);
       g.appendChild(_pclubsList(clubs.map(c => _pclubsRow(c, { sub: vibeShownClubSubline(c) }))));
       body.appendChild(g);
     }
   } else if (!_pclubs.mine) {
-    section.hidden = true;
+    section.classList.add('pclubs-off');
   } else {
-    section.hidden = false;
+    section.classList.remove('pclubs-off');
     if (!_pclubs.data && _pclubs.failure) {
       const slot = document.createElement('div');
       body.appendChild(slot);

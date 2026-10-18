@@ -206,12 +206,50 @@ test("the profile asks the bootstrap for clubs and reads mine from /api/me/clubs
   assert.match(profile, /\/bootstrap\?clubs=1`/);
   assert.match(profile, /readPublicClubs\(r\.data\.clubs\)/);
   assert.match(profile, /useMyClubs\(!isVisitor\)/);
-  assert.match(profile, /<ClubFlairChips clubs=\{isVisitor \? \(visitorClubs \?\? \[\]\) : myClubs\.shown\} \/>/);
+  // My own chips follow the Clubs eye, read first: on my own /profile/<handle>
+  // the phone is in visitor mode but the bootstrap answers me as the owner.
+  // (A real visitor's `hidden` is always [], so for them it changes nothing.)
+  assert.match(profile, /<ClubFlairChips clubs=\{clubsHidden \? \[\] : isVisitor \? \(visitorClubs \?\? \[\]\) : myClubs\.shown\} \/>/);
+  assert.match(profile, /const clubsHidden = layout\.hidden\.includes\("clubs"\);/);
   const section = read("./ClubsSection.tsx");
   assert.match(section, /"\/api\/me\/clubs"/);
   assert.match(section, /\/api\/me\/followed-orgs\?cursor=/);
   assert.match(section, /method: "PATCH"/);
   assert.doesNotMatch(section, /\btitle:\s*(?!CLUBS_COPY)[a-z]/, "a member never sends a title");
+});
+
+test("the phone draws Clubs in the Portfolio tab only, as its first movable sub-section (Oct 18 2026)", () => {
+  const profile = read("../mobile/ProfileMobile.tsx");
+  // Both uses sit inside <PortfolioPane …>'s `clubs` prop: nothing above the
+  // tab strip, so the Posts tab no longer shows it.
+  const uses = [...profile.matchAll(/<ClubsSection\b/g)].map((m) => m.index ?? -1);
+  assert.equal(uses.length, 2, "one for visitors, one for the owner");
+  const pane = profile.indexOf("<PortfolioPane");
+  const paneProps = profile.indexOf("currentProjects={currentProjects}", pane);
+  const clubsProp = profile.indexOf("clubs={", pane);
+  assert.ok(pane > 0 && clubsProp > pane && clubsProp < paneProps, "PortfolioPane has no clubs prop");
+  for (const at of uses) assert.ok(at > clubsProp && at < paneProps, "a ClubsSection is drawn outside the Portfolio tab");
+  assert.ok(profile.indexOf("<ProfileTabs") < pane, "the Portfolio pane comes after the tab strip");
+  // The visitor gets only what the bootstrap sent; the owner gets the store,
+  // and a note while the section is hidden (it still draws for them).
+  assert.match(profile, /<ClubsSection mode="visitor" clubs=\{visitorClubs\} \/>/);
+  assert.match(profile, /<ClubsSection\s+mode="owner"\s+store=\{myClubs\}\s+note=\{clubsHidden \? "Hidden · only you see it" : undefined\}\s*\/>/);
+  assert.match(profile, /order=\{portfolioWidgetOrder\(layout, !isVisitor\)\}/, "the owner's hidden Clubs keeps its slot");
+  assert.match(profile, /\(!layout\.hidden\.includes\(id\) \|\| \(keepClubs && id === "clubs"\)\)/);
+  // The owner's section is never blank, so it always counts; the empty
+  // prompt goes under it.
+  assert.match(profile, /isVisitor \? \(visitorClubs\?\.length \?\? 0\) : 1/);
+  assert.match(profile, /const rest = isVisitor \? order : order\.filter\(\(id\) => id !== "clubs"\);/);
+  // The pager is as tall as the open tab, not the taller one.
+  assert.match(profile, /alignItems: "flex-start",\s*overflowX: "auto",/);
+  assert.match(profile, /pager\.style\.height = `\$\{pane\.offsetHeight\}px`;/);
+  assert.match(profile, /ref=\{setPostsPaneEl\}/);
+  assert.match(profile, /ref=\{setPortfolioPaneEl\}/);
+  // A movable, hideable sub-section like the others, first by default.
+  assert.match(profile, /const PORTFOLIO_WIDGET_IDS: readonly PortfolioWidgetId\[\] = \[\s*"clubs",/);
+  assert.match(profile, /const sections: Record<PortfolioWidgetId, React\.ReactNode> = \{\s*clubs,/);
+  assert.match(profile, /sectionCount: Record<PortfolioWidgetId, number> = \{\s*clubs: clubsCount,/);
+  assert.match(profile, /counts=\{\{\s*clubs: myClubs\.shown\.length,/);
 });
 
 test("the chips carry no dates", () => {

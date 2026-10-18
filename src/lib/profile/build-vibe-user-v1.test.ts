@@ -123,13 +123,14 @@ test("every other key is unchanged by P1 (S67 wave 2 adds profileLayout, always 
 });
 
 test("profileLayout: the default when the row has none, the sanitized whole document when it does", () => {
-  const DEFAULT_ORDER = ["bio", "experience", "skills", "posts", "resume", "working_on"];
+  const DEFAULT_ORDER = ["clubs", "bio", "experience", "skills", "posts", "resume", "working_on"];
   // No column in the row (a select that didn't ask, or the '{}' default).
   const none = buildVibeUserV1FromProfile(normalizeProfileView(row()));
   assert.deepEqual(none.profileLayout, { v: 1, order: DEFAULT_ORDER, hidden: [], bioSide: false });
   const empty = buildVibeUserV1FromProfile(normalizeProfileView(row({ profile_layout: {} })));
   assert.deepEqual(empty.profileLayout, none.profileLayout);
-  // A stored document: unknown ids gone, posts never hidden, missing ids appended.
+  // A stored document: unknown ids gone, posts never hidden, a missing clubs
+  // first, the other missing ids appended.
   const stored = buildVibeUserV1FromProfile(
     normalizeProfileView(
       row({ profile_layout: { order: ["posts", "bio", "calendar"], hidden: ["experience", "posts"], bioSide: true } }),
@@ -137,7 +138,7 @@ test("profileLayout: the default when the row has none, the sanitized whole docu
   );
   assert.deepEqual(stored.profileLayout, {
     v: 1,
-    order: ["posts", "bio", "experience", "skills", "resume", "working_on"],
+    order: ["clubs", "posts", "bio", "experience", "skills", "resume", "working_on"],
     hidden: ["experience"],
     bioSide: true,
   });

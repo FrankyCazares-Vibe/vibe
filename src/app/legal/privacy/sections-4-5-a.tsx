@@ -19,7 +19,8 @@ export function Sections5aTo5d() {
           experience, skills and &ldquo;Working on&rdquo;, unless you hid them
           (<Sec to="9">section 9</Sec>). It also lists the clubs you are in,
           each with any title the club gave you and the month you joined it on
-          Vibe, unless you hid that club or the title. Your role in a club is
+          Vibe, unless you hid that club, the title or your whole Clubs
+          section. Your role in a club is
           not shown there. Not shown: either email address, résumés,
           &ldquo;here for&rdquo; answers, the clubs you hid or your list of the
           clubs you follow.

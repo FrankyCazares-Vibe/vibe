@@ -30,7 +30,10 @@ import {
 
 /**
  * The Clubs section of the phone profile (batch 2E; club model spec D;
- * Franky's rules, Oct 18 2026). It sits between Bio and the tab strip.
+ * Franky's rules, Oct 18 2026). Since Oct 18 it is a sub-section of the
+ * Portfolio tab (widget id `clubs` in users.profile_layout, first unless
+ * the owner moves it), drawn like the others there: a title, then its rows
+ * in one card.
  *
  *   - Anyone's profile: "Member of", the clubs they show, from the public
  *     bootstrap (`?clubs=1`). Nothing at all when they show none.
@@ -316,13 +319,15 @@ export function useMyClubs(enabled: boolean): MyClubsStore {
 
 type ClubsSectionProps =
   | { mode: "visitor"; clubs: readonly ShownClub[] | null }
-  | { mode: "owner"; store: MyClubsStore };
+  /** `note`: a short line after the title, e.g. while the owner has the
+   *  whole section hidden (it still draws for them, so its lists stay reachable). */
+  | { mode: "owner"; store: MyClubsStore; note?: string };
 
 export function ClubsSection(props: ClubsSectionProps): JSX.Element | null {
   return props.mode === "visitor" ? (
     <VisitorClubs clubs={props.clubs} />
   ) : (
-    <OwnerClubs store={props.store} />
+    <OwnerClubs store={props.store} note={props.note} />
   );
 }
 
@@ -331,16 +336,18 @@ function VisitorClubs({ clubs }: { clubs: readonly ShownClub[] | null }): JSX.El
   const titleId = useId();
   if (!clubs || clubs.length === 0) return null;
   return (
-    <section style={cardStyle} aria-labelledby={titleId}>
+    <section style={sectionStyle} aria-labelledby={titleId}>
       <h2 id={titleId} style={titleStyle}>{CLUBS_COPY.title}</h2>
-      <div style={eyebrowStyle}>{CLUBS_COPY.memberOf}</div>
-      <ul style={listStyle}>
-        {clubs.map((club) => (
-          <li key={club.handle} style={rowStyle}>
-            <ClubRowLink club={club} sub={shownClubSubline(club)} />
-          </li>
-        ))}
-      </ul>
+      <div style={cardStyle}>
+        <div style={eyebrowStyle}>{CLUBS_COPY.memberOf}</div>
+        <ul style={listStyle}>
+          {clubs.map((club) => (
+            <li key={club.handle} style={rowStyle}>
+              <ClubRowLink club={club} sub={shownClubSubline(club)} />
+            </li>
+          ))}
+        </ul>
+      </div>
     </section>
   );
 }
@@ -360,7 +367,7 @@ function readSeenTitles(): Record<string, string> {
 }
 
 /** My own profile: every club I'm in, then the ones I only follow, then the muted ones. */
-function OwnerClubs({ store }: { store: MyClubsStore }): JSX.Element {
+function OwnerClubs({ store, note }: { store: MyClubsStore; note?: string }): JSX.Element {
   const titleId = useId();
   const [sheet, setSheet] = useState<SheetTarget | null>(null);
   // Read once; the marks only draw after the clubs load, so a first render
@@ -382,92 +389,97 @@ function OwnerClubs({ store }: { store: MyClubsStore }): JSX.Element {
     }
   };
   return (
-    <section style={cardStyle} aria-labelledby={titleId}>
-      <h2 id={titleId} style={titleStyle}>{CLUBS_COPY.title}</h2>
-      {store.status === "failed" && store.failure ? (
-        <LoadFailed compact failure={store.failure} onRetry={store.retry} />
-      ) : !data ? (
-        <ClubsSkeleton />
-      ) : (
-        <>
-          <div style={eyebrowStyle}>{CLUBS_COPY.memberOf}</div>
-          {data.member_of.length === 0 ? (
-            <p style={emptyStyle}>{CLUBS_COPY.emptyMemberOf}</p>
-          ) : (
-            <>
-              <p style={noteStyle}>{CLUBS_COPY.memberOfNote}</p>
-              <ul style={listStyle}>
-                {data.member_of.map((club) => (
-                  <li key={club.org_id} style={rowStyle}>
-                    <ClubRowLink
-                      club={club}
-                      sub={myClubSubline(club)}
-                      dim={!club.show_on_profile}
-                      tags={[
-                        club.show_on_profile ? null : CLUBS_COPY.hiddenTag,
-                        club.muted ? CLUBS_COPY.mutedTag : null,
-                        showsNewTitleMark(club, seenTitles) ? CLUBS_COPY.newTitleTag : null,
-                      ]}
-                    />
-                    <MoreButton
-                      name={club.name}
-                      onClick={() => openSheet({ orgId: club.org_id, standing: "member" })}
-                    />
-                  </li>
-                ))}
-              </ul>
-            </>
-          )}
+    <section style={sectionStyle} aria-labelledby={titleId}>
+      <h2 id={titleId} style={titleStyle}>
+        {CLUBS_COPY.title}
+        {note ? <span style={titleNoteStyle}> · {note}</span> : null}
+      </h2>
+      <div style={cardStyle}>
+        {store.status === "failed" && store.failure ? (
+          <LoadFailed compact failure={store.failure} onRetry={store.retry} />
+        ) : !data ? (
+          <ClubsSkeleton />
+        ) : (
+          <>
+            <div style={eyebrowStyle}>{CLUBS_COPY.memberOf}</div>
+            {data.member_of.length === 0 ? (
+              <p style={emptyStyle}>{CLUBS_COPY.emptyMemberOf}</p>
+            ) : (
+              <>
+                <p style={noteStyle}>{CLUBS_COPY.memberOfNote}</p>
+                <ul style={listStyle}>
+                  {data.member_of.map((club) => (
+                    <li key={club.org_id} style={rowStyle}>
+                      <ClubRowLink
+                        club={club}
+                        sub={myClubSubline(club)}
+                        dim={!club.show_on_profile}
+                        tags={[
+                          club.show_on_profile ? null : CLUBS_COPY.hiddenTag,
+                          club.muted ? CLUBS_COPY.mutedTag : null,
+                          showsNewTitleMark(club, seenTitles) ? CLUBS_COPY.newTitleTag : null,
+                        ]}
+                      />
+                      <MoreButton
+                        name={club.name}
+                        onClick={() => openSheet({ orgId: club.org_id, standing: "member" })}
+                      />
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )}
 
-          <div style={{ ...eyebrowStyle, marginTop: 18 }}>
-            {CLUBS_COPY.following}
-            <span style={onlyYouStyle}> · {CLUBS_COPY.onlyYou}</span>
-          </div>
-          {data.following.length === 0 && !data.next_cursor ? (
-            <p style={emptyStyle}>{CLUBS_COPY.emptyFollowing}</p>
-          ) : (
-            <ul style={listStyle}>
-              {data.following.map((club) => (
-                <li key={club.org_id} style={rowStyle}>
-                  <ClubRowLink club={club} tags={[club.muted ? CLUBS_COPY.mutedTag : null]} />
-                  <MoreButton
-                    name={club.name}
-                    onClick={() => openSheet({ orgId: club.org_id, standing: "following" })}
-                  />
-                </li>
-              ))}
-            </ul>
-          )}
-          {data.next_cursor ? (
-            <button
-              type="button"
-              onClick={store.loadMore}
-              disabled={store.loadingMore}
-              style={showMoreStyle}
-            >
-              {store.loadingMore ? CLUBS_COPY.loadingMore : CLUBS_COPY.showMore}
-            </button>
-          ) : null}
-
-          {data.muted_only.length > 0 ? (
-            <>
-              <div style={{ ...eyebrowStyle, marginTop: 18 }}>{CLUBS_COPY.mutedGroup}</div>
-              <p style={noteStyle}>{CLUBS_COPY.mutedGroupNote}</p>
+            <div style={{ ...eyebrowStyle, marginTop: 18 }}>
+              {CLUBS_COPY.following}
+              <span style={onlyYouStyle}> · {CLUBS_COPY.onlyYou}</span>
+            </div>
+            {data.following.length === 0 && !data.next_cursor ? (
+              <p style={emptyStyle}>{CLUBS_COPY.emptyFollowing}</p>
+            ) : (
               <ul style={listStyle}>
-                {data.muted_only.map((club) => (
+                {data.following.map((club) => (
                   <li key={club.org_id} style={rowStyle}>
                     <ClubRowLink club={club} tags={[club.muted ? CLUBS_COPY.mutedTag : null]} />
                     <MoreButton
                       name={club.name}
-                      onClick={() => openSheet({ orgId: club.org_id, standing: "muted" })}
+                      onClick={() => openSheet({ orgId: club.org_id, standing: "following" })}
                     />
                   </li>
                 ))}
               </ul>
-            </>
-          ) : null}
-        </>
-      )}
+            )}
+            {data.next_cursor ? (
+              <button
+                type="button"
+                onClick={store.loadMore}
+                disabled={store.loadingMore}
+                style={showMoreStyle}
+              >
+                {store.loadingMore ? CLUBS_COPY.loadingMore : CLUBS_COPY.showMore}
+              </button>
+            ) : null}
+
+            {data.muted_only.length > 0 ? (
+              <>
+                <div style={{ ...eyebrowStyle, marginTop: 18 }}>{CLUBS_COPY.mutedGroup}</div>
+                <p style={noteStyle}>{CLUBS_COPY.mutedGroupNote}</p>
+                <ul style={listStyle}>
+                  {data.muted_only.map((club) => (
+                    <li key={club.org_id} style={rowStyle}>
+                      <ClubRowLink club={club} tags={[club.muted ? CLUBS_COPY.mutedTag : null]} />
+                      <MoreButton
+                        name={club.name}
+                        onClick={() => openSheet({ orgId: club.org_id, standing: "muted" })}
+                      />
+                    </li>
+                  ))}
+                </ul>
+              </>
+            ) : null}
+          </>
+        )}
+      </div>
       {sheet && data ? (
         <ClubOptionsSheet store={store} target={sheet} onClose={() => setSheet(null)} />
       ) : null}
@@ -652,23 +664,36 @@ function ClubsSkeleton(): JSX.Element {
 // Night). The sheet matches its ⋯ menu: cream surface, layers 10000/10001,
 // above the tab bar (9988) and under ToastHost (12000).
 
+/** A Portfolio sub-section: no box of its own, the pane's gutters. */
+const sectionStyle: CSSProperties = { minWidth: 0, color: "var(--charcoal)" };
+
+/** The rows' card. Its top padding is short: the first row brings a hairline. */
 const cardStyle: CSSProperties = {
-  margin: 16,
-  padding: "18px 16px",
+  padding: "12px 14px 6px",
   background: "var(--paper)",
-  borderRadius: 18,
+  borderRadius: 16,
   border: "1px solid rgba(var(--scrim-rgb),0.06)",
-  boxShadow: "0 4px 18px rgba(0,0,0,0.04)",
-  color: "var(--charcoal)",
+  boxShadow: "var(--card-shadow)",
   minWidth: 0,
 };
 
+/** PortfolioSubsection's title (ProfileMobile.tsx), so the tab reads as one list. */
 const titleStyle: CSSProperties = {
-  margin: "0 0 12px",
+  margin: "0 0 10px",
   fontFamily: "Fraunces, serif",
-  fontSize: 16,
+  fontSize: 14,
   fontWeight: 800,
   letterSpacing: "-0.2px",
+  color: "var(--charcoal)",
+};
+
+/** The owner's note after the title ("Hidden · only you see it"). */
+const titleNoteStyle: CSSProperties = {
+  fontFamily: "DM Sans, sans-serif",
+  fontSize: 12,
+  fontWeight: 600,
+  letterSpacing: 0,
+  color: "var(--ink-muted)",
 };
 
 const eyebrowStyle: CSSProperties = {

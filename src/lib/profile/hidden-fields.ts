@@ -44,7 +44,8 @@ type ResumeKeys = Pick<HideableProfile, "resume_url" | "resume_docs" | "resume_r
  *   skills     → []
  *   working_on → current_on []
  *   resume     → resume_url null, resume_docs [] and resume_redactions []
- * and `profile_layout.hidden` is always [] (order and bioSide stay: all six
+ *   clubs      → nothing here: see clubsVisibleToViewer
+ * and `profile_layout.hidden` is always [] (order and bioSide stay: all seven
  * ids are always present, so they say nothing). Posts can't be hidden.
  */
 export function blankHiddenWidgets<T extends HideableProfile>(
@@ -68,6 +69,20 @@ export function blankHiddenWidgets<T extends HideableProfile>(
   if (hidden.has("working_on")) w.current_on = [];
   if (hidden.has("resume")) Object.assign(w, noResume());
   return out;
+}
+
+/**
+ * The Clubs widget (Oct 18 2026). Its rows are not on the ProfileView (the
+ * bootstrap reads them from org_members, `?clubs=1`), so blankHiddenWidgets
+ * can't empty them; the route asks this instead, BEFORE blanking, while
+ * `hidden` still says what the owner hid. False → the route sends `clubs: []`
+ * without reading them, so a hidden Clubs reads like one with no clubs shown
+ * (the section and the chips under the name both draw nothing). Each club's
+ * own "Hide from my profile" stays the finer switch. The Map's club zones
+ * read both: campus-map/zone asks this too, for every member it would list.
+ */
+export function clubsVisibleToViewer(f: { isOwner: boolean; layout: Pick<ProfileLayout, "hidden"> }): boolean {
+  return f.isOwner || !f.layout.hidden.includes("clubs");
 }
 
 function noResume(): ResumeKeys {

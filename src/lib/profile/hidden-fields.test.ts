@@ -20,6 +20,7 @@ import { test } from "node:test";
 const specifier = "./hidden-fields.ts";
 const {
   blankHiddenWidgets,
+  clubsVisibleToViewer,
   hasResume,
   postPreviewIsPublic,
   profilePreviewDescription,
@@ -160,12 +161,32 @@ const read = (path: string): string => readFileSync(new URL(path, REPO_ROOT), "u
 
 test("bootstrap blanks hidden widgets BEFORE building the vibeUser, and gates résumé keys", () => {
   const src = read("src/app/api/users/[handle]/bootstrap/route.ts");
-  const blank = src.indexOf("blankHiddenWidgets(normalizeProfileView(rowForViewer), { isOwner })");
+  const viewed = src.indexOf("const viewed = normalizeProfileView(rowForViewer);");
+  const blank = src.indexOf("blankHiddenWidgets(viewed, { isOwner })");
   const build = src.indexOf("buildVibeUserV1FromProfile(profile");
-  assert.ok(blank > 0, "blankHiddenWidgets runs on the normalized profile");
+  assert.ok(viewed > 0 && blank > viewed, "blankHiddenWidgets runs on the normalized profile");
   assert.ok(build > blank, "the build comes after the blank (tagline-from-bio leak)");
   assert.ok(src.includes("resumeVisibleToViewer("), "résumé keys follow the shared rule");
   assert.ok(src.indexOf("resumeVisibleToViewer(") < build);
+});
+
+test("a hidden Clubs widget: no clubs for anyone but the owner, decided before the blanking", () => {
+  const hidden = { hidden: ["clubs" as const] };
+  assert.equal(clubsVisibleToViewer({ isOwner: false, layout: hidden }), false);
+  assert.equal(clubsVisibleToViewer({ isOwner: true, layout: hidden }), true);
+  assert.equal(clubsVisibleToViewer({ isOwner: false, layout: { hidden: [] } }), true);
+  assert.equal(clubsVisibleToViewer({ isOwner: false, layout: { hidden: ["bio", "resume"] } }), true);
+  // In the route: read from the layout as saved (blanking empties `hidden`
+  // for non-owners), and a hidden one never reaches loadShownClubs.
+  const src = read("src/app/api/users/[handle]/bootstrap/route.ts");
+  const rule = src.indexOf("clubsVisibleToViewer({ isOwner, layout: viewed.profile_layout })");
+  const blank = src.indexOf("blankHiddenWidgets(viewed, { isOwner })");
+  assert.ok(rule > 0 && rule < blank, "the clubs rule must read `hidden` before blankHiddenWidgets empties it");
+  // The legacy select has no profile_layout: nothing says Clubs is shown, so
+  // non-owners get none (fail closed, like the résumé's `!layoutRead`).
+  assert.match(src, /const clubsShown =\s*isOwner \|\| \(layoutRead && clubsVisibleToViewer\(/);
+  assert.match(src, /: clubsShown\s*\?\s*loadShownClubs\(service, targetId\)\s*:\s*Promise\.resolve\(\[\] as PublicProfileClub\[\]\)/);
+  assert.equal(src.split("loadShownClubs(service, targetId)").length - 1, 1, "clubs are read in one place only");
 });
 
 test("the résumé proxy runs the A1 gate for non-owners only, never on the owner's ?view=public", () => {

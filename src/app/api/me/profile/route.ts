@@ -27,7 +27,7 @@ import { contentBlockedResponse, requireNotRestricted } from "@/lib/moderation/a
 import { blockedProfileField } from "@/lib/moderation/profile-filter";
 import { checkText } from "@/lib/moderation/text-filter";
 import { parseLookingForBody } from "@/lib/profile/looking-for";
-import { sanitizeProfileLayout } from "@/lib/profile/profile-layout";
+import { keepStoredClubs, layoutSaveLacksClubs, sanitizeProfileLayout } from "@/lib/profile/profile-layout";
 import { normalizeResumeRef } from "@/lib/profile/resume-doc-url";
 import { unexpectedSelfWriteKeys } from "@/lib/profile/self-write-columns";
 import { sanitizeWorkExperience } from "@/lib/profile/work-experience";
@@ -189,7 +189,24 @@ export async function PATCH(req: Request) {
   // and fills anything missing from the default, so a partial can't land.
   // Ids only, no free text: the word filter below has nothing to read here.
   if ("profile_layout" in body) {
-    patch.profile_layout = sanitizeProfileLayout(body.profile_layout);
+    let layout = sanitizeProfileLayout(body.profile_layout);
+    // A save from a build older than the `clubs` id (Oct 18 2026) has no
+    // "clubs" at all: keep where it sat and whether it was hidden, rather
+    // than let the sanitizer put it first and shown. An unreadable row fails
+    // the save: un-hiding Clubs is not a safe guess.
+    if (layoutSaveLacksClubs(body.profile_layout)) {
+      const { data: stored, error: storedErr } = await createSupabaseServiceClient()
+        .from("users")
+        .select("profile_layout")
+        .eq("id", user.id)
+        .maybeSingle();
+      if (storedErr) {
+        console.error("[me/profile PATCH layout]", storedErr);
+        return NextResponse.json({ ok: false, error: "Could not save profile" }, { status: 500 });
+      }
+      layout = keepStoredClubs(layout, (stored as { profile_layout?: unknown } | null)?.profile_layout);
+    }
+    patch.profile_layout = layout;
   }
 
   // Every free-text field is parsed above this line so the word filter sees

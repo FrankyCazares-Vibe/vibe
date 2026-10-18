@@ -5,6 +5,8 @@ import { mapCampusClosed, resolveCampusRequest, scopeViewerFromRow } from "@/lib
 import { scopeCampusIds } from "@/lib/iu/campus-scope";
 import { campusScopeError } from "@/lib/iu/community-scope";
 import { loadOrgRole, MAP_ZONE_SHOWN_COLUMN, mapZoneListsMembers } from "@/lib/orgs/following";
+import { clubsVisibleToViewer } from "@/lib/profile/hidden-fields";
+import { sanitizeProfileLayout } from "@/lib/profile/profile-layout";
 import { loadHiddenUsers } from "@/lib/safety/hidden-users";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
@@ -54,7 +56,8 @@ type UserRow = {
  *
  * WHO THE ORG ZONE LISTS (club model batch 2A, `orgZoneMemberIds`): only the
  * members who show the club on their profile (`show_on_profile`, on by
- * default), for every viewer, members included. A hidden club answers what a
+ * default, and their Clubs section not hidden), for every viewer, members
+ * included. A hidden club answers what a
  * missing handle answers. A member sees their own club's zone; anyone else
  * only a public club anyone can join (`mapZoneListsMembers`), the reach the
  * database gave before 20261017120000 made member lists members-only. The
@@ -74,8 +77,8 @@ type ZoneMembers = { kind: "ids"; ids: string[] } | { kind: "not_found" } | { ki
 
 /**
  * The ids the org zone may list (see the docblock below). Never the viewer;
- * never a member who hid the club; a database without the column lists
- * nobody rather than everyone.
+ * never a member who hid the club or their whole Clubs section; a database
+ * without either column lists nobody rather than everyone.
  */
 async function orgZoneMemberIds(
   supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>,
@@ -120,7 +123,31 @@ async function orgZoneMemberIds(
   const ids = (members ?? [])
     .map((r) => (r as { user_id?: unknown }).user_id)
     .filter((id): id is string => typeof id === "string" && id !== viewerId);
-  return { kind: "ids", ids };
+  if (ids.length === 0) return { kind: "ids", ids };
+  // A member who hid their whole Clubs section (Oct 18 2026) shows no club
+  // on their profile, so no zone lists them either: the bootstrap's rule
+  // (`clubsVisibleToViewer`), for a viewer who is never the owner here.
+  // Fail closed: only ids whose layout was read and shows Clubs stay.
+  const { data: layouts, error: layoutErr } = await service
+    .from("users")
+    .select("id,profile_layout")
+    .in("id", ids);
+  if (layoutErr) {
+    if (isMissingColumnError(layoutErr, ["profile_layout"])) {
+      console.error("[campus-map/zone] profile_layout missing; migration 20260926100000 not applied");
+      return { kind: "ids", ids: [] };
+    }
+    console.error("[campus-map/zone layouts]", layoutErr);
+    return { kind: "failed" };
+  }
+  const showsClubs = new Set<string>();
+  for (const row of layouts ?? []) {
+    const r = row as { id?: unknown; profile_layout?: unknown };
+    if (typeof r.id !== "string") continue;
+    const layout = sanitizeProfileLayout(r.profile_layout);
+    if (clubsVisibleToViewer({ isOwner: false, layout })) showsClubs.add(r.id);
+  }
+  return { kind: "ids", ids: ids.filter((id) => showsClubs.has(id)) };
 }
 
 /** Nobody to show. Same shape the client already handles for an empty zone. */

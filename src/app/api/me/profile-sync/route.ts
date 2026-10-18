@@ -26,7 +26,7 @@ import {
   readCampusWriteRow,
   type CampusWriteDecision,
 } from "@/lib/profile/profile-campus-write";
-import { sanitizeProfileLayout } from "@/lib/profile/profile-layout";
+import { keepStoredClubs, layoutSaveLacksClubs, sanitizeProfileLayout } from "@/lib/profile/profile-layout";
 import { parseLookingForBody } from "@/lib/profile/looking-for";
 import { normalizeResumeRef, resumeKeyOwnerId } from "@/lib/profile/resume-doc-url";
 import { sanitizeResumeDocs } from "@/lib/profile/resume-docs";
@@ -439,7 +439,24 @@ export async function POST(req: Request) {
   // nothing a client typed reaches the column as-is. Ids only, no free text,
   // so the word filter below has nothing to read here.
   if ("profile_layout" in body) {
-    patch.profile_layout = sanitizeProfileLayout(body.profile_layout);
+    let layout = sanitizeProfileLayout(body.profile_layout);
+    // A save from a build older than the `clubs` id (Oct 18 2026) has no
+    // "clubs" at all: keep where it sat and whether it was hidden, rather
+    // than let the sanitizer put it first and shown. An unreadable row fails
+    // the save: un-hiding Clubs is not a safe guess.
+    if (layoutSaveLacksClubs(body.profile_layout)) {
+      const { data: stored, error: storedErr } = await createSupabaseServiceClient()
+        .from("users")
+        .select("profile_layout")
+        .eq("id", user.id)
+        .maybeSingle();
+      if (storedErr) {
+        console.error("[profile-sync POST layout]", storedErr);
+        return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
+      }
+      layout = keepStoredClubs(layout, (stored as { profile_layout?: unknown } | null)?.profile_layout);
+    }
+    patch.profile_layout = layout;
   }
 
   // The word filter, on the free-text fields this save actually changes. It

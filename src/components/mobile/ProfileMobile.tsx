@@ -318,30 +318,40 @@ function readOwnCampus(d: Record<string, unknown> | null | undefined): OwnCampus
 
 /** The Portfolio tab's movable sub-sections. Bio stays in the header at
  *  375px (there is no side column, so `bioSide` means nothing here) and
- *  Posts is its own tab, so of the six widget ids these four are the
- *  ones `order` and `hidden` actually rearrange on the phone. */
+ *  Posts is its own tab, so of the seven widget ids these five are the
+ *  ones `order` and `hidden` actually rearrange on the phone. Clubs moved
+ *  in from above the tabs on Oct 18 2026 (Franky: "move the clubs section
+ *  to portfolio"); a layout saved before that leads with it. */
 type PortfolioWidgetId = Extract<
   WidgetId,
-  "working_on" | "experience" | "skills" | "resume"
+  "clubs" | "working_on" | "experience" | "skills" | "resume"
 >;
 const PORTFOLIO_WIDGET_IDS: readonly PortfolioWidgetId[] = [
+  "clubs",
   "working_on",
   "experience",
   "skills",
   "resume",
 ];
 
-/** `order` filtered to the Portfolio sub-sections, hidden ones dropped. */
-function portfolioWidgetOrder(layout: ProfileLayout): PortfolioWidgetId[] {
+/** `order` filtered to the Portfolio sub-sections, hidden ones dropped,
+ *  except a hidden Clubs when `keepClubs` (the owner): that section is the
+ *  only screen with their Following and Muted lists and each club's Hide,
+ *  so it stays in its slot with a "hidden" note, like desktop's ghost. */
+function portfolioWidgetOrder(
+  layout: ProfileLayout,
+  keepClubs = false,
+): PortfolioWidgetId[] {
   return layout.order.filter(
     (id): id is PortfolioWidgetId =>
       (PORTFOLIO_WIDGET_IDS as readonly string[]).includes(id) &&
-      !layout.hidden.includes(id),
+      (!layout.hidden.includes(id) || (keepClubs && id === "clubs")),
   );
 }
 
 /** Row names in the Arrange sheet. Product words, not column names. */
 const WIDGET_LABEL: Record<WidgetId, string> = {
+  clubs: "Clubs",
   bio: "Bio",
   working_on: "Working on",
   experience: "Experience",
@@ -351,9 +361,11 @@ const WIDGET_LABEL: Record<WidgetId, string> = {
 };
 
 /** The 7px dot in front of each row. C0 tokens only, one ink per widget
- *  so the six rows read apart at a glance; the two coral-family ones
- *  are Bio (brick) and Posts (coral), the profile's own colour. */
+ *  so the seven rows read apart at a glance; the two coral-family ones
+ *  are Bio (brick) and Posts (coral), the profile's own colour. Clubs
+ *  takes the green of a club's verified tick. */
 const WIDGET_DOT: Record<WidgetId, string> = {
+  clubs: "var(--ok-ink)",
   bio: "var(--tag-ink)",
   working_on: "var(--coral)",
   experience: "var(--charcoal)",
@@ -397,8 +409,10 @@ function widgetStatusLine(id: WidgetId, hidden: boolean, count: number): string 
   if (hidden) return "hidden · only you see it";
   if (id === "bio") return count > 0 ? "Shown up top" : "Nothing written yet";
   // Empty widgets are skipped for visitors on both surfaces (plan A).
-  if (count === 0) return "Nothing yet · visitors skip it";
+  // Clubs counts the ones visitors see, so it says "shown", not "yet".
+  if (count === 0) return id === "clubs" ? "No clubs shown · visitors skip it" : "Nothing yet · visitors skip it";
   const noun: Record<PortfolioWidgetId, [string, string]> = {
+    clubs: ["club shown", "clubs shown"],
     working_on: ["thing", "things"],
     experience: ["role", "roles"],
     skills: ["skill", "skills"],
@@ -522,6 +536,27 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
     // referential dep that doesn't change.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab]);
+  // The pager is as tall as the OPEN pane, not the taller of the two: with
+  // Clubs (and the owner's whole Following list) in Portfolio since Oct 18
+  // 2026, a stretched row left a blank run under the last post. The panes
+  // are callback refs because the pager mounts after the profile loads.
+  // Written straight to the element: a pane resizes often (images load,
+  // lists page in) and a state update would re-render the whole profile.
+  const [postsPaneEl, setPostsPaneEl] = useState<HTMLDivElement | null>(null);
+  const [portfolioPaneEl, setPortfolioPaneEl] = useState<HTMLDivElement | null>(null);
+  useEffect(() => {
+    const pager = tabScrollRef.current;
+    const pane = tab === "portfolio" ? portfolioPaneEl : postsPaneEl;
+    // No ResizeObserver: no height, so the row keeps its old stretch.
+    if (!pager || !pane || typeof ResizeObserver === "undefined") return;
+    const fit = () => {
+      pager.style.height = `${pane.offsetHeight}px`;
+    };
+    fit();
+    const ro = new ResizeObserver(fit);
+    ro.observe(pane);
+    return () => ro.disconnect();
+  }, [tab, postsPaneEl, portfolioPaneEl]);
   /** Resume item the viewer should open. null = closed. */
   // Track the docIndex alongside the item so the resume viewer filters
   // its bars to the right doc instead of always defaulting to doc 0.
@@ -1483,6 +1518,9 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
   // an old cached bootstrap without the key still renders the default.
   const layout = sanitizeProfileLayout(user.profileLayout);
   const bioHidden = layout.hidden.includes("bio");
+  // Owner only in practice: a visitor's `hidden` is always [] (the server
+  // blanks it, and sends no clubs for a hidden Clubs widget).
+  const clubsHidden = layout.hidden.includes("clubs");
   // A hidden Skills widget must look never-filled everywhere — the header
   // tag row included — so it matches the desktop, which drops them fully.
   const skills = layout.hidden.includes("skills")
@@ -1944,8 +1982,13 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
 
         {/* Club flair: up to 3 chips, titled clubs first, no dates
             ("President · SAE"). What a visitor sees, on your own profile
-            too: hidden clubs and hidden titles stay off. */}
-        <ClubFlairChips clubs={isVisitor ? (visitorClubs ?? []) : myClubs.shown} />
+            too: hidden clubs and hidden titles stay off, and so do all of
+            them while the Clubs widget is hidden. The eye is read first:
+            on my own /profile/<handle> the phone is in visitor mode, yet
+            the bootstrap answers me as the owner, clubs and `hidden` and
+            all (a real visitor's `hidden` is always [], so for them this
+            changes nothing). */}
+        <ClubFlairChips clubs={clubsHidden ? [] : isVisitor ? (visitorClubs ?? []) : myClubs.shown} />
 
         {/* Tagline */}
         {editMode && effectiveDraft ? (
@@ -2321,16 +2364,6 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
         </Section>
       ) : null}
 
-      {/* Clubs — between Bio and the tab strip (club model spec D).
-          Visitors: "Member of", only the clubs this person shows, nothing
-          when none. Owner: every club with its ⋯ choices, then Following,
-          which only they see. */}
-      {isVisitor ? (
-        <ClubsSection mode="visitor" clubs={visitorClubs} />
-      ) : (
-        <ClubsSection mode="owner" store={myClubs} />
-      )}
-
       {/* Tab strip — Instagram-style. Posts + Portfolio (experience +
           portfolio + resume PDF). */}
       <ProfileTabs active={tab} onChange={setTab} />
@@ -2348,6 +2381,9 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
         }}
         style={{
           display: "flex",
+          // Each pane keeps its own height; the effect above sizes the row
+          // to the open one, and overflowY clips the other.
+          alignItems: "flex-start",
           overflowX: "auto",
           overflowY: "hidden",
           scrollSnapType: "x mandatory",
@@ -2359,6 +2395,7 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
         className="vibe-no-scrollbar"
       >
         <div
+          ref={setPostsPaneEl}
           style={{
             flex: "0 0 100%",
             scrollSnapAlign: "start",
@@ -2416,6 +2453,7 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
           )}
         </div>
         <div
+          ref={setPortfolioPaneEl}
           style={{
             flex: "0 0 100%",
             scrollSnapAlign: "start",
@@ -2424,11 +2462,32 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
           }}
         >
           <PortfolioPane
+            clubs={
+              // Clubs: a Portfolio sub-section since Oct 18 2026, first
+              // unless moved. Visitors: "Member of", only the clubs this
+              // person shows, nothing when none. Owner: every club with
+              // its ⋯ choices, then Following, which only they see; still
+              // drawn when hidden, with a note saying so.
+              isVisitor ? (
+                <ClubsSection mode="visitor" clubs={visitorClubs} />
+              ) : (
+                <ClubsSection
+                  mode="owner"
+                  store={myClubs}
+                  note={clubsHidden ? "Hidden · only you see it" : undefined}
+                />
+              )
+            }
+            clubsCount={
+              // The owner's section always draws something (its two empty
+              // lines, a skeleton or a retry), so it always counts.
+              isVisitor ? (visitorClubs?.length ?? 0) : 1
+            }
             currentProjects={currentProjects}
             workExperience={workExperience}
             skills={allSkills}
             resumePortfolio={resumePortfolio}
-            order={portfolioWidgetOrder(layout)}
+            order={portfolioWidgetOrder(layout, !isVisitor)}
             onOpenDoc={(r, index) => setViewerItem({ item: r, index })}
             isVisitor={isVisitor}
             ownerName={name}
@@ -2561,6 +2620,7 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
         <ArrangeProfileSheet
           initial={layout}
           counts={{
+            clubs: myClubs.shown.length,
             bio: bio ? 1 : 0,
             working_on: currentProjects.length,
             experience: workExperience.length,
@@ -3485,6 +3545,8 @@ function SubPaneEmpty({ title, body }: { title: string; body: string }) {
 }
 
 function PortfolioPane({
+  clubs,
+  clubsCount,
   currentProjects,
   workExperience,
   skills,
@@ -3504,6 +3566,12 @@ function PortfolioPane({
   onUploadExperienceLogo,
   onUploadCurrentOnLogo,
 }: {
+  /** The Clubs sub-section, built by the parent (it owns the clubs data
+   *  and the owner's store). Draws nothing for a visitor with no clubs. */
+  clubs: React.ReactNode;
+  /** How many rows `clubs` draws (0 = nothing for a visitor; always 1
+   *  for the owner, whose section is never blank). */
+  clubsCount: number;
   currentProjects: CurrentProject[];
   workExperience: WorkExp[];
   /** The full skills list (users.skills). Edited on the desktop profile
@@ -3511,7 +3579,8 @@ function PortfolioPane({
   skills: string[];
   resumePortfolio: ResumeItem[];
   /** Which sub-sections to paint and in what order — `profile_layout.order`
-   *  filtered by `portfolioWidgetOrder` (hidden ones already dropped). */
+   *  filtered by `portfolioWidgetOrder` (hidden ones already dropped, but
+   *  the owner's Clubs stays). */
   order: PortfolioWidgetId[];
   /** Open this doc in the resume viewer. `index` is its position in
    *  resume_docs so the viewer can scope redaction bars to it. */
@@ -3647,12 +3716,17 @@ function PortfolioPane({
   // Only the sections the layout shows count: a hidden Experience with
   // three roles is still "nothing here" to a visitor.
   const sectionCount: Record<PortfolioWidgetId, number> = {
+    clubs: clubsCount,
     working_on: currentProjects.length,
     experience: workExperience.length,
     skills: skills.length,
     resume: resumePortfolio.length,
   };
-  const allEmpty = order.every((id) => sectionCount[id] === 0);
+  // The owner's Clubs always draws (hidden or not, see portfolioWidgetOrder),
+  // so for them "empty" means the other sections, and the prompt goes under
+  // Clubs, the way it sat under the Clubs card when that was above the tabs.
+  const rest = isVisitor ? order : order.filter((id) => id !== "clubs");
+  const allEmpty = rest.every((id) => sectionCount[id] === 0);
   if (allEmpty) {
     if (isVisitor) {
       return (
@@ -3662,22 +3736,24 @@ function PortfolioPane({
         />
       );
     }
-    if (order.length === 0) {
-      // Every Portfolio section is hidden. Say so instead of "add a
-      // resume", which would send the owner in circles.
-      return (
-        <EmptyTab
-          title="All tucked away"
-          body="You hid every Portfolio section. Tap the pencil, then Layout, to bring them back."
-        />
-      );
-    }
     return (
-      <EmptyTab
-        title="Nothing here yet"
-        body="Show what you're working on, where you've worked, or add a resume."
-        cta={{ href: "/profile?edit=1", label: "Edit profile →" }}
-      />
+      <div style={{ display: "flex", flexDirection: "column", gap: 22 }}>
+        {order.includes("clubs") ? clubs : null}
+        {rest.length === 0 ? (
+          // Every other section is hidden. Say so instead of "add a
+          // resume", which would send the owner in circles.
+          <EmptyTab
+            title="All tucked away"
+            body="You hid the other Portfolio sections. Tap the pencil, then Layout, to bring them back."
+          />
+        ) : (
+          <EmptyTab
+            title="Nothing here yet"
+            body="Show what you're working on, where you've worked, or add a resume."
+            cta={{ href: "/profile?edit=1", label: "Edit profile →" }}
+          />
+        )}
+      </div>
     );
   }
 
@@ -4002,6 +4078,7 @@ function PortfolioPane({
     ) : null;
 
   const sections: Record<PortfolioWidgetId, React.ReactNode> = {
+    clubs,
     working_on: workingOnSection,
     experience: experienceSection,
     skills: skillsSection,

@@ -248,10 +248,15 @@ const OPEN_CLUB = { id: SMALL, campus_id: CAMPUS, is_public: true, join_policy: 
 const REQUEST_CLUB = { ...OPEN_CLUB, join_policy: "request" };
 const person = (id: string) => ({ id, name: "P", handle: `p${id.slice(-1)}`, major: null, year: null, avatar_url: null });
 
-type ZoneSetup = { club: unknown; role?: Answer; members?: Answer };
+type ZoneSetup = { club: unknown; role?: Answer; members?: Answer; layouts?: Answer };
 function zoneWorld(s: ZoneSetup) {
   return install((q) => {
     if (q.table === "users" && has(q, "maybeSingle")) return { data: [ME_ROW] };
+    // The members' layouts (a hidden Clubs section): every one shown unless set.
+    if (q.client === "service" && q.table === "users" && has(q, "select", "id,profile_layout")) {
+      if (s.layouts) return s.layouts;
+      return { data: ((q.calls.find((c) => c[0] === "in")?.[2] ?? []) as string[]).map((id) => ({ id, profile_layout: null })) };
+    }
     if (q.table === "users") return { data: ((q.calls.find((c) => c[0] === "in")?.[2] ?? []) as string[]).map(person) };
     if (q.client === "cookie" && q.table === "orgs") return { data: s.club ? [s.club] : [] };
     if (q.table === "connections") return { data: [] };
@@ -301,6 +306,33 @@ test("zone: a hidden club is 404 to everyone, members included, with no roster r
   assert.equal(w.queries.filter((q) => q.client === "service").length, 0);
   zoneWorld({ club: null });
   assert.equal((await zoneGet()).status, 404, "the same answer as a missing handle");
+});
+
+test("zone: a member who hid their whole Clubs section is not listed; an unreadable layout lists nobody or is a 500", async () => {
+  const hides = { v: 1, order: [], hidden: ["clubs"], bioSide: false };
+  const w = zoneWorld({
+    club: OPEN_CLUB,
+    members: { data: [{ user_id: PEER }, { user_id: PEER2 }] },
+    layouts: { data: [{ id: PEER, profile_layout: hides }, { id: PEER2, profile_layout: { hidden: ["bio", "resume"] } }] },
+  });
+  const res = await zoneGet();
+  assert.equal(res.status, 200, JSON.stringify(res.body));
+  assert.deepEqual(listed(res.body), [PEER2], "the Map follows the Clubs section's eye");
+  const [layoutRead] = reads(w, "service", "users");
+  assert.ok(layoutRead && has(layoutRead, "in", "id", [PEER, PEER2]), "layouts are read with the SERVICE client, for the members only");
+
+  // A member whose layout didn't come back is left out, never assumed shown.
+  zoneWorld({ club: OPEN_CLUB, members: { data: [{ user_id: PEER }, { user_id: PEER2 }] }, layouts: { data: [{ id: PEER2, profile_layout: null }] } });
+  assert.deepEqual(listed((await zoneGet()).body), [PEER2]);
+
+  const missing = { code: "42703", message: "column users.profile_layout does not exist" };
+  zoneWorld({ club: OPEN_CLUB, members: { data: [{ user_id: PEER }] }, layouts: { error: missing } });
+  const old = await quietly(zoneGet);
+  assert.equal(old.status, 200);
+  assert.deepEqual(listed(old.body), [], "never everyone");
+
+  zoneWorld({ club: OPEN_CLUB, members: { data: [{ user_id: PEER }] }, layouts: { error: { message: "boom" } } });
+  assert.equal((await quietly(zoneGet)).status, 500);
 });
 
 test("zone: another campus lists nobody; a database without show_on_profile lists nobody; other failures are 500", async () => {

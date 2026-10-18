@@ -1,7 +1,7 @@
-PRIVACY POLICY, PAGE AGAINST TEXT  (Sun Oct 18 2026 17:35:48)
+PRIVACY POLICY, PAGE AGAINST TEXT  (Sun Oct 18 2026 18:56:43)
 page: http://localhost:3000/legal/privacy
 text: /Users/franciscocazares/vibe/handoffs/legal-2026-10-04-privacy-v3/privacy-policy-final.md
-sentences: 1214 in the text, 1214 on the page, 1214 the same and in the same order
+sentences: 1215 in the text, 1215 on the page, 1215 the same and in the same order
 blocks: 464 in the text, 464 on the page; tables: 5 / 5
 date at the top (page.tsx EFFECTIVE_DATE): October 18, 2026
 dates on the page: {"October 18, 2026":1,"October 5, 2026":8,"October 8, 2026":2,"October 12, 2026":2,"October 7, 2026":1,"October 4, 2026":1}; "section N" mentions: 102 on the page, 102 of them links

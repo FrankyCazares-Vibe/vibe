@@ -10,12 +10,13 @@ export function Sections9To10() {
       <SectionH2 n={9} />
       <LegalP>
         <strong>See and change.</strong> You can edit your profile, and hide
-        five parts of it: bio, experience, skills, &ldquo;Working on&rdquo; and
-        résumé. Your name, handle, photos, tagline, location line, website
+        six parts of it: bio, experience, skills, &ldquo;Working on&rdquo;,
+        résumé and your Clubs section. Your name, handle, photos, tagline, location line, website
         link, interest tags, major, year, campus, verified badge, three counts
         (followers, following and connections) and posts cannot be hidden.
         Your clubs show on your profile unless you hide one, and hiding one
-        takes it off at once. You can also hide the title a club gave you, and
+        takes it off at once. Hiding the Clubs section takes them all off,
+        the club names under your name too. You can also hide the title a club gave you, and
         choose the order your clubs show in. The club&apos;s members still see
         you in its member list. When you leave a club, you choose whether to
         keep following it. If you do, you can read its Board as a follower can

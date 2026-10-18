@@ -358,16 +358,133 @@ test("the chips carry no dates", () => {
   assert.doesNotMatch(paintFlair, /since|MemberSince/i);
 });
 
-test("the markup: chips under the @handle, the card outside both columns", () => {
+test("the markup: chips under the @handle, the card a side widget at the top of the side column", () => {
   const handleRow = html.indexOf('id="profileHandleRow"');
   const flairRow = html.indexOf('<ul class="pclub-flair" id="profileFlairRow"');
   const tagline = html.indexOf('<p class="profile-tagline"');
   assert.ok(handleRow > 0 && flairRow > handleRow && tagline > flairRow, "the flair row moved");
-  const card = /<section class="card pclubs" id="profileClubs"[^>]*>/.exec(html);
+  const card = /<section class="([^"]*)" id="profileClubs"[^>]*>/.exec(html);
   assert.ok(card, "the Clubs card is missing");
-  assert.ok(!card[0].includes("data-widget"), "the Clubs card is a widget (_placeWidgets would move it)");
+  const classes = (card[1] ?? "").split(/\s+/);
+  for (const c of ["stat-card", "pclubs", "pclubs-off"]) assert.ok(classes.includes(c), `the Clubs card lost .${c}`);
+  assert.ok(card[0].includes('data-widget="clubs"'), "the Clubs card is not a widget (the layout can't move or hide it)");
+  assert.doesNotMatch(card[0], /\shidden[\s>=]/, "`hidden` is the layout's eye, not the card's own switch (.pclubs-off)");
+  assert.equal(html.split('id="profileClubs"').length - 1, 1);
+  // Oct 18 2026: inside the side column, first (the default order), before
+  // Resume and "Currently working on"; never above the grid any more.
   const grid = html.indexOf('<div class="profile-grid">');
-  assert.ok(card.index < grid, "the Clubs card sits inside the grid");
+  const right = html.indexOf('<div class="profile-right">');
+  const rightEnd = html.indexOf("</div><!-- /profile-right -->");
+  const resume = html.indexOf('data-widget="resume"');
+  const workingOn = html.indexOf('data-widget="working_on"');
+  assert.ok(grid > 0 && right > grid, "the side column is missing");
+  assert.ok(card.index > right && card.index < rightEnd, "the Clubs card is not in the side column");
+  assert.ok(card.index < resume && resume < workingOn, "the Clubs card does not lead the side column");
+  assert.ok(html.slice(right, card.index).indexOf("data-widget=") < 0, "a widget sits above Clubs in the markup");
+});
+
+test("the card's own switch never touches `hidden`, and its eye takes the chips with it", () => {
+  assert.doesNotMatch(uiSource, /section\.hidden\s*=/, "_pclubsPaint sets `hidden`, which the layout's eye owns");
+  assert.match(uiSource, /section\.classList\.toggle\('pclubs-off', clubs\.length === 0\)/);
+  assert.match(cssSource, /#profileClubs\.pclubs-off \{ display:none !important; \}/);
+  const shown = /function _pclubsShown\(\) \{[\s\S]*?\n\}/.exec(uiSource)?.[0] ?? "";
+  const visitorLine = shown.indexOf("if (window.viewingRealUser) return _pclubs.visitor || [];");
+  const eyeLine = shown.indexOf("card.classList.contains('widget-hidden')) return [];");
+  assert.ok(visitorLine > 0 && eyeLine > visitorLine, "my chips don't follow the Clubs eye");
+  const apply = /function applyProfileLayout\(raw\) \{[\s\S]*?\n\}/.exec(html)?.[0] ?? "";
+  assert.ok(apply.includes("_pclubsPaintFlair()"), "hiding Clubs doesn't repaint the chips");
+});
+
+// ── The widget layout: the page's mirror of profile-layout.ts ──────────────
+
+const layoutSpecifier = "./profile-layout.ts";
+const layoutTs = (await import(layoutSpecifier)) as typeof import("./profile-layout");
+const layoutSource = region("// Mirror of src/lib/profile/profile-layout.ts. Keep in sync.", "// Any arrange-mode change:");
+
+type FakeCard = { dataset: { widget: string }; classList: { contains: (c: string) => boolean } };
+/** The page's layout code over a stand-in document: two columns of cards.
+ *  `last`: the layout applyProfileLayout last painted, if any. */
+function pageLayout(left: string[], right: string[], hidden: string[] = [], last: unknown = null) {
+  const card = (id: string): FakeCard => ({
+    dataset: { widget: id },
+    classList: { contains: (c: string) => c === "widget-hidden" && hidden.includes(id) },
+  });
+  const document = {
+    querySelectorAll(sel: string): FakeCard[] {
+      if (sel === ".profile-left > [data-widget]") return left.map(card);
+      if (sel === ".profile-right > [data-widget]") return right.map(card);
+      if (sel === "[data-widget].widget-hidden") return hidden.map(card);
+      throw new Error(`unexpected selector ${sel}`);
+    },
+  };
+  return new Function(
+    "document",
+    "__last",
+    `${layoutSource}\n_profileLayoutLast = __last ? _sanitizeProfileLayout(__last) : null;\nreturn { _WIDGET_IDS, _WIDGET_SIDE_IDS, _sanitizeProfileLayout, _readProfileLayoutFromDom };`,
+  )(document, last) as {
+    _WIDGET_IDS: string[];
+    _WIDGET_SIDE_IDS: string[];
+    _sanitizeProfileLayout: (raw: unknown) => unknown;
+    _readProfileLayoutFromDom: () => { order: string[]; hidden: string[]; bioSide: boolean };
+  };
+}
+
+test("the page's layout sanitizer is profile-layout.ts's, clubs included", () => {
+  const page = pageLayout([], []);
+  assert.deepEqual(page._WIDGET_IDS, [...layoutTs.WIDGET_IDS]);
+  assert.deepEqual(page._WIDGET_SIDE_IDS, ["clubs", "resume", "working_on"]);
+  const OLD = ["bio", "experience", "skills", "posts", "resume", "working_on"];
+  for (const raw of [
+    undefined,
+    null,
+    {},
+    { v: 1, order: OLD, hidden: [], bioSide: false },
+    { v: 1, order: ["posts", "working_on", "bio", "resume", "skills", "experience"], hidden: ["resume", "posts"], bioSide: true },
+    { order: ["bio", "resume", "clubs", "x"], hidden: ["clubs", "clubs"] },
+    { order: "clubs", hidden: "clubs" },
+  ]) {
+    assert.deepEqual(page._sanitizeProfileLayout(raw), layoutTs.sanitizeProfileLayout(raw), JSON.stringify(raw));
+  }
+});
+
+test("saving from the page: Clubs at the top of the side column leads the order, so the phone keeps it first", () => {
+  const LEFT = ["bio", "experience", "skills", "posts"];
+  const top = pageLayout(LEFT, ["clubs", "resume", "working_on"])._readProfileLayoutFromDom();
+  assert.deepEqual(top.order, [...layoutTs.WIDGET_IDS]);
+  assert.equal(layoutTs.isDefaultLayout(layoutTs.sanitizeProfileLayout(top)), true, "an untouched page saves the default");
+  // Docked bio: bio first, then clubs.
+  const docked = pageLayout(["experience", "skills", "posts"], ["bio", "clubs", "resume", "working_on"])._readProfileLayoutFromDom();
+  assert.deepEqual(docked.order, ["bio", "clubs", "experience", "skills", "posts", "resume", "working_on"]);
+  assert.equal(docked.bioSide, true);
+  // Dragged under "Currently working on": after the main column, like the others.
+  const low = pageLayout(LEFT, ["resume", "working_on", "clubs"], ["clubs"])._readProfileLayoutFromDom();
+  assert.deepEqual(low.order, ["bio", "experience", "skills", "posts", "resume", "working_on", "clubs"]);
+  assert.deepEqual(low.hidden, ["clubs"]);
+});
+
+test("saving from the page keeps a side card's slot from the phone while the side column's order holds", () => {
+  // The phone put Clubs after Experience; the page paints it top of the side column.
+  const PHONE = { v: 1, order: ["bio", "experience", "clubs", "skills", "posts", "resume", "working_on"], hidden: [], bioSide: false };
+  const SIDE = ["clubs", "resume", "working_on"];
+  // Hiding Skills on the desktop: Clubs stays after Experience.
+  const eye = pageLayout(["bio", "experience", "skills", "posts"], SIDE, ["skills"], PHONE)._readProfileLayoutFromDom();
+  assert.deepEqual(eye.order, PHONE.order);
+  assert.deepEqual(eye.hidden, ["skills"]);
+  // A main-column move keeps the slot too (the third place).
+  const moved = pageLayout(["skills", "bio", "experience", "posts"], SIDE, [], PHONE)._readProfileLayoutFromDom();
+  assert.deepEqual(moved.order, ["skills", "bio", "clubs", "experience", "posts", "resume", "working_on"]);
+  // Docking the bio: bio leads, the rest keep their slots.
+  const docked = pageLayout(["experience", "skills", "posts"], ["bio", ...SIDE], [], PHONE)._readProfileLayoutFromDom();
+  assert.deepEqual(docked.order, ["bio", "experience", "clubs", "skills", "posts", "resume", "working_on"]);
+  assert.equal(docked.bioSide, true);
+  // Reordering the side column itself is a new choice: the column decides again.
+  const dragged = pageLayout(["bio", "experience", "skills", "posts"], ["resume", "clubs", "working_on"], [], PHONE)._readProfileLayoutFromDom();
+  assert.deepEqual(dragged.order, ["bio", "experience", "skills", "posts", "resume", "clubs", "working_on"]);
+  const top = pageLayout(["bio", "experience", "skills", "posts"], SIDE, [], { ...PHONE, order: [...PHONE.order.filter((id) => id !== "clubs"), "clubs"] })._readProfileLayoutFromDom();
+  assert.deepEqual(top.order, [...layoutTs.WIDGET_IDS], "dragged to the top of the side column, Clubs leads again");
+  // Right after a paint, reading the page gives back what was painted.
+  const same = pageLayout(["bio", "experience", "skills", "posts"], SIDE, [], PHONE)._readProfileLayoutFromDom();
+  assert.deepEqual(same, layoutTs.sanitizeProfileLayout(PHONE));
 });
 
 /** The values a token gets in the first `selector {` block of the page. */
