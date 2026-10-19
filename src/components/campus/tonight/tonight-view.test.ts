@@ -394,8 +394,8 @@ test("rule lines and reason labels", () => {
   const live = game("g2", campus(15, 30));
   const featured = schoolEvent("f1", campus(20), campus(21), { source: "iu-featured", featured: true });
   const c = club("c1", campus(20), campus(22));
-  assert.equal(V.leadRuleLine(build([g], []).lead!), "First because it starts soonest. Your school can feature one event a day instead.");
-  assert.equal(V.leadRuleLine(build([live], []).lead!), "First because it's on right now. Your school can feature one event a day instead.");
+  assert.equal(V.leadRuleLine(build([g], []).lead!), "First because it starts soonest.");
+  assert.equal(V.leadRuleLine(build([live], []).lead!), "First because it's on right now.");
   assert.equal(V.leadRuleLine(build([featured, g], []).lead!), "Your school featured this today. Never paid, never ranked by popularity.");
   assert.equal(V.leadRuleLine(build([], [c]).lead!), "Nothing from your school tonight, so the soonest club event leads.");
   assert.equal(V.reasonLabel("next"), "Up next");

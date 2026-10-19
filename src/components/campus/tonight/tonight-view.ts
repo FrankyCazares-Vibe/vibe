@@ -308,12 +308,16 @@ export function buildTonight(input: {
 
 // ── Words around #1 ───────────────────────────────────────────────────────
 
-/** The small line under #1 that says why it is first (the sheet and the Events hero). */
+/**
+ * The small line under #1 that says why it is first (the sheet and the Events
+ * hero). No "your school can feature one" (Franky, Oct 19 2026): a school or
+ * its licensing office could read that as the school taking part in Vibe.
+ */
 export function leadRuleLine(lead: TonightLead): string {
   if (lead.kind === "club") return "Nothing from your school tonight, so the soonest club event leads.";
   if (lead.reason === "featured") return "Your school featured this today. Never paid, never ranked by popularity.";
-  if (lead.reason === "live") return "First because it's on right now. Your school can feature one event a day instead.";
-  return "First because it starts soonest. Your school can feature one event a day instead.";
+  if (lead.reason === "live") return "First because it's on right now.";
+  return "First because it starts soonest.";
 }
 
 /**
