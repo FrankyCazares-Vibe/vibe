@@ -1,0 +1,2437 @@
+BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//SIDEARM Sports//NONSGML SIDEARM//EN
+X-WR-CALNAME:IU Indy Athletics
+X-PUBLISHED-TTL:PT120M
+BEGIN:VEVENT
+UID:vcal_17605-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART;VALUE=DATE:20260919
+DTEND;VALUE=DATE:20260920
+LOCATION:Greenwood\, Ind., Center Grove High School
+SUMMARY:[N] IU Indy Women's Tennis vs UIndy Invite
+DESCRIPTION:[N] IU Indy Women's Tennis vs UIndy Invite\n\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17605&amp;sport_id=13
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17443-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART:20260919T130500Z
+DTEND:20260919T160500Z
+LOCATION:Terre Haute\, Ind.
+SUMMARY:[N] IU Indy Men's Cross Country at John McNichols Invitational (Open)
+DESCRIPTION:[N] IU Indy Men's Cross Country at John McNichols Invitational (Open)\n ind. results only\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17443&amp;sport_id=3
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17438-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART:20260919T140000Z
+DTEND:20260919T170000Z
+LOCATION:Fort Wayne\, Ind.
+SUMMARY:[N] IU Indy Women's Cross Country at Rumble in the Fort
+DESCRIPTION:[N] IU Indy Women's Cross Country at Rumble in the Fort\n 2nd of 4 (42)\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17438&amp;sport_id=4
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17364-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART:20260919T170000Z
+DTEND:20260919T190000Z
+LOCATION:Indianapolis\, Ind., Michael A. Carroll Stadium
+SUMMARY:[L] IU Indy Women's Soccer vs Milwaukee - Alumni Day
+DESCRIPTION:[L] IU Indy Women's Soccer vs Milwaukee - Alumni Day\nL 2-3\nTV: ESPN+\nStreaming Video: https://www.espn.com/watch/player?id=c35a4694-7c7c-47c7-b7ea-c8a5e33af05f\nTickets: https://am.ticketmaster.com/iuindy/buy/26-WSOC\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17364&amp;sport_id=8
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17384-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART:20260919T210000Z
+DTEND:20260919T230000Z
+LOCATION:Indianapolis\, Ind., Michael A. Carroll Stadium
+SUMMARY:[L] IU Indy Men's Soccer vs Northern Kentucky - Alumni Day
+DESCRIPTION:[L] IU Indy Men's Soccer vs Northern Kentucky - Alumni Day\nL 1-5\nTV: ESPN+\nStreaming Video: https://www.espn.com/watch/player?id=cd834676-bf18-4bd7-b9e4-9d32f550aee4\nTickets: https://am.ticketmaster.com/iuindy/buy/26-MSOC\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17384&amp;sport_id=7
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17419-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART:20260919T220000Z
+DTEND:20260920T000000Z
+LOCATION:Muncie\, Ind.
+SUMMARY:[L] IU Indy Volleyball at Ball State
+DESCRIPTION:[L] IU Indy Volleyball at Ball State\nL 1-3\nTV: ESPN+\nStreaming Video: https://www.espn.com/watch/player/_/id/ed331400-b8a9-4a1e-ad24-fde1ad4348ae\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17419&amp;sport_id=14
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17385-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART:20260922T220000Z
+DTEND:20260923T000000Z
+LOCATION:Indianapolis\, Ind., Michael A. Carroll Stadium
+SUMMARY:[T] IU Indy Men's Soccer vs Western Illinois
+DESCRIPTION:[T] IU Indy Men's Soccer vs Western Illinois\nT 3-3\nTickets: https://am.ticketmaster.com/iuindy/buy/26-MSOC\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17385&amp;sport_id=7
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17365-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART:20260924T230000Z
+DTEND:20260925T010000Z
+LOCATION:Indianapolis\, Ind., Michael A. Carroll Stadium
+SUMMARY:[L] IU Indy Women's Soccer vs Wright State
+DESCRIPTION:[L] IU Indy Women's Soccer vs Wright State\nL 1-3\nTickets: https://am.ticketmaster.com/iuindy/buy/26-WSOC\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17365&amp;sport_id=8
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17601-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART;VALUE=DATE:20260925
+DTEND;VALUE=DATE:20260927
+LOCATION:Cleveland\, OH
+SUMMARY:[N] IU Indy Men's Tennis vs Horizon League Individual Championships
+DESCRIPTION:[N] IU Indy Men's Tennis vs Horizon League Individual Championships\n\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17601&amp;sport_id=12
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17602-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART;VALUE=DATE:20260925
+DTEND;VALUE=DATE:20260927
+LOCATION:Toledo\, OH
+SUMMARY:[N] IU Indy Men's Tennis at Everybody vs. Cancer Invitational
+DESCRIPTION:[N] IU Indy Men's Tennis at Everybody vs. Cancer Invitational\n\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17602&amp;sport_id=12
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17420-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART:20260925T220000Z
+DTEND:20260926T000000Z
+LOCATION:Indianapolis\, Ind., The Jungle
+SUMMARY:[W] IU Indy Volleyball vs Robert Morris
+DESCRIPTION:[W] IU Indy Volleyball vs Robert Morris\nW 3-0\nTV: ESPN+\nStreaming Video: https://www.espn.com/watch/player?id=9d1b91a9-eee3-4a50-991d-bc55bf09ef58\nTickets: https://am.ticketmaster.com/iuindy/buy/2026-volleyball\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17420&amp;sport_id=14
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17496-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART:20260926T130000Z
+DTEND:20260926T160000Z
+LOCATION:Muncie\, Ind.
+SUMMARY:[N] IU Indy Men's Golf at Earl Yestingsmeier Invitational
+DESCRIPTION:[N] IU Indy Men's Golf at Earl Yestingsmeier Invitational\n\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17496&amp;sport_id=6
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17386-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART:20260926T170000Z
+DTEND:20260926T190000Z
+LOCATION:Rochester\, Mich.
+SUMMARY:[L] IU Indy Men's Soccer at Oakland
+DESCRIPTION:[L] IU Indy Men's Soccer at Oakland\nL 0-1\nTV: ESPN+\nStreaming Video: https://www.espn.com/watch/player/_/id/89982089-d15b-48d2-bdca-c0df30bbb7e8\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17386&amp;sport_id=7
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17421-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART:20260926T190000Z
+DTEND:20260926T210000Z
+LOCATION:Indianapolis\, Ind., The Jungle
+SUMMARY:[W] IU Indy Volleyball vs Robert Morris
+DESCRIPTION:[W] IU Indy Volleyball vs Robert Morris\nW 3-2\nTV: ESPN+\nStreaming Video: https://www.espn.com/watch/player?id=92bd8756-8e4f-4c13-9eed-da0f85860a2f\nTickets: https://am.ticketmaster.com/iuindy/buy/2026-volleyball\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17421&amp;sport_id=14
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17497-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART:20260927T130000Z
+DTEND:20260927T160000Z
+LOCATION:Muncie\, Ind.
+SUMMARY:[N] IU Indy Men's Golf at Earl Yestingsmeier Invitational
+DESCRIPTION:[N] IU Indy Men's Golf at Earl Yestingsmeier Invitational\n 11th of 16 (288-290-292=870)\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17497&amp;sport_id=6
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17366-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART:20260927T170000Z
+DTEND:20260927T190000Z
+LOCATION:Indianapolis\, Ind., Michael A. Carroll Stadium
+SUMMARY:[W] IU Indy Women's Soccer vs Northern Kentucky
+DESCRIPTION:[W] IU Indy Women's Soccer vs Northern Kentucky\nW 3-2\nTickets: https://am.ticketmaster.com/iuindy/buy/26-WSOC\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17366&amp;sport_id=8
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17520-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART:20260928T123000Z
+DTEND:20260928T153000Z
+LOCATION:Florence\, Ind.
+SUMMARY:[N] IU Indy Women's Golf at NKU Women's Fall Invitational
+DESCRIPTION:[N] IU Indy Women's Golf at NKU Women's Fall Invitational\n\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17520&amp;sport_id=5
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17521-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART:20260929T123000Z
+DTEND:20260929T153000Z
+LOCATION:Florence\, Ind.
+SUMMARY:[N] IU Indy Women's Golf at NKU Women's Fall Invitational
+DESCRIPTION:[N] IU Indy Women's Golf at NKU Women's Fall Invitational\n 2nd of 11 (295-299-302=896)\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17521&amp;sport_id=5
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17367-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART:20261001T230000Z
+DTEND:20261002T010000Z
+LOCATION:Cleveland\, Ohio
+SUMMARY:[L] IU Indy Women's Soccer at Cleveland State
+DESCRIPTION:[L] IU Indy Women's Soccer at Cleveland State\nL 0-1\nTV: ESPN+\nStreaming Video: https://www.espn.com/watch/player/_/id/e48d955f-98bc-410a-8076-a2b923e33500\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17367&amp;sport_id=8
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17606-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART;VALUE=DATE:20261002
+DTEND;VALUE=DATE:20261004
+LOCATION:Cleveland\, OH
+SUMMARY:[N] IU Indy Women's Tennis vs Horizon League Individual Championships
+DESCRIPTION:[N] IU Indy Women's Tennis vs Horizon League Individual Championships\n\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17606&amp;sport_id=13
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17444-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART:20261002T144000Z
+DTEND:20261002T174000Z
+LOCATION:South Bend\, Ind.
+SUMMARY:[N] IU Indy Men's Cross Country at Joe Piane Invitational
+DESCRIPTION:[N] IU Indy Men's Cross Country at Joe Piane Invitational\n 8th of 18 (235)\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17444&amp;sport_id=3
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17422-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART:20261002T220000Z
+DTEND:20261003T000000Z
+LOCATION:Youngstown\, Ohio
+SUMMARY:[L] IU Indy Volleyball at Youngstown State
+DESCRIPTION:[L] IU Indy Volleyball at Youngstown State\nL 0-3\nTV: ESPN+\nStreaming Video: https://www.espn.com/watch/player/_/id/b8f2fd1f-6560-44f7-868e-e0c8dd62a387\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17422&amp;sport_id=14
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17439-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART:20261003T134500Z
+DTEND:20261003T164500Z
+LOCATION:Louisville\, Ky.
+SUMMARY:[N] IU Indy Women's Cross Country at Louisville Classic
+DESCRIPTION:[N] IU Indy Women's Cross Country at Louisville Classic\n 6th of 24 (223)\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17439&amp;sport_id=4
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17548-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART:20261003T160000Z
+DTEND:20261003T190000Z
+LOCATION:Indianapolis\, Ind., IU Natatorium
+SUMMARY:[W] IU Indy Men's Swimming vs Xavier
+DESCRIPTION:[W] IU Indy Men's Swimming vs Xavier\nW 238-55\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17548&amp;sport_id=11
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17549-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART:20261003T160000Z
+DTEND:20261003T190000Z
+LOCATION:Indianapolis\, Ind., IU Natatorium
+SUMMARY:[W] IU Indy Men's Swimming vs Bellarmine
+DESCRIPTION:[W] IU Indy Men's Swimming vs Bellarmine\nW 232-59\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17549&amp;sport_id=11
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17550-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART:20261003T160000Z
+DTEND:20261003T190000Z
+LOCATION:Indianapolis\, Ind., IU Natatorium
+SUMMARY:[W] IU Indy Men's Swimming vs Eastern Illinois
+DESCRIPTION:[W] IU Indy Men's Swimming vs Eastern Illinois\nW 244-49\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17550&amp;sport_id=11
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17576-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART:20261003T160000Z
+DTEND:20261003T190000Z
+LOCATION:Indianapolis\, Ind., IU Natatorium
+SUMMARY:[W] IU Indy Women's Swimming vs Xavier
+DESCRIPTION:[W] IU Indy Women's Swimming vs Xavier\nW 196-94\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17576&amp;sport_id=10
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17577-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART:20261003T160000Z
+DTEND:20261003T190000Z
+LOCATION:Indianapolis\, Ind., IU Natatorium
+SUMMARY:[W] IU Indy Women's Swimming vs Bellarmine
+DESCRIPTION:[W] IU Indy Women's Swimming vs Bellarmine\nW 226-66\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17577&amp;sport_id=10
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17578-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART:20261003T160000Z
+DTEND:20261003T190000Z
+LOCATION:Indianapolis\, Ind., IU Natatorium
+SUMMARY:[W] IU Indy Women's Swimming vs Eastern Illinois
+DESCRIPTION:[W] IU Indy Women's Swimming vs Eastern Illinois\nW 226-67\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17578&amp;sport_id=10
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17579-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART:20261003T160000Z
+DTEND:20261003T190000Z
+LOCATION:Indianapolis\, Ind., IU Natatorium
+SUMMARY:[L] IU Indy Women's Swimming vs Bowling Green
+DESCRIPTION:[L] IU Indy Women's Swimming vs Bowling Green\nL 99-200\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17579&amp;sport_id=10
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17580-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART:20261003T160000Z
+DTEND:20261003T190000Z
+LOCATION:Indianapolis\, Ind., IU Natatorium
+SUMMARY:[W] IU Indy Women's Swimming vs Butler
+DESCRIPTION:[W] IU Indy Women's Swimming vs Butler\nW 182.50-110.50\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17580&amp;sport_id=10
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17423-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART:20261003T180000Z
+DTEND:20261003T200000Z
+LOCATION:Youngstown\, Ohio
+SUMMARY:[W] IU Indy Volleyball at Youngstown State
+DESCRIPTION:[W] IU Indy Volleyball at Youngstown State\nW 3-2\nTV: ESPN+\nStreaming Video: https://www.espn.com/watch/player/_/id/ea9516fa-cc6e-4309-8973-f9f07d69471e\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17423&amp;sport_id=14
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17387-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART:20261003T230000Z
+DTEND:20261004T010000Z
+LOCATION:Cleveland\, Ohio
+SUMMARY:[L] IU Indy Men's Soccer at Cleveland State
+DESCRIPTION:[L] IU Indy Men's Soccer at Cleveland State\nL 0-2\nTV: ESPN+\nStreaming Video: https://www.espn.com/watch/player/_/id/8d85edf0-9e31-452e-8314-89e3565bea80\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17387&amp;sport_id=7
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17368-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART:20261004T170000Z
+DTEND:20261004T190000Z
+LOCATION:Fort Wayne\, Ind.
+SUMMARY:[W] IU Indy Women's Soccer at Purdue Fort Wayne
+DESCRIPTION:[W] IU Indy Women's Soccer at Purdue Fort Wayne\nW 2-1\nTV: ESPN+\nStreaming Video: https://www.espn.com/watch/player/_/id/0b2dd8f6-28f5-490d-9724-6e26625bf05c\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17368&amp;sport_id=8
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17498-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART:20261005T130000Z
+DTEND:20261005T160000Z
+LOCATION:Westlake\, Ohio
+SUMMARY:[N] IU Indy Men's Golf at Tom Tontimonia Invitational
+DESCRIPTION:[N] IU Indy Men's Golf at Tom Tontimonia Invitational\n\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17498&amp;sport_id=6
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17499-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART:20261006T130000Z
+DTEND:20261006T160000Z
+LOCATION:Westlake\, Ohio
+SUMMARY:[N] IU Indy Men's Golf at Tom Tontimonia Invitational
+DESCRIPTION:[N] IU Indy Men's Golf at Tom Tontimonia Invitational\n t-6th of 12 (295-283-301=879)\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17499&amp;sport_id=6
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17603-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART;VALUE=DATE:20261007
+DTEND;VALUE=DATE:20261013
+LOCATION:Nashville\, TN
+SUMMARY:[N] IU Indy Men's Tennis vs ITA Ohio Valley Regional
+DESCRIPTION:[N] IU Indy Men's Tennis vs ITA Ohio Valley Regional\n\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17603&amp;sport_id=12
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17388-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART:20261007T190000Z
+DTEND:20261007T210000Z
+LOCATION:Indianapolis\, Ind., Michael A. Carroll Stadium
+SUMMARY:[T] IU Indy Men's Soccer vs Robert Morris
+DESCRIPTION:[T] IU Indy Men's Soccer vs Robert Morris\nT 1-1\nTV: ESPN+\nStreaming Video: https://www.espn.com/watch/player?id=8280e8f1-41bf-4843-9836-96c393d2ff01\nTickets: https://am.ticketmaster.com/iuindy/buy/26-MSOC\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17388&amp;sport_id=7
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17607-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART;VALUE=DATE:20261008
+DTEND;VALUE=DATE:20261013
+LOCATION:Cincinnati\, OH
+SUMMARY:[N] IU Indy Women's Tennis vs ITA Ohio Valley Regional
+DESCRIPTION:[N] IU Indy Women's Tennis vs ITA Ohio Valley Regional\n\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17607&amp;sport_id=13
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17553-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART:20261009T210000Z
+DTEND:20261010T000000Z
+LOCATION:Allendale\, MI
+SUMMARY:[N] IU Indy Men's Swimming at Grand Valley State
+DESCRIPTION:[N] IU Indy Men's Swimming at Grand Valley State\n Currently 1st of 5 (258 pts)\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17553&amp;sport_id=11
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17581-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART:20261009T210000Z
+DTEND:20261010T000000Z
+LOCATION:Allendale\, MI
+SUMMARY:[N] IU Indy Women's Swimming at Grand Valley State
+DESCRIPTION:[N] IU Indy Women's Swimming at Grand Valley State\n Currently 2nd of 5 (202 pts)\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17581&amp;sport_id=10
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17424-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART:20261009T220000Z
+DTEND:20261010T000000Z
+LOCATION:Rochester\, Mich.
+SUMMARY:[L] IU Indy Volleyball at Oakland
+DESCRIPTION:[L] IU Indy Volleyball at Oakland\nL 2-3\nTV: ESPN+\nStreaming Video: https://www.espn.com/watch/player/_/id/c0a6ca15-7f15-4f68-ad56-7f26aa5a9444\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17424&amp;sport_id=14
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17582-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART:20261010T144500Z
+DTEND:20261010T174500Z
+LOCATION:Allendale\, MI
+SUMMARY:[N] IU Indy Women's Swimming at Grand Valley State
+DESCRIPTION:[N] IU Indy Women's Swimming at Grand Valley State\n 2nd of 5 (616.5 pts)\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17582&amp;sport_id=10
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17554-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART:20261010T144500Z
+DTEND:20261010T174500Z
+LOCATION:Allendale\, MI
+SUMMARY:[N] IU Indy Men's Swimming at Grand Valley State
+DESCRIPTION:[N] IU Indy Men's Swimming at Grand Valley State\n 2nd of 5 (800.5 pts)\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17554&amp;sport_id=11
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17369-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART:20261010T180000Z
+DTEND:20261010T200000Z
+LOCATION:Green Bay\, Wisc.
+SUMMARY:[L] IU Indy Women's Soccer at Green Bay
+DESCRIPTION:[L] IU Indy Women's Soccer at Green Bay\nL 0-1\nTV: ESPN+\nStreaming Video: https://www.espn.com/watch/player/_/eventCalendarId/401897724?gameId=401897724&sourceLang=en&om-navmethod=espn:globalsearch:results\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17369&amp;sport_id=8
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17425-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART:20261010T180000Z
+DTEND:20261010T200000Z
+LOCATION:Rochester\, Mich.
+SUMMARY:[W] IU Indy Volleyball at Oakland
+DESCRIPTION:[W] IU Indy Volleyball at Oakland\nW 3-0\nTV: ESPN+\nStreaming Video: https://www.espn.com/watch/player/_/id/429262d5-4171-42cd-b5dd-c55ed4c3d5d9\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17425&amp;sport_id=14
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17524-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART:20261012T130000Z
+DTEND:20261012T160000Z
+LOCATION:Portage\, Mich.
+SUMMARY:[N] IU Indy Women's Golf at Bronco Fall Classic
+DESCRIPTION:[N] IU Indy Women's Golf at Bronco Fall Classic\n\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17524&amp;sport_id=5
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17501-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART:20261012T130000Z
+DTEND:20261012T160000Z
+LOCATION:Kennesaw\, Ga.
+SUMMARY:[N] IU Indy Men's Golf at The Scrappy at Pinetree
+DESCRIPTION:[N] IU Indy Men's Golf at The Scrappy at Pinetree\n\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17501&amp;sport_id=6
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17500-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART:20261013T130000Z
+DTEND:20261013T160000Z
+LOCATION:Kennesaw\, Ga.
+SUMMARY:[N] IU Indy Men's Golf at The Scrappy at Pinetree
+DESCRIPTION:[N] IU Indy Men's Golf at The Scrappy at Pinetree\n 4th of 11 (301-285-290=876)\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17500&amp;sport_id=6
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17525-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART:20261013T130000Z
+DTEND:20261013T160000Z
+LOCATION:Portage\, Mich.
+SUMMARY:[N] IU Indy Women's Golf at Bronco Fall Classic
+DESCRIPTION:[N] IU Indy Women's Golf at Bronco Fall Classic\n 4th of 4 (307-309-315=931)\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17525&amp;sport_id=5
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17389-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART:20261013T190000Z
+DTEND:20261013T210000Z
+LOCATION:Louisville\, Ky.
+SUMMARY:[L] IU Indy Men's Soccer at Bellarmine
+DESCRIPTION:[L] IU Indy Men's Soccer at Bellarmine\nL 0-2\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17389&amp;sport_id=7
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17370-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART:20261015T210000Z
+DTEND:20261015T230000Z
+LOCATION:Indianapolis\, Ind., Michael A. Carroll Stadium
+SUMMARY:[W] IU Indy Women's Soccer vs Oakland
+DESCRIPTION:[W] IU Indy Women's Soccer vs Oakland\nW 2-1\nTV: ESPN+\nStreaming Video: https://www.espn.com/watch/player?id=d386411b-4a1e-4da0-8bda-ab5e0a885fee\nTickets: https://am.ticketmaster.com/iuindy/buy/26-WSOC\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17370&amp;sport_id=8
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17440-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART:20261016T140000Z
+DTEND:20261016T170000Z
+LOCATION:Terre Haute\, Ind.
+SUMMARY:[N] IU Indy Women's Cross Country at ISU Pre-Nationals
+DESCRIPTION:[N] IU Indy Women's Cross Country at ISU Pre-Nationals\n 15th of 26 (443)\nStreaming Video: https://prenationals-d1.runnerspace.com/eprofile.php?event_id=473&do=videos&video_id=465409\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17440&amp;sport_id=4
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17446-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART:20261016T144000Z
+DTEND:20261016T174000Z
+LOCATION:Terre Haute\, Ind.
+SUMMARY:[N] IU Indy Men's Cross Country at ISU Pre-Nationals
+DESCRIPTION:[N] IU Indy Men's Cross Country at ISU Pre-Nationals\n 40th of 44 (1,052)\nStreaming Video: https://prenationals-d1.runnerspace.com/eprofile.php?event_id=473&do=videos&video_id=465409\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17446&amp;sport_id=3
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17426-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART:20261016T220000Z
+DTEND:20261017T000000Z
+LOCATION:Indianapolis\, Ind., James T. Morris Arena
+SUMMARY:[L] IU Indy Volleyball vs Wright State
+DESCRIPTION:[L] IU Indy Volleyball vs Wright State\nL 1-3\nTV: ESPN+\nStreaming Video: https://www.espn.com/watch/player?id=ee7b62f2-0bda-42a4-ab5a-190c74822a16\nTickets: https://am.ticketmaster.com/iuindy/buy/2026-volleyball\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17426&amp;sport_id=14
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17427-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART:20261017T180000Z
+DTEND:20261017T200000Z
+LOCATION:Indianapolis\, Ind., James T. Morris Arena
+SUMMARY:[L] IU Indy Volleyball vs Wright State
+DESCRIPTION:[L] IU Indy Volleyball vs Wright State\nL 0-3\nTV: ESPN+\nStreaming Video: https://www.espn.com/watch/player?id=825e0f19-99b1-465a-b74a-3882a4209f24\nTickets: https://am.ticketmaster.com/iuindy/buy/2026-volleyball\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17427&amp;sport_id=14
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17390-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART:20261017T200000Z
+DTEND:20261017T220000Z
+LOCATION:Indianapolis\, Ind., Michael A. Carroll Stadium
+SUMMARY:[T] IU Indy Men's Soccer vs Milwaukee
+DESCRIPTION:[T] IU Indy Men's Soccer vs Milwaukee\nT 0-0\nTickets: https://am.ticketmaster.com/iuindy/buy/26-MSOC\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17390&amp;sport_id=7
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17371-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART:20261018T170000Z
+DTEND:20261018T190000Z
+LOCATION:Indianapolis\, Ind., Michael A. Carroll Stadium
+SUMMARY:[W] IU Indy Women's Soccer vs Detroit Mercy
+DESCRIPTION:[W] IU Indy Women's Soccer vs Detroit Mercy\nW 4-2\nTickets: https://am.ticketmaster.com/iuindy/buy/26-WSOC\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17371&amp;sport_id=8
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17502-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART;VALUE=DATE:20261019
+DTEND;VALUE=DATE:20261020
+LOCATION:Cincinnati\, Ohio
+SUMMARY:IU Indy Men's Golf at Xavier Invitational
+DESCRIPTION:IU Indy Men's Golf at Xavier Invitational\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17502&amp;sport_id=6
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17526-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART;VALUE=DATE:20261019
+DTEND;VALUE=DATE:20261020
+LOCATION:Kettering\, Ohio
+SUMMARY:IU Indy Women's Golf at UD Invitational
+DESCRIPTION:IU Indy Women's Golf at UD Invitational\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17526&amp;sport_id=5
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17527-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART;VALUE=DATE:20261020
+DTEND;VALUE=DATE:20261021
+LOCATION:Kettering\, Ohio
+SUMMARY:IU Indy Women's Golf at UD Invitational
+DESCRIPTION:IU Indy Women's Golf at UD Invitational\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17527&amp;sport_id=5
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17503-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART;VALUE=DATE:20261020
+DTEND;VALUE=DATE:20261021
+LOCATION:Cincinnati\, Ohio
+SUMMARY:IU Indy Men's Golf at Xavier Invitational
+DESCRIPTION:IU Indy Men's Golf at Xavier Invitational\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17503&amp;sport_id=6
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17555-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART:20261022T190000Z
+DTEND:20261022T220000Z
+LOCATION:Indianapolis\, Ind., IU Natatorium
+SUMMARY:IU Indy Men's Swimming vs Ball State
+DESCRIPTION:IU Indy Men's Swimming vs Ball State\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17555&amp;sport_id=11
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17372-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART:20261022T190000Z
+DTEND:20261022T210000Z
+LOCATION:Moon Township\, Pa.
+SUMMARY:IU Indy Women's Soccer at Robert Morris
+DESCRIPTION:IU Indy Women's Soccer at Robert Morris\nTV: ESPN+\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17372&amp;sport_id=8
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17583-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART:20261022T190000Z
+DTEND:20261022T220000Z
+LOCATION:Indianapolis\, Ind., IU Natatorium
+SUMMARY:IU Indy Women's Swimming vs Ball State
+DESCRIPTION:IU Indy Women's Swimming vs Ball State\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17583&amp;sport_id=10
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17428-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART:20261023T230000Z
+DTEND:20261024T010000Z
+LOCATION:Milwaukee\, Wisc.
+SUMMARY:IU Indy Volleyball at Milwaukee
+DESCRIPTION:IU Indy Volleyball at Milwaukee\nTV: ESPN+\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17428&amp;sport_id=14
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17584-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART:20261024T160000Z
+DTEND:20261024T190000Z
+LOCATION:West Lafayette\, IN
+SUMMARY:IU Indy Women's Swimming at Indiana Intercollegiates
+DESCRIPTION:IU Indy Women's Swimming at Indiana Intercollegiates\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17584&amp;sport_id=10
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17556-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART:20261024T160000Z
+DTEND:20261024T190000Z
+LOCATION:West Lafayette\, IN
+SUMMARY:IU Indy Men's Swimming at Indiana Intercollegiates
+DESCRIPTION:IU Indy Men's Swimming at Indiana Intercollegiates\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17556&amp;sport_id=11
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17391-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART:20261024T180000Z
+DTEND:20261024T200000Z
+LOCATION:Green Bay\, Wisc.
+SUMMARY:IU Indy Men's Soccer at Green Bay
+DESCRIPTION:IU Indy Men's Soccer at Green Bay\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17391&amp;sport_id=7
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17429-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART:20261024T190000Z
+DTEND:20261024T210000Z
+LOCATION:Green Bay\, Wisc.
+SUMMARY:IU Indy Volleyball at Green Bay
+DESCRIPTION:IU Indy Volleyball at Green Bay\nTV: ESPN+\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17429&amp;sport_id=14
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17373-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART:20261025T170000Z
+DTEND:20261025T190000Z
+LOCATION:Youngstown\, Ohio
+SUMMARY:IU Indy Women's Soccer at Youngstown State
+DESCRIPTION:IU Indy Women's Soccer at Youngstown State\nTV: ESPN+\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17373&amp;sport_id=8
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17640-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART:20261028T000000Z
+DTEND:20261028T020000Z
+LOCATION:Clarksville\, Tenn.
+SUMMARY:IU Indy Men's Basketball at Austin Peay (exh.)
+DESCRIPTION:IU Indy Men's Basketball at Austin Peay (exh.)\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17640&amp;sport_id=1
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17430-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART:20261029T230000Z
+DTEND:20261030T010000Z
+LOCATION:Indianapolis\, Ind., James T. Morris Arena
+SUMMARY:IU Indy Volleyball vs Northern Kentucky
+DESCRIPTION:IU Indy Volleyball vs Northern Kentucky\nTV: ESPN+\nStreaming Video: https://www.espn.com/watch/player?id=54e0a32e-1d58-4782-b04d-9ae9db722cc7\nTickets: https://am.ticketmaster.com/iuindy/buy/2026-volleyball\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17430&amp;sport_id=14
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17608-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART;VALUE=DATE:20261030
+DTEND;VALUE=DATE:20261101
+LOCATION:DeKalb\, IL
+SUMMARY:IU Indy Women's Tennis at Northern Illinois Invite
+DESCRIPTION:IU Indy Women's Tennis at Northern Illinois Invite\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17608&amp;sport_id=13
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17557-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART;VALUE=DATE:20261030
+DTEND;VALUE=DATE:20261031
+LOCATION:Green Bay\, WI
+SUMMARY:IU Indy Men's Swimming at Green Bay
+DESCRIPTION:IU Indy Men's Swimming at Green Bay\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17557&amp;sport_id=11
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17585-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART;VALUE=DATE:20261030
+DTEND;VALUE=DATE:20261031
+LOCATION:Green Bay\, WI
+SUMMARY:IU Indy Women's Swimming at Green Bay
+DESCRIPTION:IU Indy Women's Swimming at Green Bay\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17585&amp;sport_id=10
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17374-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART:20261030T180000Z
+DTEND:20261030T200000Z
+LOCATION:Indianapolis\, Ind., Michael A. Carroll Stadium
+SUMMARY:IU Indy Women's Soccer vs Northern Illinois
+DESCRIPTION:IU Indy Women's Soccer vs Northern Illinois\nTV: ESPN+\nStreaming Video: https://www.espn.com/watch/player?id=f7447d82-de63-46a3-aeff-72ea9ff739b3\nTickets: https://am.ticketmaster.com/iuindy/buy/26-WSOC\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17374&amp;sport_id=8
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17392-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART:20261030T230000Z
+DTEND:20261031T010000Z
+LOCATION:Dayton\, Ohio
+SUMMARY:IU Indy Men's Soccer at Wright State
+DESCRIPTION:IU Indy Men's Soccer at Wright State\nTV: ESPN+\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17392&amp;sport_id=7
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17558-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART:20261031T140000Z
+DTEND:20261031T170000Z
+LOCATION:Chicago\, IL
+SUMMARY:IU Indy Men's Swimming at UIC
+DESCRIPTION:IU Indy Men's Swimming at UIC\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17558&amp;sport_id=11
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17586-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART:20261031T140000Z
+DTEND:20261031T170000Z
+LOCATION:Chicago\, IL
+SUMMARY:IU Indy Women's Swimming at UIC
+DESCRIPTION:IU Indy Women's Swimming at UIC\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17586&amp;sport_id=10
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17587-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART:20261031T140000Z
+DTEND:20261031T170000Z
+LOCATION:Chicago\, IL
+SUMMARY:IU Indy Women's Swimming vs Milwaukee
+DESCRIPTION:IU Indy Women's Swimming vs Milwaukee\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17587&amp;sport_id=10
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17559-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART:20261031T140000Z
+DTEND:20261031T170000Z
+LOCATION:Chicago\, IL
+SUMMARY:IU Indy Men's Swimming vs Milwaukee
+DESCRIPTION:IU Indy Men's Swimming vs Milwaukee\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17559&amp;sport_id=11
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17441-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART:20261031T150000Z
+DTEND:20261031T180000Z
+LOCATION:Clinton\, Pa.
+SUMMARY:IU Indy Women's Cross Country at Horizon League Championships
+DESCRIPTION:IU Indy Women's Cross Country at Horizon League Championships\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17441&amp;sport_id=4
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17447-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART:20261031T160000Z
+DTEND:20261031T190000Z
+LOCATION:Clinton\, Pa.
+SUMMARY:IU Indy Men's Cross Country at Horizon League Championships
+DESCRIPTION:IU Indy Men's Cross Country at Horizon League Championships\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17447&amp;sport_id=3
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17431-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART:20261031T200000Z
+DTEND:20261031T220000Z
+LOCATION:Fort Wayne\, Ind.
+SUMMARY:IU Indy Volleyball at Purdue Fort Wayne
+DESCRIPTION:IU Indy Volleyball at Purdue Fort Wayne\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17431&amp;sport_id=14
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17610-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART;VALUE=DATE:20261102
+DTEND;VALUE=DATE:20261103
+LOCATION:West Lafayette\, Ind.
+SUMMARY:IU Indy Women's Basketball at Purdue
+DESCRIPTION:IU Indy Women's Basketball at Purdue\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17610&amp;sport_id=2
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17458-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART:20261102T160000Z
+DTEND:20261102T180000Z
+LOCATION:Indianapolis\, Ind., James T. Morris Arena
+SUMMARY:IU Indy Men's Basketball vs Miami University (Middletown) - NCAA 'Readers Become Leaders' Day
+DESCRIPTION:IU Indy Men's Basketball vs Miami University (Middletown) - NCAA 'Readers Become Leaders' Day\nTickets: https://am.ticketmaster.com/iuindy/buy/JagsAthletics\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17458&amp;sport_id=1
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17393-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART:20261103T190000Z
+DTEND:20261103T210000Z
+LOCATION:Indianapolis\, Ind., Michael A. Carroll Stadium
+SUMMARY:IU Indy Men's Soccer vs Detroit Mercy
+DESCRIPTION:IU Indy Men's Soccer vs Detroit Mercy\nTV: ESPN+\nTickets: https://am.ticketmaster.com/iuindy/buy/26-MSOC\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17393&amp;sport_id=7
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17432-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART:20261104T000000Z
+DTEND:20261104T020000Z
+LOCATION:Indianapolis\, Ind., James T. Morris Arena
+SUMMARY:IU Indy Volleyball vs Purdue Fort Wayne
+DESCRIPTION:IU Indy Volleyball vs Purdue Fort Wayne\nTV: ESPN+\nTickets: https://am.ticketmaster.com/iuindy/buy/2026-volleyball\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17432&amp;sport_id=14
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17611-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART:20261105T233000Z
+DTEND:20261106T013000Z
+LOCATION:Indianapolis\, Ind., James T. Morris Arena
+SUMMARY:IU Indy Women's Basketball vs SIUE
+DESCRIPTION:IU Indy Women's Basketball vs SIUE\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17611&amp;sport_id=2
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17604-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART;VALUE=DATE:20261106
+DTEND;VALUE=DATE:20261108
+LOCATION:Muncie\, IN
+SUMMARY:IU Indy Men's Tennis at Ball State Invite
+DESCRIPTION:IU Indy Men's Tennis at Ball State Invite\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17604&amp;sport_id=12
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17433-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART:20261106T230000Z
+DTEND:20261107T010000Z
+LOCATION:Indianapolis\, Ind., James T. Morris Arena
+SUMMARY:IU Indy Volleyball vs Northern Illinois
+DESCRIPTION:IU Indy Volleyball vs Northern Illinois\nTV: ESPN+\nTickets: https://am.ticketmaster.com/iuindy/buy/2026-volleyball\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17433&amp;sport_id=14
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17401-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART;VALUE=DATE:20261107
+DTEND;VALUE=DATE:20261108
+LOCATION:tba
+SUMMARY:IU Indy Women's Soccer vs Horizon League Tournament
+DESCRIPTION:IU Indy Women's Soccer vs Horizon League Tournament\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17401&amp;sport_id=8
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17459-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART:20261107T220000Z
+DTEND:20261108T000000Z
+LOCATION:Indianapolis\, Ind., James T. Morris Arena
+SUMMARY:IU Indy Men's Basketball vs UT Martin - Bob Lovell Day
+DESCRIPTION:IU Indy Men's Basketball vs UT Martin - Bob Lovell Day\nTV: WNDY-TV\nTickets: https://am.ticketmaster.com/iuindy/buy/JagsAthletics\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17459&amp;sport_id=1
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17404-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART;VALUE=DATE:20261108
+DTEND;VALUE=DATE:20261109
+LOCATION:tba
+SUMMARY:IU Indy Men's Soccer vs Horizon League Tournament
+DESCRIPTION:IU Indy Men's Soccer vs Horizon League Tournament\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17404&amp;sport_id=7
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17434-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART:20261110T230000Z
+DTEND:20261111T010000Z
+LOCATION:Highland Heights\, Ky.
+SUMMARY:IU Indy Volleyball at Northern Kentucky
+DESCRIPTION:IU Indy Volleyball at Northern Kentucky\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17434&amp;sport_id=14
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17639-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART:20261111T000000Z
+DTEND:20261111T020000Z
+LOCATION:Terre Haute\, Ind.
+SUMMARY:IU Indy Women's Basketball at Indiana State
+DESCRIPTION:IU Indy Women's Basketball at Indiana State\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17639&amp;sport_id=2
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17405-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART;VALUE=DATE:20261111
+DTEND;VALUE=DATE:20261112
+LOCATION:tba
+SUMMARY:IU Indy Men's Soccer vs Horizon League Tournament
+DESCRIPTION:IU Indy Men's Soccer vs Horizon League Tournament\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17405&amp;sport_id=7
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17402-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART;VALUE=DATE:20261111
+DTEND;VALUE=DATE:20261112
+LOCATION:tba
+SUMMARY:IU Indy Women's Soccer vs Horizon League Tournament
+DESCRIPTION:IU Indy Women's Soccer vs Horizon League Tournament\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17402&amp;sport_id=8
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17460-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART:20261111T233000Z
+DTEND:20261112T013000Z
+LOCATION:Indianapolis\, Ind., James T. Morris Arena
+SUMMARY:IU Indy Men's Basketball vs Southern Indiana - 500 Festival + Military Appreciation Night
+DESCRIPTION:IU Indy Men's Basketball vs Southern Indiana - 500 Festival + Military Appreciation Night\nTV: WNDY-TV\nTickets: https://am.ticketmaster.com/iuindy/buy/JagsAthletics\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17460&amp;sport_id=1
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17442-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART;VALUE=DATE:20261113
+DTEND;VALUE=DATE:20261114
+LOCATION:Lansing\, Mich.
+SUMMARY:IU Indy Women's Cross Country at NCAA Great Lakes Regional
+DESCRIPTION:IU Indy Women's Cross Country at NCAA Great Lakes Regional\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17442&amp;sport_id=4
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17448-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART;VALUE=DATE:20261113
+DTEND;VALUE=DATE:20261114
+LOCATION:Lansing\, Mich.
+SUMMARY:IU Indy Men's Cross Country at NCAA Great Lakes Regional
+DESCRIPTION:IU Indy Men's Cross Country at NCAA Great Lakes Regional\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17448&amp;sport_id=3
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17406-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART;VALUE=DATE:20261114
+DTEND;VALUE=DATE:20261115
+LOCATION:tba
+SUMMARY:IU Indy Men's Soccer vs Horizon League Tournament
+DESCRIPTION:IU Indy Men's Soccer vs Horizon League Tournament\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17406&amp;sport_id=7
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17403-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART;VALUE=DATE:20261114
+DTEND;VALUE=DATE:20261115
+LOCATION:tba
+SUMMARY:IU Indy Women's Soccer vs Horizon League Tournament
+DESCRIPTION:IU Indy Women's Soccer vs Horizon League Tournament\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17403&amp;sport_id=8
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17435-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART:20261114T220000Z
+DTEND:20261115T000000Z
+LOCATION:Indianapolis\, Ind., James T. Morris Arena
+SUMMARY:IU Indy Volleyball vs Cleveland State
+DESCRIPTION:IU Indy Volleyball vs Cleveland State\nTV: ESPN+\nTickets: https://am.ticketmaster.com/iuindy/buy/2026-volleyball\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17435&amp;sport_id=14
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17461-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART:20261115T003000Z
+DTEND:20261115T023000Z
+LOCATION:Morehead\, Ky.
+SUMMARY:IU Indy Men's Basketball at Morehead State
+DESCRIPTION:IU Indy Men's Basketball at Morehead State\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17461&amp;sport_id=1
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17612-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART:20261115T230000Z
+DTEND:20261116T010000Z
+LOCATION:Morehead\, Ky.
+SUMMARY:IU Indy Women's Basketball at Morehead State
+DESCRIPTION:IU Indy Women's Basketball at Morehead State\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17612&amp;sport_id=2
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17613-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART:20261118T233000Z
+DTEND:20261119T013000Z
+LOCATION:Indianapolis\, Ind., James T. Morris Arena
+SUMMARY:IU Indy Women's Basketball vs Evansville
+DESCRIPTION:IU Indy Women's Basketball vs Evansville\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17613&amp;sport_id=2
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17462-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART:20261118T233000Z
+DTEND:20261119T013000Z
+LOCATION:University Park\, Pa.
+SUMMARY:IU Indy Men's Basketball at Penn State
+DESCRIPTION:IU Indy Men's Basketball at Penn State\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17462&amp;sport_id=1
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17560-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART;VALUE=DATE:20261119
+DTEND;VALUE=DATE:20261120
+LOCATION:Indianapolis\, Ind., IU Natatorium
+SUMMARY:IU Indy Men's Swimming vs House of Champions
+DESCRIPTION:IU Indy Men's Swimming vs House of Champions\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17560&amp;sport_id=11
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17436-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART;VALUE=DATE:20261119
+DTEND;VALUE=DATE:20261122
+LOCATION:TBA
+SUMMARY:IU Indy Volleyball vs Horizon League Tournament
+DESCRIPTION:IU Indy Volleyball vs Horizon League Tournament\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17436&amp;sport_id=14
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17588-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART:20261119T150000Z
+DTEND:20261119T180000Z
+LOCATION:Indianapolis\, Ind., IU Natatorium
+SUMMARY:IU Indy Women's Swimming vs House of Champions
+DESCRIPTION:IU Indy Women's Swimming vs House of Champions\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17588&amp;sport_id=10
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17561-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART;VALUE=DATE:20261120
+DTEND;VALUE=DATE:20261121
+LOCATION:Indianapolis\, Ind., IU Natatorium
+SUMMARY:IU Indy Men's Swimming vs House of Champions
+DESCRIPTION:IU Indy Men's Swimming vs House of Champions\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17561&amp;sport_id=11
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17589-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART:20261120T150000Z
+DTEND:20261120T180000Z
+LOCATION:Indianapolis\, Ind., IU Natatorium
+SUMMARY:IU Indy Women's Swimming vs House of Champions
+DESCRIPTION:IU Indy Women's Swimming vs House of Champions\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17589&amp;sport_id=10
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17562-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART;VALUE=DATE:20261121
+DTEND;VALUE=DATE:20261122
+LOCATION:Indianapolis\, Ind., IU Natatorium
+SUMMARY:IU Indy Men's Swimming vs House of Champions
+DESCRIPTION:IU Indy Men's Swimming vs House of Champions\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17562&amp;sport_id=11
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17614-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART;VALUE=DATE:20261121
+DTEND;VALUE=DATE:20261122
+LOCATION:Chicago\, Ill.
+SUMMARY:IU Indy Women's Basketball at DePaul
+DESCRIPTION:IU Indy Women's Basketball at DePaul\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17614&amp;sport_id=2
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17445-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART;VALUE=DATE:20261121
+DTEND;VALUE=DATE:20261122
+LOCATION:Terre Haute\, Ind.
+SUMMARY:IU Indy Men's Cross Country at NCAA National Championships
+DESCRIPTION:IU Indy Men's Cross Country at NCAA National Championships\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17445&amp;sport_id=3
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17590-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART:20261121T150000Z
+DTEND:20261121T180000Z
+LOCATION:Indianapolis\, Ind., IU Natatorium
+SUMMARY:IU Indy Women's Swimming vs House of Champions
+DESCRIPTION:IU Indy Women's Swimming vs House of Champions\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17590&amp;sport_id=10
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17463-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART:20261122T213000Z
+DTEND:20261122T233000Z
+LOCATION:Youngstown\, Ohio
+SUMMARY:IU Indy Men's Basketball vs UMES
+DESCRIPTION:IU Indy Men's Basketball vs UMES\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17463&amp;sport_id=1
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17464-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART:20261123T203000Z
+DTEND:20261123T223000Z
+LOCATION:Youngstown\, Ohio
+SUMMARY:IU Indy Men's Basketball vs William & Mary
+DESCRIPTION:IU Indy Men's Basketball vs William & Mary\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17464&amp;sport_id=1
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17615-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART:20261125T180000Z
+DTEND:20261125T200000Z
+LOCATION:Indianapolis\, Ind., James T. Morris Arena
+SUMMARY:IU Indy Women's Basketball vs IU Columbus
+DESCRIPTION:IU Indy Women's Basketball vs IU Columbus\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17615&amp;sport_id=2
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17609-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART:20261129T190000Z
+DTEND:20261129T210000Z
+LOCATION:Tulsa\, Okla.
+SUMMARY:IU Indy Men's Basketball at Tulsa
+DESCRIPTION:IU Indy Men's Basketball at Tulsa\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17609&amp;sport_id=1
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17563-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART;VALUE=DATE:20261202
+DTEND;VALUE=DATE:20261205
+LOCATION:Austin\, Texas
+SUMMARY:IU Indy Men's Swimming vs Toyota US Open Championships
+DESCRIPTION:IU Indy Men's Swimming vs Toyota US Open Championships\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17563&amp;sport_id=11
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17591-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART;VALUE=DATE:20261202
+DTEND;VALUE=DATE:20261205
+LOCATION:Austin\, Texas
+SUMMARY:IU Indy Women's Swimming vs Toyota US Open Championships
+DESCRIPTION:IU Indy Women's Swimming vs Toyota US Open Championships\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17591&amp;sport_id=10
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17465-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART:20261202T233000Z
+DTEND:20261203T013000Z
+LOCATION:Indianapolis\, Ind., James T. Morris Arena
+SUMMARY:IU Indy Men's Basketball vs Robert Morris - IBJ Subscriber Night
+DESCRIPTION:IU Indy Men's Basketball vs Robert Morris - IBJ Subscriber Night\nTickets: https://am.ticketmaster.com/iuindy/buy/JagsAthletics\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17465&amp;sport_id=1
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17616-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART:20261203T233000Z
+DTEND:20261204T013000Z
+LOCATION:Indianapolis\, Ind., James T. Morris Arena
+SUMMARY:IU Indy Women's Basketball vs Purdue Fort Wayne
+DESCRIPTION:IU Indy Women's Basketball vs Purdue Fort Wayne\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17616&amp;sport_id=2
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17466-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART:20261205T190000Z
+DTEND:20261205T210000Z
+LOCATION:Indianapolis\, Ind., James T. Morris Arena
+SUMMARY:IU Indy Men's Basketball vs Oakland - Holiday Hoops Day + Beyond the Game 5K
+DESCRIPTION:IU Indy Men's Basketball vs Oakland - Holiday Hoops Day + Beyond the Game 5K\nTickets: https://am.ticketmaster.com/iuindy/buy/JagsAthletics\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17466&amp;sport_id=1
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17617-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART:20261206T190000Z
+DTEND:20261206T210000Z
+LOCATION:Rochester\, Mich\,
+SUMMARY:IU Indy Women's Basketball at Oakland
+DESCRIPTION:IU Indy Women's Basketball at Oakland\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17617&amp;sport_id=2
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17467-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART:20261209T020000Z
+DTEND:20261209T040000Z
+LOCATION:Manhattan\, Kan.
+SUMMARY:IU Indy Men's Basketball at Kansas State
+DESCRIPTION:IU Indy Men's Basketball at Kansas State\nTV: ESPN+\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17467&amp;sport_id=1
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17618-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART:20261209T160000Z
+DTEND:20261209T180000Z
+LOCATION:Muncie\, Ind.
+SUMMARY:IU Indy Women's Basketball at Ball State
+DESCRIPTION:IU Indy Women's Basketball at Ball State\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17618&amp;sport_id=2
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17619-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART:20261212T190000Z
+DTEND:20261212T210000Z
+LOCATION:Cincinnati Ohio
+SUMMARY:IU Indy Women's Basketball at Cincinnati
+DESCRIPTION:IU Indy Women's Basketball at Cincinnati\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17619&amp;sport_id=2
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17468-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART:20261213T010000Z
+DTEND:20261213T030000Z
+LOCATION:Chicago\, Ill.
+SUMMARY:IU Indy Men's Basketball at Loyola University Chicago
+DESCRIPTION:IU Indy Men's Basketball at Loyola University Chicago\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17468&amp;sport_id=1
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17469-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART:20261217T190000Z
+DTEND:20261217T210000Z
+LOCATION:Indianapolis\, Ind., James T. Morris Arena
+SUMMARY:IU Indy Men's Basketball vs Judson University - Healthcare Worker Appreciation
+DESCRIPTION:IU Indy Men's Basketball vs Judson University - Healthcare Worker Appreciation\nTickets: https://am.ticketmaster.com/iuindy/buy/JagsAthletics\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17469&amp;sport_id=1
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17646-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART;VALUE=DATE:20261219
+DTEND;VALUE=DATE:20261220
+LOCATION:West Palm Beach\, Fla.
+SUMMARY:IU Indy Women's Basketball vs San Diego State
+DESCRIPTION:IU Indy Women's Basketball vs San Diego State\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17646&amp;sport_id=2
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17647-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART;VALUE=DATE:20261220
+DTEND;VALUE=DATE:20261221
+LOCATION:West Palm Beach\, Fla.
+SUMMARY:IU Indy Women's Basketball vs South Dakota State
+DESCRIPTION:IU Indy Women's Basketball vs South Dakota State\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17647&amp;sport_id=2
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17470-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART:20261222T170000Z
+DTEND:20261222T190000Z
+LOCATION:Indianapolis\, Ind., James T. Morris Arena
+SUMMARY:IU Indy Men's Basketball vs Charleston Southern - Chick-Fil-A Day
+DESCRIPTION:IU Indy Men's Basketball vs Charleston Southern - Chick-Fil-A Day\nTickets: https://am.ticketmaster.com/iuindy/buy/JagsAthletics\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17470&amp;sport_id=1
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17620-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART:20261228T190000Z
+DTEND:20261228T210000Z
+LOCATION:Indianapolis\, Ind., James T. Morris Arena
+SUMMARY:IU Indy Women's Basketball vs Grace College (Ind.)
+DESCRIPTION:IU Indy Women's Basketball vs Grace College (Ind.)\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17620&amp;sport_id=2
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17471-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART:20261231T000000Z
+DTEND:20261231T020000Z
+LOCATION:Highland Heights\, Ky.
+SUMMARY:IU Indy Men's Basketball at Northern Kentucky
+DESCRIPTION:IU Indy Men's Basketball at Northern Kentucky\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17471&amp;sport_id=1
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17621-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART:20261231T180000Z
+DTEND:20261231T200000Z
+LOCATION:Indianapolis\, Ind., James T. Morris Arena
+SUMMARY:IU Indy Women's Basketball vs Wright State
+DESCRIPTION:IU Indy Women's Basketball vs Wright State\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17621&amp;sport_id=2
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17472-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART:20270103T190000Z
+DTEND:20270103T210000Z
+LOCATION:Indianapolis\, Ind., James T. Morris Arena
+SUMMARY:IU Indy Men's Basketball vs Youngstown State - Mascot Day
+DESCRIPTION:IU Indy Men's Basketball vs Youngstown State - Mascot Day\nTickets: https://am.ticketmaster.com/iuindy/buy/JagsAthletics\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17472&amp;sport_id=1
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17622-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART:20270103T210000Z
+DTEND:20270103T230000Z
+LOCATION:Detroit\, Mich.
+SUMMARY:IU Indy Women's Basketball at Detroit Mercy
+DESCRIPTION:IU Indy Women's Basketball at Detroit Mercy\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17622&amp;sport_id=2
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17473-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART:20270107T000000Z
+DTEND:20270107T020000Z
+LOCATION:Dayton\, Ohio
+SUMMARY:IU Indy Men's Basketball at Wright State
+DESCRIPTION:IU Indy Men's Basketball at Wright State\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17473&amp;sport_id=1
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17623-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART;VALUE=DATE:20270107
+DTEND;VALUE=DATE:20270108
+LOCATION:Moon Township\, Pa.
+SUMMARY:IU Indy Women's Basketball at Robert Morris
+DESCRIPTION:IU Indy Women's Basketball at Robert Morris\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17623&amp;sport_id=2
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17474-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART:20270109T190000Z
+DTEND:20270109T210000Z
+LOCATION:Indianapolis\, Ind., James T. Morris Arena
+SUMMARY:IU Indy Men's Basketball vs Cleveland State - FCA Day
+DESCRIPTION:IU Indy Men's Basketball vs Cleveland State - FCA Day\nTickets: https://am.ticketmaster.com/iuindy/buy/JagsAthletics\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17474&amp;sport_id=1
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17624-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART:20270110T190000Z
+DTEND:20270110T210000Z
+LOCATION:Youngstown\, Ohio
+SUMMARY:IU Indy Women's Basketball at Youngstown State
+DESCRIPTION:IU Indy Women's Basketball at Youngstown State\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17624&amp;sport_id=2
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17625-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART:20270113T233000Z
+DTEND:20270114T013000Z
+LOCATION:Indianapolis\, Ind., James T. Morris Arena
+SUMMARY:IU Indy Women's Basketball vs Milwaukee
+DESCRIPTION:IU Indy Women's Basketball vs Milwaukee\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17625&amp;sport_id=2
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17475-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART:20270114T233000Z
+DTEND:20270115T013000Z
+LOCATION:Indianapolis\, Ind., James T. Morris Arena
+SUMMARY:IU Indy Men's Basketball vs Northern Kentucky - Indiana Sports Corp Night
+DESCRIPTION:IU Indy Men's Basketball vs Northern Kentucky - Indiana Sports Corp Night\nTV: WNDY-TV\nTickets: https://am.ticketmaster.com/iuindy/buy/JagsAthletics\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17475&amp;sport_id=1
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17626-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART:20270116T190000Z
+DTEND:20270116T210000Z
+LOCATION:Indianapolis\, Ind., James T. Morris Arena
+SUMMARY:IU Indy Women's Basketball vs Northern Illinois
+DESCRIPTION:IU Indy Women's Basketball vs Northern Illinois\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17626&amp;sport_id=2
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17476-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART:20270117T000000Z
+DTEND:20270117T020000Z
+LOCATION:Fort Wayne\, Ind.
+SUMMARY:IU Indy Men's Basketball at Purdue Fort Wayne
+DESCRIPTION:IU Indy Men's Basketball at Purdue Fort Wayne\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17476&amp;sport_id=1
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17477-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART:20270120T233000Z
+DTEND:20270121T013000Z
+LOCATION:Youngstown\, Ohio
+SUMMARY:IU Indy Men's Basketball at Youngstown State
+DESCRIPTION:IU Indy Men's Basketball at Youngstown State\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17477&amp;sport_id=1
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17627-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART:20270121T233000Z
+DTEND:20270122T013000Z
+LOCATION:Indianapolis\, Ind., James T. Morris Arena
+SUMMARY:IU Indy Women's Basketball vs Cleveland State
+DESCRIPTION:IU Indy Women's Basketball vs Cleveland State\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17627&amp;sport_id=2
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17594-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART:20270123T170000Z
+DTEND:20270123T200000Z
+LOCATION:Indianapolis\, Ind., IU Natatorium
+SUMMARY:IU Indy Women's Swimming vs Butler
+DESCRIPTION:IU Indy Women's Swimming vs Butler\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17594&amp;sport_id=10
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17566-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART:20270123T170000Z
+DTEND:20270123T200000Z
+LOCATION:Indianapolis\, Ind., IU Natatorium
+SUMMARY:IU Indy Men's Swimming vs Wabash
+DESCRIPTION:IU Indy Men's Swimming vs Wabash\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17566&amp;sport_id=11
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17478-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART:20270123T180000Z
+DTEND:20270123T200000Z
+LOCATION:Moon Township\, Pa.
+SUMMARY:IU Indy Men's Basketball at Robert Morris
+DESCRIPTION:IU Indy Men's Basketball at Robert Morris\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17478&amp;sport_id=1
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17628-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART;VALUE=DATE:20270124
+DTEND;VALUE=DATE:20270125
+LOCATION:Highland Heights\, Ky.
+SUMMARY:IU Indy Women's Basketball at Northern Kentucky
+DESCRIPTION:IU Indy Women's Basketball at Northern Kentucky\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17628&amp;sport_id=2
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17479-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART:20270127T233000Z
+DTEND:20270128T013000Z
+LOCATION:Indianapolis\, Ind., James T. Morris Arena
+SUMMARY:IU Indy Men's Basketball vs Green Bay - Clayton Anderson Country Night
+DESCRIPTION:IU Indy Men's Basketball vs Green Bay - Clayton Anderson Country Night\nTickets: https://am.ticketmaster.com/iuindy/buy/JagsAthletics\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17479&amp;sport_id=1
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17629-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART;VALUE=DATE:20270128
+DTEND;VALUE=DATE:20270129
+LOCATION:Dayton\, Ohio
+SUMMARY:IU Indy Women's Basketball at Wright State
+DESCRIPTION:IU Indy Women's Basketball at Wright State\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17629&amp;sport_id=2
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17480-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART:20270130T210000Z
+DTEND:20270130T230000Z
+LOCATION:Detroit\, Mich.
+SUMMARY:IU Indy Men's Basketball at Detroit Mercy
+DESCRIPTION:IU Indy Men's Basketball at Detroit Mercy\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17480&amp;sport_id=1
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17630-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART:20270131T180000Z
+DTEND:20270131T200000Z
+LOCATION:Indianapolis\, Ind., James T. Morris Arena
+SUMMARY:IU Indy Women's Basketball vs Youngstown State
+DESCRIPTION:IU Indy Women's Basketball vs Youngstown State\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17630&amp;sport_id=2
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17631-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART:20270204T000000Z
+DTEND:20270204T020000Z
+LOCATION:Fort Wayne\, Ind.
+SUMMARY:IU Indy Women's Basketball at Purdue Fort Wayne
+DESCRIPTION:IU Indy Women's Basketball at Purdue Fort Wayne\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17631&amp;sport_id=2
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17481-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART:20270204T233000Z
+DTEND:20270205T013000Z
+LOCATION:Indianapolis\, Ind., James T. Morris Arena
+SUMMARY:IU Indy Men's Basketball vs Northern Illinois - Favorite Professor Night
+DESCRIPTION:IU Indy Men's Basketball vs Northern Illinois - Favorite Professor Night\nTickets: https://am.ticketmaster.com/iuindy/buy/JagsAthletics\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17481&amp;sport_id=1
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17632-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART:20270206T180000Z
+DTEND:20270206T200000Z
+LOCATION:Indianapolis\, Ind., James T. Morris Arena
+SUMMARY:IU Indy Women's Basketball vs Northern Kentucky
+DESCRIPTION:IU Indy Women's Basketball vs Northern Kentucky\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17632&amp;sport_id=2
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17482-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART:20270207T190000Z
+DTEND:20270207T210000Z
+LOCATION:Indianapolis\, Ind., James T. Morris Arena
+SUMMARY:IU Indy Men's Basketball vs Purdue Fort Wayne - Alumni Weekend / Winter Homecoming
+DESCRIPTION:IU Indy Men's Basketball vs Purdue Fort Wayne - Alumni Weekend / Winter Homecoming\nTV: WNDY-TV\nTickets: https://am.ticketmaster.com/iuindy/buy/JagsAthletics\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17482&amp;sport_id=1
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17633-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART:20270210T233000Z
+DTEND:20270211T013000Z
+LOCATION:Indianapolis\, Ind., James T. Morris Arena
+SUMMARY:IU Indy Women's Basketball vs Robert Morris
+DESCRIPTION:IU Indy Women's Basketball vs Robert Morris\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17633&amp;sport_id=2
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17483-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART:20270212T000000Z
+DTEND:20270212T020000Z
+LOCATION:Rochester\, Mich.
+SUMMARY:IU Indy Men's Basketball at Oakland
+DESCRIPTION:IU Indy Men's Basketball at Oakland\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17483&amp;sport_id=1
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17634-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART:20270213T180000Z
+DTEND:20270213T200000Z
+LOCATION:Indianapolis\, Ind., James T. Morris Arena
+SUMMARY:IU Indy Women's Basketball vs Detroit Mercy
+DESCRIPTION:IU Indy Women's Basketball vs Detroit Mercy\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17634&amp;sport_id=2
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17484-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART:20270213T210000Z
+DTEND:20270213T230000Z
+LOCATION:Indianapolis\, Ind., James T. Morris Arena
+SUMMARY:IU Indy Men's Basketball vs Detroit Mercy - Senior Day
+DESCRIPTION:IU Indy Men's Basketball vs Detroit Mercy - Senior Day\nTickets: https://am.ticketmaster.com/iuindy/buy/JagsAthletics\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17484&amp;sport_id=1
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17595-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART:20270217T150000Z
+DTEND:20270217T180000Z
+LOCATION:Indianapolis\, Ind., IU Natatorium
+SUMMARY:IU Indy Women's Swimming vs Horizon League Championships
+DESCRIPTION:IU Indy Women's Swimming vs Horizon League Championships\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17595&amp;sport_id=10
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17567-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART:20270217T150000Z
+DTEND:20270217T180000Z
+LOCATION:Indianapolis\, Ind., IU Natatorium
+SUMMARY:IU Indy Men's Swimming vs Horizon League Championships
+DESCRIPTION:IU Indy Men's Swimming vs Horizon League Championships\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17567&amp;sport_id=11
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17635-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART:20270218T003000Z
+DTEND:20270218T023000Z
+LOCATION:Green Bay\, Wisc.
+SUMMARY:IU Indy Women's Basketball at Green Bay
+DESCRIPTION:IU Indy Women's Basketball at Green Bay\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17635&amp;sport_id=2
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17568-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART:20270218T150000Z
+DTEND:20270218T180000Z
+LOCATION:Indianapolis\, Ind., IU Natatorium
+SUMMARY:IU Indy Men's Swimming vs Horizon League Championships
+DESCRIPTION:IU Indy Men's Swimming vs Horizon League Championships\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17568&amp;sport_id=11
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17596-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART:20270218T150000Z
+DTEND:20270218T180000Z
+LOCATION:Indianapolis\, Ind., IU Natatorium
+SUMMARY:IU Indy Women's Swimming vs Horizon League Championships
+DESCRIPTION:IU Indy Women's Swimming vs Horizon League Championships\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17596&amp;sport_id=10
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17597-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART:20270219T150000Z
+DTEND:20270219T180000Z
+LOCATION:Indianapolis\, Ind., IU Natatorium
+SUMMARY:IU Indy Women's Swimming vs Horizon League Championships
+DESCRIPTION:IU Indy Women's Swimming vs Horizon League Championships\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17597&amp;sport_id=10
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17569-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART:20270219T150000Z
+DTEND:20270219T180000Z
+LOCATION:Indianapolis\, Ind., IU Natatorium
+SUMMARY:IU Indy Men's Swimming vs Horizon League Championships
+DESCRIPTION:IU Indy Men's Swimming vs Horizon League Championships\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17569&amp;sport_id=11
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17485-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART:20270220T010000Z
+DTEND:20270220T030000Z
+LOCATION:Milwaukee\, Wisc.
+SUMMARY:IU Indy Men's Basketball at Milwaukee
+DESCRIPTION:IU Indy Men's Basketball at Milwaukee\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17485&amp;sport_id=1
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17504-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART;VALUE=DATE:20270220
+DTEND;VALUE=DATE:20270221
+LOCATION:Savannah\, Ga.
+SUMMARY:IU Indy Men's Golf vs Savannah Intercollegiate
+DESCRIPTION:IU Indy Men's Golf vs Savannah Intercollegiate\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17504&amp;sport_id=6
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17570-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART:20270220T150000Z
+DTEND:20270220T180000Z
+LOCATION:Indianapolis\, Ind., IU Natatorium
+SUMMARY:IU Indy Men's Swimming vs Horizon League Championships
+DESCRIPTION:IU Indy Men's Swimming vs Horizon League Championships\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17570&amp;sport_id=11
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17598-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART:20270220T150000Z
+DTEND:20270220T180000Z
+LOCATION:Indianapolis\, Ind., IU Natatorium
+SUMMARY:IU Indy Women's Swimming vs Horizon League Championships
+DESCRIPTION:IU Indy Women's Swimming vs Horizon League Championships\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17598&amp;sport_id=10
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17636-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART:20270220T200000Z
+DTEND:20270220T220000Z
+LOCATION:Milwaukee\, Wisc.
+SUMMARY:IU Indy Women's Basketball at Milwaukee
+DESCRIPTION:IU Indy Women's Basketball at Milwaukee\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17636&amp;sport_id=2
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17505-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART;VALUE=DATE:20270221
+DTEND;VALUE=DATE:20270222
+LOCATION:Savannah\, Ga.
+SUMMARY:IU Indy Men's Golf vs Savannah Intercollegiate
+DESCRIPTION:IU Indy Men's Golf vs Savannah Intercollegiate\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17505&amp;sport_id=6
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17486-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART:20270221T190000Z
+DTEND:20270221T210000Z
+LOCATION:Green Bay\, Wisc.
+SUMMARY:IU Indy Men's Basketball at Green Bay
+DESCRIPTION:IU Indy Men's Basketball at Green Bay\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17486&amp;sport_id=1
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17487-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART:20270224T233000Z
+DTEND:20270225T013000Z
+LOCATION:Indianapolis\, Ind., James T. Morris Arena
+SUMMARY:IU Indy Men's Basketball vs Wright State - Fan Appreciation Night
+DESCRIPTION:IU Indy Men's Basketball vs Wright State - Fan Appreciation Night\nTickets: https://am.ticketmaster.com/iuindy/buy/JagsAthletics\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17487&amp;sport_id=1
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17637-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART:20270225T233000Z
+DTEND:20270226T013000Z
+LOCATION:Indianapolis\, Ind., James T. Morris Arena
+SUMMARY:IU Indy Women's Basketball vs Oakland
+DESCRIPTION:IU Indy Women's Basketball vs Oakland\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17637&amp;sport_id=2
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17638-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART:20270227T180000Z
+DTEND:20270227T200000Z
+LOCATION:Cleveland\, Ohio
+SUMMARY:IU Indy Women's Basketball at Cleveland State
+DESCRIPTION:IU Indy Women's Basketball at Cleveland State\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17638&amp;sport_id=2
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17488-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART:20270227T223000Z
+DTEND:20270228T003000Z
+LOCATION:DeKalb\, Ill.
+SUMMARY:IU Indy Men's Basketball at Northern Illinois
+DESCRIPTION:IU Indy Men's Basketball at Northern Illinois\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17488&amp;sport_id=1
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17489-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART;VALUE=DATE:20270301
+DTEND;VALUE=DATE:20270302
+LOCATION:campus sites
+SUMMARY:IU Indy Men's Basketball vs Horizon League Play-In
+DESCRIPTION:IU Indy Men's Basketball vs Horizon League Play-In\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17489&amp;sport_id=1
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17528-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART;VALUE=DATE:20270301
+DTEND;VALUE=DATE:20270302
+LOCATION:Owens Cross Roads\, Ala.
+SUMMARY:IU Indy Women's Golf at Huntsville.org Intercollegiate
+DESCRIPTION:IU Indy Women's Golf at Huntsville.org Intercollegiate\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17528&amp;sport_id=5
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17529-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART;VALUE=DATE:20270302
+DTEND;VALUE=DATE:20270303
+LOCATION:Owens Cross Roads\, Ala.
+SUMMARY:IU Indy Women's Golf at Huntsville.org Intercollegiate
+DESCRIPTION:IU Indy Women's Golf at Huntsville.org Intercollegiate\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17529&amp;sport_id=5
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17642-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART;VALUE=DATE:20270303
+DTEND;VALUE=DATE:20270304
+LOCATION:campus sites
+SUMMARY:IU Indy Women's Basketball vs Horizon League - 1st Round
+DESCRIPTION:IU Indy Women's Basketball vs Horizon League - 1st Round\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17642&amp;sport_id=2
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17490-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART;VALUE=DATE:20270304
+DTEND;VALUE=DATE:20270305
+LOCATION:campus sites
+SUMMARY:IU Indy Men's Basketball vs Horizon League - 1st Round
+DESCRIPTION:IU Indy Men's Basketball vs Horizon League - 1st Round\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17490&amp;sport_id=1
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17491-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART;VALUE=DATE:20270307
+DTEND;VALUE=DATE:20270308
+LOCATION:Noblesville\, Ind., The Arena at Innovation Mile
+SUMMARY:IU Indy Men's Basketball vs Horizon League - 2nd Round
+DESCRIPTION:IU Indy Men's Basketball vs Horizon League - 2nd Round\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17491&amp;sport_id=1
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17643-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART;VALUE=DATE:20270307
+DTEND;VALUE=DATE:20270308
+LOCATION:Noblesville\, Ind., The Arena at Innovation Mile
+SUMMARY:IU Indy Women's Basketball vs Horizon League - 2nd Round
+DESCRIPTION:IU Indy Women's Basketball vs Horizon League - 2nd Round\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17643&amp;sport_id=2
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17644-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART;VALUE=DATE:20270308
+DTEND;VALUE=DATE:20270309
+LOCATION:Noblesville\, Ind., The Arena at Innovation Mile
+SUMMARY:IU Indy Women's Basketball vs Horizon League - Semifinals
+DESCRIPTION:IU Indy Women's Basketball vs Horizon League - Semifinals\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17644&amp;sport_id=2
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17492-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART;VALUE=DATE:20270308
+DTEND;VALUE=DATE:20270309
+LOCATION:Noblesville\, Ind., The Arena at Innovation Mile
+SUMMARY:IU Indy Men's Basketball vs Horizon League - Semifinals
+DESCRIPTION:IU Indy Men's Basketball vs Horizon League - Semifinals\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17492&amp;sport_id=1
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17493-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART;VALUE=DATE:20270309
+DTEND;VALUE=DATE:20270310
+LOCATION:Noblesville\, Ind., The Arena at Innovation Mile
+SUMMARY:IU Indy Men's Basketball vs Horizon League - Championship
+DESCRIPTION:IU Indy Men's Basketball vs Horizon League - Championship\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17493&amp;sport_id=1
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17645-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART;VALUE=DATE:20270309
+DTEND;VALUE=DATE:20270310
+LOCATION:Noblesville\, Ind., The Arena at Innovation Mile
+SUMMARY:IU Indy Women's Basketball vs Horizon League - Championship
+DESCRIPTION:IU Indy Women's Basketball vs Horizon League - Championship\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17645&amp;sport_id=2
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17571-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART;VALUE=DATE:20270311
+DTEND;VALUE=DATE:20270313
+LOCATION:Ocala\, Fla.
+SUMMARY:IU Indy Men's Swimming vs National Invitational Championship (NIC)
+DESCRIPTION:IU Indy Men's Swimming vs National Invitational Championship (NIC)\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17571&amp;sport_id=11
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17599-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART;VALUE=DATE:20270311
+DTEND;VALUE=DATE:20270313
+LOCATION:Ocala\, Fla.
+SUMMARY:IU Indy Women's Swimming vs National Invitational Championship (NIC)
+DESCRIPTION:IU Indy Women's Swimming vs National Invitational Championship (NIC)\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17599&amp;sport_id=10
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17506-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART;VALUE=DATE:20270312
+DTEND;VALUE=DATE:20270313
+LOCATION:Boulder City\, Nev.
+SUMMARY:IU Indy Men's Golf vs Jackrabbit Invitational
+DESCRIPTION:IU Indy Men's Golf vs Jackrabbit Invitational\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17506&amp;sport_id=6
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17507-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART;VALUE=DATE:20270313
+DTEND;VALUE=DATE:20270314
+LOCATION:Boulder City\, Nev.
+SUMMARY:IU Indy Men's Golf vs Jackrabbit Invitational
+DESCRIPTION:IU Indy Men's Golf vs Jackrabbit Invitational\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17507&amp;sport_id=6
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17530-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART;VALUE=DATE:20270315
+DTEND;VALUE=DATE:20270316
+LOCATION:Boulder City\, Nev.
+SUMMARY:IU Indy Women's Golf vs Jackrabbits Invitational
+DESCRIPTION:IU Indy Women's Golf vs Jackrabbits Invitational\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17530&amp;sport_id=5
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17531-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART;VALUE=DATE:20270316
+DTEND;VALUE=DATE:20270317
+LOCATION:Boulder City\, Nev.
+SUMMARY:IU Indy Women's Golf vs Jackrabbits Invitational
+DESCRIPTION:IU Indy Women's Golf vs Jackrabbits Invitational\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17531&amp;sport_id=5
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17532-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART;VALUE=DATE:20270329
+DTEND;VALUE=DATE:20270330
+LOCATION:Batavia\, Ohio
+SUMMARY:IU Indy Women's Golf at NKU Julie Invitational
+DESCRIPTION:IU Indy Women's Golf at NKU Julie Invitational\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17532&amp;sport_id=5
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17508-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART;VALUE=DATE:20270329
+DTEND;VALUE=DATE:20270330
+LOCATION:Indianapolis\, Ind.
+SUMMARY:IU Indy Men's Golf at Butler Don Benbow Spring Invite
+DESCRIPTION:IU Indy Men's Golf at Butler Don Benbow Spring Invite\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17508&amp;sport_id=6
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17509-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART;VALUE=DATE:20270330
+DTEND;VALUE=DATE:20270331
+LOCATION:Indianapolis\, Ind.
+SUMMARY:IU Indy Men's Golf at Butler Don Benbow Spring Invite
+DESCRIPTION:IU Indy Men's Golf at Butler Don Benbow Spring Invite\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17509&amp;sport_id=6
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17533-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART;VALUE=DATE:20270330
+DTEND;VALUE=DATE:20270331
+LOCATION:Batavia\, Ohio
+SUMMARY:IU Indy Women's Golf at NKU Julie Invitational
+DESCRIPTION:IU Indy Women's Golf at NKU Julie Invitational\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17533&amp;sport_id=5
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17535-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART;VALUE=DATE:20270405
+DTEND;VALUE=DATE:20270406
+LOCATION:Richmond\, Ky.
+SUMMARY:IU Indy Women's Golf at EKU Colonel Classic
+DESCRIPTION:IU Indy Women's Golf at EKU Colonel Classic\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17535&amp;sport_id=5
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17510-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART;VALUE=DATE:20270405
+DTEND;VALUE=DATE:20270406
+LOCATION:Batavia\, Ohio
+SUMMARY:IU Indy Men's Golf at NKU Jewell Invitational
+DESCRIPTION:IU Indy Men's Golf at NKU Jewell Invitational\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17510&amp;sport_id=6
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17511-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART;VALUE=DATE:20270406
+DTEND;VALUE=DATE:20270407
+LOCATION:Batavia\, Ohio
+SUMMARY:IU Indy Men's Golf at NKU Jewell Invitational
+DESCRIPTION:IU Indy Men's Golf at NKU Jewell Invitational\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17511&amp;sport_id=6
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17536-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART;VALUE=DATE:20270406
+DTEND;VALUE=DATE:20270407
+LOCATION:Richmond\, Ky.
+SUMMARY:IU Indy Women's Golf at EKU Colonel Classic
+DESCRIPTION:IU Indy Women's Golf at EKU Colonel Classic\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17536&amp;sport_id=5
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17537-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART;VALUE=DATE:20270411
+DTEND;VALUE=DATE:20270412
+LOCATION:West Lafayette\, Ind.
+SUMMARY:IU Indy Women's Golf at Boilermaker Spring Classic
+DESCRIPTION:IU Indy Women's Golf at Boilermaker Spring Classic\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17537&amp;sport_id=5
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17538-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART;VALUE=DATE:20270412
+DTEND;VALUE=DATE:20270413
+LOCATION:West Lafayette\, Ind.
+SUMMARY:IU Indy Women's Golf at Boilermaker Spring Classic
+DESCRIPTION:IU Indy Women's Golf at Boilermaker Spring Classic\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17538&amp;sport_id=5
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17512-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART;VALUE=DATE:20270412
+DTEND;VALUE=DATE:20270413
+LOCATION:Springboro\, Ohio
+SUMMARY:IU Indy Men's Golf at Wright State Invitational
+DESCRIPTION:IU Indy Men's Golf at Wright State Invitational\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17512&amp;sport_id=6
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17513-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART;VALUE=DATE:20270413
+DTEND;VALUE=DATE:20270414
+LOCATION:Springboro\, Ohio
+SUMMARY:IU Indy Men's Golf at Wright State Invitational
+DESCRIPTION:IU Indy Men's Golf at Wright State Invitational\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17513&amp;sport_id=6
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17641-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART;VALUE=DATE:20270417
+DTEND;VALUE=DATE:20270418
+LOCATION:West Lafayette\, Ind.
+SUMMARY:IU Indy Men's Golf at Spring Boilermaker
+DESCRIPTION:IU Indy Men's Golf at Spring Boilermaker\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17641&amp;sport_id=6
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17514-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART;VALUE=DATE:20270424
+DTEND;VALUE=DATE:20270425
+LOCATION:Howey-in-the-Hills\, Fla.
+SUMMARY:IU Indy Men's Golf vs Horizon League Championships
+DESCRIPTION:IU Indy Men's Golf vs Horizon League Championships\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17514&amp;sport_id=6
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17539-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART;VALUE=DATE:20270424
+DTEND;VALUE=DATE:20270425
+LOCATION:Howey-in-the-Hills\, Fla.
+SUMMARY:IU Indy Women's Golf vs Horizon League Championships
+DESCRIPTION:IU Indy Women's Golf vs Horizon League Championships\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17539&amp;sport_id=5
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17540-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART;VALUE=DATE:20270425
+DTEND;VALUE=DATE:20270426
+LOCATION:Howey-in-the-Hills\, Fla.
+SUMMARY:IU Indy Women's Golf vs Horizon League Championships
+DESCRIPTION:IU Indy Women's Golf vs Horizon League Championships\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17540&amp;sport_id=5
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17515-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART;VALUE=DATE:20270425
+DTEND;VALUE=DATE:20270426
+LOCATION:Howey-in-the-Hills\, Fla.
+SUMMARY:IU Indy Men's Golf vs Horizon League Championships
+DESCRIPTION:IU Indy Men's Golf vs Horizon League Championships\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17515&amp;sport_id=6
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17516-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART;VALUE=DATE:20270426
+DTEND;VALUE=DATE:20270427
+LOCATION:Howey-in-the-Hills\, Fla.
+SUMMARY:IU Indy Men's Golf vs Horizon League Championships
+DESCRIPTION:IU Indy Men's Golf vs Horizon League Championships\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17516&amp;sport_id=6
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_17541-iuindyjags.com
+DTSTAMP:20261019T053043Z
+DTSTART;VALUE=DATE:20270426
+DTEND;VALUE=DATE:20270427
+LOCATION:Howey-in-the-Hills\, Fla.
+SUMMARY:IU Indy Women's Golf vs Horizon League Championships
+DESCRIPTION:IU Indy Women's Golf vs Horizon League Championships\n
+URL:https://iuindyjags.com/calendar.aspx?game_id=17541&amp;sport_id=5
+PRIORITY:3
+END:VEVENT
+END:VCALENDAR

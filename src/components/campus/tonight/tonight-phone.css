@@ -1,0 +1,569 @@
+/*
+ * The phone's Tonight card (Feed) and sheet (Oct 19 2026), from the boards
+ * P2_Card and P2_Sheet. Theme tokens only: the app's own (globals.css) and
+ * the --tonight-* ones (tonight.css), so Night and Light both come from
+ * those files and nothing here needs a dark twin.
+ * Contract: handoffs/2026-10-19-tonight-build/CONTRACT.md §6.2.
+ */
+
+/* ── The card ─────────────────────────────────────────────────────────────
+   Five fixed lines, each one line tall, so the card never changes height as
+   the lead changes (the rolling strip under it must not jump). */
+.tonight-card {
+  position: relative;
+  flex-shrink: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 28px;
+  column-gap: 8px;
+  row-gap: 4px;
+  align-items: center;
+  padding: 12px 10px 12px 12px;
+  border-radius: 18px;
+  background: var(--glass);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--card-shadow);
+  color: var(--charcoal);
+}
+/* One tap target over the whole card: the lines under it are words only. */
+.tonight-card-hit {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  border: 0;
+  border-radius: 18px;
+  padding: 0;
+  background: transparent;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.tonight-card-top {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+}
+.tonight-card-h {
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 16px;
+  color: var(--tag-ink);
+}
+.tonight-card-reason {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+  font-size: 10.5px;
+  font-weight: 600;
+  line-height: 16px;
+  color: var(--ink-muted);
+}
+.tonight-card-body {
+  grid-column: 1;
+  grid-row: 2;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.tonight-card-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+  line-height: 22px;
+  color: var(--charcoal);
+}
+.tonight-card-by {
+  margin-top: 3px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  /* Holds its height when a club lead has no club name. */
+  min-height: 18px;
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--ink-muted);
+}
+.tonight-card-when {
+  margin-top: 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12.5px;
+  line-height: 17px;
+  color: var(--ink-2);
+}
+.tonight-card-when b,
+.tonight-sheet-meta b {
+  font-weight: 700;
+  color: var(--charcoal);
+}
+.tonight-card-more {
+  margin-top: 5px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 16px;
+  color: var(--ink-muted);
+}
+.tonight-card-chev {
+  grid-column: 2;
+  grid-row: 2;
+  width: 28px;
+  height: 28px;
+  border-radius: 10px;
+  background: var(--paper-55);
+  border: 1px solid rgba(var(--scrim-rgb), 0.06);
+  color: var(--ink-2);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+/* The stretched button is invisible, so its own .vibe-press shrink can't be
+   seen: the card itself takes the press, on the same spring curve. Transform
+   only, and off with reduce motion (as globals.css does for .vibe-press). */
+@media (prefers-reduced-motion: no-preference) {
+  .tonight-card {
+    transition: transform 320ms var(--vibe-spring-snappy);
+  }
+  .tonight-card:has(> .tonight-card-hit:active) {
+    transform: scale(0.98);
+    transition-duration: 90ms;
+  }
+}
+
+/* ── The sheet ────────────────────────────────────────────────────────────
+   Above the tab bar (z 9988) and below the toasts (12000): the same tier as
+   the feed's Post options sheet. One height, no detents. */
+.tonight-sheet-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  background: rgba(0, 0, 0, 0.4);
+}
+.tonight-sheet {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 10001;
+  max-height: 80dvh;
+  display: flex;
+  flex-direction: column;
+  background: var(--paper);
+  border-top: 1px solid var(--glass-border);
+  border-radius: 24px 24px 0 0;
+  box-shadow: 0 -16px 48px rgba(0, 0, 0, 0.35);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  outline: none;
+  color: var(--charcoal);
+}
+/* Grabber (16px) + title row (44px) + 4px = the 64px the body subtracts. */
+.tonight-sheet-grab {
+  flex-shrink: 0;
+  align-self: center;
+  width: 38px;
+  height: 4px;
+  margin: 8px auto 4px;
+  border-radius: 999px;
+  background: rgba(var(--scrim-rgb), 0.18);
+}
+.tonight-sheet-top {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 44px;
+  margin-bottom: 4px;
+  padding: 0 6px 0 16px;
+}
+.tonight-sheet-top .tonight-eyebrow {
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tonight-sheet-close {
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  border: 0;
+  border-radius: 999px;
+  padding: 0;
+  background: transparent;
+  color: var(--ink-2);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+.tonight-sheet-close > span {
+  width: 30px;
+  height: 30px;
+  border-radius: 999px;
+  border: 1px solid rgba(var(--scrim-rgb), 0.06);
+  background: var(--paper-62);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.tonight-sheet-body {
+  max-height: calc(80dvh - 64px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 0 16px 20px;
+}
+
+/* #1 */
+.tonight-sheet-hero {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+.tonight-sheet-reason {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11.5px;
+  font-weight: 600;
+  line-height: 16px;
+  color: var(--ink-muted);
+}
+.tonight-sheet-tagrow {
+  margin-top: -3px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.tonight-sheet-by,
+.tonight-sheet-sub {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--ink-muted);
+}
+.tonight-sheet-count {
+  flex-shrink: 0;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: rgba(var(--scrim-rgb), 0.08);
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+  color: var(--charcoal);
+}
+.tonight-sheet-title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 24px;
+  font-weight: 900;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  color: var(--charcoal);
+  text-wrap: balance;
+}
+/* The title is the way in (calendar page, or the club event's card), so it
+   is a real link or button that still reads as a title. */
+.tonight-sheet-title a,
+.tonight-sheet-title button {
+  display: inline;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  letter-spacing: inherit;
+  text-align: left;
+  color: inherit;
+  text-decoration: none;
+  cursor: pointer;
+}
+.tonight-sheet-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  column-gap: 14px;
+  row-gap: 4px;
+  font-size: 13.5px;
+  line-height: 1.4;
+  color: var(--ink-2);
+}
+.tonight-sheet-meta > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+/* Tickets, Watch on ESPN+ and the credit: 44px tall to tap on a phone. */
+.tonight-sheet-links {
+  margin: 2px -10px 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.tonight-sheet-links a {
+  min-height: 44px;
+  padding: 0 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+}
+.tonight-sheet-rule {
+  margin: 0;
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  font-size: 12px;
+  line-height: 17px;
+  color: var(--ink-muted);
+}
+.tonight-sheet-rule > svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+.tonight-sheet-hr {
+  flex-shrink: 0;
+  height: 1px;
+  margin: 12px 0 2px;
+  background: var(--hairline);
+}
+
+/* The rest of tonight */
+.tonight-sheet-head {
+  margin-right: -10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.tonight-sheet-h3 {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  line-height: 24px;
+  color: var(--ink-muted);
+}
+.tonight-sheet-h3--gap {
+  margin-top: 6px;
+}
+.tonight-sheet-none {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink-muted);
+}
+.tonight-sheet-all {
+  flex-shrink: 0;
+  min-height: 44px;
+  padding: 0 10px;
+  border: 0;
+  background: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--tag-ink);
+  cursor: pointer;
+}
+.tonight-sheet-empty {
+  margin: 4px 0 0;
+  padding: 6px 0;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--ink-2);
+}
+.tonight-sheet-list {
+  margin: 0 -10px;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+}
+/* A row is an <a> (school, new tab) or a <button> (club): same look. The
+   radius, hover and focus ring come from .tonight-row (tonight.css). */
+.tonight-sheet-row {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 44px;
+  padding: 5px 10px;
+  border: 0;
+  background: none;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font: inherit;
+  text-align: left;
+  text-decoration: none;
+  color: inherit;
+  cursor: pointer;
+}
+.tonight-sheet-when {
+  flex: 0 0 72px;
+  display: flex;
+  flex-direction: column;
+  white-space: nowrap;
+}
+.tonight-sheet-time {
+  font-size: 12.5px;
+  font-weight: 700;
+  line-height: 19px;
+  color: var(--charcoal);
+}
+.tonight-sheet-tail {
+  font-size: 10.5px;
+  font-weight: 600;
+  line-height: 13px;
+  color: var(--ink-muted);
+}
+.tonight-sheet-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.tonight-sheet-rtitle {
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 19px;
+  color: var(--charcoal);
+  text-wrap: pretty;
+}
+.tonight-sheet-sub {
+  margin-top: 2px;
+}
+.tonight-sheet-line,
+.tonight-ellipsis {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tonight-sheet-line {
+  font-size: 12px;
+  line-height: 17px;
+  color: var(--ink-muted);
+}
+
+/* Home games this week: two columns of tiles. Played games fade back,
+   tonight's (or the one on now) is ringed in coral. */
+.tonight-sheet-weekhead {
+  margin: 0 0 6px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  column-gap: 8px;
+}
+.tonight-sheet-weeksub {
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 24px;
+  color: var(--ink-muted);
+}
+.tonight-week {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.tonight-tile {
+  box-sizing: border-box;
+  height: 100%;
+  min-height: 44px;
+  padding: 8px 10px;
+  border-radius: 14px;
+  border: 1px solid rgba(var(--scrim-rgb), 0.12);
+  background: rgba(var(--scrim-rgb), 0.03);
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  text-decoration: none;
+  color: inherit;
+}
+.tonight-tile-top {
+  display: flex;
+  justify-content: space-between;
+  gap: 6px;
+  min-width: 0;
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  line-height: 15px;
+  color: var(--ink-muted);
+}
+.tonight-tile-top > span:last-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--ink-2);
+}
+.tonight-tile-sport {
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 18px;
+  color: var(--charcoal);
+}
+.tonight-tile-vs {
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--ink-2);
+}
+.tonight-tile[data-state="final"] {
+  border-color: transparent;
+  background: transparent;
+}
+.tonight-tile[data-state="final"] .tonight-tile-top > span:last-child,
+.tonight-tile[data-state="final"] .tonight-tile-sport,
+.tonight-tile[data-state="final"] .tonight-tile-vs {
+  font-weight: 600;
+  color: var(--ink-muted);
+}
+.tonight-tile[data-state="final"] .tonight-tile-top > span:last-child {
+  font-weight: 800;
+}
+.tonight-tile[data-state="today"],
+.tonight-tile[data-state="live"] {
+  border-color: rgba(255, 92, 53, 0.38);
+  background: var(--tag-bg);
+}
+.tonight-tile[data-state="today"] .tonight-tile-top,
+.tonight-tile[data-state="today"] .tonight-tile-top > span:last-child,
+.tonight-tile[data-state="live"] .tonight-tile-top,
+.tonight-tile[data-state="live"] .tonight-tile-top > span:last-child {
+  color: var(--tag-ink);
+}
+.tonight-sheet-credit {
+  margin-top: 14px;
+}
+.tonight-sheet-hr--week {
+  margin: 12px 0 8px;
+}
+.tonight-sheet-row--still {
+  cursor: default;
+}

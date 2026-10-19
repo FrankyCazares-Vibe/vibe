@@ -1,0 +1,266 @@
+/* "What's the vibe tonight?" and "Your clubs" (Oct 19 2026): the tokens and
+   the shared classes every Tonight surface uses (TonightBits.tsx imports this
+   file; the panels, the phone card and sheet and the Events tab add their own
+   layout files on top). Values are the boards' (handoffs/2026-10-18-side-
+   space/project, C2_Desk and friends). Everything else reads the app's own
+   tokens from globals.css, so Light and Night both come for free.
+   Contract: handoffs/2026-10-19-tonight-build/CONTRACT.md §5.6.
+   Fraunces is already SOFT 100 app-wide (fonts.ts): no font-variation-settings. */
+
+/* Light. */
+:root {
+  /* The flat, framed side trays: a step under the page, two under the cards. */
+  --tonight-tray: rgba(120,96,70,0.045);
+  --tonight-tray-border: rgba(20,20,22,0.10);
+  /* The one "tonight" mark: a soft coral glow at the top of the tonight tray.
+     Light lays the tray down OPAQUE (#F4F0EA is the tray tint over the page)
+     so the page's own bloom doesn't add to it and the coral eyebrow keeps 4.5:1. */
+  --tonight-glow: radial-gradient(320px 120px at 82% 0%, rgba(255,92,53,0.12), rgba(255,92,53,0.035) 55%, rgba(255,92,53,0) 100%) no-repeat, #F4F0EA;
+  --tonight-pill-line: rgba(28,28,30,0.16);
+  --tonight-pill-bg: rgba(255,255,255,0.7);
+  --tonight-row-hover: rgba(127,120,112,0.12);
+  --tonight-chip-on-bg: rgba(255,92,53,0.14);
+  --tonight-chip-on-line: rgba(200,64,30,0.55);
+  --tonight-chip-on-ink: #1C1C1E;
+  --tonight-chip-off-line: rgba(20,20,22,0.12);
+  /* The outlined "School event" tag of the phone and Events boards (no fill,
+     so its line is a touch stronger than the filled pill's). */
+  --tonight-tag-line: rgba(28,28,30,0.20);
+}
+
+/* Night. */
+:root[data-theme="dark"] {
+  --tonight-tray: rgba(0,0,0,0.24);
+  --tonight-tray-border: rgba(255,255,255,0.10);
+  --tonight-glow: radial-gradient(320px 120px at 82% 0%, rgba(255,92,53,0.20), rgba(255,92,53,0.06) 55%, rgba(255,92,53,0) 100%) no-repeat, rgba(0,0,0,0.24);
+  --tonight-pill-line: rgba(255,255,255,0.16);
+  --tonight-pill-bg: rgba(255,255,255,0.05);
+  --tonight-row-hover: rgba(127,120,112,0.12);
+  --tonight-chip-on-bg: linear-gradient(180deg, rgba(255,92,53,0.50) 0%, rgba(255,92,53,0.22) 100%), #161515;
+  --tonight-chip-on-line: rgba(255,180,150,0.55);
+  --tonight-chip-on-ink: #FFFFFF;
+  --tonight-chip-off-line: rgba(255,255,255,0.14);
+  --tonight-tag-line: rgba(246,241,234,0.24);
+}
+
+/* "School event": a quiet outlined pill, never coral (coral is for actions). */
+.tonight-tag {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  padding: 0 5px;
+  border-radius: 999px;
+  border: 1px solid var(--tonight-pill-line);
+  background: var(--tonight-pill-bg);
+  color: var(--ink-2);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  line-height: 16px;
+  white-space: nowrap;
+}
+/* The phone and Events boards (P2_*, D2) draw the tag as an outline, not a
+   filled pill: "row" in list rows, "hero" beside a #1 title and on cards.
+   The default above is C2's desktop panel pill. */
+.tonight-tag--row,
+.tonight-tag--hero {
+  border-color: var(--tonight-tag-line);
+  background: transparent;
+  letter-spacing: 0.02em;
+  line-height: 14px;
+}
+.tonight-tag--row {
+  padding: 0 6px;
+}
+.tonight-tag--hero {
+  padding: 1px 7px;
+  font-size: 10.5px;
+}
+/* On the dark-glass event cards, which are dark in both looks. Last, so its
+   white line wins over a size's. */
+.tonight-tag--glass {
+  border-color: rgba(255,255,255,0.18);
+  background: transparent;
+  color: rgba(255,255,255,0.78);
+}
+
+/* The "vs" in "IU Indy vs UT Martin". */
+.tonight-vs {
+  font-style: italic;
+  font-weight: 400;
+  color: var(--ink-muted);
+}
+
+/* Words that act: coral-brown ink (4.5:1 on cream), underlined on hover. */
+.tonight-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--tag-ink);
+  font-weight: 700;
+  text-decoration: none;
+}
+.tonight-link:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+/* A tappable row: a soft tint on hover (mouse only, so a tap doesn't leave
+   it stuck on a phone). Layout is the caller's. */
+.tonight-row {
+  border-radius: 14px;
+  color: inherit;
+  text-decoration: none;
+}
+button.tonight-row {
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border: 0;
+  font: inherit;
+  cursor: pointer;
+}
+@media (hover: hover) {
+  .tonight-row:hover {
+    background: var(--tonight-row-hover);
+  }
+}
+
+.tonight-focus:focus-visible,
+.tonight-row:focus-visible {
+  outline: 2px solid var(--coral);
+  outline-offset: 2px;
+}
+
+/* "Up next" / "Happening now" / "Featured by your school". Size comes from the caller. */
+.tonight-reason {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+.tonight-reason--live {
+  color: var(--ink-2);
+}
+/* Static on purpose: no pulse (no keyframes anywhere in Tonight). */
+.tonight-live-dot {
+  display: inline-block;
+  flex-shrink: 0;
+  width: 7px;
+  height: 7px;
+  margin-left: 1px;
+  border-radius: 50%;
+  background: var(--coral);
+  box-shadow: 0 0 0 3px rgba(255,92,53,0.22);
+}
+
+.tonight-eyebrow {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  line-height: 16px;
+  text-transform: uppercase;
+  color: var(--eyebrow-ink);
+}
+
+.tonight-clamp2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* "School events: From the IU Indy athletics calendar ↗ · …". */
+.tonight-credit {
+  margin: 0;
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--ink-muted);
+}
+.tonight-credit .tonight-credit-link {
+  display: inline;
+  color: inherit;
+  font-weight: 600;
+}
+.tonight-credit .tonight-credit-link .tonight-icon {
+  display: inline-block;
+  margin-left: 2px;
+  vertical-align: -1px;
+}
+
+/* Club marks. White initials on the club's colour tile, like the post cards. */
+.tonight-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  overflow: hidden;
+  color: #FFFFFF;
+  font-family: var(--font-display);
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: 0;
+  user-select: none;
+}
+.tonight-swatch {
+  display: inline-block;
+  flex-shrink: 0;
+  width: 12px;
+  height: 12px;
+  border-radius: 4px;
+}
+
+/* The open orbit: coral at half strength in Light, a touch more in Night. */
+.tonight-orbit {
+  display: block;
+  flex-shrink: 0;
+}
+.tonight-orbit-ring {
+  stroke: var(--coral);
+  stroke-opacity: 0.5;
+}
+:root[data-theme="dark"] .tonight-orbit-ring {
+  stroke-opacity: 0.6;
+}
+.tonight-orbit-dot {
+  fill: var(--coral);
+}
+
+.tonight-icon {
+  display: block;
+  flex-shrink: 0;
+}
+
+/* Loading: still blocks, the shapes of rows. */
+.tonight-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 12px 16px 14px;
+}
+.tonight-skel-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.tonight-skel {
+  display: block;
+  border-radius: 8px;
+  background: rgba(var(--scrim-rgb), 0.08);
+}
+
+/* Read by screen readers, not drawn. */
+.tonight-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}

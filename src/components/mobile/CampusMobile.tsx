@@ -3,7 +3,7 @@
 import { animate, motion, useMotionValue, useReducedMotion } from "motion/react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Drawer } from "vaul";
 
 import {
@@ -22,6 +22,16 @@ import { CampusBrowsePicker } from "@/components/campus/CampusBrowsePicker";
 import { RollingStrip } from "@/components/campus/RollingStrip";
 import { nextTagFilter } from "@/components/campus/rolling-strip-view";
 import { useStripData } from "@/components/campus/strip-data";
+import { EventFilterChips } from "@/components/campus/tonight/EventFilterChips";
+import { SchoolEventCard } from "@/components/campus/tonight/SchoolEventCard";
+import { mergeComingUp, TONIGHT_COPY, upcomingSchool } from "@/components/campus/tonight/tonight-view";
+import { QuietBoundary } from "@/components/campus/tonight/QuietBoundary";
+import { TonightCard } from "@/components/campus/tonight/TonightCard";
+import { TonightSection } from "@/components/campus/tonight/TonightSection";
+import { TonightSheet } from "@/components/campus/tonight/TonightSheet";
+import type { SchoolEventsState, TonightFilter } from "@/components/campus/tonight/types";
+import { useCampusNow } from "@/components/campus/tonight/use-campus-now";
+import { useSchoolEvents } from "@/components/campus/tonight/use-school-events";
 import {
   campusViewName,
   isOpenCampus,
@@ -174,6 +184,10 @@ type OrgChangeHandler = (
 ) => void;
 const EMPTY_ORG_LISTS: OrgLists = { discover: null, following: null, invites: null, campusId: null };
 const NO_ORG_ERRS: OrgErrs = { discover: null, following: null, invites: null };
+/** Tonight's club list once /api/events has failed: no club rows, but the
+ *  school parts still show (CONTRACT.md §6.4). One shared [] so the Tonight
+ *  memos don't see a new list on every render. */
+const NO_CLUB_EVENTS: CampusEvent[] = [];
 
 // ---------- Component ----------
 
@@ -265,6 +279,15 @@ export function CampusMobile() {
   );
   const feedUrl = withCampus("/api/feed?limit=50", viewingId, homeId);
   const eventsUrl = withCampus("/api/events?limit=50", viewingId, homeId);
+  // School and athletics events (Oct 19 2026, CONTRACT.md §6.2): one read for
+  // the Feed's Tonight card, its sheet and the Events tab. It follows the
+  // campus on screen like the reads above; off Indianapolis, or with the
+  // switch off, it answers school_on false and every school part hides.
+  const schoolUrl = withCampus("/api/school-events", viewingId, homeId);
+  const school = useSchoolEvents(schoolUrl);
+  // The Events tab's All / School / Clubs chips (shown only while school is on).
+  const [eventsFilter, setEventsFilter] = useState<TonightFilter>("all");
+  const [tonightOpen, setTonightOpen] = useState(false);
   const discoverUrl = withCampus("/api/orgs?filter=discover", viewingId, homeId);
   // The banner slot shows one card at a time (wave 3′b): the push ask waits
   // while the campus-confirm banner hasn't answered yet, for the rest of any
@@ -297,6 +320,12 @@ export function CampusMobile() {
   // the skeleton or the empty copy. Cleared by Retry and by any success.
   const [feedErr, setFeedErr] = useState<LoadFailure | null>(null);
   const [eventsErr, setEventsErr] = useState<LoadFailure | null>(null);
+  // What the Tonight card, section and sheet get as the club list. A failed
+  // first read leaves `events` null for good (only Retry reads again), and
+  // null means "still loading" to Tonight, which would hide tonight's home
+  // game with it. A failure is "no club events" instead, so only the club
+  // rows go; Retry clears the error, and Tonight waits again on its own.
+  const tonightClubs = events ?? (eventsErr ? NO_CLUB_EVENTS : null);
   const [orgErrs, setOrgErrs] = useState<OrgErrs>(NO_ORG_ERRS);
   // What a row's control reported, painted until the next full reload answers.
   const [orgLocal, setOrgLocal] = useState<Record<string, OrgLocal>>({});
@@ -477,6 +506,14 @@ export function CampusMobile() {
         .getElementById(`event-${id}`)
         ?.scrollIntoView({ block: "start", behavior: "smooth" });
     });
+  };
+  // Every jump to a CLUB event's card goes through here. The Events pane
+  // stays mounted with its chips, so "School" picked earlier would still be
+  // hiding every club card and the jump would find nothing to scroll to:
+  // the filter goes back to All first, in the same commit as the tab switch.
+  const pickClubEvent = (id: string) => {
+    if (eventsFilter === "school") setEventsFilter("all");
+    pickEvent(id);
   };
   useEffect(() => {
     const id = pendingEventRef.current;
@@ -1067,8 +1104,15 @@ export function CampusMobile() {
         }}
       >
         <section style={paneStyle}>
-          {/* First in the pane so it scrolls away with the feed and swipes
-              with the tab; the pane's gap separates it from the first card.
+          {/* "What's the vibe tonight?": above the strip, and gone under a
+              tag filter (the strip is the filter's control there). Null
+              while loading and when nothing is on tonight. */}
+          {feedTag ? null : (
+            <QuietBoundary name="tonight-card"><TonightCard school={school} clubs={tonightClubs} onOpen={() => setTonightOpen(true)} /></QuietBoundary>
+          )}
+          {/* At the top of the pane (under the Tonight card) so it scrolls
+              away with the feed and swipes with the tab; the pane's gap
+              separates it from the first card.
               Bleeds past the pane's 16px side padding (-mx-4 px-4) so the
               chips run edge to edge; it hides itself when both lists are
               empty, so the first card just moves up. No auto-roll on the
@@ -1076,7 +1120,7 @@ export function CampusMobile() {
           <RollingStrip
             data={stripData}
             onPickTag={pickStripTag}
-            onPickEvent={pickEvent}
+            onPickEvent={pickClubEvent}
             activeTag={feedTag}
             visiting={isVisiting}
             className="vibe-no-scrollbar -mx-4 px-4"
@@ -1110,7 +1154,20 @@ export function CampusMobile() {
           />
         </section>
         <section style={paneStyle}>
+          {/* The chips filter Tonight and Coming up; with school off there
+              is nothing to filter, so they hide and the filter reads "all". */}
+          {school.on ? <EventFilterChips value={eventsFilter} onChange={setEventsFilter} /> : null}
+          {/* Tonight, then its own "Coming up" heading over the list below. */}
+          <QuietBoundary name="tonight-section"><TonightSection
+            layout="phone"
+            school={school}
+            clubs={tonightClubs}
+            filter={school.on ? eventsFilter : "all"}
+            onPickClubEvent={pickClubEvent}
+          /></QuietBoundary>
           <EventsPane
+            school={school}
+            filter={eventsFilter}
             events={events}
             loadErr={eventsErr}
             onRetry={() => {
@@ -1253,6 +1310,32 @@ export function CampusMobile() {
           }
         />
       ) : null}
+
+      {/* The Tonight sheet, opened from the Feed's Tonight card. A club row
+          and "All in Events" close it first, then go to Events, two frames
+          later: on iOS Safari, vaul puts the page's old (Feed) scroll back
+          one frame after closing, which would undo the scroll to the card
+          and leave Events at the Feed's depth (and the tab memory would
+          save it there). "All in Events" also shows All again, as it says. */}
+      <QuietBoundary name="tonight-sheet"><TonightSheet
+        open={tonightOpen}
+        onOpenChange={setTonightOpen}
+        school={school}
+        clubs={tonightClubs}
+        onPickClubEvent={(id) => {
+          setTonightOpen(false);
+          requestAnimationFrame(() => requestAnimationFrame(() => pickClubEvent(id)));
+        }}
+        onOpenEvents={() => {
+          setTonightOpen(false);
+          requestAnimationFrame(() =>
+            requestAnimationFrame(() => {
+              setEventsFilter("all");
+              setTab("events");
+            }),
+          );
+        }}
+      /></QuietBoundary>
 
       {/* Viewers */}
       {openPostId ? (
@@ -2454,6 +2537,8 @@ function FeedCard({
 // ---------- Events pane ----------
 
 function EventsPane({
+  school,
+  filter,
   events,
   loadErr,
   onRetry,
@@ -2462,6 +2547,10 @@ function EventsPane({
   onUpdated,
   visitingName,
 }: {
+  /** School and athletics events: "Coming up" mixes this week's in. */
+  school: SchoolEventsState;
+  /** The All / School / Clubs chips; read as "all" while school is off. */
+  filter: TonightFilter;
   events: CampusEvent[] | null;
   loadErr: LoadFailure | null;
   onRetry: () => void;
@@ -2474,39 +2563,78 @@ function EventsPane({
    *  refused there (403 `campus_visiting`), so the cards say so up front. */
   visitingName: string | null;
 }) {
+  // Above the early returns (hooks always run). A five-minute clock is
+  // plenty for "this week"; 0 until the page has hydrated, and then no
+  // school cards yet, so the server and first client render agree.
+  const weekNow = useCampusNow(300_000);
+  const shown: TonightFilter = school.on ? filter : "all";
+  const entries = useMemo(
+    () =>
+      mergeComingUp({
+        clubs: events ?? [],
+        school: school.on && weekNow ? upcomingSchool(school.events, weekNow) : [],
+        sources: school.sources,
+        filter: shown,
+      }),
+    [events, school.on, school.events, school.sources, weekNow, shown],
+  );
   if (events === null) {
     return loadErr ? <LoadFailed failure={loadErr} onRetry={onRetry} /> : <PaneSkeleton />;
   }
-  if (events.length === 0) {
+  // The club lists' own "nothing yet" line, at home or while visiting.
+  const clubsBody = visitingName
+    ? `When clubs at ${visitingName} post events, they'll show up here.`
+    : "When orgs or classmates create events, they'll surface here.";
+  // No club events yet, and the school read (up to a few seconds on a cold
+  // server cache) or the clock hasn't answered: "Nothing scheduled" now
+  // could be replaced by school cards a moment later, so keep the skeleton
+  // until both have. Most campuses start with no club events at all.
+  if (entries.length === 0 && (school.status === "loading" || (school.on && weekNow === 0))) {
+    return <PaneSkeleton />;
+  }
+  if (entries.length === 0) {
+    if (shown === "school") {
+      return (
+        <EmptyTab
+          title={TONIGHT_COPY.noSchoolWeek}
+          body={TONIGHT_COPY.noSchoolWeekBody}
+        />
+      );
+    }
+    if (shown === "clubs") {
+      return <EmptyTab title={TONIGHT_COPY.noClubsComing} body={clubsBody} />;
+    }
     return visitingName ? (
-      <EmptyTab
-        title={VISITING_COPY.emptyEvents}
-        body={`When clubs at ${visitingName} post events, they'll show up here.`}
-      />
+      <EmptyTab title={VISITING_COPY.emptyEvents} body={clubsBody} />
     ) : (
-      <EmptyTab
-        title="Nothing scheduled"
-        body="When orgs or classmates create events, they'll surface here."
-      />
+      <EmptyTab title="Nothing scheduled" body={clubsBody} />
     );
   }
   return (
     <>
-      {events.map((ev, i) => (
-        // Visiting: the card renders its RSVP off, titled "RSVP works on
-        // your home campus", with the italic "RSVP works at home" beside it
-        // (the desktop card, shared; the org page passes the same flag).
-        // Rises in like a feed card (motion pass); its dialogs are portalled.
-        <Reveal key={ev.id} delayIndex={i} still={i >= REVEAL_SCREENFUL}>
-          <EventCard
-            ev={ev}
-            onMutate={onMutate}
-            onRemoved={onRemoved}
-            onUpdated={onUpdated}
-            visiting={visitingName !== null}
-          />
-        </Reveal>
-      ))}
+      {entries.map((entry, i) =>
+        entry.kind === "club" ? (
+          // Visiting: the card renders its RSVP off, titled "RSVP works on
+          // your home campus", with the italic "RSVP works at home" beside it
+          // (the desktop card, shared; the org page passes the same flag).
+          // Rises in like a feed card (motion pass); its dialogs are portalled.
+          <Reveal key={entry.key} delayIndex={i} still={i >= REVEAL_SCREENFUL}>
+            <EventCard
+              ev={entry.ev}
+              onMutate={onMutate}
+              onRemoved={onRemoved}
+              onUpdated={onUpdated}
+              visiting={visitingName !== null}
+            />
+          </Reveal>
+        ) : (
+          // A school event: its calendar's card, with no Going, Interested
+          // or Report (Vibe keeps no RSVPs for them in v1).
+          <Reveal key={entry.key} delayIndex={i} still={i >= REVEAL_SCREENFUL}>
+            <SchoolEventCard ev={entry.ev} source={entry.source} />
+          </Reveal>
+        ),
+      )}
     </>
   );
 }

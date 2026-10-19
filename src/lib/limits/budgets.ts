@@ -40,6 +40,12 @@ export const BUDGETS = {
   orgSubscribe: { limit: 30, windowSec: 600 },
   /** Delete an account or a club. */
   bigDelete: { limit: 5, windowSec: 600 },
+  /**
+   * Read the school calendars on Campus (GET /api/school-events). A DAY window on
+   * purpose: the count says only that an account opened Campus that day, never
+   * when (Privacy Policy, abuse counts). Normal use is a few dozen a day.
+   */
+  schoolEventsRead: { limit: 2000, windowSec: 86_400 },
 } as const satisfies Record<string, Pick<RateLimitOptions, "limit" | "windowSec">>;
 
 export type BudgetName = keyof typeof BUDGETS;

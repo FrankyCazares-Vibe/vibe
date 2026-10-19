@@ -1,0 +1,1703 @@
+BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//Indiana University//NONSGML v1.0//EN
+X-WR-CALNAME:Indiana University Events
+BEGIN:VEVENT
+DTSTART;VALUE=DATE:20261019
+DTEND;VALUE=DATE:20261020
+LOCATION:Costa Mesa\, CA
+SUMMARY:ACPA Institute on the Curricular Approach
+UID:20261019T040000Z-2278983@events.iu.edu
+URL:https://events.iu.edu/studentaffairs-indianapolis/event/2278983-acpa-in
+ stitute-on-the-curricular-approach
+X-LIVEWHALE-ID:2278983
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-ALL-DAY:1
+X-LIVEWHALE-TAGS:Conference|Professional Development Page - National|Sign-u
+ p Required|Travel Required
+END:VEVENT
+BEGIN:VEVENT
+DTSTART;VALUE=DATE:20261019
+DTEND;VALUE=DATE:20261020
+SUMMARY:Sober October Challenge
+UID:20261019T040000Z-2381244@events.iu.edu
+URL:https://events.iu.edu/studentaffairs-indianapolis/event/2381244-sober-o
+ ctober-challenge
+CATEGORIES:Health and wellness
+X-LIVEWHALE-ID:2381244
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-ALL-DAY:1
+X-LIVEWHALE-TAGS:HWP
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20261019T111500Z
+DTEND:20261019T121500Z
+LOCATION:CAMPUS CENTER
+SUMMARY:Mat Pilates
+UID:20261019T111500Z-2394178@events.iu.edu
+URL:https://events.iu.edu/studentaffairs-indianapolis/event/2394178-mat-pil
+ ates
+CATEGORIES:Health and wellness
+RRULE:FREQ=WEEKLY;UNTIL=20261214T121500Z;INTERVAL=1
+X-LIVEWHALE-ID:2394178
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-TAGS:Fall Semester|Fitness classes|Fitness|Group Fitness Classe
+ s|IU Indianapolis Campus Recreation
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20261019T150000Z
+DTEND:20261019T170000Z
+LOCATION:Campus Center
+SUMMARY:United Way Chili and Dessert Cook-off
+UID:20261019T150000Z-2385172@events.iu.edu
+URL:https://events.iu.edu/studentaffairs-indianapolis/event/2385172-united-
+ way-chili-and-dessert-cook-off
+CATEGORIES:Functions, festivals, and celebrations
+X-LIVEWHALE-ID:2385172
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-TAGS:DoSA Fall 2026 Events|Internal Events
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20261019T190000Z
+DTEND:20261019T200000Z
+LOCATION:CAMPUS CENTER
+SUMMARY:Yoga
+UID:20261019T190000Z-2394224@events.iu.edu
+URL:https://events.iu.edu/studentaffairs-indianapolis/event/2394224-yoga
+CATEGORIES:Health and wellness
+RRULE:FREQ=WEEKLY;UNTIL=20261214T200000Z;INTERVAL=1
+X-LIVEWHALE-ID:2394224
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-TAGS:Fall Semester|Fitness classes|Fitness|Group Fitness Classe
+ s|IU Indianapolis Campus Recreation
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20261019T200000Z
+DTEND:20261019T210000Z
+LOCATION:CAMPUS CENTER
+SUMMARY:Yoga
+UID:20261019T200000Z-2394239@events.iu.edu
+URL:https://events.iu.edu/studentaffairs-indianapolis/event/2394239-yoga
+CATEGORIES:Health and wellness
+RRULE:FREQ=WEEKLY;UNTIL=20261214T210000Z;INTERVAL=1
+X-LIVEWHALE-ID:2394239
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-TAGS:Fall Semester|Fitness classes|Fitness|Group Fitness Classe
+ s|IU Indianapolis Campus Recreation
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20261019T214500Z
+DTEND:20261019T224500Z
+LOCATION:CAMPUS CENTER
+SUMMARY:Zumba
+UID:20261019T214500Z-2394258@events.iu.edu
+URL:https://events.iu.edu/studentaffairs-indianapolis/event/2394258-zumba
+CATEGORIES:Health and wellness
+RRULE:FREQ=WEEKLY;UNTIL=20261214T224500Z;INTERVAL=1
+X-LIVEWHALE-ID:2394258
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-TAGS:Fall Semester|Fitness classes|Fitness|Group Fitness Classe
+ s|IU Indianapolis Campus Recreation
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20261019T220000Z
+DTEND:20261019T224500Z
+LOCATION:CAMPUS CENTER
+SUMMARY:Cycling
+UID:20261019T220000Z-2394274@events.iu.edu
+URL:https://events.iu.edu/studentaffairs-indianapolis/event/2394274-cycling
+CATEGORIES:Health and wellness
+RRULE:FREQ=WEEKLY;UNTIL=20261214T230000Z;INTERVAL=1
+X-LIVEWHALE-ID:2394274
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-TAGS:Cycling|Fall Semester|Fitness classes|Fitness|Group Fitnes
+ s Classes|IU Indianapolis Campus Recreation
+END:VEVENT
+BEGIN:VEVENT
+DTSTART;VALUE=DATE:20261020
+DTEND;VALUE=DATE:20261021
+LOCATION:Costa Mesa\, CA
+SUMMARY:ACPA Institute on the Curricular Approach
+UID:20261020T040000Z-2278983@events.iu.edu
+URL:https://events.iu.edu/studentaffairs-indianapolis/event/2278983-acpa-in
+ stitute-on-the-curricular-approach
+X-LIVEWHALE-ID:2278983
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-ALL-DAY:1
+X-LIVEWHALE-TAGS:Conference|Professional Development Page - National|Sign-u
+ p Required|Travel Required
+END:VEVENT
+BEGIN:VEVENT
+DTSTART;VALUE=DATE:20261020
+DTEND;VALUE=DATE:20261021
+SUMMARY:Sober October Challenge
+UID:20261020T040000Z-2381244@events.iu.edu
+URL:https://events.iu.edu/studentaffairs-indianapolis/event/2381244-sober-o
+ ctober-challenge
+CATEGORIES:Health and wellness
+X-LIVEWHALE-ID:2381244
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-ALL-DAY:1
+X-LIVEWHALE-TAGS:HWP
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20261020T143000Z
+DTEND:20261020T153000Z
+LOCATION:CAMPUS CENTER
+SUMMARY:Mat Pilates
+UID:20261020T143000Z-2394305@events.iu.edu
+URL:https://events.iu.edu/studentaffairs-indianapolis/event/2394305-mat-pil
+ ates
+CATEGORIES:Health and wellness
+RRULE:FREQ=WEEKLY;UNTIL=20261215T153000Z;INTERVAL=1
+X-LIVEWHALE-ID:2394305
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-TAGS:Fall Semester|Fitness classes|Fitness|Group Fitness Classe
+ s|IU Indianapolis Campus Recreation
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20261020T160000Z
+DTEND:20261020T170000Z
+LOCATION:CAMPUS CENTER
+SUMMARY:Mat Pilates
+UID:20261020T160000Z-2394322@events.iu.edu
+URL:https://events.iu.edu/studentaffairs-indianapolis/event/2394322-mat-pil
+ ates
+CATEGORIES:Health and wellness
+RRULE:FREQ=WEEKLY;UNTIL=20261215T170000Z;INTERVAL=1
+X-LIVEWHALE-ID:2394322
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-TAGS:Fall Semester|Fitness classes|Fitness|Group Fitness Classe
+ s|IU Indianapolis Campus Recreation
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20261020T213000Z
+DTEND:20261020T223000Z
+LOCATION:CAMPUS CENTER
+SUMMARY:Total Body Conditioning
+UID:20261020T213000Z-2394357@events.iu.edu
+URL:https://events.iu.edu/studentaffairs-indianapolis/event/2394357-total-b
+ ody-conditioning
+CATEGORIES:Health and wellness
+RRULE:FREQ=WEEKLY;UNTIL=20261215T223000Z;INTERVAL=1
+X-LIVEWHALE-ID:2394357
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-TAGS:Fall Semester|Fitness classes|Fitness|Group Fitness Classe
+ s|IU Indianapolis Campus Recreation
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20261020T213000Z
+DTEND:20261020T223000Z
+LOCATION:CAMPUS CENTER
+SUMMARY:Zumba
+UID:20261020T213000Z-2394340@events.iu.edu
+URL:https://events.iu.edu/studentaffairs-indianapolis/event/2394340-zumba
+CATEGORIES:Health and wellness
+RRULE:FREQ=WEEKLY;UNTIL=20261215T223000Z;INTERVAL=1
+X-LIVEWHALE-ID:2394340
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-TAGS:Fall Semester|Fitness classes|Fitness|Group Fitness Classe
+ s|IU Indianapolis Campus Recreation
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20261020T230000Z
+DTEND:20261021T000000Z
+LOCATION:CAMPUS CENTER
+SUMMARY:Mat Pilates
+UID:20261020T230000Z-2394373@events.iu.edu
+URL:https://events.iu.edu/studentaffairs-indianapolis/event/2394373-mat-pil
+ ates
+CATEGORIES:Health and wellness
+RRULE:FREQ=WEEKLY;UNTIL=20261216T000000Z;INTERVAL=1
+X-LIVEWHALE-ID:2394373
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-TAGS:Fall Semester|Fitness classes|Fitness|Group Fitness Classe
+ s|IU Indianapolis Campus Recreation
+END:VEVENT
+BEGIN:VEVENT
+DTSTART;VALUE=DATE:20261021
+DTEND;VALUE=DATE:20261022
+LOCATION:Costa Mesa\, CA
+SUMMARY:ACPA Institute on the Curricular Approach
+UID:20261021T040000Z-2278983@events.iu.edu
+URL:https://events.iu.edu/studentaffairs-indianapolis/event/2278983-acpa-in
+ stitute-on-the-curricular-approach
+X-LIVEWHALE-ID:2278983
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-ALL-DAY:1
+X-LIVEWHALE-TAGS:Conference|Professional Development Page - National|Sign-u
+ p Required|Travel Required
+END:VEVENT
+BEGIN:VEVENT
+DTSTART;VALUE=DATE:20261021
+DTEND;VALUE=DATE:20261022
+SUMMARY:Sober October Challenge
+UID:20261021T040000Z-2381244@events.iu.edu
+URL:https://events.iu.edu/studentaffairs-indianapolis/event/2381244-sober-o
+ ctober-challenge
+CATEGORIES:Health and wellness
+X-LIVEWHALE-ID:2381244
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-ALL-DAY:1
+X-LIVEWHALE-TAGS:HWP
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20261021T111500Z
+DTEND:20261021T121500Z
+LOCATION:CAMPUS CENTER
+SUMMARY:Yoga (Instructor in Training)
+UID:20261021T111500Z-2396789@events.iu.edu
+URL:https://events.iu.edu/studentaffairs-indianapolis/event/2396789-yoga-in
+ structor-in-training
+CATEGORIES:Health and wellness
+RRULE:FREQ=WEEKLY;UNTIL=20261216T121500Z;INTERVAL=1
+X-LIVEWHALE-ID:2396789
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-TAGS:Fall Semester|Fitness classes|Fitness|Group Fitness Classe
+ s|IU Indianapolis Campus Recreation
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20261021T111500Z
+DTEND:20261021T121500Z
+LOCATION:CAMPUS CENTER
+SUMMARY:Yoga
+UID:20261021T111500Z-2394390@events.iu.edu
+URL:https://events.iu.edu/studentaffairs-indianapolis/event/2394390-yoga
+CATEGORIES:Health and wellness
+RRULE:FREQ=WEEKLY;UNTIL=20261216T121500Z;INTERVAL=1
+X-LIVEWHALE-ID:2394390
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-TAGS:Fall Semester|Fitness classes|Fitness|Group Fitness Classe
+ s|IU Indianapolis Campus Recreation
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20261021T130000Z
+DTEND:20261021T140000Z
+LOCATION:CAMPUS CENTER
+SUMMARY:Mat Pilates
+UID:20261021T130000Z-2394406@events.iu.edu
+URL:https://events.iu.edu/studentaffairs-indianapolis/event/2394406-mat-pil
+ ates
+CATEGORIES:Health and wellness
+RRULE:FREQ=WEEKLY;UNTIL=20261216T140000Z;INTERVAL=1
+X-LIVEWHALE-ID:2394406
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-TAGS:Fall Semester|Fitness classes|Fitness|Group Fitness Classe
+ s|IU Indianapolis Campus Recreation
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20261021T140000Z
+DTEND:20261021T200000Z
+LOCATION:CAMPUS CENTER
+SUMMARY:Graduate School Fair
+UID:20261021T140000Z-2427999@events.iu.edu
+URL:https://events.iu.edu/live/events/2427998-graduate-school-fair
+CATEGORIES:Career development,Functions, festivals, and celebrations,Lectur
+ es, talks, seminars, and conferences
+X-LIVEWHALE-ID:2427999
+X-LIVEWHALE-TIMEZONE:America/New_York
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20261021T160000Z
+DTEND:20261021T170000Z
+LOCATION:CAMPUS CENTER
+SUMMARY:Mobility and Strength
+UID:20261021T160000Z-2394422@events.iu.edu
+URL:https://events.iu.edu/studentaffairs-indianapolis/event/2394422-mobilit
+ y-and-strength
+CATEGORIES:Health and wellness
+RRULE:FREQ=WEEKLY;UNTIL=20261216T170000Z;INTERVAL=1
+X-LIVEWHALE-ID:2394422
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-TAGS:Fall Semester|Fitness classes|Fitness|Group Fitness Classe
+ s|IU Indianapolis Campus Recreation
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20261021T160000Z
+DTEND:20261021T180000Z
+LOCATION:Inlow Hall (School of Law)
+SUMMARY:Flu Shot Clinic
+UID:20261021T160000Z-2398689@events.iu.edu
+URL:https://events.iu.edu/studentaffairs-indianapolis/event/2398689-flu-sho
+ t-clinic
+CATEGORIES:Health and wellness
+X-LIVEWHALE-ID:2398689
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-TAGS:Flu Shot Clinic
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20261021T173000Z
+DTEND:20261021T183000Z
+LOCATION:CAMPUS CENTER
+SUMMARY:Mat Pilates
+UID:20261021T173000Z-2403489@events.iu.edu
+URL:https://events.iu.edu/studentaffairs-indianapolis/event/2403489-mat-pil
+ ates
+CATEGORIES:Health and wellness
+RRULE:FREQ=WEEKLY;UNTIL=20261216T183000Z;INTERVAL=1
+X-LIVEWHALE-ID:2403489
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-TAGS:Fall Semester|Fitness classes|Fitness|Group Fitness Classe
+ s|IU Indianapolis Campus Recreation
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20261021T213000Z
+DTEND:20261021T223000Z
+LOCATION:CAMPUS CENTER
+SUMMARY:ReFit
+UID:20261021T213000Z-2394441@events.iu.edu
+URL:https://events.iu.edu/studentaffairs-indianapolis/event/2394441-refit
+CATEGORIES:Health and wellness
+RRULE:FREQ=WEEKLY;UNTIL=20261216T223000Z;INTERVAL=1
+X-LIVEWHALE-ID:2394441
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-TAGS:Fall Semester|Fitness classes|Fitness|Group Fitness Classe
+ s|IU Indianapolis Campus Recreation
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20261021T220000Z
+DTEND:20261021T224500Z
+LOCATION:CAMPUS CENTER
+SUMMARY:Cycling
+UID:20261021T220000Z-2394459@events.iu.edu
+URL:https://events.iu.edu/studentaffairs-indianapolis/event/2394459-cycling
+CATEGORIES:Health and wellness
+RRULE:FREQ=WEEKLY;UNTIL=20261216T230000Z;INTERVAL=1
+X-LIVEWHALE-ID:2394459
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-TAGS:Fall Semester|Fitness classes|Fitness|Group Fitness Classe
+ s|IU Indianapolis Campus Recreation
+END:VEVENT
+BEGIN:VEVENT
+DTSTART;VALUE=DATE:20261022
+DTEND;VALUE=DATE:20261023
+SUMMARY:Sober October Challenge
+UID:20261022T040000Z-2381244@events.iu.edu
+URL:https://events.iu.edu/studentaffairs-indianapolis/event/2381244-sober-o
+ ctober-challenge
+CATEGORIES:Health and wellness
+X-LIVEWHALE-ID:2381244
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-ALL-DAY:1
+X-LIVEWHALE-TAGS:HWP
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20261022T130000Z
+DTEND:20261022T170000Z
+LOCATION:Campus Center
+SUMMARY:Flu Shot Clinic
+UID:20261022T130000Z-2398690@events.iu.edu
+URL:https://events.iu.edu/studentaffairs-indianapolis/event/2398690-flu-sho
+ t-clinic
+CATEGORIES:Health and wellness
+X-LIVEWHALE-ID:2398690
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-TAGS:Flu Shot Clinic
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20261022T213000Z
+DTEND:20261022T223000Z
+LOCATION:CAMPUS CENTER
+SUMMARY:Total Body Conditioning
+UID:20261022T213000Z-2394499@events.iu.edu
+URL:https://events.iu.edu/studentaffairs-indianapolis/event/2394499-total-b
+ ody-conditioning
+CATEGORIES:Health and wellness
+RRULE:FREQ=WEEKLY;UNTIL=20261217T223000Z;INTERVAL=1
+X-LIVEWHALE-ID:2394499
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-TAGS:Fall Semester|Fitness classes|Fitness|Group Fitness Classe
+ s|IU Indianapolis Campus Recreation
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20261022T213000Z
+DTEND:20261022T223000Z
+LOCATION:CAMPUS CENTER
+SUMMARY:Zumba
+UID:20261022T213000Z-2394483@events.iu.edu
+URL:https://events.iu.edu/studentaffairs-indianapolis/event/2394483-zumba
+CATEGORIES:Health and wellness
+RRULE:FREQ=WEEKLY;UNTIL=20261217T223000Z;INTERVAL=1
+X-LIVEWHALE-ID:2394483
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-TAGS:Fall Semester|Fitness classes|Fitness|Group Fitness Classe
+ s|IU Indianapolis Campus Recreation|Zumba
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20261022T230000Z
+DTEND:20261023T000000Z
+LOCATION:CAMPUS CENTER
+SUMMARY:Mat Pilates
+UID:20261022T230000Z-2394519@events.iu.edu
+URL:https://events.iu.edu/studentaffairs-indianapolis/event/2394519-mat-pil
+ ates
+CATEGORIES:Health and wellness
+RRULE:FREQ=WEEKLY;UNTIL=20261218T000000Z;INTERVAL=1
+X-LIVEWHALE-ID:2394519
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-TAGS:Fall Semester|Fitness classes|Fitness|Group Fitness Classe
+ s|IU Indianapolis Campus Recreation
+END:VEVENT
+BEGIN:VEVENT
+DTSTART;VALUE=DATE:20261023
+DTEND;VALUE=DATE:20261024
+SUMMARY:Sober October Challenge
+UID:20261023T040000Z-2381244@events.iu.edu
+URL:https://events.iu.edu/studentaffairs-indianapolis/event/2381244-sober-o
+ ctober-challenge
+CATEGORIES:Health and wellness
+X-LIVEWHALE-ID:2381244
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-ALL-DAY:1
+X-LIVEWHALE-TAGS:HWP
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20261023T140000Z
+DTEND:20261023T150000Z
+LOCATION:CAMPUS CENTER
+SUMMARY:Mat Pilates
+UID:20261023T140000Z-2394544@events.iu.edu
+URL:https://events.iu.edu/studentaffairs-indianapolis/event/2394544-mat-pil
+ ates
+CATEGORIES:Health and wellness
+RRULE:FREQ=WEEKLY;UNTIL=20261218T150000Z;INTERVAL=1
+X-LIVEWHALE-ID:2394544
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-TAGS:Fall Semester|Fitness classes|Fitness|Group Fitness Classe
+ s|IU Indianapolis Campus Recreation
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20261023T160000Z
+DTEND:20261023T170000Z
+LOCATION:CAMPUS CENTER
+SUMMARY:Mobility and Strength
+UID:20261023T160000Z-2394561@events.iu.edu
+URL:https://events.iu.edu/studentaffairs-indianapolis/event/2394561-mobilit
+ y-and-strength
+CATEGORIES:Health and wellness
+RRULE:FREQ=WEEKLY;UNTIL=20261218T170000Z;INTERVAL=1
+X-LIVEWHALE-ID:2394561
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-TAGS:Fall Semester|Fitness classes|Fitness|Group Fitness Classe
+ s|IU Indianapolis Campus Recreation
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20261023T203000Z
+DTEND:20261023T213000Z
+LOCATION:CAMPUS CENTER
+SUMMARY:ReFit
+UID:20261023T203000Z-2394578@events.iu.edu
+URL:https://events.iu.edu/studentaffairs-indianapolis/event/2394578-refit
+CATEGORIES:Health and wellness
+RRULE:FREQ=WEEKLY;UNTIL=20261218T213000Z;INTERVAL=1
+X-LIVEWHALE-ID:2394578
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-TAGS:Fall Semester|Fitness classes|Fitness|Group Fitness Classe
+ s|IU Indianapolis Campus Recreation
+END:VEVENT
+BEGIN:VEVENT
+DTSTART;VALUE=DATE:20261024
+DTEND;VALUE=DATE:20261025
+SUMMARY:Sober October Challenge
+UID:20261024T040000Z-2381244@events.iu.edu
+URL:https://events.iu.edu/studentaffairs-indianapolis/event/2381244-sober-o
+ ctober-challenge
+CATEGORIES:Health and wellness
+X-LIVEWHALE-ID:2381244
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-ALL-DAY:1
+X-LIVEWHALE-TAGS:HWP
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20261024T161500Z
+DTEND:20261024T171500Z
+LOCATION:CAMPUS CENTER
+SUMMARY:Yoga
+UID:20261024T161500Z-2394595@events.iu.edu
+URL:https://events.iu.edu/studentaffairs-indianapolis/event/2394595-yoga
+CATEGORIES:Health and wellness
+RRULE:FREQ=WEEKLY;UNTIL=20261212T171500Z;INTERVAL=1
+X-LIVEWHALE-ID:2394595
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-TAGS:Fall Semester|Fitness classes|Fitness|Group Fitness Classe
+ s|IU Indianapolis Campus Recreation
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20261024T173000Z
+DTEND:20261024T183000Z
+LOCATION:CAMPUS CENTER
+SUMMARY:Yoga
+UID:20261024T173000Z-2394621@events.iu.edu
+URL:https://events.iu.edu/studentaffairs-indianapolis/event/2394621-yoga
+CATEGORIES:Health and wellness
+RRULE:FREQ=WEEKLY;UNTIL=20261212T183000Z;INTERVAL=1
+X-LIVEWHALE-ID:2394621
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-TAGS:Fall Semester|Fitness classes|Fitness|Group Fitness Classe
+ s|IU Indianapolis Campus Recreation
+END:VEVENT
+BEGIN:VEVENT
+DTSTART;VALUE=DATE:20261025
+DTEND;VALUE=DATE:20261026
+SUMMARY:Sober October Challenge
+UID:20261025T040000Z-2381244@events.iu.edu
+URL:https://events.iu.edu/studentaffairs-indianapolis/event/2381244-sober-o
+ ctober-challenge
+CATEGORIES:Health and wellness
+X-LIVEWHALE-ID:2381244
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-ALL-DAY:1
+X-LIVEWHALE-TAGS:HWP
+END:VEVENT
+BEGIN:VEVENT
+DTSTART;VALUE=DATE:20261026
+DTEND;VALUE=DATE:20261027
+LOCATION:Minneapolis\, MN
+SUMMARY:ACUHO-I Business Operations Conference
+UID:20261026T040000Z-2278959@events.iu.edu
+URL:https://events.iu.edu/studentaffairs-indianapolis/event/2278959-acuho-i
+ -business-operations-conference
+X-LIVEWHALE-ID:2278959
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-ALL-DAY:1
+X-LIVEWHALE-TAGS:Conference|Professional Development Page - National|Sign-u
+ p Required|Travel Required
+END:VEVENT
+BEGIN:VEVENT
+DTSTART;VALUE=DATE:20261026
+DTEND;VALUE=DATE:20261027
+LOCATION:Minneapolis\, MN
+SUMMARY:ACUHO-I Housing Facilities Conference
+UID:20261026T040000Z-2278960@events.iu.edu
+URL:https://events.iu.edu/studentaffairs-indianapolis/event/2278960-acuho-i
+ -housing-facilities-conference
+X-LIVEWHALE-ID:2278960
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-ALL-DAY:1
+X-LIVEWHALE-TAGS:Conference|Professional Development Page - National|Sign-u
+ p Required|Travel Required
+END:VEVENT
+BEGIN:VEVENT
+DTSTART;VALUE=DATE:20261026
+DTEND;VALUE=DATE:20261027
+LOCATION:Minneapolis\, MN
+SUMMARY:ACUHO-I Residence Education Conference
+UID:20261026T040000Z-2278958@events.iu.edu
+URL:https://events.iu.edu/studentaffairs-indianapolis/event/2278958-acuho-i
+ -residence-education-conference
+X-LIVEWHALE-ID:2278958
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-ALL-DAY:1
+X-LIVEWHALE-TAGS:Conference|Professional Development Page - National|Sign-u
+ p Required|Travel Required
+END:VEVENT
+BEGIN:VEVENT
+DTSTART;VALUE=DATE:20261026
+DTEND;VALUE=DATE:20261027
+LOCATION:Washington\, DC
+SUMMARY:ASCA - Student Organization Misconduct Institute
+UID:20261026T040000Z-2278992@events.iu.edu
+URL:https://events.iu.edu/studentaffairs-indianapolis/event/2278992-asca-st
+ udent-organization-misconduct-institute
+X-LIVEWHALE-ID:2278992
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-ALL-DAY:1
+X-LIVEWHALE-TAGS:Conference|Professional Development Page - National|Sign-u
+ p Required|Travel Required
+END:VEVENT
+BEGIN:VEVENT
+DTSTART;VALUE=DATE:20261026
+DTEND;VALUE=DATE:20261027
+SUMMARY:Sober October Challenge
+UID:20261026T040000Z-2381244@events.iu.edu
+URL:https://events.iu.edu/studentaffairs-indianapolis/event/2381244-sober-o
+ ctober-challenge
+CATEGORIES:Health and wellness
+X-LIVEWHALE-ID:2381244
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-ALL-DAY:1
+X-LIVEWHALE-TAGS:HWP
+END:VEVENT
+BEGIN:VEVENT
+DTSTART;VALUE=DATE:20261027
+DTEND;VALUE=DATE:20261028
+LOCATION:Minneapolis\, MN
+SUMMARY:ACUHO-I Business Operations Conference
+UID:20261027T040000Z-2278959@events.iu.edu
+URL:https://events.iu.edu/studentaffairs-indianapolis/event/2278959-acuho-i
+ -business-operations-conference
+X-LIVEWHALE-ID:2278959
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-ALL-DAY:1
+X-LIVEWHALE-TAGS:Conference|Professional Development Page - National|Sign-u
+ p Required|Travel Required
+END:VEVENT
+BEGIN:VEVENT
+DTSTART;VALUE=DATE:20261027
+DTEND;VALUE=DATE:20261028
+LOCATION:Minneapolis\, MN
+SUMMARY:ACUHO-I Housing Facilities Conference
+UID:20261027T040000Z-2278960@events.iu.edu
+URL:https://events.iu.edu/studentaffairs-indianapolis/event/2278960-acuho-i
+ -housing-facilities-conference
+X-LIVEWHALE-ID:2278960
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-ALL-DAY:1
+X-LIVEWHALE-TAGS:Conference|Professional Development Page - National|Sign-u
+ p Required|Travel Required
+END:VEVENT
+BEGIN:VEVENT
+DTSTART;VALUE=DATE:20261027
+DTEND;VALUE=DATE:20261028
+LOCATION:Minneapolis\, MN
+SUMMARY:ACUHO-I Residence Education Conference
+UID:20261027T040000Z-2278958@events.iu.edu
+URL:https://events.iu.edu/studentaffairs-indianapolis/event/2278958-acuho-i
+ -residence-education-conference
+X-LIVEWHALE-ID:2278958
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-ALL-DAY:1
+X-LIVEWHALE-TAGS:Conference|Professional Development Page - National|Sign-u
+ p Required|Travel Required
+END:VEVENT
+BEGIN:VEVENT
+DTSTART;VALUE=DATE:20261027
+DTEND;VALUE=DATE:20261028
+LOCATION:Washington\, DC
+SUMMARY:ASCA - Student Organization Misconduct Institute
+UID:20261027T040000Z-2278992@events.iu.edu
+URL:https://events.iu.edu/studentaffairs-indianapolis/event/2278992-asca-st
+ udent-organization-misconduct-institute
+X-LIVEWHALE-ID:2278992
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-ALL-DAY:1
+X-LIVEWHALE-TAGS:Conference|Professional Development Page - National|Sign-u
+ p Required|Travel Required
+END:VEVENT
+BEGIN:VEVENT
+DTSTART;VALUE=DATE:20261027
+DTEND;VALUE=DATE:20261028
+SUMMARY:Sober October Challenge
+UID:20261027T040000Z-2381244@events.iu.edu
+URL:https://events.iu.edu/studentaffairs-indianapolis/event/2381244-sober-o
+ ctober-challenge
+CATEGORIES:Health and wellness
+X-LIVEWHALE-ID:2381244
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-ALL-DAY:1
+X-LIVEWHALE-TAGS:HWP
+END:VEVENT
+BEGIN:VEVENT
+DTSTART;VALUE=DATE:20261028
+DTEND;VALUE=DATE:20261029
+LOCATION:Minneapolis\, MN
+SUMMARY:ACUHO-I Business Operations Conference
+UID:20261028T040000Z-2278959@events.iu.edu
+URL:https://events.iu.edu/studentaffairs-indianapolis/event/2278959-acuho-i
+ -business-operations-conference
+X-LIVEWHALE-ID:2278959
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-ALL-DAY:1
+X-LIVEWHALE-TAGS:Conference|Professional Development Page - National|Sign-u
+ p Required|Travel Required
+END:VEVENT
+BEGIN:VEVENT
+DTSTART;VALUE=DATE:20261028
+DTEND;VALUE=DATE:20261029
+LOCATION:Minneapolis\, MN
+SUMMARY:ACUHO-I Housing Facilities Conference
+UID:20261028T040000Z-2278960@events.iu.edu
+URL:https://events.iu.edu/studentaffairs-indianapolis/event/2278960-acuho-i
+ -housing-facilities-conference
+X-LIVEWHALE-ID:2278960
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-ALL-DAY:1
+X-LIVEWHALE-TAGS:Conference|Professional Development Page - National|Sign-u
+ p Required|Travel Required
+END:VEVENT
+BEGIN:VEVENT
+DTSTART;VALUE=DATE:20261028
+DTEND;VALUE=DATE:20261029
+LOCATION:Minneapolis\, MN
+SUMMARY:ACUHO-I Residence Education Conference
+UID:20261028T040000Z-2278958@events.iu.edu
+URL:https://events.iu.edu/studentaffairs-indianapolis/event/2278958-acuho-i
+ -residence-education-conference
+X-LIVEWHALE-ID:2278958
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-ALL-DAY:1
+X-LIVEWHALE-TAGS:Conference|Professional Development Page - National|Sign-u
+ p Required|Travel Required
+END:VEVENT
+BEGIN:VEVENT
+DTSTART;VALUE=DATE:20261028
+DTEND;VALUE=DATE:20261029
+LOCATION:Washington\, DC
+SUMMARY:ASCA - Student Organization Misconduct Institute
+UID:20261028T040000Z-2278992@events.iu.edu
+URL:https://events.iu.edu/studentaffairs-indianapolis/event/2278992-asca-st
+ udent-organization-misconduct-institute
+X-LIVEWHALE-ID:2278992
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-ALL-DAY:1
+X-LIVEWHALE-TAGS:Conference|Professional Development Page - National|Sign-u
+ p Required|Travel Required
+END:VEVENT
+BEGIN:VEVENT
+DTSTART;VALUE=DATE:20261028
+DTEND;VALUE=DATE:20261029
+SUMMARY:Sober October Challenge
+UID:20261028T040000Z-2381244@events.iu.edu
+URL:https://events.iu.edu/studentaffairs-indianapolis/event/2381244-sober-o
+ ctober-challenge
+CATEGORIES:Health and wellness
+X-LIVEWHALE-ID:2381244
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-ALL-DAY:1
+X-LIVEWHALE-TAGS:HWP
+END:VEVENT
+BEGIN:VEVENT
+DTSTART;VALUE=DATE:20261029
+DTEND;VALUE=DATE:20261030
+LOCATION:Minneapolis\, MN
+SUMMARY:ACUHO-I Business Operations Conference
+UID:20261029T040000Z-2278959@events.iu.edu
+URL:https://events.iu.edu/studentaffairs-indianapolis/event/2278959-acuho-i
+ -business-operations-conference
+X-LIVEWHALE-ID:2278959
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-ALL-DAY:1
+X-LIVEWHALE-TAGS:Conference|Professional Development Page - National|Sign-u
+ p Required|Travel Required
+END:VEVENT
+BEGIN:VEVENT
+DTSTART;VALUE=DATE:20261029
+DTEND;VALUE=DATE:20261030
+LOCATION:Minneapolis\, MN
+SUMMARY:ACUHO-I Housing Facilities Conference
+UID:20261029T040000Z-2278960@events.iu.edu
+URL:https://events.iu.edu/studentaffairs-indianapolis/event/2278960-acuho-i
+ -housing-facilities-conference
+X-LIVEWHALE-ID:2278960
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-ALL-DAY:1
+X-LIVEWHALE-TAGS:Conference|Professional Development Page - National|Sign-u
+ p Required|Travel Required
+END:VEVENT
+BEGIN:VEVENT
+DTSTART;VALUE=DATE:20261029
+DTEND;VALUE=DATE:20261030
+LOCATION:Minneapolis\, MN
+SUMMARY:ACUHO-I Residence Education Conference
+UID:20261029T040000Z-2278958@events.iu.edu
+URL:https://events.iu.edu/studentaffairs-indianapolis/event/2278958-acuho-i
+ -residence-education-conference
+X-LIVEWHALE-ID:2278958
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-ALL-DAY:1
+X-LIVEWHALE-TAGS:Conference|Professional Development Page - National|Sign-u
+ p Required|Travel Required
+END:VEVENT
+BEGIN:VEVENT
+DTSTART;VALUE=DATE:20261029
+DTEND;VALUE=DATE:20261030
+SUMMARY:Sober October Challenge
+UID:20261029T040000Z-2381244@events.iu.edu
+URL:https://events.iu.edu/studentaffairs-indianapolis/event/2381244-sober-o
+ ctober-challenge
+CATEGORIES:Health and wellness
+X-LIVEWHALE-ID:2381244
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-ALL-DAY:1
+X-LIVEWHALE-TAGS:HWP
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20261029T120000Z
+DTEND:20261029T170000Z
+LOCATION:School of Dentistry
+SUMMARY:Flu Shot Clinic
+UID:20261029T120000Z-2398691@events.iu.edu
+URL:https://events.iu.edu/studentaffairs-indianapolis/event/2398691-flu-sho
+ t-clinic
+CATEGORIES:Health and wellness
+X-LIVEWHALE-ID:2398691
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-TAGS:Flu Shot Clinic
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20261029T150000Z
+DTEND:20261029T190000Z
+LOCATION:Taylor Courtyard
+SUMMARY:Campus Cleanup
+UID:20261029T150000Z-2416915@events.iu.edu
+URL:https://events.iu.edu/studentaffairs-indianapolis/event/2416915-campus-
+ cleanup
+CATEGORIES:Health and wellness,Volunteer and fundraising opportunities
+X-LIVEWHALE-ID:2416915
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-TAGS:Fall Semester|HWP|In Person|Sustainability
+END:VEVENT
+BEGIN:VEVENT
+DTSTART;VALUE=DATE:20261030
+DTEND;VALUE=DATE:20261031
+SUMMARY:Sober October Challenge
+UID:20261030T040000Z-2381244@events.iu.edu
+URL:https://events.iu.edu/studentaffairs-indianapolis/event/2381244-sober-o
+ ctober-challenge
+CATEGORIES:Health and wellness
+X-LIVEWHALE-ID:2381244
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-ALL-DAY:1
+X-LIVEWHALE-TAGS:HWP
+END:VEVENT
+BEGIN:VEVENT
+DTSTART;VALUE=DATE:20261031
+DTEND;VALUE=DATE:20261101
+SUMMARY:Sober October Challenge
+UID:20261031T040000Z-2381244@events.iu.edu
+URL:https://events.iu.edu/studentaffairs-indianapolis/event/2381244-sober-o
+ ctober-challenge
+CATEGORIES:Health and wellness
+X-LIVEWHALE-ID:2381244
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-ALL-DAY:1
+X-LIVEWHALE-TAGS:HWP
+END:VEVENT
+BEGIN:VEVENT
+DTSTART;VALUE=DATE:20261101
+DTEND;VALUE=DATE:20261102
+LOCATION:Lansing\, MI
+SUMMARY:GLACUHO Annual Conference
+UID:20261101T040000Z-2278951@events.iu.edu
+URL:https://events.iu.edu/studentaffairs-indianapolis/event/2278951-glacuho
+ -annual-conference
+X-LIVEWHALE-ID:2278951
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-ALL-DAY:1
+X-LIVEWHALE-TAGS:Conference|Professional Development Page - National|Sign-u
+ p Required|Travel Required
+END:VEVENT
+BEGIN:VEVENT
+DTSTART;VALUE=DATE:20261102
+DTEND;VALUE=DATE:20261103
+LOCATION:Lansing\, MI
+SUMMARY:GLACUHO Annual Conference
+UID:20261102T050000Z-2278951@events.iu.edu
+URL:https://events.iu.edu/studentaffairs-indianapolis/event/2278951-glacuho
+ -annual-conference
+X-LIVEWHALE-ID:2278951
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-ALL-DAY:1
+X-LIVEWHALE-TAGS:Conference|Professional Development Page - National|Sign-u
+ p Required|Travel Required
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20261102T170000Z
+DTEND:20261102T190000Z
+LOCATION:Campus Center Info Table 1
+SUMMARY:Sexual Health Awareness Table
+UID:20261102T170000Z-2413491@events.iu.edu
+URL:https://events.iu.edu/studentaffairs-indianapolis/event/2413491-sexual-
+ health-awareness-table
+CATEGORIES:Functions, festivals, and celebrations,Health and wellness
+X-LIVEWHALE-ID:2413491
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-TAGS:HWP
+END:VEVENT
+BEGIN:VEVENT
+DTSTART;VALUE=DATE:20261103
+DTEND;VALUE=DATE:20261104
+LOCATION:Lansing\, MI
+SUMMARY:GLACUHO Annual Conference
+UID:20261103T050000Z-2278951@events.iu.edu
+URL:https://events.iu.edu/studentaffairs-indianapolis/event/2278951-glacuho
+ -annual-conference
+X-LIVEWHALE-ID:2278951
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-ALL-DAY:1
+X-LIVEWHALE-TAGS:Conference|Professional Development Page - National|Sign-u
+ p Required|Travel Required
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20261103T160000Z
+DTEND:20261103T180000Z
+LOCATION:JOSEPH T. TAYLOR HALL
+SUMMARY:IU Indy First Gen Student Celebration
+UID:20261103T160000Z-2209438@events.iu.edu
+URL:https://events.iu.edu/live/events/2208159-iu-indy-first-generation-stud
+ ent-celebration
+CATEGORIES:Functions, festivals, and celebrations,Student success and caree
+ r development
+X-LIVEWHALE-ID:2209438
+X-LIVEWHALE-TIMEZONE:America/New_York
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20261105T160000Z
+DTEND:20261105T190000Z
+LOCATION:Campus Center Atrium
+SUMMARY:Know Your Status: Health Fair and Testing Event
+UID:20261105T160000Z-2212899@events.iu.edu
+URL:https://events.iu.edu/studentaffairs-indianapolis/event/2212899-know-yo
+ ur-status-health-fair-and-testing-event
+CATEGORIES:Functions, festivals, and celebrations,Health and wellness
+X-LIVEWHALE-ID:2212899
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-TAGS:HWP|Know Your Status
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20261112T140000Z
+DTEND:20261112T200000Z
+LOCATION:DUNLAP BUILDING
+SUMMARY:DoSA Wellness Retreat
+UID:20261112T140000Z-2385179@events.iu.edu
+URL:https://events.iu.edu/studentaffairs-indianapolis/event/2385179-dosa-we
+ llness-retreat
+X-LIVEWHALE-ID:2385179
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-TAGS:DoSA Fall 2026 Events|Internal Events
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20261112T200000Z
+DTEND:20261112T210000Z
+LOCATION:https://iu.zoom.us/j/88445001809
+SUMMARY:Wellness Coalition Open Meeting
+UID:20261112T200000Z-2109485@events.iu.edu
+URL:https://events.iu.edu/studentaffairs-indianapolis/event/2109485-wellnes
+ s-coalition-open-meeting
+CATEGORIES:Health and wellness
+X-LIVEWHALE-ID:2109485
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-TAGS:Wellness Coalition
+END:VEVENT
+BEGIN:VEVENT
+DTSTART;VALUE=DATE:20261115
+DTEND;VALUE=DATE:20261116
+LOCATION:University of Michigan
+SUMMARY:ACUI Regional Conference
+UID:20261115T050000Z-2278991@events.iu.edu
+URL:https://events.iu.edu/studentaffairs-indianapolis/event/2278991-acui-re
+ gional-conference
+X-LIVEWHALE-ID:2278991
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-ALL-DAY:1
+X-LIVEWHALE-TAGS:Conference|Professional Development Page - National|Sign-u
+ p Required|Travel Required
+END:VEVENT
+BEGIN:VEVENT
+DTSTART;VALUE=DATE:20261116
+DTEND;VALUE=DATE:20261117
+LOCATION:University of Michigan
+SUMMARY:ACUI Regional Conference
+UID:20261116T050000Z-2278991@events.iu.edu
+URL:https://events.iu.edu/studentaffairs-indianapolis/event/2278991-acui-re
+ gional-conference
+X-LIVEWHALE-ID:2278991
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-ALL-DAY:1
+X-LIVEWHALE-TAGS:Conference|Professional Development Page - National|Sign-u
+ p Required|Travel Required
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20261116T183000Z
+DTEND:20261116T203000Z
+LOCATION:Campus Center
+SUMMARY:DoSA State of the Division
+UID:20261116T183000Z-2386468@events.iu.edu
+URL:https://events.iu.edu/studentaffairs-indianapolis/event/2386468-dosa-st
+ ate-of-the-division
+CATEGORIES:Lectures, talks, seminars, and conferences
+X-LIVEWHALE-ID:2386468
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-TAGS:DoSA Fall 2026 Events|Internal Events
+END:VEVENT
+BEGIN:VEVENT
+DTSTART;VALUE=DATE:20261117
+DTEND;VALUE=DATE:20261118
+LOCATION:University of Michigan
+SUMMARY:ACUI Regional Conference
+UID:20261117T050000Z-2278991@events.iu.edu
+URL:https://events.iu.edu/studentaffairs-indianapolis/event/2278991-acui-re
+ gional-conference
+X-LIVEWHALE-ID:2278991
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-ALL-DAY:1
+X-LIVEWHALE-TAGS:Conference|Professional Development Page - National|Sign-u
+ p Required|Travel Required
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20261117T160000Z
+DTEND:20261117T190000Z
+LOCATION:CAMPUS CENTER
+SUMMARY:Basic Needs Resource Fair
+UID:20261117T160000Z-2435802@events.iu.edu
+URL:https://events.iu.edu/studentaffairs-indianapolis/event/2435802-basic-n
+ eeds-resource-fair
+X-LIVEWHALE-ID:2435802
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-TAGS:hhaw
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20261118T190000Z
+DTEND:20261118T200000Z
+LOCATION:CAMPUS CENTER
+SUMMARY:Canstruction
+UID:20261118T190000Z-2435804@events.iu.edu
+URL:https://events.iu.edu/studentaffairs-indianapolis/event/2435804-canstru
+ ction
+X-LIVEWHALE-ID:2435804
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-TAGS:hhaw
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20261120T180000Z
+DTEND:20261120T200000Z
+LOCATION:Paw's Pantry (Campus Center)
+SUMMARY:University College Day
+UID:20261120T180000Z-2435806@events.iu.edu
+URL:https://events.iu.edu/studentaffairs-indianapolis/event/2435806-univers
+ ity-college-day
+X-LIVEWHALE-ID:2435806
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-TAGS:hhaw
+END:VEVENT
+BEGIN:VEVENT
+DTSTART;VALUE=DATE:20261126
+DTEND;VALUE=DATE:20261127
+LOCATION:Valpo\, IN
+SUMMARY:IRSA Conference
+UID:20261126T050000Z-2278988@events.iu.edu
+URL:https://events.iu.edu/studentaffairs-indianapolis/event/2278988-irsa-co
+ nference
+X-LIVEWHALE-ID:2278988
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-ALL-DAY:1
+X-LIVEWHALE-TAGS:Conference|Professional Development Page - Local|Sign-up R
+ equired|Travel Required
+END:VEVENT
+BEGIN:VEVENT
+DTSTART;VALUE=DATE:20261202
+DTEND;VALUE=DATE:20261203
+LOCATION:Chicago\, IL
+SUMMARY:AFA (Fraternity/Sorority) Annual Meeting
+UID:20261202T050000Z-2278990@events.iu.edu
+URL:https://events.iu.edu/studentaffairs-indianapolis/event/2278990-afa-fra
+ ternitysorority-annual-meeting
+X-LIVEWHALE-ID:2278990
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-ALL-DAY:1
+X-LIVEWHALE-TAGS:Conference|Professional Development Page - National|Sign-u
+ p Required|Travel Required
+END:VEVENT
+BEGIN:VEVENT
+DTSTART;VALUE=DATE:20261202
+DTEND;VALUE=DATE:20261203
+LOCATION:Campus Center 156
+SUMMARY:Campus Rec is Free for Stress Busters Week
+UID:20261202T050000Z-2445543@events.iu.edu
+URL:https://events.iu.edu/studentaffairs-indianapolis/event/2445543-campus-
+ rec-is-free-for-stress-busters-week
+X-LIVEWHALE-ID:2445543
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-ALL-DAY:1
+X-LIVEWHALE-TAGS:Stress Busters Week
+END:VEVENT
+BEGIN:VEVENT
+DTSTART;VALUE=DATE:20261202
+DTEND;VALUE=DATE:20261203
+SUMMARY:Stress Busters Week
+UID:20261202T050000Z-2406464@events.iu.edu
+URL:https://events.iu.edu/studentaffairs-indianapolis/event/2406464-stress-
+ busters-week
+CATEGORIES:Functions, festivals, and celebrations,Health and wellness
+X-LIVEWHALE-ID:2406464
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-ALL-DAY:1
+X-LIVEWHALE-TAGS:Stress Busters Week
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20261202T190000Z
+DTEND:20261202T203000Z
+LOCATION:Campus Center Atrium
+SUMMARY:Paws and Relax
+UID:20261202T190000Z-2445550@events.iu.edu
+URL:https://events.iu.edu/studentaffairs-indianapolis/event/2445550-paws-an
+ d-relax
+CATEGORIES:Functions, festivals, and celebrations,Health and wellness
+X-LIVEWHALE-ID:2445550
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-TAGS:HWP|Stress Busters Week
+END:VEVENT
+BEGIN:VEVENT
+DTSTART;VALUE=DATE:20261203
+DTEND;VALUE=DATE:20261204
+LOCATION:Chicago\, IL
+SUMMARY:AFA (Fraternity/Sorority) Annual Meeting
+UID:20261203T050000Z-2278990@events.iu.edu
+URL:https://events.iu.edu/studentaffairs-indianapolis/event/2278990-afa-fra
+ ternitysorority-annual-meeting
+X-LIVEWHALE-ID:2278990
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-ALL-DAY:1
+X-LIVEWHALE-TAGS:Conference|Professional Development Page - National|Sign-u
+ p Required|Travel Required
+END:VEVENT
+BEGIN:VEVENT
+DTSTART;VALUE=DATE:20261203
+DTEND;VALUE=DATE:20261204
+LOCATION:Campus Center 156
+SUMMARY:Campus Rec is Free for Stress Busters Week
+UID:20261203T050000Z-2445543@events.iu.edu
+URL:https://events.iu.edu/studentaffairs-indianapolis/event/2445543-campus-
+ rec-is-free-for-stress-busters-week
+X-LIVEWHALE-ID:2445543
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-ALL-DAY:1
+X-LIVEWHALE-TAGS:Stress Busters Week
+END:VEVENT
+BEGIN:VEVENT
+DTSTART;VALUE=DATE:20261203
+DTEND;VALUE=DATE:20261204
+SUMMARY:Stress Busters Week
+UID:20261203T050000Z-2406464@events.iu.edu
+URL:https://events.iu.edu/studentaffairs-indianapolis/event/2406464-stress-
+ busters-week
+CATEGORIES:Functions, festivals, and celebrations,Health and wellness
+X-LIVEWHALE-ID:2406464
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-ALL-DAY:1
+X-LIVEWHALE-TAGS:Stress Busters Week
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20261203T160000Z
+DTEND:20261203T190000Z
+LOCATION:Campus Center Atrium
+SUMMARY:Know Your Status: Health Fair and Testing Event
+UID:20261203T160000Z-2212900@events.iu.edu
+URL:https://events.iu.edu/studentaffairs-indianapolis/event/2212900-know-yo
+ ur-status-health-fair-and-testing-event
+CATEGORIES:Functions, festivals, and celebrations,Health and wellness
+X-LIVEWHALE-ID:2212900
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-TAGS:HWP|Know Your Status|Stress Busters Week
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20261203T190000Z
+DTEND:20261203T203000Z
+LOCATION:Taylor Hall 104
+SUMMARY:Stress Less with Snacks from Around the World
+UID:20261203T190000Z-2445551@events.iu.edu
+URL:https://events.iu.edu/studentaffairs-indianapolis/event/2445551-stress-
+ less-with-snacks-from-around-the-world
+CATEGORIES:Functions, festivals, and celebrations,Health and wellness
+X-LIVEWHALE-ID:2445551
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-TAGS:Stress Busters Week
+END:VEVENT
+BEGIN:VEVENT
+DTSTART;VALUE=DATE:20261204
+DTEND;VALUE=DATE:20261205
+LOCATION:Chicago\, IL
+SUMMARY:AFA (Fraternity/Sorority) Annual Meeting
+UID:20261204T050000Z-2278990@events.iu.edu
+URL:https://events.iu.edu/studentaffairs-indianapolis/event/2278990-afa-fra
+ ternitysorority-annual-meeting
+X-LIVEWHALE-ID:2278990
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-ALL-DAY:1
+X-LIVEWHALE-TAGS:Conference|Professional Development Page - National|Sign-u
+ p Required|Travel Required
+END:VEVENT
+BEGIN:VEVENT
+DTSTART;VALUE=DATE:20261204
+DTEND;VALUE=DATE:20261205
+LOCATION:Campus Center 156
+SUMMARY:Campus Rec is Free for Stress Busters Week
+UID:20261204T050000Z-2445543@events.iu.edu
+URL:https://events.iu.edu/studentaffairs-indianapolis/event/2445543-campus-
+ rec-is-free-for-stress-busters-week
+X-LIVEWHALE-ID:2445543
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-ALL-DAY:1
+X-LIVEWHALE-TAGS:Stress Busters Week
+END:VEVENT
+BEGIN:VEVENT
+DTSTART;VALUE=DATE:20261204
+DTEND;VALUE=DATE:20261205
+SUMMARY:Stress Busters Week
+UID:20261204T050000Z-2406464@events.iu.edu
+URL:https://events.iu.edu/studentaffairs-indianapolis/event/2406464-stress-
+ busters-week
+CATEGORIES:Functions, festivals, and celebrations,Health and wellness
+X-LIVEWHALE-ID:2406464
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-ALL-DAY:1
+X-LIVEWHALE-TAGS:Stress Busters Week
+END:VEVENT
+BEGIN:VEVENT
+DTSTART;VALUE=DATE:20261205
+DTEND;VALUE=DATE:20261206
+LOCATION:Chicago\, IL
+SUMMARY:AFA (Fraternity/Sorority) Annual Meeting
+UID:20261205T050000Z-2278990@events.iu.edu
+URL:https://events.iu.edu/studentaffairs-indianapolis/event/2278990-afa-fra
+ ternitysorority-annual-meeting
+X-LIVEWHALE-ID:2278990
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-ALL-DAY:1
+X-LIVEWHALE-TAGS:Conference|Professional Development Page - National|Sign-u
+ p Required|Travel Required
+END:VEVENT
+BEGIN:VEVENT
+DTSTART;VALUE=DATE:20261205
+DTEND;VALUE=DATE:20261206
+LOCATION:Campus Center 156
+SUMMARY:Campus Rec is Free for Stress Busters Week
+UID:20261205T050000Z-2445543@events.iu.edu
+URL:https://events.iu.edu/studentaffairs-indianapolis/event/2445543-campus-
+ rec-is-free-for-stress-busters-week
+X-LIVEWHALE-ID:2445543
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-ALL-DAY:1
+X-LIVEWHALE-TAGS:Stress Busters Week
+END:VEVENT
+BEGIN:VEVENT
+DTSTART;VALUE=DATE:20261205
+DTEND;VALUE=DATE:20261206
+SUMMARY:Stress Busters Week
+UID:20261205T050000Z-2406464@events.iu.edu
+URL:https://events.iu.edu/studentaffairs-indianapolis/event/2406464-stress-
+ busters-week
+CATEGORIES:Functions, festivals, and celebrations,Health and wellness
+X-LIVEWHALE-ID:2406464
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-ALL-DAY:1
+X-LIVEWHALE-TAGS:Stress Busters Week
+END:VEVENT
+BEGIN:VEVENT
+DTSTART;VALUE=DATE:20261206
+DTEND;VALUE=DATE:20261207
+LOCATION:Campus Center 156
+SUMMARY:Campus Rec is Free for Stress Busters Week
+UID:20261206T050000Z-2445543@events.iu.edu
+URL:https://events.iu.edu/studentaffairs-indianapolis/event/2445543-campus-
+ rec-is-free-for-stress-busters-week
+X-LIVEWHALE-ID:2445543
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-ALL-DAY:1
+X-LIVEWHALE-TAGS:Stress Busters Week
+END:VEVENT
+BEGIN:VEVENT
+DTSTART;VALUE=DATE:20261206
+DTEND;VALUE=DATE:20261207
+SUMMARY:Stress Busters Week
+UID:20261206T050000Z-2406464@events.iu.edu
+URL:https://events.iu.edu/studentaffairs-indianapolis/event/2406464-stress-
+ busters-week
+CATEGORIES:Functions, festivals, and celebrations,Health and wellness
+X-LIVEWHALE-ID:2406464
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-ALL-DAY:1
+X-LIVEWHALE-TAGS:Stress Busters Week
+END:VEVENT
+BEGIN:VEVENT
+DTSTART;VALUE=DATE:20261207
+DTEND;VALUE=DATE:20261208
+LOCATION:Campus Center 156
+SUMMARY:Campus Rec is Free for Stress Busters Week
+UID:20261207T050000Z-2445543@events.iu.edu
+URL:https://events.iu.edu/studentaffairs-indianapolis/event/2445543-campus-
+ rec-is-free-for-stress-busters-week
+X-LIVEWHALE-ID:2445543
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-ALL-DAY:1
+X-LIVEWHALE-TAGS:Stress Busters Week
+END:VEVENT
+BEGIN:VEVENT
+DTSTART;VALUE=DATE:20261207
+DTEND;VALUE=DATE:20261208
+SUMMARY:Stress Busters Week
+UID:20261207T050000Z-2406464@events.iu.edu
+URL:https://events.iu.edu/studentaffairs-indianapolis/event/2406464-stress-
+ busters-week
+CATEGORIES:Functions, festivals, and celebrations,Health and wellness
+X-LIVEWHALE-ID:2406464
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-ALL-DAY:1
+X-LIVEWHALE-TAGS:Stress Busters Week
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20261207T160000Z
+DTEND:20261207T220000Z
+LOCATION:Taylor Hall 101
+SUMMARY:Lo-Fi Lounge
+UID:20261207T160000Z-2445555@events.iu.edu
+URL:https://events.iu.edu/studentaffairs-indianapolis/event/2445555-lo-fi-l
+ ounge
+CATEGORIES:Functions, festivals, and celebrations,Health and wellness
+X-LIVEWHALE-ID:2445555
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-TAGS:HWP|Stress Busters Week
+END:VEVENT
+BEGIN:VEVENT
+DTSTART;VALUE=DATE:20261208
+DTEND;VALUE=DATE:20261209
+LOCATION:Campus Center 156
+SUMMARY:Campus Rec is Free for Stress Busters Week
+UID:20261208T050000Z-2445543@events.iu.edu
+URL:https://events.iu.edu/studentaffairs-indianapolis/event/2445543-campus-
+ rec-is-free-for-stress-busters-week
+X-LIVEWHALE-ID:2445543
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-ALL-DAY:1
+X-LIVEWHALE-TAGS:Stress Busters Week
+END:VEVENT
+BEGIN:VEVENT
+DTSTART;VALUE=DATE:20261208
+DTEND;VALUE=DATE:20261209
+SUMMARY:Stress Busters Week
+UID:20261208T050000Z-2406464@events.iu.edu
+URL:https://events.iu.edu/studentaffairs-indianapolis/event/2406464-stress-
+ busters-week
+CATEGORIES:Functions, festivals, and celebrations,Health and wellness
+X-LIVEWHALE-ID:2406464
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-ALL-DAY:1
+X-LIVEWHALE-TAGS:Stress Busters Week
+END:VEVENT
+BEGIN:VEVENT
+DTSTART;VALUE=DATE:20261209
+DTEND;VALUE=DATE:20261210
+LOCATION:Campus Center 156
+SUMMARY:Campus Rec is Free for Stress Busters Week
+UID:20261209T050000Z-2445543@events.iu.edu
+URL:https://events.iu.edu/studentaffairs-indianapolis/event/2445543-campus-
+ rec-is-free-for-stress-busters-week
+X-LIVEWHALE-ID:2445543
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-ALL-DAY:1
+X-LIVEWHALE-TAGS:Stress Busters Week
+END:VEVENT
+BEGIN:VEVENT
+DTSTART;VALUE=DATE:20261209
+DTEND;VALUE=DATE:20261210
+SUMMARY:Stress Busters Week
+UID:20261209T050000Z-2406464@events.iu.edu
+URL:https://events.iu.edu/studentaffairs-indianapolis/event/2406464-stress-
+ busters-week
+CATEGORIES:Functions, festivals, and celebrations,Health and wellness
+X-LIVEWHALE-ID:2406464
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-ALL-DAY:1
+X-LIVEWHALE-TAGS:Stress Busters Week
+END:VEVENT
+BEGIN:VEVENT
+DTSTART;VALUE=DATE:20261210
+DTEND;VALUE=DATE:20261211
+LOCATION:Campus Center 156
+SUMMARY:Campus Rec is Free for Stress Busters Week
+UID:20261210T050000Z-2445543@events.iu.edu
+URL:https://events.iu.edu/studentaffairs-indianapolis/event/2445543-campus-
+ rec-is-free-for-stress-busters-week
+X-LIVEWHALE-ID:2445543
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-ALL-DAY:1
+X-LIVEWHALE-TAGS:Stress Busters Week
+END:VEVENT
+BEGIN:VEVENT
+DTSTART;VALUE=DATE:20261210
+DTEND;VALUE=DATE:20261211
+SUMMARY:Stress Busters Week
+UID:20261210T050000Z-2406464@events.iu.edu
+URL:https://events.iu.edu/studentaffairs-indianapolis/event/2406464-stress-
+ busters-week
+CATEGORIES:Functions, festivals, and celebrations,Health and wellness
+X-LIVEWHALE-ID:2406464
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-ALL-DAY:1
+X-LIVEWHALE-TAGS:Stress Busters Week
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20261210T170000Z
+DTEND:20261210T200000Z
+LOCATION:Campus Center Atrium
+SUMMARY:Stress Less: Friendship Bracelet Bar
+UID:20261210T170000Z-2445557@events.iu.edu
+URL:https://events.iu.edu/studentaffairs-indianapolis/event/2445557-stress-
+ less-friendship-bracelet-bar
+CATEGORIES:Functions, festivals, and celebrations,Health and wellness
+X-LIVEWHALE-ID:2445557
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-TAGS:HWP|Stress Busters Week
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20261210T230000Z
+DTEND:20261211T010000Z
+LOCATION:CAMPUS CENTER
+SUMMARY:Mindful Art Viewing with Vision Boards
+UID:20261210T230000Z-2445560@events.iu.edu
+URL:https://events.iu.edu/studentaffairs-indianapolis/event/2445560-mindful
+ -art-viewing-with-vision-boards
+CATEGORIES:Functions, festivals, and celebrations,Health and wellness
+X-LIVEWHALE-ID:2445560
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-TAGS:Stress Busters Week
+END:VEVENT
+BEGIN:VEVENT
+DTSTART;VALUE=DATE:20261211
+DTEND;VALUE=DATE:20261212
+LOCATION:Campus Center 156
+SUMMARY:Campus Rec is Free for Stress Busters Week
+UID:20261211T050000Z-2445543@events.iu.edu
+URL:https://events.iu.edu/studentaffairs-indianapolis/event/2445543-campus-
+ rec-is-free-for-stress-busters-week
+X-LIVEWHALE-ID:2445543
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-ALL-DAY:1
+X-LIVEWHALE-TAGS:Stress Busters Week
+END:VEVENT
+BEGIN:VEVENT
+DTSTART;VALUE=DATE:20261211
+DTEND;VALUE=DATE:20261212
+SUMMARY:Stress Busters Week
+UID:20261211T050000Z-2406464@events.iu.edu
+URL:https://events.iu.edu/studentaffairs-indianapolis/event/2406464-stress-
+ busters-week
+CATEGORIES:Functions, festivals, and celebrations,Health and wellness
+X-LIVEWHALE-ID:2406464
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-ALL-DAY:1
+X-LIVEWHALE-TAGS:Stress Busters Week
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20261211T220000Z
+DTEND:20261212T020000Z
+LOCATION:Eskenazi Fine Art Center
+SUMMARY:The M.E.L.T. Experience
+UID:20261211T220000Z-2445561@events.iu.edu
+URL:https://events.iu.edu/studentaffairs-indianapolis/event/2445561-the-mel
+ t-experience
+CATEGORIES:Functions, festivals, and celebrations,Health and wellness
+X-LIVEWHALE-ID:2445561
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-TAGS:Stress Busters Week
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20261217T180000Z
+DTEND:20261217T213000Z
+LOCATION:Campus Center
+SUMMARY:DoSA Holiday Gift Exchange
+UID:20261217T180000Z-2386531@events.iu.edu
+URL:https://events.iu.edu/studentaffairs-indianapolis/event/2386531-dosa-ho
+ liday-gift-exchange
+CATEGORIES:Functions, festivals, and celebrations
+X-LIVEWHALE-ID:2386531
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-TAGS:DoSA Fall 2026 Events|Internal Events
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20270219T140000Z
+DTEND:20270219T180000Z
+LOCATION:INNOVATION HALL
+SUMMARY:JagsCARE and Student Support Training
+UID:20270219T140000Z-2357815@events.iu.edu
+URL:https://events.iu.edu/studentaffairs-indianapolis/event/2357815-jagscar
+ e-and-student-support-training
+X-LIVEWHALE-ID:2357815
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-TAGS:JagsCARE Training
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20270226T140000Z
+DTEND:20270226T170000Z
+LOCATION:INNOVATION HALL
+SUMMARY:Culture of Care: Interpersonal Violence Prevention Training
+UID:20270226T140000Z-2357821@events.iu.edu
+URL:https://events.iu.edu/studentaffairs-indianapolis/event/2357821-culture
+ -of-care-interpersonal-violence-prevention-tr
+X-LIVEWHALE-ID:2357821
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-TAGS:Culture of Care
+END:VEVENT
+BEGIN:VEVENT
+DTSTART;VALUE=DATE:20270306
+DTEND;VALUE=DATE:20270307
+LOCATION:National Harbor\, MD
+SUMMARY:NASPA Conference
+UID:20270306T050000Z-2278982@events.iu.edu
+URL:https://events.iu.edu/studentaffairs-indianapolis/event/2278982-naspa-c
+ onference
+X-LIVEWHALE-ID:2278982
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-ALL-DAY:1
+X-LIVEWHALE-TAGS:Conference|Professional Development Page - National|Sign-u
+ p Required|Travel Required
+END:VEVENT
+BEGIN:VEVENT
+DTSTART;VALUE=DATE:20270307
+DTEND;VALUE=DATE:20270308
+LOCATION:National Harbor\, MD
+SUMMARY:NASPA Conference
+UID:20270307T050000Z-2278982@events.iu.edu
+URL:https://events.iu.edu/studentaffairs-indianapolis/event/2278982-naspa-c
+ onference
+X-LIVEWHALE-ID:2278982
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-ALL-DAY:1
+X-LIVEWHALE-TAGS:Conference|Professional Development Page - National|Sign-u
+ p Required|Travel Required
+END:VEVENT
+BEGIN:VEVENT
+DTSTART;VALUE=DATE:20270308
+DTEND;VALUE=DATE:20270309
+LOCATION:National Harbor\, MD
+SUMMARY:NASPA Conference
+UID:20270308T050000Z-2278982@events.iu.edu
+URL:https://events.iu.edu/studentaffairs-indianapolis/event/2278982-naspa-c
+ onference
+X-LIVEWHALE-ID:2278982
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-ALL-DAY:1
+X-LIVEWHALE-TAGS:Conference|Professional Development Page - National|Sign-u
+ p Required|Travel Required
+END:VEVENT
+BEGIN:VEVENT
+DTSTART;VALUE=DATE:20270309
+DTEND;VALUE=DATE:20270310
+LOCATION:National Harbor\, MD
+SUMMARY:NASPA Conference
+UID:20270309T050000Z-2278982@events.iu.edu
+URL:https://events.iu.edu/studentaffairs-indianapolis/event/2278982-naspa-c
+ onference
+X-LIVEWHALE-ID:2278982
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-ALL-DAY:1
+X-LIVEWHALE-TAGS:Conference|Professional Development Page - National|Sign-u
+ p Required|Travel Required
+END:VEVENT
+BEGIN:VEVENT
+DTSTART;VALUE=DATE:20270310
+DTEND;VALUE=DATE:20270311
+LOCATION:National Harbor\, MD
+SUMMARY:NASPA Conference
+UID:20270310T050000Z-2278982@events.iu.edu
+URL:https://events.iu.edu/studentaffairs-indianapolis/event/2278982-naspa-c
+ onference
+X-LIVEWHALE-ID:2278982
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-ALL-DAY:1
+X-LIVEWHALE-TAGS:Conference|Professional Development Page - National|Sign-u
+ p Required|Travel Required
+END:VEVENT
+BEGIN:VEVENT
+DTSTART;VALUE=DATE:20270314
+DTEND;VALUE=DATE:20270315
+LOCATION:Norfolk\, VA
+SUMMARY:ACCED-I Conference
+UID:20270314T050000Z-2278980@events.iu.edu
+URL:https://events.iu.edu/studentaffairs-indianapolis/event/2278980-acced-i
+ -conference
+X-LIVEWHALE-ID:2278980
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-ALL-DAY:1
+X-LIVEWHALE-TAGS:Conference|Professional Development Page - National|Sign-u
+ p Required|Travel Required
+END:VEVENT
+BEGIN:VEVENT
+DTSTART;VALUE=DATE:20270315
+DTEND;VALUE=DATE:20270316
+LOCATION:Norfolk\, VA
+SUMMARY:ACCED-I Conference
+UID:20270315T040000Z-2278980@events.iu.edu
+URL:https://events.iu.edu/studentaffairs-indianapolis/event/2278980-acced-i
+ -conference
+X-LIVEWHALE-ID:2278980
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-ALL-DAY:1
+X-LIVEWHALE-TAGS:Conference|Professional Development Page - National|Sign-u
+ p Required|Travel Required
+END:VEVENT
+BEGIN:VEVENT
+DTSTART;VALUE=DATE:20270315
+DTEND;VALUE=DATE:20270316
+LOCATION:Toronto\, ON
+SUMMARY:ACPA Conference
+UID:20270315T040000Z-2278961@events.iu.edu
+URL:https://events.iu.edu/studentaffairs-indianapolis/event/2278961-acpa-co
+ nference
+X-LIVEWHALE-ID:2278961
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-ALL-DAY:1
+X-LIVEWHALE-TAGS:Conference|Professional Development Page - National|Sign-u
+ p Required|Travel Required
+END:VEVENT
+BEGIN:VEVENT
+DTSTART;VALUE=DATE:20270316
+DTEND;VALUE=DATE:20270317
+LOCATION:Norfolk\, VA
+SUMMARY:ACCED-I Conference
+UID:20270316T040000Z-2278980@events.iu.edu
+URL:https://events.iu.edu/studentaffairs-indianapolis/event/2278980-acced-i
+ -conference
+X-LIVEWHALE-ID:2278980
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-ALL-DAY:1
+X-LIVEWHALE-TAGS:Conference|Professional Development Page - National|Sign-u
+ p Required|Travel Required
+END:VEVENT
+BEGIN:VEVENT
+DTSTART;VALUE=DATE:20270316
+DTEND;VALUE=DATE:20270317
+LOCATION:Toronto\, ON
+SUMMARY:ACPA Conference
+UID:20270316T040000Z-2278961@events.iu.edu
+URL:https://events.iu.edu/studentaffairs-indianapolis/event/2278961-acpa-co
+ nference
+X-LIVEWHALE-ID:2278961
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-ALL-DAY:1
+X-LIVEWHALE-TAGS:Conference|Professional Development Page - National|Sign-u
+ p Required|Travel Required
+END:VEVENT
+BEGIN:VEVENT
+DTSTART;VALUE=DATE:20270317
+DTEND;VALUE=DATE:20270318
+LOCATION:Norfolk\, VA
+SUMMARY:ACCED-I Conference
+UID:20270317T040000Z-2278980@events.iu.edu
+URL:https://events.iu.edu/studentaffairs-indianapolis/event/2278980-acced-i
+ -conference
+X-LIVEWHALE-ID:2278980
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-ALL-DAY:1
+X-LIVEWHALE-TAGS:Conference|Professional Development Page - National|Sign-u
+ p Required|Travel Required
+END:VEVENT
+BEGIN:VEVENT
+DTSTART;VALUE=DATE:20270317
+DTEND;VALUE=DATE:20270318
+LOCATION:Toronto\, ON
+SUMMARY:ACPA Conference
+UID:20270317T040000Z-2278961@events.iu.edu
+URL:https://events.iu.edu/studentaffairs-indianapolis/event/2278961-acpa-co
+ nference
+X-LIVEWHALE-ID:2278961
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-ALL-DAY:1
+X-LIVEWHALE-TAGS:Conference|Professional Development Page - National|Sign-u
+ p Required|Travel Required
+END:VEVENT
+BEGIN:VEVENT
+DTSTART;VALUE=DATE:20270318
+DTEND;VALUE=DATE:20270319
+LOCATION:Toronto\, ON
+SUMMARY:ACPA Conference
+UID:20270318T040000Z-2278961@events.iu.edu
+URL:https://events.iu.edu/studentaffairs-indianapolis/event/2278961-acpa-co
+ nference
+X-LIVEWHALE-ID:2278961
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-ALL-DAY:1
+X-LIVEWHALE-TAGS:Conference|Professional Development Page - National|Sign-u
+ p Required|Travel Required
+END:VEVENT
+END:VCALENDAR

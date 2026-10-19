@@ -22,6 +22,18 @@ import { CampusAppShell } from "@/components/campus-app-shell";
 import { CampusBrowsePicker } from "@/components/campus/CampusBrowsePicker";
 import { RollingStrip } from "@/components/campus/RollingStrip";
 import { useStripData } from "@/components/campus/strip-data";
+// "What's the vibe tonight?" (Oct 19 2026): the Feed's side panels and the
+// Events tab's Tonight block, chips and school cards. Contract:
+// handoffs/2026-10-19-tonight-build/CONTRACT.md §6.1 and §6.3.
+import { EventFilterChips } from "@/components/campus/tonight/EventFilterChips";
+import { QuietBoundary } from "@/components/campus/tonight/QuietBoundary";
+import { FeedSideLayout } from "@/components/campus/tonight/FeedSideLayout";
+import { SchoolEventCard } from "@/components/campus/tonight/SchoolEventCard";
+import { mergeComingUp, TONIGHT_COPY, upcomingSchool } from "@/components/campus/tonight/tonight-view";
+import { TonightSection } from "@/components/campus/tonight/TonightSection";
+import type { TonightFilter } from "@/components/campus/tonight/types";
+import { useCampusNow } from "@/components/campus/tonight/use-campus-now";
+import { useSchoolEvents } from "@/components/campus/tonight/use-school-events";
 import {
   isOpenCampus,
   useViewingCampus,
@@ -1117,6 +1129,7 @@ export function CampusHome({
               onPickEvent={onPickEvent}
               highlightEventId={pendingEventId}
               onHighlightDone={onEventHighlighted}
+              onOpenTab={setTab}
             />
           </div>
         )}
@@ -6752,6 +6765,7 @@ function TabBody({
   onPickEvent,
   highlightEventId,
   onHighlightDone,
+  onOpenTab,
 }: {
   tab: CampusTab;
   onCreateOrg: () => void;
@@ -6762,16 +6776,29 @@ function TabBody({
   onPickEvent: (eventId: string) => void;
   highlightEventId: string | null;
   onHighlightDone: () => void;
+  /** The Feed's side panels: "All in Events" and "Find clubs on campus". */
+  onOpenTab: (tab: "events" | "orgs") => void;
 }) {
+  const view = useCampusView();
   if (tab === "feed")
     return (
-      <FeedTabBody
-        key={feedTagFilter ?? "all"}
-        tagFilter={feedTagFilter}
-        onClearTagFilter={onClearTagFilter}
-        onPickTag={onPickTag}
+      // "Your clubs" left, Tonight right (C2). The panels sit OUTSIDE the
+      // tag-keyed FeedTabBody, so picking a tag never refetches them; this
+      // TabBody's campus key remounts them when the campus changes.
+      <FeedSideLayout
+        eventsUrl={view.url("/api/events?limit=50")}
+        schoolUrl={view.url("/api/school-events")}
         onPickEvent={onPickEvent}
-      />
+        onOpenTab={onOpenTab}
+      >
+        <FeedTabBody
+          key={feedTagFilter ?? "all"}
+          tagFilter={feedTagFilter}
+          onClearTagFilter={onClearTagFilter}
+          onPickTag={onPickTag}
+          onPickEvent={onPickEvent}
+        />
+      </FeedSideLayout>
     );
   if (tab === "events")
     return (
@@ -10272,6 +10299,11 @@ export type CampusEvent = {
   } | null;
 };
 
+/** Tonight's club list once /api/events has failed: no club rows, the school
+ *  rows still show. One shared [] so Tonight's memo doesn't see a new list
+ *  on every render (the phone's NO_CLUB_EVENTS twin). */
+const NO_TONIGHT_CLUBS: CampusEvent[] = [];
+
 function EventsTabBody({
   highlightEventId = null,
   onHighlightDone,
@@ -10287,9 +10319,33 @@ function EventsTabBody({
   const view = useCampusView();
   // Bare at home; `?campus=<id>` while visiting (C5).
   const eventsUrl = view.url("/api/events?limit=50");
+  // School calendars (Oct 19 2026, CONTRACT §6.3): the same campus rule as
+  // events. Off Indianapolis, or with the switch off, `school.on` is false
+  // and every school part below (chips, rows, cards) stays hidden.
+  const school = useSchoolEvents(view.url("/api/school-events"));
+  const [filter, setFilter] = useState<TonightFilter>("all");
+  // "Coming up" holds school events of the next 7 campus days. A 5-minute
+  // tick is plenty for that window; Tonight keeps its own minute clock.
+  const weekNow = useCampusNow(300_000);
+  // With no school part there's nothing to filter: everything shows.
+  const shownFilter: TonightFilter = school.on ? filter : "all";
   const [events, setEvents] = useState<CampusEvent[] | null>(null);
   // First-load failure only; a failed refresh keeps the events on screen.
   const [loadErr, setLoadErr] = useState<LoadFailure | null>(null);
+  // Club cards (every event /api/events sends, tonight's included: the card
+  // stays the RSVP place) and the school events after tonight, one grid,
+  // by start. weekNow is 0 until the page is live in the browser, so the
+  // server's first paint and hydration hold club cards only.
+  const entries = useMemo(
+    () =>
+      mergeComingUp({
+        clubs: events ?? [],
+        school: school.on && weekNow ? upcomingSchool(school.events, weekNow) : [],
+        sources: school.sources,
+        filter: shownFilter,
+      }),
+    [events, school.on, school.events, school.sources, weekNow, shownFilter],
+  );
   const [loadKey, setLoadKey] = useState(0);
   const [showCreate, setShowCreate] = useState(false);
   const [eligibleOrgs, setEligibleOrgs] = useState<EligibleOrg[]>([]);
@@ -10374,23 +10430,42 @@ function EventsTabBody({
   // dark glass, so a ring reads where a background tint would not. Reports
   // back whether or not the event is in this list (it may have scrolled
   // past the 50-event window), so the id is never left to replay.
+  // Tonight's club rows call the same flash directly (they sit right above
+  // the grid). Only one ring at a time: a second pick inside the 2.2 s puts
+  // the first card back first, so its own ring can never be left stuck on.
+  const flashRef = useRef<{ el: HTMLElement; prev: string; timer: number } | null>(null);
+  const flashEvent = useCallback((id: string) => {
+    const el = document.getElementById(`event-${id}`);
+    if (!el) return;
+    const last = flashRef.current;
+    if (last) {
+      window.clearTimeout(last.timer);
+      last.el.style.boxShadow = last.prev;
+    }
+    el.scrollIntoView({ behavior: "smooth", block: "center" });
+    const prev = el.style.boxShadow;
+    el.style.boxShadow = "0 0 0 3px rgba(255,92,53,0.6)";
+    const timer = window.setTimeout(() => {
+      el.style.boxShadow = prev;
+      flashRef.current = null;
+    }, 2200);
+    flashRef.current = { el, prev, timer };
+  }, []);
   useEffect(() => {
-    if (!highlightEventId || events === null) return;
+    // Wait for everything that lands above or around the card, not just the
+    // club list: the school read brings the chips, Tonight's real height (in
+    // place of its skeleton) and school cards sorted in ahead of this one, and
+    // weekNow is 0 until the page is live (no school cards yet). Flashing
+    // earlier would centre the card and then push it off screen. A failed
+    // school read still lands as "ready", so this can't wait forever.
+    if (!highlightEventId || events === null || school.status === "loading" || weekNow === 0) return;
     // requestAnimationFrame so layout has settled before we measure.
     const raf = window.requestAnimationFrame(() => {
-      const el = document.getElementById(`event-${highlightEventId}`);
-      if (el) {
-        el.scrollIntoView({ behavior: "smooth", block: "center" });
-        const prevShadow = el.style.boxShadow;
-        el.style.boxShadow = "0 0 0 3px rgba(255,92,53,0.6)";
-        window.setTimeout(() => {
-          el.style.boxShadow = prevShadow;
-        }, 2200);
-      }
+      flashEvent(highlightEventId);
       onHighlightDone?.();
     });
     return () => window.cancelAnimationFrame(raf);
-  }, [events, highlightEventId, onHighlightDone]);
+  }, [events, school.status, weekNow, highlightEventId, onHighlightDone, flashEvent]);
 
   return (
     <section
@@ -10448,6 +10523,20 @@ function EventsTabBody({
         ) : null}
       </div>
 
+      {/* One filter for Tonight and "Coming up" (D2). Only with the school
+          part on: without it a "School" chip could only ever come up empty. */}
+      {school.on ? <EventFilterChips value={filter} onChange={setFilter} /> : null}
+      <QuietBoundary name="tonight-section"><TonightSection
+        layout="desktop"
+        school={school}
+        // A failed club read leaves `events` null for good (the error card
+        // below says so); Tonight takes that as "no club events" so its
+        // school rows still show instead of a skeleton that never resolves.
+        clubs={events ?? (loadErr ? NO_TONIGHT_CLUBS : null)}
+        filter={shownFilter}
+        onPickClubEvent={flashEvent}
+      /></QuietBoundary>
+
       {events === null && loadErr ? (
         <DarkGlassCard>
           <LoadFailed
@@ -10463,13 +10552,35 @@ function EventsTabBody({
         <div style={{ color: COLORS.glassMuted, fontFamily: "DM Sans, sans-serif", fontSize: 14, padding: "20px 0" }}>
           Loading events…
         </div>
-      ) : events.length === 0 && view.isVisiting ? (
+      ) : entries.length === 0 && shownFilter === "school" ? (
+        // The chip's own card comes first, also while visiting: "No events
+        // here yet." would be false when the campus has events of the other
+        // kind (the phone's EventsPane checks in the same order).
+        <DarkGlassCard>
+          <div style={{ fontFamily: "DM Sans, sans-serif", fontSize: 14, color: COLORS.glassMuted, lineHeight: 1.6, textAlign: "center", padding: "12px 8px" }}>
+            <div style={{ fontFamily: "Fraunces, serif", fontWeight: 800, fontSize: 16, color: "#fff", marginBottom: 6 }}>
+              {TONIGHT_COPY.noSchoolWeek}
+            </div>
+            {TONIGHT_COPY.noSchoolWeekBody}
+          </div>
+        </DarkGlassCard>
+      ) : entries.length === 0 && shownFilter === "clubs" ? (
+        <DarkGlassCard>
+          <div style={{ fontFamily: "DM Sans, sans-serif", fontSize: 14, color: COLORS.glassMuted, lineHeight: 1.6, textAlign: "center", padding: "12px 8px" }}>
+            <div style={{ fontFamily: "Fraunces, serif", fontWeight: 800, fontSize: 16, color: "#fff", marginBottom: view.isVisiting ? 0 : 6 }}>
+              {TONIGHT_COPY.noClubsComing}
+            </div>
+            {/* No "+ Create event" while visiting (canCreate), so no hint to it. */}
+            {view.isVisiting ? null : <>Be the first to post one — hit &ldquo;+ Create event&rdquo; above.</>}
+          </div>
+        </DarkGlassCard>
+      ) : entries.length === 0 && view.isVisiting ? (
         <DarkGlassCard>
           <div style={{ fontFamily: "Fraunces, serif", fontWeight: 800, fontSize: 16, color: "#fff", textAlign: "center", padding: "12px 8px" }}>
             {VISITING_COPY.emptyEvents}
           </div>
         </DarkGlassCard>
-      ) : events.length === 0 ? (
+      ) : entries.length === 0 ? (
         <DarkGlassCard>
           <div style={{ fontFamily: "DM Sans, sans-serif", fontSize: 14, color: COLORS.glassMuted, lineHeight: 1.6, textAlign: "center", padding: "12px 8px" }}>
             <div style={{ fontFamily: "Fraunces, serif", fontWeight: 800, fontSize: 16, color: "#fff", marginBottom: 6 }}>
@@ -10491,16 +10602,24 @@ function EventsTabBody({
               While it fades, the card's frost can't read the page behind it
               (a fading parent cuts that off); the scene there is soft washes,
               so the frost settling in at the end doesn't read as a jump. */}
-          {events.map((ev, i) => (
-            <Reveal key={ev.id} delayIndex={i}>
-              <EventCard
-                ev={ev}
-                onMutate={refresh}
-                onRemoved={dropEvent}
-                onUpdated={swapEvent}
-              />
-            </Reveal>
-          ))}
+          {/* School cards (Oct 19) share the grid in start order; they carry
+              no RSVP, no Report and no `event-<id>` anchor (SchoolEventCard). */}
+          {entries.map((entry, i) =>
+            entry.kind === "club" ? (
+              <Reveal key={entry.key} delayIndex={i}>
+                <EventCard
+                  ev={entry.ev}
+                  onMutate={refresh}
+                  onRemoved={dropEvent}
+                  onUpdated={swapEvent}
+                />
+              </Reveal>
+            ) : (
+              <Reveal key={entry.key} delayIndex={i}>
+                <SchoolEventCard ev={entry.ev} source={entry.source} />
+              </Reveal>
+            ),
+          )}
         </div>
       )}
 
