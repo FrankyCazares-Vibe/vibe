@@ -1,10 +1,12 @@
 "use client";
 
+import { Arrow } from "@/components/brand/Arrow";
 import { KineticWordmark } from "@/components/brand/KineticWordmark";
 import { isAuthRetryableFetchError, type AuthError } from "@supabase/supabase-js";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useRef, useState } from "react";
+import { preload } from "react-dom";
 
 import { ConfirmCodeForm } from "@/components/auth/ConfirmCodeForm";
 import { ResendConfirmation } from "@/components/auth/ResendConfirmation";
@@ -21,6 +23,7 @@ import { getPostLoginDestination } from "@/lib/auth/post-login";
 import { sanitizeLoginNextParam } from "@/lib/auth/login-next";
 import { readPendingSignupEmail } from "@/lib/auth/pending-signup";
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser";
+import { WORDMARK_FONT_PATH } from "@/lib/theme/fonts";
 import { useSignupOpen } from "@/lib/waitlist/use-signup-open";
 
 const NOT_CONFIRMED =
@@ -267,7 +270,7 @@ function LoginForm() {
   return (
     <div className="vibe-auth-page">
       <Link href="/" className="vibe-auth-back">
-        <span aria-hidden>←</span> back
+        <Arrow direction="left" /> back
       </Link>
 
       <div className="vibe-auth-card">
@@ -304,9 +307,7 @@ function LoginForm() {
               style={{ display: "flex", width: "100%", marginTop: 10 }}
             >
               Continue
-              <span aria-hidden style={{ marginLeft: 8 }}>
-                →
-              </span>
+              <Arrow direction="right" style={{ marginLeft: 8 }} />
             </button>
           </div>
         ) : (
@@ -367,9 +368,7 @@ function LoginForm() {
           >
             {loading ? "Signing in…" : (humanWait ?? "Sign in")}
             {loading || humanWait !== null ? null : (
-              <span aria-hidden style={{ marginLeft: 8 }}>
-                →
-              </span>
+              <Arrow direction="right" style={{ marginLeft: 8 }} />
             )}
           </button>
         </form>
@@ -464,6 +463,10 @@ function LoginForm() {
 }
 
 export default function LoginPage() {
+  // Oct 19, 2026: the logo face is font-display block and only asked for once
+  // the form renders, so on a slow phone the letters' entrance played while
+  // they were still invisible. 1.4 KB, same origin, used on this page only.
+  preload(WORDMARK_FONT_PATH, { as: "font", type: "font/woff2" });
   return (
     <Suspense
       fallback={

@@ -17,7 +17,7 @@ import { DayOnVibe, MOMENTS, type DayHandle, type MomentId } from "./day-on-vibe
 import { HeroTitle } from "./hero-title";
 import { NightSky, type SkyLight } from "./night-sky";
 import { Readout, type Still } from "./readout";
-import { frauncesSoft } from "./soft-font";
+import { frauncesSoft, landingMono } from "./soft-font";
 import "./landing.css";
 
 const WARP_DURATION_MS = 750;
@@ -199,7 +199,7 @@ export function HomeLanding({ signupOpen }: { signupOpen: boolean }) {
   }, []);
 
   return (
-    <div className={`vln-root ${frauncesSoft.variable}${warping ? " is-warping" : ""}`}>
+    <div className={`vln-root ${frauncesSoft.variable} ${landingMono.variable}${warping ? " is-warping" : ""}`}>
       <header className="vln-bar">
         <KineticWordmark className="vln-wordmark" dotClassName="vln-wordmark-dot" />
         <nav aria-label="Account">

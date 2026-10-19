@@ -58,6 +58,9 @@
     .vsa-overlay{position:fixed;inset:0;background:transparent;z-index:11000;display:none;align-items:center;justify-content:center;padding:24px;}
     .vsa-overlay.show{display:flex;}
     .vsa-card{width:min(420px,92vw);background:var(--paper,white);border-radius:16px;border:1px solid var(--hairline,rgba(28,28,30,.08));box-shadow:0 28px 80px rgba(0,0,0,.28),0 4px 16px rgba(0,0,0,.08);overflow:hidden;display:flex;flex-direction:column;font-family:'DM Sans',system-ui,sans-serif;}
+    /* The mute rows are buttons: without this they draw in the browser's
+       own font instead of the card's DM Sans (Oct 19, 2026). */
+    .vsa-card button{font-family:inherit;}
     .vsa-hdr{padding:16px 20px 12px;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--hairline,rgba(28,28,30,.08));}
     .vsa-title{font-family:'Fraunces',serif;font-size:17px;font-weight:800;flex:1;color:var(--charcoal,#1C1C1E);}
     .vsa-x{background:none;border:none;color:var(--ink-muted, #6C6761);cursor:pointer;font-size:18px;line-height:1;padding:4px 6px;}

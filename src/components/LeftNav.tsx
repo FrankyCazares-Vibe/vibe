@@ -275,14 +275,15 @@ export default function LeftNav() {
           background: cursorGlow,
         }}
       />
+      {/* Oct 19, 2026: the family, weight and letter-spacing come from
+          .vibe-wordmark (globals.css), the landing's exact soft "vibe."
+          shape; an inline value here would override the class. */}
       <Link
         href="/campus"
+        className="vibe-wordmark"
         style={{
-          fontFamily: "Fraunces, serif",
           fontSize: "22px",
-          fontWeight: "900",
           color: "var(--charcoal)",
-          letterSpacing: "-1px",
           display: "block",
           marginBottom: "24px",
           textDecoration: "none",

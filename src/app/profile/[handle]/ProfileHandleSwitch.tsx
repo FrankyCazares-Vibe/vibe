@@ -167,7 +167,6 @@ export function ProfileHandleSwitch({ handle, query = "", firstGuessPhone = fals
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        fontFamily: "system-ui, sans-serif",
         fontSize: 15,
         color: "#444",
       }}

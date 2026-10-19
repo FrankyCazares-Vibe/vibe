@@ -23,9 +23,13 @@ function getFrom(): string {
   return from;
 }
 
-// Brand tokens from docs/DESIGN_SYSTEM.md, matching the sign-in card and
-// supabase/templates/confirmation.html. Fraunces / DM Sans load in Apple Mail;
-// everything else falls back to Georgia / system sans.
+// Brand tokens from docs/DESIGN_SYSTEM.md, matching the sign-in card.
+// (supabase/templates/confirmation.html uses system fonts only, no web fonts.)
+// Fraunces / DM Sans load in Apple Mail; everything else falls back to
+// Georgia / system sans. Oct 19, 2026: the head link asks for Fraunces
+// 700..900 with SOFT 100 (the app's soft titles; the file is no bigger), and
+// the wordmark is 900, its one weight everywhere. The soft "vibe." cut itself
+// can't travel in email without an image.
 const CREAM = "#FAF7F2";
 const CHARCOAL = "#1C1C1E";
 const BODY = "#5A564F";
@@ -118,7 +122,7 @@ function brandedEmailHtml(e: BrandedEmail): string {
 <meta name="supported-color-schemes" content="light only">
 <meta name="format-detection" content="telephone=no,date=no,address=no,email=no">
 <title>${e.title}</title>
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@700;800&family=DM+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400..700&family=Fraunces:wght,SOFT@700..900,100&display=swap" rel="stylesheet">
 <style>
   :root { color-scheme: light only; }
   body { margin: 0; padding: 0; background: ${CREAM}; }
@@ -141,7 +145,7 @@ function brandedEmailHtml(e: BrandedEmail): string {
           <td class="vibe-card" bgcolor="#FFFFFF" style="background:#FFFFFF;border:1px solid #EEE8DF;border-radius:24px;padding:40px 36px 34px;font-family:${SANS};color:${CHARCOAL};">
             <table role="presentation" cellpadding="0" cellspacing="0" border="0">
               <tr>
-                <td bgcolor="#F4F2EF" style="background:#F4F2EF;border-radius:999px;padding:5px 12px;font-family:${SERIF};font-size:18px;line-height:22px;font-weight:800;letter-spacing:-0.5px;color:${CHARCOAL};">
+                <td bgcolor="#F4F2EF" style="background:#F4F2EF;border-radius:999px;padding:5px 12px;font-family:${SERIF};font-size:18px;line-height:22px;font-weight:900;letter-spacing:-0.5px;color:${CHARCOAL};">
                   <a href="${getSiteUrl()}" style="color:${CHARCOAL};text-decoration:none;">vibe<span style="color:${ACCENT};">.</span></a>
                 </td>
               </tr>
@@ -153,7 +157,7 @@ function brandedEmailHtml(e: BrandedEmail): string {
         </tr>
         <tr>
           <td align="center" style="padding:20px 12px 0;font-family:${SANS};font-size:12px;line-height:18px;color:${MUTED};">
-            <span style="font-family:${SERIF};font-weight:800;color:${CHARCOAL};">vibe<span style="color:${ACCENT};">.</span></span> &middot; Indianapolis<br>
+            <span style="font-family:${SERIF};font-weight:900;color:${CHARCOAL};">vibe<span style="color:${ACCENT};">.</span></span> &middot; Indianapolis<br>
             <a href="${escapeAttr(e.privacyHref ?? PRIVACY_URL)}" style="color:${MUTED};">Privacy policy</a>
           </td>
         </tr>

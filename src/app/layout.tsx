@@ -1,6 +1,5 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
-import { JetBrains_Mono } from "next/font/google";
 import { headers } from "next/headers";
 
 import { BuildRefresh } from "@/components/build/BuildRefresh";
@@ -11,11 +10,9 @@ import { NativeBridge } from "@/components/native/NativeBridge";
 import { ServiceWorkerRegistrar } from "@/components/pwa/ServiceWorkerRegistrar";
 import { ActivityTouch } from "@/components/usage/ActivityTouch";
 import { NONCE_HEADER } from "@/lib/security/csp";
+import { GOOGLE_FONTS_HREF } from "@/lib/theme/fonts";
 import { THEME_BOOT_SCRIPT } from "@/lib/theme/theme";
 import { ThemeSync } from "@/lib/theme/ThemeSync";
-import { cn } from "@/lib/utils";
-
-const jetbrainsMono = JetBrains_Mono({subsets:['latin'],variable:'--font-mono'});
 
 const SITE_TITLE = "Vibe · Your campus. Your people. Yourself.";
 const SITE_TAGLINE = "Your campus. Your people. Yourself.";
@@ -91,12 +88,7 @@ export default async function RootLayout({
     // then keeps whatever the DOM says (suppressHydrationWarning), the Next
     // "preventing flash before hydration" recipe. DEFAULT_THEME_PREF is
     // "system" (Auto) since S68 wave 5, so a dark device gets Night here.
-    <html
-      lang="en"
-      data-theme="light"
-      suppressHydrationWarning
-      className={cn("font-mono", jetbrainsMono.variable)}
-    >
+    <html lang="en" data-theme="light" suppressHydrationWarning>
       <head>
         {/* FIRST child of <head>: reads localStorage.vibe_theme, resolves
             "system" with matchMedia and sets data-theme. Nothing else; the
@@ -110,10 +102,11 @@ export default async function RootLayout({
             the font files come from gstatic, fetched in CORS mode, so that is
             the connection worth opening early. */}
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link
-          href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,400;0,700;0,800;0,900;1,400&family=DM+Sans:wght@300;400;500;600;700;800&display=swap"
-          rel="stylesheet"
-        />
+        {/* One link for the whole app, the same string the three static
+            pages paste (src/lib/theme/fonts.ts; fonts.test.ts catches drift).
+            No JetBrains Mono here since Oct 19, 2026: only the landing draws
+            it, so it loads there (components/landing/soft-font.ts). */}
+        <link href={GOOGLE_FONTS_HREF} rel="stylesheet" />
       </head>
       <body>
         {/* The theme after first paint: the theme-color meta, Auto following

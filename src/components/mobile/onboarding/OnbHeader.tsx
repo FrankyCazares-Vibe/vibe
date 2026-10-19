@@ -265,11 +265,13 @@ const topBarStyle: CSSProperties = {
   backdropFilter: "blur(8px)",
 };
 
+// Oct 19, 2026: the dedicated wordmark face (globals.css "Vibe Wordmark"),
+// so the header logo matches the landing's soft "vibe." exactly.
 const logoStyle: CSSProperties = {
-  fontFamily: "'Fraunces', Georgia, serif",
+  fontFamily: "var(--font-wordmark)",
   fontSize: 18,
   fontWeight: 900,
-  letterSpacing: "-0.5px",
+  letterSpacing: "-0.03em",
   color: "white",
 };
 

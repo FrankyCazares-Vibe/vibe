@@ -3,6 +3,7 @@ import Link from "next/link";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { Arrow } from "@/components/brand/Arrow";
 import { LoadFailed } from "@/components/feedback/LoadFailed";
 import { MobileTabBar } from "@/components/mobile/MobileTabBar";
 import { OrgInviteBanner } from "@/components/orgs/OrgInviteBanner";
@@ -598,15 +599,15 @@ function TopNav({ signedIn, backHref }: { signedIn: boolean; backHref: string })
         fontSize: 13,
       }}
     >
-      {/* Vibe logo with orange dot — matches the LeftNav treatment. */}
+      {/* Vibe logo with orange dot — matches the LeftNav treatment.
+          Oct 19, 2026: family, weight and letter-spacing come from
+          .vibe-wordmark (globals.css), the landing's soft shape. */}
       <Link
         href="/"
+        className="vibe-wordmark"
         style={{
           color: "#fff",
           textDecoration: "none",
-          fontFamily: "Fraunces, serif",
-          fontWeight: 900,
-          letterSpacing: "-0.02em",
           fontSize: 22,
         }}
       >
@@ -631,7 +632,7 @@ function TopNav({ signedIn, backHref }: { signedIn: boolean; backHref: string })
             WebkitBackdropFilter: "blur(12px)",
           }}
         >
-          ← Return to Organizations
+          <Arrow direction="left" /> Return to Organizations
         </Link>
       ) : (
         <Link

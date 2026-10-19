@@ -127,7 +127,6 @@ export function ProfileHtmlBridge() {
           maxWidth: 420,
           margin: "0 auto",
           padding: 24,
-          fontFamily: "system-ui, sans-serif",
           fontSize: 15,
           color: "#444",
           textAlign: "center",
@@ -154,7 +153,6 @@ export function ProfileHtmlBridge() {
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        fontFamily: "system-ui, sans-serif",
         fontSize: 15,
         color: "#444",
       }}

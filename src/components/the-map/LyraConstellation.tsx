@@ -211,7 +211,9 @@ export default function LyraConstellation() {
             }}
           >
             The Lyra{" "}
-            <span style={{ fontStyle: "italic", color: "#FFD08A" }}>
+            {/* Oct 19, 2026: the accent word stays upright at the title's own
+                weight, the way the landing does it. */}
+            <span style={{ color: "#FFD08A" }}>
               Constellation.
             </span>
           </h2>
@@ -440,10 +442,11 @@ function HyperspaceViewport({
             >
               stage 0{active.n} · {active.star}
             </div>
+            {/* Oct 19, 2026: upright, since the app loads no bold italic
+                Fraunces and fake bold is off. */}
             <div
               style={{
                 fontFamily: fontDisplay,
-                fontStyle: "italic",
                 fontWeight: 700,
                 fontSize: 36,
                 lineHeight: 1,
@@ -813,12 +816,9 @@ function StageDetail({ stage }: { stage: Stage }) {
                 margin: 0,
               }}
             >
-              <span
-                style={{
-                  fontStyle: "italic",
-                  color: isVega ? "#FFD08A" : "#FF5C35",
-                }}
-              >
+              {/* Oct 19, 2026: upright at the title's weight (no bold
+                  italic is loaded). */}
+              <span style={{ color: isVega ? "#FFD08A" : "#FF5C35" }}>
                 {stage.name}
               </span>
             </h3>
@@ -1111,10 +1111,11 @@ function MobileStageList({
                 {s.time}
               </div>
             </div>
+            {/* Oct 19, 2026: upright for the same reason as the stage name
+                above. */}
             <div
               style={{
                 fontFamily: fontDisplay,
-                fontStyle: "italic",
                 fontWeight: 600,
                 fontSize: 24,
                 color: isVega ? "#FFD08A" : "#FF5C35",

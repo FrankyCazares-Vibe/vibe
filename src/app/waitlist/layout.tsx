@@ -3,7 +3,7 @@ import Link from "next/link";
 
 import "@/components/landing/landing.css";
 import { CookieNotice } from "@/components/legal/CookieNotice";
-import { frauncesSoft } from "@/components/landing/soft-font";
+import { frauncesSoft, landingMono } from "@/components/landing/soft-font";
 
 import "./waitlist.css";
 
@@ -17,7 +17,7 @@ export const viewport: Viewport = { themeColor: "#0C0B0B" };
  */
 export default function WaitlistLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className={`vln-root vwl-root ${frauncesSoft.variable}`}>
+    <div className={`vln-root vwl-root ${frauncesSoft.variable} ${landingMono.variable}`}>
       <header className="vwl-bar">
         <Link href="/" className="vln-wordmark" aria-label="Vibe home">
           vibe<i>.</i>

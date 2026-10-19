@@ -14,7 +14,11 @@
 <meta name="theme-color" content="#FAF7F2">
 <script src="/html/_sw.js" defer></script>
 <title>Meet Otto — Vibe</title>
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,400;0,700;0,900;1,400;1,700&family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<!-- The one shared font link: byte-identical to GOOGLE_FONTS_HREF in
+     src/lib/theme/fonts.ts (fonts.test.ts fails when they drift). Upright
+     Fraunces is pinned soft (SOFT 100) like the landing, Oct 19, 2026. -->
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,300..800;1,400&family=Fraunces:ital,wght,SOFT@0,400..900,100;1,400,100&display=swap" rel="stylesheet">
 <script src="/html/_persistence.js"></script>
 <!-- window.vibeMajorsForCampus: the curated majors list for the campus the
      student picks, generated from src/lib/iu/majors.ts (same include as
@@ -47,11 +51,22 @@
   --bg-rgb:12,11,11; --surface:#161515; --surface-2:#1F1D1C; --option-ink:#F6F1EA; }
 * { margin: 0; padding: 0; box-sizing: border-box; }
 html, body { height: 100%; }
+/* The "vibe." logo face: Fraunces cut to the landing's exact shape (opsz
+   144, SOFT 100, 900), only its five letters, 1.4 KB, same origin. The twin
+   of the @font-face in src/app/globals.css (Oct 19, 2026). */
+@font-face { font-family: "Vibe Wordmark"; src: url("/fonts/vibe-wordmark-v1.woff2") format("woff2"); font-weight: 900; font-style: normal; font-display: block; unicode-range: U+2E, U+62, U+65, U+69, U+76; }
 body {
   font-family: 'DM Sans', sans-serif;
+  /* No browser-faked bold: a weight the font lacks draws as the real face
+     instead of a smeared one (Oct 19, 2026). */
+  font-synthesis-weight: none;
   background: var(--charcoal); color: white;
   cursor: none; overflow-x: hidden; min-height: 100vh;
 }
+/* Buttons and fields take DM Sans, not the browser's own font. Family only:
+   the font shorthand would also reset sizes that rely on the browser
+   default (Oct 19, 2026). */
+button, input, select, textarea { font-family: inherit; }
 
 /* Custom cursor (matches the rest of vibe) */
 .cursor { width:8px;height:8px;background:var(--accent);border-radius:50%;position:fixed;top:0;left:0;pointer-events:none;z-index:2147483647;will-change:transform;transition:width .15s,height .15s,background .15s; }
@@ -83,7 +98,7 @@ input, textarea, [contenteditable="true"] { cursor:text!important; }
 }
 .onb-back:hover:not(:disabled) { background: rgba(255,255,255,.12); }
 .onb-back:disabled { opacity: .4; }
-.onb-logo { font-family: 'Fraunces', serif; font-size: 22px; font-weight: 900; color: white; letter-spacing: -1px; text-decoration: none; }
+.onb-logo { font-family: "Vibe Wordmark", 'Fraunces', serif; font-size: 22px; font-weight: 900; color: white; letter-spacing: -0.03em; text-decoration: none; }
 .onb-logo span { color: var(--accent); }
 .onb-skip {
   justify-self: end; min-height: 44px; min-width: 44px;
@@ -163,7 +178,10 @@ input, textarea, [contenteditable="true"] { cursor:text!important; }
 
 /* Type */
 .h1 { font-family: 'Fraunces', serif; font-size: 40px; font-weight: 900; color: white; letter-spacing: -1.5px; line-height: 1.1; margin-bottom: 18px; }
-.h1 em { color: var(--accent); font-style: italic; }
+/* "otto" stays upright at the title's own 900, the way the landing does it.
+   The shared font link has no bold italic (this page used to load its own
+   italic 700), so an italic here would be a lighter 400 (Oct 19, 2026). */
+.h1 em { color: var(--accent); font-style: normal; }
 .h2 { font-family: 'Fraunces', serif; font-size: 30px; font-weight: 900; color: white; letter-spacing: -1px; line-height: 1.15; margin-bottom: 12px; }
 .intro { font-family: 'Fraunces', serif; font-style: italic; font-size: 17px; line-height: 1.6; color: rgba(255,255,255,.78); max-width: 480px; margin-bottom: 36px; }
 .sub-intro { font-family: 'Fraunces', serif; font-style: italic; font-size: 14px; color: rgba(255,255,255,.55); margin-bottom: 28px; max-width: 480px; line-height: 1.55; }

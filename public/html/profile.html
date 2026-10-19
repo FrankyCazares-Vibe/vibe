@@ -25,7 +25,11 @@
      which counts Otto opens through it. -->
 <script src="/html/_usageTouch.js" defer></script>
 <title>Vibe Profile</title>
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,300;0,400;0,600;0,900;1,300;1,400&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<!-- The one shared font link: byte-identical to GOOGLE_FONTS_HREF in
+     src/lib/theme/fonts.ts (fonts.test.ts fails when they drift). Upright
+     Fraunces is pinned soft (SOFT 100) like the landing, Oct 19, 2026. -->
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,300..800;1,400&family=Fraunces:ital,wght,SOFT@0,400..900,100;1,400,100&display=swap" rel="stylesheet">
 <script src="/html/_persistence.js"></script>
 <script src="/html/_otto.js" defer></script>
 <!-- PDF.js — rasterizes uploaded PDFs into images so redaction bars can
@@ -253,13 +257,25 @@ html.vibe-pre-paint .profile-cover { opacity: 0; }
 * { margin:0; padding:0; box-sizing:border-box; }
 html { scroll-behavior:smooth; }
 
+/* The "vibe." logo face: Fraunces cut to the landing's exact shape (opsz
+   144, SOFT 100, 900), only its five letters, 1.4 KB, same origin. The
+   twin of the @font-face in src/app/globals.css (Oct 19, 2026). */
+@font-face { font-family:"Vibe Wordmark"; src:url("/fonts/vibe-wordmark-v1.woff2") format("woff2"); font-weight:900; font-style:normal; font-display:block; unicode-range:U+2E, U+62, U+65, U+69, U+76; }
+
 body {
   font-family:'DM Sans',sans-serif;
+  /* No browser-faked bold: a weight the font lacks (a bold italic accent)
+     draws as the real face instead of a smeared one (Oct 19, 2026). */
+  font-synthesis-weight:none;
   background:var(--cream);
   color:var(--charcoal);
   cursor:none;
   overflow-x:hidden;
 }
+/* Buttons and fields take DM Sans, not the browser's own font (Arial on
+   "Connections / Following", "+ Add tag"). Family only: the font shorthand
+   would also reset sizes that rely on the browser default (Oct 19, 2026). */
+button, input, select, textarea { font-family: inherit; }
 
 /* ── Cursor ── */
 .cursor { width:8px;height:8px;background:var(--accent);border-radius:50%;position:fixed;top:0;left:0;pointer-events:none;z-index:2147483647;will-change:transform;transition:width .15s,height .15s,background .15s; }
@@ -277,7 +293,7 @@ nav {
   backdrop-filter:blur(18px);
   border-bottom:1px solid rgba(var(--scrim-rgb),0.06);
 }
-.nav-logo { font-family:'Fraunces',serif;font-size:24px;font-weight:900;color:var(--charcoal);letter-spacing:-1px;text-decoration:none; }
+.nav-logo { font-family:"Vibe Wordmark",'Fraunces',serif;font-size:24px;font-weight:900;color:var(--charcoal);letter-spacing:-0.03em;text-decoration:none; }
 .nav-logo span { color:var(--accent); }
 .nav-right { display:flex;align-items:center;gap:12px; }
 
@@ -760,7 +776,11 @@ body.edit-mode .tag-add { display:flex;align-items:center;gap:5px; }
   letter-spacing:-.3px;margin-bottom:16px;
   display:flex;align-items:center;justify-content:space-between;
 }
+/* DM Sans by name: it sits inside the Fraunces card titles, so the
+   buttons-inherit rule above would turn "+ Add role" into Fraunces
+   (Oct 19, 2026). */
 .card-add-btn {
+  font-family:'DM Sans',sans-serif;
   font-size:12px;font-weight:600;color:var(--tag-ink);
   background:none;border:none;cursor:none;display:none;
   transition:opacity .15s;
@@ -1761,6 +1781,10 @@ body.viewer-mode .doc-edit-cta { display:none; }
   position:absolute;inset:0;width:100%;height:100%;object-fit:cover;
   border-radius:22px;
 }
+/* The initials when there's no photo: Fraunces 800, as on the phone profile
+   (ProfileMobile) and the composer's mini avatar. They inherited DM Sans 400
+   before (Oct 19, 2026). An old emoji avatar still draws in the emoji font. */
+#avatarEmoji { font-family:'Fraunces',serif; font-weight:800; letter-spacing:-0.02em; }
 
 /* Cover upload panel */
 .cover-panel {
@@ -3129,7 +3153,11 @@ body.empty-profile-mode #profileEmpty { display: flex !important; }
   letter-spacing: -2px; color: var(--charcoal);
   margin-bottom: 22px; max-width: 720px;
 }
-.empty-title em { font-style: italic; color: var(--tag-ink); }
+/* The coral word stays upright at the title's own 900, the way the landing
+   does it. No bold italic is loaded: an italic here was a browser-faked
+   bold, and with faking off it would be a lighter italic 400 (Oct 19,
+   2026). */
+.empty-title em { font-style: normal; color: var(--tag-ink); }
 .empty-otto-line {
   font-family: 'Fraunces', serif; font-style: italic;
   font-size: 17px; line-height: 1.6;

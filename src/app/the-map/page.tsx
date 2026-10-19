@@ -121,8 +121,10 @@ function SectionHeader({
         }}
       >
         {title}{" "}
+        {/* Oct 19, 2026: the coral word stays upright at the title's own
+            weight, the way the landing does it (the prop keeps its name). */}
         {italic ? (
-          <span style={{ fontStyle: "italic", color: CORAL_INK }}>
+          <span style={{ color: CORAL_INK }}>
             {italic}
           </span>
         ) : null}
@@ -214,7 +216,7 @@ function Hero() {
           This is the
           <br />
           map of{" "}
-          <span style={{ fontStyle: "italic", color: "#FF5C35" }}>vibe.</span>
+          <span style={{ color: "#FF5C35" }}>vibe.</span>
         </h1>
         <p
           style={{
@@ -538,7 +540,7 @@ function OttoHighlight() {
             }}
           >
             Meet{" "}
-            <span style={{ fontStyle: "italic", color: "#FF5C35" }}>
+            <span style={{ color: "#FF5C35" }}>
               Otto.
             </span>
           </h2>
@@ -811,8 +813,7 @@ function TaskColumn({
                   style={{
                     display: "inline-block",
                     marginTop: 6,
-                    fontFamily:
-                      "ui-monospace, SFMono-Regular, Menlo, monospace",
+                    fontFamily: "var(--font-code)",
                     fontSize: 12,
                     color: INK_MUTED,
                     background: "rgba(28,28,30,0.04)",
@@ -1026,7 +1027,7 @@ function Closing() {
           }}
         >
           This is the moment to{" "}
-          <span style={{ fontStyle: "italic", color: CORAL_INK }}>commit.</span>
+          <span style={{ color: CORAL_INK }}>commit.</span>
         </h2>
         <p
           style={{

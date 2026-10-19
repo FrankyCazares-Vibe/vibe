@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 
+import { Arrow } from "@/components/brand/Arrow";
 import { useIsStandalone } from "@/lib/pwa/use-standalone";
 
 /**
@@ -26,7 +27,7 @@ export function LegalBackLink() {
         textDecoration: "none",
       }}
     >
-      ← Back to Vibe
+      <Arrow direction="left" /> Back to Vibe
     </Link>
   );
 }

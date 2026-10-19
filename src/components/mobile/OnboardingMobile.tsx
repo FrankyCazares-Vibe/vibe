@@ -1281,9 +1281,11 @@ const h1Style: CSSProperties = {
   lineHeight: 1.1,
   marginBottom: 14,
 };
+// Oct 19, 2026: upright coral at the h1's own 900, the way the landing does
+// it. An italic here was a browser-faked bold italic (no 900 italic loaded).
 const emStyle: CSSProperties = {
   color: COLORS.accent,
-  fontStyle: "italic",
+  fontStyle: "normal",
 };
 const introStyle: CSSProperties = {
   fontFamily: "'Fraunces', Georgia, serif",

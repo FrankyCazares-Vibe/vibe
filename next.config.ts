@@ -166,6 +166,15 @@ const nextConfig: NextConfig = {
         ],
       },
       {
+        // Self-hosted font files (Oct 19, 2026: the "vibe." wordmark face).
+        // The version is in the file name, so a re-cut ships as -v2 and a
+        // year-long cache is safe.
+        source: "/fonts/:path*",
+        headers: [
+          { key: "Cache-Control", value: "public, max-age=31536000, immutable" },
+        ],
+      },
+      {
         // The service worker (public/sw.js) must never come from a cache: a
         // stale copy keeps a phone on old code and holds back the kill switch
         // (scripts/pwa/sw-killswitch.js). Browsers already skip their own HTTP

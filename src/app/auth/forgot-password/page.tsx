@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 
+import { Arrow } from "@/components/brand/Arrow";
 import { resetRequestError } from "@/lib/auth/password-reset-copy";
 
 export default function ForgotPasswordPage() {
@@ -46,7 +47,7 @@ export default function ForgotPasswordPage() {
   return (
     <div className="vibe-auth-page">
       <Link href="/auth/login" className="vibe-auth-back">
-        <span aria-hidden>←</span> back
+        <Arrow direction="left" /> back
       </Link>
 
       <div className="vibe-auth-card">
@@ -103,9 +104,7 @@ export default function ForgotPasswordPage() {
           <button type="submit" disabled={loading} className="vibe-auth-submit">
             {loading ? "Sending…" : "Send reset link"}
             {loading ? null : (
-              <span aria-hidden style={{ marginLeft: 8 }}>
-                →
-              </span>
+              <Arrow direction="right" style={{ marginLeft: 8 }} />
             )}
           </button>
         </form>

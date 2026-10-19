@@ -1,5 +1,6 @@
 "use client";
 
+import { Arrow } from "@/components/brand/Arrow";
 import { KineticWordmark } from "@/components/brand/KineticWordmark";
 import {
   isAuthRetryableFetchError,
@@ -9,6 +10,7 @@ import {
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+import { preload } from "react-dom";
 
 import { ConfirmCodeForm } from "@/components/auth/ConfirmCodeForm";
 import { ResendConfirmation } from "@/components/auth/ResendConfirmation";
@@ -46,6 +48,7 @@ import {
 import { openInBrowser } from "@/lib/native/bridge";
 import { appShellOnClient } from "@/lib/native/detect";
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser";
+import { WORDMARK_FONT_PATH } from "@/lib/theme/fonts";
 import {
   ACCESS_CODE_METADATA_KEY,
   ACCESS_CODE_URL_PARAM,
@@ -173,6 +176,11 @@ export function SignupForm({
   initialAccessCode: string;
   probe: boolean;
 }) {
+  // Oct 19, 2026: fetch the logo face with the page, so the kinetic logo's
+  // entrance isn't half over before its font (font-display block) arrives.
+  // Here, not in page.tsx: from the async server page the hint reached the
+  // stream after the <head> (local check), too late to help.
+  preload(WORDMARK_FONT_PATH, { as: "font", type: "font/woff2" });
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -398,7 +406,7 @@ export function SignupForm({
     return (
       <div className="vibe-auth-page">
         <Link href="/" className="vibe-auth-back">
-          <span aria-hidden>←</span> back
+          <Arrow direction="left" /> back
         </Link>
 
         <div className="vibe-auth-card">
@@ -474,7 +482,7 @@ export function SignupForm({
   return (
     <div className="vibe-auth-page">
       <Link href="/" className="vibe-auth-back">
-        <span aria-hidden>←</span> back
+        <Arrow direction="left" /> back
       </Link>
 
       <div className="vibe-auth-card">
@@ -529,7 +537,7 @@ export function SignupForm({
                 onChange={(e) => setAccessCode(e.target.value)}
                 className="vibe-auth-input"
                 style={{
-                  fontFamily: 'ui-monospace, "SF Mono", Menlo, Monaco, monospace',
+                  fontFamily: "var(--font-code)",
                   letterSpacing: "0.08em",
                 }}
               />
@@ -683,9 +691,7 @@ export function SignupForm({
           >
             {loading ? "Creating…" : agreed && humanWait !== null ? humanWait : "Create account"}
             {loading || (agreed && humanWait !== null) ? null : (
-              <span aria-hidden style={{ marginLeft: 8 }}>
-                →
-              </span>
+              <Arrow direction="right" style={{ marginLeft: 8 }} />
             )}
           </button>
         </form>
