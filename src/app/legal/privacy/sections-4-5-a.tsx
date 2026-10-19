@@ -52,9 +52,9 @@ export function Sections5aTo5d() {
       <LegalP>
         These need a signed-in account, or more (<Sec to="5b">5b</Sec> to{" "}
         <Sec to="5g">5g</Sec>): your reposts, follower and following lists,
-        chats, RSVP lists and member lists. A club the Vibe team has hidden, or
-        the profile of a suspended or banned account, looks like a page that
-        does not exist.
+        chats, RSVP lists, event check-in lists and member lists. A club the
+        Vibe team has hidden, or the profile of a suspended or banned account,
+        looks like a page that does not exist.
       </LegalP>
       <LegalP>
         <strong>Blocks.</strong> A block only works while the other person is
@@ -77,7 +77,10 @@ export function Sections5aTo5d() {
           notification naming each liker. Vibe shows nobody else who liked, and
           shows nobody who saved.
         </li>
-        <li>Club events, with Going and Interested totals.</li>
+        <li>
+          Club events, with Going and Interested totals and, once at least 5
+          people have checked in at one, how many did.
+        </li>
         <li>
           Search finds verified accounts that finished setting up, across both
           universities. The Map lists people by campus and major. For a club

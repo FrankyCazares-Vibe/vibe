@@ -190,6 +190,37 @@ test("a waitlist access code is redacted in a link and an encoded next=, and the
   assert.equal(JSON.stringify(out).includes("VIBE-7KQ2-M9XD"), false);
 });
 
+test("an event check-in link loses its token, in the address and in an encoded next=; the school-email check is untouched", () => {
+  // The door screen's QR link (contract 2026-10-19 D5): the token checks
+  // someone in for up to two minutes, so it never reaches a report.
+  const event = "4f9c2b1e-3a7d-4c5e-9b8a-1d2e3f4a5b6c";
+  const token = "UVxxReBJ3ewsgZRtrv3ISQ";
+  assert.equal(
+    redactAuthTokens(`https://www.connectvibe.app/campus/checkin/${event}?checkin=${token}`),
+    `https://www.connectvibe.app/campus/checkin/${event}?checkin=[redacted]`,
+  );
+  // Signed out, the login page carries the page in next=; the page itself
+  // drops the token first (contract 3.7), and this covers a link that kept it.
+  const next = encodeURIComponent(`/campus/checkin/${event}?checkin=${token}`);
+  assert.equal(
+    redactAuthTokens(`/auth/login?next=${next}`),
+    `/auth/login?next=${encodeURIComponent(`/campus/checkin/${event}`)}%3Fcheckin%3D[redacted]`,
+  );
+  assert.equal(
+    redactAuthTokens(`/auth/login?next=${encodeURIComponent(`/auth/login?next=${next}`)}`).includes(token),
+    false,
+  );
+  // "Check-in" also names the yearly school-email check; its route has no
+  // `checkin=` parameter and stays as it was.
+  assert.equal(redactAuthTokens("/api/me/school-checkin"), "/api/me/school-checkin");
+  assert.equal(
+    redactAuthTokens("https://www.connectvibe.app/api/me/school-checkin?x=1"),
+    "https://www.connectvibe.app/api/me/school-checkin?x=1",
+  );
+  const out = scrub({ request: { url: `https://www.connectvibe.app/campus/checkin/${event}?checkin=${token}` } });
+  assert.equal(JSON.stringify(out).includes(token), false);
+});
+
 test("the event scrub reaches urls and breadcrumbs but not frames, and drops the body", () => {
   const frame = "https://www.connectvibe.app/_next/static/chunks/app/profile/page-3f2a1b9c.js";
   const event = {

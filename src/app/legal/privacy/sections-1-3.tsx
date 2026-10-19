@@ -199,6 +199,14 @@ export function Sections1To3() {
           Club events, your RSVPs (Going or Interested) and personal calendar
           entries.
         </li>
+        <li>
+          Event check-ins: the club events you checked in at. You check in
+          yourself, with the 4-digit code or the QR code on the club&apos;s
+          check-in screen, or the club&apos;s owner or an admin marks you as
+          here. Our database does not store the time you checked in or which
+          way you did it, but Vercel&apos;s visit logs can show both
+          (<Sec to="6">section 6</Sec>).
+        </li>
         <li>Messages and everything in them.</li>
         <li>
           Which messages are pinned in a chat, who pinned each one, and when.

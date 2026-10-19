@@ -11,10 +11,12 @@ import {
   type LoadFailure,
 } from "@/components/feedback/LoadFailed";
 import { AppearanceCard } from "@/components/settings/AppearanceCard";
+import { CheckinsCard } from "@/components/settings/CheckinsCard";
 import { NotificationsCard } from "@/components/settings/NotificationsCard";
 import { PersonalEmailRow } from "@/components/settings/PersonalEmail";
 import { SessionsCard } from "@/components/settings/SessionsCard";
 import type { NotificationPrefs } from "@/components/settings/notifications-card-view";
+import { CHECKIN_COPY } from "@/lib/events/event-checkin";
 import { vibeRequest } from "@/lib/feedback/request";
 import { clearDraft } from "@/lib/onboarding/draft";
 import {
@@ -149,6 +151,7 @@ export function SettingsClient({
         title={<SectionTitle>Notifications</SectionTitle>}
       />
       <BlockedUsersCard />
+      <CheckinsCard cardStyle={CARD_GLASS} title={<SectionTitle>{CHECKIN_COPY.settingsTitle}</SectionTitle>} />
       <HelpAndSafetyCard />
       <SessionsCard />
       <SignOutCard />

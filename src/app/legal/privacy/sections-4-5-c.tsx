@@ -17,7 +17,7 @@ export function Sections5fTo5g() {
           handle, photo, role, title and join date.
         </li>
         <li>
-          <strong>The club&apos;s owner and admins</strong> see four more lists:
+          <strong>The club&apos;s owner and admins</strong> see five more lists:
           <LegalUL bullets>
             <li>
               followers, with the date each first followed. You are on it from
@@ -25,6 +25,11 @@ export function Sections5fTo5g() {
             </li>
             <li>invites and their outcome;</li>
             <li>who RSVP&apos;d to the club&apos;s events;</li>
+            <li>
+              who checked in at the club&apos;s events, including people who are
+              not members or did not RSVP, and who marked Going but did not
+              check in;
+            </li>
             <li>the people added to a room, with the date each was added.</li>
           </LegalUL>
           <LegalP>
@@ -32,8 +37,10 @@ export function Sections5fTo5g() {
             profile unless the member hides the club or the title. They can stop
             followers reading the Board. They can remove a follower without that
             person being told: that person can follow again, but cannot read the
-            Board until they join. And they can delete any post made as the
-            club.
+            Board until they join. They can mark a person who marked Going or
+            Interested as here, take one person&apos;s check-in off, and clear
+            all of an event&apos;s check-ins. And they can delete any post made
+            as the club.
           </LegalP>
         </li>
         <li>

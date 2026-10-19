@@ -112,6 +112,9 @@ type World = {
   cardsWriteError?: Err;
   collect?: { ok: true; ids: string[] } | { ok: false };
   send?: { notified: number; failed: boolean };
+  /** What `event_checkin_state` answers (event check-in, Oct 19 2026). Unset: the RSVP rows, as before. */
+  checkinState?: unknown[];
+  checkinStateError?: Err;
 };
 
 type Call = [string, ...unknown[]];
@@ -181,7 +184,12 @@ function setup(w: World) {
   const cookie = {
     auth: { getUser: async () => ({ data: { user: { id: ME } }, error: null }) },
     from: (table: string) => chain(table, answerCookie),
-    rpc: async () => ({ data: [{ event_id: EVENT, going_count: 3, maybe_count: 1 }], error: null }),
+    // Every RPC answers the RSVP count rows, unless a test sets the check-in
+    // state (those rows read as "nothing known" to parseCheckinStateRows).
+    rpc: async (name: string) =>
+      name === "event_checkin_state" && (w.checkinState || w.checkinStateError)
+        ? { data: w.checkinStateError ? null : w.checkinState, error: w.checkinStateError ?? null }
+        : { data: [{ event_id: EVENT, going_count: 3, maybe_count: 1 }], error: null },
   };
   (globalThis as unknown as { __ev: unknown }).__ev = {
     cookie,
@@ -416,4 +424,46 @@ test("PATCH: the refusals touch no card (ended 409, not an officer 403, invalid 
   const times = setup({ event: UPCOMING, updatedEvent: EDITED_TITLE, cardIds: CARDS, notes: NOTES });
   assert.equal((await patch({ starts_at: "2026-10-12T00:00:00Z" })).status, 400);
   assert.deepEqual(times.log, []);
+});
+
+// ── PATCH: the event check-in fields (Oct 19 2026, contract 3.6) ─────────────
+
+type PatchAnswer = { ok: boolean; event: Record<string, unknown> | null };
+
+test("PATCH: the answer's event carries the check-in state, the three keys last", async (t) => {
+  quiet(t);
+  setup({
+    event: UPCOMING,
+    updatedEvent: { ...UPCOMING, description: "New text" },
+    checkinState: [{ event_id: EVENT, is_open: true, viewer_checked_in: true, checked_in_count: 7 }],
+  });
+  const res = await patch({ description: "New text" });
+  assert.equal(res.status, 200);
+  const { event } = (await res.json()) as PatchAnswer;
+  assert.ok(event);
+  assert.deepEqual(Object.keys(event).slice(-4), ["org", "checkin_open", "checked_in_count", "viewer_checked_in"]);
+  assert.deepEqual([event.checkin_open, event.checked_in_count, event.viewer_checked_in], [true, 7, true]);
+  assert.deepEqual([event.going_count, event.interested_count], [3, 1]);
+});
+
+test("PATCH: a failed check-in state read still saves and answers, the fields 'nothing known', the log code only", async (t) => {
+  quiet(t);
+  const seen: unknown[][] = [];
+  t.mock.method(console, "error", (...args: unknown[]) => {
+    seen.push(args);
+  });
+  setup({
+    event: UPCOMING,
+    updatedEvent: { ...UPCOMING, description: "New text" },
+    checkinStateError: { code: "PGRST202", message: `function event_checkin_state(${EVENT}) missing` },
+  });
+  const res = await patch({ description: "New text" });
+  assert.equal(res.status, 200);
+  const { ok, event } = (await res.json()) as PatchAnswer;
+  assert.equal(ok, true);
+  assert.ok(event);
+  assert.deepEqual([event.checkin_open, event.checked_in_count, event.viewer_checked_in], [false, null, false]);
+  assert.deepEqual([event.going_count, event.interested_count], [3, 1], "the RSVP counts are untouched");
+  const lines = seen.filter((a) => String(a[0]).includes("checkin state"));
+  assert.deepEqual(lines, [["[events/:id PATCH checkin state]", { code: "PGRST202" }]]);
 });

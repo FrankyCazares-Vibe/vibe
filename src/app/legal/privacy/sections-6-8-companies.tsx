@@ -32,7 +32,12 @@ export function CompanyList() {
         software and the daily waitlist clean-up. Its visit logs record the web
         address requested, your IP address and browser. Some web addresses
         carry personal details, such as search words or the link in one of our
-        emails. It also stores the short film on our front page. Your browser
+        emails. Checking in at an event, with the link or the code, puts that
+        event in the log, with the time and your IP address. When the
+        club&apos;s owner or an admin marks you as here, or takes your check-in
+        off, the log holds that event and your account ID (a random label),
+        with the time. It also stores the
+        short film on our front page. Your browser
         loads the film from Vercel&apos;s file storage when the film comes into
         view or you press Play.
       </li>

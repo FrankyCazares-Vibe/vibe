@@ -4,6 +4,7 @@ import { resolveCampusRequest, scopeViewerFromRow } from "@/lib/iu/campus-reques
 import { scopeCampusIds } from "@/lib/iu/campus-scope";
 import { ALL_CAMPUSES, isSchoolSystem, legacyLabel, type SchoolSystem } from "@/lib/iu/campuses";
 import { campusScopeError, homeCampusIdFor } from "@/lib/iu/community-scope";
+import { parseCheckinStateRows, type CheckinStateRow } from "@/lib/events/event-checkin";
 import {
   EVENT_ROW_COLUMNS,
   toCount,
@@ -21,6 +22,10 @@ import { createSupabaseServiceClient } from "@/lib/supabase/service";
 const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 200;
 const WINDOW_DAYS = 60;
+// The club page's Past events block (event check-in, Oct 19 2026): events
+// that ended in the last 30 days, at most 20 of them.
+const PAST_DAYS = 30;
+const MAX_PAST_LIMIT = 20;
 
 // The creator embed. A CLUB event ships no creator identity (the app shows the
 // club, not the officer who typed it), but keeps an id-only INNER join: under
@@ -99,10 +104,31 @@ function fail(status: number, code: string, error: string) {
  * org ids are resolved with the service role and matched by id. Only ids leave
  * those queries; the events themselves stay under the viewer's RLS.
  *
- * Past events are hidden in v1 (we filter `ends_at >= now()`). When we add
- * a "Past" tab later, swap to a separate query path.
+ * Past events stay out of every list (we filter `ends_at >= now()`), with
+ * one exception: `?org_id=<uuid>&when=past` (event check-in, Oct 19 2026) is
+ * the club page's Past events block, the events of that one club that ended
+ * in the last 30 days, newest first, at most 20. It is where "N were there"
+ * shows once a card has gone. Without `org_id`, `when` is ignored; the
+ * hidden-club and uuid rules of the org branch apply the same.
+ *
+ * EVENT CHECK-IN. Every item also carries checkin_open, checked_in_count
+ * (the database's from-5 floor already applied; exact for the event's
+ * officers) and viewer_checked_in, from the `event_checkin_state` RPC. A
+ * failed read there leaves them "nothing known" instead of failing the list:
+ * no check-in shown is honest, a broken list isn't.
+ *
+ * CACHING. Every answer, refusals included, says Cache-Control: no-store
+ * (contract 3.0): each one is per viewer (their RSVPs, whether they checked
+ * in, and an officer's exact check-in counts), so nothing between may keep it.
  */
 export async function GET(req: Request) {
+  const res = await listEvents(req);
+  res.headers.set("Cache-Control", "no-store");
+  return res;
+}
+
+/** GET's body; every return here leaves through GET's no-store line. */
+async function listEvents(req: Request): Promise<Response> {
   const supabase = await createSupabaseServerClient();
   const {
     data: { user },
@@ -121,6 +147,8 @@ export async function GET(req: Request) {
   // Used by the org profile page; bypasses the campus filter so a
   // logged-in user from another campus can still see this org's events.
   const orgIdFilter = (url.searchParams.get("org_id") ?? "").trim();
+  // ?when=past only means something on one club's page (see the docblock).
+  const past = !!orgIdFilter && url.searchParams.get("when") === "past";
 
   const { data: me, error: meErr } = await supabase
     .from("users")
@@ -149,22 +177,34 @@ export async function GET(req: Request) {
   const horizonIso = new Date(
     Date.now() + WINDOW_DAYS * 24 * 60 * 60 * 1000,
   ).toISOString();
+  const pastFloorIso = new Date(Date.now() - PAST_DAYS * 24 * 60 * 60 * 1000).toISOString();
 
   // Inner-join the creator (see CLUB_CREATOR_EMBED / PERSONAL_CREATOR_EMBED):
   // club queries take the id-only embed, the org-less fallback the full one so
   // it can filter on the creator's campus. Mirror /api/feed's embed pattern.
-  const baseQuery = (creatorEmbed: string) =>
-    supabase
+  // `pastView`: the club page's Past events (ended in the last 30 days,
+  // newest first); otherwise the upcoming list, unchanged.
+  const baseQuery = (creatorEmbed: string, pastView: boolean) => {
+    const query = supabase
       .from("events")
       .select(
         // No `org:orgs(...)`: under the viewer's client that embed is null for
         // every org they are not in. Attribution is joined in below.
         `${EVENT_ROW_COLUMNS},${creatorEmbed}`,
-      )
+      );
+    if (pastView) {
+      return query
+        .lt("ends_at", nowIso)
+        .gte("ends_at", pastFloorIso)
+        .order("starts_at", { ascending: false })
+        .limit(Math.min(limit, MAX_PAST_LIMIT));
+    }
+    return query
       .gte("ends_at", nowIso)
       .lte("starts_at", horizonIso)
       .order("starts_at", { ascending: true })
       .limit(limit);
+  };
 
   const failed = () => fail(500, "request_failed", "Request failed");
 
@@ -214,7 +254,7 @@ export async function GET(req: Request) {
     if (!isUuid(orgIdFilter) || hiddenOrgIds.has(orgIdFilter)) {
       return answer([]);
     }
-    const { data, error } = await baseQuery(CLUB_CREATOR_EMBED).eq("org_id", orgIdFilter);
+    const { data, error } = await baseQuery(CLUB_CREATOR_EMBED, past).eq("org_id", orgIdFilter);
     if (error) {
       console.error("[events GET org-scoped]", error);
       return failed();
@@ -259,8 +299,9 @@ export async function GET(req: Request) {
     const orgIds = (campusOrgs ?? []).map((o) => (o as { id: string }).id);
 
     const [byOrg, byCreator] = await Promise.all([
-      orgIds.length > 0 ? baseQuery(CLUB_CREATOR_EMBED).in("org_id", orgIds) : null,
-      baseQuery(PERSONAL_CREATOR_EMBED)
+      // Never the past view: `when` means nothing without `org_id`.
+      orgIds.length > 0 ? baseQuery(CLUB_CREATOR_EMBED, false).in("org_id", orgIds) : null,
+      baseQuery(PERSONAL_CREATOR_EMBED, false)
         .is("org_id", null)
         // Campus ids come from our own frozen table, never from user text, so
         // embedding them in the filter grammar is safe.
@@ -310,6 +351,8 @@ export async function GET(req: Request) {
   const goingByEvent = new Map<string, number>();
   const maybeByEvent = new Map<string, number>();
   const viewerStatusByEvent = new Map<string, "going" | "maybe">();
+  // Event check-in per event id; empty when the read failed (see below).
+  let checkinById = new Map<string, CheckinStateRow>();
 
   // Viewer's CURRENT owner/admin org memberships. A club event is managed by
   // them, whoever made it; its creator gets nothing for having made it (a
@@ -338,17 +381,30 @@ export async function GET(req: Request) {
     // quietly turning into "0 going" is a wrong page, not a degraded one.
     // DEPLOY ORDER: migration 20260922100000 must be live BEFORE this code
     // ships. Without the RPC every signed-in GET here answers 500.
-    const [countsRes, mineRsvps] = await Promise.all([
+    //
+    // Event check-in (20261019120000) rides in the same round trip, on the
+    // viewer's client so the database decides who sees an exact count. Unlike
+    // the RSVP counts, a failure here is NOT fatal: the cards just show no
+    // check-in, which is honest, and it means the list keeps working if this
+    // code ships before the migration does.
+    const [countsRes, mineRsvps, checkinRes] = await Promise.all([
       supabase.rpc("event_rsvp_counts", { p_event_ids: eventIds }),
       supabase
         .from("rsvps")
         .select("event_id,status")
         .in("event_id", eventIds)
         .eq("user_id", user.id),
+      supabase.rpc("event_checkin_state", { p_event_ids: eventIds }),
     ]);
     if (countsRes.error) {
       console.error("[events GET rsvp counts]", countsRes.error);
       return failed();
+    }
+    if (checkinRes.error) {
+      // The code only: the message can carry ids.
+      console.error("[events GET checkin state]", { code: checkinRes.error.code });
+    } else {
+      checkinById = parseCheckinStateRows(checkinRes.data);
     }
     for (const row of Array.isArray(countsRes.data) ? countsRes.data : []) {
       const r = row as { event_id?: unknown; going_count?: unknown; maybe_count?: unknown };
@@ -373,6 +429,7 @@ export async function GET(req: Request) {
       goingCount: goingByEvent.get(row.id) ?? 0,
       interestedCount: maybeByEvent.get(row.id) ?? 0,
       viewerStatus: viewerStatusByEvent.get(row.id) ?? null,
+      checkin: checkinById.get(row.id),
     }),
   );
 

@@ -117,8 +117,12 @@ export function Sections4To5() {
             "The club's members. For a club that anyone can join, any signed-in account also sees on the Map the members who show that club on their profile",
           ],
           [
-            "A club's follower list, and who RSVP'd to its events",
+            "A club's follower list, who RSVP'd to its events and who checked in at them",
             "The club's owner and admins. The people in an event's chat also see who is in it, and the first few who marked Going (up to 8)",
+          ],
+          [
+            "How many people checked in at an event",
+            "Any signed-in account that can see the event, once at least 5 have checked in. The club's owner and admins see the exact number. So does anyone who can see the check-in screen at the door",
           ],
           [
             "Drafts, saved posts, your mute list, your personal calendar, the clubs you hid from your profile and your list of the clubs you follow",

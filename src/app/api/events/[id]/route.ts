@@ -6,6 +6,7 @@ import {
   rewriteEventCardTexts,
 } from "@/lib/chat/cards/refresh-event-cards";
 import { cancelSendsNotices } from "@/lib/events/cancel-notice";
+import { parseCheckinStateRows } from "@/lib/events/event-checkin";
 import {
   EVENT_ROW_COLUMNS,
   toCount,
@@ -236,6 +237,9 @@ export async function DELETE(_req: Request, ctx: RouteContext) {
  * card. The caller was just checked as a current owner / admin, so
  * viewer_can_manage is true. A failed count read answers null (the edit is
  * saved; the client refetches) rather than "0 going", which would be wrong.
+ * Event check-in's fields come from `event_checkin_state` in the same round
+ * trip; a failure there only leaves them "nothing known" (the edit is saved,
+ * and no check-in shown is honest).
  */
 async function itemFor(
   supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>,
@@ -243,7 +247,7 @@ async function itemFor(
   org: OrgRecord,
   viewerId: string,
 ) {
-  const [countsRes, mine] = await Promise.all([
+  const [countsRes, mine, checkinRes] = await Promise.all([
     supabase.rpc("event_rsvp_counts", { p_event_ids: [row.id] }),
     supabase
       .from("rsvps")
@@ -251,11 +255,18 @@ async function itemFor(
       .eq("event_id", row.id)
       .eq("user_id", viewerId)
       .maybeSingle(),
+    supabase.rpc("event_checkin_state", { p_event_ids: [row.id] }),
   ]);
   if (countsRes.error) {
     console.error("[events/:id PATCH rsvp counts]", countsRes.error);
     return null;
   }
+  if (checkinRes.error) {
+    // The code only: the message can carry ids.
+    console.error("[events/:id PATCH checkin state]", { code: checkinRes.error.code });
+  }
+  // undefined, never null, on a failure: toEventListItem reads it as "nothing known".
+  const checkin = checkinRes.error ? undefined : parseCheckinStateRows(checkinRes.data).get(row.id);
   const counts = (Array.isArray(countsRes.data) ? countsRes.data : []).find(
     (r) => (r as { event_id?: unknown }).event_id === row.id,
   ) as { going_count?: unknown; maybe_count?: unknown } | undefined;
@@ -269,6 +280,7 @@ async function itemFor(
       goingCount: toCount(counts?.going_count),
       interestedCount: toCount(counts?.maybe_count),
       viewerStatus: status === "going" || status === "maybe" ? status : null,
+      checkin,
     },
   );
 }

@@ -21,6 +21,8 @@ export function Sections9To10() {
         you in its member list. When you leave a club, you choose whether to
         keep following it. If you do, you can read its Board as a follower can
         (<Sec to="5e">section 5e</Sec>).{" "}
+        <PageLink href="/settings">Settings</PageLink> lists the events you
+        checked in at, and you can remove any of your check-ins there.{" "}
         <PageLink href="/settings">Settings</PageLink> shows your sign-in and
         school emails. To change your sign-in email, write to{" "}
         <Mail box="help" /> from your current sign-in email. We reply to that
@@ -98,8 +100,8 @@ export function Sections9To10() {
             </li>
             <li>everything you posted, sent, liked, saved or voted on;</li>
             <li>
-              your follows, club memberships and titles, RSVPs, blocks and
-              mutes, club mutes included;
+              your follows, club memberships and titles, RSVPs, event
+              check-ins, blocks and mutes, club mutes included;
             </li>
             <li>the records of what you viewed and of who viewed you;</li>
             <li>
@@ -124,8 +126,8 @@ export function Sections9To10() {
         pins on them, the replies under your Board posts and the votes on polls
         you posted. Other people&apos;s comments, likes and reposts on your
         posts go with the posts. Posts and events you made as a club are
-        deleted, and each event takes everyone&apos;s RSVPs and its whole chat
-        with it.
+        deleted, and each event takes everyone&apos;s RSVPs, check-ins and its
+        whole chat with it.
       </LegalP>
       <LegalP>
         <strong>What stays with Vibe after deletion.</strong>

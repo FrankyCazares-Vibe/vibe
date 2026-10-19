@@ -54,6 +54,7 @@ import { OrgProfileAdminBar } from "./admin-actions";
 import { BoardSection, ChannelsSection } from "./ChannelsSection";
 import { OrgContent } from "./OrgContent";
 import { OrgEventsSection } from "./OrgEventsSection";
+import { OrgPastEvents } from "./OrgPastEvents";
 import { type OrgPostItem, OrgPostsList } from "./OrgPostsList";
 import { OrgProfileJoinButton } from "./join-button";
 
@@ -520,14 +521,20 @@ export default async function OrgProfilePage({ params }: Params) {
             </>
           }
           eventsColumn={
-            <OrgEventsSection
-              orgId={org.id}
-              orgName={org.name}
-              orgHandle={org.handle}
-              orgVerified={org.verified}
-              viewerRole={viewerRole}
-              rsvpAtHomeOnly={visiting}
-            />
+            <>
+              <OrgEventsSection
+                orgId={org.id}
+                orgName={org.name}
+                orgHandle={org.handle}
+                orgVerified={org.verified}
+                viewerRole={viewerRole}
+                rsvpAtHomeOnly={visiting}
+              />
+              {/* Event check-in (Oct 19 2026, contract 4.6): events that
+                  ended in the last 30 days, "N were there" and the
+                  officers' "Who came". Draws nothing when there are none. */}
+              <OrgPastEvents orgId={org.id} orgHandle={org.handle} />
+            </>
           }
           aboutColumn={
             <>

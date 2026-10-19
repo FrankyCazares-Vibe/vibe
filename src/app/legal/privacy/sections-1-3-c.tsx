@@ -21,13 +21,15 @@ export function Sections3eTo3h() {
         </li>
         <li>
           We do not ask your device for its location, and we do not work one out
-          from your IP address. Three things come close. Some photos and videos
+          from your IP address. Four things come close. Some photos and videos
           you upload carry a location inside the file (
           <Sec to="3c">section 3c</Sec>). Vercel adds a rough location to each
           request. Until our release of October 5, 2026, that could end up in a
-          report to Sentry (<Sec to="3d">section 3d</Sec>). And each report your
+          report to Sentry (<Sec to="3d">section 3d</Sec>). Each report your
           browser sends to Sentry carries the browser&apos;s language and time
-          zone.
+          zone. And an event check-in records that you were at that event while
+          it was on (<Sec to="3c">section 3c</Sec>). Vibe does not ask your
+          device where it is to check you in.
         </li>
         <li>
           No date of birth, phone number, contact list or card number, and no

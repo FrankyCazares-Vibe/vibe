@@ -6,9 +6,12 @@
  *
  * The key order is the one GET has always sent: the row (club rows with
  * `creator: null`), then going_count, interested_count, viewer_status,
- * is_creator, viewer_can_manage, org.
+ * is_creator, viewer_can_manage, org; then the three event check-in fields
+ * (checkin_open, checked_in_count, viewer_checked_in, Oct 19 2026), last so
+ * the old keys keep their places.
  */
 
+import { checkinListFields, type CheckinStateRow } from "@/lib/events/event-checkin";
 import { orgAssetProxyUrl } from "@/lib/org-asset-url";
 
 import { viewerCanManage, withoutClubCreator } from "./manage";
@@ -66,6 +69,12 @@ export function toEventListItem(
     goingCount: number;
     interestedCount: number;
     viewerStatus: EventViewerStatus | null;
+    /**
+     * The event's `event_checkin_state` row. Left out (or a failed read)
+     * means "nothing known": not open, no count, not checked in. The from-5
+     * floor is already applied by the database.
+     */
+    checkin?: CheckinStateRow;
   },
 ) {
   const org = ctx.org;
@@ -85,6 +94,8 @@ export function toEventListItem(
     }),
     // Same shape the old `org:orgs(...)` embed produced, so no client changes.
     org: org ? { ...org, logo_url: orgAssetProxyUrl(org.handle, org.logo_url, "logo") } : null,
+    // After `org` on purpose: the three new keys come last.
+    ...checkinListFields(ctx.checkin),
   };
 }
 

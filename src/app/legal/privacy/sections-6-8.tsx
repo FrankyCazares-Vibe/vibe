@@ -115,6 +115,10 @@ export function Sections6To8() {
             "You take yours back, the club takes you out (upcoming events only), or the event, the club or your account is deleted",
           ],
           [
+            "Event check-ins",
+            "You remove yours, the club's owner or an admin takes it off or clears the event's check-ins, or the event, the club or your account is deleted. Leaving the club, or being taken out of it, does not remove them",
+          ],
+          [
             "Events",
             "An owner or admin cancels the event, or the club or the account that made it is deleted",
           ],

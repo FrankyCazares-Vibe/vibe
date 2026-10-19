@@ -17,11 +17,13 @@ const dsn = process.env.NEXT_PUBLIC_SENTRY_DSN?.trim();
 
 /**
  * Link parameters whose value signs someone in, resets a password, verifies
- * an email, or (`access_code`, the waitlist's `/auth/signup?access_code=`)
- * lets one new account through the sign-up gate.
+ * an email, (`access_code`, the waitlist's `/auth/signup?access_code=`)
+ * lets one new account through the sign-up gate, or (`checkin`, the QR on a
+ * club's door screen, `/campus/checkin/<event>?checkin=`) is good for
+ * checking in at that event for up to two minutes.
  */
 const AUTH_PARAM_KEYS =
-  "token_hash|token|access_token|refresh_token|code|provider_token|access_code";
+  "token_hash|token|access_token|refresh_token|code|provider_token|access_code|checkin";
 
 /**
  * `key=value` after `?`, `&` or `#`, plus the percent-encoded forms a link
@@ -38,8 +40,9 @@ const REDACTED = "[redacted]";
 
 /**
  * Replaces the values of auth link parameters (token_hash, token,
- * access_token, refresh_token, code, provider_token, access_code) in a URL or any text
- * holding one. Pure: same input, same output.
+ * access_token, refresh_token, code, provider_token, access_code) and of an
+ * event check-in link's `checkin` in a URL or any text holding one. Pure:
+ * same input, same output.
  */
 export function redactAuthTokens(s: string): string {
   return s.replace(AUTH_PARAM_RE, `$1${REDACTED}`);

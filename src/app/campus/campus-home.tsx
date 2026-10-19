@@ -59,6 +59,12 @@ import {
   clubUrl,
   savedBoardSetting,
 } from "@/components/desktop/messages/rooms-dialog-rules";
+// Event check-in (Oct 19 2026): the card's student slot and officer pill, and
+// the attendee list's "Mark as here". Contract:
+// handoffs/2026-10-19-checkin-build/CONTRACT.md §4.1 and §4.2.
+import { CheckinSlot } from "@/components/events/checkin/CheckinSlot";
+import { HereToggle, hereRequestsOut, type ConfirmOff } from "@/components/events/checkin/HereToggle";
+import { StartCheckinAction } from "@/components/events/checkin/StartCheckinAction";
 import { useClubMute, type ClubMuteFn } from "@/components/mobile/PostViewerMobile";
 import { SharePostSheet } from "@/components/mobile/SharePostSheet";
 import { UserCard, type UserCardProps } from "@/components/network/UserCard";
@@ -87,6 +93,20 @@ import {
   capturePosterFrame,
   extractHashtags,
 } from "@/lib/composer/helpers";
+import {
+  ATTENDEES_POLL_MS,
+  type AttendeesCheckin,
+  type AttendeesResponse,
+  CHECKIN_COPY,
+  CHECKIN_ERRORS,
+  checkinPhase,
+  type ClearResponse,
+  clearConfirmLine,
+  type EventAttendee,
+  markPhase,
+  showCheckinSplit,
+  splitAttendees,
+} from "@/lib/events/event-checkin";
 import { copyText, type VibeFailure, type VibeResult, vibeRequest } from "@/lib/feedback/request";
 import { toast, type ToastInput } from "@/lib/feedback/toast";
 import {
@@ -10285,6 +10305,11 @@ export type CampusEvent = {
   viewer_status: "going" | "maybe" | null;
   is_creator: boolean;
   viewer_can_manage: boolean;
+  // Event check-in (Oct 19 2026, EventCheckinListFields): GET /api/events and
+  // PATCH send them; optional so older fixtures and lists still type.
+  checkin_open?: boolean;
+  checked_in_count?: number | null;
+  viewer_checked_in?: boolean;
   org: {
     id: string;
     handle: string;
@@ -10954,6 +10979,14 @@ export function EventCard({
           {EVENT_CHAT_LINE}
         </div>
       ) : null}
+      {/* Event check-in for the student (contract 4.1): its own slot, never
+          the action row below, which hides from a creator who neither
+          RSVP'd nor manages. Draws nothing outside the check-in window.
+          BELOW the chat line, not between it and Going / Interested: that
+          line is about an RSVP, and right under "You're checked in" it read
+          as if checking in put the student in the event chat, which it
+          doesn't (contract D12). */}
+      <CheckinSlot ev={ev} />
       {(status || ev.viewer_can_manage || !ev.is_creator) ? (
         <div
           style={{
@@ -10979,6 +11012,9 @@ export function EventCard({
               eventTitle={ev.title}
             />
           ) : null}
+          {/* Start / Show check-in (contract 4.1). On `viewer_can_manage`
+              alone, so an org-less event's creator runs check-in too. */}
+          {ev.viewer_can_manage ? <StartCheckinAction ev={ev} /> : null}
           {/* Edit / Cancel (or Delete, once it has ended) for a CURRENT
               owner / admin of the club (S68 officer tools, C5). Club events
               only: DELETE and PATCH /api/events/[id] answer 404 for a legacy
@@ -11332,6 +11368,8 @@ function EventOfficerActions({
  * two buttons. The caller puts focus back on whatever opened it.
  * Pointer moves stop here: React bubbles them through the portal to the
  * card's MouseSpotlight, which would tilt the card behind the dialog.
+ * `zIndex` (default 1100) lets a dialog that sits above the phone tab bar
+ * keep its confirm above itself (the attendee list, event check-in).
  */
 export function ConfirmDialog({
   message,
@@ -11341,6 +11379,7 @@ export function ConfirmDialog({
   busy,
   onConfirm,
   onCancel,
+  zIndex = 1100,
 }: {
   message: string;
   confirmLabel: string;
@@ -11349,6 +11388,7 @@ export function ConfirmDialog({
   busy: boolean;
   onConfirm: () => void;
   onCancel: () => void;
+  zIndex?: number;
 }) {
   const messageId = useId();
   const cancelRef = useRef<HTMLButtonElement | null>(null);
@@ -11388,7 +11428,7 @@ export function ConfirmDialog({
       style={{
         position: "fixed",
         inset: 0,
-        zIndex: 1100,
+        zIndex,
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
@@ -11470,19 +11510,48 @@ export function ConfirmDialog({
   );
 }
 
-type Attendee = {
-  status: "going" | "maybe";
-  user: {
-    id: string;
-    name: string | null;
-    handle: string | null;
-    avatar_url: string | null;
-    major: string | null;
-    year: number | null;
-  };
+/** One row of the officers' list (a walk-in, checked in with no RSVP, has
+ *  `status: null`). The shared type, kept under its old name here. */
+type Attendee = EventAttendee;
+
+/** What the attendee list holds once a read lands. `checkin` is null when the
+ *  answer carried none (then the list is the plain Going / Interested one). */
+type AttendeeLists = {
+  going: Attendee[];
+  interested: Attendee[];
+  walkIns: Attendee[];
+  checkin: AttendeesCheckin | null;
 };
 
-function AttendeesModal({
+function attendeeRows(raw: unknown): Attendee[] {
+  return Array.isArray(raw) ? (raw as Attendee[]) : [];
+}
+
+function attendeesCheckinOf(raw: unknown): AttendeesCheckin | null {
+  if (!raw || typeof raw !== "object") return null;
+  const c = raw as Record<string, unknown>;
+  if (typeof c.starts_at !== "string" || typeof c.ends_at !== "string") return null;
+  const n = typeof c.count === "number" && Number.isFinite(c.count) ? Math.max(0, Math.trunc(c.count)) : 0;
+  return { open: c.open === true, count: n, starts_at: c.starts_at, ends_at: c.ends_at };
+}
+
+/** No re-read of the attendee list this soon after a change made in it. */
+const RECENT_CHANGE_MS = 5_000;
+
+/**
+ * The list's layer: above the phone tab bar (globals.css, z 9988) and under
+ * the toasts (12000), the tier of the sheets that must cover the bar
+ * (CampusBrowsePicker). It is portalled to <body>, so the club page's
+ * `.vibe-tabbar-page:has([aria-modal])` rule, which sees only dialogs inside
+ * its <main>, never hid the bar, and the footer (Clear check-ins, Close) sat
+ * under it at phone width. Its confirms go one step above it.
+ */
+const ATTENDEES_Z = 10000;
+const ATTENDEES_CONFIRM_Z = 10100;
+
+/** The officers' attendee list (S68; event check-in, contract 4.2). Exported
+ *  for the club page's Past events ("Who came", once the card has gone). */
+export function AttendeesModal({
   eventId,
   eventTitle,
   onClose,
@@ -11491,35 +11560,193 @@ function AttendeesModal({
   eventTitle: string;
   onClose: () => void;
 }) {
-  const [going, setGoing] = useState<Attendee[] | null>(null);
-  const [interested, setInterested] = useState<Attendee[] | null>(null);
+  const [lists, setLists] = useState<AttendeeLists | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [confirmClear, setConfirmClear] = useState(false);
+  const [clearing, setClearing] = useState(false);
+  const clearingRef = useRef(false);
+  const clearRef = useRef<HTMLButtonElement | null>(null);
+  const closeRef = useRef<HTMLButtonElement | null>(null);
+  const panelRef = useRef<HTMLDivElement | null>(null);
+  const titleRef = useRef<HTMLHeadingElement | null>(null);
+  const titleId = useId();
+  const subId = useId();
+  // "Here" tapped where the removal can't be put back: whose, the toggle to
+  // hand focus back to, and the toggle's own send.
+  const [askOff, setAskOff] = useState<{ name: string; opener: HTMLButtonElement; go: () => void } | null>(null);
+  const now = useCampusNow(60_000);
+  // Bumped by every change made here (a mark, a removal, a clear): a read
+  // that started before it would put the old rows back, so it is dropped.
+  const changeSeqRef = useRef(0);
+  // When the last change was made. A re-read sent in the next few seconds
+  // could still beat that change's request to the database, so none is sent.
+  const changedAtRef = useRef(0);
+  const aliveRef = useRef(true);
+
+  // `first`: the opening read, whose failure is said in the modal. A
+  // re-read that fails keeps the rows on screen and says nothing.
+  // The state is set in the answer's callback, never in the effect's own
+  // turn (the opening read runs from an effect).
+  const load = useCallback(
+    (first: boolean) => {
+      if (!first && Date.now() - changedAtRef.current < RECENT_CHANGE_MS) return;
+      // A mark still on its way: this read could reach the database first
+      // and bring the old row back over it (slow Wi-Fi at the door).
+      if (!first && hereRequestsOut(eventId)) return;
+      const seq = changeSeqRef.current;
+      void vibeRequest<AttendeesResponse>(
+        `/api/events/${encodeURIComponent(eventId)}/attendees`,
+        { cache: "no-store", quiet: true, failure: "Could not load attendees" },
+      ).then((r) => {
+        if (!aliveRef.current || seq !== changeSeqRef.current) return;
+        if (!r.ok) {
+          if (first) {
+            setError(r.message);
+            setLists({ going: [], interested: [], walkIns: [], checkin: null });
+          }
+          return;
+        }
+        setLists({
+          going: attendeeRows(r.data.going),
+          interested: attendeeRows(r.data.interested),
+          walkIns: attendeeRows(r.data.walk_ins),
+          checkin: attendeesCheckinOf(r.data.checkin),
+        });
+      });
+    },
+    [eventId],
+  );
 
   useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const res = await fetch(`/api/events/${eventId}/attendees`, {
-          cache: "no-store",
-        });
-        const data = await res.json();
-        if (cancelled) return;
-        if (!res.ok || !data?.ok) throw new Error(data?.error || `HTTP ${res.status}`);
-        setGoing(data.going ?? []);
-        setInterested(data.interested ?? []);
-      } catch (e) {
-        if (!cancelled) {
-          setError(e instanceof Error ? e.message : "Could not load attendees");
-          setGoing([]);
-          setInterested([]);
-        }
-      }
-    })();
+    aliveRef.current = true;
+    load(true);
     return () => {
-      cancelled = true;
+      aliveRef.current = false;
     };
-  }, [eventId]);
+  }, [load]);
+
+  // Focus moves into the list on open (its title, so a screen reader starts
+  // at "Attendees") and back to the opener on close, when nothing else has
+  // taken it by then (the club page's Past events hands it back itself).
+  // The opener is kept in a ref, never re-read once inside: in dev React
+  // runs this effect twice, and the second run would find the title.
+  const returnFocusRef = useRef<HTMLElement | null>(null);
+  useEffect(() => {
+    const active = document.activeElement;
+    if (active instanceof HTMLElement && active !== document.body && !panelRef.current?.contains(active)) {
+      returnFocusRef.current = active;
+    }
+    titleRef.current?.focus({ preventScroll: true });
+    return () => {
+      const back = returnFocusRef.current;
+      const lost = document.activeElement === null || document.activeElement === document.body;
+      if (lost && back?.isConnected) back.focus({ preventScroll: true });
+    };
+  }, []);
+
+  // Escape closes the list, unless one of its confirms is open: Escape there
+  // is that confirm's "Keep" (ConfirmDialog handles it and marks it handled).
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape" || e.defaultPrevented || confirmClear || askOff) return;
+      e.preventDefault();
+      onClose();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [confirmClear, askOff, onClose]);
+
+  const checkin = lists?.checkin ?? null;
+  // "Mark as here" runs from an hour before the start to a day after the end.
+  const markNow = checkin !== null ? markPhase(checkin.starts_at, checkin.ends_at, now) : null;
+  const canMark = markNow === "open";
+  // Taking a check-in off works any time (D8), but sometimes nobody can put
+  // it back from here: once the mark window is over (the code closed even
+  // earlier), or a walk-in's (they can't be marked) while the code isn't
+  // open. Then "Here" asks first (review, Oct 19; the contract had no
+  // confirm), in the card's words for a closed check-in.
+  const offConfirm = (name: string, a: Attendee): ConfirmOff | undefined =>
+    markNow === "after" || (a.status === null && checkin?.open !== true)
+      ? (opener, go) => setAskOff({ name, opener, go })
+      : undefined;
+
+  // While people can still be marked, re-read every 20 s with the tab in
+  // view (a walk-in's code check-in shows up), and at once on coming back.
+  useEffect(() => {
+    if (!canMark) return;
+    const onVisible = () => {
+      if (document.visibilityState === "visible") load(false);
+    };
+    const t = window.setInterval(onVisible, ATTENDEES_POLL_MS);
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      window.clearInterval(t);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [canMark, load]);
+
+  // A HereToggle's flip (optimistic; it flips back on a refusal). The row
+  // moves between sections and the count follows it, with no re-read.
+  const setHere = useCallback((userId: string, next: boolean) => {
+    changeSeqRef.current += 1;
+    changedAtRef.current = Date.now();
+    setLists((prev) => {
+      if (!prev) return prev;
+      let moved = false;
+      const flip = (rows: Attendee[]) =>
+        rows.map((a) => {
+          if (a.user.id !== userId || a.checked_in === next) return a;
+          moved = true;
+          return { ...a, checked_in: next };
+        });
+      const going = flip(prev.going);
+      const interested = flip(prev.interested);
+      const walkIns = flip(prev.walkIns);
+      if (!moved) return prev;
+      const c = prev.checkin;
+      return {
+        going,
+        interested,
+        walkIns,
+        checkin: c ? { ...c, count: Math.max(0, c.count + (next ? 1 : -1)) } : c,
+      };
+    });
+  }, []);
+
+  const clearAll = async () => {
+    if (clearingRef.current) return;
+    clearingRef.current = true;
+    setClearing(true);
+    // Not quiet: a refusal toasts the server's own sentence.
+    const r = await vibeRequest<ClearResponse>(
+      `/api/events/${encodeURIComponent(eventId)}/checkin/marks`,
+      { method: "DELETE", failure: CHECKIN_ERRORS.request_failed },
+    );
+    clearingRef.current = false;
+    setClearing(false);
+    setConfirmClear(false);
+    if (!r.ok) {
+      clearRef.current?.focus();
+      return;
+    }
+    changeSeqRef.current += 1;
+    changedAtRef.current = Date.now();
+    const off = (a: Attendee): Attendee => (a.checked_in ? { ...a, checked_in: false } : a);
+    // Walk-ins leave the list: with no RSVP they were only here as check-ins.
+    setLists((prev) =>
+      prev
+        ? {
+            going: prev.going.map(off),
+            interested: prev.interested.map(off),
+            walkIns: [],
+            checkin: prev.checkin ? { ...prev.checkin, count: 0 } : null,
+          }
+        : prev,
+    );
+    // "Clear check-ins" goes with the count; Close is the next control.
+    closeRef.current?.focus();
+  };
 
   const messageOne = async (handle: string | null) => {
     if (!handle) return;
@@ -11539,7 +11766,8 @@ function AttendeesModal({
 
   const messageAll = async () => {
     if (busy) return;
-    const recipients = (going ?? []).map((a) => a.user.id);
+    // The whole Going list, checked in or not (contract 4.2).
+    const recipients = (lists?.going ?? []).map((a) => a.user.id);
     if (recipients.length < 2) {
       setError("Need at least 2 attendees marked Going to start a group chat.");
       return;
@@ -11566,8 +11794,25 @@ function AttendeesModal({
     }
   };
 
+  const going = lists?.going ?? null;
+  const interested = lists?.interested ?? null;
   const goingCount = going?.length ?? 0;
   const interestedCount = interested?.length ?? 0;
+  // The check-in split once the window has opened or anyone is checked in;
+  // before that, the plain Going / Interested lists of today.
+  const split =
+    lists !== null &&
+    checkin !== null &&
+    showCheckinSplit(checkinPhase(checkin.starts_at, checkin.ends_at, now), checkin.count);
+  // Walk-ins taken off (or cleared) have no other section to sit in.
+  const parts = lists
+    ? splitAttendees({
+        going: lists.going,
+        interested: lists.interested,
+        walk_ins: lists.walkIns.filter((a) => a.checked_in),
+      })
+    : null;
+  const here = { eventId, canMark, onChange: setHere, offConfirm };
 
   // Portalled: the card that opens this (EventCard) paints on MouseSpotlight's
   // tilt layer, whose transform, backdrop filter and overflow would otherwise
@@ -11576,14 +11821,13 @@ function AttendeesModal({
 
   return createPortal(
     <div
-      role="dialog"
-      aria-modal="true"
+      role="presentation"
       onClick={onClose}
       onPointerMove={(e) => e.stopPropagation()}
       style={{
         position: "fixed",
         inset: 0,
-        zIndex: 1000,
+        zIndex: ATTENDEES_Z,
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
@@ -11593,8 +11837,33 @@ function AttendeesModal({
       {/* Motion pass (Oct 18): tint fades in, the panel (the frosted surface
           itself) fades and settles from 0.97. Enter only. */}
       <ModalScrim tint="rgba(8,6,12,0.55)" />
+      {/* The dialog is the panel, not the backdrop, so its name is the
+          title. Tab stays inside it; the confirms are their own dialogs
+          (portalled, so their keys never count here). */}
       <motion.div
+        ref={panelRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        aria-describedby={subId}
         onClick={(e) => e.stopPropagation()}
+        onKeyDown={(e) => {
+          if (e.key !== "Tab" || e.defaultPrevented) return;
+          const panel = panelRef.current;
+          if (!panel || !(e.target instanceof Node) || !panel.contains(e.target)) return;
+          const stops = Array.from(
+            panel.querySelectorAll<HTMLElement>('a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])'),
+          ).filter((el) => el.tabIndex >= 0 && el.getClientRects().length > 0);
+          const first = stops[0];
+          const last = stops[stops.length - 1];
+          if (!first || !last) return;
+          const active = document.activeElement;
+          const atStart = active === first || active === panel || active === titleRef.current;
+          if (e.shiftKey ? atStart : active === last) {
+            e.preventDefault();
+            (e.shiftKey ? last : first).focus();
+          }
+        }}
         {...MODAL_PANEL_ENTER_FADE}
         // Positioned so it paints over the scrim layers once it settles.
         style={{
@@ -11614,10 +11883,16 @@ function AttendeesModal({
           }}
         >
           <div>
-            <div style={{ fontFamily: "Fraunces, serif", fontWeight: 800, fontSize: 18, color: "#fff" }}>
+            {/* Focused on open (tabIndex -1: never a Tab stop). */}
+            <h2
+              ref={titleRef}
+              id={titleId}
+              tabIndex={-1}
+              style={{ margin: 0, outline: "none", fontFamily: "Fraunces, serif", fontWeight: 800, fontSize: 18, color: "#fff" }}
+            >
               Attendees
-            </div>
-            <div style={{ fontFamily: "DM Sans, sans-serif", fontSize: 12, color: "rgba(255,255,255,0.55)", marginTop: 2 }}>
+            </h2>
+            <div id={subId} style={{ fontFamily: "DM Sans, sans-serif", fontSize: 12, color: "rgba(255,255,255,0.55)", marginTop: 2 }}>
               {eventTitle}
             </div>
           </div>
@@ -11660,21 +11935,65 @@ function AttendeesModal({
           </div>
         ) : null}
 
-        <AttendeeList
-          heading={`Going · ${goingCount}`}
-          rows={going}
-          onMessage={messageOne}
-          accent="#5BD18C"
-        />
-        <AttendeeList
-          heading={`Interested · ${interestedCount}`}
-          rows={interested}
-          onMessage={messageOne}
-          accent="#FFB85A"
-        />
+        {split && parts ? (
+          <>
+            {/* Headings count the rows shown, never checkin.count: a
+                restricted student's check-in is counted but not listed. */}
+            <AttendeeList
+              heading={`${CHECKIN_COPY.checkedInHeading} · ${parts.checkedIn.length}`}
+              rows={parts.checkedIn}
+              onMessage={messageOne}
+              accent="#5BD18C"
+              here={here}
+            />
+            <AttendeeList
+              heading={`${CHECKIN_COPY.goingNotInHeading} · ${parts.goingNotIn.length}`}
+              rows={parts.goingNotIn}
+              onMessage={messageOne}
+              accent="#FFB85A"
+              here={here}
+            />
+            <AttendeeList
+              heading={`${CHECKIN_COPY.interestedHeading} · ${parts.interestedNotIn.length}`}
+              rows={parts.interestedNotIn}
+              onMessage={messageOne}
+              accent="rgba(255,255,255,0.55)"
+              here={here}
+            />
+          </>
+        ) : (
+          <>
+            <AttendeeList
+              heading={`Going · ${goingCount}`}
+              rows={going}
+              onMessage={messageOne}
+              accent="#5BD18C"
+            />
+            <AttendeeList
+              heading={`Interested · ${interestedCount}`}
+              rows={interested}
+              onMessage={messageOne}
+              accent="#FFB85A"
+            />
+          </>
+        )}
 
-        <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 4 }}>
+        <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, flexWrap: "wrap", marginTop: 4 }}>
+          {checkin && checkin.count > 0 ? (
+            <button
+              ref={clearRef}
+              type="button"
+              className="vibe-press"
+              aria-haspopup="dialog"
+              onClick={() => setConfirmClear(true)}
+              // eventCardDangerLink at the size of Close beside it.
+              style={{ ...eventCardDangerLink, minHeight: 32, boxSizing: "border-box", padding: "8px 14px", fontSize: 12 }}
+            >
+              {CHECKIN_COPY.clearAll}
+            </button>
+          ) : null}
           <button
+            ref={closeRef}
             type="button"
             onClick={onClose}
             style={{
@@ -11692,6 +12011,49 @@ function AttendeesModal({
             Close
           </button>
         </div>
+        {/* Inside the panel, so a tap in the confirm never reaches this
+            modal's backdrop (the panel stops the click). */}
+        {confirmClear ? (
+          <ConfirmDialog
+            message={clearConfirmLine(eventTitle)}
+            confirmLabel={CHECKIN_COPY.clearAll}
+            busyLabel={CHECKIN_COPY.clearing}
+            cancelLabel={CHECKIN_COPY.keepThem}
+            busy={clearing}
+            onConfirm={() => void clearAll()}
+            onCancel={() => {
+              setConfirmClear(false);
+              clearRef.current?.focus();
+            }}
+            zIndex={ATTENDEES_CONFIRM_Z}
+          />
+        ) : null}
+        {/* "Here" where the removal can't be put back. The card's words for
+            a closed check-in (CHECKIN_COPY.removeConfirm), after the
+            person's name. The send is the toggle's own optimistic one, so
+            this closes at once and is never busy. Focus goes back to the
+            toggle first, so it can pass to the next person as a mark does. */}
+        {askOff ? (
+          <ConfirmDialog
+            message={`${askOff.name}: ${CHECKIN_COPY.removeConfirm}`}
+            confirmLabel={CHECKIN_COPY.removeYes}
+            busyLabel={CHECKIN_COPY.removeYes}
+            cancelLabel={CHECKIN_COPY.removeKeep}
+            busy={false}
+            onConfirm={() => {
+              const { opener, go } = askOff;
+              setAskOff(null);
+              opener.focus({ preventScroll: true });
+              go();
+            }}
+            onCancel={() => {
+              const { opener } = askOff;
+              setAskOff(null);
+              opener.focus({ preventScroll: true });
+            }}
+            zIndex={ATTENDEES_CONFIRM_Z}
+          />
+        ) : null}
       </motion.div>
     </div>,
     document.body,
@@ -11703,14 +12065,26 @@ function AttendeeList({
   rows,
   onMessage,
   accent,
+  here,
 }: {
   heading: string;
   rows: Attendee[] | null;
   onMessage: (handle: string | null) => void;
   accent: string;
+  /** Event check-in (contract 4.2): each row gets "Mark as here" / "Here".
+   *  `canMark` is the mark window; walk-ins (no RSVP) can only be taken off.
+   *  `offConfirm` says, per row, when taking it off must ask first. */
+  here?: {
+    eventId: string;
+    canMark: boolean;
+    onChange: (userId: string, next: boolean) => void;
+    offConfirm?: (name: string, a: Attendee) => ConfirmOff | undefined;
+  };
 }) {
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+    // `data-here-list`: one section, so a HereToggle can hand focus to the
+    // next person's toggle in it when its own row moves away.
+    <div data-here-list={here ? "" : undefined} style={{ display: "flex", flexDirection: "column", gap: 6 }}>
       <div
         style={{
           fontFamily: "DM Sans, sans-serif",
@@ -11746,7 +12120,13 @@ function AttendeeList({
               style={{
                 display: "flex",
                 alignItems: "center",
-                gap: 10,
+                // With "Mark as here" the buttons move under the name when
+                // the row is narrow (a 375 px phone): the name is how an
+                // officer finds someone at the door, so it never gets
+                // under 120 px (it had about 60).
+                flexWrap: here ? "wrap" : undefined,
+                columnGap: 10,
+                rowGap: 6,
                 padding: "6px 0",
                 borderBottom: "1px solid rgba(255,255,255,0.06)",
               }}
@@ -11771,7 +12151,7 @@ function AttendeeList({
               >
                 {!a.user.avatar_url ? initials : null}
               </div>
-              <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ flex: "1 1 120px", minWidth: 0 }}>
                 <div
                   style={{
                     fontFamily: "DM Sans, sans-serif",
@@ -11797,24 +12177,39 @@ function AttendeeList({
                   </div>
                 ) : null}
               </div>
-              <button
-                type="button"
-                onClick={() => onMessage(a.user.handle)}
-                disabled={!a.user.handle}
-                style={{
-                  padding: "4px 12px",
-                  borderRadius: 999,
-                  border: "1px solid rgba(255,255,255,0.18)",
-                  background: "rgba(255,255,255,0.06)",
-                  color: "rgba(255,255,255,0.85)",
-                  fontFamily: "DM Sans, sans-serif",
-                  fontWeight: 600,
-                  fontSize: 11,
-                  cursor: a.user.handle ? "pointer" : "default",
-                }}
-              >
-                Message
-              </button>
+              {/* One group, so on a narrow row both buttons wrap together
+                  and sit at the right, where they are on a wide one. */}
+              <div style={{ display: "flex", alignItems: "center", gap: 10, marginLeft: "auto", flexShrink: 0 }}>
+                {here ? (
+                  <HereToggle
+                    eventId={here.eventId}
+                    userId={a.user.id}
+                    name={name}
+                    checkedIn={a.checked_in}
+                    canMark={here.canMark && a.status !== null}
+                    onChange={(next) => here.onChange(a.user.id, next)}
+                    confirmOff={here.offConfirm?.(name, a)}
+                  />
+                ) : null}
+                <button
+                  type="button"
+                  onClick={() => onMessage(a.user.handle)}
+                  disabled={!a.user.handle}
+                  style={{
+                    padding: "4px 12px",
+                    borderRadius: 999,
+                    border: "1px solid rgba(255,255,255,0.18)",
+                    background: "rgba(255,255,255,0.06)",
+                    color: "rgba(255,255,255,0.85)",
+                    fontFamily: "DM Sans, sans-serif",
+                    fontWeight: 600,
+                    fontSize: 11,
+                    cursor: a.user.handle ? "pointer" : "default",
+                  }}
+                >
+                  Message
+                </button>
+              </div>
             </div>
           );
         })

@@ -191,8 +191,8 @@ export default function DeleteAccountPage() {
           <strong>What you posted:</strong> posts, comments, reposts and the
           events you created, including the posts and events you made as a
           club. Other people&apos;s comments, likes and reposts on your posts
-          go with the posts. Each event takes everyone&apos;s RSVPs and its
-          whole chat with it.
+          go with the posts. Each event takes everyone&apos;s RSVPs,
+          check-ins and its whole chat with it.
         </li>
         <li>
           <strong>Your messages:</strong> every message you sent in direct
@@ -204,7 +204,8 @@ export default function DeleteAccountPage() {
         <li>
           <strong>Your activity:</strong> likes, saves, poll votes, follows and
           followers, club memberships and roles, join requests and invites,
-          RSVPs and personal calendar entries, blocks and mutes,
+          RSVPs, event check-ins and personal calendar entries, blocks and
+          mutes,
           notifications, and the records of what you viewed and of who viewed
           you.
         </li>

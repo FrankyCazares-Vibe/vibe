@@ -21,7 +21,23 @@ import { Sections11To15 } from "./sections-11-15";
 
 // The day this page last changed. Section 13 promises the new date goes at
 // the top with every change, and check/checks.mjs pins the same date.
-const EFFECTIVE_DATE = "October 18, 2026";
+const EFFECTIVE_DATE = "October 19, 2026";
+
+// The live policy must never show a placeholder where its date goes (section
+// 13 promises the real day at the top). A draft may carry one on a laptop or
+// a Vercel preview, but a production build stops here until the real day is
+// set, in this line and in the text file's line 3. The policy checker can't
+// catch it: it compares the page's date with this same line.
+if (
+  process.env.VERCEL_ENV === "production" &&
+  !/^(?:January|February|March|April|May|June|July|August|September|October|November|December) \d{1,2}, \d{4}$/.test(
+    EFFECTIVE_DATE,
+  )
+) {
+  throw new Error(
+    `[privacy] EFFECTIVE_DATE is "${EFFECTIVE_DATE}", not a date. Set the real day in src/app/legal/privacy/page.tsx and line 3 of the policy text before a production build.`,
+  );
+}
 
 export const metadata = {
   title: "Privacy Policy · Vibe",
