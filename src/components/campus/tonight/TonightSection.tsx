@@ -28,7 +28,6 @@ import {
   IconPin,
   ItemTitle,
   LeadLinks,
-  OrbitMark,
   ReasonLabel,
   SchoolTag,
   TonightSkeleton,
@@ -104,7 +103,6 @@ function Shell({
               {title}
               {day}
             </div>
-            <OrbitMark size={28} />
           </div>
         ) : (
           <div className="tonight-ev-head">

@@ -12,8 +12,11 @@
  */
 import { useId, type CSSProperties } from "react";
 
+import { MouseSpotlight } from "@/components/ui/mouse-spotlight";
+import { IU_CRIMSON } from "@/lib/iu/school-colors";
+
 import { campusClock, campusDateTime } from "./campus-time";
-import { IconPin, LeadLinks, MatchupTitle, OutLink, SchoolTag, schoolHref } from "./TonightBits";
+import { IconCalendar, IconPin, LeadLinks, MatchupTitle, OutLink, SchoolTag, schoolHref } from "./TonightBits";
 import { TONIGHT_COPY } from "./tonight-view";
 import type { SchoolEventCardProps } from "./types";
 
@@ -41,25 +44,26 @@ const SCHOOL_CARD_SURFACE: CSSProperties = {
   color: "#fff",
 };
 
+/**
+ * A school event wears its school's colour where a club card wears the
+ * club's: the left edge and the spotlight that follows the pointer (Franky,
+ * Oct 19 2026: "school events hover in school colours"). Every calendar in v1
+ * is IU's, so crimson; a Purdue calendar would map to gold here.
+ */
+function schoolAccent(source: SchoolEventCardProps["ev"]["source"]): { edge: string; glow: string } {
+  switch (source) {
+    case "athletics":
+    case "iu-student-affairs":
+    case "iu-featured":
+      return { edge: IU_CRIMSON, glow: "rgba(153, 0, 0, 0.55)" };
+  }
+}
+
 const CARD_STYLE: CSSProperties = {
   ...SCHOOL_CARD_SURFACE,
   borderRadius: 18,
-  // A club card's left edge is its club colour; a school event never takes
-  // one, so it gets a quiet white edge instead (never mistaken for a club).
-  borderLeft: "3px solid rgba(255,255,255,0.28)",
-  padding: 20,
   fontFamily: "DM Sans, sans-serif",
 };
-
-/** The board's 14-grid calendar glyph (TonightBits has clock and pin only). */
-function IconCalendar() {
-  return (
-    <svg width="13" height="13" viewBox="0 0 14 14" fill="none" aria-hidden="true">
-      <rect x="1" y="2" width="12" height="11" rx="2.5" stroke="currentColor" strokeWidth="1.3" />
-      <path d="M1 6h12M4 1v2M10 1v2" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
-    </svg>
-  );
-}
 
 /** "Wed, Nov 11 · 6:30 PM", plus " – 8:00 PM" for an event. A game's end is
  *  the feed's guess (start + 2 h when it gives none), so it is never shown. */
@@ -88,8 +92,11 @@ export function SchoolEventCard({ ev, source }: SchoolEventCardProps) {
   // again here by the one shared check, so a bad page falls back to the calendar).
   const calendarHref = schoolHref(ev, source ? [source] : []);
 
+  const accent = schoolAccent(ev.source);
+
   return (
-    <article aria-labelledby={titleId} className="tonight-school-card" style={CARD_STYLE}>
+    <MouseSpotlight size={240} color={accent.glow} style={{ ...CARD_STYLE, borderLeft: `3px solid ${accent.edge}` }}>
+    <article aria-labelledby={titleId} className="tonight-school-card" style={{ padding: 20 }}>
       <h4 id={titleId} className="tonight-sc-title">
         <MatchupTitle ev={ev} />
       </h4>
@@ -100,7 +107,7 @@ export function SchoolEventCard({ ev, source }: SchoolEventCardProps) {
       <div className="tonight-sc-facts">
         {when ? (
           <span>
-            <IconCalendar />
+            <IconCalendar size={13} />
             {when}
           </span>
         ) : null}
@@ -122,5 +129,6 @@ export function SchoolEventCard({ ev, source }: SchoolEventCardProps) {
         <LeadLinks ev={ev} />
       </div>
     </article>
+    </MouseSpotlight>
   );
 }

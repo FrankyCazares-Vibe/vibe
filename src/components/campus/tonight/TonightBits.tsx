@@ -3,7 +3,7 @@
 /**
  * The small pieces every Tonight surface draws (Oct 19 2026): the "School
  * event" tag, the italic "vs" title, the reason for #1, outside links, the
- * calendar credit, club marks, the orbit, the icons and the skeleton. One
+ * calendar credit, club marks, the icons and the skeleton. One
  * file so the desktop panel, the phone card and sheet and the Events tab
  * look like one feature.
  *
@@ -252,16 +252,6 @@ export function ClubSwatch({ orgId }: { orgId: string | null }): ReactElement {
   );
 }
 
-/** The Events header's open orbit (D2): a coral ring with its dot, softer in Light. */
-export function OrbitMark({ size = 28 }: { size?: number }): ReactElement {
-  return (
-    <svg className="tonight-orbit" width={size} height={size} viewBox="0 0 64 64" fill="none" aria-hidden="true" focusable="false">
-      <path className="tonight-orbit-ring" d="M47.87 50 A24 24 0 1 1 54.44 40.5" strokeWidth={3} strokeLinecap="round" />
-      <circle className="tonight-orbit-dot" cx={51.17} cy={45.23} r={5} />
-    </svg>
-  );
-}
-
 // ── Icons (the boards' stroke icons on a 16 grid, currentColor) ───────────
 
 function Icon({ size, strokeWidth, children }: { size: number; strokeWidth: number; children: ReactNode }): ReactElement {
@@ -289,6 +279,16 @@ export function IconClock({ size = 14 }: { size?: number }): ReactElement {
     <Icon size={size} strokeWidth={1.4}>
       <circle cx={8} cy={8} r={6.2} />
       <path d="M8 4.6V8l2.4 1.6" />
+    </Icon>
+  );
+}
+
+/** A calendar page (event dates on the Events cards, school and club alike). */
+export function IconCalendar({ size = 13 }: { size?: number }): ReactElement {
+  return (
+    <Icon size={size} strokeWidth={1.4}>
+      <rect x={2} y={3} width={12} height={11} rx={2.5} />
+      <path d="M2 7h12M5 1.8v2.4M11 1.8v2.4" />
     </Icon>
   );
 }

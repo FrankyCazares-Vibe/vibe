@@ -213,22 +213,6 @@ button.tonight-row {
   border-radius: 4px;
 }
 
-/* The open orbit: coral at half strength in Light, a touch more in Night. */
-.tonight-orbit {
-  display: block;
-  flex-shrink: 0;
-}
-.tonight-orbit-ring {
-  stroke: var(--coral);
-  stroke-opacity: 0.5;
-}
-:root[data-theme="dark"] .tonight-orbit-ring {
-  stroke-opacity: 0.6;
-}
-.tonight-orbit-dot {
-  fill: var(--coral);
-}
-
 .tonight-icon {
   display: block;
   flex-shrink: 0;

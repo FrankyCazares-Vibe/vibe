@@ -27,6 +27,7 @@ import { useStripData } from "@/components/campus/strip-data";
 // handoffs/2026-10-19-tonight-build/CONTRACT.md §6.1 and §6.3.
 import { EventFilterChips } from "@/components/campus/tonight/EventFilterChips";
 import { QuietBoundary } from "@/components/campus/tonight/QuietBoundary";
+import { IconCalendar, IconPin } from "@/components/campus/tonight/TonightBits";
 import { FeedSideLayout } from "@/components/campus/tonight/FeedSideLayout";
 import { SchoolEventCard } from "@/components/campus/tonight/SchoolEventCard";
 import { mergeComingUp, TONIGHT_COPY, upcomingSchool } from "@/components/campus/tonight/tonight-view";
@@ -10874,11 +10875,17 @@ export function EventCard({
           marginBottom: 12,
         }}
       >
-        🗓 {formatEventTime(ev.starts_at, ev.ends_at)}
+        {/* Line icons, not emoji (Oct 19, 2026): the same calendar and pin as
+            the school cards beside these in "Coming up", in the card's grey. */}
+        <span style={{ display: "flex", alignItems: "center", gap: 7 }}>
+          <IconCalendar size={13} />
+          {formatEventTime(ev.starts_at, ev.ends_at)}
+        </span>
         {ev.location ? (
-          <>
-            <br />📍 {ev.location}
-          </>
+          <span style={{ display: "flex", alignItems: "center", gap: 7 }}>
+            <IconPin size={13} />
+            {ev.location}
+          </span>
         ) : null}
       </div>
       {ev.description ? (
