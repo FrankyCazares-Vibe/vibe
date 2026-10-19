@@ -64,3 +64,32 @@ was blocked by the permission check. Ask Franky: fill it, or delete it (his call
 - Testing note: the built-in Browser pane, when the session isn't on screen, runs no animation frames and
   fires no scroll events. Use headless Chromium from gstack's `playwright-core` with
   `handoffs/chat-redesign/wave-1-build/tools/cookie.mjs <name>` for the local seed cookie.
+
+## Later the same night (Oct 18-19): mockups picked, fonts fixed
+
+**Side space + tonight card.** Canvas: https://claude.ai/artifact/TcM2bx35HJuD6ydt2kuchA (Round 1 = four
+options A-D; Round 2 = what Franky reacted to). Sources and renders in `handoffs/2026-10-18-side-space/`
+(BRIEF.md, ROUND2.md). **Franky's picks:** desktop = **C2** (both sides, each in its own framed panel,
+the feed stays centered); phone = **A's card on Feed that opens C's sheet**; and **yes, the same Tonight
+section at the top of Events** (phone and desktop, All · School · Clubs chips). He asked for the desktop
+Events Tonight block to be a bit smaller (done on the board: 28 → 22px title, tighter).
+The ranking rule we proposed (not yet confirmed in words, but he liked the boards drawn on it): the card
+is about SCHOOL events (sports and non-sports equal); #1 = the school's one featured pick of the day if
+any ("Featured by your school"; founders set it until a school signs on), else the soonest school event
+that hasn't ended, a live one first; then the other school events, then club events (counts only, 5+).
+Never ranked by popularity, never paid. **Open question for Franky:** does a pin hold #1 while another
+school event is live? (Boards: the pin holds, the live one shows "Happening now".)
+Data: the Jaguars' iCal feed and IU's LiveWhale group feeds (events.iu.edu/live/ical/events/group_id/N);
+both need the office's written OK before the card ships (research doc). Not built yet.
+
+**Fonts (`5d3ddc6`, live).** One Google link in `src/lib/theme/fonts.ts` (GOOGLE_FONTS_HREF), pasted
+byte-identical into profile.html, messages.html and onboarding.html (`fonts.test.ts` fails on drift).
+Franky's picks: **all Fraunces titles soft** (SOFT 100 pinned, same bytes) and **coral accent words
+upright** at the title's weight. The logo is a 1.4 KB face `public/fonts/vibe-wordmark-v1.woff2`
+(opsz 144, SOFT 100, 900; class `.vibe-wordmark`, token `--font-wordmark`); a re-cut ships as -v2.
+`font-synthesis-weight: none` everywhere; static pages now get real Bold/ExtraBold and DM Sans buttons;
+JetBrains Mono loads only on the landing; auth arrows are SVG (`src/components/brand/Arrow.tsx`).
+Left for later: other symbols DM Sans lacks (⌄ ⋯ ✓ ↗ ▶ ❤ ↻, the orgs/plus arrows) still draw one glyph
+from a system font; the admin map wasn't renderable with seed accounts; Safari/iPhone not yet checked
+(old iOS before 16.4 still fakes bold, same as before); the logo face uses font-display block with no
+preload, so on a very slow connection the login logo can be invisible for a moment.
