@@ -1,8 +1,9 @@
 "use client";
 
+import { useAnimate } from "motion/react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { Fragment, useCallback, useEffect, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Drawer } from "vaul";
 
 import { ImageCropperModal } from "@/components/ImageCropperModal";
@@ -21,6 +22,7 @@ import {
   type DocBar,
 } from "@/components/mobile/ResumeViewerMobile";
 import { useMobileTour } from "@/components/mobile/use-mobile-tour";
+import { useTabScrollMemory } from "@/components/mobile/use-tab-scroll-memory";
 import { ClubFlairChips } from "@/components/profile/ClubFlair";
 import { ClubsSection, useMyClubs } from "@/components/profile/ClubsSection";
 import { readPublicClubs, type ShownClub } from "@/components/profile/clubs-model";
@@ -28,6 +30,8 @@ import { vibeRequest } from "@/lib/feedback/request";
 import { toast } from "@/lib/feedback/toast";
 import { allowedCampusId, isSchoolSystem, type SchoolSystem } from "@/lib/iu/campuses";
 import { majorsForCampus } from "@/lib/iu/majors";
+import { Reveal } from "@/lib/motion/Reveal";
+import { SPRING_SNAPPY } from "@/lib/motion/springs";
 import {
   CONNECTED_MEANING,
   FOLLOW_LABELS,
@@ -502,10 +506,49 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
   // swiping scrolls naturally and the scroll handler syncs `tab`.
   const tabScrollRef = useRef<HTMLDivElement | null>(null);
   const isProgrammaticScrollRef = useRef(false);
+  // The pager is as tall as the OPEN pane, not the taller of the two: with
+  // Clubs (and the owner's whole Following list) in Portfolio since Oct 18
+  // 2026, a stretched row left a blank run under the last post. The panes
+  // are callback refs because the pager mounts after the profile loads.
+  // Written straight to the element: a pane resizes often (images load,
+  // lists page in) and a state update would re-render the whole profile.
+  // A layout effect declared ABOVE useTabScrollMemory: same-component layout
+  // effects run in order, so the pager takes the new pane's height before
+  // the tab's saved place is put back. Fitted later, the page would still be
+  // the old (short) pane's height, the browser would clamp the restore, and
+  // the clamp would be saved over the real place.
+  const [postsPaneEl, setPostsPaneEl] = useState<HTMLDivElement | null>(null);
+  const [portfolioPaneEl, setPortfolioPaneEl] = useState<HTMLDivElement | null>(null);
+  useLayoutEffect(() => {
+    const pager = tabScrollRef.current;
+    const pane = tab === "portfolio" ? portfolioPaneEl : postsPaneEl;
+    // No ResizeObserver: no height, so the row keeps its old stretch.
+    if (!pager || !pane || typeof ResizeObserver === "undefined") return;
+    const fit = () => {
+      pager.style.height = `${pane.offsetHeight}px`;
+    };
+    fit();
+    const ro = new ResizeObserver(fit);
+    ro.observe(pane);
+    return () => ro.disconnect();
+  }, [tab, postsPaneEl, portfolioPaneEl]);
+  // Each tab keeps its own place under the one page scroll (Oct 18, 2026).
+  // A tab never read opens with the tab strip where it was, not the header:
+  // the page stays put unless it was below the pager's top.
+  useTabScrollMemory(tab, `/profile:${targetHandle ?? "me"}`, () => {
+    const pager = tabScrollRef.current;
+    if (!pager) return window.scrollY;
+    const pagerTop = pager.getBoundingClientRect().top + window.scrollY - 120;
+    return Math.min(window.scrollY, Math.max(0, pagerTop));
+  });
   const TAB_ORDER: ProfileTab[] = ["posts", "portfolio"];
   // Sub-tab state inside the Posts pane — see PostsSubTab type for
   // why these aren't top-level tabs.
   const [postsSubTab, setPostsSubTab] = useState<PostsSubTab>("mine");
+  // Sub-tabs whose list has been on screen. Each sub-tab's list remounts
+  // when it's opened, so without this every return replayed the rise as if
+  // it were loading again; only a first look plays it.
+  const [shownSubTabs, setShownSubTabs] = useState<ReadonlySet<PostsSubTab>>(() => new Set());
   const [reposts, setReposts] = useState<RepostEntry[] | null>(null);
   const [savedPosts, setSavedPosts] = useState<SavedPost[] | null>(null);
   // Failed reads for the two sub-panes. A failure never writes [] (that
@@ -536,27 +579,6 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
     // referential dep that doesn't change.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab]);
-  // The pager is as tall as the OPEN pane, not the taller of the two: with
-  // Clubs (and the owner's whole Following list) in Portfolio since Oct 18
-  // 2026, a stretched row left a blank run under the last post. The panes
-  // are callback refs because the pager mounts after the profile loads.
-  // Written straight to the element: a pane resizes often (images load,
-  // lists page in) and a state update would re-render the whole profile.
-  const [postsPaneEl, setPostsPaneEl] = useState<HTMLDivElement | null>(null);
-  const [portfolioPaneEl, setPortfolioPaneEl] = useState<HTMLDivElement | null>(null);
-  useEffect(() => {
-    const pager = tabScrollRef.current;
-    const pane = tab === "portfolio" ? portfolioPaneEl : postsPaneEl;
-    // No ResizeObserver: no height, so the row keeps its old stretch.
-    if (!pager || !pane || typeof ResizeObserver === "undefined") return;
-    const fit = () => {
-      pager.style.height = `${pane.offsetHeight}px`;
-    };
-    fit();
-    const ro = new ResizeObserver(fit);
-    ro.observe(pane);
-    return () => ro.disconnect();
-  }, [tab, postsPaneEl, portfolioPaneEl]);
   /** Resume item the viewer should open. null = closed. */
   // Track the docIndex alongside the item so the resume viewer filters
   // its bars to the right doc instead of always defaulting to doc 0.
@@ -1772,6 +1794,7 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
                 type="button"
                 onClick={commitEdit}
                 disabled={savingEdit}
+                className="vibe-press"
                 style={floatingActionSaveStyle}
                 aria-label="Save profile"
               >
@@ -1784,6 +1807,7 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
                 type="button"
                 onClick={enterEdit}
                 aria-label="Edit profile"
+                className="vibe-press"
                 style={floatingActionStyle}
               >
                 <svg width="17" height="17" viewBox="0 0 17 17" fill="none" aria-hidden>
@@ -2405,12 +2429,22 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
         >
           <PostsSubTabs
             active={postsSubTab}
-            onChange={setPostsSubTab}
+            onChange={(next) => {
+              if (next === postsSubTab) return;
+              // The list being left was seen if it had rows.
+              const left =
+                postsSubTab === "mine" ? posts : postsSubTab === "reposts" ? reposts : savedPosts;
+              if (left && left.length > 0) {
+                setShownSubTabs((prev) => new Set(prev).add(postsSubTab));
+              }
+              setPostsSubTab(next);
+            }}
             isVisitor={isVisitor}
           />
           {postsSubTab === "mine" ? (
             <PostsGrid
               posts={feedPosts}
+              playRise={!shownSubTabs.has("mine")}
               loading={posts === null}
               failure={postsErr}
               onRetry={() => {
@@ -2431,6 +2465,7 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
           ) : postsSubTab === "reposts" ? (
             <RepostsList
               reposts={reposts}
+              playRise={!shownSubTabs.has("reposts")}
               failure={repostsErr}
               onRetry={() => {
                 setRepostsErr(null);
@@ -2443,6 +2478,7 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
           ) : (
             <SavedGrid
               posts={savedPosts}
+              playRise={!shownSubTabs.has("saved")}
               failure={savedErr}
               onRetry={() => {
                 setSavedErr(null);
@@ -2728,6 +2764,7 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
           type="button"
           onClick={openComposer}
           aria-label="New post"
+          className="vibe-press"
           style={{
             position: "fixed",
             right: 18,
@@ -2793,8 +2830,29 @@ function ProfileTabs({
     { id: "posts", label: "Posts", icon: <IconGrid /> },
     { id: "portfolio", label: "Portfolio", icon: <IconResume /> },
   ];
+  // The underline slides to the open tab (motion pass, Oct 18 2026), by hand
+  // as on the campus strip (CampusMobile TabStrip): it lives in the active
+  // button and, when that changes, starts under the old one (x,
+  // SPRING_SNAPPY) and settles. Not Motion's layoutId: a tab change also
+  // moves the page (useTabScrollMemory), and this screen re-renders on every
+  // keystroke in edit mode, which a layoutId would re-measure each time.
+  // useAnimate follows reduce motion (the underline just appears).
+  const [scope, animate] = useAnimate<HTMLDivElement>();
+  const buttonsRef = useRef<Partial<Record<ProfileTab, HTMLButtonElement | null>>>({});
+  const barRef = useRef<HTMLSpanElement | null>(null);
+  const shownRef = useRef(active);
+  useLayoutEffect(() => {
+    const from = buttonsRef.current[shownRef.current];
+    const to = buttonsRef.current[active];
+    shownRef.current = active;
+    const bar = barRef.current;
+    if (!from || !to || from === to || !bar) return;
+    const centre = (b: HTMLElement) => b.offsetLeft + b.offsetWidth / 2;
+    animate(bar, { x: [centre(from) - centre(to), 0] }, SPRING_SNAPPY);
+  }, [active, animate]);
   return (
     <div
+      ref={scope}
       style={{
         display: "grid",
         gridTemplateColumns: `repeat(${tabs.length}, 1fr)`,
@@ -2808,9 +2866,13 @@ function ProfileTabs({
         return (
           <button
             key={t.id}
+            ref={(el) => {
+              buttonsRef.current[t.id] = el;
+            }}
             type="button"
             onClick={() => onChange(t.id)}
             aria-pressed={isActive}
+            className="vibe-press"
             style={{
               position: "relative",
               display: "flex",
@@ -2835,12 +2897,16 @@ function ProfileTabs({
             {t.label}
             {isActive ? (
               <span
+                ref={barRef}
                 aria-hidden
                 style={{
                   position: "absolute",
                   bottom: -1,
-                  left: "50%",
-                  transform: "translateX(-50%)",
+                  // Centred by auto margins, not translateX(-50%): the slide
+                  // above owns this element's transform.
+                  left: 0,
+                  right: 0,
+                  margin: "0 auto",
                   width: 34,
                   height: 2,
                   borderRadius: 2,
@@ -2857,6 +2923,7 @@ function ProfileTabs({
 
 function PostsGrid({
   posts,
+  playRise,
   loading,
   failure,
   onRetry,
@@ -2868,6 +2935,8 @@ function PostsGrid({
   onDeleted,
 }: {
   posts: PostRow[];
+  /** False when this list was already seen: it appears, no rise. */
+  playRise: boolean;
   loading: boolean;
   /** The first load failed: LoadFailed takes the skeleton's place,
    *  never the empty copy. */
@@ -2914,15 +2983,19 @@ function PostsGrid({
         gap: 14,
       }}
     >
-      {posts.map((p) => (
-        <PostFeedCard
-          key={p.id}
-          post={p}
-          isOwner={!isVisitor}
-          onTap={() => onOpenPost(p.id)}
-          onEdited={onEdited}
-          onDeleted={onDeleted}
-        />
+      {/* Cards rise in as the posts land (motion pass), the first
+          screenful staggered. Keyed by post, so an edit never replays one;
+          the card's ⋯ sheet portals out, so the rise can't trap it. */}
+      {posts.map((p, i) => (
+        <MaybeReveal key={p.id} play={playRise} delayIndex={i}>
+          <PostFeedCard
+            post={p}
+            isOwner={!isVisitor}
+            onTap={() => onOpenPost(p.id)}
+            onEdited={onEdited}
+            onDeleted={onDeleted}
+          />
+        </MaybeReveal>
       ))}
       {signInForMoreHref ? (
         // Below the last card, so it moves nothing; it arrives with the rows.
@@ -3170,8 +3243,29 @@ function PostsSubTabs({
         { id: "reposts", label: "Reposts" },
         { id: "saved", label: "Saved" },
       ];
+  // The dark pill slides to the open sub-tab (motion pass, Oct 18 2026), by
+  // hand as on the campus strip (CampusMobile TabStrip): from the old
+  // button's box (x + scaleX, SPRING_SNAPPY) into its own. useAnimate
+  // follows reduce motion (the pill just appears).
+  const [scope, animate] = useAnimate<HTMLDivElement>();
+  const buttonsRef = useRef<Partial<Record<PostsSubTab, HTMLButtonElement | null>>>({});
+  const pillRef = useRef<HTMLSpanElement | null>(null);
+  const shownRef = useRef(active);
+  useLayoutEffect(() => {
+    const from = buttonsRef.current[shownRef.current];
+    const to = buttonsRef.current[active];
+    shownRef.current = active;
+    const pill = pillRef.current;
+    if (!from || !to || from === to || !pill || !to.offsetWidth) return;
+    animate(
+      pill,
+      { x: [from.offsetLeft - to.offsetLeft, 0], scaleX: [from.offsetWidth / to.offsetWidth, 1] },
+      SPRING_SNAPPY,
+    );
+  }, [active, animate]);
   return (
     <div
+      ref={scope}
       role="tablist"
       style={{
         display: "flex",
@@ -3180,6 +3274,8 @@ function PostsSubTabs({
         overflowX: "auto",
         scrollbarWidth: "none",
         msOverflowStyle: "none",
+        // Keeps the z-order below inside the strip.
+        isolation: "isolate",
       }}
       className="vibe-no-scrollbar"
     >
@@ -3188,17 +3284,25 @@ function PostsSubTabs({
         return (
           <button
             key={t.id}
+            ref={(el) => {
+              buttonsRef.current[t.id] = el;
+            }}
             type="button"
             role="tab"
             aria-selected={on}
             onClick={() => onChange(t.id)}
+            className="vibe-press"
             style={{
+              position: "relative",
+              // The open tab sits over the others, so its sliding pill
+              // passes over their backgrounds; their words (zIndex 2) stay
+              // on top of it.
+              zIndex: on ? 1 : undefined,
               padding: "6px 14px",
               borderRadius: 999,
-              border: on
-                ? "1px solid rgba(var(--scrim-rgb),0.85)"
-                : "1px solid rgba(var(--scrim-rgb),0.12)",
-              background: on ? "var(--charcoal)" : "var(--paper-62)",
+              // The open tab's dark ring and fill are the pill below.
+              border: "1px solid rgba(var(--scrim-rgb),0.12)",
+              background: "var(--paper-62)",
               color: on ? "var(--paper)" : "var(--charcoal)",
               fontFamily: "DM Sans, sans-serif",
               fontSize: 12.5,
@@ -3209,7 +3313,25 @@ function PostsSubTabs({
               flexShrink: 0,
             }}
           >
-            {t.label}
+            {on ? (
+              <span
+                ref={pillRef}
+                aria-hidden
+                style={{
+                  position: "absolute",
+                  // Over the border too, as the old charcoal background was,
+                  // with the old dark ring on it.
+                  inset: -1,
+                  borderRadius: 999,
+                  background: "var(--charcoal)",
+                  border: "1px solid rgba(var(--scrim-rgb),0.85)",
+                  boxSizing: "border-box",
+                  transformOrigin: "0 50%",
+                  pointerEvents: "none",
+                }}
+              />
+            ) : null}
+            <span style={{ position: "relative", zIndex: 2 }}>{t.label}</span>
           </button>
         );
       })}
@@ -3222,6 +3344,7 @@ function PostsSubTabs({
  *  right) and opens that post's full viewer on tap. */
 function RepostsList({
   reposts,
+  playRise,
   failure,
   onRetry,
   isVisitor,
@@ -3229,6 +3352,8 @@ function RepostsList({
   onOpenPost,
 }: {
   reposts: RepostEntry[] | null;
+  /** False when this list was already seen: it appears, no rise. */
+  playRise: boolean;
   /** Read only while nothing has loaded; loaded rows win. */
   failure: LoadFailure | null;
   onRetry: () => void;
@@ -3257,8 +3382,10 @@ function RepostsList({
   }
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-      {reposts.map((r) => (
-        <RepostRow key={`${r.post_id}-${r.reposted_at}`} entry={r} onOpen={onOpenPost} />
+      {reposts.map((r, i) => (
+        <MaybeReveal key={`${r.post_id}-${r.reposted_at}`} play={playRise} delayIndex={i}>
+          <RepostRow entry={r} onOpen={onOpenPost} />
+        </MaybeReveal>
       ))}
     </div>
   );
@@ -3417,11 +3544,14 @@ function RepostRow({
  *  to a content-snippet tile for posts without media. */
 function SavedGrid({
   posts,
+  playRise,
   failure,
   onRetry,
   onOpenPost,
 }: {
   posts: SavedPost[] | null;
+  /** False when this list was already seen: it appears, no rise. */
+  playRise: boolean;
   /** Read only while nothing has loaded; loaded rows win. */
   failure: LoadFailure | null;
   onRetry: () => void;
@@ -3450,52 +3580,79 @@ function SavedGrid({
         gap: 4,
       }}
     >
-      {posts.map((p) => {
+      {posts.map((p, i) => {
         const thumb =
           p.media_thumbnail_url || (p.type === "post" ? p.media_url : null);
+        // Tiles fade and rise in (motion pass). The wrapper is a one-cell
+        // grid so the tile keeps the size it had as a cell of the grid above.
         return (
-          <button
-            key={p.id}
-            type="button"
-            onClick={() => onOpenPost({ id: p.id })}
-            style={{
-              position: "relative",
-              aspectRatio: "1 / 1",
-              border: "none",
-              padding: 0,
-              borderRadius: 2,
-              overflow: "hidden",
-              background: thumb
-                ? `url(${thumb}) center/cover, #1C1C1E`
-                : "rgba(var(--scrim-rgb),0.06)",
-              cursor: "pointer",
-              WebkitTapHighlightColor: "transparent",
-            }}
-          >
-            {!thumb ? (
-              <span
-                style={{
-                  position: "absolute",
-                  inset: 0,
-                  padding: 8,
-                  fontFamily: "DM Sans, sans-serif",
-                  fontSize: 11.5,
-                  color: "var(--ink-body)",
-                  textAlign: "left",
-                  display: "-webkit-box",
-                  WebkitLineClamp: 5,
-                  WebkitBoxOrient: "vertical",
-                  overflow: "hidden",
-                  whiteSpace: "pre-wrap",
-                }}
-              >
-                {p.content || "Saved post"}
-              </span>
-            ) : null}
-          </button>
+          <MaybeReveal key={p.id} play={playRise} delayIndex={i} style={{ display: "grid" }}>
+            <button
+              type="button"
+              onClick={() => onOpenPost({ id: p.id })}
+              style={{
+                position: "relative",
+                width: "100%",
+                aspectRatio: "1 / 1",
+                border: "none",
+                padding: 0,
+                borderRadius: 2,
+                overflow: "hidden",
+                background: thumb
+                  ? `url(${thumb}) center/cover, #1C1C1E`
+                  : "rgba(var(--scrim-rgb),0.06)",
+                cursor: "pointer",
+                WebkitTapHighlightColor: "transparent",
+              }}
+            >
+              {!thumb ? (
+                <span
+                  style={{
+                    position: "absolute",
+                    inset: 0,
+                    padding: 8,
+                    fontFamily: "DM Sans, sans-serif",
+                    fontSize: 11.5,
+                    color: "var(--ink-body)",
+                    textAlign: "left",
+                    display: "-webkit-box",
+                    WebkitLineClamp: 5,
+                    WebkitBoxOrient: "vertical",
+                    overflow: "hidden",
+                    whiteSpace: "pre-wrap",
+                  }}
+                >
+                  {p.content || "Saved post"}
+                </span>
+              ) : null}
+            </button>
+          </MaybeReveal>
         );
       })}
     </div>
+  );
+}
+
+/** A Posts sub-tab item: Reveal's rise the first time its list is seen,
+ *  the same box with no arrival after that (`play` is fixed for a list's
+ *  life: it only changes as the sub-tab is left, which unmounts it). */
+function MaybeReveal({
+  play,
+  delayIndex,
+  style,
+  children,
+}: {
+  play: boolean;
+  delayIndex: number;
+  style?: React.CSSProperties;
+  children: React.ReactNode;
+}) {
+  return play ? (
+    <Reveal delayIndex={delayIndex} style={style}>
+      {children}
+    </Reveal>
+  ) : (
+    <div style={style}>{children}</div>
   );
 }
 
@@ -4164,6 +4321,7 @@ function EditPill({
       type="button"
       onClick={onClick}
       disabled={disabled}
+      className="vibe-press"
       style={{
         padding: "4px 10px",
         borderRadius: 999,
@@ -5808,7 +5966,11 @@ function FollowButton({
   if (messageFirst) {
     return (
       <div style={{ marginBottom: 22 }}>
-        <Link href={`/messages?to=${encodeURIComponent(handle as string)}`} style={primary}>
+        <Link
+          href={`/messages?to=${encodeURIComponent(handle as string)}`}
+          className="vibe-press"
+          style={primary}
+        >
           Message
         </Link>
         <button
@@ -5837,7 +5999,7 @@ function FollowButton({
     );
   }
   return (
-    <button type="button" onClick={onTap} disabled={busy} style={primary}>
+    <button type="button" onClick={onTap} disabled={busy} className="vibe-press" style={primary}>
       {copy.label}
     </button>
   );

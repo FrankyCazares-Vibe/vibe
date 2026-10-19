@@ -1,7 +1,8 @@
 "use client";
 
+import { useAnimate } from "motion/react";
 import { useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import type {
   ActivityRow,
@@ -11,6 +12,7 @@ import type {
   UpcomingRow,
 } from "@/app/api/me/otto/route";
 import { OttoActivity } from "@/components/otto/OttoActivity";
+import { useTabScrollMemory } from "@/components/mobile/use-tab-scroll-memory";
 import { OttoMetrics } from "@/components/otto/OttoMetrics";
 import { OttoRequests } from "@/components/otto/OttoRequests";
 import { OttoSettings } from "@/components/otto/OttoSettings";
@@ -19,6 +21,7 @@ import { OttoUpcoming } from "@/components/otto/OttoUpcoming";
 import { PushAsk } from "@/components/push/PushAsk";
 import { OttoOrb } from "@/components/the-map/OttoOrb";
 import { vibeRequest } from "@/lib/feedback/request";
+import { SPRING_SNAPPY } from "@/lib/motion/springs";
 import { followFailureLine, personName } from "@/lib/people/follow-label";
 
 type Tab = "today" | "stats";
@@ -50,6 +53,8 @@ export function OttoMobile({ initial }: { initial: OttoPayload }) {
 
   const tabScrollRef = useRef<HTMLDivElement | null>(null);
   const isProgrammaticScrollRef = useRef(false);
+  // Each tab keeps its own place under the one page scroll (Oct 18, 2026).
+  useTabScrollMemory(tab, "/otto");
 
   const setActiveTab = useCallback((next: Tab) => {
     setTab(next);
@@ -323,25 +328,7 @@ export function OttoMobile({ initial }: { initial: OttoPayload }) {
       </header>
 
       {/* Tab strip — Today / Stats */}
-      <div
-        style={{
-          display: "flex",
-          gap: 6,
-          padding: "6px 18px 10px",
-          justifyContent: "center",
-        }}
-      >
-        <TabPill
-          label="Today"
-          active={tab === "today"}
-          onClick={() => setActiveTab("today")}
-        />
-        <TabPill
-          label="Stats"
-          active={tab === "stats"}
-          onClick={() => setActiveTab("stats")}
-        />
-      </div>
+      <TabStrip active={tab} onChange={setActiveTab} />
 
       {/* Swipeable panes */}
       <div
@@ -426,36 +413,97 @@ const visuallyHidden: React.CSSProperties = {
   border: 0,
 };
 
-function TabPill({
-  label,
-  active,
-  onClick,
-}: {
-  label: string;
-  active: boolean;
-  onClick: () => void;
-}) {
+const TAB_LABEL: Record<Tab, string> = { today: "Today", stats: "Stats" };
+
+function TabStrip({ active, onChange }: { active: Tab; onChange: (t: Tab) => void }) {
+  // The glass pill slides to the new tab (motion pass, Oct 18 2026), the
+  // same way as the campus strip (CampusMobile TabStrip): it lives in the
+  // active button and, when that changes, starts from the old button's box
+  // (x + scaleX, SPRING_SNAPPY) and settles into its own. By hand rather
+  // than Motion's layoutId, so every phone strip moves alike and a tab
+  // change that also moves the page (useTabScrollMemory) can't throw it.
+  // useAnimate follows reduce motion (the pill just appears).
+  const [scope, animate] = useAnimate<HTMLDivElement>();
+  const buttonsRef = useRef<Partial<Record<Tab, HTMLButtonElement | null>>>({});
+  const pillRef = useRef<HTMLSpanElement | null>(null);
+  const shownRef = useRef(active);
+  useLayoutEffect(() => {
+    const from = buttonsRef.current[shownRef.current];
+    const to = buttonsRef.current[active];
+    shownRef.current = active;
+    const pill = pillRef.current;
+    if (!from || !to || from === to || !pill || !to.offsetWidth) return;
+    animate(
+      pill,
+      { x: [from.offsetLeft - to.offsetLeft, 0], scaleX: [from.offsetWidth / to.offsetWidth, 1] },
+      SPRING_SNAPPY,
+    );
+  }, [active, animate]);
+
   return (
-    <button
-      type="button"
-      onClick={onClick}
+    <div
+      ref={scope}
       style={{
-        padding: "8px 18px",
-        borderRadius: 999,
-        border: active
-          ? "1px solid rgba(255,255,255,0.18)"
-          : "1px solid rgba(255,255,255,0.08)",
-        background: active ? "rgba(255,255,255,0.14)" : "transparent",
-        color: active ? "#fff" : "rgba(255,255,255,0.62)",
-        fontFamily: "DM Sans, sans-serif",
-        fontSize: 13,
-        fontWeight: 700,
-        cursor: "pointer",
-        WebkitTapHighlightColor: "transparent",
+        display: "flex",
+        gap: 6,
+        padding: "6px 18px 10px",
+        justifyContent: "center",
+        // Keeps the z-order below inside the strip.
+        isolation: "isolate",
       }}
     >
-      {label}
-    </button>
+      {TAB_ORDER.map((t) => {
+        const isActive = t === active;
+        return (
+          <button
+            key={t}
+            ref={(el) => {
+              buttonsRef.current[t] = el;
+            }}
+            type="button"
+            onClick={() => onChange(t)}
+            className="vibe-press"
+            style={{
+              position: "relative",
+              // The open tab sits over the other, so its pill slides over
+              // that one's ring; the words (zIndex 2) stay on top.
+              zIndex: isActive ? 1 : undefined,
+              padding: "8px 18px",
+              borderRadius: 999,
+              // The open tab's ring and glass are the pill below.
+              border: isActive
+                ? "1px solid transparent"
+                : "1px solid rgba(255,255,255,0.08)",
+              background: "transparent",
+              color: isActive ? "#fff" : "rgba(255,255,255,0.62)",
+              fontFamily: "DM Sans, sans-serif",
+              fontSize: 13,
+              fontWeight: 700,
+              cursor: "pointer",
+              WebkitTapHighlightColor: "transparent",
+            }}
+          >
+            {isActive ? (
+              <span
+                ref={pillRef}
+                aria-hidden
+                style={{
+                  position: "absolute",
+                  inset: -1,
+                  borderRadius: 999,
+                  border: "1px solid rgba(255,255,255,0.18)",
+                  background: "rgba(255,255,255,0.14)",
+                  boxSizing: "border-box",
+                  transformOrigin: "0 50%",
+                  pointerEvents: "none",
+                }}
+              />
+            ) : null}
+            <span style={{ position: "relative", zIndex: 2 }}>{TAB_LABEL[t]}</span>
+          </button>
+        );
+      })}
+    </div>
   );
 }
 

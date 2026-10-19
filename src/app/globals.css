@@ -2700,3 +2700,44 @@ html.vibe-app .vibe-auth-back {
   font-size: 26px;
   padding: 6px 14px;
 }
+
+/* ---------- Motion pass (Oct 18, 2026) ----------
+   Press feedback: `.vibe-press` on anything tappable shrinks it a touch
+   while held and springs back on release. The easing is SPRING_SNAPPY
+   (src/lib/motion/springs.ts) sampled into linear() over 320ms, so a press
+   settles the way the JS taps and the tab pill do, without JavaScript on
+   every button. src/lib/motion/spring-curve.ts makes the curve; its test
+   fails when this one drifts. Transform only. Off with reduce motion.
+   `.vibe-toggle` is a press on a chip that turns on and off (like, repost,
+   save): its fill fades, and when on it sits a touch larger by its own
+   --vibe-on-scale (1 unless the chip sets it). */
+:root {
+  /* Safari before 17.2 has no linear(): there the whole transition that
+     names this would be thrown out (fades included), so it gets a close
+     ease-out first and the spring only where linear() is understood. */
+  --vibe-spring-snappy: cubic-bezier(0.22, 1, 0.36, 1);
+}
+@supports (transition-timing-function: linear(0, 1)) {
+  :root {
+    --vibe-spring-snappy: linear(0, 0.029 3%, 0.097 6%, 0.218 10%, 0.346 14%, 0.495 19%, 0.62 24%, 0.738 30%, 0.834 37%, 0.904 45%, 0.953 55%, 0.981 67%, 0.994 82%, 1);
+  }
+}
+.vibe-toggle[aria-pressed="true"] {
+  transform: scale(var(--vibe-on-scale, 1));
+}
+@media (prefers-reduced-motion: no-preference) {
+  .vibe-press {
+    transition: transform 320ms var(--vibe-spring-snappy);
+  }
+  .vibe-press.vibe-toggle {
+    transition: transform 320ms var(--vibe-spring-snappy), background-color 140ms ease;
+  }
+  /* After the on-state above, so a held chip still shrinks. */
+  .vibe-press:active {
+    transform: scale(0.96);
+    /* !important: buttons that carry their own inline transition (the
+       desktop tabs, engagement chips, RSVP) would otherwise press in on the
+       slow 320ms release curve. */
+    transition-duration: 90ms !important;
+  }
+}

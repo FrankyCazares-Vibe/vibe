@@ -350,6 +350,8 @@ function ControlButton({
         e.stopPropagation();
         onPress();
       }}
+      // Join / Follow press like every other tap (motion pass, Oct 18 2026).
+      className="vibe-press"
       style={{
         ...style,
         cursor: disabled ? "default" : "pointer",

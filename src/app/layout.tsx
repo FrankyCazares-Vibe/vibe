@@ -6,6 +6,7 @@ import { headers } from "next/headers";
 import { BuildRefresh } from "@/components/build/BuildRefresh";
 import { CustomCursor } from "@/components/CustomCursor";
 import { ToastHost } from "@/components/feedback/ToastHost";
+import { MotionRoot } from "@/lib/motion/MotionRoot";
 import { NativeBridge } from "@/components/native/NativeBridge";
 import { ServiceWorkerRegistrar } from "@/components/pwa/ServiceWorkerRegistrar";
 import { ActivityTouch } from "@/components/usage/ActivityTouch";
@@ -121,7 +122,7 @@ export default async function RootLayout({
             before any page's: the Settings card can then paint the account's
             theme over it on a new device, never the other way round. */}
         <ThemeSync />
-        {children}
+        <MotionRoot>{children}</MotionRoot>
         {/* One toast for every React route; failed requests land here via
             vibeRequest (src/lib/feedback). Static pages have their own. */}
         <ToastHost />

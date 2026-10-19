@@ -1,0 +1,54 @@
+/**
+ * The CSS press spring (globals.css `--vibe-spring-snappy`) is SPRING_SNAPPY
+ * sampled over 320ms, so a press springs back the way the JS taps and the
+ * tab pill do (Oct 18, 2026). On a drift the failure prints the right curve.
+ *
+ * The resolve hook is the same as in `mobile-tab-active.test.ts`.
+ *
+ * Run with:
+ *   node --test src/lib/motion/spring-curve.test.ts
+ */
+
+import test from "node:test";
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import * as nodeModule from "node:module";
+
+type NextResolve = (specifier: string, context?: unknown) => unknown;
+const { registerHooks } = nodeModule as unknown as {
+  registerHooks?: (hooks: {
+    resolve: (specifier: string, context: unknown, nextResolve: NextResolve) => unknown;
+  }) => void;
+};
+if (typeof registerHooks !== "function") {
+  throw new Error("spring-curve.test.ts needs Node >= 22.15 (module.registerHooks)");
+}
+registerHooks({
+  resolve(specifier, context, nextResolve) {
+    try {
+      return nextResolve(specifier, context);
+    } catch (err) {
+      if (specifier.startsWith(".") && !/\.[cm]?[jt]sx?$/.test(specifier)) {
+        return nextResolve(`${specifier}.ts`, context);
+      }
+      throw err;
+    }
+  },
+});
+
+const { springLinear, springProgress } = await import("./spring-curve");
+const { SPRING_SNAPPY } = await import("./springs");
+
+test("the CSS press curve is SPRING_SNAPPY over 320ms", () => {
+  const css = readFileSync(new URL("../../app/globals.css", import.meta.url), "utf8");
+  const found = css.match(/--vibe-spring-snappy:\s*(linear\([^;]*\));/)?.[1] ?? null;
+  assert.equal(found, springLinear(SPRING_SNAPPY, 320));
+  assert.match(css, /transition: transform 320ms var\(--vibe-spring-snappy\)/);
+});
+
+test("SPRING_SNAPPY has settled by 320ms, with no visible overshoot", () => {
+  assert.ok(Math.abs(springProgress(SPRING_SNAPPY, 0.32) - 1) < 0.005);
+  for (let ms = 0; ms <= 320; ms += 4) {
+    assert.ok(springProgress(SPRING_SNAPPY, ms / 1000) < 1.005, `${ms}ms`);
+  }
+});

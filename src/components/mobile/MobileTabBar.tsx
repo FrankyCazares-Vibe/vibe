@@ -1,9 +1,12 @@
 "use client";
 
+import { motion } from "motion/react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect } from "react";
 
 import { activeMobileTab, type MobileTabHref } from "@/components/mobile/mobile-tab-active";
+import { SPRING_SNAPPY } from "@/lib/motion/springs";
 
 /**
  * Bottom tab bar — the only mobile chrome. Renders from any mobile page
@@ -128,9 +131,20 @@ const MOBILE_TABS: MobileTab[] = [
   },
 ];
 
+/** The tab lit by the last bar on screen in this page load (null: none
+ *  lit; undefined: no bar yet). A cold load (server HTML included) shows its
+ *  lit icon as is; a bar that lights a different tab (a tap to another tab)
+ *  settles its icon in; one that lights the same tab (a club page inside
+ *  Campus, then Back) doesn't. */
+let lastLitHref: MobileTabHref | null | undefined;
+
 export function MobileTabBar() {
   const pathname = usePathname() ?? "";
   const activeHref = activeMobileTab(pathname);
+  const settle = lastLitHref !== undefined && activeHref !== lastLitHref;
+  useEffect(() => {
+    lastLitHref = activeHref;
+  }, [activeHref]);
 
   return (
     <nav className="vibe-mobile-tabbar" aria-label="Primary">
@@ -147,15 +161,30 @@ export function MobileTabBar() {
             href={item.href}
             className={
               active
-                ? "vibe-mobile-tab vibe-mobile-tab--active"
-                : "vibe-mobile-tab"
+                ? "vibe-mobile-tab vibe-mobile-tab--active vibe-press"
+                : "vibe-mobile-tab vibe-press"
             }
             // "page" only on the tab's own page. A club page sits inside
             // Campus, and /profile/<handle> inside Profile, without being
             // that page, so there the lit tab is just "true".
             aria-current={active ? (pathname === item.href ? "page" : "true") : undefined}
           >
-            <span className="vibe-mobile-tab-icon">{item.icon}</span>
+            {/* The lit tab's icon settles in from 0.9 (Oct 18, 2026, motion
+                pass). Keyed on the state, so it plays when a tab lights in
+                this bar, and on the bar a tab tap mounts (each page mounts
+                its own), but not on a cold load or on a new bar that lights
+                the tab that was already lit. The coral mark above stays
+                the CSS one: it can't slide between bars that aren't the same
+                element. */}
+            <motion.span
+              key={active ? "on" : "off"}
+              className="vibe-mobile-tab-icon"
+              initial={active && settle ? { scale: 0.9 } : false}
+              animate={{ scale: 1 }}
+              transition={SPRING_SNAPPY}
+            >
+              {item.icon}
+            </motion.span>
             {item.label}
           </Link>
         );

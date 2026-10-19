@@ -1,8 +1,9 @@
 "use client";
 
+import { animate, motion, useMotionValue, useReducedMotion } from "motion/react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Drawer } from "vaul";
 
 import {
@@ -41,6 +42,7 @@ import { PostComposerMobile } from "@/components/mobile/PostComposerMobile";
 import { PostViewerMobile, useClubMute, type ClubMuteFn } from "@/components/mobile/PostViewerMobile";
 import { SharePostSheet } from "@/components/mobile/SharePostSheet";
 import { PENDING_KEY as TOUR_PENDING_KEY, useMobileTour } from "@/components/mobile/use-mobile-tour";
+import { useTabScrollMemory } from "@/components/mobile/use-tab-scroll-memory";
 import { OrgJoinControl } from "@/components/orgs/OrgJoinControl";
 import { PushAsk } from "@/components/push/PushAsk";
 import { RemovedContentCard, ReportSheet } from "@/components/safety/ReportSheet";
@@ -48,6 +50,9 @@ import { useChatV2 } from "@/lib/chat/use-chat-v2";
 import { vibeRequest } from "@/lib/feedback/request";
 import { toast } from "@/lib/feedback/toast";
 import { campusRowById } from "@/lib/iu/campuses";
+import { LikeBurst } from "@/lib/motion/LikeBurst";
+import { Reveal } from "@/lib/motion/Reveal";
+import { SPRING_SNAPPY } from "@/lib/motion/springs";
 import { orgAssetProxyUrl } from "@/lib/org-asset-url";
 import {
   audienceChip,
@@ -506,6 +511,57 @@ export function CampusMobile() {
 
   const tabScrollRef = useRef<HTMLDivElement | null>(null);
   const isProgrammaticScrollRef = useRef(false);
+  // A swipe changes `tab` when the pager comes to rest, not as it passes
+  // halfway: a tab change puts the page at that tab's place, and doing it
+  // under a moving finger jumped both half-visible panes. Until then the
+  // strip's pill follows the drag (previewTab).
+  const [previewTab, setPreviewTab] = useState<Tab | null>(null);
+  const settleTimerRef = useRef(0);
+  const commitPager = (el: HTMLDivElement, order: readonly Tab[]) => {
+    if (isProgrammaticScrollRef.current) return;
+    // The real (fractional) width: snap points sit at whole panes of it.
+    const w = el.getBoundingClientRect().width;
+    if (w === 0) return;
+    const idx = Math.round(el.scrollLeft / w);
+    // Still between panes (a finger holding still mid-swipe): not yet.
+    if (Math.abs(el.scrollLeft - idx * w) > 2) return;
+    setPreviewTab(null);
+    const next = order[idx];
+    if (next) setTab(next);
+  };
+  // Each tab keeps its own place under the one page scroll (Oct 18, 2026),
+  // per campus on screen: a visited campus's feed is a different list. Home
+  // is "home" before and after its id arrives, so a load never switches
+  // maps. An address that opened the page for something else (a #tag, an
+  // event, a post, a chat) isn't sent back to the tab's old depth.
+  const [restoreOnMount] = useState(
+    () =>
+      !(
+        urlTag ||
+        initialPostId ||
+        initialChannelId ||
+        (searchParams.get("tab") === "events" && searchParams.get("event"))
+      ),
+  );
+  useTabScrollMemory(tab, `/campus:${isVisiting ? viewingId : "home"}`, { restoreOnMount });
+  // The open tab rides in the address (replaceState, `null` state so Next
+  // syncs useSearchParams), so Back from a club or a profile, or a reload,
+  // reopens it and the tab's own place. Feed is the bare address; Chat is
+  // never written (it would read as a chat link), nor is an `event`.
+  useEffect(() => {
+    if (tab === "chat") return;
+    try {
+      const url = new URL(window.location.href);
+      const want = tab === "feed" ? null : tab;
+      if (url.searchParams.get("tab") === want) return;
+      if (want) url.searchParams.set("tab", want);
+      else url.searchParams.delete("tab");
+      url.searchParams.delete("event");
+      window.history.replaceState(null, "", url.pathname + url.search + url.hash);
+    } catch {
+      /* the tab still works; Back just opens Feed */
+    }
+  }, [tab]);
 
   // The #tag list: /api/feed?tag= for the active filter (the effect after the
   // fetches below says when it is asked for and what a failure keeps).
@@ -968,7 +1024,14 @@ export function CampusMobile() {
           zIndex: 5,
         }}
       >
-        <TabStrip active={tab} onChange={setTab} order={tabOrder} />
+        <TabStrip
+          active={previewTab && tabOrder.includes(previewTab) ? previewTab : tab}
+          onChange={(t) => {
+            setPreviewTab(null);
+            setTab(t);
+          }}
+          order={tabOrder}
+        />
       </header>
 
       <div
@@ -979,10 +1042,18 @@ export function CampusMobile() {
           const el = e.currentTarget;
           const w = el.clientWidth;
           if (w === 0) return;
-          const idx = Math.round(el.scrollLeft / w);
-          const next = tabOrder[idx];
-          if (next && next !== tab) setTab(next);
+          const next = tabOrder[Math.round(el.scrollLeft / w)];
+          const preview = next && next !== tab ? next : null;
+          if (preview !== previewTab) setPreviewTab(preview);
+          // Where scrollend is missing (older iOS Safari): at rest once no
+          // pager scroll has come for a moment.
+          window.clearTimeout(settleTimerRef.current);
+          const hasScrollEnd = "onscrollend" in window;
+          if (!hasScrollEnd) {
+            settleTimerRef.current = window.setTimeout(() => commitPager(el, tabOrder), 120);
+          }
         }}
+        onScrollEnd={(e) => commitPager(e.currentTarget, tabOrder)}
         className="vibe-no-scrollbar"
         style={{
           display: "flex",
@@ -1281,6 +1352,9 @@ const TAB_LABEL: Record<Tab, string> = {
   map: "Map",
 };
 
+/** The tab labels' ink/paper crossfade, on the press spring's curve. */
+const LABEL_FADE = "opacity 320ms var(--vibe-spring-snappy)";
+
 function TabStrip({
   active,
   onChange,
@@ -1292,6 +1366,55 @@ function TabStrip({
   order: readonly Tab[];
 }) {
   const tabs = order.map((id) => ({ id, label: TAB_LABEL[id] }));
+
+  // The dark pill slides to the new tab (Oct 18, 2026, motion pass). It is
+  // drawn in the open tab's button, so it shrinks with that button's press
+  // and stays under its words. On a change it starts where the old pill is
+  // on screen (measured, so a press still springing back or a slide still in
+  // flight carries over, speed included) and springs home on SPRING_SNAPPY.
+  // By hand, not Motion's layoutId: this strip is sticky, and a tab change
+  // also moves the page (each tab keeps its own scroll), so layoutId's
+  // page-relative boxes would fly the pill in from the old scroll depth.
+  // With reduce motion on, the pill just appears.
+  const reduce = useReducedMotion();
+  const pillX = useMotionValue(0);
+  const pillScale = useMotionValue(1);
+  const buttonsRef = useRef<Partial<Record<Tab, HTMLButtonElement | null>>>({});
+  const pillRef = useRef<HTMLSpanElement | null>(null);
+  const shownRef = useRef(active);
+  useLayoutEffect(() => {
+    const from = buttonsRef.current[shownRef.current];
+    const to = buttonsRef.current[active];
+    shownRef.current = active;
+    if (!from || !to || from === to || reduce || !from.offsetWidth || !to.offsetWidth) {
+      pillX.jump(0);
+      pillScale.jump(1);
+      return;
+    }
+    // On screen a button is scaled about its centre by its press, so a point
+    // p px into it sits at rect.left + s * p. At rest the pill covers the
+    // button's border box (inset -1 inside the 1px border); it moves by x and
+    // scales from its left edge.
+    const f = from.getBoundingClientRect();
+    const t = to.getBoundingClientRect();
+    const fs = f.width / from.offsetWidth;
+    const ts = t.width / to.offsetWidth;
+    const oldLeft = f.left + fs * pillX.get();
+    const oldWidth = fs * pillScale.get() * from.offsetWidth;
+    const restWidth = ts * to.offsetWidth;
+    const x0 = (oldLeft - t.left) / ts;
+    const s0 = oldWidth / restWidth;
+    // The old pill's speed, in the new button's terms.
+    const vx = (pillX.getVelocity() * fs) / ts;
+    const vs = (pillScale.getVelocity() * fs * from.offsetWidth) / restWidth;
+    pillX.jump(x0);
+    pillScale.jump(s0);
+    // Painted at the start now, not on Motion's next frame.
+    if (pillRef.current) pillRef.current.style.transform = `translateX(${x0}px) scaleX(${s0})`;
+    animate(pillX, 0, { ...SPRING_SNAPPY, velocity: vx });
+    animate(pillScale, 1, { ...SPRING_SNAPPY, velocity: vs });
+  }, [active, reduce, pillX, pillScale]);
+
   return (
     <div
       className="vibe-no-scrollbar"
@@ -1303,6 +1426,8 @@ function TabStrip({
         scrollbarWidth: "none",
         msOverflowStyle: "none",
         WebkitOverflowScrolling: "touch",
+        // Keeps the z-order below inside the strip.
+        isolation: "isolate",
       }}
     >
       {tabs.map((t) => {
@@ -1310,14 +1435,24 @@ function TabStrip({
         return (
           <button
             key={t.id}
+            ref={(el) => {
+              buttonsRef.current[t.id] = el;
+            }}
             type="button"
             onClick={() => onChange(t.id)}
+            className="vibe-press"
             style={{
+              position: "relative",
+              // The open tab sits over the others, so its sliding pill
+              // passes over their 70% paper instead of under it; their
+              // words (zIndex 2) stay on top of it.
+              zIndex: isActive ? 1 : undefined,
               padding: "7px 14px",
               borderRadius: 999,
               border: "1px solid rgba(var(--scrim-rgb),0.10)",
-              background: isActive ? "var(--charcoal)" : "var(--paper-70)",
-              color: isActive ? "var(--paper)" : "var(--ink-2)",
+              // The open tab's charcoal is the pill below, over this.
+              background: "var(--paper-70)",
+              color: "var(--ink-2)",
               fontFamily: "DM Sans, sans-serif",
               fontSize: 13,
               fontWeight: 700,
@@ -1326,7 +1461,45 @@ function TabStrip({
               flexShrink: 0,
             }}
           >
-            {t.label}
+            {isActive ? (
+              <motion.span
+                ref={pillRef}
+                aria-hidden
+                style={{
+                  x: pillX,
+                  scaleX: pillScale,
+                  position: "absolute",
+                  // Over the border too, as the old charcoal background was,
+                  // with the same hairline on it.
+                  inset: -1,
+                  borderRadius: 999,
+                  background: "var(--charcoal)",
+                  border: "1px solid rgba(var(--scrim-rgb),0.10)",
+                  boxSizing: "border-box",
+                  transformOrigin: "0 50%",
+                  pointerEvents: "none",
+                }}
+              />
+            ) : null}
+            {/* Ink and paper copies of the label crossfade as the pill
+                leaves and arrives, so neither word sits paper on paper or
+                ink on charcoal mid-slide. */}
+            <span style={{ position: "relative", zIndex: 2, display: "inline-grid" }}>
+              <span style={{ gridArea: "1 / 1", opacity: isActive ? 0 : 1, transition: LABEL_FADE }}>
+                {t.label}
+              </span>
+              <span
+                aria-hidden
+                style={{
+                  gridArea: "1 / 1",
+                  color: "var(--paper)",
+                  opacity: isActive ? 1 : 0,
+                  transition: LABEL_FADE,
+                }}
+              >
+                {t.label}
+              </span>
+            </span>
           </button>
         );
       })}
@@ -1335,6 +1508,10 @@ function TabStrip({
 }
 
 // ---------- Feed pane ----------
+
+/** List items from this index on are past the first screen: they mount as
+ *  they are, so a 50-card load doesn't run 50 springs at once. */
+const REVEAL_SCREENFUL = 8;
 
 /** A #tag as publish-post stores it and /api/feed?tag= matches it: no
  *  leading #, lowercase, letters / digits / underscore, at most 32.
@@ -1437,19 +1614,24 @@ function FeedPane({
   return (
     <>
       {chip}
-      {posts.map((p) => (
-        <FeedCard
-          key={p.id}
-          post={p}
-          onOpen={() => onOpenPost(p.id)}
-          onPickTag={onPickTag}
-          // Owner means author, the same rule as the edit route and desktop.
-          isOwner={!!viewerId && p.user_id === viewerId}
-          onEdited={onEdited}
-          onDeleted={onDeleted}
-          onBlocked={onBlocked}
-          onMuteClub={onMuteClub}
-        />
+      {/* Each card rises in once as it first appears, the first screenful a
+          beat apart (Oct 18, 2026, motion pass). Keyed by post, so a refresh
+          that keeps a card doesn't replay it. Everything a card opens is
+          portalled (vaul), so the brief transform traps no fixed overlay. */}
+      {posts.map((p, i) => (
+        <Reveal key={p.id} delayIndex={i} still={i >= REVEAL_SCREENFUL}>
+          <FeedCard
+            post={p}
+            onOpen={() => onOpenPost(p.id)}
+            onPickTag={onPickTag}
+            // Owner means author, the same rule as the edit route and desktop.
+            isOwner={!!viewerId && p.user_id === viewerId}
+            onEdited={onEdited}
+            onDeleted={onDeleted}
+            onBlocked={onBlocked}
+            onMuteClub={onMuteClub}
+          />
+        </Reveal>
       ))}
     </>
   );
@@ -1614,6 +1796,9 @@ function FeedCard({
   const [reposted, setReposted] = useState(!!post.viewer_reposted);
   const [repostCount, setRepostCount] = useState(post.repost_count ?? 0);
   const [saved, setSaved] = useState(!!post.viewer_saved);
+  // Bumped by the person's own like (tap or double tap), not by `liked`
+  // coming back on after a failed unlike: only a like pops the heart.
+  const [likeBurst, setLikeBurst] = useState(0);
   const [menuOpen, setMenuOpen] = useState(false);
   const tapTimerRef = useRef<number | null>(null);
   const likingRef = useRef(false);
@@ -1627,6 +1812,7 @@ function FeedCard({
     const prevLiked = liked;
     const prevCount = likeCount;
     setLiked(targetLiked);
+    if (targetLiked) setLikeBurst((n) => n + 1);
     setLikeCount((n) => Math.max(0, n + (targetLiked ? 1 : -1)));
     // The heart flips first; on a refusal it flips back and the toast says why.
     const r = await vibeRequest(`/api/posts/${post.id}/like`, {
@@ -1825,6 +2011,7 @@ function FeedCard({
             setMenuOpen(true);
           }}
           aria-label="More actions"
+          className="vibe-press"
           style={{
             width: 30,
             height: 30,
@@ -2020,6 +2207,7 @@ function FeedCard({
           }}
           aria-label={liked ? "Unlike" : "Like"}
           aria-pressed={liked}
+          className="vibe-press vibe-toggle"
           style={{
             display: "inline-flex",
             alignItems: "center",
@@ -2035,25 +2223,26 @@ function FeedCard({
             fontWeight: 700,
             cursor: "pointer",
             WebkitTapHighlightColor: "transparent",
-            transition: "transform 140ms ease, background 140ms ease",
-            transform: liked ? "scale(1.03)" : "scale(1)",
           }}
         >
-          <svg
-            width="14"
-            height="14"
-            viewBox="0 0 20 20"
-            fill={liked ? "#FF5C35" : "none"}
-            stroke={liked ? "#FF5C35" : "currentColor"}
-            strokeWidth="1.8"
-            aria-hidden
-          >
-            <path
-              d="M10 17s-6-3.6-6-8.2A3.8 3.8 0 0 1 7.8 5c1.3 0 2.4.65 2.95 1.65A3.4 3.4 0 0 1 13.7 5 3.8 3.8 0 0 1 17.5 8.8C17.5 13.4 11.5 17 11.5 17z"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
+          {/* A like (tap or double tap) pops the heart (motion pass). */}
+          <LikeBurst liked={liked} burst={likeBurst}>
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 20 20"
+              fill={liked ? "#FF5C35" : "none"}
+              stroke={liked ? "#FF5C35" : "currentColor"}
+              strokeWidth="1.8"
+              aria-hidden
+            >
+              <path
+                d="M10 17s-6-3.6-6-8.2A3.8 3.8 0 0 1 7.8 5c1.3 0 2.4.65 2.95 1.65A3.4 3.4 0 0 1 13.7 5 3.8 3.8 0 0 1 17.5 8.8C17.5 13.4 11.5 17 11.5 17z"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </LikeBurst>
           {likeCount}
         </button>
 
@@ -2072,6 +2261,7 @@ function FeedCard({
             onOpen();
           }}
           aria-label="Comment"
+          className="vibe-press"
           style={{
             display: "inline-flex",
             alignItems: "center",
@@ -2111,6 +2301,7 @@ function FeedCard({
           }}
           aria-label={reposted ? "Undo repost" : "Repost"}
           aria-pressed={reposted}
+          className="vibe-press vibe-toggle"
           style={{
             display: "inline-flex",
             alignItems: "center",
@@ -2126,8 +2317,8 @@ function FeedCard({
             fontWeight: 700,
             cursor: "pointer",
             WebkitTapHighlightColor: "transparent",
-            transition: "transform 140ms ease, background 140ms ease",
-            transform: reposted ? "scale(1.03)" : "scale(1)",
+            // The lift when on, the press and the fill fade: .vibe-toggle.
+            ["--vibe-on-scale" as string]: 1.03,
           }}
         >
           <svg
@@ -2188,6 +2379,7 @@ function FeedCard({
           }}
           aria-label={saved ? "Unsave" : "Save"}
           aria-pressed={saved}
+          className="vibe-press vibe-toggle"
           style={{
             marginLeft: "auto",
             display: "inline-flex",
@@ -2203,8 +2395,8 @@ function FeedCard({
             color: saved ? "var(--charcoal)" : "var(--ink-2)",
             cursor: "pointer",
             WebkitTapHighlightColor: "transparent",
-            transition: "transform 140ms ease, background 140ms ease",
-            transform: saved ? "scale(1.05)" : "scale(1)",
+            // The lift when on, the press and the fill fade: .vibe-toggle.
+            ["--vibe-on-scale" as string]: 1.05,
           }}
         >
           <svg
@@ -2300,18 +2492,20 @@ function EventsPane({
   }
   return (
     <>
-      {events.map((ev) => (
+      {events.map((ev, i) => (
         // Visiting: the card renders its RSVP off, titled "RSVP works on
         // your home campus", with the italic "RSVP works at home" beside it
         // (the desktop card, shared; the org page passes the same flag).
-        <EventCard
-          key={ev.id}
-          ev={ev}
-          onMutate={onMutate}
-          onRemoved={onRemoved}
-          onUpdated={onUpdated}
-          visiting={visitingName !== null}
-        />
+        // Rises in like a feed card (motion pass); its dialogs are portalled.
+        <Reveal key={ev.id} delayIndex={i} still={i >= REVEAL_SCREENFUL}>
+          <EventCard
+            ev={ev}
+            onMutate={onMutate}
+            onRemoved={onRemoved}
+            onUpdated={onUpdated}
+            visiting={visitingName !== null}
+          />
+        </Reveal>
       ))}
     </>
   );
@@ -3308,13 +3502,25 @@ function OrgsPane({
   }
 
   const blocks: React.ReactNode[] = [];
+  // Headers and rows rise in once, top to bottom, the first screenful a beat
+  // apart (Oct 18, 2026, motion pass). Keyed as before, so a club moving
+  // from All clubs to Following after a Follow doesn't replay.
+  let shown = 0;
+  const reveal = (key: string, node: React.ReactNode) => {
+    const i = shown++;
+    return (
+      <Reveal key={key} delayIndex={i} still={i >= REVEAL_SCREENFUL}>
+        {node}
+      </Reveal>
+    );
+  };
   const header = (key: string, label: string) => {
     if (blocks.length > 0) blocks.push(<div key={`${key}:gap`} style={{ height: 6 }} />);
-    blocks.push(<OrgSectionHeader key={`${key}:header`} label={label} />);
+    blocks.push(reveal(`${key}:header`, <OrgSectionHeader label={label} />));
   };
-  const orgRow = (o: Org) => (
+  const orgRow = (o: Org) => reveal(
+    o.id,
     <OrgRow
-      key={o.id}
       orgId={o.id}
       handle={o.handle}
       name={o.name}
@@ -3325,7 +3531,7 @@ function OrgsPane({
       memberCount={o.member_count ?? null}
       inviteSub={null}
       onChange={onChange}
-    />
+    />,
   );
 
   // A failed list shows its line with Retry and no header: a header over a
@@ -3335,9 +3541,9 @@ function OrgsPane({
   } else if (inviteRows.length > 0) {
     header("invites", "You're invited");
     for (const r of inviteRows) {
-      blocks.push(
+      blocks.push(reveal(
+        `invite:${r.id}`,
         <OrgRow
-          key={`invite:${r.id}`}
           orgId={r.org.id}
           handle={r.org.handle}
           name={r.org.name ?? r.org.handle}
@@ -3350,7 +3556,7 @@ function OrgsPane({
           inviteSub={inviteSubText(r.invited_by?.name ?? null, r.expires_at)}
           onChange={onChange}
         />,
-      );
+      ));
     }
   }
 
@@ -3641,8 +3847,11 @@ function PaneSkeleton() {
 }
 
 function EmptyTab({ title, body }: { title: string; body: string }) {
+  // Fades in over the skeleton it replaces (Oct 18, 2026, motion pass): one
+  // block, so a crossfade, not a rise.
   return (
-    <div
+    <Reveal
+      rise={false}
       style={{
         padding: "48px 24px",
         textAlign: "center",
@@ -3674,7 +3883,7 @@ function EmptyTab({ title, body }: { title: string; body: string }) {
       >
         {body}
       </p>
-    </div>
+    </Reveal>
   );
 }
 
@@ -4177,6 +4386,9 @@ const ComposerFab = ({
         type="button"
         onClick={onPost}
         aria-label="New post"
+        // Press shrink only (motion pass); the composer opens from this
+        // button's box, which a 4% press doesn't move off its centre.
+        className="vibe-press"
         style={{
           position: "fixed",
           right: 18,

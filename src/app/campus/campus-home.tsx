@@ -1,6 +1,6 @@
 "use client";
 
-import { motion } from "framer-motion";
+import { motion } from "motion/react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import {
@@ -98,6 +98,9 @@ import {
 } from "@/lib/iu/school-colors";
 import { PURDUE_INDIANAPOLIS_SCHOOLS } from "@/lib/iu/majors-purdue-indianapolis";
 import { VIDEO_LOCATION_HINT } from "@/lib/media/copy";
+import { LikeBurst } from "@/lib/motion/LikeBurst";
+import { Reveal } from "@/lib/motion/Reveal";
+import { SPRING_SNAPPY, SPRING_SOFT } from "@/lib/motion/springs";
 import { orgAssetProxyUrl } from "@/lib/org-asset-url";
 import {
   AUDIENCE_HELP,
@@ -1046,7 +1049,10 @@ export function CampusHome({
         ) : isLoading && tab === "chat" ? (
           <LoadingPane />
         ) : showThreeColumn ? (
-          <div
+          // Crossfades in over "Loading your campus…" (motion pass, Oct 18):
+          // opacity only, so no transform ever sits over the rails.
+          <Reveal
+            rise={false}
             className="campus-three-rail"
             style={{
               flex: 1,
@@ -1082,7 +1088,7 @@ export function CampusHome({
               backdropCss={activeBackdrop}
               showSchoolVerifiedBanner={showSchoolVerifiedBanner}
             />
-          </div>
+          </Reveal>
         ) : isEmpty && tab === "chat" ? (
           <EmptyState
             showSchoolVerifiedBanner={showSchoolVerifiedBanner}
@@ -1308,20 +1314,23 @@ function CreateOrgModal({
       style={{
         position: "fixed",
         inset: 0,
-        background: "rgba(8,4,16,0.55)",
-        backdropFilter: "blur(8px)",
-        WebkitBackdropFilter: "blur(8px)",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
         zIndex: 1000,
       }}
     >
-      <form
+      {/* Motion pass (Oct 18): tint fades in, the form (the frosted surface
+          itself) fades and settles from 0.97. Enter only. */}
+      <ModalScrim tint="rgba(8,4,16,0.55)" />
+      <motion.form
         onClick={(e) => e.stopPropagation()}
         onSubmit={submit}
+        {...MODAL_PANEL_ENTER_FADE}
         style={{
           ...GLASS_SURFACE,
+          // Positioned so it paints over the scrim layers once it settles.
+          position: "relative",
           background:
             "linear-gradient(180deg, rgba(40,20,50,0.85) 0%, rgba(20,10,30,0.85) 100%)",
           borderRadius: 22,
@@ -1495,7 +1504,7 @@ function CreateOrgModal({
             {busy ? "Creating…" : "Create org"}
           </button>
         </div>
-      </form>
+      </motion.form>
     </div>
   );
 }
@@ -4291,6 +4300,53 @@ function ChannelDanger({
   );
 }
 
+/**
+ * A desktop modal's backdrop (motion pass, Oct 18): first child of the fixed
+ * overlay. The page blur is a plain layer that appears in one frame, as it
+ * always did; only the tint over it fades in (SPRING_SOFT), so no blur ever
+ * animates. Both sit beside the panel, never around it, so neither fade
+ * reaches the panel's frost. The panel after it needs `position: relative`
+ * to paint on top of these absolute layers.
+ */
+function ModalScrim({ tint }: { tint: string }) {
+  return (
+    <>
+      <div
+        aria-hidden
+        style={{
+          position: "absolute",
+          inset: 0,
+          backdropFilter: "blur(8px)",
+          WebkitBackdropFilter: "blur(8px)",
+        }}
+      />
+      <motion.div
+        aria-hidden
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={SPRING_SOFT}
+        style={{ position: "absolute", inset: 0, background: tint }}
+      />
+    </>
+  );
+}
+
+/** The panel's enter, shared by the desktop modals: settles from 0.97. */
+const MODAL_PANEL_ENTER = {
+  initial: { scale: 0.97 },
+  animate: { scale: 1 },
+  transition: SPRING_SOFT,
+} as const;
+
+/** The same, fading too: only for a panel that is itself the frosted surface
+ *  (or has no frost at all), since a fading parent switches its children's
+ *  frost off until it reaches 1. */
+const MODAL_PANEL_ENTER_FADE = {
+  initial: { opacity: 0, scale: 0.97 },
+  animate: { opacity: 1, scale: 1 },
+  transition: SPRING_SOFT,
+} as const;
+
 function ModalShell({
   onClose,
   children,
@@ -4298,22 +4354,32 @@ function ModalShell({
   onClose: () => void;
   children: React.ReactNode;
 }) {
+  // Motion pass (Oct 18): the scrim's tint fades in (ModalScrim) and the
+  // panel settles from 0.97 on SPRING_SOFT. Enter only; closing is still
+  // instant. The panel only scales: it wraps each modal's frosted form, and
+  // a fade on it would switch that frost off until the very last frame. The
+  // scale settles to `transform: none`.
   return (
     <div
       onClick={onClose}
       style={{
         position: "fixed",
         inset: 0,
-        background: "rgba(8,4,16,0.55)",
-        backdropFilter: "blur(8px)",
-        WebkitBackdropFilter: "blur(8px)",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
         zIndex: 1000,
       }}
     >
-      <div onClick={(e) => e.stopPropagation()}>{children}</div>
+      <ModalScrim tint="rgba(8,4,16,0.55)" />
+      <motion.div
+        onClick={(e) => e.stopPropagation()}
+        {...MODAL_PANEL_ENTER}
+        // Positioned so it paints over the scrim layers once it settles.
+        style={{ position: "relative" }}
+      >
+        {children}
+      </motion.div>
     </div>
   );
 }
@@ -6597,6 +6663,10 @@ function CampusTabs({
   const tabs = hideChat ? mapTabs.filter((t) => t.key !== "chat") : mapTabs;
   // The pills live in the top bar's right zone (S68). #campus-tabs stays the
   // tour's target. Hover and focus come from TOPBAR_CSS (.vibe-topbar-tab).
+  // Each pill has its own fill that crossfades on SPRING_SNAPPY (motion pass,
+  // Oct 18), in step with the label's colour. Not a fill sliding across: the
+  // inactive labels are the fill's own colour in every zone palette, so any
+  // word a moving fill passed under would vanish.
   return (
     <nav
       id="campus-tabs"
@@ -6619,33 +6689,59 @@ function CampusTabs({
           <button
             key={t.key}
             type="button"
-            className="vibe-topbar-tab"
+            className="vibe-topbar-tab vibe-press"
             aria-current={isActive ? "page" : undefined}
             title={t.short === t.label ? undefined : t.label}
             onClick={() => onChange(t.key)}
             style={{
+              position: "relative",
               height: 30,
               padding: "0 12px",
               borderRadius: 999,
               border: "none",
-              // Inactive pills take their (hover) paint from TOPBAR_CSS.
-              ...(isActive ? { background: palette.activeBg } : null),
+              // Inactive pills take their (hover) paint from TOPBAR_CSS; the
+              // active one's fill is the span below.
               color: isActive ? palette.activeInk : palette.inactiveInk,
               fontFamily: "DM Sans, sans-serif",
               fontSize: 13,
               fontWeight: isActive ? 700 : 500,
               whiteSpace: "nowrap",
               cursor: "pointer",
-              transition: "background 160ms ease, color 160ms ease",
+              transition: `background 160ms ease, color 160ms ease, ${PRESS_TRANSITION}`,
             }}
           >
-            {t.short}
+            {/* Always mounted, so it fades in place; `initial={false}` paints
+                the server's state with no mount fade. */}
+            <motion.span
+              aria-hidden
+              initial={false}
+              animate={{ opacity: isActive ? 1 : 0 }}
+              transition={SPRING_SNAPPY}
+              style={{
+                position: "absolute",
+                inset: 0,
+                zIndex: 0,
+                borderRadius: 999,
+                background: palette.activeBg,
+                pointerEvents: "none",
+              }}
+            />
+            <span style={{ position: "relative", zIndex: 1 }}>{t.short}</span>
           </button>
         );
       })}
     </nav>
   );
 }
+
+/**
+ * `.vibe-press` (globals.css) carries its own transform transition, and an
+ * inline `transition` replaces it. A button that keeps an inline transition
+ * adds this so the release still springs back (motion pass, Oct 18). The
+ * quick 90ms press-in is globals.css's `.vibe-press:active` duration, which
+ * only beats this inline value when it is marked `!important` there.
+ */
+const PRESS_TRANSITION = "transform 320ms var(--vibe-spring-snappy)";
 
 function TabBody({
   tab,
@@ -7244,17 +7340,27 @@ function FeedTabBody({
         </div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-          {entries.map((entry) => (
-            <FeedRow
+          {/* Each card rises in once as it mounts, the first screenful a beat
+              apart (motion pass, Oct 18). Keyed by the row, so a refresh that
+              keeps a card doesn't replay it. The rise settles to
+              `transform: none`, so the row's unportalled fixed layers (the
+              share sheet, the comment menu's click-away) are only ever boxed
+              in for the half second it moves. */}
+          {entries.map((entry, i) => (
+            <Reveal
               key={entry.kind === "repost" ? `r:${entry.reposter.id}:${entry.post.id}` : `p:${entry.post.id}`}
-              entry={entry}
-              onMutate={refresh}
-              onEdited={applyPostEdit}
-              onDeleted={dropDeletedPost}
-              onPickTag={onPickTag}
-              onMuteClub={clubMute.mute}
-              viewerId={viewerId}
-            />
+              delayIndex={i}
+            >
+              <FeedRow
+                entry={entry}
+                onMutate={refresh}
+                onEdited={applyPostEdit}
+                onDeleted={dropDeletedPost}
+                onPickTag={onPickTag}
+                onMuteClub={clubMute.mute}
+                viewerId={viewerId}
+              />
+            </Reveal>
           ))}
         </div>
       )}
@@ -8747,7 +8853,12 @@ function FeedRow({
           }}
         >
           <EngagementAction
-            icon={<LikeIcon filled={liked} />}
+            // The heart pops and throws a few dots when a tap turns it on.
+            icon={
+              <LikeBurst liked={liked} color="#E0245E">
+                <LikeIcon filled={liked} />
+              </LikeBurst>
+            }
             count={likeCount}
             label="Like"
             onClick={toggleLike}
@@ -8963,9 +9074,6 @@ function PostViewersModal({
       style={{
         position: "fixed",
         inset: 0,
-        background: "rgba(8,6,12,0.55)",
-        backdropFilter: "blur(8px)",
-        WebkitBackdropFilter: "blur(8px)",
         zIndex: 1000,
         display: "flex",
         alignItems: "center",
@@ -8973,9 +9081,16 @@ function PostViewersModal({
         padding: 20,
       }}
     >
-      <div
+      {/* Motion pass (Oct 18): tint fades in, the panel settles from 0.97.
+          Scale only: the viewer rows (UserCard) are frosted, and a fading
+          panel would switch their frost off until it reached 1. */}
+      <ModalScrim tint="rgba(8,6,12,0.55)" />
+      <motion.div
         onClick={(e) => e.stopPropagation()}
+        {...MODAL_PANEL_ENTER}
         style={{
+          // Positioned so it paints over the scrim layers once it settles.
+          position: "relative",
           width: "min(520px, 92vw)",
           maxHeight: "82vh",
           overflowY: "auto",
@@ -9032,7 +9147,7 @@ function PostViewersModal({
           renderRow={renderRow}
           tone="light"
         />
-      </div>
+      </motion.div>
     </div>,
     document.body,
   );
@@ -9425,7 +9540,9 @@ function CommentsDrawer({
       ) : comments === null ? (
         <div style={{ fontSize: 12, color: COLORS.faint }}>Loading comments…</div>
       ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+        // The thread crossfades in over "Loading comments…" (motion pass,
+        // Oct 18). Opacity only: the comment menu's click-away is fixed.
+        <Reveal rise={false} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           {comments.length === 0 ? (
             <div style={{ fontSize: 12, color: COLORS.faint }}>
               No comments yet — be the first.
@@ -9482,7 +9599,7 @@ function CommentsDrawer({
               Post
             </button>
           </div>
-        </div>
+        </Reveal>
       )}
     </div>
   );
@@ -9725,7 +9842,9 @@ function CommentRow({
               font: "inherit",
             }}
           >
-            <LikeIcon filled={liked} />
+            <LikeBurst liked={liked} color="#E0245E">
+              <LikeIcon filled={liked} />
+            </LikeBurst>
             {likeCount > 0 ? <span>{likeCount}</span> : null}
           </button>
           <button
@@ -10022,6 +10141,9 @@ function EngagementAction({
   return (
     <button
       type="button"
+      // Press feedback only where there's something to press (the read-only
+      // Views chip is a disabled button).
+      className={interactive ? "vibe-press" : undefined}
       onClick={onClick}
       aria-label={label}
       aria-pressed={
@@ -10041,7 +10163,7 @@ function EngagementAction({
         cursor: interactive ? "pointer" : "default",
         color: color ?? "inherit",
         font: "inherit",
-        transition: "color 120ms ease",
+        transition: `color 120ms ease, ${PRESS_TRANSITION}`,
       }}
     >
       {icon}
@@ -10364,14 +10486,20 @@ function EventsTabBody({
             gap: 14,
           }}
         >
-          {events.map((ev) => (
-            <EventCard
-              key={ev.id}
-              ev={ev}
-              onMutate={refresh}
-              onRemoved={dropEvent}
-              onUpdated={swapEvent}
-            />
+          {/* Each card rises in once as it mounts (motion pass, Oct 18). The
+              card's dialogs are portalled, so the brief rise can't box them in.
+              While it fades, the card's frost can't read the page behind it
+              (a fading parent cuts that off); the scene there is soft washes,
+              so the frost settling in at the end doesn't read as a jump. */}
+          {events.map((ev, i) => (
+            <Reveal key={ev.id} delayIndex={i}>
+              <EventCard
+                ev={ev}
+                onMutate={refresh}
+                onRemoved={dropEvent}
+                onUpdated={swapEvent}
+              />
+            </Reveal>
           ))}
         </div>
       )}
@@ -11134,9 +11262,6 @@ export function ConfirmDialog({
       style={{
         position: "fixed",
         inset: 0,
-        background: "rgba(8,6,12,0.55)",
-        backdropFilter: "blur(8px)",
-        WebkitBackdropFilter: "blur(8px)",
         zIndex: 1100,
         display: "flex",
         alignItems: "center",
@@ -11144,10 +11269,17 @@ export function ConfirmDialog({
         padding: 16,
       }}
     >
-      <div
+      {/* Motion pass (Oct 18): the scrim's tint fades in (ModalScrim; its
+          blur doesn't animate) and the dialog fades and settles from 0.97 on
+          SPRING_SOFT. The fade sits on the frosted surface itself, never on a
+          parent of it, so the frost reads the page from the first frame.
+          Enter only. */}
+      <ModalScrim tint="rgba(8,6,12,0.55)" />
+      <motion.div
         role="alertdialog"
         aria-modal="true"
         aria-labelledby={messageId}
+        {...MODAL_PANEL_ENTER_FADE}
         onClick={(e) => e.stopPropagation()}
         onKeyDown={(e) => {
           if (e.key !== "Tab") return;
@@ -11159,7 +11291,8 @@ export function ConfirmDialog({
             next.focus();
           }
         }}
-        style={{ ...eventModalSurface, maxWidth: 400, gap: 16 }}
+        // Positioned so it paints over the scrim layers once it settles.
+        style={{ ...eventModalSurface, position: "relative", maxWidth: 400, gap: 16 }}
       >
         <p
           id={messageId}
@@ -11205,7 +11338,7 @@ export function ConfirmDialog({
             {busy ? busyLabel : confirmLabel}
           </button>
         </div>
-      </div>
+      </motion.div>
     </div>,
     document.body,
   );
@@ -11324,9 +11457,6 @@ function AttendeesModal({
       style={{
         position: "fixed",
         inset: 0,
-        background: "rgba(8,6,12,0.55)",
-        backdropFilter: "blur(8px)",
-        WebkitBackdropFilter: "blur(8px)",
         zIndex: 1000,
         display: "flex",
         alignItems: "center",
@@ -11334,9 +11464,20 @@ function AttendeesModal({
         padding: 20,
       }}
     >
-      <div
+      {/* Motion pass (Oct 18): tint fades in, the panel (the frosted surface
+          itself) fades and settles from 0.97. Enter only. */}
+      <ModalScrim tint="rgba(8,6,12,0.55)" />
+      <motion.div
         onClick={(e) => e.stopPropagation()}
-        style={{ ...eventModalSurface, maxWidth: 520, maxHeight: "82vh", overflow: "auto" }}
+        {...MODAL_PANEL_ENTER_FADE}
+        // Positioned so it paints over the scrim layers once it settles.
+        style={{
+          ...eventModalSurface,
+          position: "relative",
+          maxWidth: 520,
+          maxHeight: "82vh",
+          overflow: "auto",
+        }}
       >
         <div
           style={{
@@ -11425,7 +11566,7 @@ function AttendeesModal({
             Close
           </button>
         </div>
-      </div>
+      </motion.div>
     </div>,
     document.body,
   );
@@ -11583,6 +11724,7 @@ function RsvpButton({
   return (
     <button
       type="button"
+      className={blocked ? undefined : "vibe-press"}
       onClick={onClick}
       disabled={disabled || blocked}
       title={blockedTitle ?? removeHint}
@@ -11610,7 +11752,7 @@ function RsvpButton({
         boxShadow: active
           ? `inset 0 1px 0 rgba(255,255,255,0.22), 0 4px 14px ${hexToRgba(accent, 0.28)}`
           : "inset 0 1px 0 rgba(255,255,255,0.18)",
-        transition: "background 120ms ease, border-color 120ms ease",
+        transition: `background 120ms ease, border-color 120ms ease, ${PRESS_TRANSITION}`,
       }}
     >
       {label}
@@ -11819,9 +11961,6 @@ export function CreateEventModal(props: CreateEventModalProps) {
       style={{
         position: "fixed",
         inset: 0,
-        background: "rgba(8,6,12,0.55)",
-        backdropFilter: "blur(8px)",
-        WebkitBackdropFilter: "blur(8px)",
         zIndex: 1000,
         display: "flex",
         alignItems: "center",
@@ -11829,10 +11968,16 @@ export function CreateEventModal(props: CreateEventModalProps) {
         padding: 20,
       }}
     >
-      <div
+      {/* Motion pass (Oct 18): tint fades in, the panel (the frosted surface
+          itself) fades and settles from 0.97. Enter only. */}
+      <ModalScrim tint="rgba(8,6,12,0.55)" />
+      <motion.div
         onClick={(e) => e.stopPropagation()}
+        {...MODAL_PANEL_ENTER_FADE}
         style={{
           ...eventModalSurface,
+          // Positioned so it paints over the scrim layers once it settles.
+          position: "relative",
           // A phone with the keyboard up is shorter than the form: scroll
           // inside the panel rather than off the screen.
           maxHeight: "calc(100dvh - 40px)",
@@ -12020,7 +12165,7 @@ export function CreateEventModal(props: CreateEventModalProps) {
                 : "Create event"}
           </button>
         </div>
-      </div>
+      </motion.div>
     </div>,
     document.body,
   );
@@ -12878,9 +13023,6 @@ function OrgQuickViewModal({
       style={{
         position: "fixed",
         inset: 0,
-        background: "rgba(8,4,16,0.62)",
-        backdropFilter: "blur(8px)",
-        WebkitBackdropFilter: "blur(8px)",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
@@ -12888,10 +13030,17 @@ function OrgQuickViewModal({
         padding: 20,
       }}
     >
-      <div
+      {/* Motion pass (Oct 18): tint fades in, the panel settles from 0.97.
+          Scale only: the banner's close button is frosted, and a fading
+          panel would switch that frost off until it reached 1. */}
+      <ModalScrim tint="rgba(8,4,16,0.62)" />
+      <motion.div
         onClick={(e) => e.stopPropagation()}
+        {...MODAL_PANEL_ENTER}
         style={{
           ...GLASS_SURFACE,
+          // Positioned so it paints over the scrim layers once it settles.
+          position: "relative",
           width: "min(560px, 100%)",
           maxHeight: "min(86vh, 720px)",
           borderRadius: 20,
@@ -13183,7 +13332,7 @@ function OrgQuickViewModal({
             </div>
           ) : null}
         </div>
-      </div>
+      </motion.div>
     </div>
   );
 }

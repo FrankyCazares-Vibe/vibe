@@ -1,8 +1,15 @@
 "use client";
 
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, motion, useAnimate } from "motion/react";
 import Link from "next/link";
-import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
 
 import { VIBE_BLOOM_HOST, VibeBloom } from "@/components/bloom/VibeBloom";
 import { asLoadFailure, LoadFailed, type LoadFailure } from "@/components/feedback/LoadFailed";
@@ -15,7 +22,10 @@ import {
   type SuggestionReasonV2,
 } from "@/components/mobile/people-suggestion-groups";
 import { useMobileTour } from "@/components/mobile/use-mobile-tour";
+import { useTabScrollMemory } from "@/components/mobile/use-tab-scroll-memory";
 import { vibeRequest } from "@/lib/feedback/request";
+import { Reveal } from "@/lib/motion/Reveal";
+import { SPRING_SNAPPY } from "@/lib/motion/springs";
 import {
   CONNECTED_MEANING,
   followButtonFor,
@@ -164,6 +174,19 @@ export function NetworkMobile() {
   // Swipeable tab content. Mirrors the profile-tabs pattern.
   const tabScrollRef = useRef<HTMLDivElement | null>(null);
   const isProgrammaticScrollRef = useRef(false);
+  // Each tab keeps its own place under the one page scroll (Oct 18, 2026).
+  // A search takes the page over with its own slot, so scrolling the
+  // results (or the clamp to their shorter page) is never saved as the open
+  // tab's place, and clearing the field puts that tab back where it was.
+  const searching = debouncedQuery !== "";
+  useTabScrollMemory(searching ? "search" : tab, "/network");
+  // A new search opens at the top, not at the last search's depth. After
+  // the hook's restore, so this one wins; both run before paint.
+  const wasSearchingRef = useRef(searching);
+  useLayoutEffect(() => {
+    if (searching && !wasSearchingRef.current) window.scrollTo({ top: 0, behavior: "auto" });
+    wasSearchingRef.current = searching;
+  }, [searching]);
 
   // Debounce the query — 280ms matches the profile.html typeahead.
   useEffect(() => {
@@ -390,7 +413,7 @@ export function NetworkMobile() {
         <TabStrip active={tab} onChange={setTab} disabled={!!debouncedQuery} />
       </header>
 
-      {debouncedQuery ? (
+      {searching ? (
         <div style={{ padding: "12px 16px 24px" }}>
           <SearchPane
             query={debouncedQuery}
@@ -400,60 +423,64 @@ export function NetworkMobile() {
             onRetry={() => setSearchTick((n) => n + 1)}
           />
         </div>
-      ) : (
-        <div
-          ref={tabScrollRef}
-          onScroll={(e) => {
-            if (isProgrammaticScrollRef.current) return;
-            const el = e.currentTarget;
-            const w = el.clientWidth;
-            if (w === 0) return;
-            const idx = Math.round(el.scrollLeft / w);
-            const next = TAB_ORDER[idx];
-            if (next && next !== tab) setTab(next);
-          }}
-          className="vibe-no-scrollbar"
-          style={{
-            display: "flex",
-            overflowX: "auto",
-            overflowY: "hidden",
-            scrollSnapType: "x mandatory",
-            scrollbarWidth: "none",
-            msOverflowStyle: "none",
-            WebkitOverflowScrolling: "touch",
-            width: "100%",
-          }}
-        >
-          {TAB_ORDER.map((t) => (
-            <div
-              key={t}
-              style={{
-                flex: "0 0 100%",
-                scrollSnapAlign: "start",
-                padding: "12px 16px 24px",
-                minWidth: 0,
-              }}
-            >
-              <ListPane
-                tab={t}
-                users={
-                  t === "discover"
-                    ? suggestions
-                    : usersByTab[t as RelationshipTab]
-                }
-                failure={
-                  t === "discover"
-                    ? suggestionsErr
-                    : (errByTab[t as RelationshipTab] ?? null)
-                }
-                onRetry={() => retryPane(t)}
-                onStateChange={onStateChange}
-                onDismissSuggestion={onDismissSuggestion}
-              />
-            </div>
-          ))}
-        </div>
-      )}
+      ) : null}
+      {/* Stays mounted under a search, folded away: remounting it on the
+          way out replayed every row's rise and lost the page's height. */}
+      <div
+        ref={tabScrollRef}
+        onScroll={(e) => {
+          if (isProgrammaticScrollRef.current) return;
+          const el = e.currentTarget;
+          const w = el.clientWidth;
+          if (w === 0) return;
+          const idx = Math.round(el.scrollLeft / w);
+          const next = TAB_ORDER[idx];
+          if (next && next !== tab) setTab(next);
+        }}
+        className="vibe-no-scrollbar"
+        style={{
+          display: "flex",
+          overflowX: "auto",
+          overflowY: "hidden",
+          scrollSnapType: "x mandatory",
+          scrollbarWidth: "none",
+          msOverflowStyle: "none",
+          WebkitOverflowScrolling: "touch",
+          width: "100%",
+          // Folded away under a search: no height and not drawn, but its
+          // rows and its sideways place are kept.
+          ...(searching ? { height: 0, visibility: "hidden" as const } : null),
+        }}
+      >
+        {TAB_ORDER.map((t) => (
+          <div
+            key={t}
+            style={{
+              flex: "0 0 100%",
+              scrollSnapAlign: "start",
+              padding: "12px 16px 24px",
+              minWidth: 0,
+            }}
+          >
+            <ListPane
+              tab={t}
+              users={
+                t === "discover"
+                  ? suggestions
+                  : usersByTab[t as RelationshipTab]
+              }
+              failure={
+                t === "discover"
+                  ? suggestionsErr
+                  : (errByTab[t as RelationshipTab] ?? null)
+              }
+              onRetry={() => retryPane(t)}
+              onStateChange={onStateChange}
+              onDismissSuggestion={onDismissSuggestion}
+            />
+          </div>
+        ))}
+      </div>
     </main>
   );
 }
@@ -557,8 +584,34 @@ function TabStrip({
   onChange: (t: Tab) => void;
   disabled: boolean;
 }) {
+  // The dark pill slides to the new tab (motion pass, Oct 18 2026), the
+  // same way as the campus strip (CampusMobile TabStrip): it lives in the
+  // active button and, when that changes, starts from the old button's box
+  // (x + scaleX, SPRING_SNAPPY) and settles into its own. By hand, not
+  // Motion's layoutId: this strip rides the sticky header and a tab change
+  // also moves the page (useTabScrollMemory), so page-relative boxes would
+  // fly the pill in from the old scroll depth. offsetLeft/offsetWidth don't
+  // move with the page. useAnimate follows reduce motion (the pill appears).
+  const [scope, animate] = useAnimate<HTMLDivElement>();
+  const buttonsRef = useRef<Partial<Record<Tab, HTMLButtonElement | null>>>({});
+  const pillRef = useRef<HTMLSpanElement | null>(null);
+  const shownRef = useRef(active);
+  useLayoutEffect(() => {
+    const from = buttonsRef.current[shownRef.current];
+    const to = buttonsRef.current[active];
+    shownRef.current = active;
+    const pill = pillRef.current;
+    if (!from || !to || from === to || !pill || !to.offsetWidth) return;
+    animate(
+      pill,
+      { x: [from.offsetLeft - to.offsetLeft, 0], scaleX: [from.offsetWidth / to.offsetWidth, 1] },
+      SPRING_SNAPPY,
+    );
+  }, [active, animate]);
+
   return (
     <div
+      ref={scope}
       style={{
         display: "flex",
         gap: 4,
@@ -568,6 +621,8 @@ function TabStrip({
         scrollbarWidth: "none",
         WebkitOverflowScrolling: "touch",
         opacity: disabled ? 0.45 : 1,
+        // Keeps the z-order below inside the strip.
+        isolation: "isolate",
       }}
     >
       {TABS.map((t) => {
@@ -575,14 +630,24 @@ function TabStrip({
         return (
           <button
             key={t.id}
+            ref={(el) => {
+              buttonsRef.current[t.id] = el;
+            }}
             type="button"
             onClick={() => !disabled && onChange(t.id)}
             disabled={disabled}
+            className="vibe-press"
             style={{
+              position: "relative",
+              // The open tab sits over the others, so its sliding pill
+              // passes over their backgrounds; their words (zIndex 2) stay
+              // on top of it.
+              zIndex: isActive ? 1 : undefined,
               padding: "7px 14px",
               borderRadius: 999,
               border: "1px solid rgba(var(--scrim-rgb),0.10)",
-              background: isActive ? "var(--charcoal)" : "var(--paper-70)",
+              // The open tab's charcoal is the pill below, over this.
+              background: "var(--paper-70)",
               color: isActive ? "var(--paper)" : "var(--ink-2)",
               fontFamily: "DM Sans, sans-serif",
               fontSize: 13,
@@ -592,7 +657,25 @@ function TabStrip({
               WebkitTapHighlightColor: "transparent",
             }}
           >
-            {t.label}
+            {isActive ? (
+              <span
+                ref={pillRef}
+                aria-hidden
+                style={{
+                  position: "absolute",
+                  // Over the border too, as the old charcoal background was,
+                  // with the same hairline on it.
+                  inset: -1,
+                  borderRadius: 999,
+                  background: "var(--charcoal)",
+                  border: "1px solid rgba(var(--scrim-rgb),0.10)",
+                  boxSizing: "border-box",
+                  transformOrigin: "0 50%",
+                  pointerEvents: "none",
+                }}
+              />
+            ) : null}
+            <span style={{ position: "relative", zIndex: 2 }}>{t.label}</span>
           </button>
         );
       })}
@@ -660,15 +743,14 @@ function ListPane({
       />
     );
   }
+  // Rows rise in as the list lands (motion pass), the first screenful
+  // staggered. Keyed by person, so a follow-state change never replays one.
   return (
     <ul style={listStyle}>
-      {users.map((u) => (
-        <UserRow
-          key={u.id}
-          user={u}
-          onStateChange={onStateChange}
-          variant="relationship"
-        />
+      {users.map((u, i) => (
+        <Reveal key={u.id} delayIndex={i}>
+          <UserRow user={u} onStateChange={onStateChange} variant="relationship" />
+        </Reveal>
       ))}
     </ul>
   );
@@ -693,10 +775,19 @@ function SuggestionGroups({
   // Group labels depend on the buckets ("At Indianapolis"), so they're
   // computed per render.
   const buckets = bucketSuggestions(users);
+  const groups = suggestionGroupOrder(buckets);
+  // Where each group's rows start in the whole list, so the arrival
+  // stagger (motion pass) runs top to bottom across groups, not per group.
+  const startAt: number[] = [];
+  let count = 0;
+  for (const g of groups) {
+    startAt.push(count);
+    count += buckets[g.key].length;
+  }
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
-      {suggestionGroupOrder(buckets).map(({ key, label, blurb }) => {
+      {groups.map(({ key, label, blurb }, gi) => {
         const bucket = buckets[key];
         if (bucket.length === 0) return null;
         return (
@@ -732,53 +823,57 @@ function SuggestionGroups({
               </span>
             </header>
             <ul style={listStyle}>
-              {bucket.map((u) => (
-                <div
-                  key={u.id}
-                  style={{ position: "relative" }}
-                  onMouseEnter={() => setHoveredId(u.id)}
-                  onMouseLeave={() => setHoveredId(null)}
-                  onPointerDown={() => setHoveredId(u.id)}
-                  onPointerUp={() => setHoveredId(null)}
-                  onPointerCancel={() => setHoveredId(null)}
-                >
-                  {/* Glow that animates between rows — same hoverBackground
-                      layoutId pattern as Aceternity's card-hover-effect. */}
-                  <AnimatePresence>
-                    {hoveredId === u.id ? (
-                      <motion.span
-                        layoutId="vibe-suggestion-hover"
-                        aria-hidden
-                        style={{
-                          position: "absolute",
-                          inset: -4,
-                          borderRadius: 20,
-                          background:
-                            "radial-gradient(120% 100% at 50% 50%, rgba(255,92,53,0.18) 0%, rgba(255,222,180,0.10) 55%, rgba(255,222,180,0) 90%)",
-                          pointerEvents: "none",
-                          zIndex: 0,
-                        }}
-                        initial={{ opacity: 0 }}
-                        animate={{
-                          opacity: 1,
-                          transition: { duration: 0.15 },
-                        }}
-                        exit={{
-                          opacity: 0,
-                          transition: { duration: 0.15, delay: 0.1 },
-                        }}
+              {bucket.map((u, j) => (
+                <Reveal key={u.id} delayIndex={startAt[gi] + j}>
+                  <div
+                    style={{ position: "relative" }}
+                    onMouseEnter={() => setHoveredId(u.id)}
+                    onMouseLeave={() => setHoveredId(null)}
+                    onPointerDown={() => setHoveredId(u.id)}
+                    onPointerUp={() => setHoveredId(null)}
+                    onPointerCancel={() => setHoveredId(null)}
+                  >
+                    {/* Glow that animates between rows — same hoverBackground
+                        layoutId pattern as Aceternity's card-hover-effect. */}
+                    <AnimatePresence>
+                      {hoveredId === u.id ? (
+                        <motion.span
+                          layoutId="vibe-suggestion-hover"
+                          // Travels between rows on the shared spring, not
+                          // Motion's fixed-time default layout tween.
+                          transition={{ layout: SPRING_SNAPPY }}
+                          aria-hidden
+                          style={{
+                            position: "absolute",
+                            inset: -4,
+                            borderRadius: 20,
+                            background:
+                              "radial-gradient(120% 100% at 50% 50%, rgba(255,92,53,0.18) 0%, rgba(255,222,180,0.10) 55%, rgba(255,222,180,0) 90%)",
+                            pointerEvents: "none",
+                            zIndex: 0,
+                          }}
+                          initial={{ opacity: 0 }}
+                          animate={{
+                            opacity: 1,
+                            transition: { duration: 0.15 },
+                          }}
+                          exit={{
+                            opacity: 0,
+                            transition: { duration: 0.15, delay: 0.1 },
+                          }}
+                        />
+                      ) : null}
+                    </AnimatePresence>
+                    <div style={{ position: "relative", zIndex: 1 }}>
+                      <UserRow
+                        user={u}
+                        onStateChange={onStateChange}
+                        variant="suggestion"
+                        onDismiss={() => onDismiss(u)}
                       />
-                    ) : null}
-                  </AnimatePresence>
-                  <div style={{ position: "relative", zIndex: 1 }}>
-                    <UserRow
-                      user={u}
-                      onStateChange={onStateChange}
-                      variant="suggestion"
-                      onDismiss={() => onDismiss(u)}
-                    />
+                    </div>
                   </div>
-                </div>
+                </Reveal>
               ))}
             </ul>
           </section>
@@ -826,22 +921,24 @@ function SearchPane({
   }
   return (
     <ul style={listStyle}>
-      {results.map((u) => (
-        <li key={u.id} style={rowItemStyle}>
-          <UserAvatarLink user={u} />
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <UserNameLink user={u} />
-            <div style={metaLineStyle}>
-              {[
-                u.handle ? `@${u.handle}` : null,
-                u.major,
-                u.year ? `Year ${u.year}` : null,
-              ]
-                .filter(Boolean)
-                .join(" · ")}
+      {results.map((u, i) => (
+        <Reveal key={u.id} delayIndex={i}>
+          <li style={rowItemStyle}>
+            <UserAvatarLink user={u} />
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <UserNameLink user={u} />
+              <div style={metaLineStyle}>
+                {[
+                  u.handle ? `@${u.handle}` : null,
+                  u.major,
+                  u.year ? `Year ${u.year}` : null,
+                ]
+                  .filter(Boolean)
+                  .join(" · ")}
+              </div>
             </div>
-          </div>
-        </li>
+          </li>
+        </Reveal>
       ))}
     </ul>
   );
@@ -959,6 +1056,7 @@ export function UserRow({
         onClick={toggle}
         disabled={busy}
         aria-label={copy.state === "connected" ? `Connected. ${CONNECTED_MEANING} Unfollow` : undefined}
+        className="vibe-press"
         style={{
           flexShrink: 0,
           padding: "7px 14px",

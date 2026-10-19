@@ -1,5 +1,6 @@
 "use client";
 
+import { motion } from "motion/react";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Drawer } from "vaul";
@@ -16,6 +17,9 @@ import {
 } from "@/components/safety/ReportSheet";
 import { copyText, vibeRequest } from "@/lib/feedback/request";
 import { toast } from "@/lib/feedback/toast";
+import { LikeBurst } from "@/lib/motion/LikeBurst";
+import { Reveal } from "@/lib/motion/Reveal";
+import { SPRING_SOFT } from "@/lib/motion/springs";
 import { nativeShare } from "@/lib/native/bridge";
 import { useAppShell } from "@/lib/native/use-app-shell";
 import { EDITED_LABEL, type EditedPost } from "@/lib/posts/edit";
@@ -230,6 +234,9 @@ export function PostViewerMobile({
   const [commentsOpen, setCommentsOpen] = useState(true);
   const [comments, setComments] = useState<Comment[] | null>(null);
   const [commentsErr, setCommentsErr] = useState<LoadFailure | null>(null);
+  // Comments posted from this screen. Only these rise in (motion pass): the
+  // ones that loaded with the post just appear, so opening isn't a cascade.
+  const [newCommentIds, setNewCommentIds] = useState<ReadonlySet<string>>(() => new Set());
   const [draft, setDraft] = useState("");
   const [posting, setPosting] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -488,7 +495,11 @@ export function PostViewerMobile({
       const posted = r.data.comment;
       // Onto a loaded list only: alone in a list that never loaded, it would
       // read as the only comment. A failed load runs again and picks it up.
-      if (posted) setComments((prev) => (prev ? [...prev, posted] : prev));
+      if (posted) {
+        setComments((prev) => (prev ? [...prev, posted] : prev));
+        // Same render as the row itself, so it mounts once, already rising.
+        setNewCommentIds((prev) => new Set(prev).add(posted.id));
+      }
       // Their own comment names them, which is how a stranger's post learns
       // the viewer's id without a second request.
       if (posted?.user_id) setSelfId(posted.user_id);
@@ -608,6 +619,26 @@ export function PostViewerMobile({
           >
             Post
           </Drawer.Title>
+          {/* The viewer arrives (motion pass, Oct 18 2026): its contents fade
+              in and settle from 97% on the soft spring while vaul slides the
+              sheet in. On this inner layer, not Drawer.Content: vaul owns that
+              element's transform for the slide and the drag-to-close. It fills
+              the sheet, so the composer's `absolute` bottom and the menu's
+              click-away land where they did. No backdrop to fade: there is no
+              dim overlay (above). */}
+          <motion.div
+            initial={{ opacity: 0, scale: 0.97 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={SPRING_SOFT}
+            style={{
+              flex: 1,
+              minHeight: 0,
+              display: "flex",
+              flexDirection: "column",
+              position: "relative",
+              transformOrigin: "center",
+            }}
+          >
       {/* Top bar */}
       <header
         style={{
@@ -917,7 +948,9 @@ export function PostViewerMobile({
             removedReason={post.removed_reason}
           />
         ) : (
-          <>
+          // The real post crossfades in where the skeleton stood. Its own
+          // column, with the body's gap, since this layer now holds the rows.
+          <Reveal rise={false} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
             {isImage ? (
               <div
                 role="img"
@@ -1022,11 +1055,23 @@ export function PostViewerMobile({
                 // The count is words, so it reads --tag-ink (raw coral is
                 // 2.9:1 on cream). The heart keeps its coral (HeartIcon).
                 activeColor="var(--tag-ink)"
-                icon={<HeartIcon filled={viewer.liked} />}
+                // Pops on a like (not on load: the bar first mounts with
+                // the loaded value). LikeBurst's coral is the heart's own.
+                icon={
+                  <LikeBurst liked={viewer.liked}>
+                    <HeartIcon filled={viewer.liked} />
+                  </LikeBurst>
+                }
               />
               <EngagementButton
                 label={String(counts.comments)}
-                onTap={() => setCommentsOpen((v) => !v)}
+                // Reopening remounts the list, so forget which comments were
+                // posted here: they'd rise in again. Nothing posts while
+                // it's closed (the composer goes with it).
+                onTap={() => {
+                  setCommentsOpen((v) => !v);
+                  setNewCommentIds(new Set());
+                }}
                 icon={<ChatIcon />}
               />
               <EngagementButton
@@ -1123,34 +1168,42 @@ export function PostViewerMobile({
                   </div>
                 ) : (
                   <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                    {comments.map((c) => (
-                      <CommentRow
-                        key={c.id}
-                        c={c}
-                        isMine={!!me && c.user_id === me}
-                        // Hidden while we don't know who is reading: the
-                        // route answers a report on your own comment with a
-                        // 400 the student never sees as a sentence.
-                        onReport={
-                          me && c.user_id !== me
-                            ? () =>
-                                setReportTarget({
-                                  type: "comment",
-                                  id: c.id,
-                                  authorId: c.author?.id ?? c.user_id,
-                                  authorName:
-                                    c.author?.name ||
-                                    (c.author?.handle ? `@${c.author.handle}` : null),
-                                })
-                            : undefined
-                        }
-                      />
-                    ))}
+                    {comments.map((c) => {
+                      const row = (
+                        <CommentRow
+                          key={c.id}
+                          c={c}
+                          isMine={!!me && c.user_id === me}
+                          // Hidden while we don't know who is reading: the
+                          // route answers a report on your own comment with a
+                          // 400 the student never sees as a sentence.
+                          onReport={
+                            me && c.user_id !== me
+                              ? () =>
+                                  setReportTarget({
+                                    type: "comment",
+                                    id: c.id,
+                                    authorId: c.author?.id ?? c.user_id,
+                                    authorName:
+                                      c.author?.name ||
+                                      (c.author?.handle ? `@${c.author.handle}` : null),
+                                  })
+                              : undefined
+                          }
+                        />
+                      );
+                      // One at a time, so no stagger to speak of.
+                      return newCommentIds.has(c.id) ? (
+                        <Reveal key={c.id}>{row}</Reveal>
+                      ) : (
+                        row
+                      );
+                    })}
                   </div>
                 )}
               </div>
             ) : null}
-          </>
+          </Reveal>
         )}
       </div>
 
@@ -1219,6 +1272,7 @@ export function PostViewerMobile({
           </button>
         </div>
       ) : null}
+          </motion.div>
         </Drawer.Content>
       </Drawer.Portal>
 
@@ -1533,6 +1587,7 @@ function EngagementButton({
       type="button"
       onClick={onTap}
       aria-label={ariaLabel}
+      className="vibe-press"
       style={engagementItemStyle(active && activeColor ? activeColor : "var(--ink-2)", true)}
     >
       {icon}
