@@ -93,3 +93,22 @@ Left for later: other symbols DM Sans lacks (⌄ ⋯ ✓ ↗ ▶ ❤ ↻, the or
 from a system font; the admin map wasn't renderable with seed accounts; Safari/iPhone not yet checked
 (old iOS before 16.4 still fakes bold, same as before); the logo face uses font-display block with no
 preload, so on a very slow connection the login logo can be invisible for a moment.
+
+## Built and live (Oct 19): Tonight + Your clubs (`5248efe`)
+
+Contract and maps: `handoffs/2026-10-19-tonight-build/` (CONTRACT.md is the source of truth; §7 lists
+what v1 leaves out). Franky turned the school and athletics part ON (Oct 19), against the research's
+"get written OKs first": the email to athletics and IU Licensing is still worth sending.
+- `GET /api/school-events` (signed in; 401 signed out, checked live): Jaguars iCal (home games only),
+  IU LiveWhale group 24 (Student Affairs, filtered) and 342 (Featured, empty today, drives "Featured by
+  your school"). Server fetch cached 2 h, 4 s timeout, never 500s. Budget `schoolEventsRead` (day window).
+- Off switch: env `SCHOOL_EVENTS_OFF` (`true` or a list of keys; next deploy) or the `app_settings` row
+  `school_events_off` (30 s; a production write, so ask Franky). Shipping wrote no row.
+- Desktop Feed: `src/components/campus/tonight/FeedSideLayout.tsx` (C2): "Your clubs" left, Tonight right,
+  folds 1100-1399, hidden under 1100. Phone: `TonightCard` above "today." opens `TonightSheet`.
+  Events: `TonightSection` + `EventFilterChips` (All · School · Clubs), school cards in Coming up.
+- Each surface sits in `QuietBoundary` (renders nothing on a crash; the app has no error boundary).
+- Checked locally in headless Chromium (real calendars, fake clock `?tonight_now=` in dev only) at
+  390, 1280, 1440, 1920, Night and Light; no console errors. NOT checked: signed in on production, a real
+  iPhone (sheet scroll, VoiceOver), Safari.
+- Open for Franky: does a school pin hold #1 while another school event is live (built: the pin holds)?
