@@ -139,7 +139,7 @@ input::placeholder,textarea::placeholder{opacity:1;color:color-mix(in oklab, cur
         <button type="button" aria-pressed="{{chip.clubs.pressed}}" onClick="{{chip.clubs.pick}}" style="height: 32px; padding: 0 14px; border-radius: 999px; border: {{chip.clubs.border}}; background: {{chip.clubs.bg}}; color: {{chip.clubs.ink}}; font-size: 12.5px; font-weight: {{chip.clubs.weight}}; box-shadow: {{chip.clubs.shadow}}">Clubs</button>
       </div>
 
-      <section aria-labelledby="tonight-title" style="position: relative; flex-shrink: 0; background: {{t.panel}}; border: 1px solid {{t.panelBorder}}; border-radius: 18px; box-shadow: {{t.panelShadow}}; padding: 18px 24px 22px; display: flex; flex-direction: column; gap: 14px">
+      <section aria-labelledby="tonight-title" style="position: relative; flex-shrink: 0; background: {{t.panel}}; border: 1px solid {{t.panelBorder}}; border-radius: 18px; box-shadow: {{t.panelShadow}}; padding: 16px 22px 18px; display: flex; flex-direction: column; gap: 10px">
         <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px">
           <div style="display: flex; align-items: baseline; gap: 10px">
             <h3 id="tonight-title" style="font-family: Fraunces, serif; font-variation-settings: 'SOFT' 100; font-size: 20px; font-weight: 800; letter-spacing: -0.01em; line-height: 1.2; color: {{t.ink}}">Tonight</h3>
@@ -148,7 +148,7 @@ input::placeholder,textarea::placeholder{opacity:1;color:color-mix(in oklab, cur
           <svg width="28" height="28" viewBox="0 0 64 64" fill="none" aria-hidden="true" style="flex-shrink: 0"><path d="M47.87 50 A24 24 0 1 1 54.44 40.5" stroke="#FF5C35" stroke-opacity="{{t.orbitAlpha}}" stroke-width="3" stroke-linecap="round"></path><circle cx="51.17" cy="45.23" r="5" fill="#FF5C35"></circle></svg>
         </div>
 
-        <div style="display: flex; flex-wrap: wrap; align-items: flex-start; gap: 20px 28px">
+        <div style="display: flex; flex-wrap: wrap; align-items: flex-start; gap: 16px 28px">
           <sc-if value="{{showSchool}}" hint-placeholder-val="{{true}}">
           <article aria-labelledby="tonight-lead" style="flex: 1 1 320px; min-width: 0; display: flex; flex-direction: column">
             <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px">
@@ -158,15 +158,15 @@ input::placeholder,textarea::placeholder{opacity:1;color:color-mix(in oklab, cur
               </span>
               <span style="font-size: 11.5px; font-weight: 600; line-height: 16px; color: {{t.muted}}; white-space: nowrap">Up next</span>
             </div>
-            <h4 id="tonight-lead" style="margin-top: 10px; font-family: Fraunces, serif; font-variation-settings: 'SOFT' 100; font-size: 28px; font-weight: 900; letter-spacing: -0.02em; line-height: 1.1; color: {{t.ink}}; text-wrap: balance"><a href="#">IU Indy <span style="font-style: italic; font-weight: 400; color: {{t.muted}}">vs</span> UT Martin</a></h4>
-            <p style="margin-top: 4px; font-size: 13px; line-height: 18px; color: {{t.muted}}">Men’s basketball · Home</p>
-            <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 4px 16px; margin-top: 12px; font-size: 13.5px; line-height: 20px; color: {{t.ink2}}">
+            <h4 id="tonight-lead" style="margin-top: 8px; font-family: Fraunces, serif; font-variation-settings: 'SOFT' 100; font-size: 22px; font-weight: 900; letter-spacing: -0.02em; line-height: 1.1; color: {{t.ink}}; text-wrap: balance"><a href="#">IU Indy <span style="font-style: italic; font-weight: 400; color: {{t.muted}}">vs</span> UT Martin</a></h4>
+            <p style="margin-top: 2px; font-size: 12.5px; line-height: 17px; color: {{t.muted}}">Men’s basketball · Home</p>
+            <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 4px 16px; margin-top: 8px; font-size: 13px; line-height: 19px; color: {{t.ink2}}">
               <span style="display: inline-flex; align-items: center; gap: 6px"><svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true" style="flex-shrink: 0"><circle cx="7" cy="7" r="5.6" stroke="currentColor" stroke-width="1.3"></circle><path d="M7 4v3.2l2 1.3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"></path></svg><span><span style="font-weight: 700; color: {{t.ink}}">5:00 PM</span> tip-off</span></span>
               <span style="display: inline-flex; align-items: center; gap: 6px"><svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true" style="flex-shrink: 0"><path d="M7 13s4.5-4.2 4.5-7.5a4.5 4.5 0 0 0-9 0C2.5 8.8 7 13 7 13z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"></path><circle cx="7" cy="5.5" r="1.6" stroke="currentColor" stroke-width="1.3"></circle></svg>James T. Morris Arena</span>
             </div>
-            <div style="margin-top: 16px; display: flex; flex-wrap: wrap; align-items: center; gap: 10px 18px">
+            <div style="margin-top: 12px; display: flex; flex-wrap: wrap; align-items: center; gap: 10px 18px">
               <div style="display: flex; align-items: center; gap: 12px">
-                <button type="button" aria-pressed="{{go.lead.pressed}}" onClick="{{go.lead.toggle}}" style="height: 40px; min-width: 132px; padding: 0 22px; border-radius: 10px; display: inline-flex; align-items: center; justify-content: center; gap: 7px; border: 1px solid {{go.lead.border}}; background: {{go.lead.bg}}; box-shadow: {{go.lead.shadow}}; color: {{go.lead.ink}}; font-size: 14px; font-weight: 700; line-height: 16px"><sc-if value="{{go.lead.on}}" hint-placeholder-val="{{false}}"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M3.2 8.4l3 3 6.6-6.8" stroke="#FF5C35" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg></sc-if>Going</button>
+                <button type="button" aria-pressed="{{go.lead.pressed}}" onClick="{{go.lead.toggle}}" style="height: 36px; min-width: 112px; padding: 0 18px; border-radius: 10px; display: inline-flex; align-items: center; justify-content: center; gap: 7px; border: 1px solid {{go.lead.border}}; background: {{go.lead.bg}}; box-shadow: {{go.lead.shadow}}; color: {{go.lead.ink}}; font-size: 14px; font-weight: 700; line-height: 16px"><sc-if value="{{go.lead.on}}" hint-placeholder-val="{{false}}"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M3.2 8.4l3 3 6.6-6.8" stroke="#FF5C35" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg></sc-if>Going</button>
                 <sc-if value="{{go.lead.show}}" hint-placeholder-val="{{true}}"><span style="font-size: 12.5px; font-weight: 700; color: {{t.ink2}}">{{go.lead.label}}</span></sc-if>
               </div>
               <div style="display: flex; align-items: center; gap: 16px; font-size: 12.5px; font-weight: 700; line-height: 18px">
@@ -174,7 +174,7 @@ input::placeholder,textarea::placeholder{opacity:1;color:color-mix(in oklab, cur
                 <a href="#" class="d2-link" style="color: {{t.tagInk}}">Watch on ESPN+</a>
               </div>
             </div>
-            <p style="margin-top: 16px; display: flex; align-items: flex-start; gap: 7px; max-width: 420px; font-size: 12px; line-height: 17px; color: {{t.muted}}"><svg width="13" height="13" viewBox="0 0 14 14" fill="none" aria-hidden="true" style="flex-shrink: 0; margin-top: 2px"><circle cx="7" cy="7" r="5.6" stroke="currentColor" stroke-width="1.3"></circle><path d="M7 6.3v3.4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"></path><circle cx="7" cy="4.4" r="0.8" fill="currentColor"></circle></svg><span>First because it starts soonest. Your school can feature one event a day instead. Never paid, never ranked by popularity.</span></p>
+            <p style="margin-top: 10px; display: flex; align-items: flex-start; gap: 7px; max-width: 420px; font-size: 12px; line-height: 17px; color: {{t.muted}}"><svg width="13" height="13" viewBox="0 0 14 14" fill="none" aria-hidden="true" style="flex-shrink: 0; margin-top: 2px"><circle cx="7" cy="7" r="5.6" stroke="currentColor" stroke-width="1.3"></circle><path d="M7 6.3v3.4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"></path><circle cx="7" cy="4.4" r="0.8" fill="currentColor"></circle></svg><span>First because it starts soonest. Your school can feature one a day.</span></p>
           </article>
           </sc-if>
 
@@ -184,7 +184,7 @@ input::placeholder,textarea::placeholder{opacity:1;color:color-mix(in oklab, cur
               <h4 style="font-family: Fraunces, serif; font-variation-settings: 'SOFT' 100; font-size: 15px; font-weight: 800; letter-spacing: -0.01em; line-height: 20px; color: {{t.ink}}">Also tonight</h4>
               <ul style="display: flex; flex-direction: column; margin-top: 6px">
                 <li style="border-top: 1px solid {{t.hairline}}; padding: 2px 0">
-                  <a href="#" class="d2-row" aria-label="6:00 PM, Herron student art show opening, school event by Herron School of Art + Design, Eskenazi Hall, 21 going. Opens the event." style="display: flex; align-items: flex-start; gap: 12px; margin: 0 -8px; padding: 8px; border-radius: 12px">
+                  <a href="#" class="d2-row" aria-label="6:00 PM, Herron student art show opening, school event by Herron School of Art + Design, Eskenazi Hall, 21 going. Opens the event." style="display: flex; align-items: flex-start; gap: 12px; margin: 0 -8px; padding: 6px 8px; border-radius: 12px">
                     <span style="flex: 0 0 64px; display: flex; flex-direction: column; font-variant-numeric: tabular-nums"><span style="font-size: 13px; font-weight: 700; line-height: 20px; color: {{t.ink}}">6:00 PM</span></span>
                     <span style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px">
                       <span style="display: flex; align-items: center; gap: 8px; min-width: 0"><span style="min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; font-weight: 700; line-height: 20px; color: {{t.ink}}">Herron student art show opening</span><span style="flex-shrink: 0; padding: 1px 7px; border-radius: 999px; border: 1px solid {{t.tagBorder}}; color: {{t.tagText}}; font-size: 10.5px; font-weight: 700; line-height: 14px; letter-spacing: 0.02em">School event</span></span>
@@ -195,7 +195,7 @@ input::placeholder,textarea::placeholder{opacity:1;color:color-mix(in oklab, cur
                   </a>
                 </li>
                 <li style="border-top: 1px solid {{t.hairline}}; padding: 2px 0">
-                  <a href="#" class="d2-row" aria-label="9:00 PM to midnight, Late Night at the Campus Center, school event by Student Involvement, Campus Center, 64 going. Opens the event." style="display: flex; align-items: flex-start; gap: 12px; margin: 0 -8px; padding: 8px; border-radius: 12px">
+                  <a href="#" class="d2-row" aria-label="9:00 PM to midnight, Late Night at the Campus Center, school event by Student Involvement, Campus Center, 64 going. Opens the event." style="display: flex; align-items: flex-start; gap: 12px; margin: 0 -8px; padding: 6px 8px; border-radius: 12px">
                     <span style="flex: 0 0 64px; display: flex; flex-direction: column; font-variant-numeric: tabular-nums"><span style="font-size: 13px; font-weight: 700; line-height: 20px; color: {{t.ink}}">9:00 PM</span><span style="font-size: 11.5px; line-height: 16px; color: {{t.muted}}">to midnight</span></span>
                     <span style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px">
                       <span style="display: flex; align-items: center; gap: 8px; min-width: 0"><span style="min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; font-weight: 700; line-height: 20px; color: {{t.ink}}">Late Night at the Campus Center</span><span style="flex-shrink: 0; padding: 1px 7px; border-radius: 999px; border: 1px solid {{t.tagBorder}}; color: {{t.tagText}}; font-size: 10.5px; font-weight: 700; line-height: 14px; letter-spacing: 0.02em">School event</span></span>
@@ -215,7 +215,7 @@ input::placeholder,textarea::placeholder{opacity:1;color:color-mix(in oklab, cur
               <sc-if value="{{clubsOnly}}" hint-placeholder-val="{{false}}"><h4 style="font-family: Fraunces, serif; font-variation-settings: 'SOFT' 100; font-size: 15px; font-weight: 800; letter-spacing: -0.01em; line-height: 20px; color: {{t.ink}}">Tonight from clubs</h4></sc-if>
               <ul style="display: flex; flex-direction: column; margin-top: 6px">
                 <li style="border-top: 1px solid {{t.hairline}}; padding: 2px 0">
-                  <a href="#" class="d2-row" aria-label="8:00 PM, Bouldering night, Climbing Club, Rec Center, 12 going. Opens the event." style="display: flex; align-items: flex-start; gap: 12px; margin: 0 -8px; padding: 8px; border-radius: 12px">
+                  <a href="#" class="d2-row" aria-label="8:00 PM, Bouldering night, Climbing Club, Rec Center, 12 going. Opens the event." style="display: flex; align-items: flex-start; gap: 12px; margin: 0 -8px; padding: 6px 8px; border-radius: 12px">
                     <span style="flex: 0 0 64px; display: flex; flex-direction: column; font-variant-numeric: tabular-nums"><span style="font-size: 13px; font-weight: 700; line-height: 20px; color: {{t.ink}}">8:00 PM</span></span>
                     <span style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px">
                       <span style="min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; font-weight: 700; line-height: 20px; color: {{t.ink}}">Bouldering night</span>
@@ -226,7 +226,7 @@ input::placeholder,textarea::placeholder{opacity:1;color:color-mix(in oklab, cur
                   </a>
                 </li>
                 <li style="border-top: 1px solid {{t.hairline}}; padding: 2px 0">
-                  <a href="#" class="d2-row" aria-label="9:00 PM, Blitz night, Chess Club, University Library, 6 going. Opens the event." style="display: flex; align-items: flex-start; gap: 12px; margin: 0 -8px; padding: 8px; border-radius: 12px">
+                  <a href="#" class="d2-row" aria-label="9:00 PM, Blitz night, Chess Club, University Library, 6 going. Opens the event." style="display: flex; align-items: flex-start; gap: 12px; margin: 0 -8px; padding: 6px 8px; border-radius: 12px">
                     <span style="flex: 0 0 64px; display: flex; flex-direction: column; font-variant-numeric: tabular-nums"><span style="font-size: 13px; font-weight: 700; line-height: 20px; color: {{t.ink}}">9:00 PM</span></span>
                     <span style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px">
                       <span style="min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; font-weight: 700; line-height: 20px; color: {{t.ink}}">Blitz night</span>
