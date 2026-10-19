@@ -6,9 +6,19 @@
  },
  "title": "Desktop side space + tonight card",
  "launch": {
-  "view": "canvas"
+  "view": "canvas",
+  "page": "r2"
  },
- "pages": [],
+ "pages": [
+  {
+   "id": "r2",
+   "name": "Round 2"
+  },
+  {
+   "id": "r1",
+   "name": "Round 1"
+  }
+ ],
  "boards": {
   "Main.dc.html": {
    "x": 0,
@@ -16,14 +26,16 @@
    "w": 1440,
    "h": 900,
    "expand": "fill",
-   "title": "Now: the app today \u00b7 desktop"
+   "title": "Now: the app today \u00b7 desktop",
+   "page": "r1"
   },
   "Now_Phone.dc.html": {
    "x": 1520,
    "y": 0,
    "w": 390,
    "h": 844,
-   "title": "Now: the app today \u00b7 phone"
+   "title": "Now: the app today \u00b7 phone",
+   "page": "r1"
   },
   "A_Tonight_Desk.dc.html": {
    "x": 0,
@@ -31,14 +43,16 @@
    "w": 1440,
    "h": 900,
    "expand": "fill",
-   "title": "A \u00b7 Tonight first \u00b7 desktop"
+   "title": "A \u00b7 Tonight first \u00b7 desktop",
+   "page": "r1"
   },
   "A_Tonight_Phone.dc.html": {
    "x": 1520,
    "y": 1320,
    "w": 390,
    "h": 844,
-   "title": "A \u00b7 Tonight first \u00b7 phone"
+   "title": "A \u00b7 Tonight first \u00b7 phone",
+   "page": "r1"
   },
   "B_Clubs_Desk.dc.html": {
    "x": 0,
@@ -46,14 +60,16 @@
    "w": 1440,
    "h": 900,
    "expand": "fill",
-   "title": "B \u00b7 Your clubs first \u00b7 desktop"
+   "title": "B \u00b7 Your clubs first \u00b7 desktop",
+   "page": "r1"
   },
   "B_Clubs_Phone.dc.html": {
    "x": 1520,
    "y": 2640,
    "w": 390,
    "h": 844,
-   "title": "B \u00b7 Your clubs first \u00b7 phone"
+   "title": "B \u00b7 Your clubs first \u00b7 phone",
+   "page": "r1"
   },
   "C_BothSides_Desk.dc.html": {
    "x": 0,
@@ -61,14 +77,16 @@
    "w": 1440,
    "h": 900,
    "expand": "fill",
-   "title": "C \u00b7 Both sides \u00b7 desktop"
+   "title": "C \u00b7 Both sides \u00b7 desktop",
+   "page": "r1"
   },
   "C_BothSides_Phone.dc.html": {
    "x": 1520,
    "y": 3960,
    "w": 390,
    "h": 844,
-   "title": "C \u00b7 Both sides \u00b7 phone"
+   "title": "C \u00b7 Both sides \u00b7 phone",
+   "page": "r1"
   },
   "D_Otto_Desk.dc.html": {
    "x": 0,
@@ -76,14 +94,82 @@
    "w": 1440,
    "h": 900,
    "expand": "fill",
-   "title": "D \u00b7 Otto docks in \u00b7 desktop"
+   "title": "D \u00b7 Otto docks in \u00b7 desktop",
+   "page": "r1"
   },
   "D_Otto_Phone.dc.html": {
    "x": 1520,
    "y": 5280,
    "w": 390,
    "h": 844,
-   "title": "D \u00b7 Otto docks in \u00b7 phone"
+   "title": "D \u00b7 Otto docks in \u00b7 phone",
+   "page": "r1"
+  },
+  "C2_Desk.dc.html": {
+   "x": 0,
+   "y": 0,
+   "w": 1440,
+   "h": 900,
+   "expand": "fill",
+   "title": "C2 \u00b7 Both sides, framed \u00b7 the game leads (next up)",
+   "page": "r2",
+   "is_interactive": true
+  },
+  "C2_Desk_Featured.dc.html": {
+   "x": 1520,
+   "y": 0,
+   "w": 1440,
+   "h": 900,
+   "expand": "fill",
+   "title": "C2 \u00b7 Both sides, framed \u00b7 the school's featured pick leads",
+   "page": "r2",
+   "is_interactive": true
+  },
+  "A2_Desk.dc.html": {
+   "x": 0,
+   "y": 1320,
+   "w": 1440,
+   "h": 900,
+   "expand": "fill",
+   "title": "A2 \u00b7 Right rail \u00b7 same content",
+   "page": "r2",
+   "is_interactive": true
+  },
+  "P2_Card.dc.html": {
+   "x": 0,
+   "y": 2640,
+   "w": 390,
+   "h": 844,
+   "title": "Phone 1 \u00b7 the tonight card on Feed",
+   "page": "r2",
+   "is_interactive": true
+  },
+  "P2_Sheet.dc.html": {
+   "x": 470,
+   "y": 2640,
+   "w": 390,
+   "h": 844,
+   "title": "Phone 2 \u00b7 tap the card: the sheet",
+   "page": "r2",
+   "is_interactive": true
+  },
+  "P2_Events.dc.html": {
+   "x": 940,
+   "y": 2640,
+   "w": 390,
+   "h": 844,
+   "title": "Phone 3 \u00b7 Events: Tonight on top",
+   "page": "r2",
+   "is_interactive": true
+  },
+  "D2_Events.dc.html": {
+   "x": 0,
+   "y": 3960,
+   "w": 1440,
+   "h": 900,
+   "expand": "fill",
+   "title": "Desktop Events: Tonight on top",
+   "page": "r2"
   }
  },
  "order": [
@@ -96,7 +182,14 @@
   "C_BothSides_Desk.dc.html",
   "C_BothSides_Phone.dc.html",
   "D_Otto_Desk.dc.html",
-  "D_Otto_Phone.dc.html"
+  "D_Otto_Phone.dc.html",
+  "C2_Desk.dc.html",
+  "C2_Desk_Featured.dc.html",
+  "A2_Desk.dc.html",
+  "P2_Card.dc.html",
+  "P2_Sheet.dc.html",
+  "P2_Events.dc.html",
+  "D2_Events.dc.html"
  ],
  "notes": {
   "row0": {
@@ -104,35 +197,72 @@
    "y": -280,
    "text": "Now: the app today",
    "kind": "title1",
-   "maxW": 1910
+   "maxW": 1910,
+   "page": "r1"
   },
   "row1": {
    "x": 0,
    "y": 1040,
    "text": "A \u00b7 Tonight first",
    "kind": "title1",
-   "maxW": 1910
+   "maxW": 1910,
+   "page": "r1"
   },
   "row2": {
    "x": 0,
    "y": 2360,
    "text": "B \u00b7 Your clubs first",
    "kind": "title1",
-   "maxW": 1910
+   "maxW": 1910,
+   "page": "r1"
   },
   "row3": {
    "x": 0,
    "y": 3680,
    "text": "C \u00b7 Both sides",
    "kind": "title1",
-   "maxW": 1910
+   "maxW": 1910,
+   "page": "r1"
   },
   "row4": {
    "x": 0,
    "y": 5000,
    "text": "D \u00b7 Otto docks in",
    "kind": "title1",
-   "maxW": 1910
+   "maxW": 1910,
+   "page": "r1"
+  },
+  "r2row0": {
+   "x": 0,
+   "y": -280,
+   "text": "C2 \u00b7 Both sides, framed: next up vs featured by your school",
+   "kind": "title1",
+   "maxW": 2960,
+   "page": "r2"
+  },
+  "r2row1": {
+   "x": 0,
+   "y": 1040,
+   "text": "A2 \u00b7 Right rail, same content",
+   "kind": "title1",
+   "maxW": 1440,
+   "page": "r2"
+  },
+  "r2row2": {
+   "x": 0,
+   "y": 2360,
+   "text": "Phone: card \u2192 sheet \u2192 Events",
+   "kind": "title1",
+   "maxW": 1330,
+   "page": "r2"
+  },
+  "r2row3": {
+   "x": 0,
+   "y": 3680,
+   "text": "Desktop Events: the same Tonight section",
+   "kind": "title1",
+   "maxW": 1440,
+   "page": "r2"
   }
  },
  "designSystems": []

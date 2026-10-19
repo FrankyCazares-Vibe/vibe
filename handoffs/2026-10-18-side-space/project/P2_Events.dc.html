@@ -1,0 +1,320 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Events tab with tonight</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,400;0,700;0,800;0,900;1,400&amp;family=DM+Sans:wght@300;400;500;600;700;800&amp;display=swap">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;border:0 solid}
+h1,h2,h3,h4,h5,h6{font-size:inherit;font-weight:inherit}
+ol,ul,menu{list-style:none}
+img,svg,video,canvas{display:block;vertical-align:middle}
+img,video{max-width:100%;height:auto}
+html{line-height:1.5;-webkit-text-size-adjust:100%}
+body{margin:0;font-family:"DM Sans",sans-serif;-webkit-font-smoothing:antialiased}
+button,input,textarea{font:inherit;color:inherit;letter-spacing:inherit;background-color:transparent;border:0 solid}
+button{cursor:pointer}
+a{color:inherit;text-decoration:none}
+a:hover{color:inherit}
+input::placeholder,textarea::placeholder{opacity:1;color:color-mix(in oklab, currentcolor 50%, transparent)}
+.vibe-no-scrollbar{scrollbar-width:none}
+.vibe-no-scrollbar::-webkit-scrollbar{display:none}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; position: relative; isolation: isolate; overflow: hidden; display: flex; flex-direction: column; background: {{t.page}}; color: {{t.ink}}; font-family: 'DM Sans', sans-serif">
+
+  <div aria-hidden="true" style="position: absolute; inset: 0; z-index: -1; overflow: hidden; pointer-events: none; background: {{t.page}}">
+    <sc-if value="{{night}}" hint-placeholder-val="{{true}}">
+      <div style="position: absolute; left: -48px; bottom: -48px; width: 560px; height: 480px; opacity: 0.94; background: radial-gradient(720px 620px at 48px calc(100% - 48px), rgba(255,92,53,0.42), rgba(255,92,53,0.10) 40%, transparent 68%)"></div>
+      <div style="position: absolute; right: -48px; top: -48px; width: 560px; height: 480px; opacity: 0.95; background: radial-gradient(560px 420px at calc(100% - 48px) 48px, rgba(255,92,53,0.20), transparent 60%)"></div>
+    </sc-if>
+    <sc-if value="{{day}}" hint-placeholder-val="{{false}}">
+      <div style="position: absolute; right: -48px; top: -48px; width: 560px; height: 480px; opacity: 0.94; background: radial-gradient(620px 520px at calc(100% - 48px) 48px, rgba(255,92,53,0.30), rgba(255,92,53,0.06) 45%, transparent 70%)"></div>
+      <div style="position: absolute; left: -48px; bottom: -48px; width: 560px; height: 480px; opacity: 0.95; background: radial-gradient(520px 420px at 48px calc(100% - 48px), rgba(255,92,53,0.16), transparent 65%)"></div>
+    </sc-if>
+  </div>
+
+  <div style="position: relative; z-index: 6; flex-shrink: 0">
+    <header style="position: relative; height: 64px; display: flex; align-items: center; gap: 14px; padding: 0 24px; background: #990000; box-shadow: 0 8px 24px rgba(80,5,15,0.25); overflow: hidden">
+      <div aria-hidden="true" style="width: 44px; height: 44px; flex-shrink: 0; border-radius: 12px; background: #EEEDEB; color: #990000; display: flex; align-items: center; justify-content: center; font-family: Fraunces, serif; font-weight: 900; font-size: 18px; letter-spacing: 0.03em; box-shadow: 0 4px 12px rgba(0,0,0,0.2)">IN</div>
+      <div style="display: flex; flex-direction: column; gap: 1px; min-width: 0">
+        <div style="display: flex; align-items: baseline; gap: 8px; min-width: 0">
+          <div style="min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: Fraunces, serif; font-weight: 800; font-size: 18px; color: #EEEDEB; letter-spacing: -0.01em; line-height: 1.1">Indianapolis</div>
+        </div>
+        <div style="min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; font-weight: 600; color: rgba(238,237,235,0.82); line-height: 1.2">IU + Purdue · one community</div>
+        <div style="min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; color: rgba(238,237,235,0.82); line-height: 1.2">6 at Indianapolis</div>
+      </div>
+      <div style="flex: 1"></div>
+      <div style="position: relative; align-self: stretch; display: flex; align-items: center; gap: 14px; flex-shrink: 0; margin-left: 12px; isolation: isolate">
+        <div aria-hidden="true" style="position: absolute; top: 0; bottom: 0; left: -33px; right: -24px; background: #CFB991; clip-path: polygon(16px 0, 100% 0, 100% 100%, 0 100%)"></div>
+        <div aria-hidden="true" style="position: absolute; top: 0; bottom: 0; left: -30px; right: -24px; background: #000000; box-shadow: inset 0 -1px 0 rgba(207,185,145,0.45); clip-path: polygon(16px 0, 100% 0, 100% 100%, 0 100%)"></div>
+        <button type="button" aria-label="Look around other campuses" aria-haspopup="dialog" style="display: inline-flex; align-items: center; justify-content: center; height: 44px; width: 44px; padding: 0; border-radius: 999px; position: relative; background: rgba(207,185,145,0.10); border: 1px solid rgba(207,185,145,0.34); color: #CFB991; flex-shrink: 0"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M3 12h18M12 3c2.5 2.6 3.8 5.6 3.8 9s-1.3 6.4-3.8 9c-2.5-2.6-3.8-5.6-3.8-9s1.3-6.4 3.8-9z"></path></svg></button>
+        <button type="button" aria-label="Search campus" style="display: inline-flex; align-items: center; justify-content: center; width: 38px; height: 38px; border-radius: 12px; position: relative; background: rgba(207,185,145,0.10); border: 1px solid rgba(207,185,145,0.34); color: #CFB991; flex-shrink: 0"><svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true"><circle cx="8" cy="8" r="5.2" stroke="currentColor" stroke-width="1.7"></circle><path d="M12 12l4 4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"></path></svg></button>
+      </div>
+    </header>
+  </div>
+
+  <div style="padding: 10px 0 4px; position: relative; z-index: 5; flex-shrink: 0">
+    <nav aria-label="Campus sections" class="vibe-no-scrollbar" style="display: flex; gap: 6px; padding: 0 16px 8px; overflow-x: auto; isolation: isolate">
+      <a href="P2_Card.dc.html" style="position: relative; padding: 7px 14px; border-radius: 999px; border: 1px solid {{t.tabBorder}}; background: {{t.paper70}}; color: {{t.ink2}}; font-size: 13px; font-weight: 700; line-height: 1.5; flex-shrink: 0">Feed</a>
+      <button type="button" aria-current="page" style="position: relative; z-index: 1; padding: 7px 14px; border-radius: 999px; border: 1px solid {{t.tabBorder}}; background: {{t.ink}}; color: {{t.paper}}; font-size: 13px; font-weight: 700; flex-shrink: 0">Events</button>
+      <button type="button" style="position: relative; padding: 7px 14px; border-radius: 999px; border: 1px solid {{t.tabBorder}}; background: {{t.paper70}}; color: {{t.ink2}}; font-size: 13px; font-weight: 700; flex-shrink: 0">Orgs</button>
+      <button type="button" style="position: relative; padding: 7px 14px; border-radius: 999px; border: 1px solid {{t.tabBorder}}; background: {{t.paper70}}; color: {{t.ink2}}; font-size: 13px; font-weight: 700; flex-shrink: 0">Map</button>
+    </nav>
+  </div>
+
+  <section aria-label="Events" style="padding: 2px 16px 96px; min-width: 0; display: flex; flex-direction: column; gap: 10px">
+    <!-- One filter for the whole tab. School = events from the school's official account (verified offices);
+         Clubs = club events. Same source as the feed card and sheet, so Going stays in sync. -->
+    <div role="group" aria-label="Show events from" style="display: flex; gap: 4px; flex-shrink: 0; margin: -6px 0 -8px">
+      <sc-for list="{{chips}}" as="c" hint-placeholder-count="3">
+        <button type="button" aria-pressed="{{c.pressed}}" onClick="{{c.pick}}" style="height: 44px; padding: 0; display: inline-flex; align-items: center; flex-shrink: 0"><span style="height: 28px; padding: 0 12px; border-radius: 999px; display: inline-flex; align-items: center; font-size: 12px; font-weight: 600; border: 1px solid {{c.border}}; background: {{c.bg}}; color: {{c.ink}}">{{c.label}}</span></button>
+      </sc-for>
+    </div>
+
+    <section aria-labelledby="tonight-h" style="display: flex; flex-direction: column; gap: 10px; flex-shrink: 0">
+      <div style="display: flex; align-items: baseline; justify-content: space-between; gap: 10px">
+        <h2 id="tonight-h" style="font-family: Fraunces, serif; font-variation-settings: 'SOFT' 100; font-size: 17px; font-weight: 800; color: {{t.ink}}; letter-spacing: -0.01em; line-height: 1.2">Tonight</h2>
+        <span style="font-size: 12.5px; font-weight: 600; color: {{t.muted}}; white-space: nowrap">Sat, Nov 7</span>
+      </div>
+
+      <sc-if value="{{showSchool}}" hint-placeholder-val="{{true}}">
+      <article aria-labelledby="lead-h" style="display: flex; flex-direction: column; gap: 7px; background: {{t.glass}}; border: 1px solid {{t.glassBorder}}; border-radius: 18px; box-shadow: {{t.cardShadow}}; padding: 14px 16px 8px">
+        <!-- Why this is #1, in the same words as the card and the sheet. -->
+        <p style="display: flex; align-items: center; gap: 6px; font-size: 11.5px; font-weight: 600; line-height: 16px; color: {{t.muted}}">
+          <sc-if value="{{lead.next}}" hint-placeholder-val="{{true}}">Up next</sc-if>
+          <sc-if value="{{lead.live}}" hint-placeholder-val="{{false}}"><span aria-hidden="true" style="width: 7px; height: 7px; border-radius: 50%; background: #FF5C35; box-shadow: 0 0 0 3px rgba(255,92,53,0.22)"></span><span style="color: {{t.ink2}}">Happening now</span></sc-if>
+          <sc-if value="{{lead.featured}}" hint-placeholder-val="{{false}}">Featured by your school</sc-if>
+        </p>
+        <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: -3px">
+          <span style="display: flex; align-items: center; gap: 6px; min-width: 0; font-size: 12px; line-height: 16px; color: {{t.muted}}">
+            <span style="flex-shrink: 0; padding: 1px 7px; border-radius: 999px; border: 1px solid {{t.tagLine}}; font-size: 10.5px; font-weight: 700; letter-spacing: 0.02em; line-height: 14px; color: {{t.ink2}}">School event</span>
+            <span style="min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap">{{lead.byline}}</span>
+          </span>
+          <span style="flex-shrink: 0; font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 999px; background: {{t.pill}}; color: {{t.ink}}; white-space: nowrap">{{leadGoingLabel}}</span>
+        </div>
+        <sc-if value="{{lead.isGame}}" hint-placeholder-val="{{true}}">
+          <h3 id="lead-h" style="font-family: Fraunces, serif; font-variation-settings: 'SOFT' 100; font-size: 23px; font-weight: 900; line-height: 1.12; letter-spacing: -0.02em; color: {{t.ink}}; text-wrap: balance">IU Indy <span style="font-style: italic; font-weight: 400; color: {{t.muted}}">vs</span> UT Martin</h3>
+        </sc-if>
+        <sc-if value="{{leadNotGame}}" hint-placeholder-val="{{false}}">
+          <h3 id="lead-h" style="font-family: Fraunces, serif; font-variation-settings: 'SOFT' 100; font-size: 23px; font-weight: 900; line-height: 1.12; letter-spacing: -0.02em; color: {{t.ink}}; text-wrap: balance">{{lead.title}}</h3>
+        </sc-if>
+        <sc-if value="{{lead.hasBlurb}}" hint-placeholder-val="{{false}}">
+          <span style="margin-top: -3px; font-size: 13px; line-height: 1.4; color: {{t.muted}}">{{lead.blurb}}</span>
+        </sc-if>
+        <div style="display: flex; flex-wrap: wrap; align-items: center; column-gap: 14px; row-gap: 4px; font-size: 13.5px; line-height: 1.4; color: {{t.ink2}}">
+          <span style="display: inline-flex; align-items: center; gap: 6px"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true"><circle cx="8" cy="8" r="6.2" stroke="currentColor" stroke-width="1.4"></circle><path d="M8 4.6V8l2.4 1.6" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"></path></svg><span><span style="font-weight: 700; color: {{t.ink}}">{{lead.time}}</span>{{leadTimeTail}}</span></span>
+          <span style="display: inline-flex; align-items: center; gap: 6px"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M8 14.5s-4.8-4.3-4.8-8A4.8 4.8 0 0 1 12.8 6.5c0 3.7-4.8 8-4.8 8z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"></path><circle cx="8" cy="6.5" r="1.7" stroke="currentColor" stroke-width="1.4"></circle></svg>{{lead.place}}</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 6px; margin-top: 3px">
+          <button type="button" aria-pressed="{{going}}" onClick="{{toggleGoing}}" style="height: 44px; padding: 0 18px; border-radius: 10px; display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 700; color: {{t.ink}}; background: {{goingBtn.bg}}; border: 1px solid {{goingBtn.border}}; box-shadow: {{goingBtn.shadow}}"><sc-if value="{{going}}" hint-placeholder-val="{{false}}"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M3.2 8.4l3 3 6.6-6.8" stroke="#FF5C35" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg></sc-if>Going</button>
+          <sc-if value="{{lead.isGame}}" hint-placeholder-val="{{true}}">
+            <a href="#" style="height: 44px; padding: 0 10px; display: inline-flex; align-items: center; gap: 4px; font-size: 13px; font-weight: 700; color: {{t.tagInk}}">Tickets<svg width="11" height="11" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M4 2.5h5.5V8M9.5 2.5L2.5 9.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path></svg></a>
+            <a href="#" style="height: 44px; padding: 0 10px; display: inline-flex; align-items: center; gap: 4px; font-size: 13px; font-weight: 700; color: {{t.tagInk}}">Watch on ESPN+<svg width="11" height="11" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M4 2.5h5.5V8M9.5 2.5L2.5 9.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path></svg></a>
+          </sc-if>
+        </div>
+        <p style="display: flex; align-items: flex-start; gap: 7px; padding-bottom: 6px; font-size: 12px; line-height: 17px; color: {{t.muted}}"><svg width="13" height="13" viewBox="0 0 14 14" fill="none" aria-hidden="true" style="flex-shrink: 0; margin-top: 2px"><circle cx="7" cy="7" r="5.6" stroke="currentColor" stroke-width="1.3"></circle><path d="M7 6.3v3.4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"></path><circle cx="7" cy="4.4" r="0.8" fill="currentColor"></circle></svg><span>
+          <sc-if value="{{lead.next}}" hint-placeholder-val="{{true}}">First because it starts soonest. Your school can feature one event a day instead.</sc-if>
+          <sc-if value="{{lead.live}}" hint-placeholder-val="{{false}}">First because it’s on right now. Your school can feature one event a day instead.</sc-if>
+          <sc-if value="{{lead.featured}}" hint-placeholder-val="{{false}}">Your school picked this for today, one a day. Never paid, never ranked by popularity.</sc-if>
+        </span></p>
+      </article>
+      </sc-if>
+
+      <div style="display: flex; flex-direction: column; background: {{t.glass}}; border: 1px solid {{t.glassBorder}}; border-radius: 18px; box-shadow: {{t.cardShadow}}; padding: 4px 4px 6px">
+        <sc-if value="{{showSchool}}" hint-placeholder-val="{{true}}">
+        <h3 style="padding: 0 10px; font-size: 11px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; line-height: 32px; color: {{t.muted}}">Also tonight</h3>
+        <ul aria-label="Also tonight, school events" style="display: flex; flex-direction: column">
+          <sc-for list="{{schoolRest}}" as="r" hint-placeholder-count="2">
+            <li><a href="#" style="display: flex; align-items: flex-start; gap: 10px; padding: 5px 10px; border-radius: 14px; min-height: 44px">
+              <span style="flex: 0 0 64px; display: flex; flex-direction: column; line-height: 19px; white-space: nowrap"><span style="font-size: 12.5px; font-weight: 700; color: {{t.ink}}">{{r.time}}</span><span style="font-size: 10.5px; font-weight: 600; line-height: 13px; color: {{t.muted}}">{{r.end}}</span></span>
+              <span style="flex: 1; min-width: 0; display: flex; flex-direction: column">
+                <span style="font-size: 13.5px; font-weight: 700; line-height: 19px; text-wrap: pretty; color: {{t.ink}}"><sc-if value="{{r.isGame}}" hint-placeholder-val="{{false}}">{{r.home}} <span style="font-style: italic; font-weight: 400; color: {{t.muted}}">vs</span> {{r.away}}</sc-if><sc-if value="{{r.notGame}}" hint-placeholder-val="{{true}}">{{r.title}}</sc-if></span>
+                <span style="margin-top: 2px; display: flex; align-items: center; gap: 6px; min-width: 0; font-size: 12px; line-height: 16px; color: {{t.muted}}"><span style="flex-shrink: 0; padding: 0 6px; border-radius: 999px; border: 1px solid {{t.tagLine}}; font-size: 10px; font-weight: 700; letter-spacing: 0.02em; line-height: 14px; color: {{t.ink2}}">School event</span><span style="min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap">{{r.byline}}</span></span>
+                <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; line-height: 17px; color: {{t.muted}}">{{r.placeLine}}</span>
+              </span>
+            </a></li>
+          </sc-for>
+        </ul>
+        </sc-if>
+        <sc-if value="{{showClubs}}" hint-placeholder-val="{{true}}">
+        <h3 style="margin: {{clubsHeadMargin}}; padding: 0 10px; border-top: 1px solid {{clubsHeadLine}}; font-size: 11px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; line-height: 32px; color: {{t.muted}}">{{clubsHead}}</h3>
+        <ul aria-label="{{clubsHead}}" style="display: flex; flex-direction: column">
+          <sc-for list="{{clubRows}}" as="r" hint-placeholder-count="2">
+            <li><a href="#" style="display: flex; align-items: flex-start; gap: 10px; padding: 5px 10px; border-radius: 14px; min-height: 44px">
+              <span style="flex: 0 0 64px; font-size: 12.5px; font-weight: 700; line-height: 19px; color: {{t.ink}}">{{r.time}}</span>
+              <span style="flex: 1; min-width: 0; display: flex; flex-direction: column">
+                <span style="font-size: 13.5px; font-weight: 700; line-height: 19px; text-wrap: pretty; color: {{t.ink}}">{{r.title}}</span>
+                <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; line-height: 17px; color: {{t.muted}}">{{r.clubLine}}</span>
+              </span>
+            </a></li>
+          </sc-for>
+        </ul>
+        </sc-if>
+      </div>
+    </section>
+
+    <h2 style="font-family: Fraunces, serif; font-variation-settings: 'SOFT' 100; font-size: 17px; font-weight: 800; color: {{t.ink}}; letter-spacing: -0.01em; line-height: 1.2; margin-top: 8px; flex-shrink: 0">Coming up</h2>
+
+    <!-- The live EventCard (campus-home.tsx EventCard): org-color edge, 20px padding, count chip, Going / Interested. -->
+    <sc-if value="{{showClubs}}" hint-placeholder-val="{{true}}">
+    <article style="background: {{t.glass}}; border: 1px solid {{t.glassBorder}}; border-left: 3px solid #C23A72; border-radius: 18px; box-shadow: {{t.cardShadow}}; padding: 20px; flex-shrink: 0">
+      <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; margin-bottom: 8px">
+        <div style="flex: 1; min-width: 0">
+          <h3 style="font-family: Fraunces, serif; font-variation-settings: 'SOFT' 100; font-weight: 800; font-size: 17px; color: {{t.ink}}; line-height: 1.25">Beginner Salsa Night</h3>
+          <a href="#" style="display: inline-flex; margin-top: 4px; font-size: 11px; font-weight: 600; color: {{t.muted}}">by Salsa Club</a>
+        </div>
+        <span style="font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 999px; background: {{t.pill}}; color: {{t.ink}}; white-space: nowrap">21 going</span>
+      </div>
+      <div style="display: flex; flex-direction: column; font-size: 13px; color: {{t.muted}}; line-height: 1.7; margin-bottom: 12px">
+        <span style="display: flex; align-items: center; gap: 7px"><svg width="13" height="13" viewBox="0 0 14 14" fill="none" aria-hidden="true" style="flex-shrink: 0"><rect x="1" y="2" width="12" height="11" rx="2.5" stroke="currentColor" stroke-width="1.3"></rect><path d="M1 6h12M4 1v2M10 1v2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"></path></svg>Tue, Nov 10 · 7:00 – 8:30 PM</span>
+        <span style="display: flex; align-items: center; gap: 7px"><svg width="13" height="13" viewBox="0 0 14 14" fill="none" aria-hidden="true" style="flex-shrink: 0"><path d="M7 13s4.5-4.2 4.5-7.5a4.5 4.5 0 0 0-9 0C2.5 8.8 7 13 7 13z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"></path><circle cx="7" cy="5.5" r="1.6" stroke="currentColor" stroke-width="1.3"></circle></svg>Campus Center</span>
+      </div>
+      <div style="display: flex; gap: 8px; align-items: center">
+        <button type="button" aria-pressed="true" style="flex: 1; min-height: 44px; padding: 8px 12px; border-radius: 10px; border: 1px solid #C23A72; background: {{t.salsaOn}}; color: {{t.ink}}; font-weight: 700; font-size: 13px; box-shadow: {{t.salsaShadow}}">Going</button>
+        <button type="button" aria-pressed="false" style="flex: 1; min-height: 44px; padding: 8px 12px; border-radius: 10px; border: 1px solid {{t.rsvpBorder}}; background: {{t.rsvpBg}}; color: {{t.ink}}; font-weight: 700; font-size: 13px">Interested · 6</button>
+      </div>
+    </article>
+    </sc-if>
+
+    <sc-if value="{{showSchool}}" hint-placeholder-val="{{true}}">
+    <article style="background: {{t.glass}}; border: 1px solid {{t.glassBorder}}; border-left: 3px solid {{t.schoolEdge}}; border-radius: 18px; box-shadow: {{t.cardShadow}}; padding: 20px; flex-shrink: 0">
+      <div style="margin-bottom: 8px">
+        <h3 style="font-family: Fraunces, serif; font-variation-settings: 'SOFT' 100; font-weight: 800; font-size: 17px; color: {{t.ink}}; line-height: 1.25">IU Indy <span style="font-style: italic; font-weight: 400; color: {{t.muted}}">vs</span> Southern Indiana</h3>
+        <span style="display: flex; align-items: center; gap: 6px; margin-top: 5px"><span style="flex-shrink: 0; padding: 0 6px; border-radius: 999px; border: 1px solid {{t.tagLine}}; font-size: 10px; font-weight: 700; letter-spacing: 0.02em; line-height: 14px; color: {{t.ink2}}">School event</span><a href="#" style="display: inline-flex; font-size: 11px; font-weight: 600; color: {{t.muted}}">by Athletics</a></span>
+      </div>
+      <div style="display: flex; flex-direction: column; font-size: 13px; color: {{t.muted}}; line-height: 1.7; margin-bottom: 12px">
+        <span style="display: flex; align-items: center; gap: 7px"><svg width="13" height="13" viewBox="0 0 14 14" fill="none" aria-hidden="true" style="flex-shrink: 0"><rect x="1" y="2" width="12" height="11" rx="2.5" stroke="currentColor" stroke-width="1.3"></rect><path d="M1 6h12M4 1v2M10 1v2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"></path></svg>Wed, Nov 11 · 6:30 PM · Men’s basketball</span>
+        <span style="display: flex; align-items: center; gap: 7px"><svg width="13" height="13" viewBox="0 0 14 14" fill="none" aria-hidden="true" style="flex-shrink: 0"><path d="M7 13s4.5-4.2 4.5-7.5a4.5 4.5 0 0 0-9 0C2.5 8.8 7 13 7 13z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"></path><circle cx="7" cy="5.5" r="1.6" stroke="currentColor" stroke-width="1.3"></circle></svg>James T. Morris Arena</span>
+      </div>
+      <div style="display: flex; gap: 8px; align-items: center">
+        <button type="button" aria-pressed="false" style="flex: 1; min-height: 44px; padding: 8px 12px; border-radius: 10px; border: 1px solid {{t.rsvpBorder}}; background: {{t.rsvpBg}}; color: {{t.ink}}; font-weight: 700; font-size: 13px">Going</button>
+        <button type="button" aria-pressed="false" style="flex: 1; min-height: 44px; padding: 8px 12px; border-radius: 10px; border: 1px solid {{t.rsvpBorder}}; background: {{t.rsvpBg}}; color: {{t.ink}}; font-weight: 700; font-size: 13px">Interested</button>
+      </div>
+    </article>
+    </sc-if>
+
+    <sc-if value="{{showClubs}}" hint-placeholder-val="{{true}}">
+    <article style="background: {{t.glass}}; border: 1px solid {{t.glassBorder}}; border-left: 3px solid #8A6A22; border-radius: 18px; box-shadow: {{t.cardShadow}}; padding: 20px; flex-shrink: 0">
+      <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; margin-bottom: 8px">
+        <div style="flex: 1; min-width: 0">
+          <h3 style="font-family: Fraunces, serif; font-variation-settings: 'SOFT' 100; font-weight: 800; font-size: 17px; color: {{t.ink}}; line-height: 1.25">Screening night</h3>
+          <a href="#" style="display: inline-flex; margin-top: 4px; font-size: 11px; font-weight: 600; color: {{t.muted}}">by Film Society</a>
+        </div>
+        <span style="font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 999px; background: {{t.pill}}; color: {{t.ink}}; white-space: nowrap">9 going</span>
+      </div>
+      <div style="display: flex; flex-direction: column; font-size: 13px; color: {{t.muted}}; line-height: 1.7">
+        <span style="display: flex; align-items: center; gap: 7px"><svg width="13" height="13" viewBox="0 0 14 14" fill="none" aria-hidden="true" style="flex-shrink: 0"><rect x="1" y="2" width="12" height="11" rx="2.5" stroke="currentColor" stroke-width="1.3"></rect><path d="M1 6h12M4 1v2M10 1v2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"></path></svg>Thu, Nov 19 · 7:30 PM</span>
+      </div>
+    </article>
+    </sc-if>
+  </section>
+
+
+  <nav aria-label="Primary" style="position: absolute; bottom: 0; left: 0; right: 0; z-index: 60; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); background: {{t.tabbarBg}}; -webkit-backdrop-filter: saturate(160%) blur(14px); backdrop-filter: saturate(160%) blur(14px); border-top: 1px solid {{t.hairline}}">
+    <a href="#" aria-current="page" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; padding: 10px 4px 8px; font-size: 10px; font-weight: 600; position: relative; color: {{t.ink}}"><span aria-hidden="true" style="position: absolute; top: 0; left: 50%; transform: translateX(-50%); width: 24px; height: 2.5px; border-radius: 0 0 3px 3px; background: #FF5C35"></span><span style="width: 22px; height: 22px; display: inline-flex; align-items: center; justify-content: center"><svg width="22" height="22" viewBox="0 0 22 22" fill="none" aria-hidden="true"><path d="M11 2L20 6.5V9H2V6.5L11 2Z" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linejoin="round"></path><rect x="3" y="9" width="3.2" height="8.2" stroke="currentColor" stroke-width="1.5" fill="none"></rect><rect x="9.4" y="9" width="3.2" height="8.2" stroke="currentColor" stroke-width="1.5" fill="none"></rect><rect x="15.8" y="9" width="3.2" height="8.2" stroke="currentColor" stroke-width="1.5" fill="none"></rect><path d="M2 17.2h18" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"></path></svg></span>Campus</a>
+    <a href="#" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; padding: 10px 4px 8px; font-size: 10px; font-weight: 600; position: relative; color: {{t.muted}}"><span style="width: 22px; height: 22px; display: inline-flex; align-items: center; justify-content: center"><svg width="22" height="22" viewBox="0 0 22 22" fill="none" aria-hidden="true"><circle cx="11" cy="6" r="3.2" stroke="currentColor" stroke-width="1.6"></circle><circle cx="4" cy="16" r="2.6" stroke="currentColor" stroke-width="1.6"></circle><circle cx="18" cy="16" r="2.6" stroke="currentColor" stroke-width="1.6"></circle><path d="M7.5 7.5L4.5 13.5M14.5 7.5L17.5 13.5M7 16h8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"></path></svg></span>Network</a>
+    <a href="#" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; padding: 10px 4px 8px; font-size: 10px; font-weight: 600; position: relative; color: {{t.muted}}"><span style="width: 22px; height: 22px; display: inline-flex; align-items: center; justify-content: center"><span aria-hidden="true" style="display: inline-flex; width: 22px; height: 22px; align-items: center; justify-content: center"><span style="width: 12px; height: 12px; border-radius: 50%; background: #FF5C35; box-shadow: 0 0 8px rgba(255,92,53,0.55)"></span></span></span>otto</a>
+    <a href="#" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; padding: 10px 4px 8px; font-size: 10px; font-weight: 600; position: relative; color: {{t.muted}}"><span style="width: 22px; height: 22px; display: inline-flex; align-items: center; justify-content: center"><svg width="22" height="22" viewBox="0 0 22 22" fill="none" aria-hidden="true"><path d="M2 4A1.6 1.6 0 0 1 3.6 2.4h14.8A1.6 1.6 0 0 1 20 4v10A1.6 1.6 0 0 1 18.4 15.6H6.5L2 19V4z" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linejoin="round"></path></svg></span>Messages</a>
+    <a href="#" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; padding: 10px 4px 8px; font-size: 10px; font-weight: 600; position: relative; color: {{t.muted}}"><span style="width: 22px; height: 22px; display: inline-flex; align-items: center; justify-content: center"><svg width="22" height="22" viewBox="0 0 22 22" fill="none" aria-hidden="true"><circle cx="11" cy="7.5" r="3.4" stroke="currentColor" stroke-width="1.6"></circle><path d="M3.5 19c.7-3.6 3.8-5.8 7.5-5.8s6.8 2.2 7.5 5.8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"></path></svg></span>Profile</a>
+  </nav>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"night":{"editor":"boolean","default":true},"lead":{"editor":"enum","options":["What’s next","Happening now","Featured by your school"],"default":"What’s next","section":"Who leads tonight (set it the same on P2_Card, P2_Sheet and P2_Events)"},"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const night = this.props.night ?? true;
+    const t = night ? {
+      page: '#0C0B0B', ink: '#F6F1EA', ink2: '#CFC8BE', muted: '#9C958C', paper: '#161515',
+      hairline: 'rgba(255,255,255,0.09)', glass: 'rgba(22,21,21,0.86)', glassBorder: 'rgba(255,255,255,0.07)',
+      glassBorder60: 'rgba(255,255,255,0.07)',
+      cardShadow: 'inset 0 1px 0 rgba(255,255,255,0.04), 0 6px 18px rgba(0,0,0,0.45)',
+      tagInk: '#FF8A66', tagBg: 'rgba(255,92,53,0.14)', dots: 'rgba(255,255,255,0.16)',
+      paper55: 'rgba(22,21,21,0.55)', paper62: 'rgba(22,21,21,0.62)', paper70: 'rgba(22,21,21,0.70)',
+      pillBorder: 'rgba(255,255,255,0.06)', tabBorder: 'rgba(255,255,255,0.10)', tabbarBg: 'rgba(12,11,11,0.96)',
+      tagLine: 'rgba(246,241,234,0.24)', pill: 'rgba(255,255,255,0.10)',
+      rsvpBorder: 'rgba(255,255,255,0.20)', rsvpBg: 'rgba(255,255,255,0.08)', salsaOn: 'rgba(194,58,114,0.28)',
+      salsaShadow: 'inset 0 1px 0 rgba(255,255,255,0.22), 0 4px 14px rgba(194,58,114,0.28)', schoolEdge: '#990000'
+    } : {
+      page: '#FAF7F2', ink: '#1C1C1E', ink2: '#5C5853', muted: '#6C6761', paper: '#FFFFFF',
+      hairline: 'rgba(28,28,30,0.08)', glass: 'rgba(255,253,248,0.78)', glassBorder: 'rgba(255,255,255,0.70)',
+      glassBorder60: 'rgba(255,255,255,0.60)',
+      cardShadow: 'inset 0 1px 0 rgba(255,255,255,0.85), 0 4px 14px rgba(180,120,60,0.08)',
+      tagInk: '#B83A1A', tagBg: 'rgba(255,92,53,0.10)', dots: 'rgba(28,28,30,0.16)',
+      paper55: 'rgba(255,255,255,0.55)', paper62: 'rgba(255,255,255,0.62)', paper70: 'rgba(255,255,255,0.70)',
+      pillBorder: 'rgba(28,28,30,0.06)', tabBorder: 'rgba(28,28,30,0.10)', tabbarBg: 'rgba(250,247,242,0.96)',
+      tagLine: 'rgba(28,28,30,0.20)', pill: 'rgba(28,28,30,0.07)',
+      rsvpBorder: 'rgba(28,28,30,0.14)', rsvpBg: 'rgba(28,28,30,0.04)', salsaOn: 'rgba(194,58,114,0.16)',
+      salsaShadow: '0 4px 14px rgba(194,58,114,0.18)', schoolEdge: '#990000'
+    };
+    // Tonight (Sat, Nov 7, 2026). The game is real; the other school events are SAMPLES; clubs are fictional.
+    // The same list, order and labels feed the card (P2_Card), the sheet (P2_Sheet) and Events (P2_Events).
+    const EV = {
+      game: { key: 'game', title: 'IU Indy vs UT Martin', home: 'IU Indy', away: 'UT Martin', host: 'Athletics', sport: 'Men’s basketball', time: '5:00 PM', end: '', place: 'James T. Morris Arena', going: 38, isGame: true, blurb: '' },
+      art: { key: 'art', title: 'Herron student art show opening', host: 'Herron School of Art + Design', time: '6:00 PM', end: '', place: 'Eskenazi Hall', going: 21, isGame: false, blurb: '' },
+      late: { key: 'late', title: 'Late Night at the Campus Center', host: 'Student Involvement', time: '9:00 PM', end: 'to midnight', place: 'Campus Center', going: 64, isGame: false, blurb: 'Free food and games' },
+      boulder: { key: 'boulder', title: 'Bouldering night', host: 'Climbing Club', time: '8:00 PM', end: '', place: 'Rec Center', going: 12, isGame: false, blurb: '' },
+      blitz: { key: 'blitz', title: 'Blitz night', host: 'Chess Club', time: '9:00 PM', end: '', place: 'University Library', going: 6, isGame: false, blurb: '' }
+    };
+    // Counts only, never names, and nothing under 5.
+    const goingLabel = (n) => (n >= 5 ? n + ' going' : '');
+    // The #1 rule: 1) featured by the school (one a day, labeled), else 2) the school event that starts
+    // soonest and hasn't ended (one on now leads). 3) The rest: school events, then club events, by start.
+    const rule = this.props.lead ?? 'What’s next';
+    const featured = rule === 'Featured by your school';
+    const live = rule === 'Happening now';
+    const leadKey = featured ? 'late' : 'game';
+    const L = EV[leadKey];
+    const lead = Object.assign({}, L, {
+      featured, live, next: !featured && !live, liveGame: live && L.isGame, hasBlurb: !!L.blurb,
+      byline: L.isGame ? L.host + ' · ' + L.sport : L.host,
+      endTail: L.end ? ' ' + L.end : '',
+      goingLabel: goingLabel(L.going)
+    });
+    const withCount = (txt, n) => txt + (goingLabel(n) ? ' · ' + goingLabel(n) : '');
+    const row = (k) => Object.assign({}, EV[k], {
+      notGame: !EV[k].isGame,
+      byline: EV[k].isGame ? EV[k].host + ' · ' + EV[k].sport : EV[k].host,
+      placeLine: withCount(EV[k].place, EV[k].going),
+      clubLine: withCount(EV[k].host + ' · ' + EV[k].place, EV[k].going)
+    });
+    const schoolRest = ['game', 'art', 'late'].filter((k) => k !== leadKey).map(row);
+    const clubRows = ['boulder', 'blitz'].map(row);
+    const moreCount = schoolRest.length + clubRows.length;
+    const st = this.state || {};
+    // Going on the #1: the same RSVP as the feed sheet (one source), a count only, floor of 5.
+    const going = !!st.going;
+    const goingBtn = going
+      ? { bg: night ? 'rgba(255,92,53,0.28)' : 'rgba(255,92,53,0.14)', border: '#FF5C35', shadow: night ? 'inset 0 1px 0 rgba(255,255,255,0.22), 0 4px 14px rgba(255,92,53,0.28)' : '0 4px 14px rgba(255,92,53,0.18)' }
+      : { bg: night ? 'rgba(255,255,255,0.08)' : 'rgba(28,28,30,0.04)', border: night ? 'rgba(255,255,255,0.20)' : 'rgba(28,28,30,0.18)', shadow: night ? 'inset 0 1px 0 rgba(255,255,255,0.18)' : 'inset 0 1px 0 rgba(255,255,255,0.9)' };
+    const toggleGoing = () => this.setState({ going: !going });
+    const leadGoingLabel = goingLabel(L.going + (going ? 1 : 0));
+    const leadTimeTail = L.isGame ? (live ? ' tip-off · on now' : ' tip-off') : lead.endTail;
+    // All · School · Clubs filters the whole tab (Tonight and Coming up). All is on by default.
+    const filter = st.filter || 'All';
+    const showSchool = filter !== 'Clubs';
+    const showClubs = filter !== 'School';
+    const chips = ['All', 'School', 'Clubs'].map((label) => {
+      const on = label === filter;
+      return {
+        label, pressed: on ? 'true' : 'false', pick: () => this.setState({ filter: label }),
+        bg: on ? t.tagBg : 'transparent', border: on ? 'rgba(255,92,53,0.40)' : t.tabBorder, ink: on ? t.ink : t.muted
+      };
+    });
+    const clubsHead = showSchool ? 'Also tonight from clubs' : 'Tonight from clubs';
+    return {
+      night, day: !night, t, lead, leadNotGame: !L.isGame, leadGoingLabel, leadTimeTail,
+      schoolRest, clubRows, going, goingBtn, toggleGoing,
+      chips, showSchool, showClubs, clubsHead,
+      clubsHeadMargin: showSchool ? '6px 0 0' : '0', clubsHeadLine: showSchool ? t.hairline : 'transparent'
+    };
+  }
+}
+</script>
+</body>
+</html>

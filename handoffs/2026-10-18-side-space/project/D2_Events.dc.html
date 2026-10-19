@@ -1,0 +1,447 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Campus events with tonight, desktop</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,400;0,700;0,800;0,900;1,400&amp;family=DM+Sans:wght@300;400;500;600;700;800&amp;display=swap">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;border:0 solid}
+h1,h2,h3,h4,h5,h6{font-size:inherit;font-weight:inherit}
+ol,ul,menu{list-style:none}
+img,svg,video,canvas{display:block;vertical-align:middle}
+img,video{max-width:100%;height:auto}
+html{line-height:1.5;-webkit-text-size-adjust:100%}
+body{margin:0;font-family:"DM Sans",sans-serif;-webkit-font-smoothing:antialiased}
+button,input,textarea{font:inherit;color:inherit;letter-spacing:inherit;background-color:transparent;border:0 solid}
+button{cursor:pointer}
+a{color:inherit;text-decoration:none}
+a:hover{color:inherit}
+#campus-search::placeholder{color:rgba(238,237,235,0.9);opacity:1}
+input::placeholder,textarea::placeholder{opacity:1;color:color-mix(in oklab, currentcolor 50%, transparent)}
+@keyframes otto-core-pulse{0%,100%{transform:scale(1);opacity:.9}50%{transform:scale(1.15);opacity:1}}
+@keyframes otto-orbit-spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+@keyframes otto-breath{0%,100%{transform:scale(1);opacity:.25}50%{transform:scale(1.4);opacity:0}}
+@keyframes otto-badge-pulse{0%,100%{transform:scale(1);box-shadow:0 0 0 0 rgba(255,92,53,.55)}50%{transform:scale(1.08);box-shadow:0 0 0 4px rgba(255,92,53,0)}}
+@media (prefers-reduced-motion: reduce){.otto-anim{animation:none !important}}
+.d2-row{transition:background 120ms ease}
+.d2-row:hover{background:color-mix(in oklab, currentcolor 6%, transparent)}
+.d2-row:focus-visible,.d2-link:focus-visible{outline:2px solid #FF5C35;outline-offset:2px}
+.d2-link:hover{text-decoration:underline;text-underline-offset:3px}
+</style>
+</helmet>
+<div style="min-height: 100vh; position: relative; isolation: isolate; overflow: hidden; display: flex; flex-wrap: wrap; background: {{t.page}}; color: {{t.ink}}; font-family: 'DM Sans', sans-serif">
+
+  <div aria-hidden="true" style="position: fixed; inset: 0; z-index: -1; overflow: hidden; pointer-events: none; background: {{t.page}}">
+    <sc-if value="{{night}}" hint-placeholder-val="{{true}}">
+      <div style="position: absolute; left: -48px; bottom: -48px; width: 560px; height: 480px; opacity: 0.94; background: radial-gradient(720px 620px at 48px calc(100% - 48px), rgba(255,92,53,0.42), rgba(255,92,53,0.10) 40%, transparent 68%)"></div>
+      <div style="position: absolute; right: -48px; top: -48px; width: 560px; height: 480px; opacity: 0.95; background: radial-gradient(560px 420px at calc(100% - 48px) 48px, rgba(255,92,53,0.20), transparent 60%)"></div>
+    </sc-if>
+    <sc-if value="{{day}}" hint-placeholder-val="{{false}}">
+      <div style="position: absolute; right: -48px; top: -48px; width: 560px; height: 480px; opacity: 0.94; background: radial-gradient(620px 520px at calc(100% - 48px) 48px, rgba(255,92,53,0.30), rgba(255,92,53,0.06) 45%, transparent 70%)"></div>
+      <div style="position: absolute; left: -48px; bottom: -48px; width: 560px; height: 480px; opacity: 0.95; background: radial-gradient(520px 420px at 48px calc(100% - 48px), rgba(255,92,53,0.16), transparent 65%)"></div>
+    </sc-if>
+  </div>
+
+  <aside aria-label="Vibe" style="flex: 0 0 200px; width: 200px; padding: 20px 14px; border-right: 1px solid {{t.hairline}}; display: flex; flex-direction: column; isolation: isolate; background: radial-gradient(440px circle at 0% 0%, rgba(255,92,53,0.32) 0%, rgba(255,140,90,0.18) 28%, rgba(255,92,53,0) 60%) no-repeat, radial-gradient(420px circle at 100% 100%, rgba(255,140,90,0.30) 0%, rgba(255,92,53,0.14) 32%, rgba(255,92,53,0) 62%) no-repeat, {{t.page}}">
+    <a href="#" style="font-family: Fraunces, serif; font-size: 22px; font-weight: 900; color: {{t.ink}}; letter-spacing: -1px; display: block; margin-bottom: 24px">vibe<span style="color: #FF5C35">.</span></a>
+
+    <nav aria-label="Main" style="display: flex; flex-direction: column; gap: 2px">
+      <a href="#" aria-current="page" style="display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 12px; font-size: 14px; font-weight: 600; color: {{t.ink}}; background: {{t.paper}}; box-shadow: 0 4px 24px rgba(0,0,0,0.06)"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M8 1L15 5V7H1V5L8 1Z" stroke="currentColor" stroke-width="1.4" fill="none" stroke-linejoin="round"></path><rect x="2" y="7" width="2.5" height="6" stroke="currentColor" stroke-width="1.3" fill="none"></rect><rect x="6.75" y="7" width="2.5" height="6" stroke="currentColor" stroke-width="1.3" fill="none"></rect><rect x="11.5" y="7" width="2.5" height="6" stroke="currentColor" stroke-width="1.3" fill="none"></rect><path d="M1 13h14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"></path></svg>Campus</a>
+      <a href="#" style="display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 12px; font-size: 14px; font-weight: 500; color: {{t.muted}}"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><circle cx="8" cy="4" r="2.5" stroke="currentColor" stroke-width="1.4"></circle><circle cx="2.5" cy="12" r="2" stroke="currentColor" stroke-width="1.4"></circle><circle cx="13.5" cy="12" r="2" stroke="currentColor" stroke-width="1.4"></circle><path d="M5.5 4.5L2.5 10M10.5 4.5L13.5 10M5.8 12h4.4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"></path></svg>Network</a>
+      <a href="#" style="display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 12px; font-size: 14px; font-weight: 500; color: {{t.muted}}"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M1 2.5A1.5 1.5 0 012.5 1h11A1.5 1.5 0 0115 2.5v8A1.5 1.5 0 0113.5 12H5L1 15V2.5z" stroke="currentColor" stroke-width="1.4" fill="none" stroke-linejoin="round"></path></svg>Messages</a>
+      <a href="#" style="display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 12px; font-size: 14px; font-weight: 500; color: {{t.muted}}"><span aria-hidden="true" style="display: inline-flex; width: 16px; height: 16px; align-items: center; justify-content: center"><span style="width: 8px; height: 8px; border-radius: 50%; background: #FF5C35; box-shadow: 0 0 6px #FF5C35"></span></span>otto</a>
+      <a href="#" style="display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 12px; font-size: 14px; font-weight: 500; color: {{t.muted}}"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><circle cx="8" cy="8" r="2" stroke="currentColor" stroke-width="1.4"></circle><path d="M8 1.5v2M8 12.5v2M14.5 8h-2M3.5 8h-2M12.6 3.4l-1.4 1.4M4.8 11.2l-1.4 1.4M12.6 12.6l-1.4-1.4M4.8 4.8L3.4 3.4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"></path></svg>Settings</a>
+    </nav>
+
+    <div aria-hidden="true" style="height: 1px; background: {{t.hairline}}; margin: 12px 0"></div>
+
+    <a href="#" title="Franky C. — Marketing · Year 3" style="display: block; position: relative; border-radius: 12px; overflow: hidden; background: {{t.paper}}; border: 1px solid {{t.hairline}}; box-shadow: 0 4px 16px rgba(0,0,0,0.05)">
+      <div aria-hidden="true" style="position: absolute; top: 0; left: 0; right: 0; height: 3px; background: linear-gradient(90deg, #990000 50%, #CFB991 50%); z-index: 1"></div>
+      <div aria-hidden="true" style="height: 48px; width: 100%; background: {{t.chipBanner}}"></div>
+      <div style="display: flex; align-items: flex-start; gap: 10px; padding: 10px 10px 12px; background: {{t.paper}}">
+        <div aria-hidden="true" style="width: 36px; height: 36px; border-radius: 10px; background: #1C1C1E; display: flex; align-items: center; justify-content: center; font-family: Fraunces, serif; font-size: 12px; font-weight: 700; color: #FFFFFF; flex-shrink: 0">FC</div>
+        <div style="min-width: 0; flex: 1; padding-top: 1px">
+          <div style="font-size: 12.5px; font-weight: 600; color: {{t.ink}}; line-height: 1.38; letter-spacing: -0.01em">Franky C.</div>
+          <div style="font-size: 11px; color: {{t.muted}}; line-height: 1.4; margin-top: 4px">Marketing · Year 3</div>
+        </div>
+      </div>
+    </a>
+
+    <div aria-hidden="true" style="height: 1px; background: {{t.hairline}}; margin: 12px 0"></div>
+
+    <div style="display: flex; flex-direction: column; gap: 8px">
+      <button type="button" title="Open full calendar" style="display: flex; align-items: center; gap: 6px; padding: 0 4px; background: transparent; border: none; font-family: Fraunces, serif; font-size: 12px; font-weight: 700; letter-spacing: -0.1px; color: {{t.ink}}"><svg width="12" height="12" viewBox="0 0 14 14" fill="none" aria-hidden="true"><rect x="1" y="2" width="12" height="11" rx="2.5" stroke="currentColor" stroke-width="1.3" fill="none"></rect><path d="M1 6h12" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"></path><path d="M4 1v2M10 1v2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"></path></svg>My Calendar<span style="font-family: 'DM Sans', sans-serif; font-size: 9px; font-weight: 800; background: #FF5C35; color: #160A06; padding: 1px 6px; border-radius: 999px; margin-left: 3px">2</span></button>
+      <div style="display: flex; align-items: center; justify-content: space-between; padding: 0 2px">
+        <button type="button" aria-label="Previous month" style="width: 20px; height: 20px; border-radius: 6px; background: transparent; border: none; color: {{t.muted}}; display: flex; align-items: center; justify-content: center; font-size: 13px; flex-shrink: 0">‹</button>
+        <span style="font-size: 11px; font-weight: 700; color: {{t.ink}}; text-align: center; flex: 1">Nov 2026</span>
+        <button type="button" aria-label="Next month" style="width: 20px; height: 20px; border-radius: 6px; background: transparent; border: none; color: {{t.muted}}; display: flex; align-items: center; justify-content: center; font-size: 13px; flex-shrink: 0">›</button>
+      </div>
+      <div style="display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 1px">
+        <sc-for list="{{weekdays}}" as="d" hint-placeholder-count="7">
+          <div aria-hidden="true" style="font-size: 8px; font-weight: 800; color: {{t.muted}}; text-align: center; padding: 2px 0; text-transform: uppercase; letter-spacing: 0.3px">{{d.l}}</div>
+        </sc-for>
+        <sc-for list="{{cells}}" as="c" hint-placeholder-count="42">
+          <button type="button" aria-label="{{c.label}}" style="aspect-ratio: 1; border-radius: 6px; border: none; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: {{c.weight}}; color: {{c.color}}; background: {{c.bg}}; opacity: {{c.opacity}}; position: relative; padding: 0">{{c.n}}<sc-if value="{{c.dot}}" hint-placeholder-val="{{false}}"><span aria-hidden="true" style="width: 4px; height: 4px; border-radius: 50%; background: {{c.dotColor}}; position: absolute; bottom: 2px"></span></sc-if></button>
+        </sc-for>
+      </div>
+    </div>
+  </aside>
+
+  <main style="flex: 999 1 560px; min-width: 0; display: flex; flex-direction: column">
+    <header style="position: relative; flex-shrink: 0; height: 64px; display: flex; align-items: center; padding: 0 20px 0 24px; background: #990000; overflow: hidden">
+      <div style="position: relative; flex: 1 1 auto; min-width: 0; align-self: stretch; display: flex; align-items: center; gap: 12px; padding-right: 44px">
+        <div style="flex: 0 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 1px">
+          <div style="display: flex; align-items: baseline; gap: 8px; min-width: 0">
+            <div style="min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 0 1 auto; font-family: Fraunces, serif; font-weight: 800; font-size: 18px; color: #EEEDEB; letter-spacing: -0.01em; line-height: 1.1">Indianapolis</div>
+            <div style="min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 0 10 auto; font-size: 11px; font-weight: 600; color: rgba(238,237,235,0.82); line-height: 1.2">IU + Purdue · one community</div>
+          </div>
+          <div style="min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; color: rgba(238,237,235,0.82); line-height: 1.2">6 at Indianapolis</div>
+        </div>
+        <button type="button" aria-label="Look around other campuses" aria-haspopup="dialog" style="display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 36px; padding: 0 14px; flex-shrink: 0; border-radius: 999px; border: 1px solid rgba(238,237,235,0.32); background: rgba(238,237,235,0.14); color: #EEEDEB; font-size: 12.5px; font-weight: 700">Campuses<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M6 9l6 6 6-6"></path></svg></button>
+        <div style="display: flex; align-items: center; flex: 1 1 220px; min-width: 150px; max-width: 440px">
+          <label style="height: 36px; flex: 1; min-width: 0; max-width: 440px; border-radius: 999px; padding: 0 14px; background: rgba(238,237,235,0.14); border: 1px solid rgba(238,237,235,0.32); font-size: 13px; color: rgba(238,237,235,0.9); display: flex; align-items: center; gap: 8px; position: relative">
+            <svg width="16" height="16" viewBox="0 0 18 18" fill="none" aria-hidden="true" style="flex-shrink: 0"><circle cx="8" cy="8" r="5.2" stroke="currentColor" stroke-width="1.7"></circle><path d="M12 12l4 4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"></path></svg>
+            <span style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap">Search Vibe</span>
+            <input id="campus-search" type="text" placeholder="Search people, clubs, events" style="flex: 1; background: transparent; border: none; outline: none; color: rgba(238,237,235,0.9); font-size: 13px; padding: 0; min-width: 0">
+          </label>
+        </div>
+      </div>
+      <div style="position: relative; flex-shrink: 0; align-self: stretch; display: flex; align-items: center; isolation: isolate">
+        <div aria-hidden="true" style="position: absolute; top: 0; bottom: 0; left: -33px; right: -20px; background: #CFB991; clip-path: polygon(16px 0, 100% 0, 100% 100%, 0 100%)"></div>
+        <div aria-hidden="true" style="position: absolute; top: 0; bottom: 0; left: -30px; right: -20px; background: #000000; box-shadow: inset 0 -1px 0 rgba(207,185,145,0.45); clip-path: polygon(16px 0, 100% 0, 100% 100%, 0 100%)"></div>
+        <nav aria-label="Campus sections" style="position: relative; z-index: 1; flex-shrink: 0; display: flex; align-items: center; gap: 2px; padding: 3px; border-radius: 999px; background: rgba(207,185,145,0.12)">
+          <button type="button" style="position: relative; height: 30px; padding: 0 12px; border-radius: 999px; border: none; background: transparent; color: #CFB991; font-size: 13px; font-weight: 500; white-space: nowrap">Feed</button>
+          <button type="button" aria-current="page" style="position: relative; height: 30px; padding: 0 12px; border-radius: 999px; border: none; background: #CFB991; color: #000000; font-size: 13px; font-weight: 700; white-space: nowrap">Events</button>
+          <button type="button" style="position: relative; height: 30px; padding: 0 12px; border-radius: 999px; border: none; background: transparent; color: #CFB991; font-size: 13px; font-weight: 500; white-space: nowrap">Orgs</button>
+          <button type="button" style="position: relative; height: 30px; padding: 0 12px; border-radius: 999px; border: none; background: transparent; color: #CFB991; font-size: 13px; font-weight: 500; white-space: nowrap">Map</button>
+        </nav>
+      </div>
+    </header>
+
+    <section id="campus-events" style="flex: 1; padding: 28px max(24px, calc(734px - 50vw)) 56px 24px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px; max-width: 1100px; width: 100%">
+      <div style="display: flex; justify-content: space-between; align-items: flex-end; gap: 12px">
+        <div style="margin-bottom: 4px">
+          <div style="font-family: Fraunces, serif; font-size: 11px; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase; color: {{t.eyebrow}}; margin-bottom: 6px">Events · Indianapolis</div>
+          <h2 style="font-family: Fraunces, serif; font-variation-settings: 'SOFT' 100; font-size: clamp(22px, 2.6vw, 28px); font-weight: 900; color: {{t.ink}}; letter-spacing: -0.02em; margin: 0; line-height: 1.1">What's coming up</h2>
+          <p style="font-size: 14px; color: {{t.ink2}}; margin: 4px 0 0">RSVP early — events on campus, in space, and online.</p>
+        </div>
+        <button type="button" style="flex-shrink: 0; padding: 10px 18px; border-radius: 999px; border: 1px solid rgba(255,92,53,0.45); background: linear-gradient(180deg, #FF5C35 0%, #E04918 100%); color: #160A06; font-weight: 700; font-size: 13px; white-space: nowrap; letter-spacing: 0.02em; box-shadow: 0 6px 18px rgba(255,92,53,0.35), inset 0 1px 0 rgba(255,255,255,0.18)">+ Create event</button>
+      </div>
+
+      <div role="group" aria-label="Show events from" style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px">
+        <button type="button" aria-pressed="{{chip.all.pressed}}" onClick="{{chip.all.pick}}" style="height: 32px; padding: 0 14px; border-radius: 999px; border: {{chip.all.border}}; background: {{chip.all.bg}}; color: {{chip.all.ink}}; font-size: 12.5px; font-weight: {{chip.all.weight}}; box-shadow: {{chip.all.shadow}}">All</button>
+        <button type="button" aria-pressed="{{chip.school.pressed}}" onClick="{{chip.school.pick}}" style="height: 32px; padding: 0 14px; border-radius: 999px; border: {{chip.school.border}}; background: {{chip.school.bg}}; color: {{chip.school.ink}}; font-size: 12.5px; font-weight: {{chip.school.weight}}; box-shadow: {{chip.school.shadow}}">School</button>
+        <button type="button" aria-pressed="{{chip.clubs.pressed}}" onClick="{{chip.clubs.pick}}" style="height: 32px; padding: 0 14px; border-radius: 999px; border: {{chip.clubs.border}}; background: {{chip.clubs.bg}}; color: {{chip.clubs.ink}}; font-size: 12.5px; font-weight: {{chip.clubs.weight}}; box-shadow: {{chip.clubs.shadow}}">Clubs</button>
+      </div>
+
+      <section aria-labelledby="tonight-title" style="position: relative; flex-shrink: 0; background: {{t.panel}}; border: 1px solid {{t.panelBorder}}; border-radius: 18px; box-shadow: {{t.panelShadow}}; padding: 18px 24px 22px; display: flex; flex-direction: column; gap: 14px">
+        <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px">
+          <div style="display: flex; align-items: baseline; gap: 10px">
+            <h3 id="tonight-title" style="font-family: Fraunces, serif; font-variation-settings: 'SOFT' 100; font-size: 20px; font-weight: 800; letter-spacing: -0.01em; line-height: 1.2; color: {{t.ink}}">Tonight</h3>
+            <span style="font-size: 13px; font-weight: 600; color: {{t.muted}}">Sat, Nov 7</span>
+          </div>
+          <svg width="28" height="28" viewBox="0 0 64 64" fill="none" aria-hidden="true" style="flex-shrink: 0"><path d="M47.87 50 A24 24 0 1 1 54.44 40.5" stroke="#FF5C35" stroke-opacity="{{t.orbitAlpha}}" stroke-width="3" stroke-linecap="round"></path><circle cx="51.17" cy="45.23" r="5" fill="#FF5C35"></circle></svg>
+        </div>
+
+        <div style="display: flex; flex-wrap: wrap; align-items: flex-start; gap: 20px 28px">
+          <sc-if value="{{showSchool}}" hint-placeholder-val="{{true}}">
+          <article aria-labelledby="tonight-lead" style="flex: 1 1 320px; min-width: 0; display: flex; flex-direction: column">
+            <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px">
+              <span style="display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px">
+                <span style="flex-shrink: 0; padding: 1px 8px; border-radius: 999px; border: 1px solid {{t.tagBorder}}; color: {{t.tagText}}; font-size: 10.5px; font-weight: 700; line-height: 16px; letter-spacing: 0.02em">School event</span>
+                <span style="font-size: 12px; font-weight: 600; line-height: 16px; color: {{t.muted}}">Athletics</span>
+              </span>
+              <span style="font-size: 11.5px; font-weight: 600; line-height: 16px; color: {{t.muted}}; white-space: nowrap">Up next</span>
+            </div>
+            <h4 id="tonight-lead" style="margin-top: 10px; font-family: Fraunces, serif; font-variation-settings: 'SOFT' 100; font-size: 28px; font-weight: 900; letter-spacing: -0.02em; line-height: 1.1; color: {{t.ink}}; text-wrap: balance"><a href="#">IU Indy <span style="font-style: italic; font-weight: 400; color: {{t.muted}}">vs</span> UT Martin</a></h4>
+            <p style="margin-top: 4px; font-size: 13px; line-height: 18px; color: {{t.muted}}">Men’s basketball · Home</p>
+            <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 4px 16px; margin-top: 12px; font-size: 13.5px; line-height: 20px; color: {{t.ink2}}">
+              <span style="display: inline-flex; align-items: center; gap: 6px"><svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true" style="flex-shrink: 0"><circle cx="7" cy="7" r="5.6" stroke="currentColor" stroke-width="1.3"></circle><path d="M7 4v3.2l2 1.3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"></path></svg><span><span style="font-weight: 700; color: {{t.ink}}">5:00 PM</span> tip-off</span></span>
+              <span style="display: inline-flex; align-items: center; gap: 6px"><svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true" style="flex-shrink: 0"><path d="M7 13s4.5-4.2 4.5-7.5a4.5 4.5 0 0 0-9 0C2.5 8.8 7 13 7 13z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"></path><circle cx="7" cy="5.5" r="1.6" stroke="currentColor" stroke-width="1.3"></circle></svg>James T. Morris Arena</span>
+            </div>
+            <div style="margin-top: 16px; display: flex; flex-wrap: wrap; align-items: center; gap: 10px 18px">
+              <div style="display: flex; align-items: center; gap: 12px">
+                <button type="button" aria-pressed="{{go.lead.pressed}}" onClick="{{go.lead.toggle}}" style="height: 40px; min-width: 132px; padding: 0 22px; border-radius: 10px; display: inline-flex; align-items: center; justify-content: center; gap: 7px; border: 1px solid {{go.lead.border}}; background: {{go.lead.bg}}; box-shadow: {{go.lead.shadow}}; color: {{go.lead.ink}}; font-size: 14px; font-weight: 700; line-height: 16px"><sc-if value="{{go.lead.on}}" hint-placeholder-val="{{false}}"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M3.2 8.4l3 3 6.6-6.8" stroke="#FF5C35" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg></sc-if>Going</button>
+                <sc-if value="{{go.lead.show}}" hint-placeholder-val="{{true}}"><span style="font-size: 12.5px; font-weight: 700; color: {{t.ink2}}">{{go.lead.label}}</span></sc-if>
+              </div>
+              <div style="display: flex; align-items: center; gap: 16px; font-size: 12.5px; font-weight: 700; line-height: 18px">
+                <a href="#" class="d2-link" style="color: {{t.tagInk}}">Tickets</a>
+                <a href="#" class="d2-link" style="color: {{t.tagInk}}">Watch on ESPN+</a>
+              </div>
+            </div>
+            <p style="margin-top: 16px; display: flex; align-items: flex-start; gap: 7px; max-width: 420px; font-size: 12px; line-height: 17px; color: {{t.muted}}"><svg width="13" height="13" viewBox="0 0 14 14" fill="none" aria-hidden="true" style="flex-shrink: 0; margin-top: 2px"><circle cx="7" cy="7" r="5.6" stroke="currentColor" stroke-width="1.3"></circle><path d="M7 6.3v3.4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"></path><circle cx="7" cy="4.4" r="0.8" fill="currentColor"></circle></svg><span>First because it starts soonest. Your school can feature one event a day instead. Never paid, never ranked by popularity.</span></p>
+          </article>
+          </sc-if>
+
+          <div style="flex: 1.6 1 480px; min-width: 0; display: flex; flex-direction: column; gap: 14px; padding-left: {{listPad}}; border-left: {{listRule}}">
+            <sc-if value="{{showSchool}}" hint-placeholder-val="{{true}}">
+            <div>
+              <h4 style="font-family: Fraunces, serif; font-variation-settings: 'SOFT' 100; font-size: 15px; font-weight: 800; letter-spacing: -0.01em; line-height: 20px; color: {{t.ink}}">Also tonight</h4>
+              <ul style="display: flex; flex-direction: column; margin-top: 6px">
+                <li style="border-top: 1px solid {{t.hairline}}; padding: 2px 0">
+                  <a href="#" class="d2-row" aria-label="6:00 PM, Herron student art show opening, school event by Herron School of Art + Design, Eskenazi Hall, 21 going. Opens the event." style="display: flex; align-items: flex-start; gap: 12px; margin: 0 -8px; padding: 8px; border-radius: 12px">
+                    <span style="flex: 0 0 64px; display: flex; flex-direction: column; font-variant-numeric: tabular-nums"><span style="font-size: 13px; font-weight: 700; line-height: 20px; color: {{t.ink}}">6:00 PM</span></span>
+                    <span style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px">
+                      <span style="display: flex; align-items: center; gap: 8px; min-width: 0"><span style="min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; font-weight: 700; line-height: 20px; color: {{t.ink}}">Herron student art show opening</span><span style="flex-shrink: 0; padding: 1px 7px; border-radius: 999px; border: 1px solid {{t.tagBorder}}; color: {{t.tagText}}; font-size: 10.5px; font-weight: 700; line-height: 14px; letter-spacing: 0.02em">School event</span></span>
+                      <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; line-height: 17px; color: {{t.muted}}"><span style="font-weight: 600; color: {{t.ink2}}">Herron School of Art + Design</span> · Eskenazi Hall</span>
+                    </span>
+                    <span style="flex-shrink: 0; font-size: 12px; font-weight: 600; line-height: 20px; color: {{t.muted}}">21 going</span>
+                    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true" style="flex-shrink: 0; margin-top: 3px; color: {{t.muted}}"><path d="M6 3.5L10.5 8 6 12.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+                  </a>
+                </li>
+                <li style="border-top: 1px solid {{t.hairline}}; padding: 2px 0">
+                  <a href="#" class="d2-row" aria-label="9:00 PM to midnight, Late Night at the Campus Center, school event by Student Involvement, Campus Center, 64 going. Opens the event." style="display: flex; align-items: flex-start; gap: 12px; margin: 0 -8px; padding: 8px; border-radius: 12px">
+                    <span style="flex: 0 0 64px; display: flex; flex-direction: column; font-variant-numeric: tabular-nums"><span style="font-size: 13px; font-weight: 700; line-height: 20px; color: {{t.ink}}">9:00 PM</span><span style="font-size: 11.5px; line-height: 16px; color: {{t.muted}}">to midnight</span></span>
+                    <span style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px">
+                      <span style="display: flex; align-items: center; gap: 8px; min-width: 0"><span style="min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; font-weight: 700; line-height: 20px; color: {{t.ink}}">Late Night at the Campus Center</span><span style="flex-shrink: 0; padding: 1px 7px; border-radius: 999px; border: 1px solid {{t.tagBorder}}; color: {{t.tagText}}; font-size: 10.5px; font-weight: 700; line-height: 14px; letter-spacing: 0.02em">School event</span></span>
+                      <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; line-height: 17px; color: {{t.muted}}"><span style="font-weight: 600; color: {{t.ink2}}">Student Involvement</span> · Campus Center</span>
+                    </span>
+                    <span style="flex-shrink: 0; font-size: 12px; font-weight: 600; line-height: 20px; color: {{t.muted}}">64 going</span>
+                    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true" style="flex-shrink: 0; margin-top: 3px; color: {{t.muted}}"><path d="M6 3.5L10.5 8 6 12.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+                  </a>
+                </li>
+              </ul>
+            </div>
+            </sc-if>
+
+            <sc-if value="{{showClubs}}" hint-placeholder-val="{{true}}">
+            <div>
+              <sc-if value="{{showSchool}}" hint-placeholder-val="{{true}}"><h4 style="font-family: Fraunces, serif; font-variation-settings: 'SOFT' 100; font-size: 15px; font-weight: 800; letter-spacing: -0.01em; line-height: 20px; color: {{t.ink}}">Also tonight from clubs</h4></sc-if>
+              <sc-if value="{{clubsOnly}}" hint-placeholder-val="{{false}}"><h4 style="font-family: Fraunces, serif; font-variation-settings: 'SOFT' 100; font-size: 15px; font-weight: 800; letter-spacing: -0.01em; line-height: 20px; color: {{t.ink}}">Tonight from clubs</h4></sc-if>
+              <ul style="display: flex; flex-direction: column; margin-top: 6px">
+                <li style="border-top: 1px solid {{t.hairline}}; padding: 2px 0">
+                  <a href="#" class="d2-row" aria-label="8:00 PM, Bouldering night, Climbing Club, Rec Center, 12 going. Opens the event." style="display: flex; align-items: flex-start; gap: 12px; margin: 0 -8px; padding: 8px; border-radius: 12px">
+                    <span style="flex: 0 0 64px; display: flex; flex-direction: column; font-variant-numeric: tabular-nums"><span style="font-size: 13px; font-weight: 700; line-height: 20px; color: {{t.ink}}">8:00 PM</span></span>
+                    <span style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px">
+                      <span style="min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; font-weight: 700; line-height: 20px; color: {{t.ink}}">Bouldering night</span>
+                      <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; line-height: 17px; color: {{t.muted}}"><span style="font-weight: 600; color: {{t.ink2}}">Climbing Club</span> · Rec Center</span>
+                    </span>
+                    <span style="flex-shrink: 0; font-size: 12px; font-weight: 600; line-height: 20px; color: {{t.muted}}">12 going</span>
+                    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true" style="flex-shrink: 0; margin-top: 3px; color: {{t.muted}}"><path d="M6 3.5L10.5 8 6 12.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+                  </a>
+                </li>
+                <li style="border-top: 1px solid {{t.hairline}}; padding: 2px 0">
+                  <a href="#" class="d2-row" aria-label="9:00 PM, Blitz night, Chess Club, University Library, 6 going. Opens the event." style="display: flex; align-items: flex-start; gap: 12px; margin: 0 -8px; padding: 8px; border-radius: 12px">
+                    <span style="flex: 0 0 64px; display: flex; flex-direction: column; font-variant-numeric: tabular-nums"><span style="font-size: 13px; font-weight: 700; line-height: 20px; color: {{t.ink}}">9:00 PM</span></span>
+                    <span style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px">
+                      <span style="min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; font-weight: 700; line-height: 20px; color: {{t.ink}}">Blitz night</span>
+                      <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; line-height: 17px; color: {{t.muted}}"><span style="font-weight: 600; color: {{t.ink2}}">Chess Club</span> · University Library</span>
+                    </span>
+                    <span style="flex-shrink: 0; font-size: 12px; font-weight: 600; line-height: 20px; color: {{t.muted}}">6 going</span>
+                    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true" style="flex-shrink: 0; margin-top: 3px; color: {{t.muted}}"><path d="M6 3.5L10.5 8 6 12.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+                  </a>
+                </li>
+              </ul>
+            </div>
+            </sc-if>
+          </div>
+        </div>
+      </section>
+
+      <h3 style="margin-top: 6px; font-family: Fraunces, serif; font-variation-settings: 'SOFT' 100; font-size: 17px; font-weight: 800; letter-spacing: -0.01em; line-height: 1.2; color: {{t.ink}}">Coming up</h3>
+
+      <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; align-items: start">
+        <sc-if value="{{showClubs}}" hint-placeholder-val="{{true}}">
+        <article id="event-salsa-nov10" style="border-radius: 18px; background: linear-gradient(180deg, rgba(20,16,28,0.78) 0%, rgba(14,11,22,0.82) 100%); -webkit-backdrop-filter: blur(28px) saturate(160%); backdrop-filter: blur(28px) saturate(160%); border: 1px solid rgba(255,255,255,0.10); border-left: 3px solid #C23A72; box-shadow: inset 0 1px 0 rgba(255,255,255,0.10), inset 0 -1px 0 rgba(0,0,0,0.32), 0 12px 32px rgba(20,8,40,0.22); color: #FFFFFF; padding: 20px">
+          <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; margin-bottom: 8px">
+            <div style="flex: 1; min-width: 0">
+              <h4 style="font-family: Fraunces, serif; font-variation-settings: 'SOFT' 100; font-weight: 800; font-size: 17px; color: #FFFFFF; line-height: 1.25">Beginner Salsa Night</h4>
+              <a href="#" style="display: inline-flex; align-items: center; gap: 5px; margin-top: 4px; font-size: 11px; font-weight: 600; color: rgba(255,255,255,0.62)">by Salsa Club<span title="Verified by Vibe" style="display: inline-flex; color: #F0C84A"><svg width="11" height="11" viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M8 .5l1.7 1.7L12 1.5l.5 2.3 2.3.5-.7 2.3 1.7 1.7-1.7 1.7.7 2.3-2.3.5-.5 2.3-2.3-.7L8 15.5l-1.7-1.7-2.3.7-.5-2.3-2.3-.5.7-2.3L.2 8l1.7-1.7-.7-2.3 2.3-.5.5-2.3L6.3 2.2 8 .5zm-.6 9.7 4-4-1-1L7.5 8 6 6.5l-1 1L7.5 10z"></path></svg></span></a>
+            </div>
+            <span style="font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 999px; background: rgba(255,255,255,0.10); color: #FFFFFF; white-space: nowrap">21 going</span>
+          </div>
+          <div style="display: flex; flex-direction: column; font-size: 13px; color: rgba(255,255,255,0.62); line-height: 1.7; margin-bottom: 12px">
+            <span style="display: flex; align-items: center; gap: 7px"><svg width="13" height="13" viewBox="0 0 14 14" fill="none" aria-hidden="true" style="flex-shrink: 0"><rect x="1" y="2" width="12" height="11" rx="2.5" stroke="currentColor" stroke-width="1.3"></rect><path d="M1 6h12M4 1v2M10 1v2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"></path></svg>Tue, Nov 10 · 7 PM – 8:30 PM</span>
+            <span style="display: flex; align-items: center; gap: 7px"><svg width="13" height="13" viewBox="0 0 14 14" fill="none" aria-hidden="true" style="flex-shrink: 0"><path d="M7 13s4.5-4.2 4.5-7.5a4.5 4.5 0 0 0-9 0C2.5 8.8 7 13 7 13z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"></path><circle cx="7" cy="5.5" r="1.6" stroke="currentColor" stroke-width="1.3"></circle></svg>Campus Center</span>
+          </div>
+          <p style="font-size: 12.5px; color: rgba(255,255,255,0.78); line-height: 1.55; margin-bottom: 12px; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden">The beginner lesson is back. No partner needed, just wear shoes you can turn in.</p>
+          <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap">
+            <button type="button" aria-pressed="true" style="flex: 1; padding: 8px 12px; border-radius: 10px; border: 1px solid #C23A72; background: rgba(194,58,114,0.28); color: #FFFFFF; font-weight: 700; font-size: 13px; box-shadow: inset 0 1px 0 rgba(255,255,255,0.22), 0 4px 14px rgba(194,58,114,0.28)">Going</button>
+            <button type="button" aria-pressed="false" style="flex: 1; padding: 8px 12px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.20); background: rgba(255,255,255,0.08); color: #FFFFFF; font-weight: 700; font-size: 13px; box-shadow: inset 0 1px 0 rgba(255,255,255,0.18)">Interested · 6</button>
+          </div>
+          <p style="margin-top: 8px; font-size: 12px; line-height: 1.4; color: rgba(255,255,255,0.62)">You'll appear in the event chat.</p>
+          <div style="display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap">
+            <a href="#" style="display: inline-flex; align-items: center; gap: 5px; padding: 5px 10px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.16); background: rgba(255,255,255,0.06); color: rgba(255,255,255,0.85); font-weight: 600; font-size: 11px"><svg width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true"><rect x="2" y="3" width="12" height="11" rx="1.5" stroke="currentColor" stroke-width="1.3"></rect><path d="M2 6h12M5 1.5v3M11 1.5v3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"></path></svg>Add to calendar</a>
+            <button type="button" style="margin-left: auto; display: inline-flex; align-items: center; padding: 5px 10px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.10); background: transparent; color: rgba(255,255,255,0.6); font-weight: 600; font-size: 11px">Report event</button>
+          </div>
+        </article>
+        </sc-if>
+
+        <sc-if value="{{showSchool}}" hint-placeholder-val="{{true}}">
+        <article id="event-mbb-nov11" style="border-radius: 18px; background: linear-gradient(180deg, rgba(20,16,28,0.78) 0%, rgba(14,11,22,0.82) 100%); -webkit-backdrop-filter: blur(28px) saturate(160%); backdrop-filter: blur(28px) saturate(160%); border: 1px solid rgba(255,255,255,0.10); border-left: 3px solid #5A9CFF; box-shadow: inset 0 1px 0 rgba(255,255,255,0.10), inset 0 -1px 0 rgba(0,0,0,0.32), 0 12px 32px rgba(20,8,40,0.22); color: #FFFFFF; padding: 20px">
+          <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; margin-bottom: 8px">
+            <div style="flex: 1; min-width: 0">
+              <h4 style="font-family: Fraunces, serif; font-variation-settings: 'SOFT' 100; font-weight: 800; font-size: 17px; color: #FFFFFF; line-height: 1.25">IU Indy vs Southern Indiana</h4>
+              <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; margin-top: 5px">
+                <span style="flex-shrink: 0; padding: 1px 7px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.18); color: rgba(255,255,255,0.78); font-size: 10.5px; font-weight: 700; line-height: 14px; letter-spacing: 0.02em">School event</span>
+                <span style="font-size: 11px; font-weight: 600; line-height: 16px; color: rgba(255,255,255,0.62)">From the IU Indy athletics calendar</span>
+              </div>
+            </div>
+          </div>
+          <div style="display: flex; flex-direction: column; font-size: 13px; color: rgba(255,255,255,0.62); line-height: 1.7; margin-bottom: 12px">
+            <span style="display: flex; align-items: center; gap: 7px"><svg width="13" height="13" viewBox="0 0 14 14" fill="none" aria-hidden="true" style="flex-shrink: 0"><rect x="1" y="2" width="12" height="11" rx="2.5" stroke="currentColor" stroke-width="1.3"></rect><path d="M1 6h12M4 1v2M10 1v2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"></path></svg>Wed, Nov 11 · 6:30 PM</span>
+            <span style="display: flex; align-items: center; gap: 7px"><svg width="13" height="13" viewBox="0 0 14 14" fill="none" aria-hidden="true" style="flex-shrink: 0"><path d="M7 13s4.5-4.2 4.5-7.5a4.5 4.5 0 0 0-9 0C2.5 8.8 7 13 7 13z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"></path><circle cx="7" cy="5.5" r="1.6" stroke="currentColor" stroke-width="1.3"></circle></svg>James T. Morris Arena</span>
+          </div>
+          <p style="font-size: 12.5px; color: rgba(255,255,255,0.78); line-height: 1.55; margin-bottom: 12px; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden">Men’s basketball, home game.</p>
+          <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap">
+            <button type="button" aria-pressed="false" style="flex: 1; padding: 8px 12px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.20); background: rgba(255,255,255,0.08); color: #FFFFFF; font-weight: 700; font-size: 13px; box-shadow: inset 0 1px 0 rgba(255,255,255,0.18)">Going</button>
+            <button type="button" aria-pressed="false" style="flex: 1; padding: 8px 12px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.20); background: rgba(255,255,255,0.08); color: #FFFFFF; font-weight: 700; font-size: 13px; box-shadow: inset 0 1px 0 rgba(255,255,255,0.18)">Interested</button>
+          </div>
+          <div style="display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap">
+            <button type="button" style="margin-left: auto; display: inline-flex; align-items: center; padding: 5px 10px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.10); background: transparent; color: rgba(255,255,255,0.6); font-weight: 600; font-size: 11px">Report event</button>
+          </div>
+        </article>
+        </sc-if>
+
+        <sc-if value="{{showClubs}}" hint-placeholder-val="{{true}}">
+        <article id="event-film-nov19" style="border-radius: 18px; background: linear-gradient(180deg, rgba(20,16,28,0.78) 0%, rgba(14,11,22,0.82) 100%); -webkit-backdrop-filter: blur(28px) saturate(160%); backdrop-filter: blur(28px) saturate(160%); border: 1px solid rgba(255,255,255,0.10); border-left: 3px solid #8A6A22; box-shadow: inset 0 1px 0 rgba(255,255,255,0.10), inset 0 -1px 0 rgba(0,0,0,0.32), 0 12px 32px rgba(20,8,40,0.22); color: #FFFFFF; padding: 20px">
+          <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; margin-bottom: 8px">
+            <div style="flex: 1; min-width: 0">
+              <h4 style="font-family: Fraunces, serif; font-variation-settings: 'SOFT' 100; font-weight: 800; font-size: 17px; color: #FFFFFF; line-height: 1.25">Screening night</h4>
+              <a href="#" style="display: inline-flex; align-items: center; gap: 5px; margin-top: 4px; font-size: 11px; font-weight: 600; color: rgba(255,255,255,0.62)">by Film Society<span title="Verified by Vibe" style="display: inline-flex; color: #F0C84A"><svg width="11" height="11" viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M8 .5l1.7 1.7L12 1.5l.5 2.3 2.3.5-.7 2.3 1.7 1.7-1.7 1.7.7 2.3-2.3.5-.5 2.3-2.3-.7L8 15.5l-1.7-1.7-2.3.7-.5-2.3-2.3-.5.7-2.3L.2 8l1.7-1.7-.7-2.3 2.3-.5.5-2.3L6.3 2.2 8 .5zm-.6 9.7 4-4-1-1L7.5 8 6 6.5l-1 1L7.5 10z"></path></svg></span></a>
+            </div>
+            <span style="font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 999px; background: rgba(255,255,255,0.10); color: #FFFFFF; white-space: nowrap">9 going</span>
+          </div>
+          <div style="display: flex; flex-direction: column; font-size: 13px; color: rgba(255,255,255,0.62); line-height: 1.7; margin-bottom: 12px">
+            <span style="display: flex; align-items: center; gap: 7px"><svg width="13" height="13" viewBox="0 0 14 14" fill="none" aria-hidden="true" style="flex-shrink: 0"><rect x="1" y="2" width="12" height="11" rx="2.5" stroke="currentColor" stroke-width="1.3"></rect><path d="M1 6h12M4 1v2M10 1v2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"></path></svg>Thu, Nov 19 · 7:30 PM – 9:30 PM</span>
+          </div>
+          <p style="font-size: 12.5px; color: rgba(255,255,255,0.78); line-height: 1.55; margin-bottom: 12px; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden">Moved a week, the projector needs a new bulb. Same room, same free popcorn.</p>
+          <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap">
+            <button type="button" aria-pressed="false" style="flex: 1; padding: 8px 12px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.20); background: rgba(255,255,255,0.08); color: #FFFFFF; font-weight: 700; font-size: 13px; box-shadow: inset 0 1px 0 rgba(255,255,255,0.18)">Going</button>
+            <button type="button" aria-pressed="false" style="flex: 1; padding: 8px 12px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.20); background: rgba(255,255,255,0.08); color: #FFFFFF; font-weight: 700; font-size: 13px; box-shadow: inset 0 1px 0 rgba(255,255,255,0.18)">Interested</button>
+          </div>
+          <div style="display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap">
+            <button type="button" style="margin-left: auto; display: inline-flex; align-items: center; padding: 5px 10px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.10); background: transparent; color: rgba(255,255,255,0.6); font-weight: 600; font-size: 11px">Report event</button>
+          </div>
+        </article>
+        </sc-if>
+      </div>
+    </section>
+  </main>
+
+  <button type="button" aria-label="Open Otto · 1 new" style="position: fixed; bottom: 24px; right: 24px; z-index: 30; display: block; width: 52px; height: 52px; padding: 0; border-radius: 50%; background: #1C1C1E; border: 0.5px solid rgba(255,92,53,0.3); box-shadow: 0 8px 24px rgba(0,0,0,0.18)">
+    <span aria-hidden="true" style="position: absolute; top: -6px; right: -6px; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px; background: #FF5C35; border: 2px solid {{t.page}}; box-shadow: 0 0 12px rgba(255,92,53,0.6), 0 2px 6px rgba(0,0,0,0.18); color: #160A06; font-weight: 800; font-size: 10px; line-height: 14px; display: flex; align-items: center; justify-content: center; letter-spacing: 0.02em; z-index: 2; animation: otto-badge-pulse 2.4s ease-in-out infinite" class="otto-anim">1</span>
+    <span aria-hidden="true" style="position: absolute; inset: 0; display: flex; align-items: center; justify-content: center">
+      <span style="position: relative; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center">
+        <span class="otto-anim" style="position: absolute; inset: 4px; border-radius: 50%; border: 1px solid #FF5C35; animation: otto-breath 2.8s ease-out infinite"></span>
+        <span class="otto-anim" style="position: absolute; inset: 0; border-radius: 50%; border: 0.5px solid rgba(255,92,53,0.3); animation: otto-orbit-spin 8s linear infinite"><span style="position: absolute; top: 0; left: 50%; transform: translateX(-50%); width: 3px; height: 3px; border-radius: 50%; background: #FF5C35"></span></span>
+        <span class="otto-anim" style="width: 9px; height: 9px; border-radius: 50%; background: #FF5C35; box-shadow: 0 0 10px #FF5C35; animation: otto-core-pulse 2.4s ease-in-out infinite"></span>
+      </span>
+    </span>
+  </button>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"night":{"editor":"boolean","default":true},"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const night = this.props.night ?? true;
+    const t = night ? {
+      page: '#0C0B0B', ink: '#F6F1EA', ink2: '#CFC8BE', muted: '#9C958C', paper: '#161515',
+      hairline: 'rgba(255,255,255,0.09)', glass: 'rgba(22,21,21,0.86)', glassBorder: 'rgba(255,255,255,0.07)',
+      cardShadow: 'inset 0 1px 0 rgba(255,255,255,0.04), 0 6px 18px rgba(0,0,0,0.45)',
+      tagInk: '#FF8A66', tagBg: 'rgba(255,92,53,0.14)', eyebrow: '#FF8A66',
+      dots: 'rgba(255,255,255,0.16)', postOff: 'rgba(255,255,255,0.18)',
+      chipBanner: 'linear-gradient(135deg, #2E2B29 0%, #252321 45%, #1D1B1A 100%)',
+      // The Tonight panel: its own paper surface and hairline frame. Its one
+      // mark is C2's open orbit (28px), so desktop shares one tonight mark;
+      // the page keeps the only coral bloom.
+      panel: '#161515', panelBorder: 'rgba(255,255,255,0.10)',
+      panelShadow: 'inset 0 1px 0 rgba(255,255,255,0.05), 0 10px 28px rgba(0,0,0,0.40)',
+      orbitAlpha: '0.6',
+      tagBorder: 'rgba(255,255,255,0.20)', tagText: '#CFC8BE',
+      // Filter chips, from tokens (they follow Light too).
+      chipOff: '#161515', chipOffLine: 'rgba(255,255,255,0.14)', chipOffInk: '#CFC8BE',
+      chipOn: 'linear-gradient(180deg, rgba(255,92,53,0.50) 0%, rgba(255,92,53,0.22) 100%), #161515',
+      chipOnLine: 'rgba(255,180,150,0.55)', chipOnInk: '#FFFFFF',
+      chipOnShadow: 'inset 0 1px 0 rgba(255,255,255,0.22)', chipOffShadow: 'inset 0 1px 0 rgba(255,255,255,0.05)'
+    } : {
+      page: '#FAF7F2', ink: '#1C1C1E', ink2: '#5C5853', muted: '#5A564F', paper: '#FFFFFF',
+      hairline: 'rgba(28,28,30,0.08)', glass: 'rgba(255,253,248,0.78)', glassBorder: 'rgba(255,255,255,0.70)',
+      cardShadow: 'inset 0 1px 0 rgba(255,255,255,0.85), 0 4px 14px rgba(180,120,60,0.08)',
+      tagInk: '#B83A1A', tagBg: 'rgba(255,92,53,0.10)', eyebrow: '#B83A1A',
+      dots: 'rgba(28,28,30,0.16)', postOff: 'rgba(28,28,30,0.18)',
+      chipBanner: 'linear-gradient(135deg, #EDE9E2 0%, #D8D2C8 45%, #C9C2B8 100%)',
+      panel: '#FFFFFF', panelBorder: 'rgba(20,20,22,0.10)',
+      panelShadow: 'inset 0 1px 0 rgba(255,255,255,0.9), 0 4px 14px rgba(180,120,60,0.08)',
+      orbitAlpha: '0.5',
+      tagBorder: 'rgba(28,28,30,0.18)', tagText: '#5C5853',
+      chipOff: '#FFFFFF', chipOffLine: 'rgba(20,20,22,0.12)', chipOffInk: '#5C5853',
+      chipOn: 'rgba(255,92,53,0.14)', chipOnLine: 'rgba(200,64,30,0.55)', chipOnInk: '#1C1C1E',
+      chipOnShadow: '0 2px 8px rgba(255,92,53,0.14)', chipOffShadow: 'inset 0 1px 0 rgba(255,255,255,0.9)'
+    };
+    const s = this.state || {};
+
+    // All · School · Clubs filters the whole tab: Tonight and the grid.
+    const filter = s.filter || 'all';
+    const mkChip = (key) => {
+      const on = filter === key;
+      return {
+        pressed: on ? 'true' : 'false',
+        border: '1px solid ' + (on ? t.chipOnLine : t.chipOffLine),
+        bg: on ? t.chipOn : t.chipOff,
+        ink: on ? t.chipOnInk : t.chipOffInk,
+        weight: on ? 700 : 500,
+        shadow: on ? t.chipOnShadow : t.chipOffShadow,
+        pick: () => this.setState({ filter: key })
+      };
+    };
+    const chip = { all: mkChip('all'), school: mkChip('school'), clubs: mkChip('clubs') };
+    const showSchool = filter !== 'clubs';
+    const showClubs = filter !== 'school';
+
+    // The #1's Going is the panel's one RSVP button: 40px, coral-led (the
+    // live RsvpButton's active look when on, plus a check). A count only,
+    // never who; under 5 nothing shows. Also-tonight rows open the event
+    // card instead (same as the phone), so a club RSVP and its "You'll
+    // appear in the event chat." line only happen on that card.
+    const leadOn = !!s.goLead;
+    const leadN = 38 + (leadOn ? 1 : 0);
+    const go = {
+      lead: {
+        on: leadOn, pressed: leadOn ? 'true' : 'false', show: leadN >= 5, label: leadN + ' going',
+        border: leadOn ? '#FF5C35' : 'rgba(255,92,53,0.60)',
+        bg: leadOn ? (night ? 'rgba(255,92,53,0.28)' : 'rgba(255,92,53,0.20)') : (night ? 'rgba(255,92,53,0.12)' : 'rgba(255,92,53,0.08)'),
+        shadow: leadOn
+          ? (night ? 'inset 0 1px 0 rgba(255,255,255,0.22), 0 4px 14px rgba(255,92,53,0.28)' : '0 4px 14px rgba(255,92,53,0.22)')
+          : (night ? 'inset 0 1px 0 rgba(255,255,255,0.12)' : 'inset 0 1px 0 rgba(255,255,255,0.9)'),
+        ink: night ? '#FFFFFF' : '#1C1C1E',
+        toggle: () => this.setState({ goLead: !leadOn })
+      }
+    };
+
+    // My Calendar: November 2026 (Nov 1 is a Sunday), "today" is Sat Nov 7.
+    // Dots: an event the viewer went to (Nov 3) and the RSVP in the strip (Tue Nov 10).
+    const cells = [];
+    for (let i = 0; i < 42; i++) {
+      const other = i >= 30;
+      const n = other ? i - 29 : i + 1;
+      const today = !other && n === 7;
+      const dot = !other && (n === 3 || n === 10);
+      cells.push({
+        n,
+        label: (other ? 'December ' : 'November ') + n + ', 2026',
+        weight: today ? 800 : 600,
+        color: today ? t.paper : (other ? t.muted : t.ink),
+        bg: today ? t.ink : 'transparent',
+        opacity: other ? 0.35 : 1,
+        dot,
+        dotColor: today ? t.paper : '#FF5C35'
+      });
+    }
+    const weekdays = ['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((l) => ({ l }));
+    return {
+      night, day: !night, t, cells, weekdays, chip, go,
+      showSchool, showClubs, clubsOnly: filter === 'clubs',
+      listPad: showSchool ? '28px' : '0px',
+      listRule: showSchool ? '1px solid ' + t.hairline : '0 solid transparent'
+    };
+  }
+}
+</script>
+</body>
+</html>

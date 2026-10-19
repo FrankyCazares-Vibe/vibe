@@ -1,0 +1,400 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Tonight sheet, opened from the card</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,400;0,700;0,800;0,900;1,400&amp;family=DM+Sans:wght@300;400;500;600;700;800&amp;display=swap">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;border:0 solid}
+h1,h2,h3,h4,h5,h6{font-size:inherit;font-weight:inherit}
+ol,ul,menu{list-style:none}
+img,svg,video,canvas{display:block;vertical-align:middle}
+img,video{max-width:100%;height:auto}
+html{line-height:1.5;-webkit-text-size-adjust:100%}
+body{margin:0;font-family:"DM Sans",sans-serif;-webkit-font-smoothing:antialiased}
+button,input,textarea{font:inherit;color:inherit;letter-spacing:inherit;background-color:transparent;border:0 solid}
+button{cursor:pointer}
+a{color:inherit;text-decoration:none}
+a:hover{color:inherit}
+input::placeholder,textarea::placeholder{opacity:1;color:color-mix(in oklab, currentcolor 50%, transparent)}
+.vibe-no-scrollbar{scrollbar-width:none}
+.vibe-no-scrollbar::-webkit-scrollbar{display:none}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; position: relative; isolation: isolate; overflow: hidden; display: flex; flex-direction: column; background: {{t.page}}; color: {{t.ink}}; font-family: 'DM Sans', sans-serif">
+
+  <div aria-hidden="true" style="position: absolute; inset: 0; z-index: -1; overflow: hidden; pointer-events: none; background: {{t.page}}">
+    <sc-if value="{{night}}" hint-placeholder-val="{{true}}">
+      <div style="position: absolute; left: -48px; bottom: -48px; width: 560px; height: 480px; opacity: 0.94; background: radial-gradient(720px 620px at 48px calc(100% - 48px), rgba(255,92,53,0.42), rgba(255,92,53,0.10) 40%, transparent 68%)"></div>
+      <div style="position: absolute; right: -48px; top: -48px; width: 560px; height: 480px; opacity: 0.95; background: radial-gradient(560px 420px at calc(100% - 48px) 48px, rgba(255,92,53,0.20), transparent 60%)"></div>
+    </sc-if>
+    <sc-if value="{{day}}" hint-placeholder-val="{{false}}">
+      <div style="position: absolute; right: -48px; top: -48px; width: 560px; height: 480px; opacity: 0.94; background: radial-gradient(620px 520px at calc(100% - 48px) 48px, rgba(255,92,53,0.30), rgba(255,92,53,0.06) 45%, transparent 70%)"></div>
+      <div style="position: absolute; left: -48px; bottom: -48px; width: 560px; height: 480px; opacity: 0.95; background: radial-gradient(520px 420px at 48px calc(100% - 48px), rgba(255,92,53,0.16), transparent 65%)"></div>
+    </sc-if>
+  </div>
+
+  <div style="position: relative; z-index: 6; flex-shrink: 0">
+    <header style="position: relative; height: 64px; display: flex; align-items: center; gap: 14px; padding: 0 24px; background: #990000; box-shadow: 0 8px 24px rgba(80,5,15,0.25); overflow: hidden">
+      <div aria-hidden="true" style="width: 44px; height: 44px; flex-shrink: 0; border-radius: 12px; background: #EEEDEB; color: #990000; display: flex; align-items: center; justify-content: center; font-family: Fraunces, serif; font-weight: 900; font-size: 18px; letter-spacing: 0.03em; box-shadow: 0 4px 12px rgba(0,0,0,0.2)">IN</div>
+      <div style="display: flex; flex-direction: column; gap: 1px; min-width: 0">
+        <div style="display: flex; align-items: baseline; gap: 8px; min-width: 0">
+          <div style="min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: Fraunces, serif; font-weight: 800; font-size: 18px; color: #EEEDEB; letter-spacing: -0.01em; line-height: 1.1">Indianapolis</div>
+        </div>
+        <div style="min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; font-weight: 600; color: rgba(238,237,235,0.82); line-height: 1.2">IU + Purdue · one community</div>
+        <div style="min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; color: rgba(238,237,235,0.82); line-height: 1.2">6 at Indianapolis</div>
+      </div>
+      <div style="flex: 1"></div>
+      <div style="position: relative; align-self: stretch; display: flex; align-items: center; gap: 14px; flex-shrink: 0; margin-left: 12px; isolation: isolate">
+        <div aria-hidden="true" style="position: absolute; top: 0; bottom: 0; left: -33px; right: -24px; background: #CFB991; clip-path: polygon(16px 0, 100% 0, 100% 100%, 0 100%)"></div>
+        <div aria-hidden="true" style="position: absolute; top: 0; bottom: 0; left: -30px; right: -24px; background: #000000; box-shadow: inset 0 -1px 0 rgba(207,185,145,0.45); clip-path: polygon(16px 0, 100% 0, 100% 100%, 0 100%)"></div>
+        <button type="button" aria-label="Look around other campuses" aria-haspopup="dialog" style="display: inline-flex; align-items: center; justify-content: center; height: 44px; width: 44px; padding: 0; border-radius: 999px; position: relative; background: rgba(207,185,145,0.10); border: 1px solid rgba(207,185,145,0.34); color: #CFB991; flex-shrink: 0"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M3 12h18M12 3c2.5 2.6 3.8 5.6 3.8 9s-1.3 6.4-3.8 9c-2.5-2.6-3.8-5.6-3.8-9s1.3-6.4 3.8-9z"></path></svg></button>
+        <button type="button" aria-label="Search campus" style="display: inline-flex; align-items: center; justify-content: center; width: 38px; height: 38px; border-radius: 12px; position: relative; background: rgba(207,185,145,0.10); border: 1px solid rgba(207,185,145,0.34); color: #CFB991; flex-shrink: 0"><svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true"><circle cx="8" cy="8" r="5.2" stroke="currentColor" stroke-width="1.7"></circle><path d="M12 12l4 4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"></path></svg></button>
+      </div>
+    </header>
+  </div>
+
+  <div style="padding: 10px 0 4px; position: relative; z-index: 5; flex-shrink: 0">
+    <nav aria-label="Campus sections" class="vibe-no-scrollbar" style="display: flex; gap: 6px; padding: 0 16px 8px; overflow-x: auto; isolation: isolate">
+      <button type="button" aria-current="page" style="position: relative; z-index: 1; padding: 7px 14px; border-radius: 999px; border: 1px solid {{t.tabBorder}}; background: {{t.ink}}; color: {{t.paper}}; font-size: 13px; font-weight: 700; flex-shrink: 0">Feed</button>
+      <a href="P2_Events.dc.html" style="position: relative; padding: 7px 14px; border-radius: 999px; border: 1px solid {{t.tabBorder}}; background: {{t.paper70}}; color: {{t.ink2}}; font-size: 13px; font-weight: 700; line-height: 1.5; flex-shrink: 0">Events</a>
+      <button type="button" style="position: relative; padding: 7px 14px; border-radius: 999px; border: 1px solid {{t.tabBorder}}; background: {{t.paper70}}; color: {{t.ink2}}; font-size: 13px; font-weight: 700; flex-shrink: 0">Orgs</button>
+      <button type="button" style="position: relative; padding: 7px 14px; border-radius: 999px; border: 1px solid {{t.tabBorder}}; background: {{t.paper70}}; color: {{t.ink2}}; font-size: 13px; font-weight: 700; flex-shrink: 0">Map</button>
+    </nav>
+  </div>
+
+  <section style="padding: 12px 16px 96px; min-width: 0; display: flex; flex-direction: column; gap: 10px">
+    <!-- The tonight card (A's card, made generic). #1 = featured by the school, else the school event that
+         starts soonest and hasn't ended (one on now leads). Never ranked by popularity. Tapping opens the sheet. -->
+    <!-- One tap target (the stretched link). Same five lines in every state, so the card never changes height:
+         the reason for #1 sits at the right end of the first line ("Up next" / "Happening now" / "Featured by your school").
+         Tickets and Watch on ESPN+ live in the sheet only. -->
+    <section aria-labelledby="tonight-title" style="flex-shrink: 0; position: relative; display: grid; grid-template-columns: minmax(0, 1fr) 28px; column-gap: 8px; row-gap: 4px; align-items: center; padding: 12px 10px 12px 12px; border-radius: 18px; background: {{t.glass}}; border: 1px solid {{cardBorder}}; box-shadow: {{t.cardShadow}}; color: {{t.ink}}">
+      <a href="#" onClick="{{openSheet}}" aria-label="{{cardLabel}}" aria-haspopup="dialog" aria-expanded="{{sheetOpen}}" aria-controls="p2-tonight-sheet" style="position: absolute; inset: 0; z-index: 1; border-radius: 18px"></a>
+      <div style="grid-column: 1 / -1; display: flex; align-items: center; justify-content: space-between; gap: 8px; min-width: 0">
+        <h2 id="tonight-title" style="min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; font-weight: 800; line-height: 16px; color: {{t.tagInk}}">What’s the vibe tonight? · Sat, Nov 7</h2>
+        <span style="flex-shrink: 0; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; font-size: 10.5px; font-weight: 600; line-height: 16px; color: {{t.muted}}">
+          <sc-if value="{{lead.next}}" hint-placeholder-val="{{true}}">Up next</sc-if>
+          <sc-if value="{{lead.live}}" hint-placeholder-val="{{false}}"><span aria-hidden="true" style="width: 7px; height: 7px; border-radius: 50%; background: #FF5C35; box-shadow: 0 0 0 3px rgba(255,92,53,0.22)"></span><span style="color: {{t.ink2}}">Happening now</span></sc-if>
+          <sc-if value="{{lead.featured}}" hint-placeholder-val="{{false}}">Featured by your school</sc-if>
+        </span>
+      </div>
+      <div style="grid-column: 1; grid-row: 2; min-width: 0; display: flex; flex-direction: column">
+        <sc-if value="{{lead.isGame}}" hint-placeholder-val="{{true}}">
+          <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: Fraunces, serif; font-variation-settings: 'SOFT' 100; font-size: 18px; font-weight: 900; letter-spacing: -0.02em; line-height: 22px; color: {{t.ink}}">IU Indy <span style="font-style: italic; font-weight: 400; color: {{t.muted}}">vs</span> UT Martin</span>
+        </sc-if>
+        <sc-if value="{{lead.notGame}}" hint-placeholder-val="{{false}}">
+          <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: Fraunces, serif; font-variation-settings: 'SOFT' 100; font-size: 18px; font-weight: 900; letter-spacing: -0.02em; line-height: 22px; color: {{t.ink}}">{{lead.title}}</span>
+        </sc-if>
+        <span style="margin-top: 3px; display: flex; align-items: center; gap: 6px; min-width: 0; font-size: 12px; line-height: 18px; color: {{t.muted}}">
+          <span style="flex-shrink: 0; padding: 1px 7px; border-radius: 999px; border: 1px solid {{t.tagLine}}; font-size: 10.5px; font-weight: 700; letter-spacing: 0.02em; line-height: 14px; color: {{t.ink2}}">School event</span>
+          <span style="min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap">{{lead.byline}}</span>
+        </span>
+        <span style="margin-top: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12.5px; line-height: 17px; color: {{t.ink2}}"><span style="font-weight: 700; color: {{t.ink}}">{{lead.time}}</span>{{lead.restLine}}</span>
+        <span style="margin-top: 5px; font-size: 12px; font-weight: 600; line-height: 16px; color: {{t.muted}}">+{{moreCount}} more tonight</span>
+      </div>
+      <span aria-hidden="true" style="grid-column: 2; grid-row: 2; width: 28px; height: 28px; border-radius: 999px; border: 1px solid {{t.pillBorder}}; background: {{t.paper55}}; color: {{t.ink2}}; display: inline-flex; align-items: center; justify-content: center"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M6 3.5L10.5 8 6 12.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path></svg></span>
+    </section>
+
+    <div role="group" aria-label="Your events and trending tags" class="vibe-no-scrollbar" style="height: 40px; display: flex; align-items: center; gap: 8px; position: relative; overflow-x: auto; overflow-y: hidden; margin: 0 -16px; padding: 0 16px; background: repeating-linear-gradient(90deg, {{t.dots}} 0 2px, transparent 2px 8px) center / 100% 1px no-repeat; -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - 48px), transparent); mask-image: linear-gradient(90deg, #000 calc(100% - 48px), transparent)">
+      <span aria-hidden="true" style="flex-shrink: 0; align-self: stretch; display: inline-flex; align-items: center; padding-right: 6px; position: relative; z-index: 1; background: {{t.page}}; font-family: Fraunces, serif; font-style: italic; font-size: 16px; line-height: 1; color: {{t.tagInk}}">today.</span>
+      <div style="display: flex; align-items: center; flex-shrink: 0">
+        <div style="display: flex; align-items: center; gap: 8px; flex-shrink: 0; padding-right: 8px">
+          <button type="button" title="You're going" aria-label="Beginner Salsa Night, Tue, you're going" style="height: 30px; padding: 0 12px; border-radius: 999px; flex-shrink: 0; display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 700; line-height: 1; white-space: nowrap; background: {{t.glass}}; border: 1px solid {{t.glassBorder}}; color: {{t.ink}}; box-shadow: {{t.cardShadow}}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true" style="flex-shrink: 0"><path d="M20.5 14.5A9 9 0 1 1 15 3.5" stroke="#FF5C35" stroke-width="2.4" stroke-linecap="round"></path><circle cx="19" cy="18" r="3" fill="#FF5C35"></circle></svg><span style="max-width: 150px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap">Beginner Salsa Night</span><span style="font-size: 11px; font-weight: 600; color: {{t.muted}}">Tue</span></button>
+          <button type="button" title="9 people this week" aria-label="#fallinindy, 9 people this week" aria-pressed="false" style="height: 30px; padding: 0 12px; border-radius: 999px; flex-shrink: 0; display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 700; line-height: 1; white-space: nowrap; background: {{t.tagBg}}; border: 1px solid rgba(255,92,53,0.22); color: {{t.tagInk}}">#fallinindy<span style="font-weight: 500; opacity: 0.7">9</span></button>
+        </div>
+      </div>
+    </div>
+
+    <div style="width: 100%; background: {{t.glass}}; border: 1px solid {{t.glassBorder}}; border-radius: 18px; padding: 14px; box-shadow: {{t.cardShadow}}; position: relative; overflow: hidden; flex-shrink: 0">
+      <div style="display: flex; align-items: center; gap: 10px">
+        <a href="#" aria-hidden="true" tabindex="-1" style="display: flex; flex-shrink: 0"><span style="width: 36px; height: 36px; border-radius: 999px; background: #FFD3C2; display: flex; align-items: center; justify-content: center; color: #1C1C1E; font-family: Fraunces, serif; font-weight: 800; font-size: 13px; flex-shrink: 0; border: 1px solid {{t.glassBorder60}}">MR</span></a>
+        <div style="flex: 1; min-width: 0">
+          <div style="font-family: Fraunces, serif; font-size: 14px; font-weight: 800; color: {{t.ink}}; white-space: nowrap; overflow: hidden; text-overflow: ellipsis"><a href="#">Maya R.</a></div>
+          <div style="font-size: 11.5px; color: {{t.muted}}; font-weight: 600; letter-spacing: 0.02em">@maya_r · 2h ago · Salsa Club</div>
+        </div>
+        <button type="button" aria-label="More actions" style="width: 30px; height: 30px; border-radius: 999px; border: 1px solid {{t.pillBorder}}; background: {{t.paper62}}; color: {{t.ink2}}; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0"><svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><circle cx="3" cy="8" r="1.6"></circle><circle cx="8" cy="8" r="1.6"></circle><circle cx="13" cy="8" r="1.6"></circle></svg></button>
+      </div>
+      <p style="margin: 10px 0 0; font-size: 14px; color: {{t.ink}}; line-height: 1.45; display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; white-space: pre-wrap; word-break: break-word">Beginner lesson is back Tuesday at 7 in the Campus Center. No partner needed, just wear shoes you can turn in. #salsa</p>
+      <div style="margin-top: 10px; display: flex; flex-wrap: wrap; gap: 6px"><button type="button" aria-label="Show posts tagged #salsa" style="padding: 3px 9px; border-radius: 999px; border: none; background: {{t.tagBg}}; color: {{t.tagInk}}; font-size: 11.5px; font-weight: 700">#salsa</button></div>
+      <div style="margin-top: 10px; display: flex; align-items: center; gap: 14px; font-size: 12px; color: {{t.muted}}; font-weight: 700; letter-spacing: 0.02em">
+        <button type="button" aria-label="Unlike" aria-pressed="true" style="display: inline-flex; align-items: center; gap: 6px; padding: 4px 8px; border-radius: 999px; border: 1px solid {{t.pillBorder}}; font-weight: 700; background: rgba(255,92,53,0.10); color: {{t.tagInk}}"><svg width="14" height="14" viewBox="0 0 20 20" fill="#FF5C35" stroke="#FF5C35" stroke-width="1.8" aria-hidden="true"><path d="M10 17s-6-3.6-6-8.2A3.8 3.8 0 0 1 7.8 5c1.3 0 2.4.65 2.95 1.65A3.4 3.4 0 0 1 13.7 5 3.8 3.8 0 0 1 17.5 8.8C17.5 13.4 11.5 17 11.5 17z" stroke-linecap="round" stroke-linejoin="round"></path></svg>14</button>
+        <button type="button" aria-label="Comment" style="display: inline-flex; align-items: center; gap: 6px; padding: 4px 8px; border-radius: 999px; border: 1px solid {{t.pillBorder}}; font-weight: 700; background: {{t.paper55}}; color: {{t.ink2}}"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 4a1.5 1.5 0 0 1 1.5-1.5h8a1.5 1.5 0 0 1 1.5 1.5v6A1.5 1.5 0 0 1 12 11.5H5.6L2.5 14V4z"></path></svg>3</button>
+        <button type="button" aria-label="Repost" aria-pressed="false" style="display: inline-flex; align-items: center; gap: 6px; padding: 4px 8px; border-radius: 999px; border: 1px solid {{t.pillBorder}}; font-weight: 700; background: {{t.paper55}}; color: {{t.ink2}}"><svg width="14" height="14" viewBox="0 0 22 22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9V7a2 2 0 0 1 2-2h10l-2.5-2.5"></path><path d="M18 13v2a2 2 0 0 1-2 2H6l2.5 2.5"></path></svg>2</button>
+        <span style="display: inline-flex; align-items: center; gap: 4px; color: {{t.muted}}"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M1.5 8s2.5-4.5 6.5-4.5S14.5 8 14.5 8s-2.5 4.5-6.5 4.5S1.5 8 1.5 8z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"></path><circle cx="8" cy="8" r="2" stroke="currentColor" stroke-width="1.4"></circle></svg>86</span>
+        <button type="button" aria-label="Save" aria-pressed="false" style="margin-left: auto; display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; border-radius: 999px; border: 1px solid {{t.pillBorder}}; background: {{t.paper55}}; color: {{t.ink2}}"><svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 3.5h10v14L10 14l-5 3.5z"></path></svg></button>
+      </div>
+    </div>
+
+    <div style="width: 100%; background: {{t.glass}}; border: 1px solid {{t.glassBorder}}; border-radius: 18px; padding: 14px; box-shadow: {{t.cardShadow}}; position: relative; overflow: hidden; flex-shrink: 0">
+      <div style="display: flex; align-items: center; gap: 10px">
+        <a href="#" aria-hidden="true" tabindex="-1" style="display: flex; flex-shrink: 0"><span style="width: 36px; height: 36px; border-radius: 999px; background: #FFD3C2; display: flex; align-items: center; justify-content: center; color: #1C1C1E; font-family: Fraunces, serif; font-weight: 800; font-size: 13px; flex-shrink: 0; border: 1px solid {{t.glassBorder60}}">PS</span></a>
+        <div style="flex: 1; min-width: 0">
+          <div style="font-family: Fraunces, serif; font-size: 14px; font-weight: 800; color: {{t.ink}}; white-space: nowrap; overflow: hidden; text-overflow: ellipsis"><a href="#">Priya S.</a></div>
+          <div style="font-size: 11.5px; color: {{t.muted}}; font-weight: 600; letter-spacing: 0.02em">@priya_s · 5h ago</div>
+        </div>
+        <button type="button" aria-label="More actions" style="width: 30px; height: 30px; border-radius: 999px; border: 1px solid {{t.pillBorder}}; background: {{t.paper62}}; color: {{t.ink2}}; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0"><svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><circle cx="3" cy="8" r="1.6"></circle><circle cx="8" cy="8" r="1.6"></circle><circle cx="13" cy="8" r="1.6"></circle></svg></button>
+      </div>
+      <p style="margin: 10px 0 0; font-size: 14px; color: {{t.ink}}; line-height: 1.45; display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; white-space: pre-wrap; word-break: break-word">The canal at sunset is unreal right now, every tree on the walk is orange. Worth the long way back from class. #fallinindy</p>
+      <div style="margin-top: 10px; display: flex; flex-wrap: wrap; gap: 6px"><button type="button" aria-label="Show posts tagged #fallinindy" style="padding: 3px 9px; border-radius: 999px; border: none; background: {{t.tagBg}}; color: {{t.tagInk}}; font-size: 11.5px; font-weight: 700">#fallinindy</button></div>
+      <div style="margin-top: 10px; display: flex; align-items: center; gap: 14px; font-size: 12px; color: {{t.muted}}; font-weight: 700; letter-spacing: 0.02em">
+        <button type="button" aria-label="Like" aria-pressed="false" style="display: inline-flex; align-items: center; gap: 6px; padding: 4px 8px; border-radius: 999px; border: 1px solid {{t.pillBorder}}; font-weight: 700; background: {{t.paper55}}; color: {{t.ink2}}"><svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M10 17s-6-3.6-6-8.2A3.8 3.8 0 0 1 7.8 5c1.3 0 2.4.65 2.95 1.65A3.4 3.4 0 0 1 13.7 5 3.8 3.8 0 0 1 17.5 8.8C17.5 13.4 11.5 17 11.5 17z" stroke-linecap="round" stroke-linejoin="round"></path></svg>9</button>
+        <button type="button" aria-label="Comment" style="display: inline-flex; align-items: center; gap: 6px; padding: 4px 8px; border-radius: 999px; border: 1px solid {{t.pillBorder}}; font-weight: 700; background: {{t.paper55}}; color: {{t.ink2}}"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 4a1.5 1.5 0 0 1 1.5-1.5h8a1.5 1.5 0 0 1 1.5 1.5v6A1.5 1.5 0 0 1 12 11.5H5.6L2.5 14V4z"></path></svg>1</button>
+        <button type="button" aria-label="Repost" aria-pressed="false" style="display: inline-flex; align-items: center; gap: 6px; padding: 4px 8px; border-radius: 999px; border: 1px solid {{t.pillBorder}}; font-weight: 700; background: {{t.paper55}}; color: {{t.ink2}}"><svg width="14" height="14" viewBox="0 0 22 22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9V7a2 2 0 0 1 2-2h10l-2.5-2.5"></path><path d="M18 13v2a2 2 0 0 1-2 2H6l2.5 2.5"></path></svg>0</button>
+        <span style="display: inline-flex; align-items: center; gap: 4px; color: {{t.muted}}"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M1.5 8s2.5-4.5 6.5-4.5S14.5 8 14.5 8s-2.5 4.5-6.5 4.5S1.5 8 1.5 8z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"></path><circle cx="8" cy="8" r="2" stroke="currentColor" stroke-width="1.4"></circle></svg>40</span>
+        <button type="button" aria-label="Save" aria-pressed="false" style="margin-left: auto; display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; border-radius: 999px; border: 1px solid {{t.pillBorder}}; background: {{t.paper55}}; color: {{t.ink2}}"><svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 3.5h10v14L10 14l-5 3.5z"></path></svg></button>
+      </div>
+    </div>
+
+    <div style="width: 100%; background: {{t.glass}}; border: 1px solid {{t.glassBorder}}; border-radius: 18px; padding: 14px; box-shadow: {{t.cardShadow}}; position: relative; overflow: hidden; flex-shrink: 0">
+      <div style="display: flex; align-items: center; gap: 10px">
+        <a href="#" aria-hidden="true" tabindex="-1" style="display: flex; flex-shrink: 0"><span style="width: 36px; height: 36px; border-radius: 999px; background: #FFD3C2; display: flex; align-items: center; justify-content: center; color: #1C1C1E; font-family: Fraunces, serif; font-weight: 800; font-size: 13px; flex-shrink: 0; border: 1px solid {{t.glassBorder60}}">DO</span></a>
+        <div style="flex: 1; min-width: 0">
+          <div style="font-family: Fraunces, serif; font-size: 14px; font-weight: 800; color: {{t.ink}}; white-space: nowrap; overflow: hidden; text-overflow: ellipsis"><a href="#">Dev O.</a></div>
+          <div style="font-size: 11.5px; color: {{t.muted}}; font-weight: 600; letter-spacing: 0.02em">@dev_o · 1d ago · Film Society</div>
+        </div>
+        <button type="button" aria-label="More actions" style="width: 30px; height: 30px; border-radius: 999px; border: 1px solid {{t.pillBorder}}; background: {{t.paper62}}; color: {{t.ink2}}; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0"><svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><circle cx="3" cy="8" r="1.6"></circle><circle cx="8" cy="8" r="1.6"></circle><circle cx="13" cy="8" r="1.6"></circle></svg></button>
+      </div>
+      <p style="margin: 10px 0 0; font-size: 14px; color: {{t.ink}}; line-height: 1.45; display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; white-space: pre-wrap; word-break: break-word">Thursday’s screening moves to Nov 19, the projector needs a new bulb. Same room, same free popcorn.</p>
+      <div style="margin-top: 10px; display: flex; align-items: center; gap: 14px; font-size: 12px; color: {{t.muted}}; font-weight: 700; letter-spacing: 0.02em">
+        <button type="button" aria-label="Like" aria-pressed="false" style="display: inline-flex; align-items: center; gap: 6px; padding: 4px 8px; border-radius: 999px; border: 1px solid {{t.pillBorder}}; font-weight: 700; background: {{t.paper55}}; color: {{t.ink2}}"><svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M10 17s-6-3.6-6-8.2A3.8 3.8 0 0 1 7.8 5c1.3 0 2.4.65 2.95 1.65A3.4 3.4 0 0 1 13.7 5 3.8 3.8 0 0 1 17.5 8.8C17.5 13.4 11.5 17 11.5 17z" stroke-linecap="round" stroke-linejoin="round"></path></svg>6</button>
+        <button type="button" aria-label="Comment" style="display: inline-flex; align-items: center; gap: 6px; padding: 4px 8px; border-radius: 999px; border: 1px solid {{t.pillBorder}}; font-weight: 700; background: {{t.paper55}}; color: {{t.ink2}}"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 4a1.5 1.5 0 0 1 1.5-1.5h8a1.5 1.5 0 0 1 1.5 1.5v6A1.5 1.5 0 0 1 12 11.5H5.6L2.5 14V4z"></path></svg>0</button>
+        <button type="button" aria-label="Repost" aria-pressed="false" style="display: inline-flex; align-items: center; gap: 6px; padding: 4px 8px; border-radius: 999px; border: 1px solid {{t.pillBorder}}; font-weight: 700; background: {{t.paper55}}; color: {{t.ink2}}"><svg width="14" height="14" viewBox="0 0 22 22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9V7a2 2 0 0 1 2-2h10l-2.5-2.5"></path><path d="M18 13v2a2 2 0 0 1-2 2H6l2.5 2.5"></path></svg>1</button>
+        <span style="display: inline-flex; align-items: center; gap: 4px; color: {{t.muted}}"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M1.5 8s2.5-4.5 6.5-4.5S14.5 8 14.5 8s-2.5 4.5-6.5 4.5S1.5 8 1.5 8z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"></path><circle cx="8" cy="8" r="2" stroke="currentColor" stroke-width="1.4"></circle></svg>52</span>
+        <button type="button" aria-label="Save" aria-pressed="false" style="margin-left: auto; display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; border-radius: 999px; border: 1px solid {{t.pillBorder}}; background: {{t.paper55}}; color: {{t.ink2}}"><svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 3.5h10v14L10 14l-5 3.5z"></path></svg></button>
+      </div>
+    </div>
+  </section>
+
+  <button type="button" aria-label="New post" style="position: absolute; right: 18px; bottom: 78px; width: 56px; height: 56px; border-radius: 999px; border: none; background: linear-gradient(135deg,#FF7A4D 0%,#FF5C35 60%,#E04A26 100%); color: #160A06; box-shadow: 0 12px 30px rgba(255,92,53,0.42); display: inline-flex; align-items: center; justify-content: center; z-index: 50"><svg width="22" height="22" viewBox="0 0 22 22" fill="none" aria-hidden="true"><path d="M11 4v14M4 11h14" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"></path></svg></button>
+
+  <nav aria-label="Primary" style="position: absolute; bottom: 0; left: 0; right: 0; z-index: 60; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); background: {{t.tabbarBg}}; -webkit-backdrop-filter: saturate(160%) blur(14px); backdrop-filter: saturate(160%) blur(14px); border-top: 1px solid {{t.hairline}}">
+    <a href="#" aria-current="page" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; padding: 10px 4px 8px; font-size: 10px; font-weight: 600; position: relative; color: {{t.ink}}"><span aria-hidden="true" style="position: absolute; top: 0; left: 50%; transform: translateX(-50%); width: 24px; height: 2.5px; border-radius: 0 0 3px 3px; background: #FF5C35"></span><span style="width: 22px; height: 22px; display: inline-flex; align-items: center; justify-content: center"><svg width="22" height="22" viewBox="0 0 22 22" fill="none" aria-hidden="true"><path d="M11 2L20 6.5V9H2V6.5L11 2Z" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linejoin="round"></path><rect x="3" y="9" width="3.2" height="8.2" stroke="currentColor" stroke-width="1.5" fill="none"></rect><rect x="9.4" y="9" width="3.2" height="8.2" stroke="currentColor" stroke-width="1.5" fill="none"></rect><rect x="15.8" y="9" width="3.2" height="8.2" stroke="currentColor" stroke-width="1.5" fill="none"></rect><path d="M2 17.2h18" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"></path></svg></span>Campus</a>
+    <a href="#" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; padding: 10px 4px 8px; font-size: 10px; font-weight: 600; position: relative; color: {{t.muted}}"><span style="width: 22px; height: 22px; display: inline-flex; align-items: center; justify-content: center"><svg width="22" height="22" viewBox="0 0 22 22" fill="none" aria-hidden="true"><circle cx="11" cy="6" r="3.2" stroke="currentColor" stroke-width="1.6"></circle><circle cx="4" cy="16" r="2.6" stroke="currentColor" stroke-width="1.6"></circle><circle cx="18" cy="16" r="2.6" stroke="currentColor" stroke-width="1.6"></circle><path d="M7.5 7.5L4.5 13.5M14.5 7.5L17.5 13.5M7 16h8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"></path></svg></span>Network</a>
+    <a href="#" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; padding: 10px 4px 8px; font-size: 10px; font-weight: 600; position: relative; color: {{t.muted}}"><span style="width: 22px; height: 22px; display: inline-flex; align-items: center; justify-content: center"><span aria-hidden="true" style="display: inline-flex; width: 22px; height: 22px; align-items: center; justify-content: center"><span style="width: 12px; height: 12px; border-radius: 50%; background: #FF5C35; box-shadow: 0 0 8px rgba(255,92,53,0.55)"></span></span></span>otto</a>
+    <a href="#" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; padding: 10px 4px 8px; font-size: 10px; font-weight: 600; position: relative; color: {{t.muted}}"><span style="width: 22px; height: 22px; display: inline-flex; align-items: center; justify-content: center"><svg width="22" height="22" viewBox="0 0 22 22" fill="none" aria-hidden="true"><path d="M2 4A1.6 1.6 0 0 1 3.6 2.4h14.8A1.6 1.6 0 0 1 20 4v10A1.6 1.6 0 0 1 18.4 15.6H6.5L2 19V4z" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linejoin="round"></path></svg></span>Messages</a>
+    <a href="#" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; padding: 10px 4px 8px; font-size: 10px; font-weight: 600; position: relative; color: {{t.muted}}"><span style="width: 22px; height: 22px; display: inline-flex; align-items: center; justify-content: center"><svg width="22" height="22" viewBox="0 0 22 22" fill="none" aria-hidden="true"><circle cx="11" cy="7.5" r="3.4" stroke="currentColor" stroke-width="1.6"></circle><path d="M3.5 19c.7-3.6 3.8-5.8 7.5-5.8s6.8 2.2 7.5 5.8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"></path></svg></span>Profile</a>
+  </nav>
+
+  <!-- C's sheet, now opened from the tonight card (drawn open; the card stays visible under the scrim).
+       Order is the card's: #1, then Also tonight (school events, then club events), then the arena week. No chats. -->
+  <sc-if value="{{sheetOpen}}" hint-placeholder-val="{{true}}">
+    <div aria-hidden="true" onClick="{{closeSheet}}" style="position: absolute; inset: 0; z-index: 70; background: {{t.scrim}}"></div>
+    <section id="p2-tonight-sheet" role="dialog" aria-modal="true" aria-labelledby="p2-sheet-title" style="position: absolute; left: 0; right: 0; bottom: 0; z-index: 71; height: {{sheetH}}; display: flex; flex-direction: column; padding: 8px 20px 0; background: {{t.sheet}}; border: 1px solid {{t.sheetBorder}}; border-bottom: none; border-radius: 24px 24px 0 0; box-shadow: {{t.sheetShadow}}; overflow: hidden">
+      <!-- The grabber is also a button, so the sheet can grow without a drag (Half <-> Full). -->
+      <button type="button" onClick="{{toggleDetent}}" aria-label="{{detentLabel}}" aria-expanded="{{fullStr}}" aria-controls="p2-tonight-sheet" style="position: relative; z-index: 2; align-self: center; flex-shrink: 0; width: 96px; height: 44px; margin: -8px 0 -31px; padding-top: 8px; display: flex; justify-content: center; align-items: flex-start; border-radius: 12px"><span aria-hidden="true" style="width: 36px; height: 5px; border-radius: 999px; background: {{t.grabber}}"></span></button>
+      <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 0 -10px 0 0">
+        <div style="font-family: Fraunces, serif; font-variation-settings: 'SOFT' 100; font-size: 11px; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase; color: {{t.tagInk}}">Tonight · Sat, Nov 7</div>
+        <button type="button" aria-label="Close" onClick="{{closeSheet}}" style="width: 44px; height: 44px; border-radius: 999px; display: inline-flex; align-items: center; justify-content: center; color: {{t.ink2}}; flex-shrink: 0"><span style="width: 30px; height: 30px; border-radius: 999px; border: 1px solid {{t.pillBorder}}; background: {{t.paper62}}; display: inline-flex; align-items: center; justify-content: center"><svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M2.5 2.5l7 7M9.5 2.5l-7 7" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"></path></svg></span></button>
+      </div>
+
+      <div class="vibe-no-scrollbar" style="flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; margin: 0 -20px; padding: 0 20px 18px">
+      <div style="flex-shrink: 0; display: flex; flex-direction: column; gap: 7px">
+        <!-- Why this is #1, in the same words as the card: Up next / Happening now / Featured by your school. -->
+        <p style="display: flex; align-items: center; gap: 6px; font-size: 11.5px; font-weight: 600; line-height: 16px; color: {{t.muted}}">
+          <sc-if value="{{lead.next}}" hint-placeholder-val="{{true}}">Up next</sc-if>
+          <sc-if value="{{lead.live}}" hint-placeholder-val="{{false}}"><span aria-hidden="true" style="width: 7px; height: 7px; border-radius: 50%; background: #FF5C35; box-shadow: 0 0 0 3px rgba(255,92,53,0.22)"></span><span style="color: {{t.ink2}}">Happening now</span></sc-if>
+          <sc-if value="{{lead.featured}}" hint-placeholder-val="{{false}}">Featured by your school</sc-if>
+        </p>
+        <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: -3px">
+          <span style="display: flex; align-items: center; gap: 6px; min-width: 0; font-size: 12px; line-height: 16px; color: {{t.muted}}">
+            <span style="flex-shrink: 0; padding: 1px 7px; border-radius: 999px; border: 1px solid {{t.tagLine}}; font-size: 10.5px; font-weight: 700; letter-spacing: 0.02em; line-height: 14px; color: {{t.ink2}}">School event</span>
+            <span style="min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap">{{lead.byline}}</span>
+          </span>
+          <span style="flex-shrink: 0; font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 999px; background: {{t.pill}}; color: {{t.ink}}; white-space: nowrap">{{leadGoingLabel}}</span>
+        </div>
+        <sc-if value="{{lead.isGame}}" hint-placeholder-val="{{true}}">
+          <h2 id="p2-sheet-title" style="font-family: Fraunces, serif; font-variation-settings: 'SOFT' 100; font-size: 26px; font-weight: 900; line-height: 1.1; letter-spacing: -0.02em; color: {{t.ink}}; text-wrap: balance">IU Indy <span style="font-style: italic; font-weight: 400; color: {{t.muted}}">vs</span> UT Martin</h2>
+        </sc-if>
+        <sc-if value="{{leadNotGame}}" hint-placeholder-val="{{false}}">
+          <h2 id="p2-sheet-title" style="font-family: Fraunces, serif; font-variation-settings: 'SOFT' 100; font-size: 26px; font-weight: 900; line-height: 1.1; letter-spacing: -0.02em; color: {{t.ink}}; text-wrap: balance">{{lead.title}}</h2>
+        </sc-if>
+        <sc-if value="{{lead.hasBlurb}}" hint-placeholder-val="{{false}}">
+          <span style="margin-top: -3px; font-size: 13px; line-height: 1.4; color: {{t.muted}}">{{lead.blurb}}</span>
+        </sc-if>
+        <div style="display: flex; flex-wrap: wrap; align-items: center; column-gap: 14px; row-gap: 4px; font-size: 13.5px; line-height: 1.4; color: {{t.ink2}}">
+          <span style="display: inline-flex; align-items: center; gap: 6px"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true"><circle cx="8" cy="8" r="6.2" stroke="currentColor" stroke-width="1.4"></circle><path d="M8 4.6V8l2.4 1.6" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"></path></svg><span><span style="font-weight: 700; color: {{t.ink}}">{{lead.time}}</span>{{leadTimeTail}}</span></span>
+          <span style="display: inline-flex; align-items: center; gap: 6px"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M8 14.5s-4.8-4.3-4.8-8A4.8 4.8 0 0 1 12.8 6.5c0 3.7-4.8 8-4.8 8z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"></path><circle cx="8" cy="6.5" r="1.7" stroke="currentColor" stroke-width="1.4"></circle></svg>{{lead.place}}</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 6px; margin-top: 2px">
+          <button type="button" aria-pressed="{{going}}" onClick="{{toggleGoing}}" style="height: 44px; padding: 0 18px; border-radius: 10px; display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 700; color: {{t.ink}}; background: {{goingBtn.bg}}; border: 1px solid {{goingBtn.border}}; box-shadow: {{goingBtn.shadow}}"><sc-if value="{{going}}" hint-placeholder-val="{{false}}"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M3.2 8.4l3 3 6.6-6.8" stroke="#FF5C35" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg></sc-if>Going</button>
+          <sc-if value="{{lead.isGame}}" hint-placeholder-val="{{true}}">
+            <a href="#" style="height: 44px; padding: 0 10px; display: inline-flex; align-items: center; gap: 4px; font-size: 13px; font-weight: 700; color: {{t.tagInk}}">Tickets<svg width="11" height="11" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M4 2.5h5.5V8M9.5 2.5L2.5 9.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path></svg></a>
+            <a href="#" style="height: 44px; padding: 0 10px; display: inline-flex; align-items: center; gap: 4px; font-size: 13px; font-weight: 700; color: {{t.tagInk}}">Watch on ESPN+<svg width="11" height="11" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M4 2.5h5.5V8M9.5 2.5L2.5 9.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path></svg></a>
+          </sc-if>
+        </div>
+        <!-- The rule, said once (D2's line). -->
+        <p style="display: flex; align-items: flex-start; gap: 7px; font-size: 12px; line-height: 17px; color: {{t.muted}}"><svg width="13" height="13" viewBox="0 0 14 14" fill="none" aria-hidden="true" style="flex-shrink: 0; margin-top: 2px"><circle cx="7" cy="7" r="5.6" stroke="currentColor" stroke-width="1.3"></circle><path d="M7 6.3v3.4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"></path><circle cx="7" cy="4.4" r="0.8" fill="currentColor"></circle></svg><span>
+          <sc-if value="{{lead.next}}" hint-placeholder-val="{{true}}">First because it starts soonest. Your school can feature one event a day instead.</sc-if>
+          <sc-if value="{{lead.live}}" hint-placeholder-val="{{false}}">First because it’s on right now. Your school can feature one event a day instead.</sc-if>
+          <sc-if value="{{lead.featured}}" hint-placeholder-val="{{false}}">Your school picked this for today, one a day. Never paid, never ranked by popularity.</sc-if>
+        </span></p>
+      </div>
+      <div aria-hidden="true" style="height: 1px; background: {{t.hairline}}; margin: 12px 0 2px; flex-shrink: 0"></div>
+      <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-right: -10px">
+        <h3 style="font-size: 11px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: {{t.muted}}">Also tonight</h3>
+        <a href="P2_Events.dc.html" style="min-height: 44px; padding: 0 10px; display: inline-flex; align-items: center; gap: 3px; font-size: 12px; font-weight: 700; color: {{t.tagInk}}">All in Events<svg width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M6 3.5L10.5 8 6 12.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path></svg></a>
+      </div>
+      <ul aria-label="Also tonight, school events" style="display: flex; flex-direction: column; margin: 0 -10px">
+        <sc-for list="{{schoolRest}}" as="r" hint-placeholder-count="2">
+          <li><a href="#" style="display: flex; align-items: flex-start; gap: 10px; padding: 5px 10px; border-radius: 14px; min-height: 44px">
+            <span style="flex: 0 0 64px; display: flex; flex-direction: column; line-height: 19px; white-space: nowrap"><span style="font-size: 12.5px; font-weight: 700; color: {{t.ink}}">{{r.time}}</span><span style="font-size: 10.5px; font-weight: 600; line-height: 13px; color: {{t.muted}}">{{r.end}}</span></span>
+            <span style="flex: 1; min-width: 0; display: flex; flex-direction: column">
+              <span style="font-size: 13.5px; font-weight: 700; line-height: 19px; text-wrap: pretty; color: {{t.ink}}"><sc-if value="{{r.isGame}}" hint-placeholder-val="{{false}}">{{r.home}} <span style="font-style: italic; font-weight: 400; color: {{t.muted}}">vs</span> {{r.away}}</sc-if><sc-if value="{{r.notGame}}" hint-placeholder-val="{{true}}">{{r.title}}</sc-if></span>
+              <span style="margin-top: 2px; display: flex; align-items: center; gap: 6px; min-width: 0; font-size: 12px; line-height: 16px; color: {{t.muted}}"><span style="flex-shrink: 0; padding: 0 6px; border-radius: 999px; border: 1px solid {{t.tagLine}}; font-size: 10px; font-weight: 700; letter-spacing: 0.02em; line-height: 14px; color: {{t.ink2}}">School event</span><span style="min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap">{{r.byline}}</span></span>
+              <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; line-height: 17px; color: {{t.muted}}">{{r.placeLine}}</span>
+            </span>
+          </a></li>
+        </sc-for>
+      </ul>
+      <h3 style="margin-top: 6px; font-size: 11px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; line-height: 24px; color: {{t.muted}}">Also tonight from clubs</h3>
+      <ul aria-label="Also tonight from clubs" style="display: flex; flex-direction: column; margin: 0 -10px">
+        <sc-for list="{{clubRows}}" as="r" hint-placeholder-count="2">
+          <li><a href="#" style="display: flex; align-items: flex-start; gap: 10px; padding: 5px 10px; border-radius: 14px; min-height: 44px">
+            <span style="flex: 0 0 64px; font-size: 12.5px; font-weight: 700; line-height: 19px; color: {{t.ink}}">{{r.time}}</span>
+            <span style="flex: 1; min-width: 0; display: flex; flex-direction: column">
+              <span style="font-size: 13.5px; font-weight: 700; line-height: 19px; text-wrap: pretty; color: {{t.ink}}">{{r.title}}</span>
+              <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; line-height: 17px; color: {{t.muted}}">{{r.clubLine}}</span>
+            </span>
+          </a></li>
+        </sc-for>
+      </ul>
+
+      <div aria-hidden="true" style="height: 1px; background: {{t.hairline}}; margin: 10px 0 10px; flex-shrink: 0"></div>
+      <div style="display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; column-gap: 8px; margin-bottom: 6px">
+        <h3 style="font-size: 11px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; line-height: 24px; color: {{t.muted}}">This week at the arena</h3>
+        <span style="font-size: 12px; font-weight: 600; line-height: 24px; color: {{t.muted}}">IU Indy home games · Athletics</span>
+      </div>
+      <ol style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px">
+        <li><a href="#" aria-label="Thursday, Nov 5: women’s basketball, IU Indy vs SIUE, final" style="display: flex; flex-direction: column; gap: 1px; padding: 8px 10px; border-radius: 14px; background: transparent; border: 1px solid transparent">
+          <span style="display: flex; justify-content: space-between; gap: 6px; font-size: 10.5px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; line-height: 15px; color: {{t.muted}}"><span>Thu 5</span><span>Final</span></span>
+          <span style="font-size: 13px; font-weight: 600; line-height: 18px; color: {{t.muted}}">Women’s basketball</span>
+          <span style="font-size: 12px; line-height: 16px; color: {{t.muted}}">vs SIUE</span>
+        </a></li>
+        <li><a href="#" aria-label="Friday, Nov 6: volleyball, home match, final" style="display: flex; flex-direction: column; gap: 1px; padding: 8px 10px; border-radius: 14px; background: transparent; border: 1px solid transparent">
+          <span style="display: flex; justify-content: space-between; gap: 6px; font-size: 10.5px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; line-height: 15px; color: {{t.muted}}"><span>Fri 6</span><span>Final</span></span>
+          <span style="font-size: 13px; font-weight: 600; line-height: 18px; color: {{t.muted}}">Volleyball</span>
+          <span style="font-size: 12px; line-height: 16px; color: {{t.muted}}">Home match</span>
+        </a></li>
+        <li><a href="#" aria-current="date" aria-label="Tonight, Saturday, Nov 7: men’s basketball, IU Indy vs UT Martin, 5:00 PM" style="display: flex; flex-direction: column; gap: 1px; padding: 8px 10px; border-radius: 14px; background: {{t.tagBg}}; border: 1px solid {{t.tonightLine}}">
+          <span style="display: flex; justify-content: space-between; gap: 6px; font-size: 10.5px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; line-height: 15px; color: {{t.tagInk}}"><span>Sat 7</span><span>Tonight 5:00</span></span>
+          <span style="font-size: 13px; font-weight: 700; line-height: 18px; color: {{t.ink}}">Men’s basketball</span>
+          <span style="font-size: 12px; line-height: 16px; color: {{t.ink2}}">vs UT Martin</span>
+        </a></li>
+        <li><a href="#" aria-label="Wednesday, Nov 11: men’s basketball, IU Indy vs Southern Indiana, 6:30 PM" style="display: flex; flex-direction: column; gap: 1px; padding: 8px 10px; border-radius: 14px; background: {{t.tile}}; border: 1px solid {{t.tileLine}}">
+          <span style="display: flex; justify-content: space-between; gap: 6px; font-size: 10.5px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; line-height: 15px; color: {{t.muted}}"><span>Wed 11</span><span style="color: {{t.ink2}}">6:30 PM</span></span>
+          <span style="font-size: 13px; font-weight: 700; line-height: 18px; color: {{t.ink}}">Men’s basketball</span>
+          <span style="font-size: 12px; line-height: 16px; color: {{t.ink2}}">vs Southern Indiana</span>
+        </a></li>
+      </ol>
+      </div>
+      <sc-if value="{{half}}" hint-placeholder-val="{{true}}">
+        <div aria-hidden="true" style="position: absolute; left: 0; right: 0; bottom: 0; height: 40px; pointer-events: none; background: linear-gradient(180deg, {{t.sheet0}}, {{t.sheet}})"></div>
+      </sc-if>
+    </section>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"night":{"editor":"boolean","default":true},"lead":{"editor":"enum","options":["What’s next","Happening now","Featured by your school"],"default":"What’s next","section":"Who leads tonight (set it the same on P2_Card, P2_Sheet and P2_Events)"},"sheet":{"editor":"enum","options":["Half","Full"],"default":"Half","section":"Sheet height"},"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const night = this.props.night ?? true;
+    const t = night ? {
+      page: '#0C0B0B', ink: '#F6F1EA', ink2: '#CFC8BE', muted: '#9C958C', paper: '#161515',
+      hairline: 'rgba(255,255,255,0.09)', glass: 'rgba(22,21,21,0.86)', glassBorder: 'rgba(255,255,255,0.07)',
+      glassBorder60: 'rgba(255,255,255,0.07)',
+      cardShadow: 'inset 0 1px 0 rgba(255,255,255,0.04), 0 6px 18px rgba(0,0,0,0.45)',
+      tagInk: '#FF8A66', tagBg: 'rgba(255,92,53,0.14)', dots: 'rgba(255,255,255,0.16)',
+      paper55: 'rgba(22,21,21,0.55)', paper62: 'rgba(22,21,21,0.62)', paper70: 'rgba(22,21,21,0.70)',
+      pillBorder: 'rgba(255,255,255,0.06)', tabBorder: 'rgba(255,255,255,0.10)', tabbarBg: 'rgba(12,11,11,0.96)',
+      tagLine: 'rgba(246,241,234,0.24)',
+      sheet: '#161515', sheetBorder: 'rgba(255,255,255,0.07)', tileLine: 'rgba(255,255,255,0.12)', scrim: 'rgba(0,0,0,0.40)', grabber: 'rgba(255,255,255,0.22)', pill: 'rgba(255,255,255,0.10)',
+      sheetShadow: '0 -16px 48px rgba(0,0,0,0.55)', tile: 'rgba(255,255,255,0.03)', sheet0: 'rgba(22,21,21,0)', tonightLine: 'rgba(255,92,53,0.38)'
+    } : {
+      page: '#FAF7F2', ink: '#1C1C1E', ink2: '#5C5853', muted: '#6C6761', paper: '#FFFFFF',
+      hairline: 'rgba(28,28,30,0.08)', glass: 'rgba(255,253,248,0.78)', glassBorder: 'rgba(255,255,255,0.70)',
+      glassBorder60: 'rgba(255,255,255,0.60)',
+      cardShadow: 'inset 0 1px 0 rgba(255,255,255,0.85), 0 4px 14px rgba(180,120,60,0.08)',
+      tagInk: '#B83A1A', tagBg: 'rgba(255,92,53,0.10)', dots: 'rgba(28,28,30,0.16)',
+      paper55: 'rgba(255,255,255,0.55)', paper62: 'rgba(255,255,255,0.62)', paper70: 'rgba(255,255,255,0.70)',
+      pillBorder: 'rgba(28,28,30,0.06)', tabBorder: 'rgba(28,28,30,0.10)', tabbarBg: 'rgba(250,247,242,0.96)',
+      tagLine: 'rgba(28,28,30,0.20)',
+      sheet: '#FFFFFF', sheetBorder: 'rgba(20,20,22,0.10)', tileLine: 'rgba(28,28,30,0.14)', scrim: 'rgba(28,28,30,0.30)', grabber: 'rgba(28,28,30,0.18)', pill: 'rgba(28,28,30,0.07)',
+      sheetShadow: '0 -12px 40px rgba(120,70,30,0.16)', tile: 'rgba(28,28,30,0.025)', sheet0: 'rgba(255,255,255,0)', tonightLine: 'rgba(200,64,30,0.30)'
+    };
+    // Tonight (Sat, Nov 7, 2026). The game is real; the other school events are SAMPLES; clubs are fictional.
+    // The same list, order and labels feed the card (P2_Card), the sheet (P2_Sheet) and Events (P2_Events).
+    const EV = {
+      game: { key: 'game', title: 'IU Indy vs UT Martin', home: 'IU Indy', away: 'UT Martin', host: 'Athletics', sport: 'Men’s basketball', time: '5:00 PM', end: '', place: 'James T. Morris Arena', going: 38, isGame: true, blurb: '' },
+      art: { key: 'art', title: 'Herron student art show opening', host: 'Herron School of Art + Design', time: '6:00 PM', end: '', place: 'Eskenazi Hall', going: 21, isGame: false, blurb: '' },
+      late: { key: 'late', title: 'Late Night at the Campus Center', host: 'Student Involvement', time: '9:00 PM', end: 'to midnight', place: 'Campus Center', going: 64, isGame: false, blurb: 'Free food and games' },
+      boulder: { key: 'boulder', title: 'Bouldering night', host: 'Climbing Club', time: '8:00 PM', end: '', place: 'Rec Center', going: 12, isGame: false, blurb: '' },
+      blitz: { key: 'blitz', title: 'Blitz night', host: 'Chess Club', time: '9:00 PM', end: '', place: 'University Library', going: 6, isGame: false, blurb: '' }
+    };
+    // Counts only, never names, and nothing under 5.
+    const goingLabel = (n) => (n >= 5 ? n + ' going' : '');
+    // The #1 rule: 1) featured by the school (one a day, labeled), else 2) the school event that starts
+    // soonest and hasn't ended (one on now leads). 3) The rest: school events, then club events, by start.
+    const rule = this.props.lead ?? 'What’s next';
+    const featured = rule === 'Featured by your school';
+    const live = rule === 'Happening now';
+    const leadKey = featured ? 'late' : 'game';
+    const L = EV[leadKey];
+    const withCount = (txt, n) => txt + (goingLabel(n) ? ' · ' + goingLabel(n) : '');
+    const endTail = L.end ? ' ' + L.end : '';
+    const lead = Object.assign({}, L, {
+      featured, live, next: !featured && !live, notGame: !L.isGame, liveGame: live && L.isGame, hasBlurb: !!L.blurb,
+      byline: L.isGame ? L.host + ' · ' + L.sport : L.host,
+      endTail, goingLabel: goingLabel(L.going),
+      // After the bold start time: "to midnight · Campus Center · 64 going" (no count, no dangling dot, under 5).
+      restLine: withCount(endTail + ' · ' + L.place, L.going)
+    });
+    const reason = featured ? 'Featured by your school' : (live ? 'Happening now' : 'Up next');
+    const row = (k) => Object.assign({}, EV[k], {
+      notGame: !EV[k].isGame,
+      byline: EV[k].isGame ? EV[k].host + ' · ' + EV[k].sport : EV[k].host,
+      placeLine: withCount(EV[k].place, EV[k].going),
+      clubLine: withCount(EV[k].host + ' · ' + EV[k].place, EV[k].going)
+    });
+    const schoolRest = ['game', 'art', 'late'].filter((k) => k !== leadKey).map(row);
+    const clubRows = ['boulder', 'blitz'].map(row);
+    const moreCount = schoolRest.length + clubRows.length;
+    const cardLabel = 'What’s the vibe tonight, Sat, Nov 7. ' + reason + ': ' +
+      lead.title + ', school event, ' + lead.byline + ', ' + lead.time + lead.endTail + ', ' + lead.place + (lead.goingLabel ? ', ' + lead.goingLabel : '') +
+      '. Plus ' + moreCount + ' more tonight. Opens the list.';
+    // Drawn open: the card's tap opens it, Close or the scrim closes it.
+    const st = this.state || {};
+    const sheetOpen = st.sheetOpen ?? true;
+    // Two detents, like C: Half keeps the card in view under the scrim; Full is the sheet dragged up.
+    const half = (st.detent ?? (this.props.sheet ?? 'Half')) === 'Half';
+    const sheetH = half ? '556px' : '780px';
+    const toggleDetent = () => this.setState({ detent: half ? 'Full' : 'Half' });
+    const detentLabel = half ? 'Show more' : 'Show less';
+    const fullStr = half ? 'false' : 'true';
+    const cardBorder = sheetOpen ? 'rgba(255,92,53,0.45)' : t.glassBorder;
+    const openSheet = (e) => { if (e && e.preventDefault) e.preventDefault(); this.setState({ sheetOpen: true }); };
+    const closeSheet = () => this.setState({ sheetOpen: false });
+    // Going: RsvpButton's look (radius 10), off until tapped; the count moves with it (same source as Events).
+    const going = !!st.going;
+    const goingBtn = going
+      ? { bg: night ? 'rgba(255,92,53,0.28)' : 'rgba(255,92,53,0.14)', border: '#FF5C35', shadow: night ? 'inset 0 1px 0 rgba(255,255,255,0.22), 0 4px 14px rgba(255,92,53,0.28)' : '0 4px 14px rgba(255,92,53,0.18)' }
+      : { bg: night ? 'rgba(255,255,255,0.08)' : 'rgba(28,28,30,0.04)', border: night ? 'rgba(255,255,255,0.20)' : 'rgba(28,28,30,0.18)', shadow: night ? 'inset 0 1px 0 rgba(255,255,255,0.18)' : 'inset 0 1px 0 rgba(255,255,255,0.9)' };
+    const toggleGoing = () => this.setState({ going: !going });
+    const leadGoingLabel = goingLabel(L.going + (going ? 1 : 0));
+    const leadTimeTail = L.isGame ? (live ? ' tip-off · on now' : ' tip-off') : lead.endTail;
+    return {
+      night, day: !night, t, lead, leadNotGame: !L.isGame, leadGoingLabel, leadTimeTail,
+      schoolRest, clubRows, moreCount, cardLabel,
+      sheetOpen, half, sheetH, cardBorder, openSheet, closeSheet, going, goingBtn, toggleGoing,
+      toggleDetent, detentLabel, fullStr
+    };
+  }
+}
+</script>
+</body>
+</html>
