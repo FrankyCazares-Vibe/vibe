@@ -1,0 +1,139 @@
+{
+ "v": 3,
+ "createdOnFiles": {
+  "v": 1,
+  "at": "2026-10-19T02:15:00Z"
+ },
+ "title": "Desktop side space + tonight card",
+ "launch": {
+  "view": "canvas"
+ },
+ "pages": [],
+ "boards": {
+  "Main.dc.html": {
+   "x": 0,
+   "y": 0,
+   "w": 1440,
+   "h": 900,
+   "expand": "fill",
+   "title": "Now: the app today \u00b7 desktop"
+  },
+  "Now_Phone.dc.html": {
+   "x": 1520,
+   "y": 0,
+   "w": 390,
+   "h": 844,
+   "title": "Now: the app today \u00b7 phone"
+  },
+  "A_Tonight_Desk.dc.html": {
+   "x": 0,
+   "y": 1320,
+   "w": 1440,
+   "h": 900,
+   "expand": "fill",
+   "title": "A \u00b7 Tonight first \u00b7 desktop"
+  },
+  "A_Tonight_Phone.dc.html": {
+   "x": 1520,
+   "y": 1320,
+   "w": 390,
+   "h": 844,
+   "title": "A \u00b7 Tonight first \u00b7 phone"
+  },
+  "B_Clubs_Desk.dc.html": {
+   "x": 0,
+   "y": 2640,
+   "w": 1440,
+   "h": 900,
+   "expand": "fill",
+   "title": "B \u00b7 Your clubs first \u00b7 desktop"
+  },
+  "B_Clubs_Phone.dc.html": {
+   "x": 1520,
+   "y": 2640,
+   "w": 390,
+   "h": 844,
+   "title": "B \u00b7 Your clubs first \u00b7 phone"
+  },
+  "C_BothSides_Desk.dc.html": {
+   "x": 0,
+   "y": 3960,
+   "w": 1440,
+   "h": 900,
+   "expand": "fill",
+   "title": "C \u00b7 Both sides \u00b7 desktop"
+  },
+  "C_BothSides_Phone.dc.html": {
+   "x": 1520,
+   "y": 3960,
+   "w": 390,
+   "h": 844,
+   "title": "C \u00b7 Both sides \u00b7 phone"
+  },
+  "D_Otto_Desk.dc.html": {
+   "x": 0,
+   "y": 5280,
+   "w": 1440,
+   "h": 900,
+   "expand": "fill",
+   "title": "D \u00b7 Otto docks in \u00b7 desktop"
+  },
+  "D_Otto_Phone.dc.html": {
+   "x": 1520,
+   "y": 5280,
+   "w": 390,
+   "h": 844,
+   "title": "D \u00b7 Otto docks in \u00b7 phone"
+  }
+ },
+ "order": [
+  "Main.dc.html",
+  "Now_Phone.dc.html",
+  "A_Tonight_Desk.dc.html",
+  "A_Tonight_Phone.dc.html",
+  "B_Clubs_Desk.dc.html",
+  "B_Clubs_Phone.dc.html",
+  "C_BothSides_Desk.dc.html",
+  "C_BothSides_Phone.dc.html",
+  "D_Otto_Desk.dc.html",
+  "D_Otto_Phone.dc.html"
+ ],
+ "notes": {
+  "row0": {
+   "x": 0,
+   "y": -280,
+   "text": "Now: the app today",
+   "kind": "title1",
+   "maxW": 1910
+  },
+  "row1": {
+   "x": 0,
+   "y": 1040,
+   "text": "A \u00b7 Tonight first",
+   "kind": "title1",
+   "maxW": 1910
+  },
+  "row2": {
+   "x": 0,
+   "y": 2360,
+   "text": "B \u00b7 Your clubs first",
+   "kind": "title1",
+   "maxW": 1910
+  },
+  "row3": {
+   "x": 0,
+   "y": 3680,
+   "text": "C \u00b7 Both sides",
+   "kind": "title1",
+   "maxW": 1910
+  },
+  "row4": {
+   "x": 0,
+   "y": 5000,
+   "text": "D \u00b7 Otto docks in",
+   "kind": "title1",
+   "maxW": 1910
+  }
+ },
+ "designSystems": []
+}
