@@ -72,6 +72,13 @@ export const BUDGETS = {
    * list that day, never when.
    */
   repostersRead: { limit: 600, windowSec: 86_400 },
+  /**
+   * Use a club link: make the club a setup link names, or join through a
+   * members' link (POST /api/club-links/redeem, Oct 21, 2026). A person uses
+   * one or two; 20 an hour stops a script trying codes, which 80 random bits
+   * already make hopeless. Fails closed, as check-in does.
+   */
+  clubLinkRedeem: { limit: 20, windowSec: 3600, failClosed: true },
 } as const satisfies Record<string, Pick<RateLimitOptions, "limit" | "windowSec" | "failClosed">>;
 
 export type BudgetName = keyof typeof BUDGETS;

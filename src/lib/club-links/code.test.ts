@@ -1,13 +1,21 @@
+/**
+ * Tests for the club link codes (`code.ts`). The module has no imports, so it
+ * loads through a dynamic import of its ".ts" path (tsc refuses a literal
+ * ".ts" specifier; the pattern of the waitlist's access-code.test.ts).
+ */
+
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { test } from "node:test";
 
-import {
+const specifier = "./code.ts";
+const {
   CLUB_LINK_ALPHABET,
   clubLinkUrl,
   generateClubLinkCode,
   normalizeClubLinkCode,
   suggestClubHandle,
-} from "./code.ts";
+} = (await import(specifier)) as typeof import("./code");
 
 // The shared vectors: the same cases as the POST-CHECK of
 // supabase/migrations/20261021110000_club_links.sql.
@@ -51,4 +59,12 @@ test("handle: from a club's name", () => {
   assert.equal(suggestClubHandle("Café & Code"), "cafeandcode");
   assert.equal(suggestClubHandle("!!"), null);
   assert.equal(suggestClubHandle("a".repeat(40))?.length, 31);
+});
+
+test("hash: SHA-256 of club: and the normalised code, as public.club_link_hash gives it", () => {
+  // Read from the local database (public.club_link_hash('k7q2-m9xd-ab3c-de4f'),
+  // Oct 21, 2026); store.ts hashClubLinkCode computes it this way.
+  const normalized = normalizeClubLinkCode("k7q2-m9xd-ab3c-de4f");
+  const hash = createHash("sha256").update(`club:${normalized}`, "utf8").digest("hex");
+  assert.equal(hash, "e7525067feca7b295946cc63f346233a1193dcede6699c9b9510c1056cd37992");
 });

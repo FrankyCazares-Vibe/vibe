@@ -40,11 +40,12 @@ export type ClubLinkRow = {
   off_at: string | null;
   used_at: string | null;
   used_by: string | null;
+  created_by: string | null;
   created_at: string;
 };
 
 const LINK_COLUMNS =
-  "id, kind, org_id, club_name, club_handle, checked, max_signups, expires_at, off_at, used_at, used_by, created_at";
+  "id, kind, org_id, club_name, club_handle, checked, max_signups, expires_at, off_at, used_at, used_by, created_by, created_at";
 
 /** Where a link stands, as the landing page tells it. */
 export type ClubLinkState = "live" | "used" | "expired" | "off";

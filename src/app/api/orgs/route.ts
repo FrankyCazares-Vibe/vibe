@@ -838,6 +838,21 @@ export async function POST(req: Request) {
   if (existing) {
     return fail(409, "handle_taken", "That handle is taken");
   }
+  // A live setup link holds its handle (the club's view, wave 1), so the club
+  // it makes gets the handle a founder gave its president. Before the
+  // club-links migration is in, the read fails and nothing is held.
+  const { data: held } = await service
+    .from("club_links")
+    .select("id")
+    .eq("kind", "setup")
+    .eq("club_handle", handle)
+    .is("used_at", null)
+    .is("off_at", null)
+    .gt("expires_at", new Date().toISOString())
+    .limit(1);
+  if (held && held.length > 0) {
+    return fail(409, "handle_taken", "That handle is taken");
+  }
 
   // Create the org via service role. Three reasons:
   //  1. We already authenticated the user above and own the `owner_id`
