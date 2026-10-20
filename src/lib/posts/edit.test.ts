@@ -19,18 +19,22 @@ const specifier = "./edit.ts";
 const {
   EDITED_LABEL,
   POST_MAX_CHARS,
+  POST_TAG_IN_TEXT_RE,
+  POST_TAG_LINK_RE,
+  POST_TAG_MAX,
   addedHandles,
+  blankPostLinks,
   checkPostEdit,
   editedPostFrom,
   extractPostTags,
+  isNewPostTag,
 } = (await import(specifier)) as typeof import("./edit");
 
-// The composer's copy, verbatim from `src/lib/composer/helpers.ts:81-94` at
-// f23bc5d. That file can't load here (it touches `document` and `window`), so
-// the parity test compares against this copy. If E1 has already rewritten
-// `extractHashtags` to call `extractPostTags`, this copy is the record of the
-// algorithm tags were published with.
-function composerExtractHashtags(text: string): string[] {
+// The pre-Oct 19, 2026 extractor, verbatim (it was `extractHashtags` in
+// src/lib/composer/helpers.ts at f23bc5d). Kept only as the record of how
+// older posts' tags were written, and to prove the new rule only ever DROPS
+// tags the old one stored, never invents one.
+function legacyExtract(text: string): string[] {
   const matches = text.match(/#[A-Za-z0-9_]{1,32}/g);
   if (!matches) return [];
   const seen = new Set<string>();
@@ -45,56 +49,128 @@ function composerExtractHashtags(text: string): string[] {
   return out;
 }
 
-// --- extractPostTags ---------------------------------------------------------
+// --- isNewPostTag (the write rule, Oct 19, 2026) -------------------------------
+
+test("isNewPostTag: 2-32 of a-z 0-9 _ with at least one letter", () => {
+  assert.equal(POST_TAG_MAX, 5);
+  for (const ok of ["ab", "a1", "1a", "_a", "ab_", "go_iu2026", "z".repeat(32)]) {
+    assert.equal(isNewPostTag(ok), true, ok);
+  }
+  const bad: unknown[] = [
+    "", "a", "1", "12", "2026", "_", "__", "_1", "z".repeat(33), "Ab", "café", "a b", "a-b", "#ab", null, 7, ["ab"],
+  ];
+  for (const value of bad) assert.equal(isNewPostTag(value), false, JSON.stringify(value));
+});
+
+// --- extractPostTags -------------------------------------------------------------
+
+/**
+ * The critique's probe (handoffs/2026-10-19-critique/hashtags/
+ * extractor-probe.jsonl), every case with its new expected result, plus the
+ * edges of the "never inside a word or a link" rule. The static twin in
+ * public/html/profile.html (critique batch B6) should pass this same table.
+ */
+const PROBE: ReadonlyArray<[string, string[]]> = [
+  ["#" + "a".repeat(40), []], // long40: never cut short
+  ["#" + "a".repeat(32), ["a".repeat(32)]],
+  ["coffee at #café today", []], // runs on into an accented letter
+  ["café #café", []], // the same, typed with a combining accent
+  ["#t1 #t2 #t3 #t4 #t5 #t6 #t7 #t8 #t9 #t10 #t11 #t12", ["t1", "t2", "t3", "t4", "t5"]],
+  ["hello#world", []], // glued to a word
+  ["é#tag", []],
+  ["2#tag", []],
+  ["#a party", []], // one letter
+  ["##hype", []], // after another #
+  ["#gameday! #IU-Football", ["gameday", "iu"]], // punctuation ends a tag
+  ["#GameDay #gameday", ["gameday"]],
+  ["#🔥 #fire🔥", ["fire"]], // an emoji ends a tag
+  ["see https://x.com/page#section", []], // a link's #fragment
+  ["x.com/#top and x.com/a#bc", []], // "#bc" is 2 letters, so only the link rule refuses it
+  // A link's #fragment after punctuation (review of B3, Oct 19, 2026): the
+  // one-character rule alone saved every one of these.
+  ["https://en.wikipedia.org/wiki/Indiana_(state)#History", []],
+  ["https://iuhoosiers.com/sports/football/schedule?view=#game5", []],
+  ["https://site.com/faq-#pricing", []],
+  ["https://site.com/docs.#intro", []],
+  ["https://site.com/?#top", []],
+  ["en.wikipedia.org/wiki/Indiana_(state)#History #iu", ["iu"]], // no "https://"
+  ["tickets iuhoosiers.com/tix #gameday", ["gameday"]], // a tag after a link still counts
+  ["#gameday,iuhoosiers.com/tix", ["gameday"]], // a link starting later in the word
+  ["#tagx.com/a #tag_x.com/b", []], // a link glued to a tag: dropped, never cut to "tag"
+  ["#tag://x", ["tag"]],
+  // Emoji tails (review of B3): U+FE0F and the keycap mark U+20E3 count as
+  // combining marks, so without the exception these tags were lost.
+  ["❤️#love", ["love"]],
+  ["⚽️#gameday", ["gameday"]],
+  ["1️⃣#first", ["first"]],
+  ["👍🏽#nice", ["nice"]],
+  ["cafe\u0301#xy", []], // a real combining accent: still glued to a word
+  ["#top1️⃣", []], // runs on into a keycap: dropped, never cut short
+  ["#2026 #1", []], // no letter
+  ["(#rush),#bid", ["rush", "bid"]],
+  ["#tag#other", ["tag"]],
+  ["#tag٣", []], // runs on into a non-ASCII digit
+  ["🎉#party\n#party2\t#PARTY", ["party", "party2"]],
+  ["#__ #_a #ab_", ["_a", "ab_"]],
+  ["", []],
+  ["plain text # alone", []],
+];
+
+test("extractPostTags: the critique probe and the word / link edges", () => {
+  for (const [text, want] of PROBE) {
+    assert.deepEqual(extractPostTags(text), want, `text: ${JSON.stringify(text)}`);
+  }
+});
 
 test("extractPostTags: lowercases and dedupes across case", () => {
   assert.deepEqual(extractPostTags("Go #IU and #iu and #Hoosiers!"), ["iu", "hoosiers"]);
 });
 
-test("extractPostTags: no tags gives an empty list", () => {
-  assert.deepEqual(extractPostTags(""), []);
-  assert.deepEqual(extractPostTags("no tags here # alone"), []);
+test("extractPostTags: stops at 5; duplicates and refused tags don't use a place", () => {
+  const six = Array.from({ length: 6 }, (_, i) => `#tag${i}`).join(" ");
+  assert.deepEqual(extractPostTags(six), ["tag0", "tag1", "tag2", "tag3", "tag4"]);
+  const noisy = "#ab #AB #1 #a #café #2026 x.com/p#q " + Array.from({ length: 5 }, (_, i) => `#t${i}`).join(" ");
+  assert.deepEqual(extractPostTags(noisy), ["ab", "t0", "t1", "t2", "t3"]);
 });
 
-test("extractPostTags: stops at 10 tags", () => {
-  const text = Array.from({ length: 12 }, (_, i) => `#tag${i}`).join(" ");
-  const tags = extractPostTags(text);
-  assert.equal(tags.length, 10);
-  assert.deepEqual(tags, Array.from({ length: 10 }, (_, i) => `tag${i}`));
-});
-
-test("extractPostTags: duplicates don't use up the 10", () => {
-  const text = "#a #A #a " + Array.from({ length: 10 }, (_, i) => `#t${i}`).join(" ");
-  const tags = extractPostTags(text);
-  assert.equal(tags.length, 10);
-  assert.equal(tags[0], "a");
-  assert.equal(tags.includes("t8"), true);
-  assert.equal(tags.includes("t9"), false);
-});
-
-test("extractPostTags: a tag longer than 32 characters keeps its first 32", () => {
-  const long = "A".repeat(40);
-  assert.deepEqual(extractPostTags(`#${long}`), ["a".repeat(32)]);
-});
-
-test("extractPostTags: stops at characters outside [A-Za-z0-9_]", () => {
-  assert.deepEqual(extractPostTags("#rush-week #go_iu2026 #café"), ["rush", "go_iu2026", "caf"]);
-});
-
-test("extractPostTags matches the composer's extractHashtags on every sample", () => {
-  const samples = [
-    "",
-    "plain text",
-    "#One #two #ONE",
-    "##double #x",
-    "mid#word tag",
-    "#" + "b".repeat(33) + " #c",
-    Array.from({ length: 15 }, (_, i) => `#Tag${i % 12}`).join(" "),
-    "emoji 🎉 #party\n#party2\t#PARTY",
-  ];
-  for (const s of samples) {
-    assert.deepEqual(extractPostTags(s), composerExtractHashtags(s), `sample: ${JSON.stringify(s)}`);
+test("extractPostTags: every output passes the write rule, at most POST_TAG_MAX", () => {
+  for (const [text] of PROBE) {
+    const tags = extractPostTags(text);
+    assert.ok(tags.length <= POST_TAG_MAX);
+    for (const t of tags) assert.ok(isNewPostTag(t), t);
   }
+});
+
+test("extractPostTags: only ever drops tags the old rule stored, never invents one", () => {
+  // Fewer than 10 #s each, so the old cap of 10 never decides.
+  const samples = PROBE.map(([t]) => t).filter((t) => (t.match(/#/g) ?? []).length < 10);
+  samples.push("emoji 🎉 #party\n#party2\t#PARTY", "#One #two #ONE", "mid#word tag");
+  for (const s of samples) {
+    const old = legacyExtract(s);
+    for (const t of extractPostTags(s)) assert.ok(old.includes(t), `${t} in ${JSON.stringify(s)}`);
+  }
+});
+
+test("POST_TAG_IN_TEXT_RE: the shared global regexes are never left mid-string", () => {
+  // Why 7 tags (review of B3, Oct 19, 2026): the one real risk is a rewrite
+  // that loops `exec` on the shared object and breaks at the cap of 5, which
+  // leaves lastIndex partway in, so the NEXT caption is read from the middle.
+  // Two tags never reach the cap, so that old test could never fail.
+  const seven = "x.com/a #one #two #three #four #five #six #seven";
+  assert.deepEqual(extractPostTags(seven), ["one", "two", "three", "four", "five"]);
+  assert.deepEqual(extractPostTags("#ab"), ["ab"]);
+  for (const re of [POST_TAG_IN_TEXT_RE, POST_TAG_LINK_RE]) {
+    assert.equal(re.lastIndex, 0);
+    assert.equal(re.flags, "gu");
+  }
+});
+
+test("blankPostLinks: links become spaces, same length, everything else untouched", () => {
+  const text = "go #iu https://x.com/a(b)#c and en.wikipedia.org/w#h #bid";
+  const out = blankPostLinks(text);
+  assert.equal(out.length, text.length);
+  assert.equal(out, "go #iu https" + " ".repeat(15) + " and " + " ".repeat(20) + " #bid");
+  assert.equal(blankPostLinks("no links #here"), "no links #here");
 });
 
 // --- checkPostEdit -------------------------------------------------------------

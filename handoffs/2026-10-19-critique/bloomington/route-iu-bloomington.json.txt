@@ -1,0 +1,2 @@
+{"ok":true,"school_on":false,"campus_id":"iu-bloomington","events":[],"sources":[]}
+HTTP 200

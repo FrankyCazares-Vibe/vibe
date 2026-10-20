@@ -5,7 +5,7 @@ import { campusScopeError } from "@/lib/iu/community-scope";
 import { limitFor } from "@/lib/limits/budgets";
 import { tooManyRequests } from "@/lib/rate-limit";
 import { readSchoolEvents, readSchoolSwitch } from "@/lib/school-events/read-server";
-import { SCHOOL_CAMPUS_ID } from "@/lib/school-events/sources";
+import { feedsForCampus } from "@/lib/school-events/sources";
 import type { SchoolEventsResponse } from "@/lib/school-events/types";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
@@ -14,9 +14,10 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
  * calendars for "What's the vibe tonight?" (CONTRACT.md §3.1-3.2).
  *
  * The campus follows GET /api/events' `?campus=` rule, so a student looking
- * around another campus gets that campus's answer. Only Indianapolis has
- * school calendars in v1; everywhere else answers `school_on: false` and the
- * screens hide every school part.
+ * around another campus gets that campus's answer. Indianapolis and (since
+ * Oct 19, 2026) Bloomington have school calendars, each campus only its
+ * own; everywhere else answers `school_on: false` and the screens hide every
+ * school part.
  *
  * Never a 500 for a calendar problem: a calendar that is down is just
  * missing, and anything thrown past the sign-in check answers the
@@ -24,10 +25,25 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
  * campus row and the switch row; nothing is written and nothing is stored
  * about who asked (the limiter counts per DAY on purpose, budgets.ts).
  *
+ * `&cards=any` (Oct 19, 2026): the page can draw any calendar; without it
+ * only Indy's three are sent (OLD_PAGE_KEYS below).
+ *
  * Development only: `&now=<ISO>` fakes the clock, to see an evening at noon.
  */
 
 const NO_STORE = { "cache-control": "private, no-store" };
+
+/**
+ * The only calendars a page from before Oct 19, 2026 can draw. Why: that
+ * page's school card knew just these three names and crashed on any other,
+ * and with no boundary around the Events grid the whole app fell to the
+ * error page. A tab opened before the Bloomington deploy and kept on screen
+ * never reloads onto the new build, so it must never be sent "iub-*" rows.
+ * Newer pages send `cards=any` (use-school-events.ts); without it the other
+ * calendars are left out, and Bloomington answers off, as it did before.
+ * Safe to delete (with the client's `cards=any`) a week or so after the deploy.
+ */
+const OLD_PAGE_KEYS: ReadonlySet<string> = new Set(["athletics", "iu-student-affairs", "iu-featured"]);
 
 let loggedThrow = false;
 
@@ -108,12 +124,20 @@ export async function GET(req: Request) {
     }
 
     campusId = scope.kind === "campus" ? scope.campusId : null;
-    if (campusId !== SCHOOL_CAMPUS_ID) return off(campusId);
+    // A campus with no calendar of its own answers off before the switch is
+    // even read (Oct 19, 2026: the campus's feed list, no longer "is it Indy").
+    if (campusId === null || feedsForCampus(campusId).length === 0) return off(campusId);
 
     const sw = await readSchoolSwitch();
     if (sw.all) return off(campusId);
 
-    const { events, sources } = await readSchoolEvents({ now: clockFor(url), skip: sw.sources });
+    let skip = sw.sources;
+    if (url.searchParams.get("cards") !== "any") {
+      const unknownToOldPage = feedsForCampus(campusId).filter((f) => !OLD_PAGE_KEYS.has(f.key));
+      if (unknownToOldPage.length > 0) skip = new Set([...skip, ...unknownToOldPage.map((f) => f.key)]);
+    }
+
+    const { events, sources } = await readSchoolEvents({ campusId, now: clockFor(url), skip });
     const body: SchoolEventsResponse = {
       ok: true,
       school_on: sources.length > 0,

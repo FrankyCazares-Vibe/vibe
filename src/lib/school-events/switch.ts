@@ -8,20 +8,43 @@
  *   - the `public.app_settings` row `school_events_off`: applies in about
  *     30 s, no deploy (read in read-server.ts). Writing that row is a
  *     production write, so it needs Franky's OK at that moment. Shipping
- *     writes no row. Off (`true`, or a JSON array of keys like
- *     '["athletics"]'::jsonb):
+ *     writes no row. Off (`true`, or a JSON array of words like
+ *     '["iub-athletics"]'::jsonb or '["iu-bloomington"]'::jsonb):
  *       insert into public.app_settings (key, value) values ('school_events_off', 'true'::jsonb)
  *       on conflict (key) do update set value = excluded.value, updated_at = now();
  *     Back on:
  *       delete from public.app_settings where key = 'school_events_off';
+ *     Before rolling production back to a build older than this rule
+ *     (9117dc6 or before), delete a row that holds a Bloomington word: that
+ *     build reads an unknown word as "everything off", Indy included.
+ *
+ * The words a list understands (Oct 19, 2026): a calendar key
+ * (SCHOOL_SOURCE_KEYS) turns that calendar off; a campus id
+ * (SCHOOL_CAMPUS_KEYS: "indianapolis", "iu-bloomington") turns off every
+ * calendar of that campus; an off word ("true", "all", ...) turns off all.
+ *
+ * WHY AN UNKNOWN WORD IS IGNORED (Oct 19, 2026, was "all off"): with two
+ * campuses, "all off" for a word this build doesn't know meant a Bloomington
+ * name written on an older build (or after a rollback) hid Indianapolis too.
+ * An unknown word now turns nothing off and is logged once; only a value
+ * whose SHAPE is wrong (a number, an object, blank entries, only commas)
+ * still turns everything off, since that can't be read as any list at all.
  *
  * PURE: no imports but types, no environment read here (the caller passes
- * the value in), so the tests load it straight from disk. A kill switch errs
- * toward hiding: a value it can't read turns every calendar off.
+ * the value in), so the tests load it straight from disk.
  */
 import type { SchoolSourceKey } from "./types";
 
-export const SCHOOL_SOURCE_KEYS: readonly SchoolSourceKey[] = ["athletics", "iu-student-affairs", "iu-featured"];
+/**
+ * Each campus's calendars, in credit order. sources.ts gives every feed the
+ * same campus, and sources.test.ts checks the two agree.
+ */
+export const SCHOOL_CAMPUS_KEYS: Readonly<Record<string, readonly SchoolSourceKey[]>> = Object.freeze({
+  indianapolis: Object.freeze<SchoolSourceKey[]>(["athletics", "iu-student-affairs", "iu-featured"]),
+  "iu-bloomington": Object.freeze<SchoolSourceKey[]>(["iub-athletics", "iub-student-life", "iub-featured"]),
+});
+
+export const SCHOOL_SOURCE_KEYS: readonly SchoolSourceKey[] = Object.freeze(Object.values(SCHOOL_CAMPUS_KEYS).flat());
 
 export type SchoolSwitch = { all: boolean; sources: ReadonlySet<SchoolSourceKey> };
 
@@ -38,6 +61,11 @@ function isSourceKey(value: string): value is SchoolSourceKey {
   return (SCHOOL_SOURCE_KEYS as readonly string[]).includes(value);
 }
 
+/** A campus id's calendars, or null when the word isn't a campus with calendars. */
+function campusKeys(value: string): readonly SchoolSourceKey[] | null {
+  return Object.prototype.hasOwnProperty.call(SCHOOL_CAMPUS_KEYS, value) ? SCHOOL_CAMPUS_KEYS[value] : null;
+}
+
 /** These calendars off; every one named means all off. */
 function offFor(keys: Iterable<SchoolSourceKey>): SchoolSwitch {
   const sources = new Set<SchoolSourceKey>(keys);
@@ -47,19 +75,19 @@ function offFor(keys: Iterable<SchoolSourceKey>): SchoolSwitch {
 
 /**
  * A list of entries (from the env's commas or the setting's array). Known
- * keys go off; unknown entries are ignored and reported, unless NO entry is
- * a known key: then it's a typo of the whole value, and everything goes off.
- * An off word inside a list ("athletics,all") means all off too.
+ * keys and campus ids go off; unknown entries are ignored and reported. An
+ * off word inside a list ("athletics,all") means all off.
  */
 function offFromList(entries: string[]): { value: SchoolSwitch; unknown: string[] } {
   const keys: SchoolSourceKey[] = [];
   const unknown: string[] = [];
   for (const entry of entries) {
     if (OFF_WORDS.has(entry)) return { value: SCHOOL_ALL_OFF, unknown: [] };
-    if (isSourceKey(entry)) keys.push(entry);
+    const campus = campusKeys(entry);
+    if (campus) keys.push(...campus);
+    else if (isSourceKey(entry)) keys.push(entry);
     else unknown.push(entry);
   }
-  if (keys.length === 0 && unknown.length > 0) return { value: SCHOOL_ALL_OFF, unknown };
   return { value: offFor(keys), unknown };
 }
 
@@ -76,9 +104,10 @@ function warnOnce(kind: string, detail: string): void {
 /**
  * `SCHOOL_EVENTS_OFF`, trimmed and lower-cased. Unset, "", "false", "0",
  * "no", "off": on. "true", "1", "yes", "on", "*", "all": every calendar off.
- * A comma list of keys ("athletics,iu-featured"): those off, unknown keys
- * ignored. Anything else (a typo, or only commas and spaces like ","):
- * every calendar off, with one warning.
+ * A comma list of calendar keys and campus ids ("iub-athletics",
+ * "iu-bloomington,iu-featured"): those off. An unknown word ("ture", a key
+ * from a newer build) turns nothing off, with one warning. Only commas and
+ * spaces (",") name nothing at all: every calendar off, with one warning.
  */
 export function parseSchoolOffEnv(raw: string | undefined): SchoolSwitch {
   const value = (raw ?? "").trim().toLowerCase();
@@ -94,16 +123,17 @@ export function parseSchoolOffEnv(raw: string | undefined): SchoolSwitch {
     return SCHOOL_ALL_OFF;
   }
   const { value: result, unknown } = offFromList(entries);
-  if (unknown.length) warnOnce(result.all ? "SCHOOL_EVENTS_OFF unreadable, all off" : "SCHOOL_EVENTS_OFF unknown keys ignored", unknown.join(","));
+  if (unknown.length) warnOnce("SCHOOL_EVENTS_OFF unknown words ignored", unknown.join(","));
   return result;
 }
 
 /**
- * The `app_settings` row's jsonb value. `true`: all off. An array of key
- * strings: those off (the env list's rules). `false`, null or no row
- * (undefined): on, and so is `[]` (it names nothing to turn off). Anything
- * else ("true" as a string, a number, an object, an array holding a
- * non-string, or only blank strings like [""]): all off.
+ * The `app_settings` row's jsonb value. `true`: all off. An array of
+ * strings: those keys and campuses off (the env list's rules, so an unknown
+ * word is ignored). `false`, null or no row (undefined): on, and so is `[]`
+ * (it names nothing to turn off). Anything else ("true" as a string, a
+ * number, an object, an array holding a non-string, or only blank strings
+ * like [""]): all off.
  */
 export function parseSchoolOffSetting(value: unknown): SchoolSwitch {
   if (value === undefined || value === null || value === false) return SCHOOL_ON;
@@ -120,7 +150,7 @@ export function parseSchoolOffSetting(value: unknown): SchoolSwitch {
       return SCHOOL_ALL_OFF;
     }
     const { value: result, unknown } = offFromList(entries);
-    if (unknown.length) warnOnce(result.all ? "school_events_off unreadable, all off" : "school_events_off unknown keys ignored", unknown.join(","));
+    if (unknown.length) warnOnce("school_events_off unknown words ignored", unknown.join(","));
     return result;
   }
   warnOnce("school_events_off unreadable, all off", typeof value);

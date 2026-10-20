@@ -26,13 +26,18 @@ const REFRESH_AFTER_MS = 10 * 60_000;
 const LOADING: SchoolEventsState = { status: "loading", on: false, events: [], sources: [] };
 const OFF: SchoolEventsState = { status: "ready", on: false, events: [], sources: [] };
 
-/** Development only: the faked clock goes to the server too, so the fixtures line up with the page. */
-function requestUrl(url: string): string {
-  const fake = devNowOverride();
-  if (fake === null) return url;
+/**
+ * The read's address. `cards=any` tells the server this page draws a card
+ * for any calendar name (Oct 19, 2026), so it may send Bloomington's; a tab
+ * from before that never says it and gets only Indy's three (route.ts,
+ * OLD_PAGE_KEYS). Development only: the faked clock goes to the server too,
+ * so the fixtures line up with the page.
+ */
+export function requestUrl(url: string, fake: number | null = devNowOverride()): string {
   try {
-    const u = new URL(url, window.location.origin);
-    u.searchParams.set("now", new Date(fake).toISOString());
+    const u = new URL(url, "http://vibe.invalid");
+    u.searchParams.set("cards", "any");
+    if (fake !== null) u.searchParams.set("now", new Date(fake).toISOString());
     return u.pathname + u.search;
   } catch {
     return url;
@@ -58,13 +63,24 @@ function isSource(v: unknown): v is SchoolSource {
   return typeof s.key === "string" && typeof s.credit === "string" && typeof s.calendar_url === "string";
 }
 
-/** A 200 that isn't the shape (an old server, a proxy page) reads as "off", never as a crash. */
-function toState(body: SchoolEventsResponse | null | undefined): SchoolEventsState | null {
+/**
+ * A 200 that isn't the shape (an old server, a proxy page) reads as "off",
+ * never as a crash; null means "not an answer at all". Exported for its test
+ * (school-card.test.ts).
+ */
+export function schoolStateFromAnswer(body: SchoolEventsResponse | null | undefined): SchoolEventsState | null {
   if (!body || body.ok !== true || !Array.isArray(body.events) || !Array.isArray(body.sources)) return null;
   if (body.school_on !== true) return OFF;
   const sources = body.sources.filter(isSource);
   if (sources.length === 0) return OFF;
-  return { status: "ready", on: true, events: body.events.filter(isEvent), sources };
+  // Why (Oct 19, 2026): every row must belong to a calendar in this same
+  // answer. A row from a calendar the answer doesn't list has no credit to
+  // show and no calendar page to fall back to, and the old cards crashed on
+  // a calendar name they didn't know. Such a row is dropped here, once, for
+  // every surface.
+  const listed = new Set(sources.map((s) => s.key));
+  const events = body.events.filter((e): e is SchoolEvent => isEvent(e) && listed.has(e.source));
+  return { status: "ready", on: true, events, sources };
 }
 
 /** `url`: view.url("/api/school-events") on desktop, withCampus(...) on the phone. */
@@ -87,7 +103,7 @@ export function useSchoolEvents(url: string): SchoolEventsState {
         failure: "Couldn't load school events.",
       });
       if (!alive || seq !== seqRef.current) return;
-      const next = r.ok ? toState(r.data) : null;
+      const next = r.ok ? schoolStateFromAnswer(r.data) : null;
       setAnswer((prev) => {
         if (next) return { url, state: next };
         // Failed: keep this URL's last good answer; with none, the school part is off.

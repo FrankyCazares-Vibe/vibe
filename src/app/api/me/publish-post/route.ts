@@ -9,7 +9,8 @@ import { isSupabaseHttpsUrl } from "@/lib/org-asset-url";
 import { withPostMediaUrls } from "@/lib/post-media-url";
 import { captionHashtags } from "@/lib/posts/caption-tags";
 import { hasSafeMediaUrlShape, isOwnClipKey } from "@/lib/posts/media-ownership";
-import { firstBlockedTag, normalizePostTags } from "@/lib/posts/tags";
+import { extractPostTags } from "@/lib/posts/edit";
+import { firstBlockedTag } from "@/lib/posts/tags";
 import { kickPushDrain } from "@/lib/push/dispatch";
 import { CLIP_KEY_PREFIX } from "@/lib/r2";
 import { contentBlockedResponse, requireCanPublish } from "@/lib/moderation/access";
@@ -154,7 +155,12 @@ export async function POST(req: Request) {
   // glued on with `_`, and a direct caller can send a caption tag with
   // `tags: []`. The 422 names "content": every composer derives tags from
   // the caption.
-  const tags = normalizePostTags(body.tags);
+  // Since Oct 19, 2026 (critique B3) the server reads the tags from the
+  // caption itself with the one rule every composer uses (extractPostTags:
+  // 5 at most, 2-32 characters with a letter, never from inside a link), so
+  // a composer with an older copy of the rule can't store a different set.
+  // `body.tags` is ignored.
+  const tags = extractPostTags(typeof content === "string" ? content : "");
   if (firstBlockedTag([...tags, ...captionHashtags(content)])) {
     return contentBlockedResponse("content");
   }

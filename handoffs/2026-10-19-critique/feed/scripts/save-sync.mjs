@@ -1,0 +1,41 @@
+import { open, hideBadge } from "./common.mjs";
+const { browser, page, log } = await open({ who: "blake", mobile: true });
+await page.goto("http://localhost:3000/campus", { waitUntil: "load", timeout: 90000 });
+const cardSave = page.locator('main button[aria-pressed][aria-label="Save"], main button[aria-pressed][aria-label="Unsave"]').first();
+await cardSave.waitFor({ timeout: 60000 });
+await page.waitForTimeout(1200);
+const st = async () => ({ label: await cardSave.getAttribute("aria-label"), pressed: await cardSave.getAttribute("aria-pressed") });
+const out = [{ step: "loaded", card: await st() }];
+const card = cardSave.locator("xpath=ancestor::div[contains(@style,'border-radius: 18px')][1]");
+const box = await card.boundingBox();
+await page.mouse.click(box.x + box.width - 60, box.y + 70);
+await page.locator('[role="dialog"][aria-label="Post"]').waitFor();
+await page.waitForFunction(() => Array.from(document.querySelectorAll('[role="dialog"][aria-label="Post"] button')).some((b) => b.textContent.trim() === "Repost"));
+await page.waitForTimeout(500);
+// The viewer's Save is the last button in the engagement bar's right group.
+const viewerSave = await page.evaluate(() => {
+  const dlg = document.querySelector('[role="dialog"][aria-label="Post"]');
+  const repost = Array.from(dlg.querySelectorAll("button")).find((b) => b.textContent.trim() === "Repost");
+  const bar = repost.parentElement;
+  const btns = bar.querySelectorAll("button");
+  const save = btns[btns.length - 1];
+  const before = save.querySelector("svg").getAttribute("fill") || save.querySelector("svg path")?.getAttribute("fill");
+  save.click();
+  return { before };
+});
+await page.waitForTimeout(500);
+const after = await page.evaluate(() => {
+  const dlg = document.querySelector('[role="dialog"][aria-label="Post"]');
+  const repost = Array.from(dlg.querySelectorAll("button")).find((b) => b.textContent.trim() === "Repost");
+  const btns = repost.parentElement.querySelectorAll("button");
+  const s = btns[btns.length - 1];
+  return s.innerHTML.slice(0, 220);
+});
+out.push({ step: "saved in viewer", viewerSave, after });
+await page.locator('[role="dialog"][aria-label="Post"] button[aria-label="Close"]').first().click();
+await page.locator('[role="dialog"][aria-label="Post"]').waitFor({ state: "detached" });
+await page.waitForTimeout(400);
+out.push({ step: "closed: card", card: await st() });
+console.log(JSON.stringify(out, null, 1));
+console.log(log.join("\n"));
+await browser.close();

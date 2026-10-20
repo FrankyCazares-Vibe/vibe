@@ -11,9 +11,14 @@ import type { StripTrend, StripUpcoming } from "./strip-data";
  * the tag toggle, the lead-in word, and the chip copy (titles, aria-labels).
  */
 
-/** Events shown, at most. Tags shown, at most. Days ahead an event may be. */
+/**
+ * Events shown, at most. Tags shown, at most. Days ahead an event may be.
+ * Tags went from 8 to 5 on Oct 19, 2026 (critique decision 3): a strip of
+ * five reads at a glance on a phone. The feed shells still ask the trending
+ * route for 8, which is harmless: this cut is the one that counts.
+ */
 export const STRIP_MAX_EVENTS = 3;
-export const STRIP_MAX_TAGS = 8;
+export const STRIP_MAX_TAGS = 5;
 export const STRIP_WINDOW_DAYS = 14;
 
 /** The track only rolls when it overflows by more than this many pixels. */
@@ -71,7 +76,7 @@ export function formatUpcomingChip(startsAt: string, now: Date = new Date()): st
 /**
  * Chip order: the student's RSVP'd events (soonest first, at most three,
  * only those starting within the next `windowDays`), then the trending tags
- * (at most eight, in the order the route ranked them). The route already
+ * (at most five, in the order the route ranked them). The route already
  * asks for `limit=3&days=14`; this is the belt to that suspender, so a
  * stale or over-generous answer never widens the strip. Events with an
  * unparseable `starts_at` are dropped rather than shown with no date.
@@ -194,4 +199,25 @@ export function eventChipLabel(title: string, when: string, status: "going" | "m
 export function tagChipTitle(count: number): string {
   const n = Math.max(0, Math.floor(count));
   return `${n} ${n === 1 ? "person" : "people"} this week`;
+}
+
+/**
+ * The words after the tag on its chip: "3 people" from two people up, and
+ * nothing below that (Oct 19, 2026, critique B3). A bare "1" beside "#mobile"
+ * read as a score, not a head count, and one person isn't a crowd worth
+ * naming. The tooltip ({@link tagChipTitle}) still says "1 person this week".
+ */
+export function tagChipCount(count: number): string | null {
+  const n = Number.isFinite(count) ? Math.floor(count) : 0;
+  return n >= 2 ? `${n} people` : null;
+}
+
+/**
+ * A tag chip's hover title: the whole tag, then the head count ("#mobile ·
+ * 1 person this week"). Why the tag (Oct 19, 2026, review of B3): a long tag
+ * is cut with "…" on its chip, and before this a mouse user had no way to
+ * read the rest of it short of tapping. The aria-label already names it.
+ */
+export function tagChipHover(tag: string, count: number): string {
+  return `#${tag} · ${tagChipTitle(count)}`;
 }

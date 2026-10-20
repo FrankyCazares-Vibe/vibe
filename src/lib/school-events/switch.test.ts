@@ -1,9 +1,9 @@
 /**
  * Tests for `switch.ts`, the school calendars' off switch (CONTRACT.md
  * §3.7, §8). ON BY DEFAULT: unset means every calendar shows. Every class
- * of `SCHOOL_EVENTS_OFF` value (on words, off words, a list, unknown keys,
- * a typo), every class of the `app_settings` row's value, and the merge
- * (off if either says off).
+ * of `SCHOOL_EVENTS_OFF` value (on words, off words, a list, campus ids,
+ * unknown words, a value that names nothing), every class of the
+ * `app_settings` row's value, and the merge (off if either says off).
  *
  * Run with:
  *   node --test src/lib/school-events/switch.test.ts
@@ -34,7 +34,9 @@ registerHooks({
   },
 });
 
-const { SCHOOL_ON, SCHOOL_SOURCE_KEYS, mergeSchoolSwitch, parseSchoolOffEnv, parseSchoolOffSetting } = await import("./switch");
+const { SCHOOL_CAMPUS_KEYS, SCHOOL_ON, SCHOOL_SOURCE_KEYS, mergeSchoolSwitch, parseSchoolOffEnv, parseSchoolOffSetting } = await import(
+  "./switch"
+);
 
 type Switch = { all: boolean; sources: ReadonlySet<string> };
 /** A switch as plain data: [all, sorted keys]. */
@@ -42,9 +44,32 @@ const shape = (s: Switch) => [s.all, [...s.sources].sort()];
 const ON = [false, []];
 const ALL_OFF = [true, [...SCHOOL_SOURCE_KEYS].sort()];
 
-test("the keys and the default", () => {
-  assert.deepEqual(SCHOOL_SOURCE_KEYS, ["athletics", "iu-student-affairs", "iu-featured"]);
+const INDY = ["athletics", "iu-featured", "iu-student-affairs"];
+const IUB = ["iub-athletics", "iub-featured", "iub-student-life"];
+
+test("the keys, the campuses and the default", () => {
+  assert.deepEqual(SCHOOL_SOURCE_KEYS, ["athletics", "iu-student-affairs", "iu-featured", "iub-athletics", "iub-student-life", "iub-featured"]);
+  assert.deepEqual(
+    Object.fromEntries(Object.entries(SCHOOL_CAMPUS_KEYS).map(([c, keys]) => [c, [...keys].sort()])),
+    { indianapolis: INDY, "iu-bloomington": IUB },
+  );
   assert.deepEqual(shape(SCHOOL_ON), ON);
+});
+
+test("a campus id turns off every calendar of that campus, and only those", (t) => {
+  const warn = t.mock.method(console, "warn", () => {});
+  assert.deepEqual(shape(parseSchoolOffEnv("iu-bloomington")), [false, IUB]);
+  assert.deepEqual(shape(parseSchoolOffEnv(" Indianapolis ")), [false, INDY]);
+  assert.deepEqual(shape(parseSchoolOffEnv("iu-bloomington,athletics")), [false, ["athletics", ...IUB].sort()]);
+  assert.deepEqual(shape(parseSchoolOffSetting(["iu-bloomington"])), [false, IUB]);
+  assert.deepEqual(shape(parseSchoolOffSetting(["iub-athletics"])), [false, ["iub-athletics"]]);
+  // Both campuses named is every calendar: all off.
+  assert.deepEqual(shape(parseSchoolOffEnv("indianapolis,iu-bloomington")), ALL_OFF);
+  assert.deepEqual(shape(parseSchoolOffSetting(["iu-bloomington", "indianapolis"])), ALL_OFF);
+  // A campus with no calendars, or an object key that isn't a campus, is just an unknown word.
+  assert.deepEqual(shape(parseSchoolOffEnv("iu-kokomo")), ON);
+  assert.deepEqual(shape(parseSchoolOffEnv("constructor,__proto__")), ON);
+  assert.ok(warn.mock.callCount() >= 2);
 });
 
 test("env: unset and the on words leave every calendar on", (t) => {
@@ -71,25 +96,31 @@ test("env: a comma list turns those calendars off; unknown keys are ignored (one
   assert.deepEqual(shape(parseSchoolOffEnv("athletics,iu-featurd")), [false, ["athletics"]]);
   assert.deepEqual(shape(parseSchoolOffEnv("athletics,iu-featurd")), [false, ["athletics"]]);
   assert.equal(warn.mock.callCount(), 1);
-  // Naming every calendar is all off.
-  assert.deepEqual(shape(parseSchoolOffEnv("athletics,iu-student-affairs,iu-featured")), ALL_OFF);
+  // Naming all of one campus's calendars is that campus off, not all off (Oct 19, 2026)...
+  assert.deepEqual(shape(parseSchoolOffEnv("athletics,iu-student-affairs,iu-featured")), [false, INDY]);
+  // ...and naming every calendar of both campuses is all off.
+  assert.deepEqual(shape(parseSchoolOffEnv(SCHOOL_SOURCE_KEYS.join(","))), ALL_OFF);
   // An off word inside a list is all off.
   assert.deepEqual(shape(parseSchoolOffEnv("athletics,all")), ALL_OFF);
 });
 
-test("env: a typo turns every calendar off (a kill switch errs toward hiding), with one warning", (t) => {
+test("env: an unknown word turns nothing off (Oct 19, 2026: it used to turn EVERY campus off), one warning", (t) => {
   const warn = t.mock.method(console, "warn", () => {});
-  for (const raw of ["ture", "athletcs", "disabled", "athletcs,iu-featurd"]) {
-    assert.deepEqual(shape(parseSchoolOffEnv(raw)), ALL_OFF, raw);
+  // A Bloomington name on a build that predates it, a key from a newer build, a typo: none hides anything.
+  for (const raw of ["ture", "athletcs", "disabled", "athletcs,iu-featurd", "purdue-west-lafayette"]) {
+    assert.deepEqual(shape(parseSchoolOffEnv(raw)), ON, raw);
   }
   parseSchoolOffEnv("ture");
-  assert.equal(warn.mock.callCount(), 4);
-  // Only commas and spaces name nothing: a typo too, never "on".
+  assert.equal(warn.mock.callCount(), 5);
+  assert.match(String(warn.mock.calls[0].arguments[1]), /unknown words ignored/);
+  // The known words beside an unknown one still count.
+  assert.deepEqual(shape(parseSchoolOffEnv("iub-athletcs,iub-featured")), [false, ["iub-featured"]]);
+  // Only commas and spaces name nothing at all: that can't be a list, so every calendar off, never "on".
   for (const raw of [",", " , ", ",,"]) {
     assert.deepEqual(shape(parseSchoolOffEnv(raw)), ALL_OFF, JSON.stringify(raw));
   }
   // "," and " , " are the same value once trimmed: one warning between them.
-  assert.equal(warn.mock.callCount(), 6);
+  assert.equal(warn.mock.callCount(), 8);
 });
 
 test("setting: false, null and no row are on; true is all off", () => {
@@ -105,7 +136,8 @@ test("setting: an array of keys turns those off, with the env list's rules", (t)
   assert.deepEqual(shape(parseSchoolOffSetting([" IU-Featured "])), [false, ["iu-featured"]]);
   assert.deepEqual(shape(parseSchoolOffSetting([])), ON);
   assert.deepEqual(shape(parseSchoolOffSetting(["athletics", "nope"])), [false, ["athletics"]]);
-  assert.deepEqual(shape(parseSchoolOffSetting(["nope"])), ALL_OFF);
+  // An unknown word alone turns nothing off (Oct 19, 2026; it was all off).
+  assert.deepEqual(shape(parseSchoolOffSetting(["nope"])), ON);
   assert.deepEqual(shape(parseSchoolOffSetting([...SCHOOL_SOURCE_KEYS])), ALL_OFF);
 });
 
@@ -128,6 +160,9 @@ test("merge: off if either says off", () => {
   assert.deepEqual(shape(mergeSchoolSwitch(parseSchoolOffEnv("true"), SCHOOL_ON)), ALL_OFF);
   assert.deepEqual(shape(mergeSchoolSwitch(SCHOOL_ON, parseSchoolOffSetting(true))), ALL_OFF);
   // Between them every calendar is named: all off.
-  const rest = parseSchoolOffSetting(["iu-student-affairs", "iu-featured"]);
+  const rest = parseSchoolOffSetting(["iu-student-affairs", "iu-featured", "iu-bloomington"]);
   assert.deepEqual(shape(mergeSchoolSwitch(athletics, rest)), ALL_OFF);
+  // One campus from each side: still only those two campuses' calendars, which is every one.
+  assert.deepEqual(shape(mergeSchoolSwitch(parseSchoolOffEnv("indianapolis"), parseSchoolOffSetting(["iu-bloomington"]))), ALL_OFF);
+  assert.deepEqual(shape(mergeSchoolSwitch(parseSchoolOffEnv("iub-athletics"), SCHOOL_ON)), [false, ["iub-athletics"]]);
 });

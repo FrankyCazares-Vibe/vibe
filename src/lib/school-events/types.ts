@@ -5,26 +5,46 @@
  * Contract: handoffs/2026-10-19-tonight-build/CONTRACT.md.
  */
 
-/** A school calendar Vibe reads. The list is fixed in code (sources.ts), never taken from a request. */
-export type SchoolSourceKey = "athletics" | "iu-student-affairs" | "iu-featured";
+/**
+ * A school calendar Vibe reads. The list is fixed in code (sources.ts), never
+ * taken from a request. Indianapolis keeps its first three names (the live
+ * off switch and Next's cache tags use them); Bloomington's start with "iub-"
+ * (Oct 19, 2026).
+ */
+export type SchoolSourceKey =
+  | "athletics"
+  | "iu-student-affairs"
+  | "iu-featured"
+  | "iub-athletics"
+  | "iub-student-life"
+  | "iub-featured";
 
 export type SchoolSource = {
   key: SchoolSourceKey;
   /** The office beside the "School event" tag: "Athletics", "Student Affairs", "IU Indianapolis". */
   host: string;
-  /** The credit, plain text: "From the IU Indy athletics calendar". */
+  /** The credit, plain text: "From the IU Indy athletics calendar", "From the IU Athletics calendar". */
   credit: string;
   /** The calendar's public page, https on the source's own host: what the credit links to. */
   calendar_url: string;
+  /**
+   * "athletics": the campus's home games (what "Home games this week" reads);
+   * "calendar": a school events calendar. Added Oct 19, 2026, so the screens
+   * stop looking for the one key "athletics" (Bloomington's is "iub-athletics").
+   * Optional only because an older server's answer lacks it.
+   */
+  role?: "athletics" | "calendar";
+  /** The calendar's short name for a heading: "IU Indy Athletics", "IU Athletics", "IU Bloomington Student Life". */
+  label?: string;
 };
 
 export type SchoolEvent = {
   /** "athletics:<UID>" or "iu:<LiveWhale id>". Stable across refreshes. Never an events-table uuid. */
   id: string;
   source: SchoolSourceKey;
-  /** "game": an IU Indy HOME game (athletics). "event": anything else. */
+  /** "game": a HOME game from the campus's athletics calendar. "event": anything else. */
   kind: "game" | "event";
-  /** Plain text, at most 120 characters. Games: "IU Indy vs UT Martin". */
+  /** Plain text, at most 120 characters. Games: "IU Indy vs UT Martin", "IU vs Purdue". */
   title: string;
   /** Games: the two sides, for the italic "vs". Null for events, or a game whose title didn't parse. */
   matchup: { home: string; away: string } | null;
@@ -46,7 +66,11 @@ export type SchoolEvent = {
   tickets_url: string | null;
   /** "Watch on ESPN+": only when the feed says "TV: ESPN+" and lists an espn.com stream. */
   watch_url: string | null;
-  /** From the school's own Featured Events calendar (iu-featured). Only this can lead as "Featured by your school". */
+  /**
+   * From a calendar marked `featured` in sources.ts: only Indy's Featured
+   * Events (iu-featured). Bloomington's group 341 counts as a plain calendar
+   * (Franky, Oct 19, 2026). Only this can lead as "Featured by your school".
+   */
   featured: boolean;
 };
 
@@ -58,7 +82,7 @@ export type SchoolEventsResponse = {
   ok: true;
   /**
    * False when the switch is off, the campus on screen has no school calendar
-   * (every campus but Indianapolis in v1), or the answer is not for one campus
+   * (every campus but Indianapolis and Bloomington, Oct 19 2026), or the answer is not for one campus
    * (`?campus=all`, no home campus). The screens then hide every school part.
    */
   school_on: boolean;

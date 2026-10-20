@@ -8,7 +8,7 @@ import { revalidateTag } from "next/cache";
 import { createSupabaseServiceClient, isSupabaseServiceConfigured } from "@/lib/supabase/service";
 
 import { ICS_MAX_CHARS } from "./ics";
-import { SCHOOL_FEEDS, mergeSchoolEvents, normalizeFeedWithCount, type SchoolFeed } from "./sources";
+import { feedsForCampus, mergeSchoolEvents, normalizeFeedWithCount, type SchoolFeed } from "./sources";
 import { SCHOOL_ON, mergeSchoolSwitch, parseSchoolOffEnv, parseSchoolOffSetting, type SchoolSwitch } from "./switch";
 import type { SchoolEvent, SchoolSource, SchoolSourceKey } from "./types";
 
@@ -78,10 +78,10 @@ function fixtureMode(): "file" | "fail" | null {
   return raw === "1" ? "file" : raw === "fail" ? "fail" : null;
 }
 
-/** `src/lib/school-events/fixtures/<key>.ics`; a missing file is an empty calendar (iu-featured has none). */
+/** `src/lib/school-events/fixtures/<key>.ics`; a missing file is an empty calendar (iu-featured has none; the iub-* files are Oct 19, 2026). */
 async function readFixture(key: SchoolSourceKey): Promise<string> {
   try {
-    // `key` comes from SCHOOL_FEEDS, never from a request.
+    // `key` comes from the fixed feed list (sources.ts), never from a request.
     return await readFile(join(process.cwd(), "src", "lib", "school-events", "fixtures", `${key}.ics`), "utf8");
   } catch {
     return "BEGIN:VCALENDAR\nEND:VCALENDAR\n";
@@ -125,7 +125,7 @@ async function fetchFeed(feed: SchoolFeed): Promise<FeedBody> {
       headers: { "user-agent": SCHOOL_EVENTS_USER_AGENT, accept: "text/calendar" },
       // A redirect is refused (it lands as status_30x below), not followed:
       // a feed address that starts pointing at another site must not get its
-      // text onto every Indianapolis screen. This also covers Next's
+      // text onto every screen of that campus. This also covers Next's
       // background refresh, which reuses these options. If a school moves
       // its feed, update feed_url in sources.ts.
       redirect: "manual",
@@ -166,16 +166,18 @@ async function loadFeed(feed: SchoolFeed): Promise<{ items: SchoolEvent[]; fetch
     throw err instanceof FeedFailure ? err : new FeedFailure("read_failed");
   }
   // A 200 that isn't a calendar (a maintenance page) must not wipe the last good list.
-  // A real calendar with no events (Featured is empty today) is a good answer.
+  // A real calendar with no events (Indy's Featured was empty on Oct 19) is a good answer.
   if (!/BEGIN:VCALENDAR/i.test(body.text)) {
     if (mode !== "file") dropCachedCopy(feed);
     throw new FeedFailure("not_ics");
   }
   const { parsed, events } = normalizeFeedWithCount(body.text, feed);
   // Rows came in but none passed: most likely the school changed its format (a new LOCATION
-  // style hides every home game). Still a good answer, but said once in the log instead of
-  // going quiet. Not for Featured, whose few rows can all be all-day picks.
-  if (parsed > 0 && events.length === 0 && feed.key !== "iu-featured") warnOnce(feed.key, "none_kept");
+  // style hides every home game), or a CDN answered with a calendar of nothing usable. Still
+  // a good answer, but said once in the log instead of going quiet. Not for a `featured`
+  // calendar, whose few picks can all be all-day. By the flag, not the key (Oct 19, 2026):
+  // Bloomington's "featured" group lists about 180 events and must be reported.
+  if (parsed > 0 && events.length === 0 && !feed.featured) warnOnce(feed.key, "none_kept");
   return { items: events, fetchedAt: body.fetchedAt };
 }
 
@@ -218,21 +220,32 @@ function readFeed(feed: SchoolFeed): Promise<SchoolEvent[]> {
   return pending;
 }
 
+/** What the screens get: the credit, the calendar page and the role and label (never the feed address). */
 function toSource(feed: SchoolFeed): SchoolSource {
-  return { key: feed.key, host: feed.host, credit: feed.credit, calendar_url: feed.calendar_url };
+  return {
+    key: feed.key,
+    host: feed.host,
+    credit: feed.credit,
+    calendar_url: feed.calendar_url,
+    role: feed.role,
+    label: feed.label,
+  };
 }
 
 /**
- * Every calendar not in `skip`, in parallel, merged around `now` (the
- * route's clock: real time, or the dev-only `&now=`). `sources` are the
+ * The campus's calendars not in `skip`, in parallel, merged around `now`
+ * (the route's clock: real time, or the dev-only `&now=`). `sources` are the
  * calendars switched on, in fixed order, without their feed addresses.
- * Never throws: on anything unexpected it answers no events.
+ * Only `campusId`'s calendars are read (Oct 19, 2026: Bloomington never
+ * fetches Indy's, and the other way round). Never throws: on anything
+ * unexpected it answers no events.
  */
 export async function readSchoolEvents(opts: {
+  campusId: string;
   now: number;
   skip: ReadonlySet<SchoolSourceKey>;
 }): Promise<{ events: SchoolEvent[]; sources: SchoolSource[] }> {
-  const feeds = SCHOOL_FEEDS.filter((feed) => !opts.skip.has(feed.key));
+  const feeds = feedsForCampus(opts.campusId).filter((feed) => !opts.skip.has(feed.key));
   const sources = feeds.map(toSource);
   try {
     const lists = await Promise.all(feeds.map((feed) => readFeed(feed).catch(() => [] as SchoolEvent[])));

@@ -55,6 +55,9 @@ const {
   shouldRoll,
   stripEntries,
   stripIsEmpty,
+  STRIP_MAX_TAGS,
+  tagChipCount,
+  tagChipHover,
   tagChipTitle,
 } = await import("./rolling-strip-view");
 
@@ -90,7 +93,7 @@ test("formatUpcomingChip: today, tomorrow, weekday inside a week, month/day beyo
   assert.equal(formatUpcomingChip("not a date", NOW), "");
 });
 
-test("orderChips: soonest three events inside 14 days, then up to eight tags", () => {
+test("orderChips: soonest three events inside 14 days, then up to five tags", () => {
   const upcoming = [ev("d", 10), ev("a", 0), ev("far", 15), ev("c", 5, "maybe"), ev("b", 1)];
   const trending = Array.from({ length: 10 }, (_, i) => ({ tag: `t${i}`, count: 10 - i }));
   const chips = orderChips(upcoming, trending, NOW);
@@ -98,7 +101,10 @@ test("orderChips: soonest three events inside 14 days, then up to eight tags", (
     chips.filter((c) => c.kind === "event").map((c) => (c.kind === "event" ? c.id : "")),
     ["a", "b", "c"],
   );
-  assert.equal(chips.filter((c) => c.kind === "tag").length, 8);
+  assert.equal(STRIP_MAX_TAGS, 5);
+  const tags = chips.filter((c) => c.kind === "tag");
+  // Five, the route's top five in its order (it is still asked for eight).
+  assert.deepEqual(tags.map((c) => (c.kind === "tag" ? c.tag : "")), ["t0", "t1", "t2", "t3", "t4"]);
   assert.equal(chips[0].kind, "event");
   assert.equal(chips[3].kind, "tag");
   const first = chips[0];
@@ -194,4 +200,25 @@ test("chip copy: tooltips and the aria-label", () => {
   assert.equal(tagChipTitle(1), "1 person this week");
   assert.equal(tagChipTitle(2.7), "2 people this week");
   assert.equal(tagChipTitle(-3), "0 people this week");
+});
+
+test("tagChipCount: 'N people' from two up, no bare number at one (Oct 19, 2026)", () => {
+  assert.equal(tagChipCount(2), "2 people");
+  assert.equal(tagChipCount(12), "12 people");
+  assert.equal(tagChipCount(2.9), "2 people");
+  for (const n of [1, 1.9, 0, -4, Number.NaN, Number.POSITIVE_INFINITY]) {
+    assert.equal(tagChipCount(n), null, String(n));
+  }
+});
+
+test("stripEntries: never more than five tags, whatever the route sends", () => {
+  const trending = Array.from({ length: 12 }, (_, i) => ({ tag: `tag${i}`, count: 12 - i }));
+  const entries = stripEntries({ upcoming: [], trending, upcomingErr: null, trendingErr: null }, NOW);
+  assert.equal(entries.filter((e) => e.kind === "tag").length, 5);
+});
+
+test("tagChipHover: the whole tag, even one the chip cuts, then the head count (Oct 19, 2026)", () => {
+  assert.equal(tagChipHover("mobile", 1), "#mobile · 1 person this week");
+  const long = "a_very_long_tag_that_is_32_chars";
+  assert.equal(tagChipHover(long, 6), `#${long} · 6 people this week`);
 });

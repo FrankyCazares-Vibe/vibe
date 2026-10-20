@@ -64,6 +64,14 @@ export const BUDGETS = {
   eventCheckinDoor: { limit: 180, windowSec: 600 },
   /** An event's attendee list for its officers (re-read every 20 s while check-in can happen). */
   eventAttendeesRead: { limit: 240, windowSec: 600 },
+  /**
+   * Open a post's "Reposted by" list (GET /api/posts/[id]/reposters, Oct 19,
+   * 2026). One read per tap, so a few dozen a day is heavy use; 600 stops a
+   * script walking every post for who-follows-whom. A DAY window on purpose,
+   * as the school calendars: the count says only that an account opened a
+   * list that day, never when.
+   */
+  repostersRead: { limit: 600, windowSec: 86_400 },
 } as const satisfies Record<string, Pick<RateLimitOptions, "limit" | "windowSec" | "failClosed">>;
 
 export type BudgetName = keyof typeof BUDGETS;

@@ -1,0 +1,10 @@
+HTTP/2 200 
+date: Mon, 19 Oct 2026 23:09:21 GMT
+content-type: text/plain; charset=utf-8
+vary: Accept-Encoding
+x-trace: 00-734e90548ab01eea05905bf8ea6f84ca-d5933f198cf0f539-00
+access-control-expose-headers: X-Trace
+strict-transport-security: max-age=31536000
+x-cdn: Imperva
+x-iinfo: 47-78905130-78905139 NNNY CT(9 9 0) RT(1792451361178 36) q(0 0 0 0) r(1 1) U12
+

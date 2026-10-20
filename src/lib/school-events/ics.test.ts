@@ -256,3 +256,22 @@ test("fixtures: athletics has 221 events, Student Affairs 125", () => {
   // A folded tag line comes out whole.
   assert.ok(affairs.some((e) => (e.x["X-LIVEWHALE-TAGS"] ?? "").includes("Group Fitness Classes")));
 });
+
+test("fixtures: Bloomington's calendars (Oct 19, 2026) parse whole: 282 games, 108 and 181 events", () => {
+  const fixture = (name: string) => readFileSync(new URL(`./fixtures/${name}.ics`, import.meta.url), "utf8");
+  const athletics = parseIcs(fixture("iub-athletics"));
+  const life = parseIcs(fixture("iub-student-life"));
+  const featured = parseIcs(fixture("iub-featured"));
+  assert.deepEqual([athletics.length, life.length, featured.length], [282, 108, 181]);
+  // The bare home place ("Bloomington, Ind." with no venue) and a venue after the escaped comma.
+  assert.ok(athletics.some((e) => e.location === "Bloomington, Ind."));
+  assert.ok(athletics.some((e) => e.location === "Bloomington, Ind., Jerry Yeagley Field at Bill Armstrong Stadium"));
+  // `&amp;` in the game links comes out as `&`.
+  assert.ok(athletics.every((e) => e.url === null || !e.url.includes("&amp;")));
+  // A folded event link comes out whole, with its number (the duplicate key, sources.ts).
+  assert.ok(life.some((e) => e.url === "https://events.iu.edu/live/events/2432980-union-board-stem-canvas-present-hue-knew"));
+  // The fixtures were trimmed to the lines Vibe reads: no organizer or contact lines.
+  for (const name of ["iub-athletics", "iub-student-life", "iub-featured"]) {
+    assert.ok(!/^(ORGANIZER|CONTACT|ATTENDEE)[:;]/m.test(fixture(name)), name);
+  }
+});

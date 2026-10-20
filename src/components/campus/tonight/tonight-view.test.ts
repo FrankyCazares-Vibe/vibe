@@ -323,6 +323,11 @@ test("sportTail", () => {
   assert.equal(V.sportTail("Volleyball"), " first serve");
   assert.equal(V.sportTail("Women's swimming"), "");
   assert.equal(V.sportTail(null), "");
+  // Oct 19, 2026 (Bloomington's feed): football kicks off, baseball and softball throw a first pitch.
+  assert.equal(V.sportTail("Football"), " kickoff");
+  assert.equal(V.sportTail("Baseball"), " first pitch");
+  assert.equal(V.sportTail("Softball"), " first pitch");
+  assert.equal(V.sportTail("Field hockey"), "");
 });
 
 test("headings follow what sits above the club rows", () => {
@@ -394,7 +399,9 @@ test("rule lines and reason labels", () => {
   const live = game("g2", campus(15, 30));
   const featured = schoolEvent("f1", campus(20), campus(21), { source: "iu-featured", featured: true });
   const c = club("c1", campus(20), campus(22));
-  assert.equal(V.leadRuleLine(build([g], []).lead!), "First because it starts soonest.");
+  // A game that hasn't started can lead past an earlier school event (decision 7), so it says why.
+  assert.equal(V.leadRuleLine(build([g], []).lead!), "First because it's tonight's home game.");
+  assert.equal(V.leadRuleLine(build([schoolEvent("s1", campus(17), campus(18))], []).lead!), "First because it starts soonest.");
   assert.equal(V.leadRuleLine(build([live], []).lead!), "First because it's on right now.");
   assert.equal(V.leadRuleLine(build([featured, g], []).lead!), "Your school featured this today. Never paid, never ranked by popularity.");
   assert.equal(V.leadRuleLine(build([], [c]).lead!), "Nothing from your school tonight, so the soonest club event leads.");
@@ -491,4 +498,97 @@ test("mergeComingUp: clubs and school by start then title, the filter, sources a
   assert.deepEqual(school.map((e) => e.kind), ["school", "school"]);
   const clubs = V.mergeComingUp({ clubs: [c1, c2], school: [s1, s2], sources, filter: "clubs" });
   assert.deepEqual(clubs.map((e) => e.key), ["club:c1", "club:c2"]);
+});
+
+// ── Oct 19, 2026: Bloomington, and a home game first ───────────────────────
+
+const IUB_SOURCES: SchoolSource[] = [
+  { key: "iub-athletics", host: "Athletics", credit: "From the IU Athletics calendar", calendar_url: "https://iuhoosiers.com/calendar.aspx", role: "athletics", label: "IU Athletics" },
+  { key: "iub-student-life", host: "Student Life", credit: "From the IU Bloomington Student Life calendar", calendar_url: "https://events.iu.edu/", role: "calendar", label: "IU Bloomington Student Life" },
+  { key: "iub-featured", host: "IU Bloomington", credit: "From the IU Bloomington featured events calendar", calendar_url: "https://events.iu.edu/iub-featured/", role: "calendar", label: "IU Bloomington" },
+];
+const iubGame = (id: string, start: number, over: Partial<SchoolEvent> = {}) =>
+  game(id, start, {
+    id: `iub-athletics:${id}`,
+    source: "iub-athletics",
+    title: "IU vs Purdue",
+    matchup: { home: "IU", away: "Purdue" },
+    sport: "Women's soccer",
+    location: "Jerry Yeagley Field at Bill Armstrong Stadium",
+    url: `https://iuhoosiers.com/calendar.aspx?game_id=${id}`,
+    ...over,
+  });
+
+test("lead (decision 7): tonight's home game beats a school event that's merely on now, on every campus", () => {
+  const dinner = schoolEvent("dinner", campus(15), campus(18), { source: "iub-student-life", host: "Student Life" });
+  const soccer = iubGame("soccer", campus(19));
+  let v = V.buildTonight({ school: [dinner, soccer], clubs: [], sources: IUB_SOURCES, now: NOW });
+  assert.equal(v.lead?.key, "school:iub-athletics:soccer");
+  assert.equal(v.lead?.reason, "next", "the game hasn't started: Up next, never 'Happening now'");
+  assert.equal(V.leadRuleLine(v.lead!), "First because it's tonight's home game.");
+  assert.deepEqual(v.school.map((i) => i.key), ["school:iu:dinner"], "the event on now is the first row under it");
+  // Indy the same: a game at 5 PM leads past a fair on since 3 PM.
+  v = build([schoolEvent("fair", campus(15), campus(18)), game("g1", campus(17))], []);
+  assert.equal(v.lead?.key, "school:athletics:g1");
+  // Two games tonight: the one on now, else the soonest.
+  v = build([game("late", campus(19)), game("early", campus(17))], []);
+  assert.equal(v.lead?.key, "school:athletics:early");
+  v = build([game("late", campus(19)), game("on", campus(15, 30))], []);
+  assert.deepEqual([v.lead?.key, v.lead?.reason], ["school:athletics:on", "live"]);
+  // The school's own featured pick still comes first.
+  const featured = schoolEvent("f1", campus(21), campus(22), { source: "iu-featured", featured: true });
+  v = build([game("g1", campus(17)), featured], []);
+  assert.deepEqual([v.lead?.key, v.lead?.reason], ["school:iu:f1", "featured"]);
+  // A game that's over isn't tonight's any more: the event on now leads again.
+  v = build([schoolEvent("fair", campus(15), campus(18)), game("done", campus(13))], []);
+  assert.equal(v.lead?.key, "school:iu:fair");
+  // And a club event never leads past a game, however full.
+  v = build([game("g1", campus(19))], [club("packed", campus(15), campus(22), { going_count: 400 })]);
+  assert.equal(v.lead?.kind, "school");
+});
+
+test("Bloomington words: 'IU vs Purdue', the kickoff, the credit and the week's label come from its sources", () => {
+  const soccer = iubGame("soccer", campus(19));
+  const football = iubGame("fb", campus(15, 30, 1), { sport: "Football", title: "IU vs Minnesota", matchup: { home: "IU", away: "Minnesota" }, location: "Bloomington" });
+  const v = V.buildTonight({ school: [soccer, football], clubs: [], sources: IUB_SOURCES, now: NOW });
+  assert.equal(v.lead?.ev.title, "IU vs Purdue");
+  assert.equal(v.lead?.text.timeTail, " kickoff");
+  assert.equal(v.lead?.text.byline, "Athletics · Women's soccer");
+  assert.deepEqual(v.credits.map((s) => s.credit), ["From the IU Athletics calendar"]);
+  // The week's tiles read games by kind, not by the key "athletics".
+  const tiles = V.buildHomeWeek([soccer, football, schoolEvent("talk", campus(18), campus(19), { source: "iub-student-life" })], NOW);
+  assert.deepEqual(tiles.map((t) => [t.key, t.versus, t.sport]), [
+    ["school:iub-athletics:soccer", "vs Purdue", "Women's soccer"],
+    ["school:iub-athletics:fb", "vs Minnesota", "Football"],
+  ]);
+  assert.equal(V.athleticsSource(IUB_SOURCES)?.key, "iub-athletics");
+  assert.equal(V.homeWeekLabel(IUB_SOURCES), "IU Athletics");
+  assert.equal(V.homeWeekLabel(IUB_SOURCES.slice(1)), "", "athletics switched off: no label");
+  // Indy's answer from before Oct 19 had no role or label: still found by its key, still named.
+  assert.equal(V.athleticsSource(SOURCES)?.key, "athletics");
+  assert.equal(V.homeWeekLabel(SOURCES), "IU Indy Athletics");
+  assert.equal(V.homeWeekLabel([{ ...SOURCES[0], role: "athletics", label: "IU Indy Athletics" }]), "IU Indy Athletics");
+  // The empty Events card names no campus, so Bloomington can show it too.
+  assert.doesNotMatch(V.TONIGHT_COPY.noSchoolWeekBody, /Indy|Indianapolis|Bloomington/);
+});
+
+test("lead (Oct 19, 2026): only a game from 5 PM, or one on now, jumps the queue; the line says today's or tonight's", () => {
+  // Sun 11 AM: a noon game doesn't lead past a hike that has been on since 9 AM.
+  const hike = schoolEvent("hike", campus(9), campus(15));
+  let v = build([hike, game("noon", campus(12))], [], "all", campus(11));
+  assert.deepEqual([v.lead?.key, v.lead?.reason], ["school:iu:hike", "live"]);
+  // Fri 1 PM: a 2 PM meet and a 7 PM game. The evening game leads, and says "tonight's".
+  const swim = game("swim", campus(14), { sport: "Swimming and diving", title: "IU vs Kentucky, USC" });
+  const soccer = game("soccer", campus(19), { sport: "Men's soccer" });
+  v = build([swim, soccer], [], "all", campus(13));
+  assert.equal(v.lead?.key, "school:athletics:soccer");
+  assert.equal(V.leadRuleLine(v.lead!), "First because it's tonight's home game.");
+  // Once the meet is on, it leads as on now.
+  v = build([swim, soccer], [], "all", campus(14, 30));
+  assert.deepEqual([v.lead?.key, v.lead?.reason], ["school:athletics:swim", "live"]);
+  // A 2 PM game leading before it starts says "today's", like its tile ("Today 2:00 PM").
+  v = build([swim], [], "all", campus(13));
+  assert.equal(v.lead?.key, "school:athletics:swim");
+  assert.equal(V.leadRuleLine(v.lead!), "First because it's today's home game.");
+  assert.equal(V.buildHomeWeek([swim], campus(13))[0].label, "Today 2:00 PM");
 });

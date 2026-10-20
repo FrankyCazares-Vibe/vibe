@@ -566,3 +566,10 @@ Notes: /private/tmp/claude-501/-Users-franciscocazares-vibe/81a12e11-4ed3-4da4-8
 - No dead end: /auth/signup with sign-up closed shows the access-code form with 'No code yet? Join the waitlist'; the sign-in page shows 'New to Vibe? Join the waitlist' and 'Got an access code?' (src/app/auth/login/page.tsx:391-407, seen in seo/login-mobile-final.jpg)
 - Side doors that reach sign-in first: /orgs/sae signed out offers only 'Sign in' and 'Sign in to follow', no waitlist link; /posts/<id> sends the browser to sign-in (src/app/posts/[id]/SignedOutShell.tsx:22-26); the 404 card's main button (src/app/not-found.tsx:34)
 - Known open app fix: https://www.connectvibe.app/get opened as an iPhone -> 307 /campus -> sign-in, not the front page or waitlist (src/app/get/route.ts:44-48); the marketing plan already bans that link (vibe-marketing/campaigns/2026-10-launch/campaign-plan.md:141)
+
+## Added Oct 19, 2026 (critique B3)
+
+- **Launch morning:** set `TRENDING_MIN_AUTHORS` from 1 to 2 in `src/lib/trending/count-tags.ts:29` and
+  its assert in `count-tags.test.ts`, so a tag needs two different people to trend (Franky's decision 4).
+  Tie it to whichever launch date Franky confirms (roadmap v14 says Oct 26; vibe-marketing/CLAUDE.md says
+  Oct 31 with launch night Oct 29).

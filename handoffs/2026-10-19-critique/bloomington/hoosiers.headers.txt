@@ -1,0 +1,16 @@
+HTTP/2 200 
+date: Mon, 19 Oct 2026 23:09:38 GMT
+content-type: text/calendar
+content-length: 129713
+cache-control: private
+strict-transport-security: max-age=31536000; includeSubDomains
+x-content-type-options: nosniff
+x-xss-protection: 1; mode=block
+referrer-policy: no-referrer-when-downgrade
+access-control-allow-origin: *
+x-sa-pr: calendar
+x-cache-status: MISS
+access-control-allow-headers: DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range,tenant,x-sidearm-auth
+x-cdn: Imperva
+x-iinfo: 54-155472979-155469049 PNNN RT(1792451378701 32) q(0 1 1 6) r(4 4) U2
+

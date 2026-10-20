@@ -33,7 +33,7 @@ import {
   httpsHref,
   schoolHref,
 } from "./TonightBits";
-import { leadRuleLine, sectionHeadings, TONIGHT_COPY } from "./tonight-view";
+import { athleticsSource, homeWeekLabel, leadRuleLine, sectionHeadings, TONIGHT_COPY } from "./tonight-view";
 import type {
   SchoolEventsState,
   TonightItem,
@@ -371,15 +371,20 @@ function Row({
   );
 }
 
-/** "Home games this week": athletics only, two tiles a row, played ones faded. */
+/**
+ * "Home games this week": athletics only, two tiles a row, played ones faded.
+ * The calendar and its name come from the campus's athletics source (Oct 19,
+ * 2026): "IU Athletics" in Bloomington, "IU Indy Athletics" in Indy.
+ */
 function HomeWeek({ tiles, sources }: { tiles: WeekTile[]; sources: SchoolSource[] }) {
-  const fallback = httpsHref(sourceOf(sources, "athletics")?.calendar_url);
+  const fallback = httpsHref(athleticsSource(sources)?.calendar_url);
+  const label = homeWeekLabel(sources);
   return (
     <>
       <div className="tonight-sheet-hr tonight-sheet-hr--week" aria-hidden="true" />
       <div className="tonight-sheet-weekhead">
         <h3 className="tonight-sheet-h3">{TONIGHT_COPY.homeWeek}</h3>
-        <span className="tonight-sheet-weeksub">{TONIGHT_COPY.homeWeekSub}</span>
+        {label ? <span className="tonight-sheet-weeksub">{label}</span> : null}
       </div>
       <ol className="tonight-week">
         {tiles.map((tile) => {
@@ -441,7 +446,8 @@ function sourceOf(sources: SchoolSource[], key: SchoolSource["key"]): SchoolSour
  * tiles show, since those come from it even with no game tonight.
  */
 function sheetCredits(view: TonightView, sources: SchoolSource[], weekShown: boolean): SchoolSource[] {
-  return sources.filter((s) => view.credits.some((c) => c.key === s.key) || (weekShown && s.key === "athletics"));
+  const athletics = weekShown ? athleticsSource(sources) : null;
+  return sources.filter((s) => view.credits.some((c) => c.key === s.key) || s === athletics);
 }
 
 /** The sheet's Close mark (the boards' 12-grid x), currentColor. */

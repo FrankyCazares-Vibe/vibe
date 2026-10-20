@@ -39,14 +39,17 @@ registerHooks({
 
 const { firstBlockedPostTag } = await import("./post-tag-filter");
 const { captionHashtags } = await import("./caption-tags");
-const { firstBlockedTag, isValidPostTag, normalizePostTags } = await import("./tags");
+const { POST_TAG_MAX, firstBlockedTag, isValidPostTag, normalizePostTags } = await import("./tags");
 const { extractPostTags } = await import("./edit");
 const { filterTerms } = await import("../moderation/text-filter-list");
 
 const TERMS = filterTerms();
 const asToken = (term: string) => term.replace(/ /g, "_");
-/** Ten harmless tags, so an eleventh is never among the stored ones. */
-const TEN = Array.from({ length: 10 }, (_, i) => `#week_${i}`).join(" ");
+/**
+ * A full post's worth of harmless tags (5 since Oct 19, 2026), so one more is
+ * never among the stored ones.
+ */
+const FULL = Array.from({ length: POST_TAG_MAX }, (_, i) => `#week_${i}`).join(" ");
 
 /** What PATCH /api/posts/[id] runs on new caption text. */
 const editCheck = (caption: string) => firstBlockedPostTag(extractPostTags(caption), caption);
@@ -55,44 +58,43 @@ test("the list is not empty (every positive below is real)", () => {
   assert.ok(TERMS.length > 0);
 });
 
-test("an 11th tag with a listed term is refused on edit", () => {
+test("a tag past the cap with a listed term is refused on edit", () => {
+  assert.equal(POST_TAG_MAX, 5);
   TERMS.forEach(({ term }, i) => {
-    const caption = `${TEN} #${asToken(term)}_club`;
-    // The stored tags stop at 10, so the old edit filter never saw it.
-    assert.equal(extractPostTags(caption).length, 10);
+    const caption = `${FULL} #${asToken(term)}_club`;
+    // The stored tags stop at 5, so a filter over them alone never sees it.
+    assert.equal(extractPostTags(caption).length, POST_TAG_MAX);
     assert.equal(firstBlockedTag(extractPostTags(caption)), null, `term #${i}: stored tags`);
     assert.notEqual(editCheck(caption), null, `term #${i}: edit`);
   });
 });
 
-test("a #café_<term> edit is refused (non-ASCII tag, never stored whole)", () => {
+test("a #café_<term> edit is refused (non-ASCII tag, never stored)", () => {
   TERMS.forEach(({ term }, i) => {
     const caption = `Coffee chat #café_${asToken(term)}`;
-    // extractPostTags stops at the é and stores "caf".
-    assert.deepEqual(extractPostTags(caption), ["caf"], `term #${i}: stored tags`);
+    // Since Oct 19, 2026 a tag that runs on into an accented letter is no
+    // tag at all (it used to store "caf"); the caption check still sees it.
+    assert.deepEqual(extractPostTags(caption), [], `term #${i}: stored tags`);
     assert.notEqual(editCheck(caption), null, `term #${i}: edit`);
   });
 });
 
 test("a tag over 32 characters with a listed term at the end is refused on edit", () => {
-  let cutShown = 0;
   TERMS.forEach(({ term }, i) => {
     const caption = `#${"a".repeat(30)}_${asToken(term)}`;
-    const stored = extractPostTags(caption);
-    assert.equal(stored[0].length, 32, `term #${i}: stored tag is cut at 32`);
-    if (firstBlockedTag(stored) === null) cutShown += 1;
+    // Since Oct 19, 2026 an over-long tag is never stored (it used to be cut
+    // to 32, which hid the term): only the caption check can catch it.
+    assert.deepEqual(extractPostTags(caption), [], `term #${i}: never stored, never cut`);
     assert.notEqual(editCheck(caption), null, `term #${i}: edit`);
   });
-  // The cut really does hide the term from the stored tags (why this exists).
-  assert.ok(cutShown > 0, "every cut tag still carried its term; the gap this closes is gone");
 });
 
 test("edit and publish agree on the same caption", () => {
   const captions = [
     "Welcome week! #campus_life #iu_2026 #class_of_2027 #assessment #scunthorpe #café",
-    `${TEN} #eleventh`,
+    `${FULL} #one_more`,
     `#${"b".repeat(40)} long one`,
-    ...TERMS.map(({ term }) => `${TEN} #café_${asToken(term)} #${"c".repeat(33)}_${asToken(term)}`),
+    ...TERMS.map(({ term }) => `${FULL} #café_${asToken(term)} #${"c".repeat(33)}_${asToken(term)}`),
   ];
   for (const caption of captions) {
     const tags = extractPostTags(caption);
@@ -105,13 +107,13 @@ test("edit and publish agree on the same caption", () => {
 test("ordinary edits pass, and the stored tags are unchanged and valid", () => {
   for (const caption of [
     "Welcome week! #campus_life #iu_2026 #class_of_2027 #assessment #scunthorpe #café",
-    `${TEN} #eleventh #${"d".repeat(40)}`,
+    `${FULL} #one_more #${"d".repeat(40)}`,
     "no tags at all",
     "",
   ]) {
     assert.equal(editCheck(caption), null, caption.slice(0, 20));
     const tags = extractPostTags(caption);
-    assert.ok(tags.length <= 10);
+    assert.ok(tags.length <= POST_TAG_MAX);
     for (const tag of tags) assert.ok(isValidPostTag(tag), tag);
   }
 });

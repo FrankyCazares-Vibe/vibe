@@ -23,7 +23,8 @@
  * this needs the resolve hook from src/lib/posts/tags.test.ts.
  */
 
-import { firstBlockedTag, isValidPostTag } from "../posts/tags";
+import { isNewPostTag } from "../posts/edit";
+import { firstBlockedTag } from "../posts/tags";
 
 /** Different people a tag needs before it shows on the strip. Pilot: 1. Launch: 2. */
 export const TRENDING_MIN_AUTHORS = 1;
@@ -45,7 +46,9 @@ export type CountTrendingOptions = {
 function readTag(raw: unknown): string | null {
   if (typeof raw !== "string") return null;
   const tag = raw.trim().toLowerCase().replace(/^#+/, "");
-  return isValidPostTag(tag) ? tag : null;
+  // The new-tag rule (a letter, 2+ characters, Oct 19 2026): an old stored
+  // "#1" stays on its post but never trends.
+  return isNewPostTag(tag) ? tag : null;
 }
 
 /**

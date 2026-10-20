@@ -41,9 +41,17 @@ registerHooks({
   },
 });
 
-const { POST_TAG_MAX, POST_TAG_MAX_LEN, POST_TAG_RE, isValidPostTag, normalizePostTags, firstBlockedTag } =
-  await import("./tags");
-const { extractPostTags } = await import("./edit");
+const {
+  POST_TAG_MAX,
+  POST_TAG_MAX_LEN,
+  POST_TAG_RE,
+  isNewPostTag,
+  isValidPostTag,
+  normalizePostTags,
+  firstBlockedTag,
+} = await import("./tags");
+const edit = await import("./edit");
+const { extractPostTags } = edit;
 const { filterTerms } = await import("../moderation/text-filter-list");
 
 const TERMS = filterTerms();
@@ -55,8 +63,7 @@ const WEIRD = [
   "#UPPER", "#Mixed_Case_9", "x".repeat(POST_TAG_MAX_LEN + 1), "y".repeat(POST_TAG_MAX_LEN),
 ];
 
-test("the grammar: 1-32 of a-z, 0-9, _ (the SQL twin's pattern)", () => {
-  assert.equal(POST_TAG_MAX, 10);
+test("the read grammar: 1-32 of a-z, 0-9, _ (the SQL twin's pattern), so old tags still work", () => {
   assert.equal(POST_TAG_MAX_LEN, 32);
   assert.equal(POST_TAG_RE.source, "^[a-z0-9_]{1,32}$");
   for (const ok of ["a", "_", "campus_life", "iu_2026", "0", "z".repeat(32)]) {
@@ -64,11 +71,29 @@ test("the grammar: 1-32 of a-z, 0-9, _ (the SQL twin's pattern)", () => {
   }
   const bad: unknown[] = ["", "z".repeat(33), "Foo", "café", "½", "²", "Ⅻ", "٣", "ａ", "a b", "a-b", "#a", "a\n", "<b>", null, 7, ["a"]];
   for (const value of bad) assert.equal(isValidPostTag(value), false, JSON.stringify(value));
+  // Old stored tags the Oct 19, 2026 write rule refuses still read as tags.
+  for (const old of ["1", "a", "2026", "_"]) {
+    assert.equal(isValidPostTag(old), true, old);
+    assert.equal(isNewPostTag(old), false, old);
+  }
+});
+
+test("the write rule (Oct 19, 2026): 5 a post, 2-32 with a letter, one definition", () => {
+  assert.equal(POST_TAG_MAX, 5);
+  // Re-exported from edit.ts, not copied: the same function object.
+  assert.equal(isNewPostTag, edit.isNewPostTag);
+  assert.equal(POST_TAG_MAX, edit.POST_TAG_MAX);
+  // Never looser than the read rule (and so never refused by the trigger).
+  for (const w of [...WEIRD, "ab", "a1", "_a", "z".repeat(32), "z".repeat(33)]) {
+    if (isNewPostTag(w)) assert.ok(isValidPostTag(w), w);
+  }
 });
 
 test("normalize: trim, lower-case, strip leading #, drop (never truncate) the invalid", () => {
   assert.deepEqual(normalizePostTags(["#Foo", "##Bar", "  #Baz_9  ", "qux"]), ["foo", "bar", "baz_9", "qux"]);
   assert.deepEqual(normalizePostTags(["café", "½", "²", "Ⅻ", "a b", "a-b", "#", "", "   ", "<b>"]), []);
+  // The Oct 19 write rule: one character, or no letter, is dropped.
+  assert.deepEqual(normalizePostTags(["#1", "a", "#2026", "__", "ok", "#_1", "1st"]), ["ok", "1st"]);
   assert.deepEqual(normalizePostTags(["x".repeat(33), "y".repeat(32)]), ["y".repeat(32)]);
   assert.deepEqual(normalizePostTags(["ok", 7, null, { tag: "x" }, ["y"], "fine"]), ["ok", "fine"]);
   for (const notArray of [undefined, null, "foo", "#foo,#bar", 42, { 0: "a", length: 1 }]) {
@@ -76,13 +101,13 @@ test("normalize: trim, lower-case, strip leading #, drop (never truncate) the in
   }
 });
 
-test("normalize: duplicates collapse to the first; at most 10 valid tags", () => {
+test("normalize: duplicates collapse to the first; at most 5 valid tags", () => {
   assert.deepEqual(normalizePostTags(["Foo", "#foo", "FOO", "bar", "#BAR"]), ["foo", "bar"]);
   const eleven = Array.from({ length: 11 }, (_, i) => `t${i}`);
-  assert.deepEqual(normalizePostTags(eleven), eleven.slice(0, 10));
-  // Invalid entries and duplicates don't use up the 10.
-  const noisy = ["café", "t0", "#T0", "½", ...eleven.slice(1)];
-  assert.deepEqual(normalizePostTags(noisy), eleven.slice(0, 10));
+  assert.deepEqual(normalizePostTags(eleven), eleven.slice(0, 5));
+  // Invalid entries and duplicates don't use up the 5.
+  const noisy = ["café", "t0", "#T0", "½", "#1", "a", ...eleven.slice(1)];
+  assert.deepEqual(normalizePostTags(noisy), eleven.slice(0, 5));
 });
 
 test("every normalize output is a tag the database stores", () => {
@@ -91,7 +116,7 @@ test("every normalize output is a tag the database stores", () => {
     const out = normalizePostTags(input);
     assert.ok(out.length <= POST_TAG_MAX);
     assert.equal(new Set(out).size, out.length);
-    for (const tag of out) assert.ok(isValidPostTag(tag), JSON.stringify(tag));
+    for (const tag of out) assert.ok(isValidPostTag(tag) && isNewPostTag(tag), JSON.stringify(tag));
   }
 });
 
@@ -106,7 +131,7 @@ test("every extractPostTags output (PATCH, phone composer) is a tag the database
   for (const caption of captions) {
     const tags = extractPostTags(caption);
     assert.ok(tags.length <= POST_TAG_MAX);
-    for (const tag of tags) assert.ok(isValidPostTag(tag), JSON.stringify(tag));
+    for (const tag of tags) assert.ok(isValidPostTag(tag) && isNewPostTag(tag), JSON.stringify(tag));
     // And normalizing them again changes nothing.
     assert.deepEqual(normalizePostTags(tags), tags);
   }

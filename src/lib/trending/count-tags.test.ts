@@ -97,17 +97,25 @@ test("listed terms never trend, alone or underscore-glued", () => {
 
 test("rows without an author or a tags array are skipped", () => {
   const rows = [
-    { tags: ["a"], user_id: null },
-    { tags: ["a"], user_id: "" },
-    { tags: ["a"], user_id: 42 },
-    { tags: "a", user_id: A },
+    { tags: ["aa"], user_id: null },
+    { tags: ["aa"], user_id: "" },
+    { tags: ["aa"], user_id: 42 },
+    { tags: "aa", user_id: A },
     { tags: null, user_id: A },
     null as unknown as { tags: unknown; user_id: unknown },
-    { tags: ["b"], user_id: B },
+    { tags: ["bb"], user_id: B },
   ];
-  assert.deepEqual(countTrendingTags(rows, ALL), [{ tag: "b", count: 1 }]);
+  assert.deepEqual(countTrendingTags(rows, ALL), [{ tag: "bb", count: 1 }]);
   assert.deepEqual(countTrendingTags(null, ALL), []);
   assert.deepEqual(countTrendingTags(undefined, ALL), []);
+});
+
+test("tags the new rule refuses never trend (Oct 19, 2026): no letter, or one character", () => {
+  const rows = [
+    { tags: ["1", "2026", "x", "gameday"], user_id: A },
+    { tags: ["1", "2026", "x", "gameday"], user_id: B },
+  ];
+  assert.deepEqual(countTrendingTags(rows, ALL), [{ tag: "gameday", count: 2 }]);
 });
 
 test("the floor drops tags with too few people; it is at least 1", () => {

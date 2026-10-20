@@ -48,7 +48,7 @@ export function SchoolTag({
 }
 
 /**
- * A bare school event's title: games as "IU Indy vs UT Martin" with an
+ * A bare school event's title: games as "IU Indy vs UT Martin" (Bloomington: "IU vs Purdue") with an
  * italic, quieter "vs". A no-break space glues "vs" to the opponent, so a
  * wrapping title never leaves "vs" alone at the end of a line. Not an
  * inline-block: that would stop the one-line titles (phone card) from
@@ -174,7 +174,7 @@ export function LeadLinks({ ev }: { ev: SchoolEvent }): ReactElement | null {
   );
 }
 
-/** "School events: From the IU Indy athletics calendar ↗ · …", each credit linked to its calendar. */
+/** "School events: From the IU Indy athletics calendar ↗ · …" (Bloomington: "From the IU Athletics calendar"), each credit linked to its calendar. */
 export function CreditLine({ sources }: { sources: SchoolSource[] }): ReactElement | null {
   if (sources.length === 0) return null;
   return (

@@ -1,8 +1,10 @@
 /**
  * GET /api/school-events (CONTRACT.md §3.1-3.2, §3.6, §8), run for real on
  * stand-ins: 401 signed out; 429 from the day budget (its key and numbers
- * from BUDGETS); the campus rule (home, visiting, `all`, bad ids); no fetch
- * at all off Indianapolis or with the switch off (env or the settings row);
+ * from BUDGETS); the campus rule (home, visiting, `all`, bad ids); each
+ * campus fetching only its own calendars (Bloomington since Oct 19, 2026);
+ * no fetch at all on a campus without calendars or with the switch off (env,
+ * a campus id, or the settings row);
  * every calendar failing still answers 200 with no events, never a 500; and
  * read-server.ts's guards: the plain User-Agent, the 2 h Data Cache and no
  * redirects on every fetch, the 10-minute memo, the last good list kept
@@ -78,7 +80,12 @@ registerHooks({
 });
 
 const { BUDGETS } = await import("@/lib/limits/budgets");
-const { SCHOOL_FEEDS } = await import("@/lib/school-events/sources");
+const { SCHOOL_FEEDS, feedsForCampus } = await import("@/lib/school-events/sources");
+const INDY_FEEDS = feedsForCampus("indianapolis");
+const IUB_FEEDS = feedsForCampus("iu-bloomington");
+/** What a feed looks like on the wire: no feed address, no rules. */
+const wire = (feeds: typeof SCHOOL_FEEDS) =>
+  feeds.map(({ key, host, credit, calendar_url, role, label }) => ({ key, host, credit, calendar_url, role, label }));
 
 // ── The world ────────────────────────────────────────────────────────────────
 
@@ -86,6 +93,9 @@ const ME = "11111111-1111-4111-8111-111111111111";
 const FIXTURES = new URL("../../../lib/school-events/fixtures/", import.meta.url);
 const ATHLETICS_ICS = readFileSync(new URL("athletics.ics", FIXTURES), "utf8");
 const AFFAIRS_ICS = readFileSync(new URL("iu-student-affairs.ics", FIXTURES), "utf8");
+const IUB_ATHLETICS_ICS = readFileSync(new URL("iub-athletics.ics", FIXTURES), "utf8");
+const IUB_LIFE_ICS = readFileSync(new URL("iub-student-life.ics", FIXTURES), "utf8");
+const IUB_FEATURED_ICS = readFileSync(new URL("iub-featured.ics", FIXTURES), "utf8");
 const EMPTY_ICS = "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nEND:VCALENDAR\r\n";
 /** Thu Oct 22 2026, 2:00 PM on campus: the Natatorium swim meet is at 3. */
 const NOW = Date.parse("2026-10-22T18:00:00Z");
@@ -158,6 +168,9 @@ function freshWorld(): World {
     respond: (url) => {
       if (url.includes("iuindyjags.com")) return new Response(ATHLETICS_ICS, { status: 200 });
       if (url.endsWith("/group_id/24")) return new Response(AFFAIRS_ICS, { status: 200 });
+      if (url.includes("iuhoosiers.com")) return new Response(IUB_ATHLETICS_ICS, { status: 200 });
+      if (url.endsWith("/group_id/76")) return new Response(IUB_LIFE_ICS, { status: 200 });
+      if (url.endsWith("/group_id/341")) return new Response(IUB_FEATURED_ICS, { status: 200 });
       return new Response(EMPTY_ICS, { status: 200 });
     },
     cookie: () => ({
@@ -208,8 +221,10 @@ async function setup(t: TestContext, env: Record<string, string | undefined> = {
     }
   });
   const route = (await import(`./route.ts?v=${w.version}`)) as { GET: (req: Request) => Promise<Response> };
-  const get = async (query = "") => {
-    const res = await route.GET(new Request(`http://localhost/api/school-events${query}`));
+  // Every page since Oct 19, 2026 says `cards=any`; `{ oldPage: true }` is a tab from before that.
+  const get = async (query = "", { oldPage = false } = {}) => {
+    const q = oldPage ? query : `${query}${query ? "&" : "?"}cards=any`;
+    const res = await route.GET(new Request(`http://localhost/api/school-events${q}`));
     return { res, status: res.status, body: (await res.json()) as Record<string, unknown> };
   };
   return { w, get, warn, error };
@@ -250,7 +265,7 @@ test("home Indianapolis: every calendar, merged around now, with their credits",
   assert.equal(body.ok, true);
   assert.equal(body.school_on, true);
   assert.equal(body.campus_id, "indianapolis");
-  assert.deepEqual(body.sources, SCHOOL_FEEDS.map(({ key, host, credit, calendar_url }) => ({ key, host, credit, calendar_url })));
+  assert.deepEqual(body.sources, wire(INDY_FEEDS));
   const events = body.events as { id: string; title: string; starts_at: string; source: string }[];
   assert.ok(events.length > 0);
   // From 4 days ago up to 8 days ahead, soonest first.
@@ -259,26 +274,60 @@ test("home Indianapolis: every calendar, merged around now, with their credits",
   assert.ok(starts.every((s) => s >= NOW - 4 * 86_400_000 && s < NOW + 8 * 86_400_000));
   assert.ok(events.some((e) => e.title === "IU Indy vs Ball State" && e.starts_at === "2026-10-22T19:00:00.000Z"));
   assert.ok(events.some((e) => e.title === "Graduate School Fair"));
-  // Every fetch went to a fixed feed address; the route never fetches the same calendar twice.
-  assert.deepEqual(w.fetches.map((f) => f.url).sort(), SCHOOL_FEEDS.map((f) => f.feed_url).sort());
+  // Every fetch went to one of Indy's fixed feed addresses, each once; never a Bloomington one.
+  assert.deepEqual(w.fetches.map((f) => f.url).sort(), INDY_FEEDS.map((f) => f.feed_url).sort());
   assert.equal(w.rowReads, 1);
 });
 
-test("off Indianapolis, ?campus=all, or no campus: school_on false and no fetch at all", async (t) => {
+test("home Bloomington (Oct 19, 2026): its three calendars only, games as 'IU vs ...', no Indy fetch", async (t) => {
   const { w, get } = await setup(t);
   w.me = { data: { school: "IU Bloomington", campus_id: "iu-bloomington", school_system: "iu" }, error: null };
-  assert.deepEqual((await get()).body, OFF("iu-bloomington"));
-  // Visiting Indianapolis from Bloomington follows the campus on screen.
+  const { status, body } = await get();
+  assert.equal(status, 200);
+  assert.equal(body.school_on, true);
+  assert.equal(body.campus_id, "iu-bloomington");
+  assert.deepEqual(body.sources, wire(IUB_FEEDS));
+  assert.deepEqual(w.fetches.map((f) => f.url).sort(), IUB_FEEDS.map((f) => f.feed_url).sort());
+  const events = body.events as { title: string; source: string; featured: boolean; starts_at: string; url: string | null }[];
+  assert.ok(events.some((e) => e.title === "IU vs Purdue" && e.starts_at === "2026-10-22T23:00:00.000Z"));
+  assert.ok(events.every((e) => e.source.startsWith("iub-")));
+  // Group 341 is a plain calendar here: nothing leads as "Featured by your school".
+  assert.ok(events.every((e) => e.featured === false));
+  assert.ok(events.filter((e) => e.source === "iub-athletics").every((e) => e.url === null || e.url.startsWith("https://iuhoosiers.com/")));
+  // Visiting Indianapolis from Bloomington follows the campus on screen, and reads only Indy's calendars.
+  const before = w.fetches.length;
   const visiting = await get("?campus=indianapolis");
-  assert.equal(visiting.body.school_on, true);
   assert.equal(visiting.body.campus_id, "indianapolis");
-  const fetched = w.fetches.length;
+  assert.deepEqual(visiting.body.sources, wire(INDY_FEEDS));
+  assert.deepEqual(w.fetches.slice(before).map((f) => f.url).sort(), INDY_FEEDS.map((f) => f.feed_url).sort());
+});
+
+test("a page from before Oct 19, 2026 (no `cards=any`) is never sent a calendar its card can't draw", async (t) => {
+  // Its card crashed on any calendar name but Indy's three, taking the whole app to the error page.
+  const { w, get } = await setup(t);
+  w.me = { data: { school: "IU Bloomington", campus_id: "iu-bloomington", school_system: "iu" }, error: null };
+  assert.deepEqual((await get("", { oldPage: true })).body, OFF("iu-bloomington"));
+  assert.ok(w.fetches.every((f) => !IUB_FEEDS.some((feed) => feed.feed_url === f.url)), "nothing fetched for it");
+  // Indy answers that page exactly as before.
+  const indy = await get("?campus=indianapolis", { oldPage: true });
+  assert.equal(indy.body.school_on, true);
+  assert.deepEqual(indy.body.sources, wire(INDY_FEEDS));
+  // Any other value of `cards` is an old page too.
+  assert.deepEqual((await get("?cards=1", { oldPage: true })).body, OFF("iu-bloomington"));
+});
+
+test("a campus without calendars, ?campus=all, or no campus: school_on false and no fetch at all", async (t) => {
+  const { w, get } = await setup(t);
+  w.me = { data: { school: "IU Kokomo", campus_id: "iu-kokomo", school_system: "iu" }, error: null };
+  assert.deepEqual((await get()).body, OFF("iu-kokomo"));
   w.me = { data: { school: "IU Indianapolis", campus_id: "indianapolis", school_system: "iu" }, error: null };
-  assert.deepEqual((await get("?campus=iu-bloomington")).body, OFF("iu-bloomington"));
+  assert.deepEqual((await get("?campus=iu-kokomo")).body, OFF("iu-kokomo"));
   assert.deepEqual((await get("?campus=all")).body, OFF(null));
   w.me = { data: { school: null, campus_id: null, school_system: "iu" }, error: null };
   assert.deepEqual((await get()).body, OFF(null));
-  assert.equal(w.fetches.length, fetched);
+  assert.equal(w.fetches.length, 0);
+  // None of these read the switch row either.
+  assert.equal(w.rowReads, 0);
 });
 
 test("a bad ?campus= answers as GET /api/events does", async (t) => {
@@ -364,10 +413,38 @@ test("switch: SCHOOL_EVENTS_OFF=true hides everything, with no fetch and no row 
   assert.deepEqual([w.fetches.length, w.rowReads], [0, 0]);
 });
 
-test("switch: a typo in SCHOOL_EVENTS_OFF hides everything too", async (t) => {
-  const { w, get } = await setup(t, { SCHOOL_EVENTS_OFF: "ture" });
-  assert.deepEqual((await get()).body, OFF("indianapolis"));
-  assert.equal(w.fetches.length, 0);
+test("switch: an unknown word in SCHOOL_EVENTS_OFF hides nothing (Oct 19, 2026: it used to hide every campus)", async (t) => {
+  const { w, get, warn } = await setup(t, { SCHOOL_EVENTS_OFF: "iub-athletcs" });
+  const { body } = await get();
+  assert.equal(body.school_on, true);
+  assert.deepEqual((body.sources as { key: string }[]).map((s) => s.key), ["athletics", "iu-student-affairs", "iu-featured"]);
+  assert.equal(w.fetches.length, 3);
+  assert.ok(warn.mock.calls.some((c) => String(c.arguments[1]).includes("unknown words ignored")));
+});
+
+test("switch: a campus id turns off that campus only; a Bloomington key never touches Indy", async (t) => {
+  const { w, get } = await setup(t, { SCHOOL_EVENTS_OFF: "iu-bloomington" });
+  // Indy is untouched.
+  const indy = await get();
+  assert.equal(indy.body.school_on, true);
+  assert.deepEqual(indy.body.sources, wire(INDY_FEEDS));
+  // Bloomington: every calendar off, so the school part hides, and nothing is fetched for it.
+  const before = w.fetches.length;
+  assert.deepEqual((await get("?campus=iu-bloomington")).body, OFF("iu-bloomington"));
+  assert.equal(w.fetches.length, before);
+});
+
+test("switch: SCHOOL_EVENTS_OFF=iub-athletics drops Bloomington's games and their credit, nothing else", async (t) => {
+  const { w, get } = await setup(t, { SCHOOL_EVENTS_OFF: "iub-athletics" });
+  w.me = { data: { school: "IU Bloomington", campus_id: "iu-bloomington", school_system: "iu" }, error: null };
+  const { body } = await get();
+  assert.equal(body.school_on, true);
+  assert.deepEqual((body.sources as { key: string }[]).map((s) => s.key), ["iub-student-life", "iub-featured"]);
+  assert.ok((body.events as { kind: string }[]).every((e) => e.kind === "event"));
+  assert.ok(w.fetches.every((f) => !f.url.includes("iuhoosiers.com")));
+  // Indy's games stay on.
+  const indy = await get("?campus=indianapolis");
+  assert.ok((indy.body.events as { kind: string }[]).some((e) => e.kind === "game"));
 });
 
 test("switch: SCHOOL_EVENTS_OFF=athletics drops just that calendar and its credit", async (t) => {
@@ -455,7 +532,7 @@ test("every calendar throwing: 200 with no events (never a 500), one warning per
   assert.equal(warn.mock.callCount(), 3);
   assert.deepEqual(
     warn.mock.calls.map((c) => c.arguments),
-    SCHOOL_FEEDS.map((f) => ["[school-events]", f.key, "fetch_failed"]),
+    INDY_FEEDS.map((f) => ["[school-events]", f.key, "fetch_failed"]),
   );
 });
 
@@ -536,6 +613,14 @@ test("log lines for a feed going quiet (rows in, none kept) or too big for Next'
     assert.ok((body.events as { source: string }[]).every((e) => e.source === "iu-student-affairs"));
     // Athletics is reported; Featured (whose few rows can all be all-day) is not.
     assert.deepEqual(warn.mock.calls.map((c) => c.arguments), [["[school-events]", "athletics", "none_kept"]]);
+  });
+  await t.test("by the featured flag, not the key: Bloomington's plain 'featured' group is reported", async (st) => {
+    const { w, get, warn } = await setup(st, { SCHOOL_EVENTS_OFF: "iub-athletics,iub-student-life" });
+    w.me = { data: { school: "IU Bloomington", campus_id: "iu-bloomington", school_system: "iu" }, error: null };
+    const ALL_DAY_ONLY = AWAY_ONLY.replace("DTSTART:20261023T220000Z", "DTSTART;VALUE=DATE:20261023");
+    w.respond = () => new Response(ALL_DAY_ONLY, { status: 200 });
+    assert.deepEqual((await get()).body.events, []);
+    assert.deepEqual(warn.mock.calls.map((c) => c.arguments), [["[school-events]", "iub-featured", "none_kept"]]);
   });
   await t.test("over about 1.5 MB: still shown, said once", async (st) => {
     const { w, get, warn } = await setup(st, { SCHOOL_EVENTS_OFF: "iu-student-affairs,iu-featured" });
@@ -637,6 +722,14 @@ test("SCHOOL_EVENTS_FIXTURES reads the fixture files in development, never the n
     const events = body.events as { title: string; source: string }[];
     assert.ok(events.some((e) => e.source === "athletics"));
     assert.ok(events.some((e) => e.source === "iu-student-affairs"));
+  });
+  await t.test("1 in Bloomington: the three iub-* fixtures (Oct 19, 2026), never the network", async (st) => {
+    const { w, get } = await setup(st, { NODE_ENV: "development", SCHOOL_EVENTS_FIXTURES: "1" });
+    w.me = { data: { school: "IU Bloomington", campus_id: "iu-bloomington", school_system: "iu" }, error: null };
+    const events = (await get("?now=2026-10-22T22:00:00Z")).body.events as { title: string; source: string }[];
+    assert.equal(w.fetches.length, 0);
+    for (const key of ["iub-athletics", "iub-student-life", "iub-featured"]) assert.ok(events.some((e) => e.source === key), key);
+    assert.ok(events.some((e) => e.title === "IU vs Purdue"));
   });
   await t.test("fail: every calendar down", async (st) => {
     const { w, get, warn } = await setup(st, { NODE_ENV: "development", SCHOOL_EVENTS_FIXTURES: "fail" });

@@ -19,6 +19,8 @@ import {
   shouldRoll,
   stripEntries,
   stripIsEmpty,
+  tagChipCount,
+  tagChipHover,
   tagChipTitle,
   type StripEntry,
 } from "./rolling-strip-view";
@@ -209,21 +211,23 @@ export function RollingStrip(props: {
     }
     if (entry.kind === "tag") {
       const active = activeTag === entry.tag;
+      const countWords = tagChipCount(entry.count);
       return (
         <button
           key={`${clone ? "c-" : ""}t-${entry.tag}`}
           type="button"
           className="vibe-strip-chip"
           style={active ? TAG_CHIP_ACTIVE : TAG_CHIP}
-          title={tagChipTitle(entry.count)}
+          // The whole tag too (Oct 19, 2026): the chip may cut it with "…".
+          title={tagChipHover(entry.tag, entry.count)}
           // The name is the tag; the title alone would be read as "1 person this week".
           aria-label={`#${entry.tag}, ${tagChipTitle(entry.count)}`}
           aria-pressed={active}
           tabIndex={tab}
           onClick={() => onPickTag(entry.tag)}
         >
-          #{entry.tag}
-          <span style={{ fontWeight: 500, opacity: 0.7 }}>{entry.count}</span>
+          <span style={TAG_TEXT}>#{entry.tag}</span>
+          {countWords ? <span style={TAG_COUNT}>{countWords}</span> : null}
         </button>
       );
     }
@@ -392,10 +396,30 @@ const EVENT_WHEN: CSSProperties = { fontSize: 11, fontWeight: 600, color: "var(-
 
 const TAG_CHIP: CSSProperties = {
   ...CHIP,
-  background: "var(--tag-bg)",
+  // Oct 19, 2026 (review of B3): --tag-bg is a 10-14% coral tint, so on its
+  // own the track's dotted line showed through the chip in Light and Night,
+  // right across "6 people". The tint now sits on a solid --cream layer, the
+  // same idea as LEAD_IN's patch: same colour, and the dots stop at the edge.
+  background: "linear-gradient(var(--tag-bg), var(--tag-bg)), var(--cream)",
   border: "1px solid rgba(255,92,53,0.22)",
   color: "var(--tag-ink)",
 };
+// Oct 19, 2026 (critique B3): a 32-character tag used to stretch its chip
+// past half a phone's width. The TAG is capped at 120px and ends in "…"
+// (the hover title and aria-label keep the whole tag, and a tap filters by
+// all of it); the cap sits on the tag, not the chip, so "12 people" is never
+// what's cut. Measured at 390: "#homecomingweek" (14 letters) fits uncut,
+// and the widest chip (32 w's, "1234 people") is 221px, so "today." and the
+// long chip both show in full. (160 gave chips up to 262px.)
+const TAG_TEXT: CSSProperties = {
+  maxWidth: 120,
+  minWidth: 0,
+  overflow: "hidden",
+  textOverflow: "ellipsis",
+  whiteSpace: "nowrap",
+};
+// "N people" from two up; at one the chip shows the tag alone (tagChipCount).
+const TAG_COUNT: CSSProperties = { flexShrink: 0, fontWeight: 500, opacity: 0.7 };
 const TAG_CHIP_ACTIVE: CSSProperties = {
   ...TAG_CHIP,
   background: "var(--charcoal)",

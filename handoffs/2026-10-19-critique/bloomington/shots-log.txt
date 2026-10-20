@@ -1,0 +1,24 @@
+STUB POST /api/me/heartbeat
+REAL GET /api/school-events?campus=iu-bloomington&now=2026-10-22T22%3A00%3A00.000Z
+REAL GET /api/school-events?campus=iu-bloomington&now=2026-10-22T22%3A00%3A00.000Z
+phone before: tonight card text = 0
+STUB POST /api/me/heartbeat
+SIM GET /api/school-events?campus=iu-bloomington&now=2026-10-22T22%3A00%3A00.000Z
+SIM GET /api/school-events?campus=iu-bloomington&now=2026-10-22T22%3A00%3A00.000Z
+STUB POST /__nextjs_original-stack-frames
+STUB POST /__nextjs_original-stack-frames
+phone after: tonight title count = 0
+sheet open failed locator.click: Timeout 4000ms exceeded.
+Call log:
+  - waiting for locator('text=What\'s the vibe tonight?').first()
+
+STUB POST /api/me/heartbeat
+SIM GET /api/school-events?campus=iu-bloomington&now=2026-10-22T22%3A00%3A00.000Z
+SIM GET /api/school-events?campus=iu-bloomington&now=2026-10-22T22%3A00%3A00.000Z
+STUB POST /api/posts/16e10da0-ad27-4184-937c-cb00ed70f5cb/view
+STUB POST /api/posts/b033f251-5059-47c7-8dd8-4ae50886c44d/view
+STUB POST /api/me/heartbeat
+REAL GET /api/school-events?campus=iu-bloomington&now=2026-10-22T22%3A00%3A00.000Z
+REAL GET /api/school-events?campus=iu-bloomington&now=2026-10-22T22%3A00%3A00.000Z
+STUB POST /api/posts/b033f251-5059-47c7-8dd8-4ae50886c44d/view
+STUB POST /api/posts/16e10da0-ad27-4184-937c-cb00ed70f5cb/view

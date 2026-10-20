@@ -1,0 +1,3108 @@
+BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//SIDEARM Sports//NONSGML SIDEARM//EN
+X-WR-CALNAME:Indiana University Athletics
+X-PUBLISHED-TTL:PT120M
+BEGIN:VEVENT
+UID:vcal_28786-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART;VALUE=DATE:20260919
+DTEND;VALUE=DATE:20260920
+LOCATION:Terre Haute\, Ind.
+SUMMARY:[N] Indiana University Cross Country at John McNichols Invitational
+DESCRIPTION:[N] Indiana University Cross Country at John McNichols Invitational\n 23rd (M), 12th (W)\nTV: RunnerSpace\nStreaming Video: https://indiana-state-john-mcnichols-invite.runnerspace.com/eprofile.php?event_id=12913&do=videos&video_id=465410\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28786&amp;sport_id=33
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28794-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART;VALUE=DATE:20260919
+DTEND;VALUE=DATE:20260927
+LOCATION:Tulsa\, Okla.
+SUMMARY:[N] Indiana University Men's Tennis vs ITA All-American Championships
+DESCRIPTION:[N] Indiana University Men's Tennis vs ITA All-American Championships\n\nStreaming Video: https://web.track.tennis/#/@8e877ccb-f14f-478c-a634-dc5c799a21e2/@8e877ccb-f14f-478c-a634-dc5c799a21e2/evt-szFBMn9Fh7o\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28794&amp;sport_id=10
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28801-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART;VALUE=DATE:20260919
+DTEND;VALUE=DATE:20260927
+LOCATION:Cary\, N.C.
+SUMMARY:Indiana University Women's Tennis vs ITA All-American Championships
+DESCRIPTION:Indiana University Women's Tennis vs ITA All-American Championships\nStreaming Video: https://web.playsight.com/facility/town-of-cary/home\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28801&amp;sport_id=19
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28599-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART:20260919T180000Z
+DTEND:20260919T200000Z
+LOCATION:Conway\, S.C.
+SUMMARY:[W] Indiana University Women's Volleyball vs NC State
+DESCRIPTION:[W] Indiana University Women's Volleyball vs NC State\nW 3-1\nTV: No Stream\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28599&amp;sport_id=21
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28505-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART:20260919T200000Z
+DTEND:20260919T230000Z
+LOCATION:Bloomington\, Ind.
+SUMMARY:[W] Indiana University Football vs Western Kentucky
+DESCRIPTION:[W] Indiana University Football vs Western Kentucky\nW 38-0\nTV: Peacock\nRadio: Indiana Sports Radio Network\nStreaming Audio: https://thevarsitynetwork.com/audioapplink/source/oas-1026/content/iub:allaccess-Live-5105\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28505&amp;sport_id=3
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28686-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART:20260920T170000Z
+DTEND:20260920T200000Z
+LOCATION:Iowa City\, Iowa
+SUMMARY:[L] Indiana University Field Hockey at Iowa
+DESCRIPTION:[L] Indiana University Field Hockey at Iowa\nL 1-2 (3-4, PS)\nTV: B1G+\nStreaming Video: https://www.bigtenplus.com/en-int/livestream/indiana-at-iowa/2195020\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28686&amp;sport_id=2
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28829-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART:20260920T170000Z
+DTEND:20260920T190000Z
+LOCATION:Bloomington\, Ind., Andy Mohr Field - Softball
+SUMMARY:[N] Indiana University Softball vs Indiana Tech (10 Innings)
+DESCRIPTION:[N] Indiana University Softball vs Indiana Tech (10 Innings)\n\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28829&amp;sport_id=12
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28650-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART:20260920T180000Z
+DTEND:20260920T200000Z
+LOCATION:Madison\, Wis.
+SUMMARY:[L] Indiana University Women's Soccer at #14 Wisconsin
+DESCRIPTION:[L] Indiana University Women's Soccer at #14 Wisconsin\nL 0-2\nTV: B1G+\nStreaming Video: https://www.bigtenplus.com/en-int/livestream/indiana-at-wisconsin/2195032\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28650&amp;sport_id=17
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28756-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART;VALUE=DATE:20260921
+DTEND;VALUE=DATE:20260922
+LOCATION:Lexington\, Ky.
+SUMMARY:[N] Indiana University Women's Golf vs Bettie Lou Evans Invitational - Big Blue Course
+DESCRIPTION:[N] Indiana University Women's Golf vs Bettie Lou Evans Invitational - Big Blue Course\n \n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28756&amp;sport_id=15
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28769-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART;VALUE=DATE:20260921
+DTEND;VALUE=DATE:20260922
+LOCATION:Westchester\, Ill.
+SUMMARY:[N] Indiana University Men's Golf  Highlands Invitational - Chicago Highlands Club
+DESCRIPTION:[N] Indiana University Men's Golf  Highlands Invitational - Chicago Highlands Club\n \n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28769&amp;sport_id=7
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28628-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART:20260923T000000Z
+DTEND:20260923T020000Z
+LOCATION:Madison\, Wis.
+SUMMARY:[T] Indiana University Men's Soccer at Wisconsin
+DESCRIPTION:[T] Indiana University Men's Soccer at Wisconsin\nT 1-1\nTV: Big Ten Network\nStreaming Video: https://www.foxsports.com/live\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28628&amp;sport_id=8
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28660-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART:20260924T223000Z
+DTEND:20260925T013000Z
+LOCATION:
+SUMMARY:[N] Indiana University Men's Swimming and Diving vs College Swimming League
+DESCRIPTION:[N] Indiana University Men's Swimming and Diving vs College Swimming League\n \nTV: ESPN+/DAZN\nStreaming Video: https://www.espn.com/watch/player/_/id/f1398ced-ca8b-4bde-b417-3f3408eb03a5\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28660&amp;sport_id=9
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28736-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART:20260924T223000Z
+DTEND:20260925T013000Z
+LOCATION:
+SUMMARY:Indiana University Women's Swimming and Diving vs College Swimming League
+DESCRIPTION:Indiana University Women's Swimming and Diving vs College Swimming League\nTV: ESPN+/DAZN\nStreaming Video: https://www.espn.com/watch/player/_/id/f1398ced-ca8b-4bde-b417-3f3408eb03a5\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28736&amp;sport_id=18
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28830-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART:20260924T223000Z
+DTEND:20260925T003000Z
+LOCATION:Bloomington\, Ind., Andy Mohr Field - Softball
+SUMMARY:[N] Indiana University Softball vs Louisville (7 Innings)
+DESCRIPTION:[N] Indiana University Softball vs Louisville (7 Innings)\n\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28830&amp;sport_id=12
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28592-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART:20260924T230000Z
+DTEND:20260925T010000Z
+LOCATION:Bloomington\, Ind.
+SUMMARY:[W] Indiana University Women's Volleyball vs (RV) UCLA
+DESCRIPTION:[W] Indiana University Women's Volleyball vs (RV) UCLA\nW 3-0 \nTV: B1G+\nStreaming Video: https://www.bigtenplus.com/en-int/livestream/ucla-at-indiana/2211605\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28592&amp;sport_id=21
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28651-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART:20260924T233000Z
+DTEND:20260925T013000Z
+LOCATION:Bloomington\, Ind., Jerry Yeagley Field at Bill Armstrong Stadium
+SUMMARY:[L] Indiana University Women's Soccer vs Minnesota
+DESCRIPTION:[L] Indiana University Women's Soccer vs Minnesota\nL 1-2 \nTV: B1G+\nStreaming Video: https://www.bigtenplus.com/en-int/livestream/minnesota-at-indiana/2195045\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28651&amp;sport_id=17
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28629-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART:20260925T170000Z
+DTEND:20260925T190000Z
+LOCATION:Bloomington\, Ind., Jerry Yeagley Field at Bill Armstrong Stadium
+SUMMARY:[W] Indiana University Men's Soccer vs Penn State
+DESCRIPTION:[W] Indiana University Men's Soccer vs Penn State\nW 2-1\nTV: B1G+\nStreaming Video: https://www.bigtenplus.com/en-int/page/home\nTickets: https://iuhoosiers.evenue.net/list/MSM\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28629&amp;sport_id=8
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28506-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART:20260926T000000Z
+DTEND:20260926T030000Z
+LOCATION:Bloomington\, Ind.
+SUMMARY:[W] Indiana University Football vs Northwestern
+DESCRIPTION:[W] Indiana University Football vs Northwestern\nW 29-23\nTV: FOX | FOX One\nRadio: Indiana Sports Radio Network\nStreaming Video: https://www.fox.com/sports/football/college-football?cmpid=org=one::ag=partnership::mc=referral::src=IU::cmp=100_o1_th1::cont=m2_tp10::add=07_29_08_00_41_00_02_B\nStreaming Audio: https://thevarsitynetwork.com/audioapplink/source/oas-1026/content/iub:allaccess-Live-5106\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28506&amp;sport_id=3
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28687-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART:20260926T160000Z
+DTEND:20260926T190000Z
+LOCATION:Bloomington\, Ind., Deborah Tobias Field
+SUMMARY:[W] Indiana University Field Hockey vs Michigan - SAB Redline & Student Clinic
+DESCRIPTION:[W] Indiana University Field Hockey vs Michigan - SAB Redline & Student Clinic\nW 1-0\nTV: B1G+\nStreaming Video: https://www.bigtenplus.com/en-int/livestream/michigan-at-indiana/2195064\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28687&amp;sport_id=2
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28593-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART:20260926T230000Z
+DTEND:20260927T010000Z
+LOCATION:Bloomington\, Ind.
+SUMMARY:[W] Indiana University Women's Volleyball vs Maryland
+DESCRIPTION:[W] Indiana University Women's Volleyball vs Maryland\nW 3-0\nTV: B1G+\nStreaming Video: https://www.bigtenplus.com/en-int/livestream/maryland-at-indiana/2211641\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28593&amp;sport_id=21
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28652-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART:20260927T170000Z
+DTEND:20260927T190000Z
+LOCATION:Evanston\, Ill.
+SUMMARY:[L] Indiana University Women's Soccer at Northwestern
+DESCRIPTION:[L] Indiana University Women's Soccer at Northwestern\nL 0-2 \nTV: B1G+\nStreaming Video: https://www.bigtenplus.com/en-int/livestream/indiana-at-northwestern/2211655\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28652&amp;sport_id=17
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28770-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART;VALUE=DATE:20260928
+DTEND;VALUE=DATE:20260929
+LOCATION:Lake Forest\, Ill.
+SUMMARY:[N] Indiana University Men's Golf  Windon Memorial Classic - Onwentsia Club
+DESCRIPTION:[N] Indiana University Men's Golf  Windon Memorial Classic - Onwentsia Club\n t-5th Place • 846 (+6)\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28770&amp;sport_id=7
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28600-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART:20261002T010000Z
+DTEND:20261002T030000Z
+LOCATION:Madison\, Wis.
+SUMMARY:[L] Indiana University Women's Volleyball at #6 Wisconsin
+DESCRIPTION:[L] Indiana University Women's Volleyball at #6 Wisconsin\nL 2-3\nTV: BTN\nStreaming Video: https://www.foxsports.com/live\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28600&amp;sport_id=21
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28802-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART;VALUE=DATE:20261002
+DTEND;VALUE=DATE:20261004
+LOCATION:Bloomington\, Ind., IU Tennis Center 
+SUMMARY:Indiana University Women's Tennis vs Hoosier Classic 
+DESCRIPTION:Indiana University Women's Tennis vs Hoosier Classic \n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28802&amp;sport_id=19
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28795-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART;VALUE=DATE:20261002
+DTEND;VALUE=DATE:20261004
+LOCATION:Louisville\, Ky.
+SUMMARY:[N] Indiana University Men's Tennis at Louisville Invite
+DESCRIPTION:[N] Indiana University Men's Tennis at Louisville Invite\n \nStreaming Video: https://nam12.safelinks.protection.outlook.com/?url=https://web.track.tennis/%23/@public-rMrEP_K_ByM/@public-rMrEP_K_ByM/evt-WZn6YUdu73E&data=05|02|[redacted]@iu.edu|fa3fc63b119f439fdde508df20de12b1|1113be34aed14d00ab4bcdd02510be91|1|0|639265810322977286|Unknown|TWFpbGZsb3d8eyJFbXB0eU1hcGkiOnRydWUsIlYiOiIwLjAuMDAwMCIsIlAiOiJXaW4zMiIsIkFOIjoiTWFpbCIsIldUIjoyfQ==|0|||&sdata=e1jynCP0BlucUF4wEuYu8VoFgAhtelvyy1c6Nadgjxc=&reserved=0\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28795&amp;sport_id=10
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28787-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART;VALUE=DATE:20261002
+DTEND;VALUE=DATE:20261003
+LOCATION:South Bend\, Ind.
+SUMMARY:[N] Indiana University Cross Country at Notre Dame Joe Piane Invitational
+DESCRIPTION:[N] Indiana University Cross Country at Notre Dame Joe Piane Invitational\n \n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28787&amp;sport_id=33
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28661-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART:20261002T180000Z
+DTEND:20261002T210000Z
+LOCATION:Bloomington\, Ind., Counsilman-Billingsley Aquatics Center
+SUMMARY:[N] Indiana University Men's Swimming and Diving vs Cream & Crimson (Exh.)
+DESCRIPTION:[N] Indiana University Men's Swimming and Diving vs Cream & Crimson (Exh.)\n \n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28661&amp;sport_id=9
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28737-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART:20261002T180000Z
+DTEND:20261002T210000Z
+LOCATION:Bloomington\, Ind., Counsilman-Billingsley Aquatics Center
+SUMMARY:[N] Indiana University Women's Swimming and Diving vs Cream & Crimson (Exh.)
+DESCRIPTION:[N] Indiana University Women's Swimming and Diving vs Cream & Crimson (Exh.)\n \n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28737&amp;sport_id=18
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28688-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART:20261002T200000Z
+DTEND:20261002T230000Z
+LOCATION:East Lansing\, Mich.
+SUMMARY:[W] Indiana University Field Hockey at Michigan State
+DESCRIPTION:[W] Indiana University Field Hockey at Michigan State\nW 1-0 \nTV: Big Ten Network\nStreaming Video: https://www.foxsports.com/live/btn\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28688&amp;sport_id=2
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28630-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART:20261002T230000Z
+DTEND:20261003T010000Z
+LOCATION:Bloomington\, Ind., Jerry Yeagley Field at Bill Armstrong Stadium
+SUMMARY:[W] Indiana University Men's Soccer vs Maryland
+DESCRIPTION:[W] Indiana University Men's Soccer vs Maryland\nW 3-1 \nTV: Big Ten Network\nStreaming Video: https://www.foxsports.com/live\nTickets: https://iuhoosiers.evenue.net/list/MSM\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28630&amp;sport_id=8
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28831-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART:20261003T170000Z
+DTEND:20261003T190000Z
+LOCATION:Louisville\, Ky.
+SUMMARY:[N] Indiana University Softball at Louisville (Doubleheader)
+DESCRIPTION:[N] Indiana University Softball at Louisville (Doubleheader)\n\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28831&amp;sport_id=12
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28507-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART:20261004T000000Z
+DTEND:20261004T030000Z
+LOCATION:Piscataway\, N.J.
+SUMMARY:[W] Indiana University Football at Rutgers
+DESCRIPTION:[W] Indiana University Football at Rutgers\nW 47-15\nTV: Big Ten Network\nRadio: Indiana Sports Radio Network\nStreaming Audio: https://thevarsitynetwork.com/audioapplink/source/oas-1026/content/iub:allaccess-Live-5107\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28507&amp;sport_id=3
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28771-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART;VALUE=DATE:20261004
+DTEND;VALUE=DATE:20261005
+LOCATION:Notre Dame\, Ind.
+SUMMARY:[N] Indiana University Men's Golf  Fighting Irish Classic - Warren Golf Course
+DESCRIPTION:[N] Indiana University Men's Golf  Fighting Irish Classic - Warren Golf Course\n 10th Place • 859 (+19)\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28771&amp;sport_id=7
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28689-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART:20261004T160000Z
+DTEND:20261004T190000Z
+LOCATION:Columbus\, Ohio
+SUMMARY:[W] Indiana University Field Hockey at Ohio State
+DESCRIPTION:[W] Indiana University Field Hockey at Ohio State\nW 2-1\nTV: B1G+\nStreaming Video: https://www.bigtenplus.com/en-int/livestream/indiana-at-ohio-state/2195109\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28689&amp;sport_id=2
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28653-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART:20261004T160000Z
+DTEND:20261004T180000Z
+LOCATION:Bloomington\, Ind., Jerry Yeagley Field at Bill Armstrong Stadium
+SUMMARY:[L] Indiana University Women's Soccer vs Michigan
+DESCRIPTION:[L] Indiana University Women's Soccer vs Michigan\nL 2-3\nTV: BTN\nStreaming Video: https://www.bigtenplus.com/en-int/livestream/indiana-at-michigan/2194877\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28653&amp;sport_id=17
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28601-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART:20261004T180000Z
+DTEND:20261004T200000Z
+LOCATION:Piscataway\, N.J.
+SUMMARY:[W] Indiana University Women's Volleyball at Rutgers
+DESCRIPTION:[W] Indiana University Women's Volleyball at Rutgers\nW 3-1\nTV: BTN\nStreaming Video: https://www.foxsports.com/live\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28601&amp;sport_id=21
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28757-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART;VALUE=DATE:20261005
+DTEND;VALUE=DATE:20261007
+LOCATION:West Point\, Miss.
+SUMMARY:[N] Indiana University Women's Golf vs The Ally - Old Waverly Golf Club
+DESCRIPTION:[N] Indiana University Women's Golf vs The Ally - Old Waverly Golf Club\n t-12th Place • 604 (+28)\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28757&amp;sport_id=15
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28772-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART;VALUE=DATE:20261005
+DTEND;VALUE=DATE:20261006
+LOCATION:Muncie\, Ind.
+SUMMARY:[N] Indiana University Men's Golf  Golfweek Invitational - Delaware Country Club
+DESCRIPTION:[N] Indiana University Men's Golf  Golfweek Invitational - Delaware Country Club\n \n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28772&amp;sport_id=7
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28631-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART:20261007T000000Z
+DTEND:20261007T020000Z
+LOCATION:Bloomington\, Ind., Jerry Yeagley Field at Bill Armstrong Stadium
+SUMMARY:[W] Indiana University Men's Soccer vs Kentucky
+DESCRIPTION:[W] Indiana University Men's Soccer vs Kentucky\nW 3-1 \nTV: Big Ten Network\nStreaming Video: https://www.foxsports.com/live\nTickets: https://iuhoosiers.evenue.net/list/MSM\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28631&amp;sport_id=8
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28796-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART;VALUE=DATE:20261008
+DTEND;VALUE=DATE:20261013
+LOCATION:College Grove\, Tenn.
+SUMMARY:[N] Indiana University Men's Tennis vs ITA Ohio Valley Regional Championships
+DESCRIPTION:[N] Indiana University Men's Tennis vs ITA Ohio Valley Regional Championships\n\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28796&amp;sport_id=10
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28803-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART;VALUE=DATE:20261008
+DTEND;VALUE=DATE:20261013
+LOCATION:Mason\, Ohio
+SUMMARY:Indiana University Women's Tennis vs ITA Regional Championships
+DESCRIPTION:Indiana University Women's Tennis vs ITA Regional Championships\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28803&amp;sport_id=19
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28602-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART:20261008T223000Z
+DTEND:20261009T003000Z
+LOCATION:Bloomington\, Ind.
+SUMMARY:[L] Indiana University Women's Volleyball vs #1 Nebraska
+DESCRIPTION:[L] Indiana University Women's Volleyball vs #1 Nebraska\nL 0-3 \nTV: BTN\nStreaming Video: https://www.foxsports.com/live\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28602&amp;sport_id=21
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28654-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART:20261009T020000Z
+DTEND:20261009T035959Z
+LOCATION:Los Angeles\, Calif.
+SUMMARY:[L] Indiana University Women's Soccer at #10 UCLA
+DESCRIPTION:[L] Indiana University Women's Soccer at #10 UCLA\nL 0-5 \nTV: B1G+\nStreaming Video: https://www.bigtenplus.com/en-int/livestream/indiana-at-ucla/2211731\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28654&amp;sport_id=17
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28898-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART;VALUE=DATE:20261009
+DTEND;VALUE=DATE:20261010
+LOCATION:Iowa City\, Iowa
+SUMMARY:Indiana University Women's Rowing at Iowa (Scrimmage)
+DESCRIPTION:Indiana University Women's Rowing at Iowa (Scrimmage)\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28898&amp;sport_id=16
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28662-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART:20261009T160000Z
+DTEND:20261009T190000Z
+LOCATION:Bloomington\, Ind., Counsilman-Billingsley Aquatics Center
+SUMMARY:[L] Indiana University Men's Swimming and Diving vs Texas (SCM)
+DESCRIPTION:[L] Indiana University Men's Swimming and Diving vs Texas (SCM)\nL 122.5-177.5 \nTV: B1G+\nStreaming Video: https://www.bigtenplus.com/en-int/livestream/northwestern-texas-at-indiana/2245546\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28662&amp;sport_id=9
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28663-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART:20261009T160000Z
+DTEND:20261009T190000Z
+LOCATION:Bloomington\, Ind., Counsilman-Billingsley Aquatics Center
+SUMMARY:[W] Indiana University Men's Swimming and Diving vs Northwestern (SCM)
+DESCRIPTION:[W] Indiana University Men's Swimming and Diving vs Northwestern (SCM)\nW 224-76 \nTV: B1G+\nStreaming Video: https://www.bigtenplus.com/en-int/livestream/northwestern-texas-at-indiana/2245546\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28663&amp;sport_id=9
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28738-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART:20261009T160000Z
+DTEND:20261009T190000Z
+LOCATION:Bloomington\, Ind., Counsilman-Billingsley Aquatics Center
+SUMMARY:[L] Indiana University Women's Swimming and Diving vs Texas (SCM)
+DESCRIPTION:[L] Indiana University Women's Swimming and Diving vs Texas (SCM)\nL 112-188 \nTV: B1G+\nStreaming Video: https://www.bigtenplus.com/en-int/livestream/northwestern-texas-at-indiana/2245546\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28738&amp;sport_id=18
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28739-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART:20261009T160000Z
+DTEND:20261009T190000Z
+LOCATION:Bloomington\, Ind., Counsilman-Billingsley Aquatics Center
+SUMMARY:Indiana University Women's Swimming and Diving vs Northwestern (SCM)
+DESCRIPTION:Indiana University Women's Swimming and Diving vs Northwestern (SCM)\nTV: B1G+\nStreaming Video: https://www.bigtenplus.com/en-int/livestream/northwestern-texas-at-indiana/2245546\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28739&amp;sport_id=18
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28632-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART:20261009T233000Z
+DTEND:20261010T013000Z
+LOCATION:Bloomington\, Ind., Jerry Yeagley Field at Bill Armstrong Stadium
+SUMMARY:[W] Indiana University Men's Soccer vs Hanover College
+DESCRIPTION:[W] Indiana University Men's Soccer vs Hanover College\nW 7-0 \nTV: B1G+\nStreaming Video: https://www.bigtenplus.com/en-int/page/home\nTickets: https://iuhoosiers.evenue.net/list/MSM\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28632&amp;sport_id=8
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28508-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART:20261010T160000Z
+DTEND:20261010T190000Z
+LOCATION:Lincoln\, Neb.
+SUMMARY:[W] Indiana University Football at Nebraska
+DESCRIPTION:[W] Indiana University Football at Nebraska\nW 20-17\nTV: FOX\nRadio: Indiana Sports Radio Network\nStreaming Audio: https://thevarsitynetwork.com/audioapplink/source/oas-1026/content/iub:allaccess-Live-5108\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28508&amp;sport_id=3
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28832-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART:20261010T170000Z
+DTEND:20261010T190000Z
+LOCATION:Bloomington\, Ind., Andy Mohr Field - Softball
+SUMMARY:[N] Indiana University Softball vs Lakeland CC (10 Innings)
+DESCRIPTION:[N] Indiana University Softball vs Lakeland CC (10 Innings)\n\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28832&amp;sport_id=12
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28690-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART:20261011T160000Z
+DTEND:20261011T190000Z
+LOCATION:Bloomington\, Ind., Deborah Tobias Field
+SUMMARY:[W] Indiana University Field Hockey vs Ohio - Youth Clinic & Faculty & Staff Appreciation Day
+DESCRIPTION:[W] Indiana University Field Hockey vs Ohio - Youth Clinic & Faculty & Staff Appreciation Day\nW 5-0\nTV: B1G+\nStreaming Video: https://www.bigtenplus.com/en-int/livestream/ohio-at-12-indiana/2195153\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28690&amp;sport_id=2
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28603-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART:20261011T180000Z
+DTEND:20261011T200000Z
+LOCATION:Bloomington\, Ind.
+SUMMARY:[L] Indiana University Women's Volleyball vs (RV) USC
+DESCRIPTION:[L] Indiana University Women's Volleyball vs (RV) USC\nL 0-3 \nTV: BTN\nStreaming Video: https://www.foxsports.com/live\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28603&amp;sport_id=21
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28833-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART:20261011T180000Z
+DTEND:20261011T200000Z
+LOCATION:Bloomington\, Ind., Andy Mohr Field - Softball
+SUMMARY:[N] Indiana University Softball vs Danville Area CC (10 Innings)
+DESCRIPTION:[N] Indiana University Softball vs Danville Area CC (10 Innings)\n\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28833&amp;sport_id=12
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28655-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART:20261011T200000Z
+DTEND:20261011T220000Z
+LOCATION:Los Angeles\, Calif.
+SUMMARY:[T] Indiana University Women's Soccer at USC
+DESCRIPTION:[T] Indiana University Women's Soccer at USC\nT 2-2 \nTV: B1G+\nStreaming Video: https://www.bigtenplus.com/en-int/livestream/indiana-at-usc/2211783\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28655&amp;sport_id=17
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28754-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART:20261011T223000Z
+DTEND:20261012T003000Z
+LOCATION:Indianapolis\, Ind.
+SUMMARY:[W] Indiana University Men's Basketball at Butler (Exhibition)
+DESCRIPTION:[W] Indiana University Men's Basketball at Butler (Exhibition)\nW 96-68\nTV: WISH-TV\nStreaming Audio: https://thevarsitynetwork.com/audioapplink/source/oas-1026/content/iub:allaccess-Live-5174\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28754&amp;sport_id=5
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28758-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART;VALUE=DATE:20261012
+DTEND;VALUE=DATE:20261013
+LOCATION:Medinah\, Ill.
+SUMMARY:[N] Indiana University Women's Golf vs Illini Women's Invitational at Medinah - Medinah Country Club
+DESCRIPTION:[N] Indiana University Women's Golf vs Illini Women's Invitational at Medinah - Medinah Country Club\n 1st Place • 840 (-24)\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28758&amp;sport_id=15
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28773-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART;VALUE=DATE:20261012
+DTEND;VALUE=DATE:20261013
+LOCATION:West Lafayette\, Ind.
+SUMMARY:Indiana University Men's Golf  Purdue Fall Invitational - Kampen-Cosler Golf Course
+DESCRIPTION:Indiana University Men's Golf  Purdue Fall Invitational - Kampen-Cosler Golf Course\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28773&amp;sport_id=7
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28789-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART;VALUE=DATE:20261016
+DTEND;VALUE=DATE:20261017
+LOCATION:Terre Haute\, IN
+SUMMARY:[N] Indiana University Cross Country at Indiana State Pre-Nationals
+DESCRIPTION:[N] Indiana University Cross Country at Indiana State Pre-Nationals\n \nTV: RunnerSpace\nStreaming Video: https://prenationals-d1.runnerspace.com/eprofile.php?event_id=473&do=videos&video_id=465409\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28789&amp;sport_id=33
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28664-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART:20261017T003000Z
+DTEND:20261017T033000Z
+LOCATION:Walnut\, Calif.
+SUMMARY:[N] Indiana University Men's Swimming and Diving vs College Swimming League
+DESCRIPTION:[N] Indiana University Men's Swimming and Diving vs College Swimming League\n \nTV: ESPN+/DAZN\nStreaming Video: https://www.espn.com/search/_/q/college swimming league/o/watch/appearance/dark\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28664&amp;sport_id=9
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28691-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART:20261016T190000Z
+DTEND:20261016T220000Z
+LOCATION:Bloomington\, Ind., Deborah Tobias Field
+SUMMARY:[L] Indiana University Field Hockey vs Northwestern - International Day
+DESCRIPTION:[L] Indiana University Field Hockey vs Northwestern - International Day\nL 1-4 \nTV: B1G+\nStreaming Video: https://www.bigtenplus.com/en-int/livestream/2-northwestern-at-11-indiana/2195169\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28691&amp;sport_id=2
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28656-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART:20261016T233000Z
+DTEND:20261017T013000Z
+LOCATION:Bloomington\, Ind., Jerry Yeagley Field at Bill Armstrong Stadium
+SUMMARY:[L] Indiana University Women's Soccer vs #5 Michigan State
+DESCRIPTION:[L] Indiana University Women's Soccer vs #5 Michigan State\nL 0-2 \nTV: B1G+\nStreaming Video: https://www.bigtenplus.com/en-int/livestream/michigan-state-at-indiana/2195184\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28656&amp;sport_id=17
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28634-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART:20261017T000000Z
+DTEND:20261017T020000Z
+LOCATION:Piscataway\, N.J.
+SUMMARY:[L] Indiana University Men's Soccer at Rutgers
+DESCRIPTION:[L] Indiana University Men's Soccer at Rutgers\nL 0-1 \nTV: B1G+\nStreaming Video: https://www.bigtenplus.com/en-int/page/home\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28634&amp;sport_id=8
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28740-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART:20261017T003000Z
+DTEND:20261017T033000Z
+LOCATION:Walnut\, Calif.
+SUMMARY:[N] Indiana University Women's Swimming and Diving vs College Swimming League
+DESCRIPTION:[N] Indiana University Women's Swimming and Diving vs College Swimming League\n \nTV: ESPN+/DAZN\nStreaming Video: https://www.espn.com/search/_/q/college swimming league/o/watch/appearance/dark\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28740&amp;sport_id=18
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28604-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART:20261017T010000Z
+DTEND:20261017T030000Z
+LOCATION:Eugene\, Ore.
+SUMMARY:[L] Indiana University Women's Volleyball at #11 Oregon
+DESCRIPTION:[L] Indiana University Women's Volleyball at #11 Oregon\nL 2-3 \nTV: B1G+\nStreaming Video: https://www.bigtenplus.com/en-int/livestream/indiana-at-oregon/2211812\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28604&amp;sport_id=21
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28509-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART:20261017T160000Z
+DTEND:20261017T190000Z
+LOCATION:Bloomington\, Ind.
+SUMMARY:[L] Indiana University Football vs Ohio State
+DESCRIPTION:[L] Indiana University Football vs Ohio State\nL 15-19\nTV: FOX\nRadio: Indiana Sports Radio Network\nStreaming Audio: https://thevarsitynetwork.com/audioapplink/source/oas-1026/content/iub:allaccess-Live-5109\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28509&amp;sport_id=3
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28675-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART:20261018T210000Z
+DTEND:20261018T230000Z
+LOCATION:Indianapolis\, Ind.
+SUMMARY:[W] Indiana University Men's Basketball vs North Carolina (Exhibition)
+DESCRIPTION:[W] Indiana University Men's Basketball vs North Carolina (Exhibition)\nW 76-58\nTV: B1G+\nStreaming Audio: https://thevarsitynetwork.com/audioapplink/source/oas-1026/content/iub:allaccess-Live-5181\nTickets: https://www.ticketmaster.com/event/050064C5CBA8393A?brand=fieldhouse&camefrom=CFC_FIELDHOUSE_SITE_EVENT\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28675&amp;sport_id=5
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28605-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART:20261018T210000Z
+DTEND:20261018T230000Z
+LOCATION:Seattle\, Wash.
+SUMMARY:[W] Indiana University Women's Volleyball at #20 Washington
+DESCRIPTION:[W] Indiana University Women's Volleyball at #20 Washington\nW 3-0\nTV: B1G+\nStreaming Video: https://www.bigtenplus.com/en-int/livestream/washington-indiana/2245645\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28605&amp;sport_id=21
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28993-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART;VALUE=DATE:20261019
+DTEND;VALUE=DATE:20261020
+LOCATION:Evansville\, Ind.
+SUMMARY:Indiana University Women's Golf vs Braun Intercollegiate - Oak Meadow Country Club
+DESCRIPTION:Indiana University Women's Golf vs Braun Intercollegiate - Oak Meadow Country Club\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28993&amp;sport_id=15
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28635-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART:20261020T230000Z
+DTEND:20261021T010000Z
+LOCATION:Columbus\, Ohio
+SUMMARY:Indiana University Men's Soccer at Ohio State
+DESCRIPTION:Indiana University Men's Soccer at Ohio State\nTV: Big Ten Network\nStreaming Video: https://www.foxsports.com/live\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28635&amp;sport_id=8
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28657-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART:20261022T230000Z
+DTEND:20261023T010000Z
+LOCATION:Bloomington\, Ind., Jerry Yeagley Field at Bill Armstrong Stadium
+SUMMARY:Indiana University Women's Soccer vs Purdue
+DESCRIPTION:Indiana University Women's Soccer vs Purdue\nTV: B1G+\nStreaming Video: https://www.bigtenplus.com/en-int/livestream/purdue-at-indiana/2195221\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28657&amp;sport_id=17
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28759-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART;VALUE=DATE:20261023
+DTEND;VALUE=DATE:20261025
+LOCATION:Wilmington\, N.C.
+SUMMARY:Indiana University Women's Golf vs Landfall Tradition - Country Club of Landfall
+DESCRIPTION:Indiana University Women's Golf vs Landfall Tradition - Country Club of Landfall\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28759&amp;sport_id=15
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28741-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART:20261023T180000Z
+DTEND:20261023T210000Z
+LOCATION:Bloomington\, Ind., Counsilman-Billingsley Aquatics Center
+SUMMARY:Indiana University Women's Swimming and Diving vs Kentucky
+DESCRIPTION:Indiana University Women's Swimming and Diving vs Kentucky\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28741&amp;sport_id=18
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28742-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART:20261023T180000Z
+DTEND:20261023T210000Z
+LOCATION:Bloomington\, Ind., Counsilman-Billingsley Aquatics Center
+SUMMARY:Indiana University Women's Swimming and Diving vs USC
+DESCRIPTION:Indiana University Women's Swimming and Diving vs USC\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28742&amp;sport_id=18
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28665-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART:20261023T180000Z
+DTEND:20261023T210000Z
+LOCATION:Bloomington\, Ind., Counsilman-Billingsley Aquatics Center
+SUMMARY:Indiana University Men's Swimming and Diving vs Kentucky
+DESCRIPTION:Indiana University Men's Swimming and Diving vs Kentucky\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28665&amp;sport_id=9
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28666-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART:20261023T180000Z
+DTEND:20261023T210000Z
+LOCATION:Bloomington\, Ind., Counsilman-Billingsley Aquatics Center
+SUMMARY:Indiana University Men's Swimming and Diving vs USC
+DESCRIPTION:Indiana University Men's Swimming and Diving vs USC\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28666&amp;sport_id=9
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28692-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART:20261023T190000Z
+DTEND:20261023T220000Z
+LOCATION:Bloomington\, Ind., Deborah Tobias Field
+SUMMARY:Indiana University Field Hockey vs Penn State - Breast Cancer Awareness Day
+DESCRIPTION:Indiana University Field Hockey vs Penn State - Breast Cancer Awareness Day\nTV: B1G+\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28692&amp;sport_id=2
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28636-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART:20261023T230000Z
+DTEND:20261024T010000Z
+LOCATION:Bloomington\, Ind., Jerry Yeagley Field at Bill Armstrong Stadium
+SUMMARY:Indiana University Men's Soccer vs Northwestern
+DESCRIPTION:Indiana University Men's Soccer vs Northwestern\nTV: B1G+\nStreaming Video: https://www.bigtenplus.com/en-int/page/home\nTickets: https://iuhoosiers.evenue.net/list/MSM\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28636&amp;sport_id=8
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28606-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART:20261023T230000Z
+DTEND:20261024T010000Z
+LOCATION:Columbus\, Ohio
+SUMMARY:Indiana University Women's Volleyball at Ohio State
+DESCRIPTION:Indiana University Women's Volleyball at Ohio State\nTV: BTN\nStreaming Video: https://www.foxsports.com/live\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28606&amp;sport_id=21
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28510-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART:20261024T160000Z
+DTEND:20261024T190000Z
+LOCATION:Ann Arbor\, Mich.
+SUMMARY:Indiana University Football at Michigan
+DESCRIPTION:Indiana University Football at Michigan\nTV: FOX\nRadio: Indiana Sports Radio Network\nStreaming Audio: https://thevarsitynetwork.com/audioapplink/source/oas-1026/content/iub:allaccess-Live-5110\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28510&amp;sport_id=3
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28693-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART:20261025T160000Z
+DTEND:20261025T190000Z
+LOCATION:Bloomington\, Ind., Deborah Tobias Field
+SUMMARY:Indiana University Field Hockey vs Maryland - Umpire Appreciation Day
+DESCRIPTION:Indiana University Field Hockey vs Maryland - Umpire Appreciation Day\nTV: B1G+\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28693&amp;sport_id=2
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28658-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART:20261025T170000Z
+DTEND:20261025T190000Z
+LOCATION:Bloomington\, Ind., Jerry Yeagley Field at Bill Armstrong Stadium
+SUMMARY:Indiana University Women's Soccer vs Rutgers
+DESCRIPTION:Indiana University Women's Soccer vs Rutgers\nTV: B1G+\nStreaming Video: https://www.bigtenplus.com/en-int/livestream/rutgers-at-indiana/2195257\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28658&amp;sport_id=17
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28607-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART:20261025T190000Z
+DTEND:20261025T210000Z
+LOCATION:Bloomington\, Ind.
+SUMMARY:Indiana University Women's Volleyball vs #16 Penn State
+DESCRIPTION:Indiana University Women's Volleyball vs #16 Penn State\nTV: FS1\nStreaming Video: https://www.foxsports.com/live\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28607&amp;sport_id=21
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28695-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART:20261025T200000Z
+DTEND:20261025T220000Z
+LOCATION:Evansville\, Ind.
+SUMMARY:Indiana University Men's Basketball vs Western Kentucky (Exhibition)
+DESCRIPTION:Indiana University Men's Basketball vs Western Kentucky (Exhibition)\nTV: B1G+\nStreaming Audio: https://thevarsitynetwork.com/audioapplink/source/oas-1026/content/iub:allaccess-Live-5182\nTickets: https://www.ticketmaster.com/event/050064D3C18A3DB8\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28695&amp;sport_id=5
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28876-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART:20261028T230000Z
+DTEND:20261029T010000Z
+LOCATION:Bloomington\, Ind.
+SUMMARY:Indiana University Women's Basketball vs Marian
+DESCRIPTION:Indiana University Women's Basketball vs Marian\nTV: B1G+\nRadio: B97\nStreaming Audio: https://thevarsitynetwork.com/audioapplink/source/oas-1026/content/iub:allaccess-Live-5216\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28876&amp;sport_id=13
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28797-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART;VALUE=DATE:20261029
+DTEND;VALUE=DATE:20261101
+LOCATION:Ann Arbor\, Mich.
+SUMMARY:Indiana University Men's Tennis vs Big Ten Individual Championships
+DESCRIPTION:Indiana University Men's Tennis vs Big Ten Individual Championships\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28797&amp;sport_id=10
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28790-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART;VALUE=DATE:20261030
+DTEND;VALUE=DATE:20261031
+LOCATION:Madison\, Wisc.
+SUMMARY:Indiana University Cross Country at Big Ten Championships
+DESCRIPTION:Indiana University Cross Country at Big Ten Championships\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28790&amp;sport_id=33
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28694-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART:20261030T160000Z
+DTEND:20261030T190000Z
+LOCATION:Piscataway\, N.J.
+SUMMARY:Indiana University Field Hockey at Rutgers
+DESCRIPTION:Indiana University Field Hockey at Rutgers\nTV: B1G+\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28694&amp;sport_id=2
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28608-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART:20261030T220000Z
+DTEND:20261031T000000Z
+LOCATION:East Lansing\, Mich.
+SUMMARY:Indiana University Women's Volleyball at Michigan State
+DESCRIPTION:Indiana University Women's Volleyball at Michigan State\nTV: BTN\nStreaming Video: https://www.foxsports.com/live\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28608&amp;sport_id=21
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28909-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART:20261030T220000Z
+DTEND:20261031T010000Z
+LOCATION:Bloomington\, Ind., Wilkinson Hall
+SUMMARY:Indiana University Wrestling vs Intrasquad (Wrestle-Offs)
+DESCRIPTION:Indiana University Wrestling vs Intrasquad (Wrestle-Offs)\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28909&amp;sport_id=23
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28659-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART:20261030T230000Z
+DTEND:20261031T010000Z
+LOCATION:University Park\, Pa.
+SUMMARY:Indiana University Women's Soccer at Penn State
+DESCRIPTION:Indiana University Women's Soccer at Penn State\nTV: B1G+\nStreaming Video: https://www.bigtenplus.com/en-int/livestream/indiana-at-penn-state/2211913\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28659&amp;sport_id=17
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28637-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART:20261031T020000Z
+DTEND:20261031T035959Z
+LOCATION:Los Angeles\, Calif.
+SUMMARY:Indiana University Men's Soccer at UCLA
+DESCRIPTION:Indiana University Men's Soccer at UCLA\nTV: B1G+\nStreaming Video: https://www.bigtenplus.com/en-int/page/home\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28637&amp;sport_id=8
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28511-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART:20261031T193000Z
+DTEND:20261031T223000Z
+LOCATION:Bloomington\, Ind.
+SUMMARY:Indiana University Football vs Minnesota
+DESCRIPTION:Indiana University Football vs Minnesota\nTV: CBS\nRadio: Indiana Sports Radio Network\nStreaming Audio: https://thevarsitynetwork.com/audioapplink/source/oas-1026/content/iub:allaccess-Live-5111\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28511&amp;sport_id=3
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28609-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART:20261031T230000Z
+DTEND:20261101T010000Z
+LOCATION:Ann Arbor\, Mich.
+SUMMARY:Indiana University Women's Volleyball at Michigan
+DESCRIPTION:Indiana University Women's Volleyball at Michigan\nTV: B1G+\nStreaming Video: https://www.bigtenplus.com/en-int/livestream/indiana-at-michigan/2211948\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28609&amp;sport_id=21
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28899-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART;VALUE=DATE:20261101
+DTEND;VALUE=DATE:20261102
+LOCATION:Columbus\, Ohio
+SUMMARY:Indiana University Women's Rowing at Scrimmage (Ohio State/Michigan State/Michigan)
+DESCRIPTION:Indiana University Women's Rowing at Scrimmage (Ohio State/Michigan State/Michigan)\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28899&amp;sport_id=16
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28819-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART:20261103T000000Z
+DTEND:20261103T020000Z
+LOCATION:Bloomington\, Ind.
+SUMMARY:Indiana University Men's Basketball vs Eastern Illinois
+DESCRIPTION:Indiana University Men's Basketball vs Eastern Illinois\nTV: B1G+\nStreaming Audio: https://thevarsitynetwork.com/audioapplink/source/oas-1026/content/iub:allaccess-Live-5183\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28819&amp;sport_id=5
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28808-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART:20261104T000000Z
+DTEND:20261104T020000Z
+LOCATION:Bloomington\, Ind.
+SUMMARY:Indiana University Women's Basketball vs FGCU
+DESCRIPTION:Indiana University Women's Basketball vs FGCU\nTV: B1G+\nRadio: B97\nStreaming Audio: https://thevarsitynetwork.com/audioapplink/source/oas-1026/content/iub:allaccess-Live-5217\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28808&amp;sport_id=13
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28638-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART:20261105T010000Z
+DTEND:20261105T030000Z
+LOCATION:Bloomington\, Ind., Jerry Yeagley Field at Bill Armstrong Stadium
+SUMMARY:Indiana University Men's Soccer vs Michigan State
+DESCRIPTION:Indiana University Men's Soccer vs Michigan State\nTV: B1G+\nStreaming Video: https://www.bigtenplus.com/en-int/page/home\nTickets: https://iuhoosiers.evenue.net/list/MSM\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28638&amp;sport_id=8
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28798-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART;VALUE=DATE:20261105
+DTEND;VALUE=DATE:20261108
+LOCATION:Gainesville\, Fla.
+SUMMARY:Indiana University Men's Tennis vs ITA Sectionals
+DESCRIPTION:Indiana University Men's Tennis vs ITA Sectionals\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28798&amp;sport_id=10
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28667-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART;VALUE=DATE:20261105
+DTEND;VALUE=DATE:20261106
+LOCATION:Indianapolis\, Ind., IU Natatorium
+SUMMARY:Indiana University Men's Swimming and Diving vs College Swimming League
+DESCRIPTION:Indiana University Men's Swimming and Diving vs College Swimming League\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28667&amp;sport_id=9
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28743-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART;VALUE=DATE:20261105
+DTEND;VALUE=DATE:20261106
+LOCATION:Indianapolis\, Ind., IU Natatorium
+SUMMARY:Indiana University Women's Swimming and Diving vs College Swimming League
+DESCRIPTION:Indiana University Women's Swimming and Diving vs College Swimming League\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28743&amp;sport_id=18
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28804-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART;VALUE=DATE:20261105
+DTEND;VALUE=DATE:20261108
+LOCATION:Knoxville\, Tenn.
+SUMMARY:Indiana University Women's Tennis vs ITA Sectional Championships
+DESCRIPTION:Indiana University Women's Tennis vs ITA Sectional Championships\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28804&amp;sport_id=19
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28820-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART:20261105T230000Z
+DTEND:20261106T010000Z
+LOCATION:Bloomington\, Ind.
+SUMMARY:Indiana University Men's Basketball vs Bellarmine
+DESCRIPTION:Indiana University Men's Basketball vs Bellarmine\nTV: Peacock/NBCSN\nStreaming Audio: https://thevarsitynetwork.com/audioapplink/source/oas-1026/content/iub:allaccess-Live-5184\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28820&amp;sport_id=5
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28806-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART;VALUE=DATE:20261106
+DTEND;VALUE=DATE:20261108
+LOCATION:Nashville\, Tenn.
+SUMMARY:Indiana University Women's Tennis vs June Stewart Invitational 
+DESCRIPTION:Indiana University Women's Tennis vs June Stewart Invitational \n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28806&amp;sport_id=19
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28744-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART;VALUE=DATE:20261106
+DTEND;VALUE=DATE:20261107
+LOCATION:Indianapolis\, Ind., IU Natatorium
+SUMMARY:Indiana University Women's Swimming and Diving vs College Swimming League
+DESCRIPTION:Indiana University Women's Swimming and Diving vs College Swimming League\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28744&amp;sport_id=18
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28668-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART;VALUE=DATE:20261106
+DTEND;VALUE=DATE:20261107
+LOCATION:Indianapolis\, Ind., IU Natatorium
+SUMMARY:Indiana University Men's Swimming and Diving vs College Swimming League
+DESCRIPTION:Indiana University Men's Swimming and Diving vs College Swimming League\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28668&amp;sport_id=9
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28610-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART:20261107T000000Z
+DTEND:20261107T020000Z
+LOCATION:Bloomington\, Ind.
+SUMMARY:Indiana University Women's Volleyball vs Iowa
+DESCRIPTION:Indiana University Women's Volleyball vs Iowa\nTV: B1G+\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28610&amp;sport_id=21
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28809-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART:20261107T000000Z
+DTEND:20261107T020000Z
+LOCATION:Bloomington\, Ind.
+SUMMARY:Indiana University Women's Basketball vs Southern Illinois
+DESCRIPTION:Indiana University Women's Basketball vs Southern Illinois\nTV: B1G+\nRadio: B97\nStreaming Audio: https://thevarsitynetwork.com/audioapplink/source/oas-1026/content/iub:allaccess-Live-5218\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28809&amp;sport_id=13
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28960-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART;VALUE=DATE:20261107
+DTEND;VALUE=DATE:20261108
+LOCATION:East Lansing\, Mich.
+SUMMARY:Indiana University Wrestling vs Michigan State Open
+DESCRIPTION:Indiana University Wrestling vs Michigan State Open\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28960&amp;sport_id=23
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28910-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART;VALUE=DATE:20261107
+DTEND;VALUE=DATE:20261108
+LOCATION:Bethlehem\, Pa.
+SUMMARY:Indiana University Wrestling vs Lock Haven
+DESCRIPTION:Indiana University Wrestling vs Lock Haven\nTickets: https://tournaflex.com/splat.asp?target=front.htm\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28910&amp;sport_id=23
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28911-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART;VALUE=DATE:20261107
+DTEND;VALUE=DATE:20261108
+LOCATION:Bethlehem\, Pa.
+SUMMARY:Indiana University Wrestling vs Lehigh
+DESCRIPTION:Indiana University Wrestling vs Lehigh\nTickets: https://tournaflex.com/splat.asp?target=front.htm\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28911&amp;sport_id=23
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28912-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART;VALUE=DATE:20261108
+DTEND;VALUE=DATE:20261109
+LOCATION:Bethlehem\, Pa.
+SUMMARY:Indiana University Wrestling vs Journeymen Collegiate Classic
+DESCRIPTION:Indiana University Wrestling vs Journeymen Collegiate Classic\nTickets: https://tournaflex.com/splat.asp?target=front.htm\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28912&amp;sport_id=23
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28611-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART:20261108T190000Z
+DTEND:20261108T210000Z
+LOCATION:Bloomington\, Ind.
+SUMMARY:Indiana University Women's Volleyball vs Illinois
+DESCRIPTION:Indiana University Women's Volleyball vs Illinois\nTV: B1G+\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28611&amp;sport_id=21
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28617-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART:20261109T233000Z
+DTEND:20261110T013000Z
+LOCATION:Indianapolis\, Ind.
+SUMMARY:Indiana University Men's Basketball vs Syracuse
+DESCRIPTION:Indiana University Men's Basketball vs Syracuse\nTV: FS1\nStreaming Audio: https://thevarsitynetwork.com/audioapplink/source/oas-1026/content/iub:allaccess-Live-5185\nTickets: https://www.ticketmaster.com/event/0500646AE9AEDEEA?brand=fieldhouse&camefrom=CFC_FIELDHOUSE_SITE_EVENT\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28617&amp;sport_id=5
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28810-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART:20261110T000000Z
+DTEND:20261110T020000Z
+LOCATION:Bloomington\, Ind.
+SUMMARY:Indiana University Women's Basketball vs Bradley
+DESCRIPTION:Indiana University Women's Basketball vs Bradley\nTV: B1G+\nRadio: B97\nStreaming Audio: https://thevarsitynetwork.com/audioapplink/source/oas-1026/content/iub:allaccess-Live-5219\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28810&amp;sport_id=13
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28612-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART:20261112T010000Z
+DTEND:20261112T030000Z
+LOCATION:Minneapolis\, Minn.
+SUMMARY:Indiana University Women's Volleyball at Minnesota
+DESCRIPTION:Indiana University Women's Volleyball at Minnesota\nTV: B1G+\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28612&amp;sport_id=21
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28827-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART:20261112T233000Z
+DTEND:20261113T013000Z
+LOCATION:Bloomington\, Ind.
+SUMMARY:Indiana University Men's Basketball vs Tennessee Tech
+DESCRIPTION:Indiana University Men's Basketball vs Tennessee Tech\nTV: BTN\nStreaming Audio: https://thevarsitynetwork.com/audioapplink/source/oas-1026/content/iub:allaccess-Live-5186\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28827&amp;sport_id=5
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28791-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART;VALUE=DATE:20261113
+DTEND;VALUE=DATE:20261114
+LOCATION:East Lansing\, Mich.
+SUMMARY:Indiana University Cross Country at NCAA Grat Lakes Regional
+DESCRIPTION:Indiana University Cross Country at NCAA Grat Lakes Regional\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28791&amp;sport_id=33
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28811-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART:20261114T000000Z
+DTEND:20261114T020000Z
+LOCATION:Bloomington\, Ind.
+SUMMARY:Indiana University Women's Basketball vs Samford
+DESCRIPTION:Indiana University Women's Basketball vs Samford\nTV: B1G+\nRadio: B97\nStreaming Audio: https://thevarsitynetwork.com/audioapplink/source/oas-1026/content/iub:allaccess-Live-5220\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28811&amp;sport_id=13
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28512-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART;VALUE=DATE:20261114
+DTEND;VALUE=DATE:20261115
+LOCATION:Bloomington\, Ind.
+SUMMARY:Indiana University Football vs USC
+DESCRIPTION:Indiana University Football vs USC\nRadio: Indiana Sports Radio Network\nStreaming Audio: https://thevarsitynetwork.com/audioapplink/source/oas-1026/content/iub:allaccess-Live-5112\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28512&amp;sport_id=3
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28900-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART;VALUE=DATE:20261114
+DTEND;VALUE=DATE:20261115
+LOCATION:West Windsor\, N.J.
+SUMMARY:Indiana University Women's Rowing vs USRowing Small Boat Championships
+DESCRIPTION:Indiana University Women's Rowing vs USRowing Small Boat Championships\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28900&amp;sport_id=16
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28613-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART:20261115T010000Z
+DTEND:20261115T030000Z
+LOCATION:Bloomington\, Ind.
+SUMMARY:Indiana University Women's Volleyball vs Northwestern
+DESCRIPTION:Indiana University Women's Volleyball vs Northwestern\nTV: B1G+\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28613&amp;sport_id=21
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28914-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART:20261115T190000Z
+DTEND:20261115T220000Z
+LOCATION:Mount Pleasant\, Mich.
+SUMMARY:Indiana University Wrestling at Central Michigan
+DESCRIPTION:Indiana University Wrestling at Central Michigan\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28914&amp;sport_id=23
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28817-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART:20261115T190000Z
+DTEND:20261115T210000Z
+LOCATION:Bloomington\, Ind.
+SUMMARY:Indiana University Women's Basketball vs Milwaukee
+DESCRIPTION:Indiana University Women's Basketball vs Milwaukee\nTV: B1G+\nRadio: B97\nStreaming Audio: https://thevarsitynetwork.com/audioapplink/source/oas-1026/content/iub:allaccess-Live-5221\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28817&amp;sport_id=13
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28807-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART;VALUE=DATE:20261117
+DTEND;VALUE=DATE:20261122
+LOCATION:Athens\, Ga.
+SUMMARY:Indiana University Women's Tennis vs NCAA Individual Championships
+DESCRIPTION:Indiana University Women's Tennis vs NCAA Individual Championships\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28807&amp;sport_id=19
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28745-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART;VALUE=DATE:20261117
+DTEND;VALUE=DATE:20261120
+LOCATION:Columbus\, Ohio
+SUMMARY:Indiana University Women's Swimming and Diving vs Ohio State Invitational
+DESCRIPTION:Indiana University Women's Swimming and Diving vs Ohio State Invitational\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28745&amp;sport_id=18
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28746-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART;VALUE=DATE:20261117
+DTEND;VALUE=DATE:20261122
+LOCATION:Knoxville\, Tenn.
+SUMMARY:Indiana University Women's Swimming and Diving vs Tennessee Diving Invitational
+DESCRIPTION:Indiana University Women's Swimming and Diving vs Tennessee Diving Invitational\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28746&amp;sport_id=18
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28669-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART;VALUE=DATE:20261117
+DTEND;VALUE=DATE:20261120
+LOCATION:Columbus\, Ohio
+SUMMARY:Indiana University Men's Swimming and Diving vs Ohio State Invitational
+DESCRIPTION:Indiana University Men's Swimming and Diving vs Ohio State Invitational\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28669&amp;sport_id=9
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28673-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART;VALUE=DATE:20261117
+DTEND;VALUE=DATE:20261122
+LOCATION:Knoxville\, Tenn.
+SUMMARY:Indiana University Men's Swimming and Diving vs Tennessee Diving Invitational
+DESCRIPTION:Indiana University Men's Swimming and Diving vs Tennessee Diving Invitational\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28673&amp;sport_id=9
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28799-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART;VALUE=DATE:20261117
+DTEND;VALUE=DATE:20261122
+LOCATION:Athens\, Ga.
+SUMMARY:Indiana University Men's Tennis vs NCAA Individual Championships
+DESCRIPTION:Indiana University Men's Tennis vs NCAA Individual Championships\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28799&amp;sport_id=10
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28614-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART:20261118T000000Z
+DTEND:20261118T020000Z
+LOCATION:Bloomington\, Ind.
+SUMMARY:Indiana University Women's Volleyball vs Purdue
+DESCRIPTION:Indiana University Women's Volleyball vs Purdue\nTV: B1G+\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28614&amp;sport_id=21
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28735-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART:20261118T003000Z
+DTEND:20261118T023000Z
+LOCATION:New York\, N.Y.
+SUMMARY:Indiana University Men's Basketball vs Arkansas - Bad Boy Mowers Series - New York
+DESCRIPTION:Indiana University Men's Basketball vs Arkansas - Bad Boy Mowers Series - New York\nTV: Peacock/NBCSN\nStreaming Audio: https://thevarsitynetwork.com/audioapplink/source/oas-1026/content/iub:allaccess-Live-5187\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28735&amp;sport_id=5
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28812-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART:20261119T000000Z
+DTEND:20261119T020000Z
+LOCATION:Bloomington\, Ind.
+SUMMARY:Indiana University Women's Basketball vs Coastal Carolina
+DESCRIPTION:Indiana University Women's Basketball vs Coastal Carolina\nTV: B1G+\nRadio: B97\nStreaming Audio: https://thevarsitynetwork.com/audioapplink/source/oas-1026/content/iub:allaccess-Live-5222\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28812&amp;sport_id=13
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28915-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART:20261121T000000Z
+DTEND:20261121T030000Z
+LOCATION:Bloomington\, Ind., Wilkinson Hall
+SUMMARY:Indiana University Wrestling vs Oklahoma
+DESCRIPTION:Indiana University Wrestling vs Oklahoma\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28915&amp;sport_id=23
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28616-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART:20261121T010000Z
+DTEND:20261121T030000Z
+LOCATION:Indianapolis\, Ind.
+SUMMARY:Indiana University Men's Basketball vs Kentucky
+DESCRIPTION:Indiana University Men's Basketball vs Kentucky\nTV: CBS\nStreaming Audio: https://thevarsitynetwork.com/audioapplink/source/oas-1026/content/iub:allaccess-Live-5188\nTickets: https://www.ticketmaster.com/event/050064F195A6829A\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28616&amp;sport_id=5
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28792-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART;VALUE=DATE:20261121
+DTEND;VALUE=DATE:20261122
+LOCATION:Terre Haute\, Ind.
+SUMMARY:Indiana University Cross Country at NCAA Championships
+DESCRIPTION:Indiana University Cross Country at NCAA Championships\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28792&amp;sport_id=33
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28513-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART;VALUE=DATE:20261121
+DTEND;VALUE=DATE:20261122
+LOCATION:Seattle\, Wash.
+SUMMARY:Indiana University Football at Washington
+DESCRIPTION:Indiana University Football at Washington\nRadio: Indiana Sports Radio Network\nStreaming Audio: https://thevarsitynetwork.com/audioapplink/source/oas-1026/content/iub:allaccess-Live-5113\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28513&amp;sport_id=3
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28813-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART:20261122T190000Z
+DTEND:20261122T210000Z
+LOCATION:Bloomington\, Ind.
+SUMMARY:Indiana University Women's Basketball vs Southern Indiana
+DESCRIPTION:Indiana University Women's Basketball vs Southern Indiana\nTV: B1G+\nRadio: B97\nStreaming Audio: https://thevarsitynetwork.com/audioapplink/source/oas-1026/content/iub:allaccess-Live-5223\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28813&amp;sport_id=13
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28821-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART:20261125T000000Z
+DTEND:20261125T020000Z
+LOCATION:Bloomington\, Ind.
+SUMMARY:Indiana University Men's Basketball vs Jacksonville
+DESCRIPTION:Indiana University Men's Basketball vs Jacksonville\nTV: B1G+\nStreaming Audio: https://thevarsitynetwork.com/audioapplink/source/oas-1026/content/iub:allaccess-Live-5189\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28821&amp;sport_id=5
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28726-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART:20261127T160000Z
+DTEND:20261127T180000Z
+LOCATION:Ft. Myers\, Fla. 
+SUMMARY:Indiana University Women's Basketball vs Mississippi State
+DESCRIPTION:Indiana University Women's Basketball vs Mississippi State\nTV: ION\nStreaming Audio: https://thevarsitynetwork.com/audioapplink/source/oas-1026/content/iub:allaccess-Live-5224\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28726&amp;sport_id=13
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28822-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART:20261127T230000Z
+DTEND:20261128T010000Z
+LOCATION:Bloomington\, Ind.
+SUMMARY:Indiana University Men's Basketball vs Bowling Green
+DESCRIPTION:Indiana University Men's Basketball vs Bowling Green\nTV: BTN\nStreaming Audio: https://thevarsitynetwork.com/audioapplink/source/oas-1026/content/iub:allaccess-Live-5190\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28822&amp;sport_id=5
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28514-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART;VALUE=DATE:20261128
+DTEND;VALUE=DATE:20261129
+LOCATION:Bloomington\, Ind.
+SUMMARY:Indiana University Football vs Purdue
+DESCRIPTION:Indiana University Football vs Purdue\nRadio: Indiana Sports Radio Network\nStreaming Audio: https://thevarsitynetwork.com/audioapplink/source/oas-1026/content/iub:allaccess-Live-5114\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28514&amp;sport_id=3
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28727-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART:20261128T183000Z
+DTEND:20261128T203000Z
+LOCATION:
+SUMMARY:Indiana University Women's Basketball vs Georgia Tech
+DESCRIPTION:Indiana University Women's Basketball vs Georgia Tech\nTV: ION\nStreaming Audio: https://thevarsitynetwork.com/audioapplink/source/oas-1026/content/iub:allaccess-Live-5225\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28727&amp;sport_id=13
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28855-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART:20261202T010000Z
+DTEND:20261202T030000Z
+LOCATION:Bloomington\, Ind.
+SUMMARY:Indiana University Men's Basketball vs Rutgers
+DESCRIPTION:Indiana University Men's Basketball vs Rutgers\nTV: FS1\nStreaming Audio: https://thevarsitynetwork.com/audioapplink/source/oas-1026/content/iub:allaccess-Live-5191\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28855&amp;sport_id=5
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28814-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART:20261203T000000Z
+DTEND:20261203T020000Z
+LOCATION:Bloomington\, Ind.
+SUMMARY:Indiana University Women's Basketball vs Boston College
+DESCRIPTION:Indiana University Women's Basketball vs Boston College\nTV: B1G+\nRadio: B97\nStreaming Audio: https://thevarsitynetwork.com/audioapplink/source/oas-1026/content/iub:allaccess-Live-5226\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28814&amp;sport_id=13
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28823-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART:20261203T230000Z
+DTEND:20261204T010000Z
+LOCATION:Bloomington\, Ind.
+SUMMARY:Indiana University Men's Basketball vs Western Illinois
+DESCRIPTION:Indiana University Men's Basketball vs Western Illinois\nTV: BTN\nStreaming Audio: https://thevarsitynetwork.com/audioapplink/source/oas-1026/content/iub:allaccess-Live-5192\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28823&amp;sport_id=5
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28837-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART:20261205T190000Z
+DTEND:20261205T210000Z
+LOCATION:Evanston\, Ill.
+SUMMARY:Indiana University Women's Basketball at Northwestern
+DESCRIPTION:Indiana University Women's Basketball at Northwestern\nTV: BTN\nRadio: B97\nStreaming Audio: https://thevarsitynetwork.com/audioapplink/source/oas-1026/content/iub:allaccess-Live-5227\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28837&amp;sport_id=13
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28917-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART;VALUE=DATE:20261206
+DTEND;VALUE=DATE:20261207
+LOCATION:Edwardsville\, Ill.
+SUMMARY:Indiana University Wrestling vs Cougar Clash
+DESCRIPTION:Indiana University Wrestling vs Cougar Clash\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28917&amp;sport_id=23
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28856-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART:20261208T000000Z
+DTEND:20261208T020000Z
+LOCATION:Iowa City\, Iowa
+SUMMARY:Indiana University Men's Basketball at Iowa
+DESCRIPTION:Indiana University Men's Basketball at Iowa\nTV: FS1\nStreaming Audio: https://thevarsitynetwork.com/audioapplink/source/oas-1026/content/iub:allaccess-Live-5193\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28856&amp;sport_id=5
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28818-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART:20261210T000000Z
+DTEND:20261210T020000Z
+LOCATION:Bloomington\, Ind.
+SUMMARY:Indiana University Women's Basketball vs Northern Kentucky
+DESCRIPTION:Indiana University Women's Basketball vs Northern Kentucky\nRadio: B97\nStreaming Audio: https://thevarsitynetwork.com/audioapplink/source/oas-1026/content/iub:allaccess-Live-5228\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28818&amp;sport_id=13
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28639-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART;VALUE=DATE:20261211
+DTEND;VALUE=DATE:20261214
+LOCATION:Cary\, N.C., WakeMed Soccer Park
+SUMMARY:Indiana University Men's Soccer vs 2026 NCAA College Cup
+DESCRIPTION:Indiana University Men's Soccer vs 2026 NCAA College Cup\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28639&amp;sport_id=8
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28824-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART:20261212T170000Z
+DTEND:20261212T190000Z
+LOCATION:Bloomington\, Ind.
+SUMMARY:Indiana University Men's Basketball vs UCF
+DESCRIPTION:Indiana University Men's Basketball vs UCF\nTV: FS1\nStreaming Audio: https://thevarsitynetwork.com/audioapplink/source/oas-1026/content/iub:allaccess-Live-5194\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28824&amp;sport_id=5
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28815-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART:20261213T190000Z
+DTEND:20261213T210000Z
+LOCATION:Bloomington\, Ind.
+SUMMARY:Indiana University Women's Basketball vs Illinois State
+DESCRIPTION:Indiana University Women's Basketball vs Illinois State\nTV: B1G+\nRadio: B97\nStreaming Audio: https://thevarsitynetwork.com/audioapplink/source/oas-1026/content/iub:allaccess-Live-5229\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28815&amp;sport_id=13
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28825-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART:20261218T230000Z
+DTEND:20261219T010000Z
+LOCATION:Bloomington\, Ind.
+SUMMARY:Indiana University Men's Basketball vs Missouri
+DESCRIPTION:Indiana University Men's Basketball vs Missouri\nTV: FS1\nStreaming Audio: https://thevarsitynetwork.com/audioapplink/source/oas-1026/content/iub:allaccess-Live-5195\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28825&amp;sport_id=5
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28961-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART;VALUE=DATE:20261220
+DTEND;VALUE=DATE:20261221
+LOCATION:Kent\, Ohio
+SUMMARY:Indiana University Wrestling vs Kent State Open
+DESCRIPTION:Indiana University Wrestling vs Kent State Open\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28961&amp;sport_id=23
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28816-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART:20261220T180000Z
+DTEND:20261220T200000Z
+LOCATION:Bloomington\, Ind.
+SUMMARY:Indiana University Women's Basketball vs Florida State
+DESCRIPTION:Indiana University Women's Basketball vs Florida State\nTV: B1G+\nRadio: B97\nStreaming Audio: https://thevarsitynetwork.com/audioapplink/source/oas-1026/content/iub:allaccess-Live-5230\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28816&amp;sport_id=13
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28919-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART:20261220T180000Z
+DTEND:20261220T210000Z
+LOCATION:Lawrenceville\, N.J.
+SUMMARY:Indiana University Wrestling at Rider
+DESCRIPTION:Indiana University Wrestling at Rider\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28919&amp;sport_id=23
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28933-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART:20261222T160000Z
+DTEND:20261222T190000Z
+LOCATION:Providence\, R.I.
+SUMMARY:Indiana University Wrestling at Brown
+DESCRIPTION:Indiana University Wrestling at Brown\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28933&amp;sport_id=23
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28826-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART:20261223T000000Z
+DTEND:20261223T020000Z
+LOCATION:Bloomington\, Ind.
+SUMMARY:Indiana University Men's Basketball vs FDU
+DESCRIPTION:Indiana University Men's Basketball vs FDU\nTV: B1G+\nStreaming Audio: https://thevarsitynetwork.com/audioapplink/source/oas-1026/content/iub:allaccess-Live-5196\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28826&amp;sport_id=5
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28936-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART;VALUE=DATE:20261229
+DTEND;VALUE=DATE:20261230
+LOCATION:Evanston\, Ill.
+SUMMARY:Indiana University Wrestling vs Ken Kraft Midlands Championships
+DESCRIPTION:Indiana University Wrestling vs Ken Kraft Midlands Championships\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28936&amp;sport_id=23
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28838-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART:20261230T000000Z
+DTEND:20261230T020000Z
+LOCATION:Bloomington\, Ind. 
+SUMMARY:Indiana University Women's Basketball vs Rutgers 
+DESCRIPTION:Indiana University Women's Basketball vs Rutgers \nTV: B1G+\nRadio: B97\nStreaming Audio: https://thevarsitynetwork.com/audioapplink/source/oas-1026/content/iub:allaccess-Live-5231\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28838&amp;sport_id=13
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28857-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART:20270102T190000Z
+DTEND:20270102T210000Z
+LOCATION:Bloomington\, Ind.
+SUMMARY:Indiana University Men's Basketball vs USC
+DESCRIPTION:Indiana University Men's Basketball vs USC\nTV: Peacock/NBCSN\nStreaming Audio: https://thevarsitynetwork.com/audioapplink/source/oas-1026/content/iub:allaccess-Live-5197\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28857&amp;sport_id=5
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28839-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART:20270102T230000Z
+DTEND:20270103T010000Z
+LOCATION:Minneapolis\, Minn.
+SUMMARY:Indiana University Women's Basketball at Minnesota
+DESCRIPTION:Indiana University Women's Basketball at Minnesota\nTV: BTN\nRadio: B97\nStreaming Audio: https://thevarsitynetwork.com/audioapplink/source/oas-1026/content/iub:allaccess-Live-5232\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28839&amp;sport_id=13
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28840-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART:20270106T000000Z
+DTEND:20270106T020000Z
+LOCATION:Bloomington\, Ind.
+SUMMARY:Indiana University Women's Basketball vs  Maryland
+DESCRIPTION:Indiana University Women's Basketball vs  Maryland\nTV: B1G+\nRadio: B97\nStreaming Audio: https://thevarsitynetwork.com/audioapplink/source/oas-1026/content/iub:allaccess-Live-5233\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28840&amp;sport_id=13
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28858-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART:20270107T033000Z
+DTEND:20270107T053000Z
+LOCATION:Eugene\, Ore.
+SUMMARY:Indiana University Men's Basketball at Oregon
+DESCRIPTION:Indiana University Men's Basketball at Oregon\nTV: BTN\nStreaming Audio: https://thevarsitynetwork.com/audioapplink/source/oas-1026/content/iub:allaccess-Live-5198\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28858&amp;sport_id=5
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28747-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART:20270108T170000Z
+DTEND:20270108T200000Z
+LOCATION:Bloomington\, Ind., Counsilman-Billingsley Aquatics Center
+SUMMARY:Indiana University Women's Swimming and Diving vs Michigan
+DESCRIPTION:Indiana University Women's Swimming and Diving vs Michigan\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28747&amp;sport_id=18
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28728-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART:20270108T170000Z
+DTEND:20270108T200000Z
+LOCATION:Bloomington\, Ind., Counsilman-Billingsley Aquatics Center
+SUMMARY:Indiana University Men's Swimming and Diving vs Michigan
+DESCRIPTION:Indiana University Men's Swimming and Diving vs Michigan\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28728&amp;sport_id=9
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28841-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART:20270108T230000Z
+DTEND:20270109T010000Z
+LOCATION:Bloomington\, Ind.
+SUMMARY:Indiana University Women's Basketball vs UCLA
+DESCRIPTION:Indiana University Women's Basketball vs UCLA\nTV: Peacock/NBCSN\nRadio: B97\nStreaming Audio: https://thevarsitynetwork.com/audioapplink/source/oas-1026/content/iub:allaccess-Live-5234\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28841&amp;sport_id=13
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28859-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART:20270109T200000Z
+DTEND:20270109T220000Z
+LOCATION:Seattle\, Wash.
+SUMMARY:Indiana University Men's Basketball at Washington
+DESCRIPTION:Indiana University Men's Basketball at Washington\nTV: Peacock/NBCSN\nStreaming Audio: https://thevarsitynetwork.com/audioapplink/source/oas-1026/content/iub:allaccess-Live-5199\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28859&amp;sport_id=5
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28940-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART:20270110T190000Z
+DTEND:20270110T220000Z
+LOCATION:Bloomington\, Ind., Wilkinson Hall
+SUMMARY:Indiana University Wrestling vs Illinois
+DESCRIPTION:Indiana University Wrestling vs Illinois\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28940&amp;sport_id=23
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28860-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART:20270112T230000Z
+DTEND:20270113T010000Z
+LOCATION:Bloomington\, Ind.
+SUMMARY:Indiana University Men's Basketball vs Maryland
+DESCRIPTION:Indiana University Men's Basketball vs Maryland\nTV: FS1\nStreaming Audio: https://thevarsitynetwork.com/audioapplink/source/oas-1026/content/iub:allaccess-Live-5200\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28860&amp;sport_id=5
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28842-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART:20270112T230000Z
+DTEND:20270113T010000Z
+LOCATION:University Park\, Pa.
+SUMMARY:Indiana University Women's Basketball at Penn State 
+DESCRIPTION:Indiana University Women's Basketball at Penn State \nTV: B1G+\nRadio: B97\nStreaming Audio: https://thevarsitynetwork.com/audioapplink/source/oas-1026/content/iub:allaccess-Live-5235\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28842&amp;sport_id=13
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28861-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART:20270116T180000Z
+DTEND:20270116T200000Z
+LOCATION:Bloomington\, Ind.
+SUMMARY:Indiana University Men's Basketball vs Michigan
+DESCRIPTION:Indiana University Men's Basketball vs Michigan\nTV: CBS\nStreaming Audio: https://thevarsitynetwork.com/audioapplink/source/oas-1026/content/iub:allaccess-Live-5201\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28861&amp;sport_id=5
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28941-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART;VALUE=DATE:20270117
+DTEND;VALUE=DATE:20270118
+LOCATION:Piscataway\, N.J.
+SUMMARY:Indiana University Wrestling at Rutgers
+DESCRIPTION:Indiana University Wrestling at Rutgers\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28941&amp;sport_id=23
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28843-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART:20270117T230000Z
+DTEND:20270118T010000Z
+LOCATION:Iowa City\, Iowa
+SUMMARY:Indiana University Women's Basketball at Iowa
+DESCRIPTION:Indiana University Women's Basketball at Iowa\nTV: BTN\nRadio: B97\nStreaming Audio: https://thevarsitynetwork.com/audioapplink/source/oas-1026/content/iub:allaccess-Live-5236\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28843&amp;sport_id=13
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28862-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART:20270121T013000Z
+DTEND:20270121T033000Z
+LOCATION:Minneapolis\, Minn.
+SUMMARY:Indiana University Men's Basketball at Minnesota
+DESCRIPTION:Indiana University Men's Basketball at Minnesota\nTV: BTN\nStreaming Audio: https://thevarsitynetwork.com/audioapplink/source/oas-1026/content/iub:allaccess-Live-5202\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28862&amp;sport_id=5
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28943-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART:20270123T010000Z
+DTEND:20270123T040000Z
+LOCATION:Bloomington\, Ind., Wilkinson Hall
+SUMMARY:Indiana University Wrestling vs Ohio State
+DESCRIPTION:Indiana University Wrestling vs Ohio State\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28943&amp;sport_id=23
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28729-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART;VALUE=DATE:20270123
+DTEND;VALUE=DATE:20270124
+LOCATION:West Lafayette\, Ind.
+SUMMARY:Indiana University Men's Swimming and Diving at Purdue
+DESCRIPTION:Indiana University Men's Swimming and Diving at Purdue\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28729&amp;sport_id=9
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28748-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART;VALUE=DATE:20270123
+DTEND;VALUE=DATE:20270124
+LOCATION:West Lafayette\, Ind.
+SUMMARY:Indiana University Women's Swimming and Diving at Purdue
+DESCRIPTION:Indiana University Women's Swimming and Diving at Purdue\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28748&amp;sport_id=18
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28863-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART:20270124T170000Z
+DTEND:20270124T190000Z
+LOCATION:Bloomington\, Ind.
+SUMMARY:Indiana University Men's Basketball vs Illinois
+DESCRIPTION:Indiana University Men's Basketball vs Illinois\nTV: CBS\nStreaming Audio: https://thevarsitynetwork.com/audioapplink/source/oas-1026/content/iub:allaccess-Live-5203\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28863&amp;sport_id=5
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28844-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART:20270124T190000Z
+DTEND:20270124T210000Z
+LOCATION:East Lansing\, Mich.
+SUMMARY:Indiana University Women's Basketball at Michigan State 
+DESCRIPTION:Indiana University Women's Basketball at Michigan State \nTV: B1G+\nRadio: B97\nStreaming Audio: https://thevarsitynetwork.com/audioapplink/source/oas-1026/content/iub:allaccess-Live-5237\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28844&amp;sport_id=13
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28845-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART:20270128T000000Z
+DTEND:20270128T020000Z
+LOCATION:Bloomington\, Ind.
+SUMMARY:Indiana University Women's Basketball vs USC
+DESCRIPTION:Indiana University Women's Basketball vs USC\nTV: Peacock/NBCSN\nRadio: B97\nStreaming Audio: https://thevarsitynetwork.com/audioapplink/source/oas-1026/content/iub:allaccess-Live-5238\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28845&amp;sport_id=13
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28864-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART:20270128T000000Z
+DTEND:20270128T020000Z
+LOCATION:Evanston\, Ill.
+SUMMARY:Indiana University Men's Basketball at Northwestern
+DESCRIPTION:Indiana University Men's Basketball at Northwestern\nTV: BTN\nStreaming Audio: https://thevarsitynetwork.com/audioapplink/source/oas-1026/content/iub:allaccess-Live-5204\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28864&amp;sport_id=5
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28944-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART;VALUE=DATE:20270129
+DTEND;VALUE=DATE:20270130
+LOCATION:Lincoln\, Neb.
+SUMMARY:Indiana University Wrestling at Nebraska
+DESCRIPTION:Indiana University Wrestling at Nebraska\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28944&amp;sport_id=23
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28749-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART;VALUE=DATE:20270129
+DTEND;VALUE=DATE:20270130
+LOCATION:Louisville\, Ky.
+SUMMARY:Indiana University Women's Swimming and Diving at Louisville
+DESCRIPTION:Indiana University Women's Swimming and Diving at Louisville\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28749&amp;sport_id=18
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28730-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART;VALUE=DATE:20270129
+DTEND;VALUE=DATE:20270130
+LOCATION:Louisville\, Ky.
+SUMMARY:Indiana University Men's Swimming and Diving at Louisville
+DESCRIPTION:Indiana University Men's Swimming and Diving at Louisville\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28730&amp;sport_id=9
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28865-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART:20270130T170000Z
+DTEND:20270130T190000Z
+LOCATION:Bloomington\, Ind.
+SUMMARY:Indiana University Men's Basketball vs UCLA
+DESCRIPTION:Indiana University Men's Basketball vs UCLA\nTV: CBS\nStreaming Audio: https://thevarsitynetwork.com/audioapplink/source/oas-1026/content/iub:allaccess-Live-5205\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28865&amp;sport_id=5
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28846-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART:20270131T190000Z
+DTEND:20270131T210000Z
+LOCATION:Bloomington\, Ind.
+SUMMARY:Indiana University Women's Basketball vs Purdue
+DESCRIPTION:Indiana University Women's Basketball vs Purdue\nTV: B1G+\nRadio: B97\nStreaming Audio: https://thevarsitynetwork.com/audioapplink/source/oas-1026/content/iub:allaccess-Live-5239\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28846&amp;sport_id=13
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28760-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART;VALUE=DATE:20270201
+DTEND;VALUE=DATE:20270203
+LOCATION:Boca Raton\, Fla.
+SUMMARY:Indiana University Women's Golf vs Paradise Invitational - Osprey Point Golf Course
+DESCRIPTION:Indiana University Women's Golf vs Paradise Invitational - Osprey Point Golf Course\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28760&amp;sport_id=15
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28866-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART:20270202T230000Z
+DTEND:20270203T010000Z
+LOCATION:University Park\, Pa.
+SUMMARY:Indiana University Men's Basketball at Penn State
+DESCRIPTION:Indiana University Men's Basketball at Penn State\nTV: FS1\nStreaming Audio: https://thevarsitynetwork.com/audioapplink/source/oas-1026/content/iub:allaccess-Live-5206\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28866&amp;sport_id=5
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28847-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART:20270204T000000Z
+DTEND:20270204T020000Z
+LOCATION:Bloomington\, Ind.
+SUMMARY:Indiana University Women's Basketball vs Ohio State 
+DESCRIPTION:Indiana University Women's Basketball vs Ohio State \nTV: B1G+\nRadio: B97\nStreaming Audio: https://thevarsitynetwork.com/audioapplink/source/oas-1026/content/iub:allaccess-Live-5240\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28847&amp;sport_id=13
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28945-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART:20270206T000000Z
+DTEND:20270206T030000Z
+LOCATION:Bloomington\, Ind., Wilkinson Hall
+SUMMARY:Indiana University Wrestling vs Wisconsin
+DESCRIPTION:Indiana University Wrestling vs Wisconsin\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28945&amp;sport_id=23
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28867-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART:20270206T193000Z
+DTEND:20270206T213000Z
+LOCATION:Lincoln\, Neb.
+SUMMARY:Indiana University Men's Basketball at Nebraska
+DESCRIPTION:Indiana University Men's Basketball at Nebraska\nTV: FOX\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28867&amp;sport_id=5
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28947-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART:20270207T190000Z
+DTEND:20270207T220000Z
+LOCATION:Bloomington\, Ind., Wilkinson Hall
+SUMMARY:Indiana University Wrestling vs Michigan
+DESCRIPTION:Indiana University Wrestling vs Michigan\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28947&amp;sport_id=23
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28848-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART:20270207T230000Z
+DTEND:20270208T010000Z
+LOCATION:Seattle\, Wash.
+SUMMARY:Indiana University Women's Basketball at Washington
+DESCRIPTION:Indiana University Women's Basketball at Washington\nTV: BTN\nRadio: B97\nStreaming Audio: https://thevarsitynetwork.com/audioapplink/source/oas-1026/content/iub:allaccess-Live-5241\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28848&amp;sport_id=13
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28868-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART:20270210T003000Z
+DTEND:20270210T023000Z
+LOCATION:Bloomington\, Ind.
+SUMMARY:Indiana University Men's Basketball vs Northwestern
+DESCRIPTION:Indiana University Men's Basketball vs Northwestern\nTV: BTN\nStreaming Audio: https://thevarsitynetwork.com/audioapplink/source/oas-1026/content/iub:allaccess-Live-5208\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28868&amp;sport_id=5
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28849-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART:20270211T030000Z
+DTEND:20270211T045959Z
+LOCATION:Eugene\, Ore.
+SUMMARY:Indiana University Women's Basketball at Oregon
+DESCRIPTION:Indiana University Women's Basketball at Oregon\nStreaming Audio: https://thevarsitynetwork.com/audioapplink/source/oas-1026/content/iub:allaccess-Live-5242\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28849&amp;sport_id=13
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28948-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART;VALUE=DATE:20270212
+DTEND;VALUE=DATE:20270213
+LOCATION:Evanston\, Ill.
+SUMMARY:Indiana University Wrestling at Northwestern
+DESCRIPTION:Indiana University Wrestling at Northwestern\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28948&amp;sport_id=23
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28869-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART:20270213T170000Z
+DTEND:20270213T190000Z
+LOCATION:College Park\, Md.
+SUMMARY:Indiana University Men's Basketball at Maryland
+DESCRIPTION:Indiana University Men's Basketball at Maryland\nTV: FOX\nStreaming Audio: https://thevarsitynetwork.com/audioapplink/source/oas-1026/content/iub:allaccess-Live-5209\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28869&amp;sport_id=5
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28949-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART;VALUE=DATE:20270214
+DTEND;VALUE=DATE:20270215
+LOCATION:West Lafayette\, Ind.
+SUMMARY:Indiana University Wrestling at Purdue
+DESCRIPTION:Indiana University Wrestling at Purdue\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28949&amp;sport_id=23
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28850-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART:20270214T190000Z
+DTEND:20270214T210000Z
+LOCATION:Bloomington\, Ind.
+SUMMARY:Indiana University Women's Basketball vs Wisconsin
+DESCRIPTION:Indiana University Women's Basketball vs Wisconsin\nTV: B1G+\nRadio: B97\nStreaming Audio: https://thevarsitynetwork.com/audioapplink/source/oas-1026/content/iub:allaccess-Live-5243\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28850&amp;sport_id=13
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28774-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART;VALUE=DATE:20270215
+DTEND;VALUE=DATE:20270216
+LOCATION:John's Island\, S.C.
+SUMMARY:Indiana University Men's Golf  Battle at Briar's Creek - Golf Club at Briar's Creek
+DESCRIPTION:Indiana University Men's Golf  Battle at Briar's Creek - Golf Club at Briar's Creek\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28774&amp;sport_id=7
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28870-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART:20270217T000000Z
+DTEND:20270217T020000Z
+LOCATION:Bloomington\, Ind.
+SUMMARY:Indiana University Men's Basketball vs Purdue
+DESCRIPTION:Indiana University Men's Basketball vs Purdue\nTV: Peacock/NBCSN\nStreaming Audio: https://thevarsitynetwork.com/audioapplink/source/oas-1026/content/iub:allaccess-Live-5210\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28870&amp;sport_id=5
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28750-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART;VALUE=DATE:20270217
+DTEND;VALUE=DATE:20270220
+LOCATION:
+SUMMARY:Indiana University Women's Swimming and Diving vs Big Ten Championships
+DESCRIPTION:Indiana University Women's Swimming and Diving vs Big Ten Championships\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28750&amp;sport_id=18
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28851-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART:20270218T000000Z
+DTEND:20270218T020000Z
+LOCATION:West Lafayette\, Ind.
+SUMMARY:Indiana University Women's Basketball at Purdue 
+DESCRIPTION:Indiana University Women's Basketball at Purdue \nTV: B1G+\nRadio: B97\nStreaming Audio: https://thevarsitynetwork.com/audioapplink/source/oas-1026/content/iub:allaccess-Live-5244\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28851&amp;sport_id=13
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28871-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART:20270220T010000Z
+DTEND:20270220T030000Z
+LOCATION:Madison\, Wis.
+SUMMARY:Indiana University Men's Basketball at Wisconsin
+DESCRIPTION:Indiana University Men's Basketball at Wisconsin\nTV: FS1\nStreaming Audio: https://thevarsitynetwork.com/audioapplink/source/oas-1026/content/iub:allaccess-Live-5211\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28871&amp;sport_id=5
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28962-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART;VALUE=DATE:20270221
+DTEND;VALUE=DATE:20270222
+LOCATION:Fairfax\, Va.
+SUMMARY:Indiana University Wrestling vs Patriots Last Chance Open
+DESCRIPTION:Indiana University Wrestling vs Patriots Last Chance Open\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28962&amp;sport_id=23
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28761-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART;VALUE=DATE:20270221
+DTEND;VALUE=DATE:20270222
+LOCATION:Peoria\, Ariz.
+SUMMARY:Indiana University Women's Golf vs Westbrook Invitational - Westbrook Village Golf Club
+DESCRIPTION:Indiana University Women's Golf vs Westbrook Invitational - Westbrook Village Golf Club\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28761&amp;sport_id=15
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28852-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART:20270221T190000Z
+DTEND:20270221T210000Z
+LOCATION:Bloomington\, Ind.
+SUMMARY:Indiana University Women's Basketball vs Illinois
+DESCRIPTION:Indiana University Women's Basketball vs Illinois\nTV: FS1\nRadio: B97\nStreaming Audio: https://thevarsitynetwork.com/audioapplink/source/oas-1026/content/iub:allaccess-Live-5245\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28852&amp;sport_id=13
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28872-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART:20270224T000000Z
+DTEND:20270224T020000Z
+LOCATION:Bloomington\, Ind.
+SUMMARY:Indiana University Men's Basketball vs Michigan State
+DESCRIPTION:Indiana University Men's Basketball vs Michigan State\nTV: Peacock/NBCSN\nStreaming Audio: https://thevarsitynetwork.com/audioapplink/source/oas-1026/content/iub:allaccess-Live-5212\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28872&amp;sport_id=5
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28731-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART;VALUE=DATE:20270224
+DTEND;VALUE=DATE:20270227
+LOCATION:
+SUMMARY:Indiana University Men's Swimming and Diving vs Big Ten Championships
+DESCRIPTION:Indiana University Men's Swimming and Diving vs Big Ten Championships\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28731&amp;sport_id=9
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28853-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART:20270224T233000Z
+DTEND:20270225T013000Z
+LOCATION:Ann Arbor\, Mich.
+SUMMARY:Indiana University Women's Basketball at Michigan
+DESCRIPTION:Indiana University Women's Basketball at Michigan\nTV: Peacock/NBCSN\nRadio: B97\nStreaming Audio: https://thevarsitynetwork.com/audioapplink/source/oas-1026/content/iub:allaccess-Live-5246\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28853&amp;sport_id=13
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28834-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART:20270226T183000Z
+DTEND:20270226T213000Z
+LOCATION:Spartanburg\, S.C.
+SUMMARY:Indiana University Baseball vs UNCW
+DESCRIPTION:Indiana University Baseball vs UNCW\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28834&amp;sport_id=1
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28854-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART:20270227T170000Z
+DTEND:20270227T190000Z
+LOCATION:Bloomington\, Ind.
+SUMMARY:Indiana University Women's Basketball vs Nebraska
+DESCRIPTION:Indiana University Women's Basketball vs Nebraska\nTV: BTN\nRadio: B97\nStreaming Audio: https://thevarsitynetwork.com/audioapplink/source/oas-1026/content/iub:allaccess-Live-5247\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28854&amp;sport_id=13
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28835-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART:20270227T230000Z
+DTEND:20270228T020000Z
+LOCATION:Spartanburg\, S.C.
+SUMMARY:Indiana University Baseball vs Wofford
+DESCRIPTION:Indiana University Baseball vs Wofford\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28835&amp;sport_id=1
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28836-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART:20270228T153000Z
+DTEND:20270228T183000Z
+LOCATION:Spartanburg\, S.C.
+SUMMARY:Indiana University Baseball vs Austin Peay
+DESCRIPTION:Indiana University Baseball vs Austin Peay\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28836&amp;sport_id=1
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28873-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART:20270228T204500Z
+DTEND:20270228T224500Z
+LOCATION:Bloomington\, Ind.
+SUMMARY:Indiana University Men's Basketball vs Ohio State
+DESCRIPTION:Indiana University Men's Basketball vs Ohio State\nTV: CBS\nStreaming Audio: https://thevarsitynetwork.com/audioapplink/source/oas-1026/content/iub:allaccess-Live-5213\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28873&amp;sport_id=5
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28874-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART:20270306T010000Z
+DTEND:20270306T030000Z
+LOCATION:West Lafayette\, Ind.
+SUMMARY:Indiana University Men's Basketball at Purdue
+DESCRIPTION:Indiana University Men's Basketball at Purdue\nTV: FOX\nStreaming Audio: https://thevarsitynetwork.com/audioapplink/source/oas-1026/content/iub:allaccess-Live-5214\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28874&amp;sport_id=5
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28951-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART;VALUE=DATE:20270306
+DTEND;VALUE=DATE:20270307
+LOCATION:Columbus\, Ohio
+SUMMARY:Indiana University Wrestling vs Big Ten Championships
+DESCRIPTION:Indiana University Wrestling vs Big Ten Championships\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28951&amp;sport_id=23
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28952-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART;VALUE=DATE:20270307
+DTEND;VALUE=DATE:20270308
+LOCATION:Columbus\, Ohio
+SUMMARY:Indiana University Wrestling vs Big Ten Championships
+DESCRIPTION:Indiana University Wrestling vs Big Ten Championships\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28952&amp;sport_id=23
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28775-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART;VALUE=DATE:20270307
+DTEND;VALUE=DATE:20270308
+LOCATION:Bluffton\, S.C.
+SUMMARY:Indiana University Men's Golf  Colleton River Collegiate - Dye Course
+DESCRIPTION:Indiana University Men's Golf  Colleton River Collegiate - Dye Course\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28775&amp;sport_id=7
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28733-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART;VALUE=DATE:20270308
+DTEND;VALUE=DATE:20270310
+LOCATION:
+SUMMARY:Indiana University Men's Swimming and Diving vs NCAA Zone C Diving Championships
+DESCRIPTION:Indiana University Men's Swimming and Diving vs NCAA Zone C Diving Championships\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28733&amp;sport_id=9
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28752-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART;VALUE=DATE:20270308
+DTEND;VALUE=DATE:20270310
+LOCATION:
+SUMMARY:Indiana University Women's Swimming and Diving vs NCAA Zone C Diving Championships
+DESCRIPTION:Indiana University Women's Swimming and Diving vs NCAA Zone C Diving Championships\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28752&amp;sport_id=18
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28676-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART;VALUE=DATE:20270309
+DTEND;VALUE=DATE:20270314
+LOCATION:Indianapolis\, Ind.
+SUMMARY:Indiana University Men's Basketball vs Big Ten Tournament
+DESCRIPTION:Indiana University Men's Basketball vs Big Ten Tournament\nStreaming Audio: https://thevarsitynetwork.com/audioapplink/source/oas-1026/content/iub:allaccess-Live-5215\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28676&amp;sport_id=5
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28776-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART;VALUE=DATE:20270315
+DTEND;VALUE=DATE:20270316
+LOCATION:St. Simons Island\, Ga.
+SUMMARY:Indiana University Men's Golf  Johnnie-O at Sea Island - Seaside Course
+DESCRIPTION:Indiana University Men's Golf  Johnnie-O at Sea Island - Seaside Course\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28776&amp;sport_id=7
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28963-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART;VALUE=DATE:20270316
+DTEND;VALUE=DATE:20270319
+LOCATION:Oak Ridge\, Tenn.
+SUMMARY:Indiana University Women's Rowing vs Spring Break Training Trip
+DESCRIPTION:Indiana University Women's Rowing vs Spring Break Training Trip\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28963&amp;sport_id=16
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28753-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART;VALUE=DATE:20270317
+DTEND;VALUE=DATE:20270320
+LOCATION:Austin\, Texas
+SUMMARY:Indiana University Women's Swimming and Diving vs NCAA Championships
+DESCRIPTION:Indiana University Women's Swimming and Diving vs NCAA Championships\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28753&amp;sport_id=18
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28954-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART;VALUE=DATE:20270318
+DTEND;VALUE=DATE:20270319
+LOCATION:St. Louis\, Mo.
+SUMMARY:Indiana University Wrestling vs NCAA Championships
+DESCRIPTION:Indiana University Wrestling vs NCAA Championships\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28954&amp;sport_id=23
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28955-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART;VALUE=DATE:20270319
+DTEND;VALUE=DATE:20270320
+LOCATION:St. Louis\, Mo.
+SUMMARY:Indiana University Wrestling vs NCAA Championships
+DESCRIPTION:Indiana University Wrestling vs NCAA Championships\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28955&amp;sport_id=23
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28777-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART;VALUE=DATE:20270319
+DTEND;VALUE=DATE:20270321
+LOCATION:Statesboro\, Ga.
+SUMMARY:Indiana University Men's Golf  The Schenkel Invitational - Forest Heights Country Club
+DESCRIPTION:Indiana University Men's Golf  The Schenkel Invitational - Forest Heights Country Club\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28777&amp;sport_id=7
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28696-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART;VALUE=DATE:20270319
+DTEND;VALUE=DATE:20270320
+LOCATION:Bloomington\, Ind.
+SUMMARY:Indiana University Baseball vs Nebraska
+DESCRIPTION:Indiana University Baseball vs Nebraska\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28696&amp;sport_id=1
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28697-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART;VALUE=DATE:20270320
+DTEND;VALUE=DATE:20270321
+LOCATION:Bloomington\, Ind.
+SUMMARY:Indiana University Baseball vs Nebraska
+DESCRIPTION:Indiana University Baseball vs Nebraska\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28697&amp;sport_id=1
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28956-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART;VALUE=DATE:20270320
+DTEND;VALUE=DATE:20270321
+LOCATION:St. Louis\, Mo.
+SUMMARY:Indiana University Wrestling vs NCAA Championships
+DESCRIPTION:Indiana University Wrestling vs NCAA Championships\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28956&amp;sport_id=23
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28964-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART;VALUE=DATE:20270320
+DTEND;VALUE=DATE:20270321
+LOCATION:Louisville\, KY
+SUMMARY:Indiana University Women's Rowing at Oak Ridge Cardinal Invitational
+DESCRIPTION:Indiana University Women's Rowing at Oak Ridge Cardinal Invitational\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28964&amp;sport_id=16
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28698-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART;VALUE=DATE:20270321
+DTEND;VALUE=DATE:20270322
+LOCATION:Bloomington\, Ind.
+SUMMARY:Indiana University Baseball vs Nebraska
+DESCRIPTION:Indiana University Baseball vs Nebraska\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28698&amp;sport_id=1
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28734-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART;VALUE=DATE:20270324
+DTEND;VALUE=DATE:20270327
+LOCATION:Austin\, Texas
+SUMMARY:Indiana University Men's Swimming and Diving vs NCAA Championships
+DESCRIPTION:Indiana University Men's Swimming and Diving vs NCAA Championships\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28734&amp;sport_id=9
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28762-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART;VALUE=DATE:20270325
+DTEND;VALUE=DATE:20270327
+LOCATION:Scottsdale\, Ariz.
+SUMMARY:Indiana University Women's Golf vs PING ASU Invitational - Popago Golf Club
+DESCRIPTION:Indiana University Women's Golf vs PING ASU Invitational - Popago Golf Club\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28762&amp;sport_id=15
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28699-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART;VALUE=DATE:20270326
+DTEND;VALUE=DATE:20270327
+LOCATION:Piscataway\, N.J.
+SUMMARY:Indiana University Baseball at Rutgers
+DESCRIPTION:Indiana University Baseball at Rutgers\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28699&amp;sport_id=1
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28700-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART;VALUE=DATE:20270327
+DTEND;VALUE=DATE:20270328
+LOCATION:Piscataway\, N.J.
+SUMMARY:Indiana University Baseball at Rutgers
+DESCRIPTION:Indiana University Baseball at Rutgers\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28700&amp;sport_id=1
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28965-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART;VALUE=DATE:20270327
+DTEND;VALUE=DATE:20270328
+LOCATION:Columbus\, Ohio
+SUMMARY:Indiana University Women's Rowing at The Spring Regatta at Ohio State
+DESCRIPTION:Indiana University Women's Rowing at The Spring Regatta at Ohio State\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28965&amp;sport_id=16
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28701-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART;VALUE=DATE:20270328
+DTEND;VALUE=DATE:20270329
+LOCATION:Piscataway\, N.J.
+SUMMARY:Indiana University Baseball at Rutgers
+DESCRIPTION:Indiana University Baseball at Rutgers\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28701&amp;sport_id=1
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28778-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART;VALUE=DATE:20270329
+DTEND;VALUE=DATE:20270330
+LOCATION:Indianapolis\, Ind.
+SUMMARY:Indiana University Men's Golf  Butler Spring Invitational - Highland Country Club
+DESCRIPTION:Indiana University Men's Golf  Butler Spring Invitational - Highland Country Club\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28778&amp;sport_id=7
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28967-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART;VALUE=DATE:20270402
+DTEND;VALUE=DATE:20270403
+LOCATION:Columbus\, Ohio
+SUMMARY:Indiana University Women's Rowing at Ohio State Double Dual
+DESCRIPTION:Indiana University Women's Rowing at Ohio State Double Dual\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28967&amp;sport_id=16
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28702-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART;VALUE=DATE:20270402
+DTEND;VALUE=DATE:20270403
+LOCATION:Minneapolis\, Minn.
+SUMMARY:Indiana University Baseball at Minnesota
+DESCRIPTION:Indiana University Baseball at Minnesota\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28702&amp;sport_id=1
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28703-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART;VALUE=DATE:20270403
+DTEND;VALUE=DATE:20270404
+LOCATION:Minneapolis\, Minn.
+SUMMARY:Indiana University Baseball at Minnesota
+DESCRIPTION:Indiana University Baseball at Minnesota\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28703&amp;sport_id=1
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28704-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART;VALUE=DATE:20270404
+DTEND;VALUE=DATE:20270405
+LOCATION:Minneapolis\, Minn.
+SUMMARY:Indiana University Baseball at Minnesota
+DESCRIPTION:Indiana University Baseball at Minnesota\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28704&amp;sport_id=1
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28763-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART;VALUE=DATE:20270405
+DTEND;VALUE=DATE:20270406
+LOCATION:Bowling Green\, Ky.
+SUMMARY:Indiana University Women's Golf vs Olde Stone Collegiate - The Club at Olde Stone
+DESCRIPTION:Indiana University Women's Golf vs Olde Stone Collegiate - The Club at Olde Stone\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28763&amp;sport_id=15
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28705-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART;VALUE=DATE:20270409
+DTEND;VALUE=DATE:20270410
+LOCATION:Bloomington\, Ind.
+SUMMARY:Indiana University Baseball vs Oregon
+DESCRIPTION:Indiana University Baseball vs Oregon\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28705&amp;sport_id=1
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28779-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART;VALUE=DATE:20270409
+DTEND;VALUE=DATE:20270410
+LOCATION:Columbus\, Ohio
+SUMMARY:Indiana University Men's Golf  The Kepler - OSU Scarlet Course
+DESCRIPTION:Indiana University Men's Golf  The Kepler - OSU Scarlet Course\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28779&amp;sport_id=7
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28706-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART;VALUE=DATE:20270410
+DTEND;VALUE=DATE:20270411
+LOCATION:Bloomington\, Ind.
+SUMMARY:Indiana University Baseball vs Oregon
+DESCRIPTION:Indiana University Baseball vs Oregon\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28706&amp;sport_id=1
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28707-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART;VALUE=DATE:20270411
+DTEND;VALUE=DATE:20270412
+LOCATION:Bloomington\, Ind.
+SUMMARY:Indiana University Baseball vs Oregon
+DESCRIPTION:Indiana University Baseball vs Oregon\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28707&amp;sport_id=1
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28708-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART;VALUE=DATE:20270416
+DTEND;VALUE=DATE:20270417
+LOCATION:Bloomington\, Ind.
+SUMMARY:Indiana University Baseball vs Penn State
+DESCRIPTION:Indiana University Baseball vs Penn State\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28708&amp;sport_id=1
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28709-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART;VALUE=DATE:20270417
+DTEND;VALUE=DATE:20270418
+LOCATION:Bloomington\, Ind.
+SUMMARY:Indiana University Baseball vs Penn State
+DESCRIPTION:Indiana University Baseball vs Penn State\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28709&amp;sport_id=1
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28764-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART;VALUE=DATE:20270417
+DTEND;VALUE=DATE:20270418
+LOCATION:Columbus\, Ohio
+SUMMARY:Indiana University Women's Golf vs Therese Hession Buckeye Invitational - OSU Scarlet Course
+DESCRIPTION:Indiana University Women's Golf vs Therese Hession Buckeye Invitational - OSU Scarlet Course\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28764&amp;sport_id=15
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28780-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART;VALUE=DATE:20270417
+DTEND;VALUE=DATE:20270418
+LOCATION:West Lafayette\, Ind.
+SUMMARY:Indiana University Men's Golf  Boilermaker Invitational - Kampen-Cosler Golf Course
+DESCRIPTION:Indiana University Men's Golf  Boilermaker Invitational - Kampen-Cosler Golf Course\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28780&amp;sport_id=7
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28966-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART;VALUE=DATE:20270417
+DTEND;VALUE=DATE:20270418
+LOCATION:Sarasota\, Fla.
+SUMMARY:Indiana University Women's Rowing vs Big Ten Invitational
+DESCRIPTION:Indiana University Women's Rowing vs Big Ten Invitational\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28966&amp;sport_id=16
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28710-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART;VALUE=DATE:20270418
+DTEND;VALUE=DATE:20270419
+LOCATION:Bloomington\, Ind.
+SUMMARY:Indiana University Baseball vs Penn State
+DESCRIPTION:Indiana University Baseball vs Penn State\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28710&amp;sport_id=1
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28711-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART;VALUE=DATE:20270423
+DTEND;VALUE=DATE:20270424
+LOCATION:Los Angeles\, Calif.
+SUMMARY:Indiana University Baseball at USC
+DESCRIPTION:Indiana University Baseball at USC\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28711&amp;sport_id=1
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28765-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART;VALUE=DATE:20270423
+DTEND;VALUE=DATE:20270425
+LOCATION:Farmingdale\, Pa.
+SUMMARY:Indiana University Women's Golf vs Big Ten Championships - Nemacolin Resort - Mystic Rock
+DESCRIPTION:Indiana University Women's Golf vs Big Ten Championships - Nemacolin Resort - Mystic Rock\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28765&amp;sport_id=15
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28712-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART;VALUE=DATE:20270424
+DTEND;VALUE=DATE:20270425
+LOCATION:Los Angeles\, Calif.
+SUMMARY:Indiana University Baseball at USC
+DESCRIPTION:Indiana University Baseball at USC\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28712&amp;sport_id=1
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28781-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART;VALUE=DATE:20270424
+DTEND;VALUE=DATE:20270425
+LOCATION:Urbana\, Ill.
+SUMMARY:Indiana University Men's Golf  Illini Spring Invitational - Atkins Golf Club
+DESCRIPTION:Indiana University Men's Golf  Illini Spring Invitational - Atkins Golf Club\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28781&amp;sport_id=7
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28968-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART;VALUE=DATE:20270424
+DTEND;VALUE=DATE:20270425
+LOCATION:
+SUMMARY:Indiana University Women's Rowing vs 18th Annual Dale England Cup
+DESCRIPTION:Indiana University Women's Rowing vs 18th Annual Dale England Cup\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28968&amp;sport_id=16
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28713-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART;VALUE=DATE:20270425
+DTEND;VALUE=DATE:20270426
+LOCATION:Los Angeles\, Calif.
+SUMMARY:Indiana University Baseball at USC
+DESCRIPTION:Indiana University Baseball at USC\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28713&amp;sport_id=1
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28714-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART;VALUE=DATE:20270430
+DTEND;VALUE=DATE:20270501
+LOCATION:Bloomington\, Ind.
+SUMMARY:Indiana University Baseball vs Purdue
+DESCRIPTION:Indiana University Baseball vs Purdue\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28714&amp;sport_id=1
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28782-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART;VALUE=DATE:20270430
+DTEND;VALUE=DATE:20270502
+LOCATION:Springfield\, N.J.
+SUMMARY:Indiana University Men's Golf  Big Ten Championships - Baltusrol Golf Club
+DESCRIPTION:Indiana University Men's Golf  Big Ten Championships - Baltusrol Golf Club\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28782&amp;sport_id=7
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28715-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART;VALUE=DATE:20270501
+DTEND;VALUE=DATE:20270502
+LOCATION:Bloomington\, Ind.
+SUMMARY:Indiana University Baseball vs Purdue
+DESCRIPTION:Indiana University Baseball vs Purdue\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28715&amp;sport_id=1
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28716-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART;VALUE=DATE:20270502
+DTEND;VALUE=DATE:20270503
+LOCATION:Bloomington\, Ind.
+SUMMARY:Indiana University Baseball vs Purdue
+DESCRIPTION:Indiana University Baseball vs Purdue\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28716&amp;sport_id=1
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28717-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART;VALUE=DATE:20270507
+DTEND;VALUE=DATE:20270508
+LOCATION:East Lansing\, Mich.
+SUMMARY:Indiana University Baseball at Michigan State
+DESCRIPTION:Indiana University Baseball at Michigan State\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28717&amp;sport_id=1
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28718-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART;VALUE=DATE:20270508
+DTEND;VALUE=DATE:20270509
+LOCATION:East Lansing\, Mich.
+SUMMARY:Indiana University Baseball at Michigan State
+DESCRIPTION:Indiana University Baseball at Michigan State\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28718&amp;sport_id=1
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28766-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART;VALUE=DATE:20270508
+DTEND;VALUE=DATE:20270512
+LOCATION:TBD
+SUMMARY:Indiana University Women's Golf vs NCAA Regionals - TBD
+DESCRIPTION:Indiana University Women's Golf vs NCAA Regionals - TBD\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28766&amp;sport_id=15
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28719-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART;VALUE=DATE:20270509
+DTEND;VALUE=DATE:20270510
+LOCATION:East Lansing\, Mich.
+SUMMARY:Indiana University Baseball at Michigan State
+DESCRIPTION:Indiana University Baseball at Michigan State\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28719&amp;sport_id=1
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28720-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART;VALUE=DATE:20270514
+DTEND;VALUE=DATE:20270515
+LOCATION:Columbus\, Ohio
+SUMMARY:Indiana University Baseball at Ohio State
+DESCRIPTION:Indiana University Baseball at Ohio State\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28720&amp;sport_id=1
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28721-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART;VALUE=DATE:20270515
+DTEND;VALUE=DATE:20270516
+LOCATION:Columbus\, Ohio
+SUMMARY:Indiana University Baseball at Ohio State
+DESCRIPTION:Indiana University Baseball at Ohio State\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28721&amp;sport_id=1
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28969-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART;VALUE=DATE:20270515
+DTEND;VALUE=DATE:20270516
+LOCATION:Indianapolis\, Ind.
+SUMMARY:Indiana University Women's Rowing vs Big Ten Championships
+DESCRIPTION:Indiana University Women's Rowing vs Big Ten Championships\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28969&amp;sport_id=16
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28722-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART;VALUE=DATE:20270516
+DTEND;VALUE=DATE:20270517
+LOCATION:Columbus\, Ohio
+SUMMARY:Indiana University Baseball at Ohio State
+DESCRIPTION:Indiana University Baseball at Ohio State\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28722&amp;sport_id=1
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28767-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART;VALUE=DATE:20270516
+DTEND;VALUE=DATE:20270521
+LOCATION:Carlsbad\, Calif.
+SUMMARY:Indiana University Women's Golf vs NCAA Championships - Omni La Costa Resort
+DESCRIPTION:Indiana University Women's Golf vs NCAA Championships - Omni La Costa Resort\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28767&amp;sport_id=15
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28783-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART;VALUE=DATE:20270517
+DTEND;VALUE=DATE:20270519
+LOCATION:Bloomington\, Ind.
+SUMMARY:Indiana University Men's Golf  NCAA Regionals - The Pfau Course
+DESCRIPTION:Indiana University Men's Golf  NCAA Regionals - The Pfau Course\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28783&amp;sport_id=7
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28723-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART;VALUE=DATE:20270520
+DTEND;VALUE=DATE:20270521
+LOCATION:Bloomington\, Ind.
+SUMMARY:Indiana University Baseball vs Maryland
+DESCRIPTION:Indiana University Baseball vs Maryland\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28723&amp;sport_id=1
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28724-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART;VALUE=DATE:20270521
+DTEND;VALUE=DATE:20270522
+LOCATION:Bloomington\, Ind.
+SUMMARY:Indiana University Baseball vs Maryland
+DESCRIPTION:Indiana University Baseball vs Maryland\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28724&amp;sport_id=1
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28725-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART;VALUE=DATE:20270522
+DTEND;VALUE=DATE:20270523
+LOCATION:Bloomington\, Ind.
+SUMMARY:Indiana University Baseball vs Maryland
+DESCRIPTION:Indiana University Baseball vs Maryland\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28725&amp;sport_id=1
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28784-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART;VALUE=DATE:20270528
+DTEND;VALUE=DATE:20270602
+LOCATION:Carlsbad\, Calif.
+SUMMARY:Indiana University Men's Golf  NCAA Championships - Omni La Costa Resort
+DESCRIPTION:Indiana University Men's Golf  NCAA Championships - Omni La Costa Resort\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28784&amp;sport_id=7
+PRIORITY:3
+END:VEVENT
+BEGIN:VEVENT
+UID:vcal_28970-admin.iuhoosiers.com
+DTSTAMP:20261019T230938Z
+DTSTART;VALUE=DATE:20270528
+DTEND;VALUE=DATE:20270530
+LOCATION:Sarasota\, Fla.
+SUMMARY:Indiana University Women's Rowing vs NCAA Rowing Championships
+DESCRIPTION:Indiana University Women's Rowing vs NCAA Rowing Championships\n
+URL:https://admin.iuhoosiers.com/calendar.aspx?game_id=28970&amp;sport_id=16
+PRIORITY:3
+END:VEVENT
+END:VCALENDAR

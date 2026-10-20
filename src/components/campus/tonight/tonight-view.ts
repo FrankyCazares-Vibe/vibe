@@ -4,8 +4,10 @@
  * tab all draw what `buildTonight` decides, so #1 is #1 everywhere.
  *
  * THE RANKING IS THE PRODUCT'S PROMISE. #1 is the school's own featured
- * pick, else the school event on now, else the soonest one; then the other
- * school events; then club events. NEVER BY POPULARITY: `going_count` and
+ * pick, else tonight's home game (decision 7, Oct 19 2026: a game beats a
+ * school event that's merely on now, on every campus), else the school event
+ * on now, else the soonest one; then the other school events; then club
+ * events. NEVER BY POPULARITY: `going_count` and
  * `interested_count` are read only to print "12 going" (from 5 up, the
  * counts-are-public floor), never to order anything. A test pins that.
  *
@@ -46,6 +48,8 @@ const LONG_EVENT_MS = 12 * HOUR_MS;
 const DEFAULT_LENGTH_MS = 2 * HOUR_MS;
 const NEXT_UP_MAX = 3;
 const HOME_WEEK_MAX = 8;
+/** From 5 PM on campus a game is "tonight's", before that "today's": the week tiles, the rule line and who leads. */
+const EVENING_HOUR = 17;
 
 /**
  * Every word the Tonight surfaces print (§5.7): plain English, the boards'
@@ -67,7 +71,6 @@ export const TONIGHT_COPY = {
   empty: "Nothing on campus tonight yet.",
   nextUp: "Next up this week",
   homeWeek: "Home games this week",
-  homeWeekSub: "IU Indy Athletics",
   tickets: "Tickets",
   watch: "Watch on ESPN+",
   seeCalendar: "See it on the calendar",
@@ -83,7 +86,9 @@ export const TONIGHT_COPY = {
   // "more": Tonight above may already list tonight's school events.
   noSchoolWeek: "No more school events this week",
   // The body under noSchoolWeek, one string for the phone and the desktop.
-  noSchoolWeekBody: "School events from the IU Indy athletics and IU Indianapolis calendars show here.",
+  // No campus named (Oct 19, 2026): Bloomington shows it too, and its
+  // calendars are IU Athletics and IU Bloomington's.
+  noSchoolWeekBody: "Home games and school events from this campus's calendars show here.",
   noClubsComing: "No club events coming up",
   actionSchool: "Opens its calendar page in a new tab.",
   actionClub: "Opens the event.",
@@ -111,14 +116,34 @@ export function isTonight(start: number, end: number, now: number, day: CampusDa
   return end > now && start < day.end && (start >= day.start || end - start <= LONG_EVENT_MS);
 }
 
-/** The word after a game's start time: " tip-off", " kickoff", " first serve", else "". */
+/**
+ * The word after a game's start time: " tip-off", " kickoff", " first serve",
+ * " first pitch", else "". Football, baseball and softball added Oct 19, 2026
+ * (Bloomington's feed has all three).
+ */
 export function sportTail(sport: string | null): string {
   if (!sport) return "";
   const s = sport.toLowerCase();
   if (s.includes("basketball")) return " tip-off";
   if (s.includes("volleyball")) return " first serve";
-  if (s.includes("soccer")) return " kickoff";
+  if (s.includes("soccer") || s.includes("football")) return " kickoff";
+  if (s.includes("baseball") || s.includes("softball")) return " first pitch";
   return "";
+}
+
+/**
+ * The campus's athletics calendar among an answer's sources: the one with
+ * role "athletics" (Oct 19, 2026), else, from a server older than that, the
+ * key "athletics" (Indy's). Null when that calendar is off.
+ */
+export function athleticsSource(sources: readonly SchoolSource[]): SchoolSource | null {
+  return sources.find((s) => s.role === "athletics") ?? sources.find((s) => s.key === "athletics") ?? null;
+}
+
+/** The words beside "Home games this week": "IU Athletics" in Bloomington, "IU Indy Athletics" in Indy. */
+export function homeWeekLabel(sources: readonly SchoolSource[]): string {
+  const athletics = athleticsSource(sources);
+  return athletics?.label ?? (athletics?.key === "athletics" ? "IU Indy Athletics" : "");
 }
 
 /** Why #1 is #1, in the words the slot prints. */
@@ -257,8 +282,9 @@ export function buildTonight(input: {
   const schoolTonight = schoolAll.filter(tonight);
   const clubTonight = clubAll.filter(tonight);
 
-  // #1: the school's featured pick, else a school item, else a club item.
-  // Only times decide it (pickLead); a count is never looked at here.
+  // #1: the school's featured pick, else tonight's home game, else a school
+  // item, else a club item. Only times and kinds decide it (pickLead); a
+  // count is never looked at here.
   let leadSpan: Span | null = null;
   let reason: LeadReason = "next";
   const featured = pickLead(
@@ -269,7 +295,23 @@ export function buildTonight(input: {
     leadSpan = featured;
     reason = "featured";
   } else {
-    leadSpan = pickLead(schoolTonight, now) ?? pickLead(clubTonight, now);
+    // Why the game first (decision 7, Oct 19, 2026, every campus): a home
+    // game is the night's big shared thing, so it beats a talk or a fair
+    // that's merely on now. The game on now, else the soonest one tonight.
+    // Only a game from 5 PM ("a home game TONIGHT", the week tiles' own
+    // split) or one on right now: an afternoon game that hasn't started
+    // ranks like any school event, so a noon game no longer leads past a
+    // hike that has been on since 9 AM.
+    const game = pickLead(
+      schoolTonight.filter(
+        (s) =>
+          s.kind === "school" &&
+          s.ev.kind === "game" &&
+          (campusHour(s.start) >= EVENING_HOUR || isLive(s.start, s.end, now)),
+      ),
+      now,
+    );
+    leadSpan = game ?? pickLead(schoolTonight, now) ?? pickLead(clubTonight, now);
     if (leadSpan) reason = isLive(leadSpan.start, leadSpan.end, now) ? "live" : "next";
   }
   const lead: TonightLead | null = leadSpan ? { ...itemOf(leadSpan, now), reason } : null;
@@ -317,6 +359,13 @@ export function leadRuleLine(lead: TonightLead): string {
   if (lead.kind === "club") return "Nothing from your school tonight, so the soonest club event leads.";
   if (lead.reason === "featured") return "Your school featured this today. Never paid, never ranked by popularity.";
   if (lead.reason === "live") return "First because it's on right now.";
+  // A game that hasn't started may lead past an earlier school event (decision 7), so
+  // "starts soonest" could be false for it. "Tonight's" only from 5 PM, as on the
+  // week tiles (Oct 19, 2026: a 3 PM swim meet said "tonight's" above a "TODAY 3:00 PM" tile).
+  if (lead.ev.kind === "game") {
+    const when = campusHour(Date.parse(lead.ev.starts_at)) >= EVENING_HOUR ? "tonight's" : "today's";
+    return `First because it's ${when} home game.`;
+  }
   return "First because it starts soonest.";
 }
 
@@ -372,8 +421,10 @@ export function buildHomeWeek(school: SchoolEvent[], now: number): WeekTile[] {
   const day = campusDay(now);
   const from = addCampusDays(day, -2).start;
   const to = addCampusDays(day, 5).start;
-  // Times first, words only for the tiles that are drawn.
-  const games = schoolSpans(school.filter((ev) => ev.source === "athletics" && ev.kind === "game"))
+  // Times first, words only for the tiles that are drawn. By kind, not the
+  // key "athletics" (Oct 19, 2026): only an athletics feed makes games, and
+  // Bloomington's is "iub-athletics".
+  const games = schoolSpans(school.filter((ev) => ev.kind === "game"))
     .filter((t) => t.start >= from && t.start < to)
     .slice(0, HOME_WEEK_MAX);
   const tiles: WeekTile[] = [];
@@ -394,7 +445,7 @@ export function buildHomeWeek(school: SchoolEvent[], now: number): WeekTile[] {
       said = "happening now";
     } else if (t.start < day.end) {
       state = "today";
-      const word = campusHour(t.start) >= 17 ? "Tonight" : "Today";
+      const word = campusHour(t.start) >= EVENING_HOUR ? "Tonight" : "Today";
       label = `${word} ${clock}`;
       said = `${word.toLowerCase()} ${clock}`;
     } else {

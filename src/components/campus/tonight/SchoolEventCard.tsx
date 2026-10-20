@@ -16,6 +16,7 @@ import { MouseSpotlight } from "@/components/ui/mouse-spotlight";
 import { IU_CRIMSON } from "@/lib/iu/school-colors";
 
 import { campusClock, campusDateTime } from "./campus-time";
+import { QuietBoundary } from "./QuietBoundary";
 import { IconCalendar, IconPin, LeadLinks, MatchupTitle, OutLink, SchoolTag, schoolHref } from "./TonightBits";
 import { TONIGHT_COPY } from "./tonight-view";
 import type { SchoolEventCardProps } from "./types";
@@ -44,18 +45,31 @@ const SCHOOL_CARD_SURFACE: CSSProperties = {
   color: "#fff",
 };
 
+/** IU crimson: every calendar Vibe reads today is IU's (Indianapolis and Bloomington). */
+const IU_ACCENT = { edge: IU_CRIMSON, glow: "rgba(153, 0, 0, 0.55)" } as const;
+
 /**
  * A school event wears its school's colour where a club card wears the
  * club's: the left edge and the spotlight that follows the pointer (Franky,
- * Oct 19 2026: "school events hover in school colours"). Every calendar in v1
- * is IU's, so crimson; a Purdue calendar would map to gold here.
+ * Oct 19 2026: "school events hover in school colours"). Every calendar so
+ * far is IU's, so crimson; a Purdue calendar would map to gold here.
+ *
+ * Why the default (Oct 19, 2026): the switch used to list only Indy's three
+ * calendars and fell off its end for any other name, so a calendar added on
+ * the server (Bloomington's) before this file knew it crashed the whole
+ * Events tab. The `string` widening keeps that true for a name sent by a
+ * newer server than this page.
  */
-function schoolAccent(source: SchoolEventCardProps["ev"]["source"]): { edge: string; glow: string } {
+function schoolAccent(source: string): { edge: string; glow: string } {
   switch (source) {
     case "athletics":
     case "iu-student-affairs":
     case "iu-featured":
-      return { edge: IU_CRIMSON, glow: "rgba(153, 0, 0, 0.55)" };
+    case "iub-athletics":
+    case "iub-student-life":
+    case "iub-featured":
+    default:
+      return IU_ACCENT;
   }
 }
 
@@ -83,7 +97,21 @@ function gameNote(ev: SchoolEventCardProps["ev"]): string | null {
   return ev.promo ? `${base} ${ev.promo}` : base;
 }
 
-export function SchoolEventCard({ ev, source }: SchoolEventCardProps) {
+/**
+ * Why the boundary (Oct 19, 2026): the Events tab draws these cards straight
+ * into its grid, with no boundary of its own around them, so one card that
+ * can't render (a row shape from a newer server, say) took the whole tab
+ * down. Here only that card goes; campus-home and CampusMobile need no edit.
+ */
+export function SchoolEventCard(props: SchoolEventCardProps) {
+  return (
+    <QuietBoundary name="school-card">
+      <SchoolEventCardBody {...props} />
+    </QuietBoundary>
+  );
+}
+
+function SchoolEventCardBody({ ev, source }: SchoolEventCardProps) {
   const titleId = useId();
   const when = whenLine(ev);
   const note = gameNote(ev);

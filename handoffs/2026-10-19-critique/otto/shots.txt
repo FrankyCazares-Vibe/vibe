@@ -1,0 +1,11 @@
+Otto area screenshots (Oct 19, local dev, seed account avery). "mock" = a browser-side fake API answer, no database write.
+desktop-otto-today.png                  /otto Today, 1440x900, Night
+desktop-otto-stats.png                  /otto?tab=stats, free account (teaser line)
+desktop-otto-stats-vibeplus-mock.png    Stats with a faked Vibe+ answer: the "Who viewed you" cards, "Sep 17"
+desktop-otto-stats-franky-numbers-mock.png  Stats with faked post stats (7v 2 likes 1 comment 2 reposts): columns go 295px / 587px
+desktop-top-posts-emoji-zoom.png        close-up of the emoji count row (2x)
+desktop-otto-stats-light-mode.png       Light mode: Otto stays dark purple beside the cream sidebar
+phone-otto-today.png / phone-otto-stats.png / phone-otto-stats-vibeplus-mock.png   390x844 full page
+phone-otto-stats-top-posts-viewport.png phone: right-hand tiles cut off, top-post counts off screen
+ref-desktop-campus*.png / ref-phone-campus.png   the current look of the feed, for comparison
+ref-mockup-0*.png                       the April Otto mockups (~/Downloads/otto_mockups)

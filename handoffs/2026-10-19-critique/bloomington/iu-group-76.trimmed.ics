@@ -1,0 +1,1265 @@
+BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//Indiana University//NONSGML v1.0//EN
+X-WR-CALNAME:Indiana University Events
+BEGIN:VEVENT
+DTSTART:20261020T180000Z
+DTEND:20261020T200000Z
+LOCATION:LILLY LIBRARY
+SUMMARY:An ornithology pop-up exhibition
+UID:20261020T180000Z-2437014@events.iu.edu
+URL:https://events.iu.edu/live/events/birds-in-books
+X-LIVEWHALE-ID:2437014
+X-LIVEWHALE-TIMEZONE:America/New_York
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20261020T210000Z
+DTEND:20261020T230000Z
+LOCATION:IMU Solarium
+SUMMARY:Union Board STEM & Canvas Present: Hue Knew
+UID:20261020T210000Z-2437042@events.iu.edu
+URL:https://events.iu.edu/live/events/2432980-union-board-stem-canvas-prese
+ nt-hue-knew
+X-LIVEWHALE-ID:2437042
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-TAGS:In Person
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20261020T213000Z
+DTEND:20261020T223000Z
+LOCATION:WILLIAM LEON GARRETT FIELDHOUSE
+SUMMARY:CANCELED: Inclusive Movement & Body Positivity
+UID:20261020T213000Z-2341703@events.iu.edu
+URL:https://events.iu.edu/live/events/2335744-inclusive-movement-body-posit
+ ivity
+X-LIVEWHALE-ID:2341703
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-CANCELED:1
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20261020T220000Z
+DTEND:20261020T233000Z
+LOCATION:Wellness House Room 115
+SUMMARY:Hoosiers Not Hazers - Training
+UID:20261020T220000Z-2437019@events.iu.edu
+URL:https://events.iu.edu/live/events/2416866-hoosiers-not-hazers-training
+X-LIVEWHALE-ID:2437019
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-TAGS:In Person
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20261020T223000Z
+DTEND:20261020T233000Z
+LOCATION:La Casa/Latino Cultural Center
+SUMMARY:Latine Book Club: You Should Have Been Nicer to My Mom
+UID:20261020T223000Z-2421264@events.iu.edu
+URL:https://events.iu.edu/live/events/2344775-latine-book-club-you-should-h
+ ave-been-nicer-to-my
+X-LIVEWHALE-ID:2421264
+X-LIVEWHALE-TIMEZONE:America/New_York
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20261020T230000Z
+DTEND:20261021T000000Z
+LOCATION:IU CINEMA
+SUMMARY:Lean on Pete w/Q&A | Making Strides: Horses\, Healing\, and Communi
+ ty
+UID:20261020T230000Z-2437034@events.iu.edu
+URL:https://events.iu.edu/live/events/2425030-lean-on-pete-wqa-making-strid
+ es-horses-healing-and-c
+X-LIVEWHALE-ID:2437034
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-TAGS:Hoosier experience
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20261021T150000Z
+DTEND:20261021T180000Z
+LOCATION:Frangipani Room\, Indiana Memorial Union
+SUMMARY:Union Board STEM Presents: Meals and Mentors
+UID:20261021T150000Z-2437041@events.iu.edu
+URL:https://events.iu.edu/live/events/2432979-union-board-stem-presents-mea
+ ls-and-mentors
+X-LIVEWHALE-ID:2437041
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-TAGS:In Person
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20261021T150000Z
+DTEND:20261021T180000Z
+LOCATION:Indiana Memorial Union – Table 1
+SUMMARY:Transfer Pop Up!
+UID:20261021T150000Z-2437023@events.iu.edu
+URL:https://events.iu.edu/live/events/2420087-transfer-pop-up
+X-LIVEWHALE-ID:2437023
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-TAGS:In Person
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20261021T200000Z
+DTEND:20261021T220000Z
+LOCATION:Asian Culture Center (807 E 10th street\, Bloomington\, IN)
+SUMMARY:Asian Cultures Around Campus: Mahjong Meetups
+UID:20261021T200000Z-2456449@events.iu.edu
+URL:https://events.iu.edu/live/events/2454355-asian-cultures-around-campus-
+ mahjong-meetups
+X-LIVEWHALE-ID:2456449
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-TAGS:In Person
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20261021T230000Z
+DTEND:20261022T000000Z
+LOCATION:La Casa/Latino Cultural Center
+SUMMARY:La Casa Queer Initiative Meeting
+UID:20261021T230000Z-2341696@events.iu.edu
+URL:https://events.iu.edu/live/events/2317146-la-casa-queer-initiative-meet
+ ing
+X-LIVEWHALE-ID:2341696
+X-LIVEWHALE-TIMEZONE:America/New_York
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20261022T150000Z
+DTEND:20261022T180000Z
+LOCATION:Indiana Memorial Union – Table 1
+SUMMARY:Transfer Pop Up!
+UID:20261022T150000Z-2437022@events.iu.edu
+URL:https://events.iu.edu/live/events/2420086-transfer-pop-up
+X-LIVEWHALE-ID:2437022
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-TAGS:In Person
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20261022T210000Z
+DTEND:20261022T220000Z
+LOCATION:Asian Culture Center (807 E 10th street\, Bloomington\, IN)
+SUMMARY:Tara\, Mag-Tagalog Tayo!: Learn and Experience Filipino Language & 
+ Culture
+UID:20261022T210000Z-2441775@events.iu.edu
+URL:https://events.iu.edu/live/events/2436936-mag-tagalog-tayo-learn-and-ex
+ perience-filipino
+X-LIVEWHALE-ID:2441775
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-TAGS:In Person
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20261022T220000Z
+DTEND:20261023T000000Z
+LOCATION:Union Street Auditorium ($300 fee)
+SUMMARY:FASE Etiquette Dinner - Fall 2026
+UID:20261022T220000Z-2437008@events.iu.edu
+URL:https://events.iu.edu/live/events/2377890-fase-etiquette-dinner-fall-20
+ 26
+X-LIVEWHALE-ID:2437008
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-TAGS:In Person
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20261023T140000Z
+DTEND:20261023T163000Z
+LOCATION:SIDNEY AND LOIS ESKENAZI MUSEUM OF ART
+SUMMARY:Happiness 2.0 mask workshop
+UID:20261023T140000Z-2413608@events.iu.edu
+URL:https://events.iu.edu/live/events/2396822-happiness-20-mask-workshop
+X-LIVEWHALE-ID:2413608
+X-LIVEWHALE-TIMEZONE:America/New_York
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20261023T180000Z
+DTEND:20261023T190000Z
+LOCATION:Lilly Library (1200 E. Seventh St.)
+SUMMARY:Guided tours of the Lilly Library
+UID:20261023T180000Z-2437000@events.iu.edu
+URL:https://events.iu.edu/live/events/2361633-guided-tours-of-the-lilly-lib
+ rary
+X-LIVEWHALE-ID:2437000
+X-LIVEWHALE-TIMEZONE:America/New_York
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20261023T183000Z
+DTEND:20261023T193000Z
+LOCATION:Asian Culture Center (807 E 10th street\, Bloomington\, IN)
+SUMMARY:Asian Cultures Around Campus: Henna Fridays
+UID:20261023T183000Z-2437007@events.iu.edu
+URL:https://events.iu.edu/live/events/2375514-asian-cultures-around-campus-
+ henna-fridays
+X-LIVEWHALE-ID:2437007
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-TAGS:In Person
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20261023T220000Z
+DTEND:20261024T000000Z
+LOCATION:Eigenmann Hall - IUOA Entrance
+SUMMARY:Free Friday Bouldering
+UID:20261023T220000Z-2385134@events.iu.edu
+URL:https://events.iu.edu/live/events/2383958-free-friday-bouldering
+X-LIVEWHALE-ID:2385134
+X-LIVEWHALE-TIMEZONE:America/New_York
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20261023T230000Z
+DTEND:20261024T000000Z
+LOCATION:IU CINEMA
+SUMMARY:The President's Cake | Arthouse Now
+UID:20261023T230000Z-2437038@events.iu.edu
+URL:https://events.iu.edu/live/events/2425036-the-presidents-cake-arthouse-
+ now
+X-LIVEWHALE-ID:2437038
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-TAGS:Hoosier experience
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20261024T020000Z
+DTEND:20261024T030000Z
+LOCATION:IU CINEMA
+SUMMARY:Don't Look Now | Friday Night Frights
+UID:20261024T020000Z-2437037@events.iu.edu
+URL:https://events.iu.edu/live/events/2425037-dont-look-now-friday-night-fr
+ ights
+X-LIVEWHALE-ID:2437037
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-TAGS:Hoosier experience
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20261024T200000Z
+DTEND:20261024T210000Z
+LOCATION:IU CINEMA
+SUMMARY:Hocus Pocus | CINEkids International Children's Film Series\, Jorge
+ nsen Guest Filmmaker Series\, Doug Jones: Of Monsters and Men
+UID:20261024T200000Z-2437033@events.iu.edu
+URL:https://events.iu.edu/live/events/2425048-hocus-pocus-cinekids-internat
+ ional-childrens-film-se
+X-LIVEWHALE-ID:2437033
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-TAGS:Hoosier experience
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20261025T130000Z
+DTEND:20261025T223000Z
+LOCATION:Eigenmann Hall - IUOA Entrance
+SUMMARY:Day Hike: Clifty Falls
+UID:20261025T130000Z-2440285@events.iu.edu
+URL:https://events.iu.edu/live/events/2437047-day-hike-clifty-falls
+X-LIVEWHALE-ID:2440285
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-TAGS:Hoosier experience
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20261026T200000Z
+DTEND:20261026T220000Z
+LOCATION:Asian Culture Center (807 E 10th street\, Bloomington\, IN)
+SUMMARY:Asian Cultures Around Campus: Mahjong Mondays
+UID:20261026T200000Z-2320846@events.iu.edu
+URL:https://events.iu.edu/live/events/2299635-asian-cultures-around-campus-
+ mahjong-mondays
+X-LIVEWHALE-ID:2320846
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-TAGS:In Person
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20261026T230000Z
+DTEND:20261027T000000Z
+LOCATION:IU CINEMA
+SUMMARY:Naza | Additional Films and Guests
+UID:20261026T230000Z-2437044@events.iu.edu
+URL:https://events.iu.edu/live/events/2435788-naza-additional-films-and-gue
+ sts
+X-LIVEWHALE-ID:2437044
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-TAGS:Hoosier experience
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20261027T180000Z
+DTEND:20261027T220000Z
+LOCATION:Wellness House
+SUMMARY:Boos and Brews
+UID:20261027T180000Z-2437026@events.iu.edu
+URL:https://events.iu.edu/live/events/2422820-boos-and-brews
+X-LIVEWHALE-ID:2437026
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-TAGS:In Person
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20261027T220000Z
+DTEND:20261027T233000Z
+LOCATION:Wellness House Room 115
+SUMMARY:Hoosiers Not Hazers - Training
+UID:20261027T220000Z-2437018@events.iu.edu
+URL:https://events.iu.edu/live/events/2416865-hoosiers-not-hazers-training
+X-LIVEWHALE-ID:2437018
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-TAGS:In Person
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20261028T200000Z
+DTEND:20261028T220000Z
+LOCATION:Asian Culture Center (807 E 10th street\, Bloomington\, IN)
+SUMMARY:Asian Cultures Around Campus: Mahjong Meetups
+UID:20261028T200000Z-2456450@events.iu.edu
+URL:https://events.iu.edu/live/events/2454352-asian-cultures-around-campus-
+ mahjong-meetups
+X-LIVEWHALE-ID:2456450
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-TAGS:In Person
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20261028T220000Z
+DTEND:20261029T000000Z
+LOCATION:La Casa/Latino Cultural Center
+SUMMARY:Dia de los Muertos
+UID:20261028T220000Z-2343430@events.iu.edu
+URL:https://events.iu.edu/live/events/2324802-dia-de-los-muertos
+X-LIVEWHALE-ID:2343430
+X-LIVEWHALE-TIMEZONE:America/New_York
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20261029T160000Z
+DTEND:20261029T183000Z
+LOCATION:IMU Club Hub
+SUMMARY:Leadership Compass Series: Thinking like a Leader [Part 2]
+UID:20261029T160000Z-2421229@events.iu.edu
+URL:https://events.iu.edu/live/events/2407649-leadership-compass-series-thi
+ nking-like-a-leader
+X-LIVEWHALE-ID:2421229
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-TAGS:In Person
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20261029T193000Z
+DTEND:20261029T210000Z
+LOCATION:Alumni Hall
+SUMMARY:Union Board and U Bring Change 2 Mind Present: Boots and Besties
+UID:20261029T193000Z-2437021@events.iu.edu
+URL:https://events.iu.edu/live/events/2420085-union-board-and-u-bring-chang
+ e-2-mind-present
+X-LIVEWHALE-ID:2437021
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-TAGS:In Person
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20261029T210000Z
+DTEND:20261029T220000Z
+LOCATION:Asian Culture Center (807 E 10th street\, Bloomington\, IN)
+SUMMARY:Tara\, Mag-Tagalog Tayo!: Learn and Experience Filipino Language & 
+ Culture
+UID:20261029T210000Z-2441774@events.iu.edu
+URL:https://events.iu.edu/live/events/2436935-mag-tagalog-tayo-learn-and-ex
+ perience-filipino
+X-LIVEWHALE-ID:2441774
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-TAGS:In Person
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20261029T210000Z
+DTEND:20261029T230000Z
+LOCATION:SIDNEY AND LOIS ESKENAZI MUSEUM OF ART
+SUMMARY:Eerie Evening at the Art Museum
+UID:20261029T210000Z-2431029@events.iu.edu
+URL:https://events.iu.edu/live/events/2429645-eerie-evening-at-the-art-muse
+ um
+X-LIVEWHALE-ID:2431029
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-TAGS:Free food
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20261029T213000Z
+DTEND:20261029T230000Z
+LOCATION:Cook Center
+SUMMARY:Halloween Party
+UID:20261029T213000Z-2341704@events.iu.edu
+URL:https://events.iu.edu/live/events/2335745-halloween-party
+X-LIVEWHALE-ID:2341704
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-TAGS:costume party|friends|fun|lgbtqia
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20261029T230000Z
+DTEND:20261030T000000Z
+LOCATION:IU CINEMA
+SUMMARY:Zodiac Killer Project w/ Q&A | Inspiring Conversations
+UID:20261029T230000Z-2437031@events.iu.edu
+URL:https://events.iu.edu/live/events/2425194-zodiac-killer-project-w-qampa
+ -inspiring
+X-LIVEWHALE-ID:2437031
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-TAGS:Hoosier experience
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20261030T180000Z
+DTEND:20261030T190000Z
+LOCATION:Lilly Library (1200 E. Seventh St.)
+SUMMARY:Guided tours of the Lilly Library
+UID:20261030T180000Z-2431109@events.iu.edu
+URL:https://events.iu.edu/live/events/2361634-guided-tours-of-the-lilly-lib
+ rary
+X-LIVEWHALE-ID:2431109
+X-LIVEWHALE-TIMEZONE:America/New_York
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20261030T183000Z
+DTEND:20261030T193000Z
+LOCATION:Asian Culture Center (807 E 10th street\, Bloomington\, IN)
+SUMMARY:Asian Cultures Around Campus: Henna Fridays
+UID:20261030T183000Z-2437006@events.iu.edu
+URL:https://events.iu.edu/live/events/2375512-asian-cultures-around-campus-
+ henna-fridays
+X-LIVEWHALE-ID:2437006
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-TAGS:In Person
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20261030T230000Z
+DTEND:20261031T000000Z
+LOCATION:IU CINEMA
+SUMMARY:The Harder They Come | New Americas Cinema
+UID:20261030T230000Z-2437032@events.iu.edu
+URL:https://events.iu.edu/live/events/2425197-the-harder-they-come-new-amer
+ icas-cinema
+X-LIVEWHALE-ID:2437032
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-TAGS:Hoosier experience
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20261030T230000Z
+DTEND:20261031T010000Z
+LOCATION:Dunn Meadow
+SUMMARY:Union Board Spirit and Traditions Presents: Nightmare on Dunn
+UID:20261030T230000Z-2454367@events.iu.edu
+URL:https://events.iu.edu/live/events/2442998-union-board-spirit-and-tradit
+ ions-presents
+X-LIVEWHALE-ID:2454367
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-TAGS:In Person
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20261031T020000Z
+DTEND:20261031T030000Z
+LOCATION:IU CINEMA
+SUMMARY:Postmodern Panic: Meta Horror Double Feature with Scream + Cabin in
+  the Woods | Friday Night Frights
+UID:20261031T020000Z-2437030@events.iu.edu
+URL:https://events.iu.edu/live/events/2425198-postmodern-panic-meta-horror-
+ double-feature-with
+X-LIVEWHALE-ID:2437030
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-TAGS:Hoosier experience
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20261031T230000Z
+DTEND:20261101T000000Z
+LOCATION:IU CINEMA
+SUMMARY:Two Tales of Terror: J-Horror Unleashed with Best Wishes to All/ Mi
+ na Ni Ko Are + Gozu | Friday Night Frights
+UID:20261031T230000Z-2437029@events.iu.edu
+URL:https://events.iu.edu/live/events/2425201-two-tales-of-terror-j-horror-
+ unleashed-with-best
+X-LIVEWHALE-ID:2437029
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-TAGS:Hoosier experience
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20261102T210000Z
+DTEND:20261102T230000Z
+LOCATION:Asian Culture Center (807 E 10th street\, Bloomington\, IN)
+SUMMARY:Asian Cultures Around Campus: Mahjong Mondays
+UID:20261102T210000Z-2320848@events.iu.edu
+URL:https://events.iu.edu/live/events/2299634-asian-cultures-around-campus-
+ mahjong-mondays
+X-LIVEWHALE-ID:2320848
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-TAGS:In Person
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20261103T160000Z
+DTEND:20261103T183000Z
+LOCATION:MAXWELL HALL
+SUMMARY:Mock Career Fair
+UID:20261103T160000Z-2454379@events.iu.edu
+URL:https://events.iu.edu/live/events/2403579-mock-career-fair
+X-LIVEWHALE-ID:2454379
+X-LIVEWHALE-TIMEZONE:America/New_York
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20261103T230000Z
+DTEND:20261104T003000Z
+LOCATION:Wellness House Room 115
+SUMMARY:Hoosiers Not Hazers - Training
+UID:20261103T230000Z-2437017@events.iu.edu
+URL:https://events.iu.edu/live/events/2416864-hoosiers-not-hazers-training
+X-LIVEWHALE-ID:2437017
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-TAGS:In Person
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20261103T234500Z
+DTEND:20261104T004500Z
+LOCATION:INDIANA MEMORIAL UNION (UNION BUILDING)
+SUMMARY:November 3rd Table Tennis Tournament
+UID:20261103T234500Z-2399858@events.iu.edu
+URL:https://events.iu.edu/live/events/2387869-november-3rd-table-tennis-tou
+ rnament
+X-LIVEWHALE-ID:2399858
+X-LIVEWHALE-TIMEZONE:America/New_York
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20261104T210000Z
+DTEND:20261104T230000Z
+LOCATION:Asian Culture Center (807 E 10th street\, Bloomington\, IN)
+SUMMARY:Asian Cultures Around Campus: Mahjong Meetups
+UID:20261104T210000Z-2456451@events.iu.edu
+URL:https://events.iu.edu/live/events/2454350-asian-cultures-around-campus-
+ mahjong-meetups
+X-LIVEWHALE-ID:2456451
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-TAGS:In Person
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20261105T220000Z
+DTEND:20261105T230000Z
+LOCATION:Asian Culture Center (807 E 10th street\, Bloomington\, IN)
+SUMMARY:CANCELED: Tara\, Mag-Tagalog Tayo!: Learn and Experience Filipino L
+ anguage & Culture
+UID:20261105T220000Z-2441783@events.iu.edu
+URL:https://events.iu.edu/live/events/2436934-mag-tagalog-tayo-learn-and-ex
+ perience-filipino
+X-LIVEWHALE-ID:2441783
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-CANCELED:1
+X-LIVEWHALE-TAGS:In Person
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20261105T220000Z
+DTEND:20261105T230000Z
+LOCATION:Asian Culture Center (807 E 10th street\, Bloomington\, IN)
+SUMMARY:ACC's Over A Cup of Tea presents Aesthetics of the Cute: Globalizat
+ ion of East Asian Kawaii Culture by Haoxuan Gao
+UID:20261105T220000Z-2320850@events.iu.edu
+URL:https://events.iu.edu/live/events/2309349-accs-over-a-cup-of-tea
+X-LIVEWHALE-ID:2320850
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-TAGS:In Person
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20261105T233000Z
+DTEND:20261106T003000Z
+LOCATION:La Casa/Latino Cultural Center
+SUMMARY:Sweet Traditions: Exploring Latine Desserts\, Part 3
+UID:20261105T233000Z-2421271@events.iu.edu
+URL:https://events.iu.edu/live/events/2314766-sweet-traditions-exploring-la
+ tine-desserts-part-3
+X-LIVEWHALE-ID:2421271
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-TAGS:Free food
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20261106T150000Z
+DTEND:20261106T173000Z
+LOCATION:SIDNEY AND LOIS ESKENAZI MUSEUM OF ART
+SUMMARY:Happiness 2.0 mask workshop
+UID:20261106T150000Z-2413609@events.iu.edu
+URL:https://events.iu.edu/live/events/2396823-happiness-20-mask-workshop
+X-LIVEWHALE-ID:2413609
+X-LIVEWHALE-TIMEZONE:America/New_York
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20261106T193000Z
+DTEND:20261106T203000Z
+LOCATION:Asian Culture Center (807 E 10th street\, Bloomington\, IN)
+SUMMARY:Asian Cultures Around Campus: Henna Fridays
+UID:20261106T193000Z-2437005@events.iu.edu
+URL:https://events.iu.edu/live/events/2375510-asian-cultures-around-campus-
+ henna-fridays
+X-LIVEWHALE-ID:2437005
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-TAGS:In Person
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20261109T210000Z
+DTEND:20261109T230000Z
+LOCATION:Asian Culture Center (807 E 10th street\, Bloomington\, IN)
+SUMMARY:Asian Cultures Around Campus: Mahjong Mondays
+UID:20261109T210000Z-2320852@events.iu.edu
+URL:https://events.iu.edu/live/events/2299633-asian-cultures-around-campus-
+ mahjong-mondays
+X-LIVEWHALE-ID:2320852
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-TAGS:In Person
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20261109T220000Z
+DTEND:20261110T003000Z
+LOCATION:Wellness House
+SUMMARY:Find Your Wellness - Scavenger Hunt
+UID:20261109T220000Z-2437025@events.iu.edu
+URL:https://events.iu.edu/live/events/2422819-find-your-wellness-scavenger-
+ hunt
+X-LIVEWHALE-ID:2437025
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-TAGS:In Person
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20261110T170000Z
+DTEND:20261110T180000Z
+LOCATION:Asian Culture Center (807 E 10th street\, Bloomington\, IN)
+SUMMARY:Student Development Series/Workshop presents "Navigating Accessibil
+ ity\, Accommodations\, and Support at IUB"
+UID:20261110T170000Z-2320855@events.iu.edu
+URL:https://events.iu.edu/live/events/2309348-student-development-serieswor
+ kshop
+X-LIVEWHALE-ID:2320855
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-TAGS:In Person
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20261110T220000Z
+DTEND:20261111T000000Z
+LOCATION:LGBTQ+ CULTURE CENTER
+SUMMARY:DND/Pathfinder & Board Game Night
+UID:20261110T220000Z-2341705@events.iu.edu
+URL:https://events.iu.edu/live/events/2335748-dndpathfinder-board-game-nigh
+ t
+X-LIVEWHALE-ID:2341705
+X-LIVEWHALE-TIMEZONE:America/New_York
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20261110T230000Z
+DTEND:20261111T003000Z
+LOCATION:Wellness House Room 115
+SUMMARY:Hoosiers Not Hazers - Training
+UID:20261110T230000Z-2437016@events.iu.edu
+URL:https://events.iu.edu/live/events/2416863-hoosiers-not-hazers-training
+X-LIVEWHALE-ID:2437016
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-TAGS:In Person
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20261111T123000Z
+DTEND:20261111T130000Z
+LOCATION:Sample Gates
+SUMMARY:Veterans Day Flag Raising
+UID:20261111T123000Z-2456396@events.iu.edu
+URL:https://events.iu.edu/live/events/2450304-veterans-day-flag-raising
+X-LIVEWHALE-ID:2456396
+X-LIVEWHALE-TIMEZONE:America/New_York
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20261111T133000Z
+DTEND:20261111T160000Z
+SUMMARY:Veterans Day Breakfast Social: Center for Veteran & Military Studen
+ ts
+UID:20261111T133000Z-2421300@events.iu.edu
+URL:https://events.iu.edu/live/events/2328425-veterans-day-breakfast-social
+ -center-for-veteran
+X-LIVEWHALE-ID:2421300
+X-LIVEWHALE-TIMEZONE:America/New_York
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20261111T210000Z
+DTEND:20261111T230000Z
+LOCATION:Asian Culture Center (807 E 10th street\, Bloomington\, IN)
+SUMMARY:Asian Cultures Around Campus: Mahjong Meetups
+UID:20261111T210000Z-2456452@events.iu.edu
+URL:https://events.iu.edu/live/events/2454348-asian-cultures-around-campus-
+ mahjong-meetups
+X-LIVEWHALE-ID:2456452
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-TAGS:In Person
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20261111T230000Z
+DTEND:20261112T013000Z
+LOCATION:IMU Club Hub
+SUMMARY:Bridgework Series: November
+UID:20261111T230000Z-2437010@events.iu.edu
+URL:https://events.iu.edu/live/events/2407646-bridgework-series-november
+X-LIVEWHALE-ID:2437010
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-TAGS:In Person
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20261112T160000Z
+DTEND:20261112T190000Z
+LOCATION:Georgian Room\, Indiana Memorial Union
+SUMMARY:Union Board STEM Presents: Meals and Mentors
+UID:20261112T160000Z-2437040@events.iu.edu
+URL:https://events.iu.edu/live/events/2432978-union-board-stem-presents-mea
+ ls-and-mentors
+X-LIVEWHALE-ID:2437040
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-TAGS:In Person
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20261112T170000Z
+DTEND:20261112T193000Z
+LOCATION:IMU Club Hub
+SUMMARY:Leadership Compass Series: Acting like a Leader [Part 1]
+UID:20261112T170000Z-2421228@events.iu.edu
+URL:https://events.iu.edu/live/events/2407644-leadership-compass-series-act
+ ing-like-a-leader
+X-LIVEWHALE-ID:2421228
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-TAGS:In Person
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20261112T210000Z
+DTEND:20261112T230000Z
+LOCATION:La Casa/Latino Cultural Center
+SUMMARY:La Casa Turns 53!
+UID:20261112T210000Z-2343435@events.iu.edu
+URL:https://events.iu.edu/live/events/2324798-la-casa-turns-53
+X-LIVEWHALE-ID:2343435
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-TAGS:Free food
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20261112T220000Z
+DTEND:20261112T230000Z
+LOCATION:Asian Culture Center (807 E 10th street\, Bloomington\, IN)
+SUMMARY:Tara\, Mag-Tagalog Tayo!: Learn and Experience Filipino Language & 
+ Culture
+UID:20261112T220000Z-2441782@events.iu.edu
+URL:https://events.iu.edu/live/events/2436933-mag-tagalog-tayo-learn-and-ex
+ perience-filipino
+X-LIVEWHALE-ID:2441782
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-TAGS:In Person
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20261112T220000Z
+DTEND:20261112T230000Z
+LOCATION:Asian Culture Center (807 E 10th street\, Bloomington\, IN)
+SUMMARY:ACC Book Club features The Interpreter of Maladies by Jhumpa Lahiri
+UID:20261112T220000Z-2437012@events.iu.edu
+URL:https://events.iu.edu/live/events/2407880-acc-book-club-features-the-in
+ terpreter-of-maladies
+X-LIVEWHALE-ID:2437012
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-TAGS:In Person
+END:VEVENT
+BEGIN:VEVENT
+DTSTART;VALUE=DATE:20261113
+DTEND;VALUE=DATE:20261114
+SUMMARY:2026 Conference on Global Indigenous Studies (CGIS)
+UID:20261113T050000Z-2454380@events.iu.edu
+URL:https://events.iu.edu/live/events/2170798-2026-conference-on-global-ind
+ igenous-studies-cgis
+X-LIVEWHALE-ID:2454380
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-ALL-DAY:1
+X-LIVEWHALE-IS-ONLINE:1
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20261113T170000Z
+DTEND:20261113T180000Z
+LOCATION:Asian Culture Center (807 E 10th street\, Bloomington\, IN)
+SUMMARY:Who are Asian Americans and Pacific Islanders? (WAAPI) A Lunch Disc
+ ussion
+UID:20261113T170000Z-2320857@events.iu.edu
+URL:https://events.iu.edu/live/events/2305822-who-are-asian-americans-and-p
+ acific-islanders
+X-LIVEWHALE-ID:2320857
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-TAGS:In Person
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20261113T193000Z
+DTEND:20261113T203000Z
+LOCATION:Asian Culture Center (807 E 10th street\, Bloomington\, IN)
+SUMMARY:Asian Cultures Around Campus: Henna Fridays
+UID:20261113T193000Z-2437004@events.iu.edu
+URL:https://events.iu.edu/live/events/2375507-asian-cultures-around-campus-
+ henna-fridays
+X-LIVEWHALE-ID:2437004
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-TAGS:In Person
+END:VEVENT
+BEGIN:VEVENT
+DTSTART;VALUE=DATE:20261114
+DTEND;VALUE=DATE:20261115
+SUMMARY:2026 Conference on Global Indigenous Studies (CGIS)
+UID:20261114T050000Z-2454380@events.iu.edu
+URL:https://events.iu.edu/live/events/2170798-2026-conference-on-global-ind
+ igenous-studies-cgis
+X-LIVEWHALE-ID:2454380
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-ALL-DAY:1
+X-LIVEWHALE-IS-ONLINE:1
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20261114T143000Z
+DTEND:20261114T170000Z
+SUMMARY:VETERANS WEEK! Salute to Service Gameday Pit Stop - CVMS
+UID:20261114T143000Z-2456397@events.iu.edu
+URL:https://events.iu.edu/live/events/2376530-veterans-week-salute-to-servi
+ ce-gameday-pit-stop-cvm
+X-LIVEWHALE-ID:2456397
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-TAGS:Fall Semester|military connected|Military|snacks|veterans
+END:VEVENT
+BEGIN:VEVENT
+DTSTART;VALUE=DATE:20261115
+DTEND;VALUE=DATE:20261116
+SUMMARY:2026 Conference on Global Indigenous Studies (CGIS)
+UID:20261115T050000Z-2454380@events.iu.edu
+URL:https://events.iu.edu/live/events/2170798-2026-conference-on-global-ind
+ igenous-studies-cgis
+X-LIVEWHALE-ID:2454380
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-ALL-DAY:1
+X-LIVEWHALE-IS-ONLINE:1
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20261116T210000Z
+DTEND:20261116T230000Z
+LOCATION:Asian Culture Center (807 E 10th street\, Bloomington\, IN)
+SUMMARY:Asian Cultures Around Campus: Mahjong Mondays
+UID:20261116T210000Z-2320859@events.iu.edu
+URL:https://events.iu.edu/live/events/2299632-asian-cultures-around-campus-
+ mahjong-mondays
+X-LIVEWHALE-ID:2320859
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-TAGS:In Person
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20261117T210000Z
+DTEND:20261117T230000Z
+LOCATION:Frangipani Room\, Indiana Memorial Union
+SUMMARY:Union Board STEM presents: Prime Time
+UID:20261117T210000Z-2437043@events.iu.edu
+URL:https://events.iu.edu/live/events/2433063-union-board-stem-presents-pri
+ me-time
+X-LIVEWHALE-ID:2437043
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-TAGS:In Person
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20261117T223000Z
+DTEND:20261118T000000Z
+LOCATION:LGBTQ+ CULTURE CENTER
+SUMMARY:Friendsgiving
+UID:20261117T223000Z-2341706@events.iu.edu
+URL:https://events.iu.edu/live/events/2335749-friendsgiving
+X-LIVEWHALE-ID:2341706
+X-LIVEWHALE-TIMEZONE:America/New_York
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20261117T230000Z
+DTEND:20261118T003000Z
+LOCATION:Wellness House Room 115
+SUMMARY:Hoosiers Not Hazers - Training
+UID:20261117T230000Z-2437015@events.iu.edu
+URL:https://events.iu.edu/live/events/2416862-hoosiers-not-hazers-training
+X-LIVEWHALE-ID:2437015
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-TAGS:In Person
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20261117T233000Z
+DTEND:20261118T003000Z
+LOCATION:La Casa/Latino Cultural Center
+SUMMARY:Latine Book Club: We Will Be Jaguars - A Memoir of My People
+UID:20261117T233000Z-2421265@events.iu.edu
+URL:https://events.iu.edu/live/events/2344777-latine-book-club-we-will-be-j
+ aguars-a-memoir-of
+X-LIVEWHALE-ID:2421265
+X-LIVEWHALE-TIMEZONE:America/New_York
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20261118T210000Z
+DTEND:20261118T230000Z
+LOCATION:Asian Culture Center (807 E 10th street\, Bloomington\, IN)
+SUMMARY:Asian Cultures Around Campus: Mahjong Meetups
+UID:20261118T210000Z-2456453@events.iu.edu
+URL:https://events.iu.edu/live/events/2454343-asian-cultures-around-campus-
+ mahjong-meetups
+X-LIVEWHALE-ID:2456453
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-TAGS:In Person
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20261119T170000Z
+DTEND:20261119T193000Z
+LOCATION:IMU Club Hub
+SUMMARY:Leadership Compass Series: Acting like a Leader [Part 2]
+UID:20261119T170000Z-2421227@events.iu.edu
+URL:https://events.iu.edu/live/events/2407642-leadership-compass-series-act
+ ing-like-a-leader
+X-LIVEWHALE-ID:2421227
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-TAGS:In Person
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20261119T220000Z
+DTEND:20261119T230000Z
+LOCATION:Asian Culture Center (807 E 10th street\, Bloomington\, IN)
+SUMMARY:Tara\, Mag-Tagalog Tayo!: Learn and Experience Filipino Language & 
+ Culture
+UID:20261119T220000Z-2441781@events.iu.edu
+URL:https://events.iu.edu/live/events/2436932-mag-tagalog-tayo-learn-and-ex
+ perience-filipino
+X-LIVEWHALE-ID:2441781
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-TAGS:In Person
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20261120T150000Z
+DTEND:20261120T173000Z
+LOCATION:SIDNEY AND LOIS ESKENAZI MUSEUM OF ART
+SUMMARY:Happiness 2.0 mask workshop
+UID:20261120T150000Z-2413610@events.iu.edu
+URL:https://events.iu.edu/live/events/2396831-happiness-20-mask-workshop
+X-LIVEWHALE-ID:2413610
+X-LIVEWHALE-TIMEZONE:America/New_York
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20261130T210000Z
+DTEND:20261130T230000Z
+LOCATION:Asian Culture Center (807 E 10th street\, Bloomington\, IN)
+SUMMARY:Asian Cultures Around Campus: Mahjong Mondays
+UID:20261130T210000Z-2320861@events.iu.edu
+URL:https://events.iu.edu/live/events/2299631-asian-cultures-around-campus-
+ mahjong-mondays
+X-LIVEWHALE-ID:2320861
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-TAGS:In Person
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20261201T234500Z
+DTEND:20261202T004500Z
+LOCATION:INDIANA MEMORIAL UNION (UNION BUILDING)
+SUMMARY:December 1st Billiards Tournament
+UID:20261201T234500Z-2399856@events.iu.edu
+URL:https://events.iu.edu/live/events/2387874-december-1st-billiards-tourna
+ ment
+X-LIVEWHALE-ID:2399856
+X-LIVEWHALE-TIMEZONE:America/New_York
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20261202T210000Z
+DTEND:20261202T230000Z
+LOCATION:Asian Culture Center (807 E 10th street\, Bloomington\, IN)
+SUMMARY:Asian Cultures Around Campus: Mahjong Meetups
+UID:20261202T210000Z-2456454@events.iu.edu
+URL:https://events.iu.edu/live/events/2454342-asian-cultures-around-campus-
+ mahjong-meetups
+X-LIVEWHALE-ID:2456454
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-TAGS:In Person
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20261202T230000Z
+DTEND:20261203T010000Z
+LOCATION:IMU Frangipani Room
+SUMMARY:Bridgework Series: December
+UID:20261202T230000Z-2437009@events.iu.edu
+URL:https://events.iu.edu/live/events/2407640-bridgework-series-december
+X-LIVEWHALE-ID:2437009
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-TAGS:In Person
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20261203T170000Z
+DTEND:20261203T190000Z
+LOCATION:IMU Club Hub
+SUMMARY:Leadership Compass Series: Planning like a Leader [Part 1]
+UID:20261203T170000Z-2421226@events.iu.edu
+URL:https://events.iu.edu/live/events/2407638-leadership-compass-series-pla
+ nning-like-a-leader
+X-LIVEWHALE-ID:2421226
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-TAGS:In Person
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20261203T210000Z
+DTEND:20261204T000000Z
+LOCATION:Wellness House
+SUMMARY:The Art of Letting Go
+UID:20261203T210000Z-2437024@events.iu.edu
+URL:https://events.iu.edu/live/events/2422815-the-art-of-letting-go
+X-LIVEWHALE-ID:2437024
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-TAGS:In Person
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20261203T220000Z
+DTEND:20261203T230000Z
+LOCATION:Asian Culture Center (807 E 10th street\, Bloomington\, IN)
+SUMMARY:Tara\, Mag-Tagalog Tayo!: Learn and Experience Filipino Language & 
+ Culture
+UID:20261203T220000Z-2441780@events.iu.edu
+URL:https://events.iu.edu/live/events/2436931-mag-tagalog-tayo-learn-and-ex
+ perience-filipino
+X-LIVEWHALE-ID:2441780
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-TAGS:In Person
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20261204T193000Z
+DTEND:20261204T203000Z
+LOCATION:Asian Culture Center (807 E 10th street\, Bloomington\, IN)
+SUMMARY:Asian Cultures Around Campus: Henna Fridays
+UID:20261204T193000Z-2436968@events.iu.edu
+URL:https://events.iu.edu/live/events/2375505-asian-cultures-around-campus-
+ henna-fridays
+X-LIVEWHALE-ID:2436968
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-TAGS:In Person
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20261207T170000Z
+DTEND:20261207T180000Z
+LOCATION:La Casa/Latino Cultural Center
+SUMMARY:Soup for the Soul and Study Hours
+UID:20261207T170000Z-2343431@events.iu.edu
+URL:https://events.iu.edu/live/events/2324823-soup-for-the-soul-and-study-h
+ ours
+X-LIVEWHALE-ID:2343431
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-TAGS:Academics|Fall Semester|Food|Study
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20261207T210000Z
+DTEND:20261207T230000Z
+LOCATION:Asian Culture Center (807 E 10th street\, Bloomington\, IN)
+SUMMARY:Asian Cultures Around Campus: Mahjong Mondays
+UID:20261207T210000Z-2320863@events.iu.edu
+URL:https://events.iu.edu/live/events/2299630-asian-cultures-around-campus-
+ mahjong-mondays
+X-LIVEWHALE-ID:2320863
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-TAGS:In Person
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20261208T170000Z
+DTEND:20261208T210000Z
+LOCATION:Wellness House
+SUMMARY:Re-Fill Your Cup
+UID:20261208T170000Z-2436969@events.iu.edu
+URL:https://events.iu.edu/live/events/2422814-re-fill-your-cup
+X-LIVEWHALE-ID:2436969
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-TAGS:In Person
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20261208T233000Z
+DTEND:20261209T003000Z
+LOCATION:La Casa/Latino Cultural Center
+SUMMARY:Latine Book Club: The Alchemist
+UID:20261208T233000Z-2421266@events.iu.edu
+URL:https://events.iu.edu/live/events/2344778-latine-book-club-the-alchemis
+ t
+X-LIVEWHALE-ID:2421266
+X-LIVEWHALE-TIMEZONE:America/New_York
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20261209T210000Z
+DTEND:20261209T230000Z
+LOCATION:Asian Culture Center (807 E 10th street\, Bloomington\, IN)
+SUMMARY:Asian Cultures Around Campus: Mahjong Meetups
+UID:20261209T210000Z-2456455@events.iu.edu
+URL:https://events.iu.edu/live/events/2454339-asian-cultures-around-campus-
+ mahjong-meetups
+X-LIVEWHALE-ID:2456455
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-TAGS:In Person
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20261210T170000Z
+DTEND:20261210T190000Z
+LOCATION:IMU Georgian Room
+SUMMARY:Leadership Compass Series: Planning like a Leader [Part 2]
+UID:20261210T170000Z-2421225@events.iu.edu
+URL:https://events.iu.edu/live/events/2407636-leadership-compass-series-pla
+ nning-like-a-leader
+X-LIVEWHALE-ID:2421225
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-TAGS:In Person
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20261211T150000Z
+DTEND:20261211T173000Z
+LOCATION:SIDNEY AND LOIS ESKENAZI MUSEUM OF ART
+SUMMARY:Happiness 2.0 mask workshop
+UID:20261211T150000Z-2413611@events.iu.edu
+URL:https://events.iu.edu/live/events/2396832-happiness-20-mask-workshop
+X-LIVEWHALE-ID:2413611
+X-LIVEWHALE-TIMEZONE:America/New_York
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20261211T193000Z
+DTEND:20261211T203000Z
+LOCATION:Asian Culture Center (807 E 10th street\, Bloomington\, IN)
+SUMMARY:Asian Cultures Around Campus: Henna Fridays
+UID:20261211T193000Z-2436990@events.iu.edu
+URL:https://events.iu.edu/live/events/2375503-asian-cultures-around-campus-
+ henna-fridays
+X-LIVEWHALE-ID:2436990
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-TAGS:In Person
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20261218T150000Z
+DTEND:20261218T173000Z
+LOCATION:SIDNEY AND LOIS ESKENAZI MUSEUM OF ART
+SUMMARY:Happiness 2.0 mask workshop
+UID:20261218T150000Z-2413612@events.iu.edu
+URL:https://events.iu.edu/live/events/2396833-happiness-20-mask-workshop
+X-LIVEWHALE-ID:2413612
+X-LIVEWHALE-TIMEZONE:America/New_York
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20270114T170000Z
+DTEND:20270114T190000Z
+LOCATION:IMU Frangipani Room
+SUMMARY:Leadership Compass Series: Serving like a Leader [Part 1]
+UID:20270114T170000Z-2421224@events.iu.edu
+URL:https://events.iu.edu/live/events/2407634-leadership-compass-series-ser
+ ving-like-a-leader
+X-LIVEWHALE-ID:2421224
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-TAGS:In Person
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20270120T230000Z
+DTEND:20270121T010000Z
+LOCATION:IMU Frangipani Room
+SUMMARY:Bridgework Series: January
+UID:20270120T230000Z-2436992@events.iu.edu
+URL:https://events.iu.edu/live/events/2407632-bridgework-series-january
+X-LIVEWHALE-ID:2436992
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-TAGS:In Person
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20270128T170000Z
+DTEND:20270128T190000Z
+LOCATION:IMU Frangipani Room
+SUMMARY:Leadership Compass Series: Serving like a Leader [Part 2]
+UID:20270128T170000Z-2421223@events.iu.edu
+URL:https://events.iu.edu/live/events/2407630-leadership-compass-series-ser
+ ving-like-a-leader
+X-LIVEWHALE-ID:2421223
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-TAGS:In Person
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20270202T200000Z
+DTEND:20270202T210000Z
+LOCATION:TBC
+SUMMARY:HLS D.C. Global Policy Program: Launch Your Summer 2027 Career in W
+ ashington\, D.C.
+UID:20270202T200000Z-2454381@events.iu.edu
+URL:https://events.iu.edu/live/events/2398701-hls-dc-global-policy-program-
+ launch-your-summer
+X-LIVEWHALE-ID:2454381
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-TAGS:Academics|Artificial Intelligence|Community engagement|Cyb
+ ersecurity|Grad Events|In Person|Spring Semester|Undergrad Events|Workshop
+ s
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20270210T230000Z
+DTEND:20270211T010000Z
+LOCATION:IMU Frangipani Room
+SUMMARY:Bridgework Series: February
+UID:20270210T230000Z-2436993@events.iu.edu
+URL:https://events.iu.edu/live/events/2407628-bridgework-series-february
+X-LIVEWHALE-ID:2436993
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-TAGS:In Person
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20270211T170000Z
+DTEND:20270211T190000Z
+LOCATION:IMU Frangipani Room
+SUMMARY:Leadership Compass Series: Learning like a Leader [Part 1]
+UID:20270211T170000Z-2421222@events.iu.edu
+URL:https://events.iu.edu/live/events/2407626-leadership-compass-series-lea
+ rning-like-a-leader
+X-LIVEWHALE-ID:2421222
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-TAGS:In Person
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20270225T170000Z
+DTEND:20270225T190000Z
+LOCATION:IMU Club Hub
+SUMMARY:Leadership Compass Series: Learning like a Leader [Part 2]
+UID:20270225T170000Z-2421221@events.iu.edu
+URL:https://events.iu.edu/live/events/2407624-leadership-compass-series-lea
+ rning-like-a-leader
+X-LIVEWHALE-ID:2421221
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-TAGS:In Person
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20270304T170000Z
+DTEND:20270304T190000Z
+LOCATION:IMU Georgian Room
+SUMMARY:Leadership Compass Series: Managing like a Leader [Part 1]
+UID:20270304T170000Z-2421220@events.iu.edu
+URL:https://events.iu.edu/live/events/2407622-leadership-compass-series-man
+ aging-like-a-leader
+X-LIVEWHALE-ID:2421220
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-TAGS:In Person
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20270324T220000Z
+DTEND:20270325T000000Z
+LOCATION:IMU Club Hub
+SUMMARY:Bridgework Series: March
+UID:20270324T220000Z-2436994@events.iu.edu
+URL:https://events.iu.edu/live/events/2407620-bridgework-series-march
+X-LIVEWHALE-ID:2436994
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-TAGS:In Person
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20270325T160000Z
+DTEND:20270325T180000Z
+LOCATION:IMU Club Hub
+SUMMARY:Leadership Compass Series: Managing like a Leader [Part 2]
+UID:20270325T160000Z-2421219@events.iu.edu
+URL:https://events.iu.edu/live/events/2407619-leadership-compass-series-man
+ aging-like-a-leader
+X-LIVEWHALE-ID:2421219
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-TAGS:In Person
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20270408T160000Z
+DTEND:20270408T180000Z
+LOCATION:IMU Georgian Room
+SUMMARY:Leadership Compass Series: Engaging like a Leader [Part 1]
+UID:20270408T160000Z-2421218@events.iu.edu
+URL:https://events.iu.edu/live/events/2407617-leadership-compass-series-eng
+ aging-like-a-leader
+X-LIVEWHALE-ID:2421218
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-TAGS:In Person
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20270414T220000Z
+DTEND:20270415T000000Z
+LOCATION:IMU Frangipani Room
+SUMMARY:Bridgework Series: April
+UID:20270414T220000Z-2436995@events.iu.edu
+URL:https://events.iu.edu/live/events/2407615-bridgework-series-april
+X-LIVEWHALE-ID:2436995
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-TAGS:In Person
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20270415T160000Z
+DTEND:20270415T180000Z
+LOCATION:IMU Frangipani Room
+SUMMARY:Leadership Compass Series: Engaging like a Leader [Part 2]
+UID:20270415T160000Z-2421217@events.iu.edu
+URL:https://events.iu.edu/live/events/2407613-leadership-compass-series-eng
+ aging-like-a-leader
+X-LIVEWHALE-ID:2421217
+X-LIVEWHALE-TIMEZONE:America/New_York
+X-LIVEWHALE-TAGS:In Person
+END:VEVENT
+END:VCALENDAR
