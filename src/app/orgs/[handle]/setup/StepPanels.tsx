@@ -82,7 +82,7 @@ export function AboutForm({ handle, onDone }: { handle: string; onDone: () => vo
           value={text}
           maxLength={ABOUT_MAX}
           onChange={(e) => setText(e.target.value)}
-          placeholder="We play chess on Thursdays. All levels."
+          placeholder="What you do, and when you meet"
           aria-invalid={err ? true : undefined}
           style={{ ...inputStyle, flex: 1, minWidth: 0 }}
         />
@@ -232,6 +232,9 @@ export function OfficersPanel({
   const [busyId, setBusyId] = useState<string | null>(null);
   const [skipping, setSkipping] = useState(false);
   const [invite, setInvite] = useState<"sheet" | "modal" | null>(null);
+  // Officers made in this panel: then the empty list means "all officers",
+  // not "nobody here", and there is nothing to skip.
+  const [made, setMade] = useState(0);
 
   useEffect(() => {
     const ctrl = new AbortController();
@@ -258,6 +261,7 @@ export function OfficersPanel({
     setBusyId(null);
     if (!r.ok) return;
     setMembers((prev) => (prev ? prev.filter((m) => m.user_id !== userId) : prev));
+    setMade((n) => n + 1);
     onDone();
   };
 
@@ -286,7 +290,11 @@ export function OfficersPanel({
   } else if (!members) {
     list = <p style={quietStyle}>Loading members…</p>;
   } else if (members.length === 0) {
-    list = <p style={lineStyle}>Nobody else is in the club yet.</p>;
+    list = (
+      <p style={lineStyle}>
+        {made > 0 ? "Everyone else in the club is an officer now." : "Nobody else is in the club yet."}
+      </p>
+    );
   } else {
     list = (
       <ul style={{ listStyle: "none", margin: 0, padding: 0, maxHeight: 320, overflowY: "auto" }}>
@@ -332,11 +340,13 @@ export function OfficersPanel({
         </div>
         <p style={quietStyle}>Once they join, make them officers here.</p>
       </div>
-      <div>
-        <button type="button" disabled={skipping} onClick={() => void skip()} style={{ ...textActionStyle, ...busyStyle(skipping) }}>
-          {skipping ? "Saving…" : "Skip for now"}
-        </button>
-      </div>
+      {made > 0 ? null : (
+        <div>
+          <button type="button" disabled={skipping} onClick={() => void skip()} style={{ ...textActionStyle, ...busyStyle(skipping) }}>
+            {skipping ? "Saving…" : "Skip for now"}
+          </button>
+        </div>
+      )}
       {invite ? (
         <OrgInviteSheet
           handle={club.handle}

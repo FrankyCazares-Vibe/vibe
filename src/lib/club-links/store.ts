@@ -231,6 +231,29 @@ export async function getOrCreateMembersLink(
   return getMembersLink(service, orgId);
 }
 
+/**
+ * A new code for a club's members' link (the old one leaked, or went
+ * somewhere it shouldn't): the old link stops working at once; the end date,
+ * the 150 and the count of who joined stay with the club, and it is on.
+ */
+export async function renewMembersLinkCode(service: SupabaseClient, orgId: string): Promise<boolean> {
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const code = generateClubLinkCode();
+    const { data, error } = await service
+      .from("club_links")
+      .update({ code, code_hash: hashClubLinkCode(code), off_at: null, updated_at: new Date().toISOString() })
+      .eq("kind", "members")
+      .eq("org_id", orgId)
+      .select("id");
+    if (!error) return (data ?? []).length > 0;
+    if (error.code !== "23505") {
+      console.error("[club-links] renew members link", error.message);
+      return false;
+    }
+  }
+  return false;
+}
+
 /** Turn a club's members' link off or back on. */
 export async function setMembersLinkOff(service: SupabaseClient, orgId: string, off: boolean): Promise<boolean> {
   const { data, error } = await service

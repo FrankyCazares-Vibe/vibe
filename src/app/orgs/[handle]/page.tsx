@@ -564,7 +564,7 @@ export default async function OrgProfilePage({ params }: Params) {
           // Signed out there is nobody to file a report as, so the row stays
           // off. `isOfficer` and not the club's `owner_id`: the route refuses
           // only the owner ("You can't report something of your own"), but an
-          // admin or mod reporting the club they help run is a conversation
+          // officer reporting the club they help run is a conversation
           // with the other officers, not a report to Vibe.
           //
           // `ctx.ok` for the same reason the header above renders no join

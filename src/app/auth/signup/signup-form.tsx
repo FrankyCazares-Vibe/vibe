@@ -186,6 +186,7 @@ export function SignupForm({
   probe,
   club = null,
   header = null,
+  signInHref = "/auth/login",
 }: {
   signupOpen: boolean;
   initialAccessCode: string;
@@ -194,6 +195,8 @@ export function SignupForm({
   club?: SignupClub | null;
   /** Replaces the headline and the line under it (the club link page's own). */
   header?: React.ReactNode;
+  /** Where "Log in" goes: a club link sends people back to the link. */
+  signInHref?: string;
 }) {
   // Oct 19, 2026: fetch the logo face with the page, so the kinetic logo's
   // entrance isn't half over before its font (font-display block) arrives.
@@ -748,7 +751,7 @@ export function SignupForm({
           style={codeShown ? { marginTop: 8 } : undefined}
         >
           Already have an account?{" "}
-          <Link href="/auth/login" className="vibe-auth-link">
+          <Link href={signInHref} className="vibe-auth-link">
             Log in
           </Link>
         </p>

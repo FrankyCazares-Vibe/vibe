@@ -119,6 +119,7 @@ export default async function ClubLinkPage({ params }: Props) {
         initialAccessCode=""
         probe={false}
         club={{ code, kind: link.kind, name: club.name }}
+        signInHref={`/auth/login?next=${encodeURIComponent(path)}`}
         header={
           <ClubLinkHeader
             kind={link.kind}

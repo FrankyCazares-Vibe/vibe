@@ -98,7 +98,7 @@ test("closing sends nothing and sets no cookie; nothing is drawn before the brow
   assert.match(readRoot("src/components/auth/TurnstileBox.tsx"), /<div data-keep-clear /);
 });
 
-test("mounted on the five signed-out places and nowhere else", () => {
+test("mounted on the six signed-out places and nowhere else", () => {
   const files = execFileSync("git", ["ls-files", "-co", "--exclude-standard", "src"], { cwd: root, encoding: "utf8" })
     .split("\n")
     .filter((f) => /\.tsx$/.test(f) && f !== "src/components/legal/CookieNotice.tsx");
@@ -107,6 +107,8 @@ test("mounted on the five signed-out places and nowhere else", () => {
     "src/app/auth/forgot-password/layout.tsx",
     "src/app/auth/login/layout.tsx",
     "src/app/auth/signup/page.tsx",
+    // A club link (wave 1, Oct 21 2026): signed out, it is the sign-up page.
+    "src/app/c/[code]/page.tsx",
     "src/app/page.tsx",
     "src/app/waitlist/layout.tsx",
   ]);

@@ -40,13 +40,14 @@ type LinkView = {
 
 type Answer = { checked: boolean; link: LinkView | null };
 
-type Action = "make" | "off" | "on";
+type Action = "make" | "off" | "on" | "new";
 
 const LOAD_FAILED = "Couldn't load the members' link.";
 const ACTION_FAILED: Record<Action, string> = {
   make: "Couldn't make the link.",
   off: "Couldn't turn the link off.",
   on: "Couldn't turn the link back on.",
+  new: "Couldn't make a new link.",
 };
 
 /** The route's answer, or null when it isn't the shape the panel draws. */
@@ -244,7 +245,7 @@ function LinkBody({
       </div>
 
       {link.state === "expired" ? null : (
-        <div>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
           <button
             type="button"
             className="vibe-press"
@@ -253,6 +254,20 @@ function LinkBody({
             style={{ ...pillStyle, ...busyStyle(busy !== null) }}
           >
             {busy === "off" ? "Turning off…" : busy === "on" ? "Turning on…" : live ? "Turn off" : "Turn on"}
+          </button>
+          {/* A link that went somewhere it shouldn't: a new one, the old one dead. */}
+          <button
+            type="button"
+            className="vibe-press"
+            disabled={busy !== null}
+            onClick={() => {
+              if (window.confirm("Make a new link? The old link stops working. People who already joined stay.")) {
+                onAction("new");
+              }
+            }}
+            style={{ ...pillStyle, ...busyStyle(busy !== null) }}
+          >
+            {busy === "new" ? "Making…" : "New link"}
           </button>
         </div>
       )}

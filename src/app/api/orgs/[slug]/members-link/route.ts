@@ -6,6 +6,7 @@ import {
   clubLinkState,
   getMembersLink,
   getOrCreateMembersLink,
+  renewMembersLinkCode,
   setMembersLinkOff,
   type MembersLink,
 } from "@/lib/club-links/store";
@@ -31,9 +32,10 @@ function fail(status: number, code: string, error: string) {
  * and lets 150 people sign up through it. Officers see only how many joined.
  *
  * GET  -> { ok, checked, link: null | { url, state, expires_at, joined, max_signups, full } }
- * POST { action: "make" | "off" | "on" } -> the same shape.
+ * POST { action: "make" | "off" | "on" | "new" } -> the same shape.
  *   make: the link, made now if the club has none (needs a checked club).
  *   off / on: turn it off, or back on (it still ends on its date).
+ *   new: a new code (the old link stops working); same end date, same 150.
  *
  * `joined` is the only number an officer sees: how many people joined the
  * club through the link. Never who.
@@ -113,8 +115,8 @@ export async function POST(req: Request, { params }: Params) {
     return fail(400, "invalid_json", "Invalid JSON");
   }
   const action = body.action;
-  if (action !== "make" && action !== "off" && action !== "on") {
-    return fail(400, "invalid_action", "action must be make, off or on");
+  if (action !== "make" && action !== "off" && action !== "on" && action !== "new") {
+    return fail(400, "invalid_action", "action must be make, off, on or new");
   }
   if (ctx.org.hidden_at) return fail(409, "org_hidden", "This club is hidden, so nobody new can join it.");
   if (ctx.org.verified !== true) {
@@ -126,7 +128,11 @@ export async function POST(req: Request, { params }: Params) {
     if (!link) return fail(500, "create_failed", "Couldn't make the link. Try again.");
     return NextResponse.json(view(ctx.origin, true, link));
   }
-  if (!(await setMembersLinkOff(ctx.service, ctx.org.id, action === "off"))) {
+  const changed =
+    action === "new"
+      ? await renewMembersLinkCode(ctx.service, ctx.org.id)
+      : await setMembersLinkOff(ctx.service, ctx.org.id, action === "off");
+  if (!changed) {
     return fail(404, "no_link", "The club has no members' link yet.");
   }
   return NextResponse.json(view(ctx.origin, true, await getMembersLink(ctx.service, ctx.org.id)));

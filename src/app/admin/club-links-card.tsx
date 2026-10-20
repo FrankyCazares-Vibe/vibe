@@ -277,6 +277,7 @@ export function ClubLinksCard() {
               type="text"
               autoComplete="off"
               maxLength={50}
+              aria-label="Club name"
               value={name}
               onChange={(e) => setName(e.target.value)}
               style={inputStyle}
@@ -295,6 +296,7 @@ export function ClubLinksCard() {
                 autoCapitalize="none"
                 spellCheck={false}
                 maxLength={31}
+                aria-label="Handle"
                 value={handle}
                 aria-describedby={hintId}
                 aria-invalid={handleBad || undefined}
@@ -327,6 +329,7 @@ export function ClubLinksCard() {
             <input
               type="checkbox"
               role="switch"
+              aria-label="We met in person: the club is checked"
               checked={checked}
               onChange={(e) => setChecked(e.target.checked)}
               style={{
