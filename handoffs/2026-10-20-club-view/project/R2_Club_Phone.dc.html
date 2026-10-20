@@ -18,7 +18,7 @@ a:hover{color:inherit}
 svg{display:block}
 </style>
 </helmet>
-<div style="width: 390px; height: 1100px; position: relative; isolation: isolate; overflow: hidden; display: flex; flex-direction: column; background: #0C0B0B; color: #F6F1EA; font-family: 'DM Sans', system-ui, sans-serif">
+<div style="width: 390px; height: 1160px; position: relative; isolation: isolate; overflow: hidden; display: flex; flex-direction: column; background: #0C0B0B; color: #F6F1EA; font-family: 'DM Sans', system-ui, sans-serif">
   <div aria-hidden="true" style="position: absolute; inset: 0; z-index: -1; pointer-events: none; background: linear-gradient(180deg, rgba(42,138,142,0.22) 0%, rgba(12,11,11,0) 38%), radial-gradient(620px 560px at 0% 85%, rgba(255,92,53,0.18), transparent 70%)"></div>
 
   <div style="position: relative; height: 150px; flex-shrink: 0; background: repeating-conic-gradient(rgba(255,255,255,0.05) 0% 25%, transparent 0% 50%) 0 0 / 28px 28px, linear-gradient(160deg, #2A6F72 0%, #1C4A4D 60%, #10292B 100%)">
@@ -39,8 +39,14 @@ svg{display:block}
         <span style="font-family: Fraunces, serif; font-weight: 800; font-size: 27px; letter-spacing: -0.03em; line-height: 1.05">Sixty-Four Chess</span>
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#CFC8BE" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"></path></svg>
       </button>
-      <div style="display: flex; align-items: center; gap: 8px; font-size: 14px; color: #9C958C"><span style="height: 22px; padding: 0 8px; border-radius: 999px; border: 1px solid rgba(150,186,255,0.5); color: #96BAFF; font-size: 11px; font-weight: 700; letter-spacing: 0.08em; display: inline-flex; align-items: center">OPEN</span>@sixtyfour</div>
+      <div style="font-size: 14px; color: #9C958C">@sixtyfour</div>
       <div style="font-size: 15px; line-height: 1.45; color: #E4DDD3; margin-top: 6px">Weekly games in the Lantern Room. Beginners welcome, we will teach you.</div>
+      <a href="#" style="display: flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 600; color: #96BAFF; min-height: 28px"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"></path></svg>Instagram · @sixtyfour</a>
+      <div style="display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 2px">
+        <span style="height: 28px; padding: 0 10px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.12); font-size: 13px; display: inline-flex; align-items: center">Open · anyone can join</span>
+        <span style="height: 28px; padding: 0 10px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.12); font-size: 13px; display: inline-flex; align-items: center">Thursdays · 7 PM</span>
+        <a href="#" style="height: 28px; padding: 0 4px; font-size: 13px; font-weight: 600; color: #CFC8BE; display: inline-flex; align-items: center">More about us ›</a>
+      </div>
     </div>
 
     <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px">
@@ -61,8 +67,9 @@ svg{display:block}
         <div style="font-size: 13px; color: #CFC8BE">Up next · Thu · 7 PM · The Lantern Room</div>
         <div style="font-size: 13px; color: #F6C468; white-space: nowrap">In 2 days</div>
       </div>
-      <div style="display: flex; align-items: baseline; justify-content: space-between; gap: 8px">
-        <div style="font-family: Fraunces, serif; font-weight: 800; font-size: 24px; letter-spacing: -0.02em; line-height: 1.05">Blitz Night</div>
+      <div style="display: flex; align-items: center; justify-content: space-between; gap: 10px">
+        <span aria-hidden="true" style="width: 44px; height: 44px; border-radius: 10px; flex-shrink: 0; background: linear-gradient(150deg, #F6C468 0%, #B9772E 55%, #4A2A12 100%); box-shadow: inset 0 0 0 1px rgba(255,255,255,0.12)"></span>
+        <div style="flex: 1; font-family: Fraunces, serif; font-weight: 800; font-size: 24px; letter-spacing: -0.02em; line-height: 1.05">Blitz Night</div>
         <div style="font-size: 13.5px; color: #CFC8BE; white-space: nowrap"><strong style="color: #F6F1EA">14</strong> going · <strong style="color: #F6F1EA">6</strong> interested</div>
       </div>
       <ol aria-label="Steps" style="list-style: none; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 2px">
@@ -86,8 +93,8 @@ svg{display:block}
       <div style="flex: 1; border-top: 1px dashed rgba(246,241,234,0.35)"></div>
     </div>
 
-    <div role="tablist" aria-label="Club profile" style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); border-bottom: 1px solid rgba(255,255,255,0.08); margin-top: 4px">
-      <sc-for list="{{ptabs}}" as="p" hint-placeholder-count="4">
+    <div role="tablist" aria-label="Club profile" style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); border-bottom: 1px solid rgba(255,255,255,0.08); margin-top: 4px">
+      <sc-for list="{{ptabs}}" as="p" hint-placeholder-count="3">
         <button type="button" role="tab" aria-selected="{{p.sel}}" style="height: 44px; font-size: 14px; font-weight: 600; color: {{p.ink}}; box-shadow: {{p.line}}">{{p.label}}</button>
       </sc-for>
     </div>
@@ -114,7 +121,7 @@ svg{display:block}
   </nav>
 </div>
 </x-dc>
-<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":1100}}'>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":1160}}'>
 class Component extends DCLogic {
   renderVals() {
     const names = ['Posted', 'Going', 'Check-in', 'Who came', 'Thank-you'];
@@ -127,7 +134,7 @@ class Component extends DCLogic {
     const off = { sel: 'false', ink: '#9C958C', line: 'none' };
     return {
       steps,
-      ptabs: [Object.assign({ label: 'Posts' }, on), Object.assign({ label: 'Events' }, off), Object.assign({ label: 'Board' }, off), Object.assign({ label: 'About' }, off)],
+      ptabs: [Object.assign({ label: 'Posts' }, on), Object.assign({ label: 'Events' }, off), Object.assign({ label: 'Board' }, off)],
       posts: [
         { t: 'Rapid Night, 18 came', bg: 'linear-gradient(150deg, #5B3A2A, #2A1B14)' },
         { t: 'New boards are in', bg: 'linear-gradient(150deg, #2A4A5B, #142530)' },

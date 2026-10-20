@@ -16,7 +16,7 @@ a{color:inherit;text-decoration:none}
 a:hover{color:inherit}
 </style>
 </helmet>
-<div style="min-height: 1600px; position: relative; isolation: isolate; background: #0C0B0B; color: #F6F1EA; font-family: 'DM Sans', system-ui, sans-serif; padding: 64px 24px 72px">
+<div style="min-height: 2240px; position: relative; isolation: isolate; background: #0C0B0B; color: #F6F1EA; font-family: 'DM Sans', system-ui, sans-serif; padding: 64px 24px 72px">
   <div aria-hidden="true" style="position: absolute; inset: 0; z-index: -1; pointer-events: none; background: radial-gradient(900px 760px at 0% 0%, rgba(255,92,53,0.28), rgba(255,92,53,0.06) 45%, transparent 70%)"></div>
   <div style="max-width: 1120px; margin: 0 auto; display: flex; flex-direction: column; gap: 44px">
     <header style="display: flex; flex-direction: column; gap: 14px; max-width: 900px">
@@ -45,7 +45,7 @@ a:hover{color:inherit}
     </section>
 
     <section aria-label="Calls" style="display: flex; flex-direction: column; gap: 10px">
-      <h2 style="font-family: Fraunces, serif; font-weight: 800; font-size: 36px; letter-spacing: -0.03em">Four calls, answered.</h2>
+      <h2 style="font-family: Fraunces, serif; font-weight: 800; font-size: 36px; letter-spacing: -0.03em">Every call, answered.</h2>
       <ol style="list-style: none; display: flex; flex-direction: column">
         <sc-for list="{{calls}}" as="c" hint-placeholder-count="4">
           <li style="display: grid; grid-template-columns: 44px minmax(0, 1fr); gap: 4px 12px; padding: 16px 0; border-bottom: 1px solid rgba(255,255,255,0.08)">
@@ -57,12 +57,21 @@ a:hover{color:inherit}
           </li>
         </sc-for>
       </ol>
-      <p style="font-size: 14.5px; line-height: 1.5; color: #9C958C">Round 1’s other calls still stand: what mods can do, the members’ link, flyers, notices, the share kit, Events first, officer numbers, hand-over.</p>
+            <h3 style="font-family: Fraunces, serif; font-weight: 800; font-size: 24px; letter-spacing: -0.02em; margin-top: 18px">Round 1’s calls, answered Oct 20.</h3>
+      <ol style="list-style: none; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(500px, 100%), 1fr)); gap: 10px">
+        <sc-for list="{{r1}}" as="d" hint-placeholder-count="8">
+          <li style="border-radius: 14px; background: rgba(22,21,21,0.86); border: 1px solid rgba(255,255,255,0.07); padding: 14px 16px; display: flex; flex-direction: column; gap: 4px">
+            <div style="display: flex; align-items: baseline; gap: 10px"><span style="font-family: Fraunces, serif; font-weight: 800; color: #FF8A66">{{d.n}}</span><span style="font-family: Fraunces, serif; font-weight: 800; font-size: 18px; letter-spacing: -0.02em">{{d.t}}</span></div>
+            <div style="font-size: 14.5px; line-height: 1.45; color: #E4DDD3">{{d.d}}</div>
+          </li>
+        </sc-for>
+      </ol>
+      <div style="border-radius: 16px; border: 1px solid rgba(255,92,53,0.4); padding: 16px 18px; font-size: 15px; line-height: 1.5; color: #E4DDD3"><strong style="color: #FF8A66">Honest note:</strong> with hand-over before launch, this is a lot to build in the nine days before Oct 29. Next step: a build order that says what must work on launch night and what can follow in the first weeks.</div>
     </section>
   </div>
 </div>
 </x-dc>
-<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1600}}'>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":2240}}'>
 class Component extends DCLogic {
   renderVals() {
     return {
@@ -72,11 +81,21 @@ class Component extends DCLogic {
         { q: 'Part of several clubs?', t: 'A switcher, and a dot where you’re needed.', lines: ['Phone: the same switcher lists you first, then each club you run, with what needs you. A dot on the Profile tab says one does.', 'Desktop: each club you run is its own line in the nav.', 'Only clubs where you’re an officer. Clubs you just belong to stay in Messages and on your profile.'] },
         { q: 'Club emails?', t: 'People sign in as themselves.', lines: ['No shared club login: when officers graduate, a shared password leaves with them.', 'The club’s email is optional: it can prove the club is real and get it back if its owner disappears.', 'For the first 20, you make a one-time setup link in Admin › Clubs and hand it over in person.'] }
       ],
+      r1: [
+        { n: '1', t: 'Roles: Owner and Officers.', d: 'Mod goes away; today’s mods become officers. Only the owner adds or removes officers, deletes the club or hands it over. Titles like President stay labels.' },
+        { n: '2', t: 'A members’ link, with limits.', d: 'One per checked club: it gets people past the waitlist and asks them to join. School email still required; 3 weeks, 150 sign-ups, officers can turn it off and see only how many joined. Needs a Privacy Policy line.' },
+        { n: '3', t: 'Flyers: Board pictures and event covers.', d: 'Officers can add one picture to a Board post, and every event gets a cover picture or a simple icon. The Lounge stays text.' },
+        { n: '4', t: 'Notices for events and Board posts.', d: 'New events reach members and followers; Board posts reach members. In the app now, phone push after Apple. At most one a day per club; anyone can mute a club.' },
+        { n: '5', t: 'The whole share kit.', d: 'The club’s own link picture, three story cards (club, event, after), a table QR, and a page for every event.' },
+        { n: '6', t: 'Posts first, About in the header.', d: 'The next event is pinned above the tabs; tabs are Posts, Events, Board. Bio, one link, who can join and when it meets sit under the name, the rest behind “More about us”.' },
+        { n: '7', t: 'Counts and a small Insights page.', d: 'Officers see exact followers and members (even under 5), this week’s change, going and who came. Insights in Club tools: followers by week, turnout by event. No “seen by”.' },
+        { n: '8', t: 'Hand-over, before launch.', d: 'The owner picks an officer, who accepts; the old owner becomes an officer or leaves. If an owner disappears, Vibe moves the club after checking with its email or two officers.' }
+      ],
       calls: [
         { n: '1', status: 'Decided Oct 20: yes', q: 'The club on the phone: switch on the Profile tab, with no sixth tab?', rec: 'yes. Students already switch to their club’s Instagram account this way. The two other ways (a row in Messages, a card on your profile) are drawn beside it for comparison.' },
         { n: '2', status: 'Kept as drawn, Oct 20', q: 'A one-time setup link from Admin › Clubs for the first 20?', rec: 'yes. It marks the club as checked, lets the president past the waitlist, and makes them the owner.' },
         { n: '3', status: 'Kept as drawn, Oct 20', q: 'Club emails?', rec: 'never a login. Optional, for checking a club that set itself up and for getting a club back.' },
-        { n: '4', status: 'Kept as drawn, Oct 20', q: 'Can mods switch to the club?', rec: 'yes, with only the tools their role allows. Members never see the switch.' }
+        { n: '4', status: 'Answered by roles', q: 'Can mods switch to the club?', rec: 'there are no mods now (Round 1, call 1): every officer can switch. Members never see the switch.' }
       ]
     };
   }

@@ -24,7 +24,7 @@
    "x": 0,
    "y": 0,
    "w": 1440,
-   "h": 3740,
+   "h": 3820,
    "expand": "fill",
    "title": "Start here: options, my pick, your calls",
    "page": "r1"
@@ -149,7 +149,7 @@
   },
   "Pick_UpNext.dc.html": {
    "x": 0,
-   "y": 4040,
+   "y": 4120,
    "w": 1440,
    "h": 760,
    "title": "My pick up close: B's Up next with D's steps",
@@ -159,16 +159,16 @@
    "x": 0,
    "y": 0,
    "w": 1440,
-   "h": 1600,
+   "h": 2240,
    "expand": "fill",
-   "title": "Round 2: less going on (answers + 4 calls)",
+   "title": "Round 2: every call answered, Oct 20",
    "page": "r2"
   },
   "R2_Club_Phone.dc.html": {
    "x": 2540,
    "y": 0,
    "w": 390,
-   "h": 1100,
+   "h": 1160,
    "title": "3 · Switched: the club's own profile",
    "page": "r2"
   },
@@ -182,16 +182,16 @@
   },
   "R2_Club_Desktop.dc.html": {
    "x": 1600,
-   "y": 1400,
+   "y": 1460,
    "w": 1440,
-   "h": 1000,
+   "h": 1060,
    "expand": "fill",
    "title": "Desktop: Clubs you run opens the club's own page",
    "page": "r2"
   },
   "R2_Setup.dc.html": {
    "x": 1600,
-   "y": 2660,
+   "y": 2800,
    "w": 1600,
    "h": 1050,
    "title": "How a club gets on Vibe",
@@ -338,7 +338,7 @@
   },
   "t_pick": {
    "x": 0,
-   "y": 3800,
+   "y": 3880,
    "text": "My pick, up close.",
    "kind": "title1",
    "maxW": 1440,
@@ -362,7 +362,7 @@
   },
   "r2_setup": {
    "x": 1600,
-   "y": 2420,
+   "y": 2560,
    "text": "Setting up a club.",
    "kind": "title1",
    "maxW": 1600,
@@ -370,7 +370,7 @@
   },
   "r2_desk": {
    "x": 1600,
-   "y": 1160,
+   "y": 1220,
    "text": "On desktop.",
    "kind": "title1",
    "maxW": 1440,

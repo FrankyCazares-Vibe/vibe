@@ -18,7 +18,7 @@ a:hover{color:inherit}
 svg{display:block}
 </style>
 </helmet>
-<div style="min-height: 1000px; position: relative; isolation: isolate; display: flex; flex-wrap: wrap; background: #0C0B0B; color: #F6F1EA; font-family: 'DM Sans', system-ui, sans-serif">
+<div style="min-height: 1060px; position: relative; isolation: isolate; display: flex; flex-wrap: wrap; background: #0C0B0B; color: #F6F1EA; font-family: 'DM Sans', system-ui, sans-serif">
   <div aria-hidden="true" style="position: absolute; inset: 0; z-index: -1; pointer-events: none; background: radial-gradient(720px 620px at 0% 100%, rgba(255,92,53,0.30), rgba(255,92,53,0.06) 40%, transparent 68%)"></div>
 
   <nav aria-label="App" style="flex: 0 0 232px; padding: 24px 14px; display: flex; flex-direction: column; gap: 4px; border-right: 1px solid rgba(255,255,255,0.06)">
@@ -62,10 +62,17 @@ svg{display:block}
 
     <div style="display: flex; flex-wrap: wrap; gap: 20px; align-items: flex-start">
       <div style="flex: 2 1 560px; min-width: 0; display: flex; flex-direction: column; gap: 16px">
-        <div style="font-size: 15.5px; line-height: 1.45; color: #E4DDD3">Weekly games in the Lantern Room. Beginners welcome, we will teach you.</div>
+        <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px">
+          <div style="font-size: 15.5px; line-height: 1.45; color: #E4DDD3">Weekly games in the Lantern Room. Beginners welcome, we will teach you.</div>
+          <a href="#" style="display: flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 600; color: #96BAFF"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"></path></svg>Instagram · @sixtyfour</a>
+          <span style="height: 28px; padding: 0 10px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.12); font-size: 13px; display: inline-flex; align-items: center">Open · anyone can join</span>
+          <span style="height: 28px; padding: 0 10px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.12); font-size: 13px; display: inline-flex; align-items: center">Thursdays · 7 PM</span>
+          <a href="#" style="font-size: 13.5px; font-weight: 600; color: #CFC8BE">More about us ›</a>
+        </div>
         <section aria-label="Up next" style="border-radius: 18px; padding: 18px 20px; background: rgba(22,21,21,0.92); border: 1px solid rgba(255,92,53,0.55); box-shadow: 0 0 30px rgba(255,92,53,0.18); display: flex; flex-wrap: wrap; align-items: center; gap: 14px 24px">
-          <div style="flex: 1 1 220px; display: flex; flex-direction: column; gap: 4px">
-            <div style="font-size: 13.5px; color: #CFC8BE">Up next · Thu · 7 PM · The Lantern Room</div>
+          <span aria-hidden="true" style="width: 64px; height: 64px; border-radius: 14px; flex-shrink: 0; background: linear-gradient(150deg, #F6C468 0%, #B9772E 55%, #4A2A12 100%); box-shadow: inset 0 0 0 1px rgba(255,255,255,0.12)"></span>
+          <div style="flex: 1 1 200px; display: flex; flex-direction: column; gap: 4px">
+            <div style="font-size: 13.5px; color: #CFC8BE; white-space: nowrap">Up next · Thu · 7 PM · The Lantern Room</div>
             <div style="font-family: Fraunces, serif; font-weight: 800; font-size: 28px; letter-spacing: -0.03em; line-height: 1.05">Blitz Night</div>
             <div style="font-size: 14px; color: #CFC8BE"><strong style="color: #F6F1EA">14</strong> going · <strong style="color: #F6F1EA">6</strong> interested · <span style="color: #F6C468">in 2 days</span></div>
           </div>
@@ -83,7 +90,7 @@ svg{display:block}
           </div>
         </section>
         <div role="tablist" aria-label="Club page" style="display: flex; gap: 28px; border-bottom: 1px solid rgba(255,255,255,0.08)">
-          <sc-for list="{{ptabs}}" as="p" hint-placeholder-count="4">
+          <sc-for list="{{ptabs}}" as="p" hint-placeholder-count="3">
             <button type="button" role="tab" aria-selected="{{p.sel}}" style="height: 44px; font-size: 14.5px; font-weight: 600; color: {{p.ink}}; box-shadow: {{p.line}}">{{p.label}}</button>
           </sc-for>
         </div>
@@ -118,7 +125,7 @@ svg{display:block}
   </main>
 </div>
 </x-dc>
-<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1000}}'>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1060}}'>
 class Component extends DCLogic {
   renderVals() {
     const names = ['Posted', 'Going', 'Check-in', 'Who came', 'Thank-you'];
@@ -131,7 +138,7 @@ class Component extends DCLogic {
     const off = { sel: 'false', ink: '#9C958C', line: 'none' };
     return {
       steps,
-      ptabs: [Object.assign({ label: 'Posts' }, on), Object.assign({ label: 'Events' }, off), Object.assign({ label: 'Board' }, off), Object.assign({ label: 'About' }, off)],
+      ptabs: [Object.assign({ label: 'Posts' }, on), Object.assign({ label: 'Events' }, off), Object.assign({ label: 'Board' }, off)],
       posts: [
         { t: 'Rapid Night, 18 came', bg: 'linear-gradient(150deg, #5B3A2A, #2A1B14)' },
         { t: 'New boards are in', bg: 'linear-gradient(150deg, #2A4A5B, #142530)' },
@@ -152,6 +159,7 @@ class Component extends DCLogic {
         { name: 'Compound Interest', initials: 'CI', color: 'linear-gradient(135deg, #8A6A2A, #5C4519)', ink: '#CFC8BE', bg: 'transparent', dot: 'transparent', current: 'false' }
       ],
       tools: [
+        { label: 'Insights', meta: 'Followers, turnout' },
         { label: 'Join requests', meta: '2' },
         { label: 'Members', meta: '23' },
         { label: 'Followers', meta: '41' },

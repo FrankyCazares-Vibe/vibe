@@ -4,6 +4,7 @@ Franky's ask after the Parker meeting (`../2026-10-20-parker-meeting-notes.md`):
 see and do in Vibe, phone and desktop. Board first, no building; Franky picks.
 
 - **The board (private Design canvas):** https://claude.ai/artifact/FZQgjLYfoBojmPFuKF3NKe
+- **Decisions:** `DECISIONS.md`.
 - **Start on `Main`:** the four options, the pick (B, with D's event card and the share kit) and 11 calls, each with a recommendation.
 - **What exists today, with file references:** `INVENTORY.md` (and the `Today` board).
 - **The builders' brief:** `SPEC.md` (sample club, look, rules, the three jobs).
@@ -15,7 +16,7 @@ The canvas opens on Round 2 (`R2_*` boards); Round 1 is its own page.
 - **Several clubs:** the same switcher lists you first, then each club you run (phone); one nav line per club (desktop); a dot where you're needed; only clubs where you're an officer.
 - **Setup:** people sign in as themselves, never with a shared club login; the club's email is optional (proof and recovery). The first 20 get a one-time setup link from Admin › Clubs, handed over in person (checks the club, gets the president past the waitlist, makes them owner).
 - **Decided by Franky, Oct 20:** officers switch to their club from the Profile tab, no sixth tab. "Keep the rest of Round 2 as drawn": the one-time setup link from Admin › Clubs for the first 20, no club logins (the club's email is optional, for proof and recovery), and mods can switch with only their role's tools.
-- **Still open (Round 1's calls):** what mods can do inside the club, the members' link past the waitlist, flyers on the Board, notices for posts and events, the share kit, Events first on the club page, officer numbers, hand-over. Nothing is built yet.
+- **Every call is answered (Oct 20):** see `DECISIONS.md` (the design, Round 1's eight calls, and what each one touches). Nothing is built yet.
 
 ## Files
 - `project/*.dc.html` + `project/canvas.json`: the canvas source, exactly as published.
