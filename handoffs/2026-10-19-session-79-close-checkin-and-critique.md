@@ -104,6 +104,45 @@ Bloomington draft; tell FSL before the Club & Greek Night pitch).
 - Not verified: real reposts and comments (none in the local seed), the cross-tab calendar case, what
   production Bloomington shows.
 
+### The first four leftovers, fixed (Oct 20, 2026; committed on its own branch, not pushed)
+
+No database change and no Privacy Policy change: counts drop a note, the phone shows what the server
+already sends, and one more refusal.
+
+- **Unread counts skip a deleted message.** The DM and group dots (`/api/me/threads`), the Otto count and
+  the app badge (and the badge number in pushes) now go by the newest message that is not a note. The preview still reads "Message deleted".
+  One helper, `readLatestPerRoomWithDeleted` + `newestLivePerRoom` in `src/lib/chat/latest-per-room.ts`.
+  On a database without `deleted_at`, the read is made again without it.
+- **The phone's open DM or group updates by itself.** `ConversationView` reads its last page every 2 s
+  while the page is visible, like the desktop pane (`thread-refresh.ts`). No new realtime channel: the app
+  has none. A new message arrives and is marked read; a deleted one turns into the note; a reply being
+  written to it lets go; pins are read again. A read is skipped while my own send, reaction or delete is
+  in flight. The mini messenger frames this page, so it updates too.
+- **No reply under a deleted Board post.** The send route refuses it with `board_post_missing` ("That post
+  is no longer there."), on the sender's own client. The database still accepts one sent straight through
+  the REST API. Closing that needs `and m.deleted_at is null` in `can_post_org_channel`, which is a
+  production change and needs Franky's yes.
+- **A refused unlike no longer pops the heart.** The post card in `campus-home.tsx`, its comment like, and
+  `PostViewerMobile` pass a `burst` counter like the phone feed card. A test now checks that every
+  `<LikeBurst>` passes one.
+- **Checks:** `npm test` 3,540 / 3,540, `tsc` clean, eslint clean on the touched files (old warnings only).
+  Headless playwright-core on the local stack (dev server from this branch, seed cookies):
+  - Phone 390, Blake with the chat open while Avery sends and deletes: the DM (Night) showed the message
+    in 0.6 s and the note in 1.4 s; the group (Light) in 0.3 s and 1.4 s. Before, nothing changed until
+    the chat was reopened.
+  - Counts, Blake's chats closed: Avery's message in the DM and the group took the badge to 3 and Otto to
+    1. Deleting them took both back to 1 and 0 (the 1 is an older chat that is really unread), with both
+    dots off.
+  - Desktop 1440: the pane still updates (0.8 s / 2.0 s), and only the chat that is really unread has a dot.
+  - Board: a reply under a live post was 200; after Avery deleted the post, a reply was 409.
+  - Likes (desktop 1440 feed, phone viewer): an unlike refused with 429 put the heart back with 0 dots.
+    A real like showed 6.
+  - Shots: `2026-10-19-critique/shots/S80fix-*.png`. Scripts: `2026-10-19-critique/leftovers-browser/`.
+    The local database is back to 232 messages, 0 notes and 93 likes.
+- **Still open:** the font symbols, the not-verified list above, and the send route still accepting a
+  quote of a note (harmless). A stranger's request whose only message was deleted still shows under
+  Requests as "Message deleted". It doesn't light the dot or count, but it may be worth hiding.
+
 ## Next (Franky's order)
 
 1. His phone walk (above), then the open calls.

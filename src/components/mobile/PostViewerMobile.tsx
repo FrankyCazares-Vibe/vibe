@@ -224,6 +224,10 @@ export function PostViewerMobile({
   // and the other way round. `eng` is the live record.
   const [counts, setCounts] = useState<Pick<Counts, "views" | "saves">>({ views: 0 });
   const eng = usePostEngagement(postId, NO_ENGAGEMENT);
+  // Bumped by the person's own like here, not by `liked` coming back on
+  // after a failed unlike (or a like on the card under this sheet): only
+  // that tap pops the heart (CampusMobile's FeedCard).
+  const [likeBurst, setLikeBurst] = useState(0);
   // Server-computed (`is_owner` from /api/posts/[id]), not the `canDelete`
   // prop: only ProfileMobile passes that one, so on the feed and on a shared
   // link the author was treated as a stranger. The owner-only audience sheets
@@ -468,6 +472,7 @@ export function PostViewerMobile({
     }));
     if (!tap) return;
     const next = readEngagement(postId)?.liked === true;
+    if (next) setLikeBurst((n) => n + 1);
     const r = await vibeRequest(`/api/posts/${postId}/like`, {
       method: next ? "POST" : "DELETE",
       failure: next ? "Couldn't like this post." : "Couldn't unlike this post.",
@@ -1093,7 +1098,7 @@ export function PostViewerMobile({
                 // Pops on a like (not on load: the bar first mounts with
                 // the loaded value). LikeBurst's coral is the heart's own.
                 icon={
-                  <LikeBurst liked={eng.liked}>
+                  <LikeBurst liked={eng.liked} burst={likeBurst}>
                     <HeartIcon filled={eng.liked} />
                   </LikeBurst>
                 }

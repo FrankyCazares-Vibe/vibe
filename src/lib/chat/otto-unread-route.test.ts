@@ -144,7 +144,7 @@ test("otto, per room: one call on the cookie client, 3 rows of EACH dm, no filte
   const calls = cookieLog.filter((l) => l.table === "rpc:chat_latest_per_channel").map((l) => l.calls);
   assert.equal(calls.length, 1);
   assert.deepEqual(calls[0][0], ["rpc", { p_channels: ["dm-busy", "dm-quiet"], p_per: 3, p_top_level_only: false, p_live_only: false }]);
-  assert.equal(arg(calls[0], "select"), "channel_id,user_id,created_at");
+  assert.equal(arg(calls[0], "select"), "channel_id,user_id,created_at, deleted_at");
   assert.deepEqual(calls[0].find((c) => c[0] === "order"), ["order", "created_at", { ascending: false }]);
   assert.equal(cookieLog.filter((l) => l.table === "messages").length, 0, "no shared window");
   assert.equal(serviceLog.filter((l) => l.table.startsWith("rpc:")).length, 0, "never the service role");
@@ -158,7 +158,7 @@ test("otto, no migration C: today's shared window, unchanged (and the busy dm hi
   assert.equal(res.body.counts.unread, 1);
   const windows = cookieLog.filter((l) => l.table === "messages").map((l) => l.calls);
   assert.equal(windows.length, 1);
-  assert.equal(arg(windows[0], "select"), "channel_id,user_id,created_at");
+  assert.equal(arg(windows[0], "select"), "channel_id,user_id,created_at, deleted_at");
   assert.deepEqual(arg(windows[0], "in", "channel_id"), ["dm-busy", "dm-quiet"]);
   assert.equal(arg(windows[0], "limit"), 6);
 });
@@ -172,4 +172,20 @@ test("otto, per room: any other error is today's \"dms\" failed section, never a
   assert.ok(res.body.failed?.includes("dms"), JSON.stringify(res.body.failed));
   assert.equal(cookieLog.filter((l) => l.table === "messages").length, 0);
   assert.ok(errors.mock.calls.some((c) => c.arguments[0] === "[api/me/otto unread-dms]"));
+});
+
+test("otto, a note is nothing to read: a dm whose newest row is a deleted message counts by the row under it", async () => {
+  const notes = [
+    { channel_id: "dm-busy", user_id: FRIEND, created_at: T(20), deleted_at: T(21) },
+    { channel_id: "dm-busy", user_id: ME, created_at: T(19), deleted_at: null },
+    { channel_id: "dm-quiet", user_id: CLASSMATE, created_at: T(10), deleted_at: T(11) },
+    { channel_id: "dm-quiet", user_id: CLASSMATE, created_at: T(9), deleted_at: null },
+  ];
+  install((calls) => {
+    const a = calls[0][1] as { p_channels: string[] };
+    return { data: notes.filter((m) => a.p_channels.includes(m.channel_id)) };
+  });
+  const res = await route.GET();
+  assert.equal(res.status, 200);
+  assert.equal(res.body.counts.unread, 1, "dm-busy: my own message under the note; dm-quiet: the classmate's earlier one is unread");
 });

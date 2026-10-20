@@ -62,7 +62,7 @@ registerHooks({
 });
 
 type ThreadsBody = { ok: boolean; threads: Entry[]; requests: Entry[] };
-type Entry = { id: string; is_request: boolean; last_message: { content: string; user_id: string; created_at: string } | null; unread: boolean };
+type Entry = { id: string; is_request: boolean; last_message: { content: string; user_id: string; created_at: string; deleted?: true } | null; unread: boolean };
 const routeSpecifier = "../../app/api/me/threads/route.ts";
 const route = (await import(routeSpecifier)) as { GET: (req: Request) => Promise<{ status: number; body: ThreadsBody }> };
 
@@ -126,9 +126,11 @@ const DM_BUSY = "dm-busy", DM_REQUEST = "dm-request", BOARD = "board-1";
 const T = (day: number, hour = 10) => `2026-10-${String(day).padStart(2, "0")}T${String(hour).padStart(2, "0")}:00:00+00:00`;
 const WIDE = "channel_id, content, created_at, user_id, media_kind, attachment_kind";
 const BASE = "channel_id, content, created_at, user_id";
+/** The first read since Oct 20, 2026: `unread` steps over a "Message deleted" note. */
+const WIDE_DELETED = `${WIDE}, deleted_at`;
 const MISSING_FN = { code: "PGRST202", message: "Could not find the function public.chat_latest_per_channel(p_channels, p_live_only, p_per, p_top_level_only) in the schema cache" };
 
-type Msg = { channel_id: string; content: string; created_at: string; user_id: string; media_kind: null; attachment_kind: null; thread_root_id: string | null; removed_at: string | null };
+type Msg = { channel_id: string; content: string; created_at: string; user_id: string; media_kind: null; attachment_kind: null; thread_root_id: string | null; removed_at: string | null; deleted_at?: string | null };
 const msg = (channel_id: string, content: string, created_at: string, user_id: string, over: Partial<Msg> = {}): Msg => ({
   channel_id, content, created_at, user_id, media_kind: null, attachment_kind: null, thread_root_id: null, removed_at: null, ...over,
 });
@@ -168,9 +170,10 @@ const peer = (channel_id: string, id: string) => ({
   channel_id, user_id: id, last_read_at: null, role: "member", users: { id, handle: id.slice(0, 4), name: `User ${id.slice(0, 4)}`, avatar_url: null, school: null },
 });
 
-type World = { rpc?: (calls: Call[]) => Answer; memberships?: (calls: Call[]) => Answer };
+type World = { rpc?: (calls: Call[]) => Answer; memberships?: (calls: Call[]) => Answer; rows?: Msg[]; noDeletedAt?: boolean };
+const NO_DELETED_AT = { code: "42703", message: "column messages.deleted_at does not exist" };
 function install(world: World = {}) {
-  const table = messagesTable(rows());
+  const table = messagesTable(world.rows ?? rows());
   const { client, log } = fakeClient((t, calls) => {
     const select = String(arg(calls, "select") ?? "");
     if (t === "channel_members") {
@@ -185,6 +188,7 @@ function install(world: World = {}) {
     }
     if (t === "orgs") return { data: [{ id: ORG, handle: "salsa", name: "Salsa", logo_url: null, banner_url: null, verified: true }] };
     if (t === "org_members") return { data: [{ org_id: ORG, role: "member" }] };
+    if (world.noDeletedAt && (t === "messages" || t === "rpc:chat_latest_per_channel") && select.includes("deleted_at")) return { error: NO_DELETED_AT };
     if (t === "messages") return table.window(calls);
     if (t === "rpc:chat_latest_per_channel") return world.rpc ? world.rpc(calls) : { error: MISSING_FN };
     return { data: [] };
@@ -209,7 +213,7 @@ test("threads, per room: two calls on the viewer's client, 5 rows of EACH channe
   assert.deepEqual(calls[0][0], ["rpc", { p_channels: [DM_BUSY, DM_REQUEST], p_per: 5, p_top_level_only: true, p_live_only: false }], "the dms and groups");
   assert.deepEqual(calls[1][0], ["rpc", { p_channels: [BOARD], p_per: 5, p_top_level_only: true, p_live_only: false }], "the club rooms");
   for (const c of calls) {
-    assert.equal(arg(c, "select"), WIDE);
+    assert.equal(arg(c, "select"), WIDE_DELETED);
     assert.deepEqual(c.find((x) => x[0] === "order"), ["order", "created_at", { ascending: false }]);
   }
   assert.equal(reads(log, "messages").length, 0);
@@ -233,7 +237,7 @@ test("threads, no migration C: the missing function falls back to today's two sh
   assert.deepEqual(windows.map((c) => arg(c, "in", "channel_id")), [[DM_BUSY, DM_REQUEST], [BOARD]]);
   assert.deepEqual(windows.map((c) => arg(c, "limit")), [10, 5], "today's reads, unchanged");
   for (const c of windows) {
-    assert.equal(arg(c, "select"), WIDE);
+    assert.equal(arg(c, "select"), WIDE_DELETED);
     assert.deepEqual(c.filter((x) => x[0] === "is"), [["is", "thread_root_id", null]]);
   }
   assert.deepEqual(res.body.requests, [], "the busy dm filled the shared window: today's behaviour, kept until C runs");
@@ -246,12 +250,12 @@ test("threads, per room: a failed wide read retries the base columns through the
     rpc: (calls) => {
       const select = String(arg(calls, "select"));
       seen.push(select);
-      return select === WIDE ? { error: { code: "XX000", message: "boom" } } : { data: [msg(DM_REQUEST, "base row", T(10), STRANGER)] };
+      return select.startsWith(WIDE) ? { error: { code: "XX000", message: "boom" } } : { data: [msg(DM_REQUEST, "base row", T(10), STRANGER)] };
     },
   });
   const res = await get();
   assert.equal(res.status, 200);
-  assert.deepEqual(seen.sort(), [BASE, BASE, WIDE, WIDE]);
+  assert.deepEqual(seen.sort(), [BASE, BASE, WIDE_DELETED, WIDE_DELETED], "a real error is not a missing deleted_at either: no second wide read");
   assert.equal(reads(log, "messages").length, 0, "a real error is not a missing function: no shared window");
   assert.deepEqual(res.body.requests.map((e) => e.last_message?.content), ["base row"]);
   assert.ok(errors.mock.calls.some((c) => c.arguments[0] === "[threads.GET lastMsgs]"));
@@ -279,4 +283,54 @@ test("threads, per room, a database without channels.kind: the function is asked
   assert.equal(calls.length, 1, "no club rooms listed: one read");
   assert.deepEqual(calls[0][0], ["rpc", { p_channels: [DM_BUSY, DM_REQUEST], p_per: 5, p_top_level_only: false, p_live_only: false }]);
   assert.deepEqual(res.body.requests.map((e) => e.id), [DM_REQUEST]);
+});
+
+// ── A deleted message (the "Message deleted" note, Oct 19, 2026) ────────────
+
+const DM_NOTE = "dm-note", DM_UNDER = "dm-under";
+/** The friend's newest row in each dm is a note; under it, a message I sent (dm-note) or the friend's own unread one (dm-under). */
+const noteRows = (): Msg[] => [
+  msg(DM_NOTE, "see you there", T(9), VIEWER),
+  msg(DM_NOTE, "", T(10), FRIEND, { deleted_at: T(11) }),
+  msg(DM_UNDER, "are you coming?", T(9), FRIEND),
+  msg(DM_UNDER, "", T(10), FRIEND, { deleted_at: T(11) }),
+];
+const noteMembers = () => ({ data: [member(DM_NOTE, "dm", T(1)), member(DM_UNDER, "dm", T(1))] });
+
+test("threads, a note: the preview still says \"Message deleted\", but unread goes by the newest row that is not a note", async () => {
+  const { table } = install({ rows: noteRows(), memberships: noteMembers, rpc: (calls) => table.perRoom(calls) });
+  const res = await get();
+  assert.equal(res.status, 200);
+  const byId = new Map(res.body.threads.map((e) => [e.id, e]));
+  for (const id of [DM_NOTE, DM_UNDER]) {
+    assert.equal(byId.get(id)?.last_message?.content, "Message deleted", id);
+    assert.equal(byId.get(id)?.last_message?.deleted, true, id);
+  }
+  assert.equal(byId.get(DM_NOTE)?.unread, false, "my own message is the newest live row: nothing to read");
+  assert.equal(byId.get(DM_UNDER)?.unread, true, "the friend's earlier message is still unread");
+});
+
+test("threads, a database without deleted_at: the wide read is made again without it, today's answer", async (t) => {
+  quiet(t);
+  const seen: string[] = [];
+  const { log, table } = install({
+    rows: noteRows().map((m) => ({ ...m, deleted_at: undefined })),
+    memberships: noteMembers,
+    noDeletedAt: true,
+    rpc: (calls) => {
+      seen.push(String(arg(calls, "select")));
+      return table.perRoom(calls);
+    },
+  });
+  const res = await get();
+  assert.equal(res.status, 200);
+  const rpcSelects = reads(log, "rpc:chat_latest_per_channel").map((entry) => arg(entry.calls, "select"));
+  assert.deepEqual(rpcSelects, [WIDE_DELETED, WIDE], "one dm read: the wider select, then today's");
+  assert.deepEqual(seen, [WIDE], "only today's select reached the rows");
+  const windows = reads(log, "messages").map((entry) => arg(entry.calls, "select"));
+  assert.deepEqual(windows, [WIDE_DELETED], "the missing column read as a missing function once: today's window with it, also refused");
+  const calls = reads(log, "rpc:chat_latest_per_channel").map((entry) => entry.calls[0]);
+  assert.ok(calls.every((c) => (c[1] as { p_top_level_only: boolean }).p_top_level_only === true), "never mistaken for a missing thread_root_id");
+  const byId = new Map(res.body.threads.map((e) => [e.id, e]));
+  assert.equal(byId.get(DM_NOTE)?.unread, true, "no notes on such a database: today's rule");
 });

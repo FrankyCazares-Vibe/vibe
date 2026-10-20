@@ -162,3 +162,55 @@ export async function readLatestPerRoom(
   for (const a of answers) if (Array.isArray(a.data)) rows.push(...(a.data as unknown[]));
   return { data: rows, error: null, perRoom: true };
 }
+
+/**
+ * The column `readLatestPerRoomWithDeleted` adds to the select: set on a
+ * message its sender deleted (the "Message deleted" note, Oct 19, 2026;
+ * supabase/migrations/20261019150000_message_deleted_note.sql).
+ */
+export const DELETED_AT_COLUMN = "deleted_at";
+
+/**
+ * `readLatestPerRoom` for an UNREAD rule (Oct 20, 2026): the same read with
+ * `deleted_at` in the select, so `newestLivePerRoom` can step over a note. A
+ * note is nothing new to read, the way the club Board and Lounge counts
+ * already leave it out (`/api/me/inbox`, review of Oct 19, 2026); the DM and
+ * group unread dots, the Otto count and the app badge read through this.
+ *
+ * `sharedWindow(select)` is today's read for the select it is given. A
+ * database without the column answers "missing" to the wider select, on the
+ * function and on the table alike; the read is then made once more with
+ * `opts.select` alone, today's read exactly, where no row is a note. (The
+ * missing column also reads as a missing function inside `readLatestPerRoom`
+ * and logs its one line per tag: only on a database without the migration.)
+ */
+export async function readLatestPerRoomWithDeleted(
+  client: SupabaseClient,
+  opts: LatestPerRoomOptions,
+  sharedWindow: (select: string) => PromiseLike<Answer>,
+): Promise<LatestPerRoomResult> {
+  const wider = `${opts.select}, ${DELETED_AT_COLUMN}`;
+  const first = await readLatestPerRoom(client, { ...opts, select: wider }, () => sharedWindow(wider));
+  if (!first.error || !isMissingChatSchema(first.error)) return first;
+  return readLatestPerRoom(client, opts, () => sharedWindow(opts.select));
+}
+
+/**
+ * The newest row of each room that is not a note (`deleted_at` unset), from
+ * rows newest first within each room, as `readLatestPerRoom` hands them. A
+ * room whose every row read is a note has no entry: nothing in it to read.
+ * `skip` leaves out more rows the same way (a club room's blocked authors).
+ */
+export function newestLivePerRoom<R extends { channel_id: string; deleted_at?: string | null }>(
+  rows: readonly R[],
+  skip?: (row: R) => boolean,
+): Map<string, R> {
+  const out = new Map<string, R>();
+  for (const row of rows) {
+    if (out.has(row.channel_id)) continue;
+    if (row.deleted_at) continue;
+    if (skip && skip(row)) continue;
+    out.set(row.channel_id, row);
+  }
+  return out;
+}

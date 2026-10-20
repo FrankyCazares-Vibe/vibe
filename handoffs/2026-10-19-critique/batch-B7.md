@@ -83,6 +83,8 @@ Named test rows were posted through the app's routes ("B7 test: ..."), deleted t
 
 ## Follow-ups (not in this batch)
 
+**Fixed Oct 20, 2026** (the first three below, plus the `LikeBurst` callers): see "The first four leftovers, fixed" in `handoffs/2026-10-19-session-79-close-checkin-and-critique.md`. The database still accepts a reply under a note sent straight through the REST API, and a quote of a note is still accepted.
+
 - Phone DM/group: the other person's open chat doesn't update until reopened (no poll). Since the review, a Pin or a reaction on the stale bubble is refused (404), so it can't land on the note.
 - DM and group unread, the Otto unread count and the app badge still count a deleted last message (club Board and Lounge counts no longer do, see the review repair).
 - The database still accepts a reply under a deleted Board post (only the app hides the field), and the send route still accepts a quote of a note (it then shows "Message deleted" in the quote; harmless, not changed).

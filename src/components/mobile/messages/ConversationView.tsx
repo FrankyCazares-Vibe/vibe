@@ -28,6 +28,7 @@ import { PinnedSheet } from "./PinnedSheet";
 import { toastSendFailure } from "./send-failure";
 import { vaulOverlayStyle, visuallyHiddenStyle } from "./sheet-styles";
 import { useNightTheme } from "./theme";
+import { applyThreadRefresh, THREAD_REFRESH_MS, THREAD_REFRESH_STUCK_MS } from "./thread-refresh";
 import { type MessageRow, type ParentPreview, type ThreadEntry } from "./types";
 
 // What the composer can attach: the upload route's own types and limits
@@ -255,13 +256,75 @@ export function ConversationView({
 
   // Mark as read — best-effort and quiet: the student didn't ask for it,
   // and only the unread dot would notice.
-  useEffect(() => {
+  const markRead = useCallback(() => {
     void vibeRequest(`/api/me/threads/${encodeURIComponent(threadId)}/read`, {
       method: "POST",
       quiet: true,
       failure: "Couldn't mark this conversation as read.",
     });
   }, [threadId]);
+  useEffect(() => {
+    markRead();
+  }, [markRead]);
+
+  // What the refresh below reads without restarting: the list on screen (as
+  // last painted), who I am, and how many changes of mine are still out (a
+  // send, a reaction, a delete; `applyThreadRefresh` drops a read then).
+  const messagesRef = useRef<MessageRow[] | null>(null);
+  const meIdRef = useRef<string | null>(null);
+  const busyRef = useRef(0);
+  useEffect(() => {
+    messagesRef.current = messages;
+    meIdRef.current = meId;
+  }, [messages, meId]);
+  // Set below, once the pins and the reply target exist: what a read that
+  // took a row away (the other person deleted it) also does.
+  const onGoneRef = useRef<(ids: string[]) => void>(() => {});
+
+  // The other side, while the chat is open (Oct 20, 2026): the last page
+  // again every 2 s while the page is visible, as the desktop pane reads it
+  // (thread-refresh.ts). A message the other person deleted turns into the
+  // note, a new one arrives (and is marked read: I watched it come), a
+  // reaction catches up. Silent: a failed read keeps what is on screen.
+  useEffect(() => {
+    let stopped = false;
+    let gen = 0;
+    let since = 0;
+    let out = false;
+    const tick = async () => {
+      if (stopped || document.visibilityState !== "visible") return;
+      if (out && performance.now() - since < THREAD_REFRESH_STUCK_MS) return;
+      const startedWith = messagesRef.current;
+      if (startedWith === null || busyRef.current > 0) return;
+      const mine = ++gen;
+      out = true;
+      since = performance.now();
+      const r = await vibeRequest<{ messages?: MessageRow[] }>(
+        `/api/me/threads/${encodeURIComponent(threadId)}/messages?limit=50`,
+        { cache: "no-store", quiet: true, failure: "Couldn't load this conversation." },
+      );
+      if (mine !== gen) return;
+      out = false;
+      if (stopped || !r.ok || !Array.isArray(r.data.messages)) return;
+      const current = messagesRef.current;
+      const next = applyThreadRefresh(current, startedWith, r.data.messages, meIdRef.current, busyRef.current > 0);
+      if (!next) return;
+      // A change of mine queued since the last paint wins too.
+      if (next.changed) setMessages((prev) => (prev === current ? next.messages : prev));
+      if (next.goneIds.length > 0) onGoneRef.current(next.goneIds);
+      if (next.arrived) markRead();
+    };
+    const timer = window.setInterval(() => void tick(), THREAD_REFRESH_MS);
+    const onVisible = () => {
+      if (document.visibilityState === "visible") void tick();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      stopped = true;
+      window.clearInterval(timer);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [threadId, markRead]);
 
   // Auto-scroll to the bottom on first message-paint + after sends. Keyed on
   // the newest message's id, not on `messages`: a reaction rewrites that
@@ -316,6 +379,17 @@ export function ConversationView({
   // phone has no timer that would ask again. A database without the table
   // answers 404, which is `available` false, never `failure`: still hidden.
   const pinsSheetRow = pinsHere && (pins.pins !== null || pins.failure !== null);
+
+  // A refresh read took rows away (their sender deleted them, or they were
+  // removed): a reply being written to one lets go (its pill would still show
+  // the words), and the pinned list is read again (the pin went with it).
+  const reloadPins = pins.reload;
+  useEffect(() => {
+    onGoneRef.current = (ids) => {
+      setReplyTo((cur) => (cur && ids.includes(cur.parent.id) ? null : cur));
+      if (pinControls) reloadPins();
+    };
+  }, [pinControls, reloadPins]);
 
   // A tap on a pin whose message is on screen: the sheet closes and the list
   // scrolls it to the middle. The rows carry `data-mid` only with `messagePins`.
@@ -398,48 +472,79 @@ export function ConversationView({
           failure,
         });
         if (!put.ok) return;
-        const r = await vibeRequest<{ message?: MessageRow }>(url, {
-          json: { ...body, media_url: objectKey, media_kind: sign.data.kind ?? media.kind },
-          failure: "Couldn't send your message.",
-          quiet: true,
-        });
+        // The refresh holds off from here to the row on screen (busyRef).
+        busyRef.current += 1;
+        let r;
+        try {
+          r = await vibeRequest<{ message?: MessageRow }>(url, {
+            json: { ...body, media_url: objectKey, media_kind: sign.data.kind ?? media.kind },
+            failure: "Couldn't send your message.",
+            quiet: true,
+          });
+          if (r.ok) {
+            const sent = r.data.message;
+            setMessages((prev) =>
+              prev && sent ? (prev.some((m) => m.id === sent.id) ? prev : [...prev, sent]) : prev,
+            );
+          }
+        } finally {
+          busyRef.current -= 1;
+        }
         if (!r.ok) {
           toastSendFailure(r);
           return;
         }
         row = r.data.message;
-        const sent = row;
-        setMessages((prev) => (prev && sent ? [...prev, sent] : prev));
         setStaged(null);
         // Anything typed while it uploaded stays in the box.
         setDraft((d) => (d.trim() === text ? "" : d));
       } else {
         // Optimistic, but only onto a list that loaded: one row under a
-        // failed load would read as the whole conversation.
+        // failed load would read as the whole conversation. The refresh
+        // holds off until the server row is in its place (busyRef).
         const tempId = `temp_${Date.now()}`;
-        setMessages((prev) =>
-          prev
-            ? [
-                ...prev,
-                {
-                  id: tempId,
-                  content: text,
-                  created_at: new Date().toISOString(),
-                  user_id: meId ?? "me",
-                  parent_preview: reply?.parent ?? null,
-                },
-              ]
-            : prev,
-        );
-        setDraft("");
-        const r = await vibeRequest<{ message?: MessageRow }>(url, {
-          json: body,
-          failure: "Couldn't send your message.",
-          quiet: true,
-        });
+        busyRef.current += 1;
+        let r;
+        try {
+          setMessages((prev) =>
+            prev
+              ? [
+                  ...prev,
+                  {
+                    id: tempId,
+                    content: text,
+                    created_at: new Date().toISOString(),
+                    user_id: meId ?? "me",
+                    parent_preview: reply?.parent ?? null,
+                  },
+                ]
+              : prev,
+          );
+          setDraft("");
+          r = await vibeRequest<{ message?: MessageRow }>(url, {
+            json: body,
+            failure: "Couldn't send your message.",
+            quiet: true,
+          });
+          if (r.ok) {
+            const sent = r.data.message;
+            // Replace the temp row with the server row (or drop it, should
+            // the server row be on screen already).
+            setMessages((prev) =>
+              prev && sent
+                ? prev.some((m) => m.id === sent.id)
+                  ? prev.filter((m) => m.id !== tempId)
+                  : prev.map((m) => (m.id === tempId ? sent : m))
+                : prev,
+            );
+          } else {
+            setMessages((prev) => (prev ? prev.filter((m) => m.id !== tempId) : prev));
+          }
+        } finally {
+          busyRef.current -= 1;
+        }
         if (!r.ok) {
           toastSendFailure(r);
-          setMessages((prev) => (prev ? prev.filter((m) => m.id !== tempId) : prev));
           setDraft(text);
           // The room stopped taking the viewer's posts after it was opened
           // (no longer an officer, the event chat closed, or the room's
@@ -455,11 +560,6 @@ export function ConversationView({
           return;
         }
         row = r.data.message;
-        const sent = row;
-        // Replace the temp row with the server row.
-        setMessages((prev) =>
-          prev && sent ? prev.map((m) => (m.id === tempId ? sent : m)) : prev,
-        );
       }
       // Sent. A reply target picked while it was sending stays.
       setReplyTo((cur) => (cur === reply ? null : cur));
@@ -609,6 +709,10 @@ export function ConversationView({
 
   const toggleReaction = useCallback(
     async (messageId: string, emoji: string) => {
+      // The refresh holds off until the server answered and any roll back
+      // is on screen (busyRef): a read taken before the tap would undo it.
+      // Nothing below throws (vibeRequest never does), so it always ends.
+      busyRef.current += 1;
       // Find current state to know if we're adding or removing.
       let willAdd = true;
       setMessages((prev) => {
@@ -670,6 +774,7 @@ export function ConversationView({
           });
         });
       }
+      busyRef.current -= 1;
     },
     [threadId],
   );
@@ -683,17 +788,21 @@ export function ConversationView({
     const target = deleteTarget;
     if (!target || deleting) return;
     setDeleting(true);
+    // The refresh holds off until the note is on screen (busyRef): a read
+    // taken before the delete would put the words back for a moment.
+    busyRef.current += 1;
     const r = await vibeRequest<DeleteOwnResponse>(
       `/api/me/threads/${encodeURIComponent(threadId)}/messages/${encodeURIComponent(target.id)}`,
       { method: "DELETE", failure: DELETE_FAILED, quiet: true },
     );
+    if (r.ok) setMessages((prev) => (prev ? [...listAfterDelete(prev, target.id, r.data)] : prev));
+    busyRef.current -= 1;
     setDeleting(false);
     setDeleteTarget(null);
     if (!r.ok) {
       toastSendFailure(r);
       return;
     }
-    setMessages((prev) => (prev ? [...listAfterDelete(prev, target.id, r.data)] : prev));
     setReplyTo((cur) => (cur?.parent.id === target.id ? null : cur));
     if (pinControls) pins.reload();
     onThreadsChanged?.();

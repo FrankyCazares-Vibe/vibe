@@ -73,6 +73,37 @@ const POST_REFUSAL_STATUS: Record<PostRefusalCode, number> = {
 };
 
 /**
+ * Where the Board post a reply stands under is now (Oct 20, 2026): "deleted"
+ * when its sender deleted it (the grey "Post deleted" note, Oct 19, 2026) or
+ * it is gone since the gate found it. The database still takes a reply under
+ * a note (`can_post_org_channel` asks only for a top-level post that is not
+ * removed, 20261001100000), and only the app hid the field; this keeps the
+ * route from adding one. Asked on the sender's own client, after the gate
+ * said yes, so RLS shows exactly the post the gate just found. A database
+ * without `deleted_at` (20261019150000) has no notes: "live". A read that
+ * fails is "failed" (503), never a guess either way.
+ */
+async function boardPostState(
+  supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>,
+  channelId: string,
+  rootId: string,
+): Promise<"live" | "deleted" | "failed"> {
+  const { data, error } = await supabase
+    .from("messages")
+    .select("id, deleted_at")
+    .eq("id", rootId)
+    .eq("channel_id", channelId)
+    .maybeSingle();
+  if (error) {
+    if (isMissingChatSchema(error)) return "live";
+    console.error("[messages.POST board post]", error.code, error.message);
+    return "failed";
+  }
+  if (!data) return "deleted";
+  return (data as { deleted_at?: string | null }).deleted_at ? "deleted" : "live";
+}
+
+/**
  * GET: list messages in a channel, oldest-first.
  * `?before=<iso>` paginates older messages; `?limit=<n>` caps results.
  *
@@ -427,6 +458,15 @@ export async function POST(req: Request, ctx: RouteCtx) {
     }
   }
   const inBoard = room !== null && room.kind === "board";
+
+  // No new reply under a Board post its sender deleted (Oct 20, 2026): the
+  // "Post deleted" note keeps the replies it had, and the field is gone in
+  // the app. The same answer as a post that is not there at all.
+  if (inBoard && rootId) {
+    const post = await boardPostState(supabase, channelId, rootId);
+    if (post === "failed") return refuse("try_again", 503);
+    if (post === "deleted") return refuse("board_post_missing", POST_REFUSAL_STATUS.board_post_missing);
+  }
 
   // Verify the parent message (if any) belongs to this channel — prevents
   // cross-channel quote-replies. Stale deploys without the column degrade

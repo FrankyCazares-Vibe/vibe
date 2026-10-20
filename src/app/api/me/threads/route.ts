@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { DELETED_LINE, hasDeletedShape } from "@/lib/chat/deleted-note";
-import { readLatestPerRoom } from "@/lib/chat/latest-per-room";
+import { DELETED_AT_COLUMN, newestLivePerRoom, readLatestPerRoom } from "@/lib/chat/latest-per-room";
 import { BOARD_POSTER_ROLES, clubRoomLabel, isClubRole, isRoomKind } from "@/lib/chat/room-rules";
 import { isMissingChatSchema, warnMissingChatSchemaOnce } from "@/lib/chat/schema";
 import type { ClubRole, OrgRef, RoomKind, ThreadEntryRoomFields } from "@/lib/chat/types";
@@ -662,6 +662,8 @@ export async function GET(req: Request) {
     // Absent from the fallback select; check-constrained to these values.
     media_kind?: "image" | "video" | null;
     attachment_kind?: "post" | "clip" | null;
+    // Absent on a database without the note (20261019150000) and from the fallbacks.
+    deleted_at?: string | null;
   };
   const readLastMessages = async (ids: string[]): Promise<LastMsgRow[]> => {
     if (ids.length === 0) return [];
@@ -680,7 +682,12 @@ export async function GET(req: Request) {
       );
     const wide = "channel_id, content, created_at, user_id, media_kind, attachment_kind";
     let topLevelOnly = roomsReady;
-    let { data, error } = await query(wide, topLevelOnly);
+    // `deleted_at` too, so `unread` can step over a note (Oct 20, 2026). A
+    // database without the column (20261019150000) answers "missing" to it:
+    // the wide read alone again, today's, before any other retry (a missing
+    // column must not read as a missing `thread_root_id` below).
+    let { data, error } = await query(`${wide}, ${DELETED_AT_COLUMN}`, topLevelOnly);
+    if (error && isMissingChatSchema(error)) ({ data, error } = await query(wide, topLevelOnly));
     if (error && topLevelOnly && isMissingChatSchema(error)) {
       warnMissingChatSchemaOnce("threads.GET lastMsgs");
       topLevelOnly = false;
@@ -724,10 +731,11 @@ export async function GET(req: Request) {
   // hides. No Board exception here (this list reads no roles; the officer's
   // post still opens in the thread). None visible in the window: no preview
   // ("No messages yet"). A dm or a group is untouched.
+  const hiddenInRoom = (m: LastMsgRow) => clubRoomIds.has(m.channel_id) && blockedPeerIds.has(m.user_id);
   const lastByChannel = new Map<string, ThreadEntry["last_message"]>();
   for (const m of lastMsgs) {
     const cid = m.channel_id as string;
-    if (clubRoomIds.has(cid) && blockedPeerIds.has(m.user_id as string)) continue;
+    if (hiddenInRoom(m)) continue;
     if (!lastByChannel.has(cid)) {
       // A message its sender deleted (Oct 19, 2026) previews as the note
       // the thread shows in its place, not as "Attachment", flagged so the
@@ -745,6 +753,13 @@ export async function GET(req: Request) {
       });
     }
   }
+
+  // What `unread` reads (Oct 20, 2026): the newest row that is not a note.
+  // The preview above still shows the note ("Message deleted"), but a message
+  // its sender deleted is nothing new to read, the way the club Board and
+  // Lounge counts already leave it out (/api/me/inbox). Five rows a room: a
+  // room whose five newest are all notes reads as nothing to read.
+  const liveByChannel = newestLivePerRoom(lastMsgs, hiddenInRoom);
 
   const threads: ThreadEntry[] = [];
   const requests: ThreadEntry[] = [];
@@ -787,10 +802,11 @@ export async function GET(req: Request) {
       if (!reactivated) continue;
     }
 
+    const live = liveByChannel.get(r.channel_id) ?? null;
     const unread =
-      !!last &&
-      last.user_id !== user.id &&
-      (!r.last_read_at || new Date(last.created_at) > new Date(r.last_read_at));
+      !!live &&
+      live.user_id !== user.id &&
+      (!r.last_read_at || new Date(live.created_at) > new Date(r.last_read_at));
 
     const members = membersByChannel.get(r.channel_id) ?? [];
     // Group display name: explicit channel.name → first 3 member first-names

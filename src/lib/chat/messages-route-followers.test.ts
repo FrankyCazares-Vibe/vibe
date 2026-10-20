@@ -116,3 +116,67 @@ test("POST: a follower is refused members_only before the gate; a failed role re
   assert.deepEqual(await route.POST(send({ content: "hi" }), ctx), { status: 403, body: { ok: false, error: "Only officers post here.", code: "board_officers_only" } });
   assert.equal(t.gateAsked, 1);
 });
+
+// ── No new reply under a deleted Board post (Oct 20, 2026) ──────────────────
+
+const POST = "eeeeeeee-0000-4000-8000-000000000001";
+/** The sender's own client: the Board post read (`maybeSingle`) answers `post`; an insert stops the send with a 500, so a case that gets past the check is seen. */
+function cookieWith(post: { data?: unknown; error?: unknown }) {
+  const reads: unknown[][] = [];
+  let inserts = 0;
+  const client = {
+    auth: { getUser: async () => ({ data: { user: { id: VIEWER } }, error: null }) },
+    from(table: string) {
+      const calls: unknown[] = [table];
+      const b: Record<string, unknown> = {};
+      for (const m of ["select", "eq"]) b[m] = (...a: unknown[]) => { calls.push([m, ...a]); return b; };
+      b.maybeSingle = async () => { reads.push(calls); return { data: post.data ?? null, error: post.error ?? null }; };
+      b.insert = () => { inserts += 1; return { select: () => ({ single: async () => ({ data: null, error: { code: "XX000", message: "stop here" } }) }) }; };
+      return b;
+    },
+  };
+  return { client, reads, inserted: () => inserts };
+}
+function replyWorld(post: { data?: unknown; error?: unknown }) {
+  world(BOARD, "member", "member");
+  t.gate = async () => "yes";
+  const cookie = cookieWith(post);
+  t.cookie = cookie.client;
+  return cookie;
+}
+const reply = () => send({ content: "count me in", thread_root_id: POST });
+
+test("POST: a reply under a Board post its sender deleted is refused board_post_missing, before any insert", async (t2) => {
+  t2.mock.method(console, "error", () => {});
+  const deleted = replyWorld({ data: { id: POST, deleted_at: "2026-10-19T20:00:00Z" } });
+  assert.deepEqual(await route.POST(reply(), ctx), { status: 409, body: { ok: false, error: "That post is no longer there.", code: "board_post_missing" } });
+  assert.equal(deleted.inserted(), 0);
+  assert.deepEqual(deleted.reads, [["messages", ["select", "id, deleted_at"], ["eq", "id", POST], ["eq", "channel_id", CH]]]);
+
+  const gone = replyWorld({ data: null });
+  assert.equal((await route.POST(reply(), ctx)).body.code, "board_post_missing", "gone whole since the gate");
+  assert.equal(gone.inserted(), 0);
+
+  const failed = replyWorld({ error: { code: "XX000", message: "boom" } });
+  assert.deepEqual((await route.POST(reply(), ctx)), { status: 503, body: { ok: false, error: "Try again in a moment.", code: "try_again" } });
+  assert.equal(failed.inserted(), 0);
+});
+
+test("POST: a reply under a live post, or on a database without deleted_at, goes on to the insert; a send without a root never reads the post", async (t2) => {
+  t2.mock.method(console, "error", () => {});
+  const live = replyWorld({ data: { id: POST, deleted_at: null } });
+  assert.equal((await route.POST(reply(), ctx)).status, 500, "past the check: the fake insert stops it");
+  assert.equal(live.inserted(), 1);
+
+  const old = replyWorld({ error: { code: "42703", message: "column messages.deleted_at does not exist" } });
+  assert.equal((await route.POST(reply(), ctx)).status, 500);
+  assert.equal(old.inserted(), 1, "no notes on such a database");
+
+  world(LOUNGE, "member", "member");
+  t.gate = async () => "yes";
+  const lounge = cookieWith({ data: { id: POST, deleted_at: "2026-10-19T20:00:00Z" } });
+  t.cookie = lounge.client;
+  t.roomOf = async () => ({ room: LOUNGE, failed: false });
+  assert.equal((await route.POST(send({ content: "hi" }), ctx)).status, 500);
+  assert.deepEqual(lounge.reads, [], "only a Board reply reads its post");
+});

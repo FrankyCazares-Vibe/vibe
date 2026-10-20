@@ -134,7 +134,7 @@ test("badge, per room: one call on the client given, 5 rows of EACH chat, live o
   const calls = log.filter((l) => l.table === "rpc:chat_latest_per_channel").map((l) => l.calls);
   assert.equal(calls.length, 1);
   assert.deepEqual(calls[0][0], ["rpc", { p_channels: ["dm-busy", "dm-quiet"], p_per: 5, p_top_level_only: false, p_live_only: true }], "a club room never reaches the read");
-  assert.equal(arg(calls[0], "select"), "channel_id, user_id, created_at");
+  assert.equal(arg(calls[0], "select"), "channel_id, user_id, created_at, deleted_at");
   assert.deepEqual(calls[0].find((c) => c[0] === "order"), ["order", "created_at", { ascending: false }]);
   assert.equal(log.filter((l) => l.table === "messages").length, 0, "no shared window");
 });
@@ -146,7 +146,7 @@ test("badge, no migration C: today's shared window answers, unchanged (and under
   assert.deepEqual(res, { ok: true, notifications: 0, messages: 1, total: 1 });
   const windows = log.filter((l) => l.table === "messages").map((l) => l.calls);
   assert.equal(windows.length, 1);
-  assert.equal(arg(windows[0], "select"), "channel_id, user_id, created_at");
+  assert.equal(arg(windows[0], "select"), "channel_id, user_id, created_at, deleted_at");
   assert.deepEqual(arg(windows[0], "in", "channel_id"), ["dm-busy", "dm-quiet"]);
   assert.deepEqual(windows[0].filter((c) => c[0] === "is"), [["is", "removed_at", null]]);
   assert.equal(arg(windows[0], "limit"), 10);
@@ -157,4 +157,40 @@ test("badge, per room: any other error is today's { ok: false } (the dispatcher 
   const { client, log } = world(() => ({ error: boom }));
   assert.deepEqual(await loadBadgeCounts(client, ME, NOBODY_HIDDEN), { ok: false, error: boom });
   assert.equal(log.filter((l) => l.table === "messages").length, 0);
+});
+
+// ── A deleted message (the "Message deleted" note, Oct 19, 2026) ────────────
+
+/** A note on top of each chat: over my own reply (dm-mine), over the friend's unread message (dm-theirs). */
+const NOTES = [
+  { channel_id: "dm-mine", user_id: FRIEND, created_at: T(10), removed_at: null, deleted_at: T(11) },
+  { channel_id: "dm-mine", user_id: ME, created_at: T(9), removed_at: null, deleted_at: null },
+  { channel_id: "dm-theirs", user_id: FRIEND, created_at: T(10), removed_at: null, deleted_at: T(11) },
+  { channel_id: "dm-theirs", user_id: FRIEND, created_at: T(9), removed_at: null, deleted_at: null },
+];
+function noteWorld(noColumn: boolean) {
+  return fakeClient((table, calls) => {
+    if (table === "notifications") return { count: 0 };
+    if (table === "channel_members") return { data: [member("dm-mine", "dm"), member("dm-theirs", "dm")] };
+    const select = String(arg(calls, "select") ?? "");
+    if (noColumn && select.includes("deleted_at")) return { error: { code: "42703", message: "column messages.deleted_at does not exist" } };
+    if (table === "rpc:chat_latest_per_channel") {
+      const a = calls[0][1] as { p_channels: string[] };
+      return { data: NOTES.filter((m) => a.p_channels.includes(m.channel_id)).map((m) => (noColumn ? { ...m, deleted_at: undefined } : m)) };
+    }
+    return { data: [] };
+  });
+}
+
+test("badge, a note is nothing to read: the newest row that is not a note decides", async () => {
+  const { client } = noteWorld(false);
+  assert.deepEqual(await loadBadgeCounts(client, ME, NOBODY_HIDDEN), { ok: true, notifications: 0, messages: 1, total: 1 }, "dm-theirs only");
+});
+
+test("badge, a database without deleted_at: the read is made again without it (no notes there, today's count)", async (t) => {
+  quiet(t);
+  const { client, log } = noteWorld(true);
+  assert.deepEqual(await loadBadgeCounts(client, ME, NOBODY_HIDDEN), { ok: true, notifications: 0, messages: 2, total: 2 });
+  const selects = log.filter((l) => l.table === "rpc:chat_latest_per_channel").map((l) => arg(l.calls, "select"));
+  assert.deepEqual(selects, ["channel_id, user_id, created_at, deleted_at", "channel_id, user_id, created_at"]);
 });

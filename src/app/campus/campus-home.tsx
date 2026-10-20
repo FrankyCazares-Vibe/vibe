@@ -8075,6 +8075,9 @@ function FeedRow({
   const engFallback = useMemo(() => engagementFromFeedPost(post), [post]);
   const eng = usePostEngagement(post.id, engFallback);
   const { liked, likeCount, reposted, repostCount, commentCount, saved } = eng;
+  // Bumped by the person's own like, not by `liked` coming back on after a
+  // failed unlike: only a like pops the heart (CampusMobile's FeedCard).
+  const [likeBurst, setLikeBurst] = useState(0);
   const [viewCount, setViewCount] = useState(post.view_count);
   const [showComments, setShowComments] = useState(false);
   const [showRepostMenu, setShowRepostMenu] = useState(false);
@@ -8282,6 +8285,7 @@ function FeedRow({
     }));
     if (!tap) return;
     const nextLiked = readEngagement(post.id)?.liked === true;
+    if (nextLiked) setLikeBurst((n) => n + 1);
     const r = await vibeRequest(`/api/posts/${post.id}/like`, {
       method: nextLiked ? "POST" : "DELETE",
       failure: nextLiked ? "Couldn't like this post." : "Couldn't unlike this post.",
@@ -8895,7 +8899,7 @@ function FeedRow({
           <EngagementAction
             // The heart pops and throws a few dots when a tap turns it on.
             icon={
-              <LikeBurst liked={liked} color="#E0245E">
+              <LikeBurst liked={liked} burst={likeBurst} color="#E0245E">
                 <LikeIcon filled={liked} />
               </LikeBurst>
             }
@@ -9572,6 +9576,9 @@ function CommentRow({
 }) {
   const [liked, setLiked] = useState(comment.viewer_liked);
   const [likeCount, setLikeCount] = useState(comment.like_count);
+  // Bumped by the person's own like only: a refused unlike that puts the
+  // heart back never pops it.
+  const [likeBurst, setLikeBurst] = useState(0);
   const [replyOpen, setReplyOpen] = useState(false);
   const [replyDraft, setReplyDraft] = useState("");
   const [replySubmitting, setReplySubmitting] = useState(false);
@@ -9629,6 +9636,7 @@ function CommentRow({
     const prevLiked = liked;
     const prevCount = likeCount;
     setLiked(next);
+    if (next) setLikeBurst((n) => n + 1);
     setLikeCount((c) => Math.max(0, c + (next ? 1 : -1)));
     const r = await vibeRequest(`/api/comments/${comment.id}/like`, {
       method: next ? "POST" : "DELETE",
@@ -9794,7 +9802,7 @@ function CommentRow({
               font: "inherit",
             }}
           >
-            <LikeBurst liked={liked} color="#E0245E">
+            <LikeBurst liked={liked} burst={likeBurst} color="#E0245E">
               <LikeIcon filled={liked} />
             </LikeBurst>
             {likeCount > 0 ? <span>{likeCount}</span> : null}

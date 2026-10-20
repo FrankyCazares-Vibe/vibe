@@ -2,7 +2,7 @@ import "server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-import { readLatestPerRoom } from "@/lib/chat/latest-per-room";
+import { newestLivePerRoom, readLatestPerRoomWithDeleted } from "@/lib/chat/latest-per-room";
 import { loadHiddenUsers, type HiddenUsers } from "@/lib/safety/hidden-users";
 
 import { visibleActorFilter } from "./event-notice";
@@ -31,7 +31,9 @@ import { visibleActorFilter } from "./event-notice";
  * (its mute copy promises "no unread badge"). And, the one addition, the
  * recommended single rule (research code-notifications.md §E): a latest
  * message from someone blocked or muted doesn't light the icon, the same
- * people whose pushes are never sent.
+ * people whose pushes are never sent. A message its sender deleted (the
+ * "Message deleted" note, Oct 19, 2026) is nothing to read: the newest row
+ * that is not a note decides (Oct 20, 2026, as the club counts already did).
  *
  * WHICH CLIENT: the badge route passes the student's own client (RLS scopes
  * every read to them, as in the count and threads routes). The dispatcher
@@ -61,7 +63,7 @@ type MemberRow = {
   channels: { type: string; org_id: string | null } | null;
 };
 
-type LatestRow = { channel_id: string; user_id: string; created_at: string };
+type LatestRow = { channel_id: string; user_id: string; created_at: string; deleted_at?: string | null };
 
 const time = (iso: string | null | undefined): number => (iso ? Date.parse(iso) : Number.NaN);
 
@@ -114,14 +116,16 @@ export async function loadBadgeCounts(
       // push a quiet one's newest message out of a shared window and off the
       // icon. A database without migration C reads today's window of
       // `channelIds.length * MESSAGES_PER_CHANNEL` rows shared by all.
+      // With `deleted_at`, so a note is stepped over (a database without the
+      // column reads the same rows without it: no notes there).
       const select = "channel_id, user_id, created_at";
-      const latestRes = await readLatestPerRoom(
+      const latestRes = await readLatestPerRoomWithDeleted(
         client,
         { ids: channelIds, per: MESSAGES_PER_CHANNEL, topLevelOnly: false, liveOnly: true, select, tag: "push/badge chat_latest_per_channel" },
-        () =>
+        (columns) =>
           client
             .from("messages")
-            .select(select)
+            .select(columns)
             .in("channel_id", channelIds)
             .is("removed_at", null)
             .order("created_at", { ascending: false })
@@ -129,10 +133,7 @@ export async function loadBadgeCounts(
       );
       if (latestRes.error) return { ok: false, error: latestRes.error };
 
-      const latest = new Map<string, LatestRow>();
-      for (const row of (latestRes.data ?? []) as LatestRow[]) {
-        if (!latest.has(row.channel_id)) latest.set(row.channel_id, row);
-      }
+      const latest = newestLivePerRoom((latestRes.data ?? []) as LatestRow[]);
       for (const m of members) {
         const last = latest.get(m.channel_id);
         if (!last || last.user_id === userId) continue;

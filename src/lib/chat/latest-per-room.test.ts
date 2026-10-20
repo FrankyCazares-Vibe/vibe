@@ -34,7 +34,7 @@ registerHooks({
 });
 
 const specifier = "./latest-per-room.ts";
-const { readLatestPerRoom, LATEST_IDS_PER_CALL, LATEST_ROWS_PER_CALL, LATEST_PER_ROOM_FN, idsPerCall } = (await import(specifier)) as typeof import("./latest-per-room");
+const { readLatestPerRoom, readLatestPerRoomWithDeleted, newestLivePerRoom, LATEST_IDS_PER_CALL, LATEST_ROWS_PER_CALL, LATEST_PER_ROOM_FN, idsPerCall } = (await import(specifier)) as typeof import("./latest-per-room");
 type Client = Parameters<typeof readLatestPerRoom>[0];
 
 type Call = unknown[];
@@ -197,4 +197,54 @@ test("chunks: one missing answer falls back for all; one failed chunk fails the 
   assert.deepEqual(await readLatestPerRoom(half.client, opts({ ids }), shared.read), { data: [{ channel_id: "shared" }], error: null, perRoom: false });
   const failed = fakeClient((_, n) => (n === 1 ? { error: BOOM } : { data: [{ channel_id: "r0" }] }));
   assert.deepEqual(await readLatestPerRoom(failed.client, opts({ ids }), window().read), { data: null, error: BOOM, perRoom: true });
+});
+
+// ── For an unread rule: `deleted_at` (the "Message deleted" note, Oct 20, 2026) ──
+
+test("with deleted: one call with deleted_at added to the select; the answer is handed back as it is", async () => {
+  const { client, log } = fakeClient(() => ({ data: [{ channel_id: "a", created_at: "t", deleted_at: null }] }));
+  const today = window();
+  const res = await readLatestPerRoomWithDeleted(client, opts({ select: "channel_id, created_at" }), () => today.read());
+  assert.equal(res.error, null);
+  assert.deepEqual(res.data, [{ channel_id: "a", created_at: "t", deleted_at: null }]);
+  assert.equal(log.length, 1);
+  assert.deepEqual(log[0].calls.find((c) => c[0] === "select"), ["select", "channel_id, created_at, deleted_at"]);
+  assert.equal(today.called.n, 0);
+});
+
+test("with deleted, no column: the function and today's window both refuse it; the read is made once more with the select alone", async (t) => {
+  t.mock.method(console, "warn", () => {});
+  const NO_COLUMN = { code: "42703", message: "column chat_latest_per_channel.deleted_at does not exist" };
+  const { client, log } = fakeClient((_a, n) => (n === 0 ? { error: NO_COLUMN } : { data: [{ channel_id: "a", created_at: "t" }] }));
+  const windows: string[] = [];
+  const res = await readLatestPerRoomWithDeleted(client, opts({ select: "channel_id, created_at" }), (select) => {
+    windows.push(select);
+    return Promise.resolve({ data: null, error: NO_COLUMN as never });
+  });
+  assert.equal(res.error, null);
+  assert.deepEqual(res.data, [{ channel_id: "a", created_at: "t" }]);
+  assert.deepEqual(log.map((l) => l.calls.find((c) => c[0] === "select")?.[1]), ["channel_id, created_at, deleted_at", "channel_id, created_at"]);
+  assert.deepEqual(windows, ["channel_id, created_at, deleted_at"], "today's window was asked with the wider select only");
+});
+
+test("with deleted: any other error is handed back, no second read", async () => {
+  const boom = { code: "XX000", message: "boom" };
+  const { client, log } = fakeClient(() => ({ error: boom }));
+  const res = await readLatestPerRoomWithDeleted(client, opts(), () => window().read());
+  assert.deepEqual(res.error, boom);
+  assert.equal(log.length, 1);
+});
+
+test("newestLivePerRoom: the first row of each room that is not a note, and not skipped; a room of notes only has no entry", () => {
+  const rows = [
+    { channel_id: "a", user_id: "x", deleted_at: "2026-10-19T12:00:00Z" },
+    { channel_id: "a", user_id: "y", deleted_at: null },
+    { channel_id: "a", user_id: "z", deleted_at: null },
+    { channel_id: "b", user_id: "x", deleted_at: "2026-10-19T12:00:00Z" },
+    { channel_id: "c", user_id: "blocked" },
+    { channel_id: "c", user_id: "w" },
+  ];
+  const out = newestLivePerRoom(rows, (r) => r.user_id === "blocked");
+  assert.deepEqual([...out.entries()].map(([id, r]) => [id, r.user_id]), [["a", "y"], ["c", "w"]]);
+  assert.deepEqual([...newestLivePerRoom(rows).entries()].map(([id, r]) => [id, r.user_id]), [["a", "y"], ["c", "blocked"]]);
 });

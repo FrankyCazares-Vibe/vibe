@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { readLatestPerRoom } from "@/lib/chat/latest-per-room";
+import { newestLivePerRoom, readLatestPerRoomWithDeleted } from "@/lib/chat/latest-per-room";
 import { attachNotificationOrgs, type NotificationOrg } from "@/lib/orgs/notification-orgs";
 import { visibleActorFilter, withEventNotices } from "@/lib/push/event-notice";
 import { loadHiddenUsers } from "@/lib/safety/hidden-users";
@@ -444,26 +444,24 @@ export async function GET() {
       // (S71 amendment 2): a busy dm can no longer push a quiet dm's newest
       // message out and drop it from the count. A database without migration
       // C reads today's window of `channelIds.length * 3` rows shared by all.
+      // A message its sender deleted (the "Message deleted" note) is nothing
+      // to read: the newest row that is not a note decides (Oct 20, 2026; a
+      // database without `deleted_at` reads the same rows without it).
       const select = "channel_id,user_id,created_at";
-      const { data: lastMsgs, error: msgsErr } = await readLatestPerRoom(
+      const { data: lastMsgs, error: msgsErr } = await readLatestPerRoomWithDeleted(
         supabase,
         { ids: channelIds, per: 3, topLevelOnly: false, liveOnly: false, select, tag: "api/me/otto unread-dms chat_latest_per_channel" },
-        () =>
+        (columns) =>
           supabase
             .from("messages")
-            .select(select)
+            .select(columns)
             .in("channel_id", channelIds)
             .order("created_at", { ascending: false })
             .limit(channelIds.length * 3),
       );
       if (msgsErr) throw msgsErr;
-      const latestByChannel = new Map<string, { user_id: string; created_at: string }>();
-      type MsgRow = { channel_id: string; user_id: string; created_at: string };
-      for (const m of (lastMsgs ?? []) as MsgRow[]) {
-        if (!latestByChannel.has(m.channel_id)) {
-          latestByChannel.set(m.channel_id, { user_id: m.user_id, created_at: m.created_at });
-        }
-      }
+      type MsgRow = { channel_id: string; user_id: string; created_at: string; deleted_at?: string | null };
+      const latestByChannel = newestLivePerRoom((lastMsgs ?? []) as MsgRow[]);
       for (const r of dms) {
         const last = latestByChannel.get(r.channel_id);
         if (!last) continue;
