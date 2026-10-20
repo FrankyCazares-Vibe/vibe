@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>Round 2 · Your club · desktop</title>
+<title>Round 2 · The club's own page, officer view · desktop</title>
 <script src="./support.js"></script>
 </head>
 <body>
@@ -12,16 +12,14 @@
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 body{margin:0;font-family:"DM Sans",system-ui,sans-serif;-webkit-font-smoothing:antialiased;background:#0C0B0B}
-button,input{font:inherit;color:inherit;background:transparent;border:0}
-button{cursor:pointer}
+button{font:inherit;color:inherit;background:transparent;border:0;cursor:pointer}
 a{color:inherit;text-decoration:none}
 a:hover{color:inherit}
 svg{display:block}
-input::placeholder{color:#9C958C;opacity:1}
 </style>
 </helmet>
-<div style="min-height: 900px; position: relative; isolation: isolate; display: flex; flex-wrap: wrap; background: #0C0B0B; color: #F6F1EA; font-family: 'DM Sans', system-ui, sans-serif">
-  <div aria-hidden="true" style="position: absolute; inset: 0; z-index: -1; pointer-events: none; background: radial-gradient(720px 620px at 0% 100%, rgba(255,92,53,0.34), rgba(255,92,53,0.08) 40%, transparent 68%), radial-gradient(560px 420px at 100% 0%, rgba(255,92,53,0.14), transparent 60%)"></div>
+<div style="min-height: 1000px; position: relative; isolation: isolate; display: flex; flex-wrap: wrap; background: #0C0B0B; color: #F6F1EA; font-family: 'DM Sans', system-ui, sans-serif">
+  <div aria-hidden="true" style="position: absolute; inset: 0; z-index: -1; pointer-events: none; background: radial-gradient(720px 620px at 0% 100%, rgba(255,92,53,0.30), rgba(255,92,53,0.06) 40%, transparent 68%)"></div>
 
   <nav aria-label="App" style="flex: 0 0 232px; padding: 24px 14px; display: flex; flex-direction: column; gap: 4px; border-right: 1px solid rgba(255,255,255,0.06)">
     <div style="font-family: Fraunces, serif; font-weight: 900; font-size: 30px; letter-spacing: -0.03em; padding: 0 10px 18px">vibe<span style="color: #FF5C35">.</span></div>
@@ -34,7 +32,7 @@ input::placeholder{color:#9C958C;opacity:1}
     <div style="font-size: 10.5px; font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase; color: #9C958C; padding: 16px 12px 6px">Clubs you run</div>
     <sc-for list="{{clubs}}" as="c" hint-placeholder-count="3">
       <a href="#" aria-current="{{c.current}}" style="height: 44px; border-radius: 12px; padding: 0 12px; display: flex; align-items: center; gap: 10px; font-size: 14.5px; color: {{c.ink}}; background: {{c.bg}}">
-        <span aria-hidden="true" style="width: 24px; height: 24px; border-radius: 999px; background: {{c.color}}; display: flex; align-items: center; justify-content: center; font-family: Fraunces, serif; font-weight: 800; font-size: 9.5px; color: #F6F1EA; flex-shrink: 0">{{c.initials}}</span>
+        <span aria-hidden="true" style="width: 24px; height: 24px; border-radius: 7px; background: {{c.color}}; display: flex; align-items: center; justify-content: center; font-family: Fraunces, serif; font-weight: 800; font-size: 9.5px; color: #F6F1EA; flex-shrink: 0">{{c.initials}}</span>
         <span style="flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{c.name}}</span>
         <span aria-hidden="true" style="width: 8px; height: 8px; border-radius: 999px; background: {{c.dot}}; flex-shrink: 0"></span>
       </a>
@@ -47,77 +45,80 @@ input::placeholder{color:#9C958C;opacity:1}
     <div style="font-size: 12px; color: #9C958C; padding: 6px 12px 0; line-height: 1.4">Founders only, as today.</div>
   </nav>
 
-  <main style="flex: 999 1 560px; min-width: 0; padding: 28px 32px 40px; display: flex; flex-direction: column; gap: 20px; max-width: 1180px">
-    <header style="display: flex; flex-wrap: wrap; align-items: center; gap: 16px">
-      <div aria-hidden="true" style="width: 56px; height: 56px; border-radius: 999px; background: linear-gradient(135deg, #2A8A8E, #1C5E62); display: flex; align-items: center; justify-content: center; font-family: Fraunces, serif; font-weight: 800; font-size: 20px">SC</div>
-      <div style="flex: 1; min-width: 220px">
-        <h1 style="font-family: Fraunces, serif; font-weight: 800; font-size: 32px; letter-spacing: -0.03em; line-height: 1.05">Sixty-Four Chess</h1>
-        <div style="font-size: 14px; color: #9C958C">Owner · 41 followers · 23 members</div>
+  <main style="flex: 999 1 560px; min-width: 0; padding: 20px 28px 40px; display: flex; flex-direction: column; gap: 18px; max-width: 1200px">
+    <div style="position: relative; height: 190px; border-radius: 20px; overflow: hidden; background: repeating-conic-gradient(rgba(255,255,255,0.05) 0% 25%, transparent 0% 50%) 0 0 / 32px 32px, linear-gradient(160deg, #2A6F72 0%, #1C4A4D 60%, #10292B 100%)"></div>
+    <header style="position: relative; z-index: 1; display: flex; flex-wrap: wrap; align-items: flex-end; gap: 18px; margin-top: -70px; padding: 0 20px">
+      <div aria-hidden="true" style="width: 112px; height: 112px; border-radius: 28px; background: linear-gradient(135deg, #2A8A8E, #1C5E62); border: 5px solid #0C0B0B; display: flex; align-items: center; justify-content: center; font-family: Fraunces, serif; font-weight: 900; font-size: 40px; flex-shrink: 0">SC</div>
+      <div style="flex: 1; min-width: 260px; display: flex; flex-direction: column; gap: 4px; padding-bottom: 4px">
+        <h1 style="font-family: Fraunces, serif; font-weight: 800; font-size: 34px; letter-spacing: -0.03em; line-height: 1.05">Sixty-Four Chess</h1>
+        <div style="font-size: 14px; color: #9C958C">@sixtyfour · <strong style="color: #F6F1EA">41</strong> followers · <strong style="color: #F6F1EA">23</strong> members · you’re the Owner</div>
       </div>
-      <a href="#" style="height: 44px; padding: 0 18px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.14); display: flex; align-items: center; font-weight: 600; font-size: 15px">View the page</a>
-      <button type="button" style="height: 44px; padding: 0 18px; border-radius: 999px; background: #F6F1EA; color: #0C0B0B; display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 15px"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12M7 8l5-5 5 5M5 14v5a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-5"></path></svg>Share the club</button>
+      <div style="display: flex; gap: 8px; padding-bottom: 6px">
+        <button type="button" style="height: 42px; padding: 0 16px; border-radius: 12px; background: rgba(255,255,255,0.08); font-size: 14.5px; font-weight: 600">Edit page</button>
+        <button type="button" style="height: 42px; padding: 0 16px; border-radius: 12px; background: rgba(255,255,255,0.08); font-size: 14.5px; font-weight: 600">Share page</button>
+        <button type="button" aria-label="Create: post, event, poll" aria-haspopup="menu" style="width: 42px; height: 42px; border-radius: 12px; background: #F6F1EA; color: #0C0B0B; display: flex; align-items: center; justify-content: center"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg></button>
+      </div>
     </header>
 
     <div style="display: flex; flex-wrap: wrap; gap: 20px; align-items: flex-start">
       <div style="flex: 2 1 560px; min-width: 0; display: flex; flex-direction: column; gap: 16px">
-        <section aria-label="Needs you" style="border-radius: 14px; background: rgba(22,21,21,0.86); border: 1px solid rgba(255,255,255,0.07); padding: 8px 8px 8px 16px; display: flex; align-items: center; gap: 12px">
-          <div aria-hidden="true" style="width: 9px; height: 9px; border-radius: 999px; background: #FF5C35"></div>
-          <div style="flex: 1; font-size: 15px">2 people want to join</div>
-          <button type="button" style="height: 38px; padding: 0 16px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.14); font-size: 14px; font-weight: 600">Review</button>
-        </section>
-
-        <section aria-label="Up next" style="border-radius: 18px; padding: 22px; background: rgba(22,21,21,0.92); border: 1px solid rgba(255,92,53,0.55); box-shadow: 0 0 32px rgba(255,92,53,0.2); display: flex; flex-direction: column; gap: 14px">
-          <div style="display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap">
-            <div style="font-size: 14px; color: #CFC8BE">Up next · Thu · 7 PM · The Lantern Room</div>
-            <div style="font-size: 14px; color: #F6C468">In 2 days</div>
+        <div style="font-size: 15.5px; line-height: 1.45; color: #E4DDD3">Weekly games in the Lantern Room. Beginners welcome, we will teach you.</div>
+        <section aria-label="Up next" style="border-radius: 18px; padding: 18px 20px; background: rgba(22,21,21,0.92); border: 1px solid rgba(255,92,53,0.55); box-shadow: 0 0 30px rgba(255,92,53,0.18); display: flex; flex-wrap: wrap; align-items: center; gap: 14px 24px">
+          <div style="flex: 1 1 220px; display: flex; flex-direction: column; gap: 4px">
+            <div style="font-size: 13.5px; color: #CFC8BE">Up next · Thu · 7 PM · The Lantern Room</div>
+            <div style="font-family: Fraunces, serif; font-weight: 800; font-size: 28px; letter-spacing: -0.03em; line-height: 1.05">Blitz Night</div>
+            <div style="font-size: 14px; color: #CFC8BE"><strong style="color: #F6F1EA">14</strong> going · <strong style="color: #F6F1EA">6</strong> interested · <span style="color: #F6C468">in 2 days</span></div>
           </div>
-          <div style="font-family: Fraunces, serif; font-weight: 800; font-size: 34px; letter-spacing: -0.03em; line-height: 1.05">Blitz Night</div>
-          <ol aria-label="Steps" style="list-style: none; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; max-width: 640px">
+          <ol aria-label="Steps" style="list-style: none; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 4px; flex: 1 1 300px">
             <sc-for list="{{steps}}" as="t" hint-placeholder-count="5">
-              <li style="display: flex; flex-direction: column; align-items: flex-start; gap: 6px">
-                <div aria-hidden="true" style="width: 28px; height: 28px; border-radius: 999px; display: flex; align-items: center; justify-content: center; font-size: 12.5px; font-weight: 700; background: {{t.bg}}; border: 1.5px solid {{t.ring}}; color: {{t.ink}}"><sc-if value="{{t.done}}" hint-placeholder-val="{{false}}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5L20 7"></path></svg></sc-if><sc-if value="{{t.open}}" hint-placeholder-val="{{true}}">{{t.mark}}</sc-if></div>
-                <div style="font-size: 13px; color: {{t.label}}">{{t.name}}</div>
+              <li style="display: flex; flex-direction: column; align-items: center; gap: 5px; text-align: center">
+                <div aria-hidden="true" style="width: 26px; height: 26px; border-radius: 999px; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; background: {{t.bg}}; border: 1.5px solid {{t.ring}}; color: {{t.ink}}"><sc-if value="{{t.done}}" hint-placeholder-val="{{false}}"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5L20 7"></path></svg></sc-if><sc-if value="{{t.open}}" hint-placeholder-val="{{true}}">{{t.mark}}</sc-if></div>
+                <div style="font-size: 12px; color: {{t.label}}">{{t.name}}</div>
               </li>
             </sc-for>
           </ol>
-          <div style="font-size: 15px; color: #E4DDD3"><strong>14</strong> going · <strong>6</strong> interested · check-in opens Thursday at 6:00</div>
-          <div style="display: flex; gap: 8px; flex-wrap: wrap">
-            <button type="button" style="height: 44px; padding: 0 20px; border-radius: 999px; background: #FF5C35; color: #160A06; font-weight: 700; font-size: 15px">Share the event</button>
-            <button type="button" style="height: 44px; padding: 0 16px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.14); font-weight: 600; font-size: 15px">Who’s going</button>
-            <button type="button" style="height: 44px; padding: 0 16px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.14); font-weight: 600; font-size: 15px">Edit</button>
+          <div style="display: flex; gap: 8px">
+            <button type="button" style="height: 42px; padding: 0 18px; border-radius: 999px; background: #FF5C35; color: #160A06; font-weight: 700; font-size: 14.5px">Share the event</button>
+            <button type="button" style="height: 42px; padding: 0 14px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.14); font-weight: 600; font-size: 14.5px">Edit</button>
           </div>
         </section>
-
-        <section aria-label="Write to members" style="border-radius: 16px; background: rgba(22,21,21,0.86); border: 1px solid rgba(255,255,255,0.07); padding: 14px; display: flex; flex-direction: column; gap: 10px">
-          <div style="display: flex; gap: 6px">
-            <button type="button" aria-pressed="true" style="height: 36px; padding: 0 14px; border-radius: 999px; background: #F6F1EA; color: #0C0B0B; font-size: 14px; font-weight: 600">Post</button>
-            <button type="button" aria-pressed="false" style="height: 36px; padding: 0 14px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.14); font-size: 14px; font-weight: 600">New event</button>
-            <button type="button" aria-pressed="false" style="height: 36px; padding: 0 14px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.14); font-size: 14px; font-weight: 600">Poll</button>
-          </div>
-          <div style="display: flex; gap: 8px; align-items: center">
-            <label for="r2d-write" style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0)">Write to members</label>
-            <input id="r2d-write" type="text" placeholder="Write to members…" style="flex: 1; min-width: 0; height: 46px; border-radius: 999px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); padding: 0 18px; font-size: 15px">
-            <button type="button" style="height: 46px; padding: 0 18px; border-radius: 999px; background: rgba(255,255,255,0.08); font-size: 14.5px; font-weight: 700">Send</button>
-          </div>
-          <div style="font-size: 12.5px; color: #9C958C">Goes on the Board. Members and followers read it.</div>
-        </section>
+        <div role="tablist" aria-label="Club page" style="display: flex; gap: 28px; border-bottom: 1px solid rgba(255,255,255,0.08)">
+          <sc-for list="{{ptabs}}" as="p" hint-placeholder-count="4">
+            <button type="button" role="tab" aria-selected="{{p.sel}}" style="height: 44px; font-size: 14.5px; font-weight: 600; color: {{p.ink}}; box-shadow: {{p.line}}">{{p.label}}</button>
+          </sc-for>
+        </div>
+        <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px">
+          <sc-for list="{{posts}}" as="g" hint-placeholder-count="6">
+            <div style="aspect-ratio: 4 / 3; border-radius: 10px; background: {{g.bg}}; display: flex; align-items: flex-end; padding: 10px">
+              <span style="font-size: 13px; font-weight: 600; text-shadow: 0 1px 4px rgba(0,0,0,0.6)">{{g.t}}</span>
+            </div>
+          </sc-for>
+        </div>
       </div>
 
-      <nav aria-label="Club tools" style="flex: 1 1 300px; min-width: 0; border-radius: 16px; background: rgba(22,21,21,0.86); border: 1px solid rgba(255,255,255,0.07); display: flex; flex-direction: column; padding: 6px 0">
-        <div style="font-family: Fraunces, serif; font-weight: 800; font-size: 19px; padding: 10px 16px 6px">Club tools</div>
-        <sc-for list="{{tools}}" as="r" hint-placeholder-count="7">
-          <a href="#" style="min-height: 48px; padding: 0 16px; display: flex; align-items: center; gap: 12px; border-top: 1px solid rgba(255,255,255,0.06)">
-            <span style="flex: 1; font-size: 15px">{{r.label}}</span>
-            <span style="font-size: 13px; color: {{r.metaInk}}">{{r.meta}}</span>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#9C958C" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"></path></svg>
-          </a>
-        </sc-for>
-      </nav>
+      <aside style="flex: 1 1 300px; min-width: 0; display: flex; flex-direction: column; gap: 14px">
+        <a href="#" style="min-height: 52px; border-radius: 14px; border: 1px dashed rgba(255,255,255,0.18); padding: 0 14px; display: flex; align-items: center; gap: 10px">
+          <span aria-hidden="true" style="width: 9px; height: 9px; border-radius: 999px; background: #FF5C35; flex-shrink: 0"></span>
+          <span style="flex: 1; font-size: 15px">2 want to join</span>
+          <span style="font-size: 13px; color: #9C958C">+6 followers</span>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#9C958C" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"></path></svg>
+        </a>
+        <nav aria-label="Club tools" style="border-radius: 16px; border: 1px dashed rgba(255,255,255,0.18); display: flex; flex-direction: column; padding: 6px 0">
+          <div style="display: flex; align-items: baseline; justify-content: space-between; padding: 10px 16px 6px"><span style="font-family: Fraunces, serif; font-weight: 800; font-size: 19px">Club tools</span><span style="font-size: 12.5px; color: #9C958C">Only officers</span></div>
+          <sc-for list="{{tools}}" as="r" hint-placeholder-count="6">
+            <a href="#" style="min-height: 46px; padding: 0 16px; display: flex; align-items: center; gap: 12px; border-top: 1px solid rgba(255,255,255,0.06)">
+              <span style="flex: 1; font-size: 14.5px">{{r.label}}</span>
+              <span style="font-size: 13px; color: #9C958C">{{r.meta}}</span>
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#9C958C" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"></path></svg>
+            </a>
+          </sc-for>
+        </nav>
+      </aside>
     </div>
   </main>
 </div>
 </x-dc>
-<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":900}}'>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1000}}'>
 class Component extends DCLogic {
   renderVals() {
     const names = ['Posted', 'Going', 'Check-in', 'Who came', 'Thank-you'];
@@ -126,8 +127,19 @@ class Component extends DCLogic {
       if (i === 1) return { name, done: false, open: true, mark: '2', bg: 'rgba(255,92,53,0.18)', ring: '#FF5C35', ink: '#FF8A66', label: '#FF8A66' };
       return { name, done: false, open: true, mark: String(i + 1), bg: 'transparent', ring: 'rgba(255,255,255,0.22)', ink: '#9C958C', label: '#9C958C' };
     });
+    const on = { sel: 'true', ink: '#F6F1EA', line: 'inset 0 -2px 0 #F6F1EA' };
+    const off = { sel: 'false', ink: '#9C958C', line: 'none' };
     return {
       steps,
+      ptabs: [Object.assign({ label: 'Posts' }, on), Object.assign({ label: 'Events' }, off), Object.assign({ label: 'Board' }, off), Object.assign({ label: 'About' }, off)],
+      posts: [
+        { t: 'Rapid Night, 18 came', bg: 'linear-gradient(150deg, #5B3A2A, #2A1B14)' },
+        { t: 'New boards are in', bg: 'linear-gradient(150deg, #2A4A5B, #142530)' },
+        { t: 'Puzzle of the week', bg: 'linear-gradient(150deg, #3D3550, #1E1A28)' },
+        { t: 'Simul with the president', bg: 'linear-gradient(150deg, #4A4A2A, #25250F)' },
+        { t: 'Beginners night', bg: 'linear-gradient(150deg, #2A5B45, #142D22)' },
+        { t: 'Our first meet', bg: 'linear-gradient(150deg, #5B2A3F, #2D1420)' }
+      ],
       nav: [
         { label: 'Campus', icon: 'M3 21h18M5 21V10M19 21V10M9 21V10M15 21V10M2 10l10-6 10 6z' },
         { label: 'Network', icon: 'M12 7a3 3 0 1 0 0-.01M5 19a3 3 0 1 0 0-.01M19 19a3 3 0 1 0 0-.01M10.5 9.5l-4 7M13.5 9.5l4 7M8 19h8' },
@@ -140,13 +152,12 @@ class Component extends DCLogic {
         { name: 'Compound Interest', initials: 'CI', color: 'linear-gradient(135deg, #8A6A2A, #5C4519)', ink: '#CFC8BE', bg: 'transparent', dot: 'transparent', current: 'false' }
       ],
       tools: [
-        { label: 'Join requests', meta: '2', metaInk: '#FF8A66' },
-        { label: 'Members', meta: '23', metaInk: '#9C958C' },
-        { label: 'Followers', meta: '41', metaInk: '#9C958C' },
-        { label: 'Officers and titles', meta: '3', metaInk: '#9C958C' },
-        { label: 'Share and invite', meta: 'Link, cards, QR', metaInk: '#9C958C' },
-        { label: 'Past events and who came', meta: '4', metaInk: '#9C958C' },
-        { label: 'Club settings', meta: 'Page, joining, Board', metaInk: '#9C958C' }
+        { label: 'Join requests', meta: '2' },
+        { label: 'Members', meta: '23' },
+        { label: 'Followers', meta: '41' },
+        { label: 'Officers and titles', meta: '3' },
+        { label: 'Past events and who came', meta: '4' },
+        { label: 'Club settings', meta: 'Page, joining, Board' }
       ]
     };
   }

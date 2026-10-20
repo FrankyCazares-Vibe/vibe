@@ -168,8 +168,8 @@
    "x": 2540,
    "y": 0,
    "w": 390,
-   "h": 844,
-   "title": "3 · Switched: the club's home, the tab shows the club",
+   "h": 1100,
+   "title": "3 · Switched: the club's own profile",
    "page": "r2"
   },
   "R2_Switcher_Phone.dc.html": {
@@ -184,14 +184,14 @@
    "x": 1600,
    "y": 1400,
    "w": 1440,
-   "h": 900,
+   "h": 1000,
    "expand": "fill",
-   "title": "Desktop: Clubs you run in the nav",
+   "title": "Desktop: Clubs you run opens the club's own page",
    "page": "r2"
   },
   "R2_Setup.dc.html": {
    "x": 1600,
-   "y": 2560,
+   "y": 2660,
    "w": 1600,
    "h": 1050,
    "title": "How a club gets on Vibe",
@@ -362,7 +362,7 @@
   },
   "r2_setup": {
    "x": 1600,
-   "y": 2320,
+   "y": 2420,
    "text": "Setting up a club.",
    "kind": "title1",
    "maxW": 1600,

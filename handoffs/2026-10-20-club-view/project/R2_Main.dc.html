@@ -22,7 +22,7 @@ a:hover{color:inherit}
     <header style="display: flex; flex-direction: column; gap: 14px; max-width: 900px">
       <div style="font-size: 12px; letter-spacing: 0.14em; text-transform: uppercase; color: #CFC8BE"><span style="color: #FF5C35">●</span> Round 2 · after your notes</div>
       <h1 style="font-family: Fraunces, serif; font-weight: 900; font-size: 72px; letter-spacing: -0.035em; line-height: 1">Less going <span style="color: #FF5C35">on.</span></h1>
-      <p style="font-size: 20px; line-height: 1.5; color: #CFC8BE">One place for officers, three things on its first screen, and people set up clubs as themselves. Round 1 is still on the other page.</p>
+      <p style="font-size: 20px; line-height: 1.5; color: #CFC8BE">Switch to your club like on Instagram: its own page with two officer things on it, and people set up clubs as themselves. Round 1 is still on the other page.</p>
     </header>
 
     <section aria-label="The answers" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(500px, 100%), 1fr)); gap: 14px">
@@ -41,7 +41,7 @@ a:hover{color:inherit}
 
     <section aria-label="What left the first screen" style="border-radius: 18px; border: 1px dashed rgba(246,241,234,0.22); padding: 20px 22px; display: flex; flex-direction: column; gap: 10px">
       <h2 style="font-family: Fraunces, serif; font-weight: 800; font-size: 22px; letter-spacing: -0.02em">What left the officer’s first screen.</h2>
-      <p style="font-size: 15.5px; line-height: 1.5; color: #E4DDD3">The four quick-action tiles, the three number tiles (now one line under the club’s name), the long list (now Club tools), and the setup list once setup is done. Nothing is removed from the app; it moved behind one tap.</p>
+      <p style="font-size: 15.5px; line-height: 1.5; color: #E4DDD3">The quick-action tiles (now one + button), the number tiles (now the page’s own counts), the long list (now Club tools), and the setup list once setup is done. Nothing is removed from the app; it moved behind one tap.</p>
     </section>
 
     <section aria-label="Calls" style="display: flex; flex-direction: column; gap: 10px">
@@ -67,8 +67,8 @@ class Component extends DCLogic {
   renderVals() {
     return {
       answers: [
-        { q: 'Your idea: an owner tab', t: 'Switch to your club on the Profile tab.', lines: ['No sixth tab: the bar stays at five. Tap your name on your profile, or hold the Profile tab, and pick your club.', 'The tab then shows the club’s picture and opens its home until you switch back, like switching to a club’s Instagram account.', 'Desktop has room: “Clubs you run” in the left nav, next to Admin, which stays founders-only.'] },
-        { q: 'A lot going on', t: 'Three things on its first screen.', lines: ['Needs you: only when something does (join requests, an unfinished setup).', 'Up next: one card from posted to thank-you, with the next thing to do as its button.', 'Write to members: Post, New event or Poll, onto the Board. Everything else is in Club tools.'] },
+        { q: 'Your idea: an owner tab', t: 'Switch to your club on the Profile tab.', lines: ['No sixth tab: the bar stays at five. Tap your name on your profile, or hold the Profile tab, and pick your club.', 'The tab then becomes the club’s own profile, with its banner, posts and events, plus Edit page and Share page, until you switch back. Like switching to a club’s Instagram account.', 'Desktop: “Clubs you run” in the left nav opens the same club page. Admin stays founders-only.'] },
+        { q: 'A lot going on', t: 'Only two officer things on the page.', lines: ['Needs you: one quiet line only officers see (join requests, new followers, an unfinished setup).', 'Up next: one card from posted to thank-you, with the next thing to do as its button. Visitors see it with Going and Interested.', 'Posting moves behind +, like Instagram: Board post, New event or Poll. Everything else is in Club tools.'] },
         { q: 'Part of several clubs?', t: 'A switcher, and a dot where you’re needed.', lines: ['Phone: the same switcher lists you first, then each club you run, with what needs you. A dot on the Profile tab says one does.', 'Desktop: each club you run is its own line in the nav.', 'Only clubs where you’re an officer. Clubs you just belong to stay in Messages and on your profile.'] },
         { q: 'Club emails?', t: 'People sign in as themselves.', lines: ['No shared club login: when officers graduate, a shared password leaves with them.', 'The club’s email is optional: it can prove the club is real and get it back if its owner disappears.', 'For the first 20, you make a one-time setup link in Admin › Clubs and hand it over in person.'] }
       ],
