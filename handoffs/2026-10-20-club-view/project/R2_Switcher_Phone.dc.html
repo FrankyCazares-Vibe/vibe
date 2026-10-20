@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Round 2 · Switch club · phone</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,300..800;1,400&amp;family=Fraunces:ital,wght,SOFT@0,400..900,100;1,400,100&amp;display=swap">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{margin:0;font-family:"DM Sans",system-ui,sans-serif;-webkit-font-smoothing:antialiased;background:#0C0B0B}
+button{font:inherit;color:inherit;background:transparent;border:0;cursor:pointer}
+a{color:inherit;text-decoration:none}
+a:hover{color:inherit}
+svg{display:block}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; position: relative; isolation: isolate; overflow: hidden; background: #0C0B0B; color: #F6F1EA; font-family: 'DM Sans', system-ui, sans-serif">
+  <div aria-hidden="true" style="position: absolute; inset: 0; pointer-events: none; background: radial-gradient(560px 420px at 100% 0%, rgba(255,92,53,0.18), transparent 60%)"></div>
+  <div aria-hidden="true" style="position: absolute; left: 16px; right: 16px; top: 14px; display: flex; align-items: center; gap: 10px; opacity: 0.45">
+    <div style="width: 42px; height: 42px; border-radius: 999px; background: linear-gradient(135deg, #2A8A8E, #1C5E62)"></div>
+    <div style="font-family: Fraunces, serif; font-weight: 800; font-size: 21px">Sixty-Four Chess</div>
+  </div>
+  <div aria-hidden="true" style="position: absolute; left: 16px; right: 16px; top: 82px; height: 56px; border-radius: 14px; background: rgba(22,21,21,0.86); opacity: 0.45"></div>
+  <div aria-hidden="true" style="position: absolute; left: 16px; right: 16px; top: 152px; height: 230px; border-radius: 18px; border: 1px solid rgba(255,92,53,0.4); opacity: 0.45"></div>
+  <div aria-hidden="true" style="position: absolute; inset: 0; background: rgba(0,0,0,0.62)"></div>
+
+  <section role="dialog" aria-label="Your clubs" style="position: absolute; left: 0; right: 0; bottom: 0; border-radius: 24px 24px 0 0; background: #161515; border-top: 1px solid rgba(255,255,255,0.08); padding: 10px 16px 28px; display: flex; flex-direction: column; gap: 14px">
+    <div aria-hidden="true" style="width: 40px; height: 5px; border-radius: 999px; background: rgba(255,255,255,0.18); align-self: center"></div>
+    <div style="display: flex; align-items: center; justify-content: space-between">
+      <h2 style="font-family: Fraunces, serif; font-weight: 800; font-size: 24px; letter-spacing: -0.02em">Clubs you run.</h2>
+      <button type="button" aria-label="Close" style="width: 44px; height: 44px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.10); display: flex; align-items: center; justify-content: center"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg></button>
+    </div>
+
+    <ul style="list-style: none; display: flex; flex-direction: column; gap: 8px">
+      <sc-for list="{{clubs}}" as="c" hint-placeholder-count="3">
+        <li>
+          <a href="#" aria-current="{{c.current}}" style="min-height: 68px; border-radius: 16px; padding: 10px 14px; display: flex; align-items: center; gap: 12px; background: {{c.bg}}; border: 1px solid {{c.border}}">
+            <span aria-hidden="true" style="width: 44px; height: 44px; border-radius: 999px; background: {{c.color}}; display: flex; align-items: center; justify-content: center; font-family: Fraunces, serif; font-weight: 800; font-size: 15px; color: #F6F1EA; flex-shrink: 0">{{c.initials}}</span>
+            <span style="flex: 1; min-width: 0; display: flex; flex-direction: column">
+              <span style="font-family: Fraunces, serif; font-weight: 800; font-size: 18px; letter-spacing: -0.02em; line-height: 1.2">{{c.name}}</span>
+              <span style="font-size: 13px; color: #9C958C">{{c.role}}</span>
+            </span>
+            <span style="font-size: 13px; font-weight: 600; color: {{c.needsInk}}; white-space: nowrap">{{c.needs}}</span>
+          </a>
+        </li>
+      </sc-for>
+    </ul>
+
+    <p style="font-size: 13.5px; line-height: 1.45; color: #9C958C">Only clubs where you’re an officer show here. Clubs you’re a member of stay in Messages and on your profile.</p>
+
+    <a href="#" style="min-height: 52px; border-radius: 14px; border: 1px dashed rgba(255,255,255,0.18); display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 15px; font-weight: 600">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>
+      Start a club
+    </a>
+  </section>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {
+      clubs: [
+        { name: 'Sixty-Four Chess', initials: 'SC', role: 'Owner · president', needs: '2 to review', needsInk: '#FF8A66', color: 'linear-gradient(135deg, #2A8A8E, #1C5E62)', bg: 'rgba(255,255,255,0.06)', border: 'rgba(255,255,255,0.14)', current: 'true' },
+        { name: 'Quiet Hours', initials: 'QH', role: 'Mod · social chair', needs: 'Check-in tonight', needsInk: '#F6C468', color: 'linear-gradient(135deg, #3E6FA8, #26476E)', bg: 'transparent', border: 'rgba(255,255,255,0.08)', current: 'false' },
+        { name: 'Compound Interest', initials: 'CI', role: 'Admin · treasurer', needs: '', needsInk: '#9C958C', color: 'linear-gradient(135deg, #8A6A2A, #5C4519)', bg: 'transparent', border: 'rgba(255,255,255,0.08)', current: 'false' }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

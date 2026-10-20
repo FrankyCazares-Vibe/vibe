@@ -8,6 +8,14 @@ see and do in Vibe, phone and desktop. Board first, no building; Franky picks.
 - **What exists today, with file references:** `INVENTORY.md` (and the `Today` board).
 - **The builders' brief:** `SPEC.md` (sample club, look, rules, the three jobs).
 
+## Round 2 (Oct 20, after Franky's notes: "a lot going on", club emails, an owner tab, several clubs)
+The canvas opens on Round 2 (`R2_*` boards); Round 1 is its own page.
+- A **Club tab only officers see**: a sixth phone tab; "Clubs you run" in the desktop nav, next to Admin (Admin stays founders-only).
+- Its first screen has three things: Needs you, Up next (one card from posted to thank-you), Write to members. Everything else is in Club tools.
+- **Several clubs:** a switcher on the club name (phone), one nav line per club (desktop), a dot where you're needed; only clubs where you're an officer.
+- **Setup:** people sign in as themselves, never with a shared club login; the club's email is optional (proof and recovery). The first 20 get a one-time setup link from Admin › Clubs, handed over in person (checks the club, gets the president past the waitlist, makes them owner).
+- Four calls on `R2_Main`, each with a recommendation; Round 1's other calls still stand.
+
 ## Files
 - `project/*.dc.html` + `project/canvas.json`: the canvas source, exactly as published.
 - `project/support.js` is NOT kept here: it is the Design type's runtime (`artifact-type/dc-runtime.js`, 188 KB). To render

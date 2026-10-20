@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Round 2 · How a club gets on Vibe</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,300..800;1,400&amp;family=Fraunces:ital,wght,SOFT@0,400..900,100;1,400,100&amp;display=swap">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{margin:0;font-family:"DM Sans",system-ui,sans-serif;-webkit-font-smoothing:antialiased;background:#0C0B0B}
+button,input{font:inherit;color:inherit;background:transparent;border:0}
+button{cursor:pointer}
+svg{display:block}
+input::placeholder{color:#9C958C;opacity:1}
+</style>
+</helmet>
+<div style="width: 1600px; height: 1050px; position: relative; isolation: isolate; overflow: hidden; background: #0C0B0B; color: #F6F1EA; font-family: 'DM Sans', system-ui, sans-serif; padding: 56px 64px; display: flex; flex-direction: column; gap: 30px">
+  <div aria-hidden="true" style="position: absolute; inset: 0; z-index: -1; pointer-events: none; background: radial-gradient(800px 640px at 0% 100%, rgba(255,92,53,0.30), rgba(255,92,53,0.06) 45%, transparent 70%), radial-gradient(560px 420px at 100% 0%, rgba(255,92,53,0.14), transparent 60%)"></div>
+
+  <header style="display: flex; flex-direction: column; gap: 8px; max-width: 1080px">
+    <div style="font-size: 12px; letter-spacing: 0.14em; text-transform: uppercase; color: #CFC8BE"><span style="color: #FF5C35">●</span> Round 2 · setting up a club</div>
+    <h1 style="font-family: Fraunces, serif; font-weight: 800; font-size: 48px; letter-spacing: -0.03em; line-height: 1.05">How a club gets on Vibe.</h1>
+    <p style="font-size: 18px; line-height: 1.5; color: #CFC8BE">Officers sign in as themselves, never with a shared club login. For the first 20 clubs, you hand the president a setup link in person.</p>
+  </header>
+
+  <ol style="list-style: none; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 24px; align-items: start">
+    <li style="display: flex; flex-direction: column; gap: 12px">
+      <div style="display: flex; gap: 10px; align-items: baseline"><span style="font-family: Fraunces, serif; font-weight: 800; font-size: 22px; color: #FF8A66">1</span><h2 style="font-family: Fraunces, serif; font-weight: 800; font-size: 20px; letter-spacing: -0.02em">You, in Admin › Clubs</h2></div>
+      <div style="border-radius: 18px; background: #161515; border: 1px solid rgba(255,255,255,0.09); padding: 18px; display: flex; flex-direction: column; gap: 12px; min-height: 560px">
+        <div style="font-family: Fraunces, serif; font-weight: 800; font-size: 19px">New club setup link</div>
+        <label for="r2s-name" style="font-size: 13px; color: #CFC8BE">Club name</label>
+        <input id="r2s-name" type="text" value="Sixty-Four Chess" style="height: 44px; border-radius: 12px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.10); padding: 0 12px; font-size: 15px">
+        <div style="display: flex; align-items: center; gap: 10px; padding: 8px 0">
+          <span aria-hidden="true" style="width: 40px; height: 24px; border-radius: 999px; background: #F6F1EA; position: relative; flex-shrink: 0"><span style="position: absolute; right: 3px; top: 3px; width: 18px; height: 18px; border-radius: 999px; background: #0C0B0B"></span></span>
+          <span style="font-size: 14px; line-height: 1.35">We met in person: the club is checked</span>
+        </div>
+        <button type="button" style="height: 44px; border-radius: 999px; background: #F6F1EA; color: #0C0B0B; font-weight: 700; font-size: 15px">Make the link</button>
+        <div style="border-top: 1px solid rgba(255,255,255,0.08); padding-top: 14px; display: flex; flex-direction: column; align-items: center; gap: 10px">
+          <div aria-hidden="true" style="width: 150px; height: 150px; border-radius: 12px; background: #F6F1EA; padding: 12px; display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 3px">
+            <sc-for list="{{qr}}" as="q" hint-placeholder-count="49"><span style="background: {{q}}; border-radius: 2px"></span></sc-for>
+          </div>
+          <div style="font-size: 13.5px; color: #CFC8BE; text-align: center; line-height: 1.4">Works once, for 7 days. It lets one person past the waitlist.</div>
+        </div>
+      </div>
+    </li>
+
+    <li style="display: flex; flex-direction: column; gap: 12px">
+      <div style="display: flex; gap: 10px; align-items: baseline"><span style="font-family: Fraunces, serif; font-weight: 800; font-size: 22px; color: #FF8A66">2</span><h2 style="font-family: Fraunces, serif; font-weight: 800; font-size: 20px; letter-spacing: -0.02em">The president scans it</h2></div>
+      <div style="border-radius: 28px; background: #0C0B0B; border: 1px solid rgba(255,255,255,0.12); padding: 22px 18px; display: flex; flex-direction: column; gap: 14px; min-height: 560px; box-shadow: 0 24px 60px rgba(0,0,0,0.5)">
+        <div style="font-family: Fraunces, serif; font-weight: 900; font-size: 24px">vibe<span style="color: #FF5C35">.</span></div>
+        <div aria-hidden="true" style="width: 56px; height: 56px; border-radius: 16px; background: linear-gradient(135deg, #2A8A8E, #1C5E62); display: flex; align-items: center; justify-content: center; font-family: Fraunces, serif; font-weight: 800; font-size: 20px">SC</div>
+        <div style="font-family: Fraunces, serif; font-weight: 800; font-size: 26px; letter-spacing: -0.02em; line-height: 1.1">Set up Sixty-Four Chess.</div>
+        <div style="align-self: flex-start; height: 26px; padding: 0 10px; border-radius: 999px; background: rgba(79,208,138,0.14); color: #6FDB9A; font-size: 12.5px; font-weight: 600; display: flex; align-items: center">Checked by Vibe</div>
+        <label for="r2s-email" style="font-size: 13px; color: #CFC8BE">Your school email</label>
+        <input id="r2s-email" type="email" placeholder="you@school.edu" style="height: 46px; border-radius: 12px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.10); padding: 0 12px; font-size: 15px">
+        <button type="button" style="height: 46px; border-radius: 999px; background: #FF5C35; color: #160A06; font-weight: 700; font-size: 15px">Continue</button>
+        <div style="font-size: 13px; line-height: 1.45; color: #9C958C">You’ll own the club’s page and add your officers next. Nobody shares a club password.</div>
+      </div>
+    </li>
+
+    <li style="display: flex; flex-direction: column; gap: 12px">
+      <div style="display: flex; gap: 10px; align-items: baseline"><span style="font-family: Fraunces, serif; font-weight: 800; font-size: 22px; color: #FF8A66">3</span><h2 style="font-family: Fraunces, serif; font-weight: 800; font-size: 20px; letter-spacing: -0.02em">The usual sign-up</h2></div>
+      <div style="border-radius: 18px; border: 1px dashed rgba(255,255,255,0.16); padding: 18px; display: flex; flex-direction: column; gap: 12px; min-height: 560px">
+        <sc-for list="{{signup}}" as="s" hint-placeholder-count="3">
+          <div style="display: flex; gap: 12px; align-items: center; min-height: 52px; border-radius: 12px; background: rgba(22,21,21,0.86); padding: 0 14px">
+            <span aria-hidden="true" style="width: 22px; height: 22px; border-radius: 999px; background: #F6F1EA; color: #0C0B0B; display: flex; align-items: center; justify-content: center; flex-shrink: 0"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5L20 7"></path></svg></span>
+            <span style="font-size: 15px">{{s}}</span>
+          </div>
+        </sc-for>
+        <p style="font-size: 14px; line-height: 1.5; color: #9C958C">Nothing new here: the same school email, code and profile as every student. It takes about a minute.</p>
+      </div>
+    </li>
+
+    <li style="display: flex; flex-direction: column; gap: 12px">
+      <div style="display: flex; gap: 10px; align-items: baseline"><span style="font-family: Fraunces, serif; font-weight: 800; font-size: 22px; color: #FF8A66">4</span><h2 style="font-family: Fraunces, serif; font-weight: 800; font-size: 20px; letter-spacing: -0.02em">Their first screen</h2></div>
+      <div style="border-radius: 28px; background: #0C0B0B; border: 1px solid rgba(255,255,255,0.12); padding: 22px 16px; display: flex; flex-direction: column; gap: 12px; min-height: 560px; box-shadow: 0 24px 60px rgba(0,0,0,0.5)">
+        <div style="font-family: Fraunces, serif; font-weight: 800; font-size: 24px; letter-spacing: -0.02em; line-height: 1.1">Get Sixty-Four Chess ready.</div>
+        <div aria-hidden="true" style="height: 4px; border-radius: 999px; background: rgba(255,255,255,0.09); overflow: hidden"><div style="width: 33%; height: 100%; background: #FF5C35"></div></div>
+        <sc-for list="{{steps}}" as="s" hint-placeholder-count="6">
+          <div style="display: flex; align-items: center; gap: 10px; min-height: 48px; border-bottom: 1px solid rgba(255,255,255,0.06)">
+            <span aria-hidden="true" style="width: 22px; height: 22px; border-radius: 999px; flex-shrink: 0; background: {{s.dot}}; border: 1.5px solid {{s.ring}}"></span>
+            <span style="flex: 1; display: flex; flex-direction: column"><span style="font-size: 14.5px; color: {{s.ink}}">{{s.label}}</span><span style="font-size: 12px; color: #9C958C">{{s.sub}}</span></span>
+            <sc-if value="{{s.todo}}" hint-placeholder-val="{{true}}"><button type="button" style="height: 34px; padding: 0 12px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.14); font-size: 13.5px; font-weight: 600">{{s.act}}</button></sc-if>
+          </div>
+        </sc-for>
+        <div style="font-size: 13px; color: #9C958C">When it’s done, this becomes the club’s home.</div>
+      </div>
+    </li>
+  </ol>
+
+  <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px">
+    <section style="border-radius: 18px; background: rgba(22,21,21,0.86); border: 1px solid rgba(255,255,255,0.07); padding: 20px 22px; display: flex; flex-direction: column; gap: 8px">
+      <h2 style="font-family: Fraunces, serif; font-weight: 800; font-size: 21px; letter-spacing: -0.02em">Later, a club on its own.</h2>
+      <p style="font-size: 15px; line-height: 1.5; color: #E4DDD3">Club › Start a club, on the phone or a laptop: name, photo, one line. Then “Get checked”: a code goes to the club’s email, or they ask Vibe. Until then the page is live, but events and invites wait, and the setup list says why.</p>
+    </section>
+    <section style="border-radius: 18px; background: rgba(22,21,21,0.86); border: 1px solid rgba(255,92,53,0.35); padding: 20px 22px; display: flex; flex-direction: column; gap: 8px">
+      <h2 style="font-family: Fraunces, serif; font-weight: 800; font-size: 21px; letter-spacing: -0.02em">Why not sign in with the club’s email?</h2>
+      <p style="font-size: 15px; line-height: 1.5; color: #E4DDD3">A shared password is the Instagram mess we promise to fix: when officers graduate, the login leaves with them. Vibe also checks each person’s school email, and a club inbox isn’t a student. The club’s email still helps twice: it proves the club is real, and it gets the club back if its owner disappears.</p>
+    </section>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1600,"height":1050}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const bits = '1110111101010111101111011110000001000101110110100100110111011101011101111';
+    const qr = []; for (let i = 0; i < 49; i++) qr.push(bits[i] === '1' ? '#0C0B0B' : 'transparent');
+    const done = (label, sub) => ({ label, sub, todo: false, act: '', dot: '#FF5C35', ring: '#FF5C35', ink: '#CFC8BE' });
+    const todo = (label, sub, act) => ({ label, sub, todo: true, act, dot: 'transparent', ring: '#9C958C', ink: '#F6F1EA' });
+    return {
+      qr,
+      signup: ['Code from the email', 'Name and a photo', 'Campus'],
+      steps: [
+        done('Photo and cover', ''),
+        done('One line about the club', ''),
+        todo('Who can join', 'Open, ask first, or invite only', 'Choose'),
+        todo('Add your officers', 'By name, or send an officer link', 'Add'),
+        todo('Post your first event', 'It goes to Events and Tonight', 'Add'),
+        todo('Share the members’ link', 'Your members get in and join', 'Share')
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>
