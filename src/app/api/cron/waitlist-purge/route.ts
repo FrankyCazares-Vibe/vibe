@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 
+import { purgeUnboundClubLinkPlaces } from "@/lib/club-links/store";
 import { cronAuthorization } from "@/lib/cron/auth";
 import { redactAddresses } from "@/lib/email/send-log-core";
 import { createSupabaseServiceClient, isSupabaseServiceConfigured } from "@/lib/supabase/service";
@@ -69,6 +70,9 @@ export async function GET(req: Request) {
   }
   // After the job, whether it worked or not; never this job's failure.
   const rate_limits_deleted = service ? await purgeLimitCounts(service) : null;
+  // Club links (wave 1): places never tied to an account go 30 days on
+  // (Privacy Policy section 11). Logged if it fails; never this job's failure.
+  if (service) await purgeUnboundClubLinkPlaces(service);
   if (deleted === null) {
     return NextResponse.json({ ok: false, error: "purge_failed", rate_limits_deleted }, { status: 500, headers: NO_STORE });
   }

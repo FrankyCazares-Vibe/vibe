@@ -1,7 +1,7 @@
-PRIVACY POLICY, PAGE AGAINST TEXT  (Tue Oct 20 2026 19:52:36)
+PRIVACY POLICY, PAGE AGAINST TEXT  (Tue Oct 20 2026 19:54:45)
 page: http://localhost:3100/legal/privacy
-text: /Users/franciscocazares/vibe/.claude/worktrees/busy-aryabhata-7b6991/handoffs/legal-2026-10-04-privacy-v3/privacy-policy-final.md
-sentences: 1282 in the text, 1282 on the page, 1282 the same and in the same order
+text: handoffs/legal-2026-10-04-privacy-v3/privacy-policy-final.md
+sentences: 1281 in the text, 1281 on the page, 1281 the same and in the same order
 blocks: 484 in the text, 484 on the page; tables: 5 / 5
 date at the top (page.tsx EFFECTIVE_DATE): <SHIP DAY>
 dates on the page: {"October 5, 2026":8,"October 8, 2026":2,"October 12, 2026":2,"October 7, 2026":1,"October 4, 2026":1}; "section N" mentions: 108 on the page, 108 of them links

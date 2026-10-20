@@ -252,9 +252,9 @@ export function Section11Waitlist() {
         If no account is made with the address, its place on the link is let go
         after 15 minutes. A place never tied to an account is let go after 30
         days. A place that is let go is deleted, with its address, the next time
-        someone signs up through that link. After a link stops working, nothing
-        deletes such a place yet. Deleting an account also deletes any place
-        its address still holds.
+        someone signs up through that link, and a daily clean-up deletes any
+        place never tied to an account 30 days after it was taken. Deleting an
+        account also deletes any place its address still holds.
       </LegalP>
       <LegalP>
         For each link we keep who made it, a cofounder or an officer, and when.

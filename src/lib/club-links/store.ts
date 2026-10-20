@@ -336,6 +336,28 @@ export async function recordMembersLinkJoin(service: SupabaseClient, linkId: str
   if (insErr && insErr.code !== "23505") console.error("[club-links] record join (insert)", insErr.message);
 }
 
+/**
+ * The daily clean-up (the waitlist purge's cron): a place on a club link that
+ * was never tied to an account goes, with its address, 30 days after the
+ * sign-up took it, whether or not anyone uses the link again (Privacy Policy,
+ * section 11). Returns how many went, or null when it couldn't run (before
+ * the club-links migration, the table isn't there).
+ */
+export async function purgeUnboundClubLinkPlaces(service: SupabaseClient): Promise<number | null> {
+  const { data, error } = await service
+    .from("club_link_uses")
+    .delete()
+    .is("user_id", null)
+    .not("claimed_email", "is", null)
+    .lt("claimed_at", new Date(Date.now() - 30 * DAY_MS).toISOString())
+    .select("id");
+  if (error) {
+    console.error("[club-links] purge unbound places", error.code || "no code", error.message.slice(0, 120));
+    return null;
+  }
+  return (data ?? []).length;
+}
+
 /** "Not now" on a members' link's join question. Best effort. */
 export async function dismissMembersLink(service: SupabaseClient, linkId: string, userId: string): Promise<void> {
   const { error } = await service

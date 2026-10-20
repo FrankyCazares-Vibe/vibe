@@ -1,11 +1,11 @@
 {
   "pass": true,
   "url": "http://localhost:3100/legal/privacy",
-  "md": "/Users/franciscocazares/vibe/.claude/worktrees/busy-aryabhata-7b6991/handoffs/legal-2026-10-04-privacy-v3/privacy-policy-final.md",
+  "md": "handoffs/legal-2026-10-04-privacy-v3/privacy-policy-final.md",
   "counts": {
-    "mdSentences": 1282,
-    "pageSentences": 1282,
-    "same": 1282,
+    "mdSentences": 1281,
+    "pageSentences": 1281,
+    "same": 1281,
     "mentions": 108,
     "dates": {
       "October 5, 2026": 8,

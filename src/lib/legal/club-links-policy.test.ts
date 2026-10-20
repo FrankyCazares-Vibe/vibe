@@ -71,11 +71,12 @@ const PHRASES = [
   "only a scrambled form of it",
   "The record is deleted with your account",
   // A place is given back, then deleted when the link is next used
-  // (club_link_claim); nothing deletes it on a schedule, and the policy says so.
+  // (club_link_claim), and the daily cron deletes any never tied to an
+  // account 30 days on (purgeUnboundClubLinkPlaces, cron/waitlist-purge).
   "its place on the link is let go after 15 minutes",
   "A place never tied to an account is let go after 30 days",
   "is deleted, with its address, the next time someone signs up through that link",
-  "After a link stops working, nothing deletes such a place yet",
+  "a daily clean-up deletes any place never tied to an account 30 days after it was taken",
   "Deleting an account also deletes any place its address still holds",
   "For each link we keep who made it, a cofounder or an officer, and when",
   "so its owner and officers can show the link again",
