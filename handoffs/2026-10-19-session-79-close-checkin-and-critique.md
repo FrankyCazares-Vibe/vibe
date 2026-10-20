@@ -4,7 +4,12 @@ Read this first in session 80. It continues `2026-10-18-session-79-motion-scroll
 per-tab scroll, research, side space, fonts, Tonight), which still holds for those parts. The S78 close
 (`2026-10-18-session-78-close-and-next-up.md`) still holds for older owed items.
 
-**Where things stand.** Main is `29b6121` plus this doc commit, deployed (Vercel success; live probes
+**Update Oct 20.** Main is `2555428` (the delete-message leftovers, live; Vercel success; no database
+change). Franky finished his pitch video and the deck he uses (made in a Claude chat; the Code-built
+"Vibe Demo Day Pitch" artifact was not used). Launch date settled: launch night Thu Oct 29, public
+launch Sat Oct 31; IU Innovates Demo Day Fri Oct 30. vibe-marketing is pushed to GitHub (`b34a43d`).
+
+**Where things stood Oct 19.** Main was `29b6121` plus the doc commit, deployed (Vercel success; live probes
 passed). 3,521 tests, type check clean. The Privacy Policy is dated **October 19, 2026** (check-in and the
 "Message deleted" note). Two production database changes on Oct 19, each after Franky's explicit yes.
 Facts sheet for this whole session: `handoffs/2026-10-19-critique/docs/FACTS.md`.
@@ -72,8 +77,8 @@ delete function starts clearing push rows on its own.
    (the brief mentions clips, a recruiter marketplace, "Otto is not live" and orange-on-maroon). The vision
    rewrite (journal vision, `vibe-marketing/research/principles-and-positioning.md`, `timeline.md`, the
    Build Overview artifact) waits for this.
-2. **The launch date**: roadmap v14 says Oct 26; `vibe-marketing/CLAUDE.md` says Oct 31 with launch night
-   Oct 29. Recommendation: pick one and we fix the other the same day.
+2. ~~The launch date~~ **Settled Oct 20:** launch night Thu Oct 29, public launch Sat Oct 31 (roadmap v14's
+   Oct 26 is out of date).
 3. Delete the empty "Untitled" Claude Doc (`RuwML2Wak7RDeDGfTvjXQs`)? Recommendation: yes.
 4. The "Requests" row style in Messages; optionally all club rows at 66px.
 5. Does a school's pin hold #1 while another school event is live? (Built: the pin holds.)
@@ -104,7 +109,7 @@ Bloomington draft; tell FSL before the Club & Greek Night pitch).
 - Not verified: real reposts and comments (none in the local seed), the cross-tab calendar case, what
   production Bloomington shows.
 
-### The first four leftovers, fixed (Oct 20, 2026; committed on its own branch, not pushed)
+### The first four leftovers, fixed (Oct 20, 2026; on main and live as `2555428`)
 
 No database change and no Privacy Policy change: counts drop a note, the phone shows what the server
 already sends, and one more refusal.
