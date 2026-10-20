@@ -2026,15 +2026,29 @@ a.otto-room-row-title:hover {
 }
 
 /* Metrics section ---------------------------------------------------- */
+/* Oct 19, 2026 (critique B9): plain `1fr` columns grew to fit a long post
+   title (nowrap), so one half ran 587px beside the other's 295px and the
+   phone page ran 15px past the screen. `minmax(0, 1fr)` plus min-width: 0
+   on each half keeps the columns equal; the title cuts off with "…" instead.
+   The Otto room stays dark in Light mode until its revamp (critique D8), so
+   these rules keep the room's light-on-dark ink rather than the app tokens,
+   which would turn dark on its dark background. */
 .otto-metrics {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 16px;
 }
 .otto-metrics-block {
   display: flex;
   flex-direction: column;
   gap: 10px;
+  min-width: 0;
+  /* Oct 19, 2026: the tile rows fold by the half's own width (the
+     @container rule below), not the window's. A 900px desktop window has
+     301px halves, too narrow for four tiles, while the old 760px media query
+     still showed four. Containment also traps position: fixed children;
+     neither half has any (ProfileViewersList and LoadFailed included). */
+  container: otto-metrics-block / inline-size;
 }
 .otto-metrics-block-head {
   display: flex;
@@ -2059,13 +2073,19 @@ a.otto-room-row-title:hover {
   gap: 6px;
 }
 .otto-metrics-tiles--4 {
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 .otto-metrics-tile {
+  min-width: 0;
   padding: 10px 12px;
   background: rgba(250, 247, 242, 0.04);
   border: 1px solid rgba(250, 247, 242, 0.08);
   border-radius: 12px;
+}
+/* Post views' All time: two columns of the shared 4-column track, so the
+   card's tiles line up section to section (Oct 19, 2026). */
+.otto-metrics-tile--wide {
+  grid-column: span 2;
 }
 .otto-metrics-tile--accent {
   background: rgba(255, 92, 53, 0.12);
@@ -2088,6 +2108,12 @@ a.otto-room-row-title:hover {
   text-transform: uppercase;
   color: rgba(250, 247, 242, 0.55);
   margin-top: 4px;
+  /* A safety net: a label too long for its tile cuts off with "…" rather
+     than wrapping to a second line or running into the next tile. */
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .otto-metrics-recent,
 .otto-metrics-top {
@@ -2095,6 +2121,14 @@ a.otto-room-row-title:hover {
   flex-direction: column;
   gap: 6px;
   padding-top: 4px;
+}
+/* Lets a top-post row stack its counts under the title when the half is
+   narrow (the @container rule below), whatever the window width. The list
+   holds nothing but links, so containment traps no position: fixed child.
+   It is as wide as its half (.otto-metrics-block, also a container since
+   Oct 19, 2026) but keeps its own name, so each threshold reads alone. */
+.otto-metrics-top {
+  container: otto-metrics-top / inline-size;
 }
 .otto-metrics-recent-label {
   font-family: "DM Sans", sans-serif;
@@ -2189,34 +2223,96 @@ a.otto-room-row-title:hover {
   flex-direction: column;
   gap: 4px;
 }
+/* Oct 19, 2026 (critique B9): a row is the title then one fixed 44px cell
+   per count (views, likes, comments, reposts, saves), so the icons line up
+   in columns down the list. Without saves the fifth column goes. */
 .otto-metrics-top-row {
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-  align-items: baseline;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) repeat(5, 44px);
+  column-gap: 6px;
+  row-gap: 4px;
+  align-items: center;
+  padding: 3px 0;
+  border-radius: 6px;
   font-family: "DM Sans", sans-serif;
   font-size: 12px;
   color: rgba(250, 247, 242, 0.85);
 }
+.otto-metrics-top-list--no-saves .otto-metrics-top-row {
+  grid-template-columns: minmax(0, 1fr) repeat(4, 44px);
+}
+.otto-metrics-top-row:hover .otto-metrics-top-content {
+  color: #faf7f2;
+}
+.otto-metrics-top-row:focus-visible {
+  outline: 2px solid rgba(255, 140, 90, 0.7);
+  outline-offset: 2px;
+}
 .otto-metrics-top-content {
-  flex: 1;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.otto-metrics-top-counts {
-  font-size: 11px;
+.otto-metrics-top-count {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  font-size: 12px;
+  line-height: 1;
   color: rgba(250, 247, 242, 0.55);
+  /* Same-width digits, so 1 and 7 don't nudge the next column. */
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
+.otto-metrics-top-count svg {
+  flex: none;
+}
+/* Screen-reader-only text: the exact count behind each short number. */
+.otto-metrics-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+/* A narrow half (the phone, or a small desktop window) has no room for a
+   title beside five 44px cells: the title takes its own line and the counts
+   sit under it, still in their columns.
+   Oct 19, 2026 review: 460px, not 420, so the 441px halves of a 1440
+   desktop stack too. Side by side, the five cells left the title 191px
+   (about 30 characters), less than a phone or a 1024 window shows. */
+@container otto-metrics-top (max-width: 460px) {
+  .otto-metrics-top-list {
+    gap: 8px;
+  }
+  .otto-metrics-top-content {
+    grid-column: 1 / -1;
+  }
+  /* The trailing flexible track gives the title (1 / -1) the whole width,
+     not just the 250px the five count cells need. Here the cells can grow
+     to 52px, since the row has room to spare: "100k" filled 43 of 44px. They
+     keep 44px on a phone narrower than about 340px. */
+  .otto-metrics-top-row,
+  .otto-metrics-top-list--no-saves .otto-metrics-top-row {
+    grid-template-columns: repeat(5, minmax(44px, 52px)) minmax(0, 1fr);
+  }
+}
+/* Four tiles need about 92px each for "COMMENTS"; a half of 390px or less
+   shows them 2 x 2. Post views' wide All time then fills a row of its own. */
+@container otto-metrics-block (max-width: 390px) {
+  .otto-metrics-tiles--4 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
 @media (max-width: 760px) {
   .otto-metrics {
-    grid-template-columns: 1fr;
-  }
-  .otto-metrics-tiles--4 {
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 

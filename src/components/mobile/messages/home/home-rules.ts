@@ -138,6 +138,20 @@ export function newCountText(count: number): string | null {
   return count > 0 ? `${badgeText(count)} new` : null;
 }
 
+/**
+ * A club row's quiet second line, for a club with no Board / Lounge preview,
+ * no event chip and no `N new` (null otherwise): every row reads as two lines
+ * (Oct 19, 2026, critique D4). `No messages yet` only when nothing was ever
+ * said there: `last_activity_at` also counts event-chat messages
+ * (`api/me/inbox/route.ts`, `newestOf`), so a club whose only talk was in an
+ * event chat shows a recent time, and `No messages yet` beside it would be
+ * false. With no Board or Lounge message, that time can only be an event chat's.
+ */
+export function clubQuietLine(club: InboxClub, now: Date): string | null {
+  if (clubPreview(club) || clubChip(club, now) || newCountText(club.lounge.unread_count)) return null;
+  return club.last_activity_at ? "Last message in an event chat" : "No messages yet";
+}
+
 const WEEKDAY_LONG: Record<string, string> = {
   Sun: "Sunday",
   Mon: "Monday",

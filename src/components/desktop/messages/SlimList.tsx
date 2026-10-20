@@ -1,5 +1,7 @@
 "use client";
 
+import { useEffect, useRef } from "react";
+
 import { clubGradient, personColor } from "@/components/mobile/messages/avatar";
 import { initialsOf } from "@/components/mobile/messages/format";
 import { FONT, palette, type Palette, SERIF } from "@/components/mobile/messages/v2-tokens";
@@ -11,9 +13,9 @@ import type { SlimRow } from "./desktop-rules";
  * The slim list of desktop Messages (handoffs/chat-redesign/wave-3-desktop/
  * contract.md 3.2, H3, H14, section 8 W3-4-lists; the board's steps 1 to 5):
  * the 232px column of names beside an open chat. The `Messages` control goes
- * back to the full list; under it, the pinned and unread chats, the open one
- * and the most recent others up to `SLIM_TARGET` rows, 44px each: a 26px
- * mark, the name on one line, the dot.
+ * back to the full list; under it, every chat of the full list, in its order
+ * (Oct 19, 2026, critique D5: the column scrolls), 44px each: a 26px mark,
+ * the name on one line, the dot.
  *
  * It decides nothing: `rows` are `slimRows(...)` (which rows, their order,
  * the dot, the spoken name, the address). Rows are links, so Cmd / Ctrl /
@@ -38,6 +40,15 @@ const plainClick = (e: React.MouseEvent): boolean => e.button === 0 && !e.metaKe
 
 export function SlimList({ rows, night, onHome, onOpen }: SlimListProps) {
   const t = palette(night);
+  const navRef = useRef<HTMLElement>(null);
+  const openKey = rows.find((r) => r.open)?.key ?? null;
+  // Every chat is in the column since Oct 19, 2026 (critique D5), so the open one can sit below its fold.
+  // Bring it into view only when a different chat opens, never against the person's own scrolling; no
+  // smooth scroll, so reduced motion holds.
+  useEffect(() => {
+    if (!openKey) return;
+    navRef.current?.querySelector<HTMLElement>('a[aria-current="page"]')?.scrollIntoView({ block: "nearest" });
+  }, [openKey]);
   return (
     <div style={{ flex: "0 0 232px", width: 232, height: "100%", minHeight: 0, boxSizing: "border-box", padding: "0 10px", display: "flex", flexDirection: "column", color: t.ink, fontFamily: FONT }}>
       <style>{SLIM_CSS}</style>
@@ -55,7 +66,7 @@ export function SlimList({ rows, night, onHome, onOpen }: SlimListProps) {
           Messages
         </button>
       </div>
-      <nav aria-label="Pinned and unread chats" style={{ flex: "1 1 0", minHeight: 0, overflowX: "hidden", overflowY: "auto", overscrollBehavior: "contain", paddingBottom: 16, display: "flex", flexDirection: "column", gap: 2 }}>
+      <nav ref={navRef} aria-label="Your chats" style={{ flex: "1 1 0", minHeight: 0, overflowX: "hidden", overflowY: "auto", overscrollBehavior: "contain", paddingBottom: 16, display: "flex", flexDirection: "column", gap: 2 }}>
         {rows.map((row) => {
           const club = row.kind === "club";
           // The open chat and an unread one read in full ink; a pinned, read one steps back (the board's two weights).

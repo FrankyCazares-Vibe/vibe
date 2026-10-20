@@ -7,8 +7,8 @@ import { initialsOf } from "../format";
 import { useNightTheme } from "../theme";
 import { FONT, palette, SERIF } from "../v2-tokens";
 
-import { clubChip, clubPreview, clubRowLabel, clubRowTime, newCountText } from "./home-rules";
-import { PinIcon } from "./PersonRow";
+import { clubChip, clubPreview, clubQuietLine, clubRowLabel, clubRowTime, newCountText } from "./home-rules";
+import { PinIcon, ROW_FRAME, ROW_PICTURE, ROW_TEXT } from "./PersonRow";
 
 /**
  * A club row of the Messages home (handoffs/chat-redesign/wave-2-contracts.md
@@ -19,6 +19,18 @@ import { PinIcon } from "./PersonRow";
  * `<eventTimeShort> · <title>` + `Going` / `Maybe`, `N new` at the right).
  * Tap → the club space on the Lounge, or on the Board when `board.unread`
  * and the Lounge has nothing new (11.1).
+ *
+ * Oct 19, 2026 (critique D4, handoffs/2026-10-19-critique/PLAN.md B5): a
+ * club with no preview and no chip drew a one-line row exactly as tall as its
+ * picture, so two such rows had pictures touching. Every row now has a second
+ * line (`clubQuietLine` when there is nothing else to say) and the shared
+ * row frame (`ROW_FRAME`, `ROW_TEXT`): at least 66px, the picture centred
+ * with room above and below, the divider at the row's bottom edge.
+ *
+ * A club with BOTH a preview and an event chip keeps three lines (about 87px),
+ * as the approved W0_Home board draws Salsa Club, Jag Robotics and Film
+ * Society: dropping the preview there would hide an unread Board post, the
+ * officers' line, behind any club's weekly event (B5 review, Oct 19, 2026).
  */
 export function ClubRow({
   club,
@@ -34,6 +46,7 @@ export function ClubRow({
   const preview = clubPreview(club);
   const chip = clubChip(club, now);
   const newText = newCountText(club.lounge.unread_count);
+  const quiet = clubQuietLine(club, now);
   const openBoard = club.board.unread && club.lounge.unread_count === 0;
   // `N new` with no event chip sits at the right of the preview line, not
   // alone on a third line (VIS-S1-4): the row stays 66px like its neighbours.
@@ -65,27 +78,13 @@ export function ClubRow({
         type="button"
         onClick={() => (openBoard ? onOpen(club.board.room_id, "board") : onOpen(club.lounge.room_id, "lounge"))}
         aria-label={clubRowLabel(club, now)}
-        style={{
-          width: "100%",
-          display: "flex",
-          alignItems: "center",
-          gap: 12,
-          padding: "0 0 0 14px",
-          margin: 0,
-          background: "transparent",
-          border: "none",
-          color: t.ink,
-          fontFamily: FONT,
-          textAlign: "left",
-          cursor: "pointer",
-          WebkitTapHighlightColor: "transparent",
-        }}
+        style={{ ...ROW_FRAME, color: t.ink, fontFamily: FONT }}
       >
         <span
           aria-hidden="true"
           style={{
-            width: 48,
-            height: 48,
+            width: ROW_PICTURE,
+            height: ROW_PICTURE,
             flexShrink: 0,
             borderRadius: 999,
             background: club.org.logo_url ? `url(${club.org.logo_url}) center/cover` : clubGradient(club.org.id),
@@ -101,18 +100,7 @@ export function ClubRow({
         >
           {club.org.logo_url ? null : initialsOf(club.org.name)}
         </span>
-        <span
-          style={{
-            flexGrow: 1,
-            minWidth: 0,
-            boxSizing: "border-box",
-            padding: "10px 16px 11px 0",
-            borderBottom: `1px solid ${t.hairline}`,
-            display: "flex",
-            flexDirection: "column",
-            gap: 3,
-          }}
-        >
+        <span style={{ ...ROW_TEXT, borderBottom: `1px solid ${t.hairline}`, gap: 3 }}>
           <span style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
             <span
               style={{
@@ -178,6 +166,11 @@ export function ClubRow({
                 {preview.text}
               </span>
               {pillOnPreview ? pill : null}
+            </span>
+          ) : quiet ? (
+            // The quiet second line (D4): a club with nothing else to show still reads as two lines.
+            <span style={{ minWidth: 0, fontSize: 13.5, lineHeight: 1.35, color: t.muted, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+              {quiet}
             </span>
           ) : null}
           {chip || (newText && !pillOnPreview) ? (

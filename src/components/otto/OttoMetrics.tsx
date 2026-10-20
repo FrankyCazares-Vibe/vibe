@@ -1,12 +1,20 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
+import { useCallback, useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 
 import { asLoadFailure, LoadFailed, type LoadFailure } from "@/components/feedback/LoadFailed";
+import {
+  BookmarkIcon,
+  CommentIcon,
+  EyeIcon,
+  LikeIcon,
+  RepostIcon,
+} from "@/components/icons/engagement-icons";
 import { vibeRequest } from "@/lib/feedback/request";
 import { useAppShell } from "@/lib/native/use-app-shell";
 
+import { countWithNoun, fmtCount, pluralNoun, spokenCount } from "./metrics-count";
 import { OttoSection } from "./OttoSection";
 import { ProfileViewersList, type ProfileViewerRow } from "./ProfileViewersList";
 
@@ -115,11 +123,8 @@ const TILE_GRID: CSSProperties = {
   gridTemplateColumns: "repeat(auto-fit, minmax(86px, 1fr))",
 };
 
-function fmt(n: number): string {
-  if (n < 1000) return String(n);
-  if (n < 10000) return (n / 1000).toFixed(1).replace(/\.0$/, "") + "k";
-  return Math.round(n / 1000) + "k";
-}
+/** A top-post count cell is 13px: the feed's glyphs, scaled to sit beside 12px digits. */
+const TOP_ICON = 13;
 
 /**
  * Full metrics section on /otto — the command-center counterpart to the
@@ -272,8 +277,12 @@ export function OttoMetrics() {
 
   // Likes / Comments / Reposts, plus Saves when the route knows about them.
   // Four tiles hand the row to the stylesheet's `--4` rule (which folds to 2x2
-  // under 760px); three stay on the auto-fit grid, which fits three on a phone.
+  // when its half is 390px or narrower, Oct 19 2026); three stay on the
+  // auto-fit grid, which fits three on a phone.
   const hasSavesTile = typeof cs?.totals.saves === "number";
+  // The same "absent is not zero" rule, per list: one row that knows its
+  // saves earns the Saves column for every row.
+  const topHasSaves = cs?.top_posts.some((p) => typeof p.save_count === "number") ?? false;
 
   return (
     <OttoSection eyebrow="Your metrics" wide>
@@ -342,7 +351,7 @@ export function OttoMetrics() {
               Posts
               {cs ? (
                 <span className="otto-metrics-block-sub">
-                  {cs.totals.posts} posts
+                  {countWithNoun(cs.totals.posts, "post")}
                 </span>
               ) : null}
             </div>
@@ -355,10 +364,14 @@ export function OttoMetrics() {
             ) : (
               <>
                 <div className="otto-metrics-recent-label">Post views</div>
-                <div className="otto-metrics-tiles" style={TILE_GRID}>
+                {/* Oct 19, 2026: the same 4-column track as the tiles above
+                    and below, with All time two columns wide, so every tile
+                    in the card lines up (it was 106 / 143 / 106px wide at
+                    1440). On a narrow half it folds to 2 + 1 full-width. */}
+                <div className="otto-metrics-tiles otto-metrics-tiles--4">
                   <Tile n={cs.by_window.seven_days.views} label="7 days" />
                   <Tile n={cs.by_window.thirty_days.views} label="30 days" />
-                  <Tile n={cs.totals.views} label="All time" accent />
+                  <Tile n={cs.totals.views} label="All time" accent wide />
                 </div>
 
                 <div className="otto-metrics-recent-label">Reactions</div>
@@ -370,11 +383,18 @@ export function OttoMetrics() {
                       className={`otto-metrics-tiles${hasSavesTile ? " otto-metrics-tiles--4" : ""}`}
                       style={hasSavesTile ? undefined : TILE_GRID}
                     >
-                      <Tile n={cs.totals.likes} label="Likes" />
-                      <Tile n={cs.totals.comments} label="Comments" />
-                      <Tile n={cs.totals.reposts} label="Reposts" />
+                      {/* Oct 19, 2026: the label follows the number ("1 /
+                          SAVE"), as the window rows below do. The view tiles
+                          keep their time labels: those name a window, not
+                          the thing counted. */}
+                      <Tile n={cs.totals.likes} label={pluralNoun(cs.totals.likes, "Like")} />
+                      <Tile
+                        n={cs.totals.comments}
+                        label={pluralNoun(cs.totals.comments, "Comment")}
+                      />
+                      <Tile n={cs.totals.reposts} label={pluralNoun(cs.totals.reposts, "Repost")} />
                       {typeof cs.totals.saves === "number" ? (
-                        <Tile n={cs.totals.saves} label="Saves" />
+                        <Tile n={cs.totals.saves} label={pluralNoun(cs.totals.saves, "Save")} />
                       ) : null}
                     </div>
                     <div className="otto-metrics-windows">
@@ -387,7 +407,15 @@ export function OttoMetrics() {
                 {cs.top_posts.length ? (
                   <div className="otto-metrics-top">
                     <div className="otto-metrics-recent-label">Top posts</div>
-                    <ul className="otto-metrics-top-list">
+                    {/* Oct 19, 2026: the counts were one emoji string at
+                        11px, so the columns wandered row to row. Each count
+                        is now its own fixed 44px cell with the feed's icon.
+                        Saves is a column only when the route sends them
+                        (an older deploy doesn't); `--no-saves` drops the
+                        fifth column rather than leaving a blank one. */}
+                    <ul
+                      className={`otto-metrics-top-list${topHasSaves ? "" : " otto-metrics-top-list--no-saves"}`}
+                    >
                       {cs.top_posts.map((p) => (
                         <li key={p.id}>
                           {/* The row is the way into the post itself — a stat
@@ -400,16 +428,36 @@ export function OttoMetrics() {
                             // row brighter than its own counts.
                             style={{ textDecoration: "none" }}
                           >
+                            {/* The CSS ellipsis does the cutting. The slice
+                                only keeps the link's spoken name short: 80
+                                could end a 420px stacked line before the
+                                edge, with no "…"; 120 can't. */}
                             <span className="otto-metrics-top-content">
-                              {p.content?.slice(0, 80) || "(no text)"}
+                              {p.content?.slice(0, 120) || "(no text)"}
                             </span>
-                            <span className="otto-metrics-top-counts">
-                              {fmt(p.view_count)}v · {fmt(p.like_count)}❤ ·{" "}
-                              {fmt(p.comment_count)}💬 · {fmt(p.repost_count)}↻
-                              {typeof p.save_count === "number"
-                                ? ` · ${fmt(p.save_count)}🔖`
-                                : ""}
-                            </span>
+                            <TopCount n={p.view_count} noun="view" icon={<EyeIcon size={TOP_ICON} />} />
+                            <TopCount n={p.like_count} noun="like" icon={<LikeIcon size={TOP_ICON} />} />
+                            <TopCount
+                              n={p.comment_count}
+                              noun="comment"
+                              icon={<CommentIcon size={TOP_ICON} />}
+                            />
+                            <TopCount
+                              n={p.repost_count}
+                              noun="repost"
+                              icon={<RepostIcon size={TOP_ICON} />}
+                            />
+                            {!topHasSaves ? null : typeof p.save_count === "number" ? (
+                              <TopCount
+                                n={p.save_count}
+                                noun="save"
+                                icon={<BookmarkIcon size={TOP_ICON} />}
+                              />
+                            ) : (
+                              // Unknown for this row only: an empty cell keeps
+                              // the columns lined up, and nothing claims 0.
+                              <span aria-hidden="true" />
+                            )}
                           </Link>
                         </li>
                       ))}
@@ -425,12 +473,43 @@ export function OttoMetrics() {
   );
 }
 
-function Tile({ n, label, accent }: { n: number; label: string; accent?: boolean }) {
+function Tile({
+  n,
+  label,
+  accent,
+  wide,
+}: {
+  n: number;
+  label: string;
+  accent?: boolean;
+  /** Two columns of the 4-column track (Post views' All time). */
+  wide?: boolean;
+}) {
+  const cls = ["otto-metrics-tile", accent && "otto-metrics-tile--accent", wide && "otto-metrics-tile--wide"]
+    .filter(Boolean)
+    .join(" ");
   return (
-    <div className={`otto-metrics-tile ${accent ? "otto-metrics-tile--accent" : ""}`}>
-      <div className="otto-metrics-tile-n">{fmt(n)}</div>
+    <div className={cls}>
+      <div className="otto-metrics-tile-n">{fmtCount(n)}</div>
       <div className="otto-metrics-tile-l">{label}</div>
     </div>
+  );
+}
+
+/**
+ * One count on a top-post row: the icon, then the short number. The icon and
+ * the short form are hidden from screen readers, which get the exact count
+ * and its noun instead (", 7 views"), so the row's link reads as a sentence.
+ * The leading comma is a pause between the post's text and its counts.
+ */
+function TopCount({ n, noun, icon }: { n: number; noun: string; icon: ReactNode }) {
+  const spoken = spokenCount(n, noun);
+  return (
+    <span className="otto-metrics-top-count" title={spoken}>
+      {icon}
+      <span aria-hidden="true">{fmtCount(n)}</span>
+      <span className="otto-metrics-sr">{`, ${spoken}`}</span>
+    </span>
   );
 }
 
@@ -438,21 +517,24 @@ function Tile({ n, label, accent }: { n: number; label: string; accent?: boolean
  * Reactions by window. Views are deliberately not repeated here — the tiles
  * above already carry 7d / 30d / all-time views, and two places printing the
  * same number is two places to get it wrong.
+ *
+ * Oct 19, 2026: the nouns follow the number ("1 comment", not "1 comments"),
+ * and the dots between them are hidden from screen readers.
  */
 function WindowRow({ label, w }: { label: string; w: WindowStats }) {
   return (
     <div className="otto-metrics-window-row">
       <span className="otto-metrics-window-label">{label}</span>
       <span className="otto-metrics-window-vals">
-        <span>{fmt(w.likes)} likes</span>
-        <span>·</span>
-        <span>{fmt(w.comments)} comments</span>
-        <span>·</span>
-        <span>{fmt(w.reposts)} reposts</span>
+        <span>{countWithNoun(w.likes, "like")}</span>
+        <span aria-hidden="true">·</span>
+        <span>{countWithNoun(w.comments, "comment")}</span>
+        <span aria-hidden="true">·</span>
+        <span>{countWithNoun(w.reposts, "repost")}</span>
         {typeof w.saves === "number" ? (
           <>
-            <span>·</span>
-            <span>{fmt(w.saves)} saves</span>
+            <span aria-hidden="true">·</span>
+            <span>{countWithNoun(w.saves, "save")}</span>
           </>
         ) : null}
       </span>

@@ -174,23 +174,20 @@ function suppliedRow(open: OpenChat, requests: readonly ThreadEntry[]): SlimRow 
 }
 
 /**
- * How many rows the slim list fills up to with recent chats (Franky, Oct 4:
- * with only pinned and unread chats it was often two or three names). Pinned,
- * unread and open rows are never dropped to make room for a recent one.
- */
-export const SLIM_TARGET = 8;
-
-/**
- * The slim list beside an open chat (H3, H14). Order = `mergeHomeRows(clubs,
- * threads)`. A row is KEPT when it is pinned, or unread and not muted, or it
- * is the open chat. The list is then filled, in that same order, with the
- * most recent other chats until it holds `SLIM_TARGET` rows; a filled row is
- * quiet (no dot, even for a muted chat with something unread). A club row
- * targets the Board when only the Board is unread, else the Lounge
- * (`ClubRow`'s rule); the open club's row targets the room that is open, so
- * nothing new (its `roomKind` is not to be acted on: `SlimRow.target`). When
- * the open chat is in neither list, one row built from `open` is put FIRST
- * and counts toward the target. Kept rows have no cap: the column scrolls.
+ * The slim list beside an open chat (H3, H14): EVERY chat of the full list,
+ * in its order (`mergeHomeRows(clubs, threads)`), and the column scrolls.
+ * Oct 19, 2026 (critique D5, handoffs/2026-10-19-critique/PLAN.md B5): it
+ * used to keep the pinned, unread and open chats and fill up to 8 rows
+ * (`SLIM_TARGET`, Oct 4), so opening a chat made Franky's other DMs and clubs
+ * vanish; the column already scrolled, so the cap only hid chats.
+ *
+ * A row is KEPT when it is pinned, or unread and not muted, or it is the open
+ * chat: a kept row keeps its dot. Every other row is quiet (no dot, even for
+ * a muted chat with something unread). A club row targets the Board when only
+ * the Board is unread, else the Lounge (`ClubRow`'s rule); the open club's
+ * row targets the room that is open, so nothing new (its `roomKind` is not to
+ * be acted on: `SlimRow.target`). When the open chat is in neither list, one
+ * row built from `open` is put FIRST.
  */
 export function slimRows(
   clubs: InboxClub[],
@@ -199,7 +196,7 @@ export function slimRows(
   open: OpenChat | null,
   now: Date,
 ): SlimRow[] {
-  const listed: Array<{ row: SlimRow; kept: boolean }> = [];
+  const rows: SlimRow[] = [];
   let openListed = false;
   for (const row of mergeHomeRows(clubs, threads)) {
     if (row.kind === "club") {
@@ -207,25 +204,18 @@ export function slimRows(
       const isOpen = isOpenClub(club, open);
       if (isOpen) openListed = true;
       const kept = isOpen || !!club.pinned_at || (clubHasUnread(club) && !isMuted(club.muted_until, now));
-      listed.push({ row: clubRow(club, open, now), kept });
+      const slim = clubRow(club, open, now);
+      rows.push(kept ? slim : { ...slim, dot: null });
     } else {
       const { thread } = row;
       const isOpen = open?.kind === "dm" && open.threadId === thread.id;
       if (isOpen) openListed = true;
       const kept = isOpen || !!thread.pinned_at || (!!thread.unread && !isMuted(thread.muted_until, now));
-      listed.push({ row: threadRow(thread, isOpen, now), kept });
+      const slim = threadRow(thread, isOpen, now);
+      rows.push(kept ? slim : { ...slim, dot: null });
     }
   }
   const supplied = open && !openListed ? suppliedRow(open, requests) : null;
-  let room = SLIM_TARGET - listed.filter((entry) => entry.kept).length - (supplied ? 1 : 0);
-  const rows: SlimRow[] = [];
-  for (const { row, kept } of listed) {
-    if (kept) rows.push(row);
-    else if (room > 0) {
-      rows.push({ ...row, dot: null });
-      room -= 1;
-    }
-  }
   return supplied ? [supplied, ...rows] : rows;
 }
 

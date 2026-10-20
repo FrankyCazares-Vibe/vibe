@@ -391,7 +391,12 @@ export function OttoMobile({ initial }: { initial: OttoPayload }) {
   );
 }
 
+// Oct 19, 2026 (critique B9): `position: relative` anchors each pane's
+// visually hidden <h2> inside the pane. Without it the Stats heading sat
+// against an ancestor outside the sideways scroller, at x=403, and stretched
+// the page and the tab bar 15px past a 390px screen.
 const paneStyle: React.CSSProperties = {
+  position: "relative",
   flex: "0 0 100%",
   scrollSnapAlign: "start",
   padding: "4px 14px 32px",

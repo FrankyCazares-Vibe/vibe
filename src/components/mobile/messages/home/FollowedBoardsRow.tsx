@@ -12,6 +12,7 @@ import { initialsOf } from "../format";
 import { useNightTheme } from "../theme";
 import { FONT, palette, SERIF } from "../v2-tokens";
 import { markBoardSeen, useBoardSeen } from "./board-seen";
+import { ROW_FRAME, ROW_PICTURE, ROW_TEXT } from "./PersonRow";
 
 /**
  * "Boards you follow" on the Messages home (club model, Franky's calls of
@@ -49,7 +50,12 @@ export function FollowedBoards({ boards, now, onOpen }: { boards: FollowedBoard[
   );
 }
 
-/** One Board I follow: the club's 48px mark, its name and the time, the megaphone and the newest post (`ClubRow`'s shape, 66px). */
+/**
+ * One Board I follow: the club's 48px mark, its name and the time, the
+ * megaphone and the newest post (`ClubRow`'s shape). Oct 19, 2026 (critique
+ * D4): it uses the list's shared `ROW_FRAME` / `ROW_TEXT`, so it is 66px at
+ * least and lines up with the club and people rows above it.
+ */
 export function FollowedBoardRow({ board, now, isNew, onOpen }: { board: FollowedBoard; now: Date; isNew: boolean; onOpen: () => void }) {
   const night = useNightTheme();
   const t = palette(night);
@@ -64,15 +70,15 @@ export function FollowedBoardRow({ board, now, isNew, onOpen }: { board: Followe
           onOpen();
         }}
         aria-label={followedBoardLabel(board, now, isNew)}
-        style={{ width: "100%", display: "flex", alignItems: "center", gap: 12, padding: "0 0 0 14px", margin: 0, background: "transparent", border: "none", color: t.ink, fontFamily: FONT, textAlign: "left", cursor: "pointer", WebkitTapHighlightColor: "transparent" }}
+        style={{ ...ROW_FRAME, color: t.ink, fontFamily: FONT }}
       >
         <span
           aria-hidden="true"
-          style={{ width: 48, height: 48, flexShrink: 0, borderRadius: 999, background: org.logo_url ? `url(${org.logo_url}) center/cover` : clubGradient(org.id), boxShadow: "inset 0 0 0 1px rgba(255,255,255,0.16)", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: SERIF, fontWeight: 800, fontSize: 18, color: "#FAF7F2" }}
+          style={{ width: ROW_PICTURE, height: ROW_PICTURE, flexShrink: 0, borderRadius: 999, background: org.logo_url ? `url(${org.logo_url}) center/cover` : clubGradient(org.id), boxShadow: "inset 0 0 0 1px rgba(255,255,255,0.16)", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: SERIF, fontWeight: 800, fontSize: 18, color: "#FAF7F2" }}
         >
           {org.logo_url ? null : initialsOf(org.name)}
         </span>
-        <span style={{ flexGrow: 1, minWidth: 0, boxSizing: "border-box", padding: "10px 16px 11px 0", borderBottom: `1px solid ${t.hairline}`, display: "flex", flexDirection: "column", gap: 3 }}>
+        <span style={{ ...ROW_TEXT, borderBottom: `1px solid ${t.hairline}`, gap: 3 }}>
           <span style={{ display: "flex", alignItems: "baseline", gap: 8, minWidth: 0 }}>
             <span style={{ minWidth: 0, fontFamily: SERIF, fontWeight: 800, fontSize: 16.5, lineHeight: 1.25, letterSpacing: "-0.3px", color: t.ink, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{org.name}</span>
             <span style={{ marginLeft: "auto", flexShrink: 0, fontSize: 12, fontWeight: isNew ? 700 : 600, color: isNew ? t.ink : t.muted }}>{latest ? rowTime(latest.created_at, now) : ""}</span>

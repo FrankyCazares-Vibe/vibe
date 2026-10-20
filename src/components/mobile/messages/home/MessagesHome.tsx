@@ -18,7 +18,7 @@ import { FollowedBoards } from "./FollowedBoardsRow";
 import { HomeEmpty } from "./HomeEmpty";
 import { allBadgeCount, badgeText, calendarUrl, HOME_FILTERS, type HomeFilter, mergeHomeRows, rsvpEntries, type WeekEntry } from "./home-rules";
 import { MonthSheet } from "./MonthSheet";
-import { PersonRow } from "./PersonRow";
+import { PersonRow, ROW_PICTURE } from "./PersonRow";
 import { YourWeek } from "./YourWeek";
 
 /**
@@ -327,16 +327,17 @@ export type HomeData = ReturnType<typeof useHomeData>; // what the desktop shell
 
 /**
  * The list's skeleton: `ListSkeleton`'s shape (discs + bars in the 11.0
- * scrims) at the home's own row height — a 44px disc in `11px 16px` = 66px,
- * the person row it resolves into (`ListSkeleton`'s 50px disc makes 74px
- * rows and a visible jump on resolve; VIS-S1-6).
+ * scrims) at the home's own row size, the rows it resolves into: since
+ * Oct 19, 2026 (critique D4, decision 14) a 48px disc (`ROW_PICTURE`) in a
+ * 66px row, so nothing grows or moves on resolve (`ListSkeleton`'s 50px disc
+ * makes 74px rows and a visible jump; VIS-S1-6).
  */
 export function HomeSkeleton() {
   return (
     <ul aria-hidden="true" style={{ listStyle: "none", padding: 0, margin: 0 }}>
       {[0, 1, 2, 3, 4].map((i) => (
-        <li key={i} style={{ display: "flex", alignItems: "center", gap: 12, padding: "11px 16px", borderBottom: "1px solid rgba(var(--scrim-rgb),0.04)" }}>
-          <div style={{ width: 44, height: 44, borderRadius: 999, background: "rgba(var(--scrim-rgb),0.06)", flexShrink: 0 }} />
+        <li key={i} style={{ display: "flex", alignItems: "center", gap: 12, minHeight: 66, boxSizing: "border-box", padding: "0 16px 0 14px", borderBottom: "1px solid rgba(var(--scrim-rgb),0.04)" }}>
+          <div style={{ width: ROW_PICTURE, height: ROW_PICTURE, borderRadius: 999, background: "rgba(var(--scrim-rgb),0.06)", flexShrink: 0 }} />
           <div style={{ flex: 1 }}>
             <div style={{ width: "55%", height: 14, background: "rgba(var(--scrim-rgb),0.08)", borderRadius: 6, marginBottom: 6 }} />
             <div style={{ width: "85%", height: 11, background: "rgba(var(--scrim-rgb),0.05)", borderRadius: 5 }} />

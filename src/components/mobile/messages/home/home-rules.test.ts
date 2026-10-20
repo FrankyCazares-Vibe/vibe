@@ -176,6 +176,17 @@ test("clubChip / newCountText: the live chip, the timed chip, the RSVP mark, N n
   assert.equal(rules.newCountText(120), "99+ new");
 });
 
+// Oct 19, 2026 (critique D4, B5 review): `No messages yet` must never sit beside a recent time.
+test("clubQuietLine: null when the row has a preview, a chip or N new; else the event-chat line when there was activity, No messages yet when none", () => {
+  const msg = { id: "m1", text: "hi", author_name: "Ana", created_at: iso(local(2026, 9, 8, 20, 0)), kind: "text" as const };
+  assert.equal(rules.clubQuietLine(club({ name: "S", lounge: { room_id: "l", latest: msg, unread_count: 0 } }), NOW), null);
+  assert.equal(rules.clubQuietLine(club({ name: "S", next_event: event() }), NOW), null);
+  assert.equal(rules.clubQuietLine(club({ name: "S", lounge: { room_id: "l", latest: null, unread_count: 2 } }), NOW), null);
+  assert.equal(rules.clubQuietLine(club({ name: "S" }), NOW), "No messages yet");
+  // Only an event chat spoke (the inbox counts event-room messages in `last_activity_at`), and that event is over.
+  assert.equal(rules.clubQuietLine(club({ name: "S", last_activity_at: iso(local(2026, 9, 8, 18, 0)) }), NOW), "Last message in an event chat");
+});
+
 test("clubRowLabel: 1.2's clauses, each only when true, the spoken time last", () => {
   assert.equal(
     rules.clubRowLabel(
