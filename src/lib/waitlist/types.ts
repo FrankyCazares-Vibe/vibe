@@ -156,8 +156,21 @@ export const GATE_REFUSALS = [
   "access_code_expired",
   "access_code_used",
   "access_code_in_use",
+  // A club link (setup or members'), 20261021120000_club_links_gate.sql.
+  "club_link_invalid",
+  "club_link_used",
+  "club_link_expired",
+  "club_link_off",
+  "club_link_full",
+  "club_link_in_use",
+  "club_link_school_email",
 ] as const;
 export type GateRefusal = (typeof GATE_REFUSALS)[number];
+
+/** A refusal about a club link rather than an access code. */
+export function isClubLinkRefusal(reason: GateRefusal): boolean {
+  return reason.startsWith("club_link_");
+}
 
 const GATE_TAG_RE = /^\[vibe:([a-z_]+)\]/;
 

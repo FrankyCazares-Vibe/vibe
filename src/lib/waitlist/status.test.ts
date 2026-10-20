@@ -56,8 +56,8 @@ test("deriveWaitlistStatus: an officer added by hand is invited before confirmin
   assert.equal(deriveWaitlistStatus({ ...BASE, code_hash: HASH }, NOW), "expired");
 });
 
-test("parseGateRefusal: the five reasons, only on a 403 with the tag", () => {
-  assert.equal(GATE_REFUSALS.length, 5);
+test("parseGateRefusal: the twelve reasons (five access code, seven club link), only on a 403 with the tag", () => {
+  assert.equal(GATE_REFUSALS.length, 12);
   for (const reason of GATE_REFUSALS) {
     assert.equal(parseGateRefusal({ status: 403, message: `[vibe:${reason}] Some sentence.` }), reason);
   }
