@@ -37,6 +37,7 @@ import {
   inputStyle,
   Notice,
 } from "./admin-shell";
+import { ClubLinksCard } from "./club-links-card";
 import { ImageSlots } from "./image-slots";
 
 export type AdminOrgRow = {
@@ -237,6 +238,9 @@ export function AdminOrgsClient({ initialOrgs }: { initialOrgs: AdminOrgRow[] })
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+      {/* The founders' setup links for the first clubs (club-links-card.tsx). */}
+      <ClubLinksCard />
+
       <div className="adm-fields">
         <input
           type="text"
