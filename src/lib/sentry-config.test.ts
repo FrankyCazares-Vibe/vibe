@@ -49,6 +49,7 @@ const specifier = "./sentry-config.ts";
 const {
   redactHandles,
   redactAuthTokens,
+  redactClubLinks,
   redactDbCallValues,
   redactElementIds,
   redactElementLabels,
@@ -1627,4 +1628,17 @@ test("the installed kit drops the two with our list, and still sends an ordinary
   assert.equal(text.includes("send failed"), true);
   assert.equal(text.includes("Object Not Found Matching Id"), false);
   assert.equal(text.includes("SCDynimacBridge"), false);
+});
+
+test("redactClubLinks: a club link's code goes, plain or inside next=; /c/welcome stays", () => {
+  assert.equal(
+    redactClubLinks("https://www.connectvibe.app/c/K7Q2M9XDAB3CDE4F"),
+    "https://www.connectvibe.app/c/[redacted]",
+  );
+  assert.equal(
+    redactClubLinks("/auth/login?next=%2Fc%2Fk7q2-m9xd-ab3c-de4f"),
+    "/auth/login?next=%2Fc%2F[redacted]",
+  );
+  assert.equal(redactClubLinks("/c/welcome"), "/c/welcome");
+  assert.equal(redactClubLinks("src/app/c/[code]/page.tsx"), "src/app/c/[code]/page.tsx");
 });

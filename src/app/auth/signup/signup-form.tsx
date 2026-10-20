@@ -56,7 +56,8 @@ import {
   GATE_PROBE_METADATA_KEY,
   readTypedAccessCode,
 } from "@/lib/waitlist/access-code";
-import { parseGateRefusal, WAITLIST_PATH } from "@/lib/waitlist/types";
+import { CLUB_CODE_METADATA_KEY } from "@/lib/club-links/code";
+import { isClubLinkRefusal, parseGateRefusal, WAITLIST_PATH } from "@/lib/waitlist/types";
 import { gateRefusalCopy } from "@/lib/waitlist/view";
 
 /** GoTrue's per-address resend cooldown. */
@@ -157,6 +158,18 @@ type PendingSignup = {
 };
 
 /**
+ * A club link's sign-up (the club's view, wave 1; /c/<code>). The code rides
+ * in `options.data.club_code` for the sign-up gate, which lets a school
+ * address in through a live link while sign-up is closed; the page above the
+ * form names the club. No access code is asked for unless the link says no.
+ */
+export type SignupClub = {
+  code: string;
+  kind: "setup" | "members";
+  name: string;
+};
+
+/**
  * The sign-up form (page.tsx reads the switch and the link on the server).
  *
  * - `signupOpen`: sign-up is open for everyone. Closed (the pilot), the form
@@ -171,10 +184,16 @@ export function SignupForm({
   signupOpen,
   initialAccessCode,
   probe,
+  club = null,
+  header = null,
 }: {
   signupOpen: boolean;
   initialAccessCode: string;
   probe: boolean;
+  /** A club link's sign-up: send its code, and say so (see SignupClub). */
+  club?: SignupClub | null;
+  /** Replaces the headline and the line under it (the club link page's own). */
+  header?: React.ReactNode;
 }) {
   // Oct 19, 2026: fetch the logo face with the page, so the kinetic logo's
   // entrance isn't half over before its font (font-display block) arrives.
@@ -193,7 +212,8 @@ export function SignupForm({
   const [accessCode, setAccessCode] = useState(initialAccessCode);
   // Shown when closed, and also when the gate refused a page that thought
   // sign-up was open (the switch changed since it loaded).
-  const [codeShown, setCodeShown] = useState(!signupOpen);
+  // A club link's sign-up needs no access code: the link is the way in.
+  const [codeShown, setCodeShown] = useState(!signupOpen && !club);
   const codeInput = useRef<HTMLInputElement>(null);
   const [focusCode, setFocusCode] = useState(0);
   // The "are you a person" box (TurnstileBox). With no site key it is "off"
@@ -320,12 +340,21 @@ export function SignupForm({
             [TERMS_METADATA_KEYS.version]: TERMS_VERSION,
             [TERMS_METADATA_KEYS.age]: true,
             ...(code ? { [ACCESS_CODE_METADATA_KEY]: formatAccessCode(code) } : {}),
+            ...(club ? { [CLUB_CODE_METADATA_KEY]: club.code } : {}),
             ...(probe ? { [GATE_PROBE_METADATA_KEY]: true } : {}),
           },
         },
       });
       if (signErr) {
-        if (parseGateRefusal(signErr)) {
+        const refusal = parseGateRefusal(signErr);
+        if (refusal && club && isClubLinkRefusal(refusal)) {
+          // The club link said no (used, ended, a personal address...): its
+          // own words. The access code field stays away: the link was the
+          // way in, and the words say what to do instead.
+          setError(signUpErrorMessage(signErr, human));
+          return;
+        }
+        if (refusal) {
           // Every field stays filled; the cursor goes to the code.
           setCodeShown(true);
           setError(signUpErrorMessage(signErr, human));
@@ -445,7 +474,13 @@ export function SignupForm({
               initialEmail={pending.email}
               autoStartCooldownSec={pending.cooldownSec}
             />
-            {codeTied ? (
+            {club?.kind === "setup" ? (
+              // A setup link works once: this address holds it now.
+              <p className="vibe-auth-tip" style={{ overflowWrap: "anywhere" }}>
+                This setup link is now tied to <strong>{pending.email}</strong>.
+                Wrong address? Ask whoever gave you the link for a new one.
+              </p>
+            ) : codeTied ? (
               <p className="vibe-auth-tip" style={{ overflowWrap: "anywhere" }}>
                 Your access code is now tied to <strong>{pending.email}</strong>.
                 Wrong address? Reply to your invite email and we&apos;ll send you
@@ -490,14 +525,18 @@ export function SignupForm({
           <KineticWordmark dotClassName="vibe-auth-dot" />
         </div>
 
-        <h1 className="vibe-auth-headline">
-          Create your account<span className="vibe-auth-dot">.</span>
-        </h1>
-        <p className="vibe-auth-sub">
-          Use your <strong>school email</strong>, the one ending in{" "}
-          <code className="vibe-auth-code">.edu</code>. We&apos;ll send it a
-          code to confirm you&apos;re a student.
-        </p>
+        {header ?? (
+          <>
+            <h1 className="vibe-auth-headline">
+              Create your account<span className="vibe-auth-dot">.</span>
+            </h1>
+            <p className="vibe-auth-sub">
+              Use your <strong>school email</strong>, the one ending in{" "}
+              <code className="vibe-auth-code">.edu</code>. We&apos;ll send it a
+              code to confirm you&apos;re a student.
+            </p>
+          </>
+        )}
 
         <div className="vibe-auth-steps" aria-hidden>
           <div className="vibe-auth-step vibe-auth-step--active">

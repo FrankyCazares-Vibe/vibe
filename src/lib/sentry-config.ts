@@ -235,10 +235,23 @@ export function redactElementIds(s: string): string {
   return s.replace(ELEMENT_ID_RUN_RE, (run: string) => run.replace(UUID_RE, ":id"));
 }
 
+/**
+ * A club link, `/c/<code>` (the club's view, wave 1): the code lets someone
+ * past the closed sign-up, and a setup link's makes them a club's owner. 16
+ * Crockford characters, read forgivingly (any case, hyphens), so anything of
+ * 16 or more letters, digits and hyphens after `/c/` goes. `/c/welcome` stays.
+ */
+const CLUB_LINK_PATH_RE = new RegExp(`(${SLASH}c${SLASH})(?!welcome\b)[0-9A-Za-z-]{16,64}`, "g");
+
+/** Replaces the code in a club link with `[redacted]`. Pure: same input, same output. */
+export function redactClubLinks(s: string): string {
+  return s.replace(CLUB_LINK_PATH_RE, `$1${REDACTED}`);
+}
+
 /** Every string scrubber, in order. */
 function scrubString(s: string): string {
   return redactElementIds(
-    redactElementLabels(redactDbCallValues(redactHandles(redactAuthTokens(s)))),
+    redactElementLabels(redactDbCallValues(redactHandles(redactClubLinks(redactAuthTokens(s))))),
   );
 }
 
