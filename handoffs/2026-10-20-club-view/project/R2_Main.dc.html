@@ -45,14 +45,14 @@ a:hover{color:inherit}
     </section>
 
     <section aria-label="Calls" style="display: flex; flex-direction: column; gap: 10px">
-      <h2 style="font-family: Fraunces, serif; font-weight: 800; font-size: 36px; letter-spacing: -0.03em">Four calls.</h2>
+      <h2 style="font-family: Fraunces, serif; font-weight: 800; font-size: 36px; letter-spacing: -0.03em">Four calls, answered.</h2>
       <ol style="list-style: none; display: flex; flex-direction: column">
         <sc-for list="{{calls}}" as="c" hint-placeholder-count="4">
           <li style="display: grid; grid-template-columns: 44px minmax(0, 1fr); gap: 4px 12px; padding: 16px 0; border-bottom: 1px solid rgba(255,255,255,0.08)">
             <div style="font-family: Fraunces, serif; font-weight: 800; font-size: 26px; color: #FF8A66; line-height: 1.1">{{c.n}}</div>
             <div style="display: flex; flex-direction: column; gap: 6px">
-              <div style="font-family: Fraunces, serif; font-weight: 800; font-size: 21px; letter-spacing: -0.02em; line-height: 1.25">{{c.q}}</div>
-              <div style="font-size: 15.5px; line-height: 1.45"><span style="color: #FF8A66; font-weight: 600">Recommend:</span> {{c.rec}}</div>
+              <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px"><div style="font-family: Fraunces, serif; font-weight: 800; font-size: 21px; letter-spacing: -0.02em; line-height: 1.25">{{c.q}}</div><span style="height: 26px; padding: 0 10px; border-radius: 999px; background: rgba(79,208,138,0.14); color: #6FDB9A; font-size: 12.5px; font-weight: 600; display: inline-flex; align-items: center; white-space: nowrap">{{c.status}}</span></div>
+              <div style="font-size: 15.5px; line-height: 1.45"><span style="color: #FF8A66; font-weight: 600">Drawn:</span> {{c.rec}}</div>
             </div>
           </li>
         </sc-for>
@@ -73,10 +73,10 @@ class Component extends DCLogic {
         { q: 'Club emails?', t: 'People sign in as themselves.', lines: ['No shared club login: when officers graduate, a shared password leaves with them.', 'The club’s email is optional: it can prove the club is real and get it back if its owner disappears.', 'For the first 20, you make a one-time setup link in Admin › Clubs and hand it over in person.'] }
       ],
       calls: [
-        { n: '1', q: 'The club on the phone: switch on the Profile tab, with no sixth tab?', rec: 'yes. Students already switch to their club’s Instagram account this way. The two other ways (a row in Messages, a card on your profile) are drawn beside it for comparison.' },
-        { n: '2', q: 'A one-time setup link from Admin › Clubs for the first 20?', rec: 'yes. It marks the club as checked, lets the president past the waitlist, and makes them the owner.' },
-        { n: '3', q: 'Club emails?', rec: 'never a login. Optional, for checking a club that set itself up and for getting a club back.' },
-        { n: '4', q: 'Can mods switch to the club?', rec: 'yes, with only the tools their role allows. Members never see the switch.' }
+        { n: '1', status: 'Decided Oct 20: yes', q: 'The club on the phone: switch on the Profile tab, with no sixth tab?', rec: 'yes. Students already switch to their club’s Instagram account this way. The two other ways (a row in Messages, a card on your profile) are drawn beside it for comparison.' },
+        { n: '2', status: 'Kept as drawn, Oct 20', q: 'A one-time setup link from Admin › Clubs for the first 20?', rec: 'yes. It marks the club as checked, lets the president past the waitlist, and makes them the owner.' },
+        { n: '3', status: 'Kept as drawn, Oct 20', q: 'Club emails?', rec: 'never a login. Optional, for checking a club that set itself up and for getting a club back.' },
+        { n: '4', status: 'Kept as drawn, Oct 20', q: 'Can mods switch to the club?', rec: 'yes, with only the tools their role allows. Members never see the switch.' }
       ]
     };
   }

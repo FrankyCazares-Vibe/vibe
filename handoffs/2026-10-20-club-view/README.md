@@ -14,7 +14,8 @@ The canvas opens on Round 2 (`R2_*` boards); Round 1 is its own page.
 - Its first screen has three things: Needs you, Up next (one card from posted to thank-you), Write to members. Everything else is in Club tools.
 - **Several clubs:** the same switcher lists you first, then each club you run (phone); one nav line per club (desktop); a dot where you're needed; only clubs where you're an officer.
 - **Setup:** people sign in as themselves, never with a shared club login; the club's email is optional (proof and recovery). The first 20 get a one-time setup link from Admin › Clubs, handed over in person (checks the club, gets the president past the waitlist, makes them owner).
-- Four calls on `R2_Main`, each with a recommendation; Round 1's other calls still stand.
+- **Decided by Franky, Oct 20:** officers switch to their club from the Profile tab, no sixth tab. "Keep the rest of Round 2 as drawn": the one-time setup link from Admin › Clubs for the first 20, no club logins (the club's email is optional, for proof and recovery), and mods can switch with only their role's tools.
+- **Still open (Round 1's calls):** what mods can do inside the club, the members' link past the waitlist, flyers on the Board, notices for posts and events, the share kit, Events first on the club page, officer numbers, hand-over. Nothing is built yet.
 
 ## Files
 - `project/*.dc.html` + `project/canvas.json`: the canvas source, exactly as published.
