@@ -211,8 +211,8 @@
     font-weight: 600;
   }
   .vpv-cact svg { display: block; }
-  .vpv-cact.on { color: #E0245E; }
-  .vpv-cact.on svg { fill: #E0245E; stroke: #E0245E; }
+  .vpv-cact.on { color: #FF5C35; }
+  .vpv-cact.on svg { fill: #FF5C35; stroke: #FF5C35; }
   .vpv-creply-form {
     display: flex; gap: 6px; margin-top: 8px;
   }

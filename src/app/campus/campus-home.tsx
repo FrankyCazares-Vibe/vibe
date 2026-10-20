@@ -8899,7 +8899,7 @@ function FeedRow({
           <EngagementAction
             // The heart pops and throws a few dots when a tap turns it on.
             icon={
-              <LikeBurst liked={liked} burst={likeBurst} color="#E0245E">
+              <LikeBurst liked={liked} burst={likeBurst} color="var(--coral)">
                 <LikeIcon filled={liked} />
               </LikeBurst>
             }
@@ -8907,7 +8907,7 @@ function FeedRow({
             label="Like"
             onClick={toggleLike}
             active={liked}
-            activeColor="#E0245E"
+            activeColor="var(--coral)"
           />
           <EngagementAction
             icon={<CommentIcon />}
@@ -9798,11 +9798,11 @@ function CommentRow({
               border: "none",
               padding: 0,
               cursor: "pointer",
-              color: liked ? "#E0245E" : "inherit",
+              color: liked ? "var(--coral)" : "inherit",
               font: "inherit",
             }}
           >
-            <LikeBurst liked={liked} burst={likeBurst} color="#E0245E">
+            <LikeBurst liked={liked} burst={likeBurst} color="var(--coral)">
               <LikeIcon filled={liked} />
             </LikeBurst>
             {likeCount > 0 ? <span>{likeCount}</span> : null}
