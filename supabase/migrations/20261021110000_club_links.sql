@@ -109,6 +109,10 @@ create table public.club_links (
   used_at      timestamptz,
   used_by      uuid references public.users (id) on delete set null,
   created_by   uuid references public.users (id) on delete set null,
+  -- Setup only: the steps of the club's setup list its officers marked done
+  -- that the club's own data can't show ("who can join" chosen, officers
+  -- skipped for now), as {"<step>": "<when>"}.
+  setup_marks  jsonb not null default '{}'::jsonb check (jsonb_typeof(setup_marks) = 'object'),
   created_at   timestamptz not null default now(),
   updated_at   timestamptz not null default now(),
   constraint club_links_shape check (
