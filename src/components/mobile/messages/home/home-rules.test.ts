@@ -145,6 +145,23 @@ test("clubPreview: the unread Board line with the dot; else the newer of the two
   );
 });
 
+test("clubPreview: a deleted message's note carries deleted, so the row draws it grey italic (Oct 19, 2026)", () => {
+  const at = (h: number, mi: number) => iso(local(2026, 9, 8, h, mi));
+  const boardNote = { id: "m1", text: "Post deleted", author_name: "Ana", created_at: at(20, 41), kind: "text" as const, deleted: true as const };
+  const loungeNote = { id: "m2", text: "Message deleted", author_name: "Sam T.", created_at: at(20, 50), kind: "text" as const, deleted: true as const };
+  assert.deepEqual(
+    rules.clubPreview(club({ name: "S", board: { room_id: "b", latest: boardNote, unread: true } })),
+    { prefix: "Board:", text: "Post deleted", dot: true, deleted: true },
+  );
+  assert.deepEqual(
+    rules.clubPreview(club({ name: "S", board: { room_id: "b", latest: boardNote, unread: false }, lounge: { room_id: "l", latest: loungeNote, unread_count: 0 } })),
+    { prefix: "Sam T.:", text: "Message deleted", dot: false, deleted: true },
+  );
+  // A live line never carries the key at all.
+  const live = rules.clubPreview(club({ name: "S", lounge: { room_id: "l", latest: { ...loungeNote, text: "hi", deleted: undefined }, unread_count: 0 } }));
+  assert.equal(live && "deleted" in live, false);
+});
+
 const event = (over: Partial<NonNullable<InboxClub["next_event"]>> = {}): NonNullable<InboxClub["next_event"]> => ({
   id: "e1",
   title: "Fall Formal",
@@ -282,7 +299,7 @@ test("entriesOn / dayDot / dayLabel: the strip's day, its dot and 1.2's labels",
   assert.equal(rules.dayLabel(thu, [], true), "Thursday, October 8, today, nothing planned");
   assert.equal(rules.dayLabel(thu, [live], true), "Thursday, October 8, today: Fall Formal, going, live now");
   assert.equal(rules.dayLabel(local(2026, 9, 9), [fri], false), "Friday, October 9: Fright Night, going");
-  assert.equal(rules.dayLabel(satDay, rules.entriesOn(satDay, all), false), "Saturday, October 10: Open Practice, going; Build Night, maybe");
+  assert.equal(rules.dayLabel(satDay, rules.entriesOn(satDay, all), false), "Saturday, October 10: Open Practice, going; Build Night, interested");
 });
 
 test("weekCardLine / weekCardLabel / spokenShort: Live now, Ended, the short time; the spoken label", () => {
@@ -299,7 +316,9 @@ test("weekCardLine / weekCardLabel / spokenShort: Live now, Ended, the short tim
   assert.deepEqual(rules.weekCardLine(ended, NOW, true), { kind: "ended", text: "Ended" });
   assert.equal(rules.weekCardLabel(live, NOW), "Fall Formal room, Salsa Club, live now, you're going");
   assert.equal(rules.weekCardLabel(fri, NOW), "Fright Night room, Film Society, Saturday 7 PM, you're going");
-  assert.equal(rules.weekCardLabel(ended, NOW), "Open Mic room, ended, you said maybe");
+  assert.equal(rules.weekCardLabel(ended, NOW), "Open Mic room, ended, you're interested");
+  // No chat behind it (Oct 19, 2026): the card opens the club page, so it says "event".
+  assert.equal(rules.weekCardLabel({ ...fri, room_id: null }, NOW), "Fright Night event, Film Society, Saturday 7 PM, you're going");
   assert.equal(rules.spokenShort("Fri 7 PM"), "Friday 7 PM");
   assert.equal(rules.spokenShort("Oct 8 7:30 PM"), "October 8 7:30 PM");
   assert.equal(rules.spokenShort("7:30 PM"), "7:30 PM");
@@ -345,9 +364,9 @@ test("monthDayLabel: the grid day's label, with today, selected, the counts and 
   assert.equal(rules.monthDayLabel(local(2026, 9, 1), [], off), "Thursday, October 1, nothing planned");
   assert.equal(rules.monthDayLabel(local(2026, 9, 8), [live], { today: true, selected: false }), "Thursday, October 8, today, 1 event you're going to, live now");
   assert.equal(rules.monthDayLabel(local(2026, 9, 9), [fri], { today: false, selected: true }), "Friday, October 9, selected, 1 event you're going to");
-  assert.equal(rules.monthDayLabel(local(2026, 9, 10), [maybe], off), "Saturday, October 10, 1 event you said maybe to");
-  assert.equal(rules.monthDayLabel(local(2026, 9, 10), [maybe, maybe2], off), "Saturday, October 10, 2 events you said maybe to");
-  assert.equal(rules.monthDayLabel(local(2026, 9, 10), [going2, maybe, maybe2], off), "Saturday, October 10, 1 event you're going to, 2 you said maybe to");
+  assert.equal(rules.monthDayLabel(local(2026, 9, 10), [maybe], off), "Saturday, October 10, 1 event you're interested in");
+  assert.equal(rules.monthDayLabel(local(2026, 9, 10), [maybe, maybe2], off), "Saturday, October 10, 2 events you're interested in");
+  assert.equal(rules.monthDayLabel(local(2026, 9, 10), [going2, maybe, maybe2], off), "Saturday, October 10, 1 event you're going to, 2 you're interested in");
   assert.equal(rules.monthDayLabel(local(2026, 9, 8), [], { today: true, selected: true }), "Thursday, October 8, today, selected, nothing planned");
   assert.equal(rules.spokenDay(local(2026, 9, 8)), "Thursday October 8");
 });
@@ -363,7 +382,7 @@ test("planRows: the day's plans by start, `<club> · <time>`, the label, and no 
   assert.deepEqual(rows.map((r) => r.time), ["2:30 PM", "7 PM", "11:30 PM"]);
   assert.deepEqual(rows.map((r) => r.club), ["Salsa Club", "Film Society", null]);
   assert.equal(rows[1].label, "Fright Night, Film Society, Friday October 9 at 7 PM, you're going. Open the event room");
-  assert.equal(rows[0].label, "Build Night, Salsa Club, Friday October 9 at 2:30 PM, you said maybe", "no room: nothing to open");
+  assert.equal(rows[0].label, "Build Night, Salsa Club, Friday October 9 at 2:30 PM, you're interested", "no room: nothing to open");
   assert.equal(rows[2].label, "Study Jam, Friday October 9 at 11:30 PM, you're going");
   assert.deepEqual(rules.planRows(local(2026, 9, 12), [late, early]), []);
 });

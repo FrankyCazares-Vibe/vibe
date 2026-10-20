@@ -23,6 +23,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { BOARD_POSTER_ROLES } from "./room-rules";
+import { isMissingChatSchema } from "./schema";
 
 /** Clubs asked about in one `in (...)` filter (the follows list is capped at 50). */
 const ORGS_PER_READ = 100;
@@ -97,15 +98,26 @@ export async function readFollowerBoardPage(
   if (!posters) return { data: null, error: { message: "board posters could not be read" } };
   const ids = Array.from(posters.get(q.orgId) ?? []);
   if (ids.length === 0) return { data: [], error: null };
-  let read = service
-    .from("messages")
-    .select(q.select)
-    .eq("channel_id", q.channelId)
-    .is("thread_root_id", null)
-    .is("removed_at", null)
-    .in("user_id", ids);
-  if (q.before) read = read.lt("created_at", q.before);
-  if (q.after) read = read.gte("created_at", q.after);
-  const { data, error } = await read.order("created_at", { ascending: q.oldestFirst }).limit(q.limit);
+  // A post its officer deleted (Oct 19, 2026) is not on a follower's Board,
+  // so it is left out HERE, in the read: filtered after the read, a page of
+  // `limit` came back short, the screens took a short page for the oldest
+  // one, and the posts before it could no longer be reached (review of Oct
+  // 19, 2026). A database without `deleted_at` (20261019150000) has no
+  // deleted post: the same read without the filter.
+  const run = (liveOnly: boolean) => {
+    let read = service
+      .from("messages")
+      .select(q.select)
+      .eq("channel_id", q.channelId)
+      .is("thread_root_id", null)
+      .is("removed_at", null)
+      .in("user_id", ids);
+    if (liveOnly) read = read.is("deleted_at", null);
+    if (q.before) read = read.lt("created_at", q.before);
+    if (q.after) read = read.gte("created_at", q.after);
+    return read.order("created_at", { ascending: q.oldestFirst }).limit(q.limit);
+  };
+  let { data, error } = await run(true);
+  if (error && isMissingChatSchema(error)) ({ data, error } = await run(false));
   return { data: (data ?? null) as unknown[] | null, error: error ?? null };
 }

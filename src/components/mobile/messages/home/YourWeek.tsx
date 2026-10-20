@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useLayoutEffect, useRef, useState } from "react";
 
 import { LoadFailed, type LoadFailure } from "@/components/feedback/LoadFailed";
+import { clubEventHref } from "@/lib/calendar/calendar-key";
 import {
   isSameLocalDay,
   swipeDirection,
@@ -24,6 +25,7 @@ import { FONT, palette, type Palette, SERIF } from "../v2-tokens";
 
 import { CheckIcon } from "./ClubRow";
 import { dayDot, dayLabel, entriesOn, isPastDay, weekCardLabel, weekCardLine, type WeekEntry } from "./home-rules";
+import { InterestedRing, RsvpDayMark } from "./RsvpMark";
 
 /**
  * The slide-in of a week (or of a month in `MonthSheet`) that a swipe or a
@@ -314,7 +316,8 @@ export function YourWeek({
                   <span style={{ fontSize: 15, fontWeight: today ? 800 : 700, lineHeight: "16px", color: today ? t.activeChip.ink : past ? t.muted : t.ink }}>
                     {day.getDate()}
                   </span>
-                  <span aria-hidden="true" style={{ width: 5, height: 5, borderRadius: 999, background: dot === "going" ? t.coral : dot === "maybe" ? t.muted : "transparent" }} />
+                  {/* The calendar key (Oct 19, 2026 repair): a coral ring for Interested. */}
+                  <RsvpDayMark kind={dot} coral={t.coral} />
                 </button>
               );
             })}
@@ -409,15 +412,18 @@ function StepButton({ label, back, disabled, onPress, t, shown }: { label: strin
 /**
  * One 142×64 card (`W0_Home:40-54`): the live chrome on `room_state ===
  * "live"`, the quiet chrome otherwise; line 1 `Live now` / `Ended` /
- * `eventTimeShort` + ` · ` + the RSVP mark (a check for Going, a dot for
- * Maybe: shape and word, never colour alone); line 2 the title; line 3 the
- * club dot + name (none when `org` is null). A link to the room when
- * `room_id` is set, else a plain tile with the same text.
+ * `eventTimeShort` + ` · ` + the RSVP mark (a check for Going, a coral ring
+ * for Interested since Oct 19, 2026, the calendar key: shape and word, never
+ * colour alone); line 2 the title; line 3
+ * the club dot + name (none when `org` is null). A link to the room when
+ * `room_id` is set; else, since Oct 19, 2026 (critique D13), a link to the
+ * club's page at that event when it has a club; else a plain tile.
  *
  * Width: 142 is the floor, not a fixed size (VIS-S1-1). The mockup's 142 was
  * drawn for `Fri 7 PM · Going`; the pinned `● Live now · ✓ Going` needs ~134px
  * of text at 12px/700 and 142 − 20 leaves 120, so line 1 alone sizes the card
- * between 142 and 184 (`Wed 11:30 PM · ● Maybe` → ~161). The title and the
+ * between 142 and 184 (`Wed 11:30 PM · ● Interested` → ~184; past that the
+ * time is the part that ends in "…"). The title and the
  * club line are `contain: inline-size` so they never widen it and keep their
  * ellipsis; line 1 keeps its own ellipsis as the guard past 184.
  */
@@ -480,8 +486,8 @@ function WeekCard({
           </span>
         ) : (
           <span style={{ flexShrink: 0, display: "inline-flex", alignItems: "center", gap: 4, fontWeight: 700, color: t.secondary }}>
-            <span aria-hidden="true" style={{ width: 6, height: 6, borderRadius: 999, background: t.muted }} />
-            Maybe
+            <InterestedRing coral={t.coral} />
+            Interested
           </span>
         )}
       </span>
@@ -513,6 +519,15 @@ function WeekCard({
       >
         {body}
       </a>
+    );
+  }
+  if (entry.org) {
+    // No chat to open (Oct 19, 2026, critique D13): the card opens the
+    // club's page, scrolled to this event.
+    return (
+      <Link ref={register} href={clubEventHref(entry.org.handle, entry.id)} aria-label={`${label}. Open the club page`} style={style}>
+        {body}
+      </Link>
     );
   }
   return (

@@ -392,6 +392,15 @@ export type ChatMessage = {
    */
   hidden: boolean;
   removed: RemovedInfo | null;
+  /**
+   * The sender deleted it (Oct 19, 2026, decision 8: "Message deleted" stays
+   * in its place). Then `content` is "", every attachment, `card`,
+   * `parent_preview` and `reactions` are empty, and `kind` is "text"; the
+   * author, `created_at`, `thread_root_id` and a Board post's `reply_count`
+   * stay. Optional so older answers and the rows built before Oct 19 still
+   * type: absent means a live message.
+   */
+  deleted?: boolean;
 };
 
 /** The room of a thread read. `going` = the first 8 by RSVP time, room members only. */
@@ -435,6 +444,15 @@ export type ThreadMessagesResponse = {
 /** A message removed by an officer or a mod; `already` when it was removed before this call. */
 export type RemoveMessageResponse = { ok: true; removed: true; already?: true };
 
+/**
+ * The sender's own delete (Oct 19, 2026). `deleted: true`: the row stays as
+ * a "Message deleted" note (`deleted_at`), so the screens swap the row for
+ * the note. Without it (`{ ok: true }` alone: a database without
+ * 20261019150000, where the delete is the old hard delete) the message is
+ * gone whole and the screens drop the row, as before.
+ */
+export type DeleteOwnResponse = { ok: true; deleted?: true; already?: true; deleted_at?: string };
+
 // ── 6.4 The thread list ──────────────────────────────────────────────────────
 
 /**
@@ -452,6 +470,13 @@ export type Preview = {
   author_name: string;
   created_at: string;
   kind: MessageKind;
+  /**
+   * Its sender deleted it (Oct 19, 2026): `text` is then the note's own line
+   * ("Message deleted", or "Post deleted" for a Board post), and this flag
+   * lets a list draw it quietly, never as words someone typed. Absent on a
+   * live message.
+   */
+  deleted?: true;
 };
 
 export type InboxClub = {

@@ -63,7 +63,8 @@ type RouteContext = { params: Promise<{ id: string }> };
 /**
  * Single post fetch for the viewer modal (P1-015). Returns the post + author
  * + counts (likes, comments, views, reposts, saves) + viewer-relative state
- * (liked, saved) + `is_owner`. One roundtrip on modal open instead of three.
+ * (liked, saved, and since Oct 19, 2026 reposted) + `is_owner`. One roundtrip
+ * on modal open instead of three.
  *
  * WHY `is_owner` IS COMPUTED HERE. Both post viewers used to be told who the
  * author was by their caller — `PostViewerMobile` takes a `canDelete` prop and
@@ -102,8 +103,12 @@ type RouteContext = { params: Promise<{ id: string }> };
  * `counts.likes` / `counts.reposts` COME FROM AN RPC (`post_engagement_counts`,
  * T1). `post_likes` and `post_reposts` return only the caller's own rows once
  * T1's policy file lands, so counting rows would read 0 or 1. The RPC returns
- * numbers only, for posts the caller can see. If it fails, both read 0, which
- * is what a failed count sent before.
+ * numbers only, for posts the caller can see. If it fails, both keys are LEFT
+ * OUT (Oct 19, 2026, review r2), and so is `counts.comments` when its count
+ * fails and any `viewer.*` flag whose own-row read fails. The open post now
+ * writes this answer into the record the feed card shares, so a 0 standing in
+ * for "couldn't count" would overwrite the card's good number; an absent key
+ * leaves it alone (the client skips absent keys).
  *
  * A HIDDEN CLUB'S POST IS "NOT FOUND" (rulings H7). `posts_select_authenticated`
  * lets any signed-in student read any published post by id, club posts
@@ -268,6 +273,7 @@ export async function GET(_req: Request, ctx: RouteContext) {
     engagement,
     commentCountRes,
     viewerLikeRes,
+    viewerRepostRes,
     viewerSaveRes,
     viewRows,
     saveCount,
@@ -281,6 +287,15 @@ export async function GET(_req: Request, ctx: RouteContext) {
       .eq("post_id", id),
     supabase
       .from("post_likes")
+      .select("post_id", { count: "exact", head: true })
+      .eq("post_id", id)
+      .eq("user_id", user.id),
+    // "You reposted this" (Oct 19, 2026, critique M1): the open post's Repost
+    // is an on/off toggle now, so it has to know where it starts. Counted the
+    // same way as the like above: your own row only, on the cookie client
+    // (post_reposts serves each account its own rows), head-only.
+    supabase
+      .from("post_reposts")
       .select("post_id", { count: "exact", head: true })
       .eq("post_id", id)
       .eq("user_id", user.id),
@@ -305,12 +320,25 @@ export async function GET(_req: Request, ctx: RouteContext) {
   // the number is the product.
   const views = viewRows === null ? (storedViewCount ?? 0) : viewRows.length;
 
-  // `null` means the RPC failed (the helper logged why). Both numbers read 0,
-  // today's answer to a failed count; the post itself still opens.
+  // `null` means the RPC failed (the helper logged why). The post still
+  // opens; likes and reposts are left out rather than sent as 0 (Oct 19, 2026,
+  // review r2), so "couldn't count" never reaches the feed card as "nobody".
+  // The same rule for the comment count and each own-row flag below.
   if (engagement === null) {
     console.error("[posts/:id GET counts]");
   }
-  const postCounts = engagement?.get(id) ?? { likes: 0, reposts: 0 };
+  const postCounts = engagement === null ? null : (engagement.get(id) ?? { likes: 0, reposts: 0 });
+  if (commentCountRes.error) console.error("[posts/:id GET comments count]", commentCountRes.error);
+  const ownRow = (label: string, r: { count: number | null; error: unknown }): boolean | undefined => {
+    if (r.error) {
+      console.error(`[posts/:id GET viewer ${label}]`, r.error);
+      return undefined;
+    }
+    return (r.count ?? 0) > 0;
+  };
+  const viewerLiked = ownRow("liked", viewerLikeRes);
+  const viewerSaved = ownRow("saved", viewerSaveRes);
+  const viewerReposted = ownRow("reposted", viewerRepostRes);
 
   const res = NextResponse.json({
     ok: true,
@@ -318,17 +346,19 @@ export async function GET(_req: Request, ctx: RouteContext) {
     is_owner: isAuthor,
     viewer_can_delete: viewerCanDeletePost({ removed, isAuthor, clubOfficer }),
     club,
+    // Every count and flag below is omitted, not zeroed, when it could not
+    // be read (see the docblock).
     counts: {
-      likes:    postCounts.likes,
-      comments: commentCountRes.count ?? 0,
+      ...(postCounts ? { likes: postCounts.likes } : {}),
+      ...(commentCountRes.error ? {} : { comments: commentCountRes.count ?? 0 }),
       views,
-      reposts:  postCounts.reposts,
-      // Omitted, not zeroed, when the count could not be read.
+      ...(postCounts ? { reposts: postCounts.reposts } : {}),
       ...(saveCount === null ? {} : { saves: saveCount }),
     },
     viewer: {
-      liked: (viewerLikeRes.count ?? 0) > 0,
-      saved: (viewerSaveRes.count ?? 0) > 0,
+      ...(viewerLiked === undefined ? {} : { liked: viewerLiked }),
+      ...(viewerSaved === undefined ? {} : { saved: viewerSaved }),
+      ...(viewerReposted === undefined ? {} : { reposted: viewerReposted }),
     },
   });
   // A hidden club's post was served only because of who is asking, so the
@@ -777,8 +807,9 @@ export async function PATCH(req: Request, ctx: RouteContext) {
       // checkText treats `_` as a word letter, so `#term_club` passes the
       // text check (report #10; src/lib/posts/tags.ts). Over the stored tags
       // AND every #tag in the caption, as publish-post does: the stored ones
-      // stop at 10, ASCII, 32 characters, so an 11th tag, a `#café_<term>`
-      // or a longer tag would otherwise get through an edit.
+      // stop at 5 (since Oct 19, 2026), ASCII, 2-32 characters with a letter,
+      // and a run that doesn't end cleanly is dropped, so a 6th tag, a
+      // `#café_<term>` or a longer tag would otherwise get through an edit.
       if (firstBlockedPostTag(patch.tags, c.content) !== null) {
         return contentBlockedResponse("content");
       }

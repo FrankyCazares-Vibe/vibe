@@ -436,7 +436,21 @@ button,input,select,textarea{font-family:inherit;}
 }
 .dm-act-sep{width:1px;height:16px;background:rgba(255,255,255,0.16);margin:0 2px;}
 .dm-act-reply{background:transparent;border:none;padding:2px 6px;color:rgba(255,255,255,0.88);font-size:11.5px;font-weight:700;font-family:'DM Sans',sans-serif;cursor:none;border-radius:6px;display:inline-flex;align-items:center;gap:4px;}
-.dm-act-del{background:transparent;border:none;padding:0;width:24px;height:24px;color:rgba(255,180,180,0.85);cursor:none;border-radius:999px;display:inline-flex;align-items:center;justify-content:center;transition:background-color .14s ease, color .14s ease;}
+.dm-act-del{background:transparent;border:none;padding:2px 7px;height:24px;color:rgba(255,180,180,0.92);font-size:11.5px;font-weight:700;font-family:'DM Sans',sans-serif;cursor:none;border-radius:6px;display:inline-flex;align-items:center;gap:4px;transition:background-color .14s ease, color .14s ease;}
+/* A deleted message's note (Oct 19, 2026): a quiet outlined line in the
+   bubble's place, in the page's own tokens (Light and Night). */
+.dm-deleted{display:inline-flex;align-items:center;gap:6px;max-width:70%;padding:7px 12px;border-radius:18px;border:1px solid var(--border);color:var(--muted);font-size:13px;font-style:italic;font-weight:500;line-height:1.35;}
+/* The page's own "Delete for everyone?" (no window.confirm). */
+.dm-confirm-back{position:fixed;inset:0;z-index:5000;background:rgba(8,7,7,.45);display:flex;align-items:center;justify-content:center;padding:24px;}
+.dm-confirm{width:100%;max-width:320px;padding:18px;border-radius:20px;border:1px solid var(--border);background:var(--paper);color:var(--charcoal);box-shadow:var(--shadow-lg);font-family:'DM Sans',sans-serif;display:flex;flex-direction:column;gap:8px;}
+.dm-confirm-t{font-size:16px;font-weight:700;line-height:1.3;}
+.dm-confirm-d{font-size:13.5px;font-weight:500;line-height:1.45;color:var(--soft);margin-bottom:6px;}
+.dm-confirm-row{display:flex;gap:8px;}
+.dm-confirm-row button{flex:1;height:42px;border:none;border-radius:999px;font-family:'DM Sans',sans-serif;font-size:14px;font-weight:700;cursor:none;}
+.dm-confirm-row button:focus-visible{outline:2px solid var(--accent);outline-offset:2px;}
+.dm-confirm-no{background:rgba(var(--scrim-rgb),.07);color:var(--charcoal);}
+.dm-confirm-yes{background:var(--error-ink);color:var(--paper);}
+.dm-confirm-yes[aria-disabled="true"]{opacity:.6;}
 .dm-act-del:hover{background:rgba(255,80,80,0.18);color:#FF8A8A;}
 .dm-act-report{background:transparent;border:none;padding:2px 6px;color:rgba(255,255,255,0.88);font-size:11.5px;font-weight:700;font-family:'DM Sans',sans-serif;cursor:none;border-radius:6px;display:inline-flex;align-items:center;}
 .dm-act-report:hover{background:rgba(255,255,255,0.12);}
@@ -1422,7 +1436,14 @@ function renderMsgs(msgs,d){
     const rs = Array.isArray(m.reactions)
       ? m.reactions.map((r) => r.emoji + ':' + r.count + (r.viewer_reacted ? '*' : '')).join('|')
       : '';
-    return (m.id || ('__noid' + Math.random())) + '#' + rs;
+    // A message turning into its "Message deleted" note keeps its id, so the
+    // note is in the signature too (Oct 19, 2026).
+    // So is the quote under a reply: when the quoted message is deleted, a
+    // poll brings the same row with its quote now "Message deleted" (review
+    // of Oct 19, 2026), and the row must be drawn again.
+    const pp = m.parentPreview;
+    const qs = pp ? '^' + (pp.id || '') + (pp.deleted ? '!' : '') : '';
+    return (m.id || ('__noid' + Math.random())) + '#' + rs + (m.deleted ? '~deleted' : '') + qs;
   }).join(',') + (d && d.canPost === false ? ';no-post' : '') // Reply comes and goes with it
     + (IS_PANE ? ';pins:' + __panePinSig(d) : ''); // pane mode: so does each row's Pin / Unpin
   const sigChanged = sig !== a.dataset.sig;
@@ -1464,7 +1485,8 @@ function renderMsgs(msgs,d){
     const pp = m.parentPreview;
     const author = pp.authorName || 'message';
     const body = (pp.content || '(media)').slice(0, 140);
-    return `<div class="dm-quote"><div class="dm-quote-author">↩ ${__dmEsc(author)}</div><div class="dm-quote-body">${__dmEsc(body)}</div></div>`;
+    const bodyStyle = pp.deleted ? ' style="font-style:italic"' : '';
+    return `<div class="dm-quote"><div class="dm-quote-author">↩ ${__dmEsc(author)}</div><div class="dm-quote-body"${bodyStyle}>${__dmEsc(body)}</div></div>`;
   };
   // Report this message — never on your own (POST /api/me/reports answers
   // 400 "You can't report something of your own"). Attribute-safe JS
@@ -1498,14 +1520,24 @@ function renderMsgs(msgs,d){
     const label = on ? 'Unpin message' : 'Pin message';
     return `<button type="button" class="dm-act-report dm-act-pin" data-pin-msg="${__dmEsc(m.id)}"${on ? ' data-on="1"' : ''} aria-label="${label}" title="${label}"><svg width="13" height="13" viewBox="0 0 13 13" fill="none" aria-hidden="true"><path d="M4.4 1.6h4.2l-.5 3.3 1.7 1.9v.9H3.2v-.9l1.7-1.9-.5-3.3zM6.5 7.7v3.7" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>`;
   };
+  // Delete for everyone (Oct 19, 2026): a labeled row in the pill on the
+  // viewer's own message of every kind (text, photo, video, shared post,
+  // shared profile), then the page's own confirm (__dmDeleteMessage). Never
+  // on a row still sending or on a note already.
+  const deleteBtnFor = (m) => {
+    if (!m || m.m !== 1 || !m.id || m.deleted || String(m.id).startsWith('temp_')) return '';
+    return `<button type="button" class="dm-act-del" onclick="event.stopPropagation();__dmDeleteMessage('${__dmEsc(m.id)}')" aria-label="Delete for everyone" title="Delete for everyone">
+          <svg width="13" height="13" viewBox="0 0 13 13" fill="none" aria-hidden="true"><path d="M2.5 3.5h8M5 3.5V2.2c0-.4.3-.7.7-.7h1.6c.4 0 .7.3.7.7v1.3M3.7 3.5l.6 7c0 .4.4.7.8.7h3.8c.4 0 .8-.3.8-.7l.6-7" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Delete</span>
+        </button>`;
+  };
   const reportPillFor = (m) => {
-    const btn = pinBtnFor(m) + reportBtnFor(m);
+    const btn = pinBtnFor(m) + reportBtnFor(m) + deleteBtnFor(m);
     return btn ? `<div class="dm-actions">${btn}</div>` : '';
   };
   // Wrap a non-bubble stack so the delegated hover in __dmInstallActionsHover
   // (which keys on .dm-bubble-wrap) can reveal the pill beside it. Own
-  // messages get no pill and keep exactly the markup they had (in pane mode
-  // they get a pill holding only Pin / Unpin).
+  // messages get a pill too since Oct 19, 2026, holding Delete (and, in pane
+  // mode, Pin / Unpin).
   const withReportPill = (m, inner) => {
     const pill = reportPillFor(m);
     return pill ? `<div class="dm-bubble-wrap"${wrapAttr}>${inner}${pill}</div>` : inner;
@@ -1525,20 +1557,14 @@ function renderMsgs(msgs,d){
       const cls = 'dm-act-emo' + (reacted.has(e) ? ' on' : '');
       return `<button type="button" class="${cls}" onclick="event.stopPropagation();__dmToggleReaction('${__dmEsc(m.id)}','${__dmEsc(e)}')" aria-label="React with ${__dmEsc(e)}">${e}</button>`;
     }).join('');
-    // Sender-only delete (matches the messages_delete_own RLS policy).
-    // Trash icon sits on the far right of the action pill — same row as
-    // reactions + reply, visible only when m.m === 1.
-    const deleteBtn = m && m.m === 1
-      ? `<button type="button" class="dm-act-del" onclick="event.stopPropagation();__dmDeleteMessage('${__dmEsc(m.id)}')" aria-label="Delete message" title="Delete">
-          <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M2.5 3.5h8M5 3.5V2.2c0-.4.3-.7.7-.7h1.6c.4 0 .7.3.7.7v1.3M3.7 3.5l.6 7c0 .4.4.7.8.7h3.8c.4 0 .8-.3.8-.7l.6-7" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        </button>`
-      : '';
+    // Sender-only delete, on the far right of the action pill: since Oct 19,
+    // 2026 a labeled "Delete" (deleteBtnFor), not a bare trash icon.
     // No Reply where the viewer can't post: there is no composer to reply
     // in (club chat v1).
     const replyBtn = d && d.canPost === false
       ? ''
       : `<button type="button" class="dm-act-reply" onclick="event.stopPropagation();__dmStartReply('${__dmEsc(m.id)}')" aria-label="Reply">↩ Reply</button>`;
-    return `<div class="dm-actions">${buttons}<span class="dm-act-sep"></span>${replyBtn}${pinBtnFor(m)}${reportBtnFor(m)}${deleteBtn}</div>`;
+    return `<div class="dm-actions">${buttons}<span class="dm-act-sep"></span>${replyBtn}${pinBtnFor(m)}${reportBtnFor(m)}${deleteBtnFor(m)}</div>`;
   };
   // The author's own notice on a message that was taken down. The same
   // words as the React card (RemovedContentCard): an officer's removal says
@@ -1584,6 +1610,15 @@ function renderMsgs(msgs,d){
     // Group + sender break + not mine → render a small "Name" header above the bubble.
     if (isGroup && !mine && gb && m.senderName) {
       h += '<div style="font-size:10.5px;color:var(--muted);font-weight:600;margin:0 0 2px 50px;">' + __dmEsc(m.senderName) + '</div>';
+    }
+    // A message its sender deleted (Oct 19, 2026, decision 8): one grey line
+    // in its place, on the sender's side, with no words, file, quote,
+    // reactions or menu. The time stays (drag to reveal, like a bubble).
+    if (m.deleted) {
+      h += `<div class="msg-row${mine?' mine':''}${gc}"${midAttr(m)}>${!mine?avForMsg(m, showAv):''}<div class="dm-deleted"><svg width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true"><circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="1.4"/><path d="M3.8 12.2l8.4-8.4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>Message deleted</div><div class="btime">${m.ts}</div></div>`;
+      last=mine;
+      lastSenderId=senderKey;
+      return;
     }
     if(m.vibe){
       h+=`<div class="msg-row${gc}">${avForMsg(m, showAv)}<div class="mv"><div class="mv-thumb" style="background:${m.vibe.bg}"><div class="mv-grad"></div><div class="mv-play">&#9654;</div></div><div class="mv-body"><div class="mv-creator">${m.vibe.creator}</div><div class="mv-title">${m.vibe.title}</div></div></div></div>`;
@@ -2640,6 +2675,9 @@ async function __dmLoadMessages(channelId, opts) {
         content: parent.content || '',
         authorName: parentAuthor ? (parentAuthor.name || parentAuthor.handle || '') : '',
         authorHandle: parentAuthor ? parentAuthor.handle : null,
+        // The quoted message was deleted (Oct 19, 2026): its content reads
+        // "Message deleted", drawn in italics.
+        deleted: parent.deleted === true,
       } : null;
       return {
         m: m.user_id === me ? 1 : 0,
@@ -2662,6 +2700,9 @@ async function __dmLoadMessages(channelId, opts) {
         removedReason: m.removed && typeof m.removed.reason === 'string' ? m.removed.reason : '',
         removedBy: m.removed && m.removed.by === 'officer' ? 'officer' : 'moderator',
         hidden: m.hidden === true,
+        // Its sender deleted it (Oct 19, 2026, decision 8): the row is the
+        // grey "Message deleted" note (renderMsgs), with no words or file.
+        deleted: m.deleted === true,
       };
     });
     __realDM.peerLastReadByChannel[channelId] = j.peer_last_read_at || null;
@@ -3591,28 +3632,108 @@ async function __dmTogglePinCurrent() {
   }
 }
 
-// Delete a single message (sender only). Confirm, then paint: the bubble
-// stays until the server says it's gone, so a refused delete has nothing
-// to roll back. (It used to vanish first, then come back on a refetch
-// behind an alert.)
+// Delete a single message for everyone (sender only). Since Oct 19, 2026
+// (decision 8) a grey "Message deleted" note stays in its place: the server
+// answers { ok, deleted: true } and the row turns into the note; a plain
+// { ok: true } (a database without the note, 20261019150000) takes the row
+// away whole, as before. The page's own confirm, never the
+// browser's. The bubble stays until the server says it's gone, so a refused
+// delete has nothing to roll back.
+// Whether a row's quote is of the message with this id.
+function __dmQuotes(m, messageId) {
+  return !!(m && m.id !== messageId && m.parentPreview && m.parentPreview.id === messageId);
+}
 async function __dmDeleteMessage(messageId) {
   const channelId = active;
   if (!channelId || !messageId) return;
-  if (!confirm('Delete this message? Both sides will lose it.')) return;
+  const yes = await __dmConfirmDelete();
+  if (!yes || active !== channelId) return;
   const r = await window.vibeRequest(
     '/api/me/threads/' + encodeURIComponent(channelId) +
     '/messages/' + encodeURIComponent(messageId),
-    { method: 'DELETE', failure: "Couldn't delete that message." }
+    { method: 'DELETE', failure: "Couldn't delete this message." }
   );
   if (!r.ok) return;
+  const note = !!(r.data && r.data.deleted === true);
   const thread = __realDM.T[channelId];
   if (thread && Array.isArray(thread.msgs)) {
-    const next = thread.msgs.filter((m) => m.id !== messageId);
-    if (next.length !== thread.msgs.length) {
-      thread.msgs = next;
-      if (active === channelId) renderMsgs(next, thread);
+    const had = thread.msgs.some((m) => m.id === messageId);
+    const quoted = thread.msgs.some((m) => __dmQuotes(m, messageId));
+    if (had || quoted) {
+      thread.msgs = note
+        ? thread.msgs.map((m) => (m.id === messageId
+          ? Object.assign({}, m, { t: '', media: null, attachment: null, reactions: [], parentMessageId: null, parentPreview: null, removedAt: null, deleted: true })
+          : m))
+        : thread.msgs.filter((m) => m.id !== messageId);
+      // A reply that quoted it no longer shows its words (review of Oct 19,
+      // 2026): its quote reads "Message deleted", as the server's next read
+      // sends it; after a hard delete (no note) the quote goes, as the
+      // server's ON DELETE SET NULL does. Twin of withDeletedQuotes in
+      // src/lib/chat/deleted-note.ts.
+      thread.msgs = thread.msgs.map((m) => (!__dmQuotes(m, messageId) ? m : note
+        ? Object.assign({}, m, { parentPreview: Object.assign({}, m.parentPreview, { content: 'Message deleted', deleted: true }) })
+        : Object.assign({}, m, { parentPreview: null, parentMessageId: null })));
+      if (active === channelId) renderMsgs(thread.msgs, thread);
     }
   }
+  // A reply being written to it lets go; the list's preview reads again.
+  if (__realDM.replyTo && __realDM.replyTo.id === messageId) {
+    __realDM.replyTo = null;
+    if (typeof __dmRenderReplyPill === 'function') __dmRenderReplyPill();
+  }
+  if (typeof __dmLoadList === 'function') __dmLoadList();
+  // Pane mode: a pin on it went with it, so the pins are read again and the
+  // shell's Pinned panel hears it.
+  if (IS_PANE && __realDM.panePins && __realDM.panePins.has(String(messageId))) {
+    __realDM.panePins.delete(String(messageId));
+    if (typeof __panePinsPaint === 'function') __panePinsPaint();
+    __paneSay('pins-changed', { channelId: channelId });
+  }
+}
+
+// "Delete for everyone?" as the page's own dialog (Oct 19, 2026; the twin of
+// src/components/mobile/messages/DeleteConfirm.tsx and its words in
+// delete-rules.ts). Resolves true on Delete, false on Cancel, Escape, a
+// click on the backdrop or a second open. Focus starts on Cancel, Tab
+// cycles the two buttons, Escape is stopped here (so in pane mode it never
+// also tells the shell to close the chat), and focus goes back to what had it.
+function __dmConfirmDelete() {
+  const old = document.getElementById('dmDeleteConfirm');
+  if (old) old.remove();
+  return new Promise((resolve) => {
+    const returnTo = document.activeElement;
+    const back = document.createElement('div');
+    back.id = 'dmDeleteConfirm';
+    back.className = 'dm-confirm-back';
+    back.innerHTML =
+      '<div class="dm-confirm" role="alertdialog" aria-modal="true" aria-labelledby="dmDelT" aria-describedby="dmDelD">' +
+        '<div class="dm-confirm-t" id="dmDelT">Delete for everyone?</div>' +
+        '<div class="dm-confirm-d" id="dmDelD">It\u2019s removed from this chat for everyone, and a grey \u201cMessage deleted\u201d note stays in its place. Anyone who already got a notification may still see it there.</div>' +
+        '<div class="dm-confirm-row"><button type="button" class="dm-confirm-no">Cancel</button><button type="button" class="dm-confirm-yes">Delete</button></div>' +
+      '</div>';
+    const no = back.querySelector('.dm-confirm-no');
+    const yes = back.querySelector('.dm-confirm-yes');
+    let done = false;
+    const finish = (answer) => {
+      if (done) return;
+      done = true;
+      back.remove();
+      if (returnTo && returnTo.isConnected && typeof returnTo.focus === 'function') returnTo.focus();
+      resolve(answer);
+    };
+    back.addEventListener('click', (e) => { if (e.target === back) finish(false); });
+    no.addEventListener('click', (e) => { e.stopPropagation(); finish(false); });
+    yes.addEventListener('click', (e) => { e.stopPropagation(); finish(true); });
+    back.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); finish(false); return; }
+      if (e.key === 'Tab') {
+        e.preventDefault();
+        (document.activeElement === no ? yes : no).focus();
+      }
+    });
+    document.body.appendChild(back);
+    no.focus();
+  });
 }
 
 // Clear the viewer's history of this thread. Stamps cleared_at on

@@ -32,6 +32,8 @@ export type ThreadEntry = {
     user_id: string;
     media_kind?: "image" | "video" | null;
     attachment_kind?: "post" | "clip" | null;
+    /** Its sender deleted it (Oct 19, 2026): `content` is "Message deleted". */
+    deleted?: boolean;
   } | null;
   /** Server-computed: the last message is someone else's and newer than
    *  the viewer's last_read_at. The API never sends last_read_at, so this
@@ -93,6 +95,8 @@ export type ParentPreview = {
   } | null;
   media_kind?: "image" | "video" | null;
   attachment_kind?: "post" | "clip" | null;
+  /** The quoted message was deleted by its sender (Oct 19, 2026); `content` then reads "Message deleted". */
+  deleted?: boolean;
 };
 
 export type MessageRow = {
@@ -134,6 +138,11 @@ export type MessageRow = {
    * grouping (12.1); never sent for a dm or a group.
    */
   hidden?: boolean;
+  /**
+   * Its sender deleted it (Oct 19, 2026, decision 8): the bubble is the grey
+   * "Message deleted" line, with no words, file, quote, reactions or menu.
+   */
+  deleted?: boolean;
 };
 
 export type Tab = "all" | "requests";

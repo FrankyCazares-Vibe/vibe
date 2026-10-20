@@ -60,6 +60,12 @@ const STUBS: Record<string, string> = {
   "@/lib/chat/rooms": stub(
     "export async function clubRole(orgId, userId) { globalThis.__b3.log.push(['clubRole', orgId, userId]); return globalThis.__b3.roles[userId] ?? null; }",
   ),
+  // Storage (Oct 19, 2026: the sender's delete removes the file). Recorded, never real.
+  "@/lib/r2": stub(
+    "export function isR2Configured() { return globalThis.__b3.r2Configured !== false; }\n" +
+      "export async function deleteR2Keys(keys) { globalThis.__b3.log.push(['deleteR2Keys', keys]); " +
+      "if (globalThis.__b3.r2Fails) throw new Error('R2 down'); return keys.length; }",
+  ),
 };
 registerHooks({
   resolve(specifier, context, nextResolve) {
@@ -84,7 +90,7 @@ const { OFFICER_REMOVED_REASON } = (await import(rulesSpecifier)) as typeof impo
 // ── A fake PostgREST client: every chain is recorded and answered whole ──────
 
 type Call = [string, ...unknown[]];
-type Answer = { data?: unknown; error?: { code?: string; message?: string } | null };
+type Answer = { data?: unknown; error?: { code?: string; message?: string } | null; count?: number | null };
 type Query = { table: string; calls: Call[]; who: "cookie" | "service" };
 
 function fakeClient(answer: (q: Query) => Answer, queries: Query[], who: Query["who"]) {
@@ -107,6 +113,12 @@ function fakeClient(answer: (q: Query) => Answer, queries: Query[], who: Query["
       }
       return builder;
     },
+    // A database function (`delete_own_message`, Oct 19, 2026): recorded as a query on "rpc:<name>".
+    rpc(name: string, args: unknown) {
+      const q: Query = { table: `rpc:${name}`, calls: [["rpc", args]], who };
+      queries.push(q);
+      return Promise.resolve().then(() => answer(q));
+    },
   };
 }
 
@@ -128,6 +140,8 @@ type State = {
   roles: Record<string, string>;
   rateAllowed: boolean;
   restricted: boolean;
+  r2Configured: boolean;
+  r2Fails: boolean;
   log: Call[];
 };
 
@@ -137,6 +151,8 @@ type Setup = {
   cookieRow?: { id: string; user_id: string; channel_id: string } | null;
   cookieError?: { code: string; message: string };
   deleteError?: { code: string; message: string };
+  /** Rows the fallback hard delete touched (`{ count: "exact" }`); 1 unless said. */
+  deleteCount?: number;
   member?: unknown;
   roomOf?: { room: unknown; failed: boolean };
   roles?: Record<string, string>;
@@ -152,6 +168,10 @@ type Setup = {
   removalsError?: { code: string; message: string };
   /** The `chat_removals` upsert throws instead of answering. */
   removalsThrows?: boolean;
+  /** What `delete_own_message` answers (the sender's path); the default is a note left, no file. */
+  ownAnswer?: Answer;
+  r2Configured?: boolean;
+  r2Fails?: boolean;
 };
 
 function setup(s: Setup) {
@@ -160,7 +180,10 @@ function setup(s: Setup) {
   const cookie = Object.assign(
     fakeClient((q) => {
       const method = q.calls[0]?.[0];
-      if (q.table === "messages" && method === "delete") return { data: null, error: s.deleteError ?? null };
+      if (q.table === "rpc:delete_own_message") {
+        return s.ownAnswer ?? { data: { status: "deleted", deleted_at: "2026-10-19T18:00:00.000Z", purge_key: null }, error: null };
+      }
+      if (q.table === "messages" && method === "delete") return { data: null, error: s.deleteError ?? null, count: s.deleteCount ?? 1 };
       if (q.table === "messages") return s.cookieError ? { data: null, error: s.cookieError } : { data: s.cookieRow ?? null, error: null };
       throw new Error(`unexpected cookie read of ${q.table}`);
     }, queries, "cookie"),
@@ -198,6 +221,8 @@ function setup(s: Setup) {
     roles: s.roles ?? { [ME]: "mod" },
     rateAllowed: s.rateAllowed ?? true,
     restricted: s.restricted ?? false,
+    r2Configured: s.r2Configured ?? true,
+    r2Fails: s.r2Fails ?? false,
     log: [],
   };
   (globalThis as unknown as { __b3: State }).__b3 = state;
@@ -238,17 +263,81 @@ test("1b: a non-uuid [id] falls through to ensureMember → 403 Not a member (no
   assert.deepEqual(state.log, [["ensureMember", "abc", ME]]);
 });
 
-test("2: the sender's own row → the hard delete as today, { ok: true }, no other gate", async () => {
+// The sender's own delete (Oct 19, 2026, decision 8): one delete_own_message
+// call on the cookie client, a "Message deleted" note left in place.
+const MISSING_FN = { code: "PGRST202", message: "Could not find the function public.delete_own_message(p_message_id) in the schema cache" };
+const KEY = `messages/${CHANNEL}/0f1e2d3c-4b5a-4968-8776-655443322110.jpg`;
+
+test("2: the sender's own row → delete_own_message on the cookie client, a note: { ok, deleted, deleted_at }, no other gate", async () => {
   const { queries, state } = setup({ cookieRow: MY_ROW });
-  assert.deepEqual(await call(), { status: 200, body: { ok: true } });
+  assert.deepEqual(await call(), { status: 200, body: { ok: true, deleted: true, deleted_at: "2026-10-19T18:00:00.000Z" } });
   assert.equal(queries.length, 2);
   assert.deepEqual(queries[0].calls, [["select", "id, user_id, channel_id"], ["eq", "id", MESSAGE], ["eq", "channel_id", CHANNEL], ["maybeSingle"]]);
-  assert.deepEqual(queries[1].calls, [["delete"], ["eq", "id", MESSAGE], ["eq", "user_id", ME]]);
+  assert.equal(queries[1].table, "rpc:delete_own_message");
+  assert.equal(queries[1].who, "cookie");
+  assert.deepEqual(queries[1].calls, [["rpc", { p_message_id: MESSAGE }]]);
+  // No gate and no storage call without a file: the sender's delete is never limited.
   assert.deepEqual(state.log, []);
 });
 
-test("2: the sender's delete that fails → 500 Request failed", async () => {
-  setup({ cookieRow: MY_ROW, deleteError: { code: "XX000", message: "boom" } });
+test("2: a note with the file's key → the file is deleted from storage, the answer unchanged", async () => {
+  const { state } = setup({ cookieRow: MY_ROW, ownAnswer: { data: { status: "deleted", deleted_at: "2026-10-19T18:00:00.000Z", purge_key: KEY }, error: null } });
+  assert.deepEqual(await call(), { status: 200, body: { ok: true, deleted: true, deleted_at: "2026-10-19T18:00:00.000Z" } });
+  assert.deepEqual(state.log, [["deleteR2Keys", [KEY]]]);
+});
+
+test("2: a key outside this chat's folder is never sent to storage", async (t) => {
+  t.mock.method(console, "warn", () => {});
+  const other = `messages/cccccccc-0000-4000-8000-000000000009/0f1e2d3c.jpg`;
+  for (const purge_key of [other, `messages/${CHANNEL}/../x.jpg`, `clips/${ME}/a.mp4`]) {
+    const { state } = setup({ cookieRow: MY_ROW, ownAnswer: { data: { status: "deleted", purge_key }, error: null } });
+    assert.deepEqual(await call(), { status: 200, body: { ok: true, deleted: true } });
+    assert.deepEqual(state.log, [], purge_key);
+  }
+});
+
+test("2: storage failing or not configured → the file stays, logged without the key; the answer is the same", async (t) => {
+  const errors = t.mock.method(console, "error", () => {});
+  t.mock.method(console, "warn", () => {});
+  const answer = { data: { status: "deleted", purge_key: KEY }, error: null };
+  setup({ cookieRow: MY_ROW, ownAnswer: answer, r2Fails: true });
+  assert.deepEqual(await call(), { status: 200, body: { ok: true, deleted: true } });
+  assert.ok(errors.mock.calls.every((c) => !JSON.stringify(c.arguments).includes(KEY)));
+  const { state } = setup({ cookieRow: MY_ROW, ownAnswer: answer, r2Configured: false });
+  assert.deepEqual(await call(), { status: 200, body: { ok: true, deleted: true } });
+  assert.deepEqual(state.log, []);
+});
+
+test("2: deleted before → { ok, deleted, already }", async () => {
+  setup({ cookieRow: MY_ROW, ownAnswer: { data: { status: "already", deleted_at: "2026-10-18T10:00:00.000Z" }, error: null } });
+  assert.deepEqual(await call(), { status: 200, body: { ok: true, deleted: true, already: true, deleted_at: "2026-10-18T10:00:00.000Z" } });
+});
+
+test("2: the function says not_found (gone a moment ago) → 404 not_found", async () => {
+  setup({ cookieRow: MY_ROW, ownAnswer: { data: { status: "not_found" }, error: null } });
+  assert.deepEqual(await call(), { status: 404, body: { ok: false, error: "That's not there anymore.", code: "not_found" } });
+});
+
+test("2: a database without delete_own_message → the hard delete as before, { ok: true }", async () => {
+  const { queries } = setup({ cookieRow: MY_ROW, ownAnswer: { data: null, error: MISSING_FN } });
+  assert.deepEqual(await call(), { status: 200, body: { ok: true } });
+  assert.equal(queries.length, 3);
+  assert.deepEqual(queries[2].calls, [["delete", { count: "exact" }], ["eq", "id", MESSAGE], ["eq", "user_id", ME]]);
+  assert.equal(queries[2].who, "cookie");
+});
+
+test("2: the fallback hard delete touched no row (gone, or refused by RLS once 5b dropped the policy) → 404 not_found, never { ok: true } (B7 review)", async () => {
+  setup({ cookieRow: MY_ROW, ownAnswer: { data: null, error: MISSING_FN }, deleteCount: 0 });
+  assert.deepEqual(await call(), { status: 404, body: { ok: false, error: "That's not there anymore.", code: "not_found" } });
+});
+
+test("2: the sender's delete that fails → 500 Request failed (the function, the fallback, an odd answer)", async (t) => {
+  t.mock.method(console, "error", () => {});
+  setup({ cookieRow: MY_ROW, ownAnswer: { data: null, error: { code: "XX000", message: "boom" } } });
+  assert.deepEqual(await call(), { status: 500, body: { ok: false, error: "Request failed" } });
+  setup({ cookieRow: MY_ROW, ownAnswer: { data: null, error: MISSING_FN }, deleteError: { code: "XX000", message: "boom" } });
+  assert.deepEqual(await call(), { status: 500, body: { ok: false, error: "Request failed" } });
+  setup({ cookieRow: MY_ROW, ownAnswer: { data: { status: "maybe" }, error: null } });
   assert.deepEqual(await call(), { status: 500, body: { ok: false, error: "Request failed" } });
 });
 

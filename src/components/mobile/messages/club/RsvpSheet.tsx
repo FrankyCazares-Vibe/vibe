@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Drawer } from "vaul";
 
 import { DesktopDialog } from "@/components/desktop/messages/DesktopDialog";
+import { emitCalendarChanged } from "@/lib/calendar/calendar-sync";
 import type { EventRef } from "@/lib/chat/types";
 import { useHideTabBar } from "@/lib/chat/use-hide-tabbar";
 import { useLayerHistory } from "@/lib/chat/use-layer-history";
@@ -17,10 +18,10 @@ import { FONT, palette } from "../v2-tokens";
  * The RSVP sheet of the event chat layer (handoffs/chat-redesign/wave-2-contracts.md
  * 11.6, 1.2): a vaul sheet nested in the layer's drawer (a plain root closing
  * inside another drawer runs vaul's unlock, ConversationView's note), rows
- * `Going`, `Maybe`, `Not going`, the line `You'll appear in the event chat.`
+ * `Going`, `Interested`, `Not going`, the line `You'll appear in the event chat.`
  * under the first two (the dialog's name, `Your RSVP`, is the card group's
  * label of 1.2 and is not drawn: section 1 pins no sheet title; S2-repair.md
- * C2). `Going` / `Maybe` → `PUT /api/events/<id>/rsvp
+ * C2). `Going` / `Interested` → `PUT /api/events/<id>/rsvp
  * { status }`; `Not going` → `DELETE`; 200 → `onChanged()` (the room's
  * `reload()`) and the sheet closes; a refusal (`campus_visiting`,
  * `terms_required`, a 404) → the toast `vibeRequest` maps for it (not quiet).
@@ -33,6 +34,12 @@ import { FONT, palette } from "../v2-tokens";
  * `DesktopDialog` (360 wide, titled `Your RSVP`), opened from the club's and
  * the event's right panel: no vaul root, the same requests, the same one
  * history entry. The phone surface is the sheet above, unchanged.
+ *
+ * Oct 19, 2026 (critique D12, D13): a saved answer also calls
+ * `emitCalendarChanged()`, so My Calendar on the page around the Otto-corner
+ * window (this sheet runs inside its iframe) and the viewer's other tabs
+ * read it again. The middle row says "Interested"; the stored value stays
+ * `maybe`.
  */
 export type RsvpSheetProps = {
   eventId: string;
@@ -46,7 +53,7 @@ type Choice = "going" | "maybe" | "no";
 
 const ROWS: { choice: Choice; text: string; line: string | null }[] = [
   { choice: "going", text: "Going", line: "You'll appear in the event chat." },
-  { choice: "maybe", text: "Maybe", line: "You'll appear in the event chat." },
+  { choice: "maybe", text: "Interested", line: "You'll appear in the event chat." },
   { choice: "no", text: "Not going", line: null },
 ];
 
@@ -68,6 +75,9 @@ export function RsvpSheet({ eventId, current, night, onClose, onChanged }: RsvpS
     setBusy(null);
     if (!r.ok) return;
     onChanged();
+    // Once per tick: the desktop shell's own emit through `onChanged` is
+    // folded into this one (calendar-sync.ts).
+    emitCalendarChanged();
     onClose();
   };
 

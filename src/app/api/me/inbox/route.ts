@@ -41,7 +41,7 @@ const MEMBERSHIP_COLUMNS = "channel_id, created_at, last_read_at, pinned_at, mut
  * one read per kind.
  */
 const PREVIEW_SELECT =
-  "id, channel_id, content, created_at, user_id, kind, thread_root_id, users:users!messages_user_id_fkey(name)";
+  "id, channel_id, content, created_at, user_id, kind, thread_root_id, attachment_kind, users:users!messages_user_id_fkey(name)";
 
 /** The service-role client for the counts, or null (said in the log) where the key is not set. Never throws. */
 function serviceOrNull(): SupabaseClient | null {
@@ -215,7 +215,7 @@ export async function GET() {
     const authorRole = room ? (officerRole.get(`${room.org_id}:${row.user_id}`) ?? null) : null;
     return isHiddenFrom({ user_id: row.user_id, thread_root_id: row.thread_root_id ?? null }, blocked, room, authorRole);
   };
-  const boardLatest = latestShownPerRoom(boardRows, hidden);
+  const boardLatest = latestShownPerRoom(boardRows, hidden, { board: true });
   const loungeLatest = latestShownPerRoom(loungeRows, hidden);
 
   // 5. Unread (service role, counts): top-level, not removed, by others,
@@ -230,19 +230,28 @@ export async function GET() {
     }
     return ids;
   };
+  // A message its sender deleted (Oct 19, 2026) is nothing new to read: its
+  // note is not counted (review of Oct 19, 2026: a deleted Board post kept
+  // the club's unread dot on). A database without `deleted_at`
+  // (20261019150000) has no note: the same count without the filter.
   const unreadCount = async (channelId: string, since: string, kind: "board" | "lounge", orgId: string): Promise<number> => {
     if (!service) return 0;
-    let query = service
-      .from("messages")
-      .select("id", { count: "exact", head: true })
-      .eq("channel_id", channelId)
-      .is("thread_root_id", null)
-      .is("removed_at", null)
-      .neq("user_id", user.id)
-      .gt("created_at", since);
     const leftOut = unreadLeftOut(blocked, kind, officersOf(orgId));
-    if (leftOut.length > 0) query = query.not("user_id", "in", notInList(leftOut));
-    const { count, error } = await query;
+    const run = (liveOnly: boolean) => {
+      let query = service
+        .from("messages")
+        .select("id", { count: "exact", head: true })
+        .eq("channel_id", channelId)
+        .is("thread_root_id", null)
+        .is("removed_at", null)
+        .neq("user_id", user.id)
+        .gt("created_at", since);
+      if (liveOnly) query = query.is("deleted_at", null);
+      if (leftOut.length > 0) query = query.not("user_id", "in", notInList(leftOut));
+      return query;
+    };
+    let { count, error } = await run(true);
+    if (error && isMissingChatSchema(error)) ({ count, error } = await run(false));
     if (error) {
       console.error(`[${TAG} unread]`, error.code, error.message);
       return 0;

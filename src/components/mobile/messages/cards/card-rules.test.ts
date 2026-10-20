@@ -130,7 +130,7 @@ test("eventPlaceLine / goingWord / rsvpSpoken / showAppearLine", () => {
   assert.equal(r.eventPlaceLine("  ", "Thu Oct 8, 7:30 PM"), "Thu Oct 8, 7:30 PM");
   assert.equal(r.goingWord(18), "18 going");
   assert.equal(r.rsvpSpoken("going"), "you're going");
-  assert.equal(r.rsvpSpoken("maybe"), "you said maybe");
+  assert.equal(r.rsvpSpoken("maybe"), "you're interested");
   assert.equal(r.rsvpSpoken(null), null);
   assert.equal(r.showAppearLine({ viewer_status: null, room_id: null, state: "soon" }), true);
   assert.equal(r.showAppearLine({ viewer_status: "going", room_id: null, state: "soon" }), false);
@@ -141,7 +141,7 @@ test("eventPlaceLine / goingWord / rsvpSpoken / showAppearLine", () => {
 test("eventCardLabel / cancelledEventLabel", () => {
   const input = { title: "Fall Formal", location: "Campus Center 450", whenSpoken: "Thursday October 8, 7:30 PM", going: 18, status: "going" as const };
   assert.equal(r.eventCardLabel(input, "Maya R.", false), "Event shared by Maya R.: Fall Formal, Campus Center 450, Thursday October 8, 7:30 PM. 18 going, you're going");
-  assert.equal(r.eventCardLabel({ ...input, location: "", status: "maybe" }, null, false), "Event shared by someone: Fall Formal, Thursday October 8, 7:30 PM. 18 going, you said maybe");
+  assert.equal(r.eventCardLabel({ ...input, location: "", status: "maybe" }, null, false), "Event shared by someone: Fall Formal, Thursday October 8, 7:30 PM. 18 going, you're interested");
   assert.equal(r.eventCardLabel({ ...input, status: null, going: 0 }, null, true), "Event you shared: Fall Formal, Campus Center 450, Thursday October 8, 7:30 PM. 0 going");
   assert.equal(r.cancelledEventLabel("Fall Formal", "Maya R.", false), "Event shared by Maya R.: Fall Formal. This event was cancelled.");
 });
@@ -150,7 +150,7 @@ test("announcements (1.2)", () => {
   assert.equal(r.announceVotes(13), "13 voted");
   assert.equal(r.announceFilled(4, 6), "4 of 6 filled");
   assert.equal(r.announceRsvp("going"), "You're going");
-  assert.equal(r.announceRsvp("maybe"), "You said maybe");
+  assert.equal(r.announceRsvp("maybe"), "You're interested");
   assert.equal(r.announceRsvp(null), "RSVP removed");
 });
 

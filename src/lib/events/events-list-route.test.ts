@@ -97,6 +97,9 @@ type World = {
   user?: { id: string } | null;
   /** Every club events read answers these. */
   events?: unknown[];
+  /** The `include` read (`eq id`) answers these (Oct 19, 2026); absent, nothing. */
+  included?: unknown[];
+  includedError?: Err;
   hidden?: readonly string[];
   hiddenError?: Err;
   checkinState?: unknown[];
@@ -120,6 +123,9 @@ function setup(w: World) {
       return { data: [{ id: ORG, handle: "sae", name: "SAE", logo_url: null, verified: true }], error: null };
     }
     // The campus list's org-less half (legacy rows): none.
+    if (client === "cookie" && table === "events" && has("eq", "id")) {
+      return w.includedError ? { data: null, error: w.includedError } : { data: w.included ?? [], error: null };
+    }
     if (client === "cookie" && table === "events") return { data: has("is", "org_id") ? [] : w.events ?? ROWS, error: null };
     if (client === "cookie" && (table === "org_members" || table === "rsvps")) return { data: [], error: null };
     throw new Error(`unexpected ${client} read of ${table}`);
@@ -235,6 +241,64 @@ test("a hidden club, or an org id that isn't a uuid, lists nothing in the past v
     assert.deepEqual(await items(res), []);
     assert.deepEqual([eventReads().length, rpcs.length], [0, 0]);
   }
+});
+
+// ── include: the one linked event (Oct 19, 2026, critique B8 repair) ─────────
+// My Calendar reads 180 days ahead; the club lists stop at 60 days / 50 rows
+// (upcoming) and 20 rows (past). `include` adds the event a calendar chip
+// opened, so the club page can show it instead of "isn't listed anymore".
+
+const EV3 = "eeeeeeee-0000-4000-8000-000000000003";
+const FAR = row(EV3, "2027-01-15T01:00:00+00:00", "2027-01-15T05:00:00+00:00");
+const OLD = row(EV3, "2026-09-25T23:00:00+00:00", "2026-09-26T02:00:00+00:00");
+
+test("include adds the linked event to a club's list, past the horizon or the row cap, in the list's own order", async (t) => {
+  fixed(t);
+  // Upcoming: Jan 15 is 88 days out, past the 60-day horizon.
+  const up = setup({ events: [ROWS[1], ROWS[0]], included: [FAR] });
+  const upRes = await get(`?org_id=${ORG}&limit=50&include=${EV3}`);
+  assert.equal(upRes.status, 200);
+  const [list, extra, ...more] = up.eventReads();
+  assert.equal(more.length, 0);
+  assert.deepEqual(list?.calls.slice(1), [...UPCOMING_CHAIN(50), ["eq", "org_id", ORG]], "the list itself is unchanged");
+  assert.match(String(extra?.calls[0]?.[1]), /,creator:users!events_creator_id_fkey!inner\(id\)$/, "the club creator embed, as the list");
+  assert.deepEqual(extra?.calls.slice(1), [["eq", "id", EV3], ["eq", "org_id", ORG], ["gte", "ends_at", NOW.toISOString()], ["limit", 1]], "this club's, not ended, no horizon");
+  assert.deepEqual((await items(upRes)).map((e) => e.id), [EV2, EV1, EV3], "soonest first");
+  // It is a full card: counts and attribution like every other row.
+  setup({ events: [ROWS[1], ROWS[0]], included: [FAR] });
+  const far = (await items(await get(`?org_id=${ORG}&include=${EV3}`))).find((e) => e.id === EV3)!;
+  assert.deepEqual([far.going_count, (far.org as { handle: string }).handle], [2, "sae"]);
+
+  // Past: older than the 20 newest.
+  const back = setup({ included: [OLD] });
+  const backRes = await get(`?org_id=${ORG}&when=past&include=${EV3}`);
+  const pastExtra = back.eventReads()[1];
+  assert.deepEqual(pastExtra?.calls.slice(1), [["eq", "id", EV3], ["eq", "org_id", ORG], ["lt", "ends_at", NOW.toISOString()], ["limit", 1]], "ended, no 30-day floor");
+  assert.deepEqual((await items(backRes)).map((e) => e.id), [EV1, EV2, EV3], "newest first");
+});
+
+test("include is ignored when the list already holds it, when it isn't a uuid, without org_id, or for a hidden club", async (t) => {
+  fixed(t);
+  for (const qs of [`?org_id=${ORG}&include=${EV1}`, `?org_id=${ORG}&include=nope`, `?org_id=${ORG}&when=past&include=`]) {
+    const { eventReads } = setup({ included: [FAR] });
+    assert.equal((await get(qs)).status, 200);
+    assert.equal(eventReads().length, 1, qs);
+  }
+  const campus = setup({ included: [FAR] });
+  await get(`?include=${EV3}`);
+  assert.equal(campus.eventReads().some((r) => r.calls.some((c) => c[0] === "eq" && c[1] === "id")), false, "the campus list never takes include");
+  const hidden = setup({ hidden: [ORG], included: [FAR] });
+  const res = await get(`?org_id=${ORG}&include=${EV3}`);
+  assert.deepEqual([await items(res), hidden.eventReads().length], [[], 0]);
+});
+
+test("a failed include read keeps the list: 200, the rows as they were, one log", async (t) => {
+  const seen = fixed(t);
+  setup({ includedError: { code: "XX000", message: "boom" } });
+  const res = await get(`?org_id=${ORG}&include=${EV3}`);
+  assert.equal(res.status, 200);
+  assert.deepEqual((await items(res)).map((e) => e.id), [EV1, EV2]);
+  assert.equal(seen.filter((args) => args[0] === "[events GET include]").length, 1);
 });
 
 // ── Check-in state ──────────────────────────────────────────────────────────

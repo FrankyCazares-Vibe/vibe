@@ -16,6 +16,8 @@ import {
 import { vibeRequest } from "@/lib/feedback/request";
 import { toast } from "@/lib/feedback/toast";
 
+import { LinkedFlash, LinkedFocusStyle, useLinkedEvent, useLinkedEventParam } from "./linked-event";
+
 /**
  * Org-scoped events section. Lives on the org profile page (desktop +
  * mobile). Fetches `/api/events?org_id=<id>` so events from this org
@@ -29,6 +31,14 @@ import { toast } from "@/lib/feedback/toast";
  * home" — the same state the campus Events tab shows while visiting. The
  * RSVP route refuses it anyway (403 `campus_visiting`); the card turns that
  * answer into "RSVP works on your home campus" if the page guessed wrong.
+ *
+ * `?event=<id>` (Oct 19, 2026, critique D13): a calendar event opens here.
+ * Once the list has loaded, the linked card scrolls into view and flashes
+ * (linked-event.tsx); if neither this list nor the past one has it, a toast
+ * says it isn't listed anymore. Every read passes the id as `include`
+ * (Oct 19, 2026 repair): My Calendar reaches 180 days ahead and this list
+ * stops at 60 days and 50 rows, so a January formal would otherwise be
+ * "not listed" while it is still on.
  */
 export function OrgEventsSection({
   orgId,
@@ -52,6 +62,15 @@ export function OrgEventsSection({
   const [createOpen, setCreateOpen] = useState(false);
 
   const canManage = viewerRole === "owner" || viewerRole === "admin";
+  const linkedParam = useLinkedEventParam();
+  const listUrl = `/api/events?org_id=${encodeURIComponent(orgId)}&limit=50${
+    linkedParam ? `&include=${encodeURIComponent(linkedParam)}` : ""
+  }`;
+  // A failed first read can't say the linked event is gone.
+  const linkedId = useLinkedEvent(
+    "upcoming",
+    events === null ? (loadErr ? "unknown" : null) : events.map((e) => e.id),
+  );
   // Only the newest refresh lands. An officer's cancel / delete / edit bumps
   // it too: a read already out predates the change and would put the old
   // card back.
@@ -62,7 +81,7 @@ export function OrgEventsSection({
   const refresh = useCallback(async () => {
     const seq = ++eventsSeqRef.current;
     const r = await vibeRequest<{ events?: CampusEvent[] }>(
-      `/api/events?org_id=${encodeURIComponent(orgId)}&limit=50`,
+      listUrl,
       { cache: "no-store", failure: "Couldn't refresh events." },
     );
     if (seq !== eventsSeqRef.current) return;
@@ -72,13 +91,13 @@ export function OrgEventsSection({
     } else if (r.ok) {
       toast({ message: "Couldn't refresh events. Try again.", tone: "error" });
     }
-  }, [orgId]);
+  }, [listUrl]);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
       const r = await vibeRequest<{ events?: CampusEvent[] }>(
-        `/api/events?org_id=${encodeURIComponent(orgId)}&limit=50`,
+        listUrl,
         { cache: "no-store", quiet: true, failure: "Couldn't load events." },
       );
       if (cancelled) return;
@@ -96,7 +115,7 @@ export function OrgEventsSection({
     return () => {
       cancelled = true;
     };
-  }, [orgId, loadKey]);
+  }, [listUrl, loadKey]);
 
   return (
     <section
@@ -181,25 +200,37 @@ export function OrgEventsSection({
         </p>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          {linkedId ? <LinkedFocusStyle /> : null}
           {events.map((ev) => (
-            <EventCard
+            // The anchor `?event=` scrolls to (EVENT_ANCHOR_ATTR).
+            <div
               key={ev.id}
-              ev={ev}
-              onMutate={refresh}
-              // An officer's Cancel / Delete / Edit (S68): the list changes
-              // at once, no refetch.
-              onRemoved={(id) => {
-                eventsSeqRef.current += 1;
-                setEvents((prev) => (prev ? prev.filter((e) => e.id !== id) : prev));
-              }}
-              onUpdated={(next) => {
-                eventsSeqRef.current += 1;
-                setEvents((prev) =>
-                  prev ? prev.map((e) => (e.id === next.id ? next : e)) : prev,
-                );
-              }}
-              visiting={rsvpAtHomeOnly}
-            />
+              data-event-anchor={ev.id}
+              tabIndex={ev.id === linkedId ? -1 : undefined}
+              // No `outline: none` (Oct 19, 2026 repair): LinkedFocusStyle
+              // keeps a coral outline while the wrapper has focus, after the
+              // flash has faded.
+              style={{ position: "relative", borderRadius: 16 }}
+            >
+              {ev.id === linkedId ? <LinkedFlash /> : null}
+              <EventCard
+                ev={ev}
+                onMutate={refresh}
+                // An officer's Cancel / Delete / Edit (S68): the list changes
+                // at once, no refetch.
+                onRemoved={(id) => {
+                  eventsSeqRef.current += 1;
+                  setEvents((prev) => (prev ? prev.filter((e) => e.id !== id) : prev));
+                }}
+                onUpdated={(next) => {
+                  eventsSeqRef.current += 1;
+                  setEvents((prev) =>
+                    prev ? prev.map((e) => (e.id === next.id ? next : e)) : prev,
+                  );
+                }}
+                visiting={rsvpAtHomeOnly}
+              />
+            </div>
           ))}
         </div>
       )}

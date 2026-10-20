@@ -267,7 +267,21 @@ test("react BACKSTOP: should a follower ever read the message, 403 members_only 
   const w = reactWorld(ORG, { data: null });
   assert.deepEqual(await json(await react("POST")), { status: 403, body: MEMBERS_ONLY });
   assert.deepEqual(tables(w), ["cookie:messages", "cookie:org_members"]);
-  assert.ok(has(w.queries[0], "select", "user_id, channels:channels!messages_channel_id_fkey(org_id)"), "the club rides on the message read");
+  assert.ok(
+    has(w.queries[0], "select", "user_id, content, kind, media_url, media_kind, attachment_id, attachment_kind, card_event_id, channels:channels!messages_channel_id_fkey(org_id)"),
+    "the club rides on the message read, with the note's shape",
+  );
+});
+
+test("react: a message its sender deleted (its \"Message deleted\" note) takes no reaction → 404, nothing more read or stored (review of Oct 19, 2026)", async () => {
+  const note = { user_id: OFFICER, content: "", kind: "text", media_url: null, media_kind: null, attachment_id: null, attachment_kind: null, card_event_id: null, channels: { org_id: null } };
+  const w = install((q) => (q.table === "messages" ? { data: note } : { data: [] }));
+  assert.deepEqual(await json(await react("POST")), { status: 404, body: { ok: false, error: "That message is no longer there." } });
+  assert.deepEqual(tables(w), ["cookie:messages"]);
+  // A shared post with no words keeps its kind: it is not a note.
+  const shared = install((q) => (q.table === "messages" ? { data: { ...note, attachment_kind: "post" } } : { data: [] }));
+  assert.notEqual((await react("POST")).status, 404);
+  assert.ok(shared.queries.length > 1);
 });
 
 test("react: a member reacts as before; a dm asks no membership; a failed membership read → 503, nothing stored", async () => {
@@ -689,6 +703,20 @@ test("club-boards: only a CURRENT owner's or admin's post previews; a member's, 
   boardsWorld({ rows });
   const latest = Object.fromEntries((await boardsOf()).map((b) => [b.org.name, b.latest?.text ?? null]));
   assert.deepEqual(latest, { SAE: "post 1", Chess: null }, "Chess's member, SAE's admin in Chess, and a stranger: none");
+});
+
+test("club-boards: a post its officer deleted never previews to a follower; the post before it does (review of Oct 19, 2026)", async () => {
+  const note = { ...row(1, BOARD_ID, OFFICER, "2026-10-14T00:00:00Z"), content: "", attachment_kind: null };
+  const w = boardsWorld({ rows: [note, row(2, BOARD_ID, OFFICER, "2026-10-13T00:00:00Z")] });
+  const sae = (await boardsOf()).find((b) => b.org.name === "SAE")!;
+  assert.equal(sae.latest?.id, uuid(2, "e"));
+  assert.equal(sae.latest?.text, "post 2");
+  assert.equal(sae.latest?.created_at, "2026-10-13T00:00:00Z", "the dot is decided by the post before it, not the deleted one");
+  const rpc = w.queries.find((q) => q.table === "rpc:chat_latest_per_channel")!;
+  assert.ok(String(rpc.calls[1][1]).includes("attachment_kind"), "the select can tell a shared post from a note");
+  // A shared post with no words is not a note: it previews.
+  boardsWorld({ rows: [{ ...note, attachment_kind: "post" }] });
+  assert.equal((await boardsOf()).find((b) => b.org.name === "SAE")!.latest?.id, uuid(1, "e"));
 });
 
 test("club-boards: a read that decides the list fails → 500; a database without rooms → empty", async () => {

@@ -4,8 +4,10 @@ import Link from "next/link";
 import { useId, useLayoutEffect, useRef, useState } from "react";
 
 import type { LoadFailure } from "@/components/feedback/LoadFailed";
+import { clubEventHref } from "@/lib/calendar/calendar-key";
 import { CheckIcon } from "@/components/mobile/messages/home/ClubRow";
 import { dayDot, dayLabel, entriesOn, isPastDay, weekCardLabel, weekCardLine, type WeekEntry } from "@/components/mobile/messages/home/home-rules";
+import { InterestedRing, RsvpDayMark } from "@/components/mobile/messages/home/RsvpMark";
 import { MONTH_SLIDE_CSS } from "@/components/mobile/messages/home/MonthBody";
 import { visuallyHiddenStyle } from "@/components/mobile/messages/sheet-styles";
 import { FONT, palette, type Palette, SERIF } from "@/components/mobile/messages/v2-tokens";
@@ -322,7 +324,8 @@ export function WeekBand({ data, folded, night, onOpenRoom }: WeekBandProps) {
                       {/* Today's weekday on the inverted chip: the chip's own ink, a step quieter than the date. */}
                       <span style={{ fontSize: 10.5, fontWeight: today ? 700 : 600, lineHeight: "12px", color: today ? t.activeChip.ink : past ? t.muted : t.secondary, opacity: today ? 0.72 : 1 }}>{WEEKDAYS[day.getDay()]}</span>
                       <span style={{ fontSize: 15, fontWeight: today ? 800 : 700, lineHeight: "16px", color: today ? t.activeChip.ink : past ? t.muted : t.ink }}>{day.getDate()}</span>
-                      <span aria-hidden="true" style={{ width: 5, height: 5, borderRadius: 999, background: dot === "going" ? t.coral : dot === "maybe" ? t.muted : "transparent" }} />
+                      {/* The calendar key (Oct 19, 2026 repair): a ring for Interested, as in My Calendar beside it. */}
+                      <RsvpDayMark kind={dot} coral={t.coral} />
                     </button>
                   );
                 })}
@@ -395,14 +398,15 @@ function roomLink(entry: WeekEntry, roomId: string, onOpenRoom: (entry: WeekEntr
 /**
  * One card of the full band, 50px tall (D3_Tuck step 0): line 1 `Live now` /
  * `Ended` / `Fri 7 PM` (`weekCardLine`) + ` · ` + the RSVP (a check and
- * `Going`, or `Maybe`: a shape and a word, never colour alone); line 2 the
+ * `Going`, or `Interested`: a shape and a word, never colour alone); line 2 the
  * title and the club's name (none when `org` is null). 168px at least, as
  * wide as its text up to 280, then both lines end in an ellipsis.
  *
  * `glow`: the live chrome and the glowing dot, for the band's first live
  * card only (one glow per screen). Any other live card is the quiet card
- * with `Live now` in coral and a plain dot. A link when `room_id` is set,
- * else the same tile.
+ * with `Live now` in coral and a plain dot. A link when `room_id` is set;
+ * else, since Oct 19, 2026 (critique D13), a link to the club's page at
+ * that event when it has a club; else the same tile.
  */
 function BandCard({ entry, now, otherWeek, glow, t, onOpenRoom }: BandEntryProps & { glow: boolean }) {
   const line = weekCardLine(entry, now, otherWeek);
@@ -443,7 +447,10 @@ function BandCard({ entry, now, otherWeek, glow, t, onOpenRoom }: BandEntryProps
             Going
           </span>
         ) : (
-          <span style={{ flexShrink: 0 }}>Maybe</span>
+          <span style={{ flexShrink: 0, display: "inline-flex", alignItems: "center", gap: 4 }}>
+            <InterestedRing coral={t.coral} />
+            Interested
+          </span>
         )}
       </span>
       <span style={{ display: "flex", alignItems: "baseline", gap: 8, whiteSpace: "nowrap" }}>
@@ -459,6 +466,13 @@ function BandCard({ entry, now, otherWeek, glow, t, onOpenRoom }: BandEntryProps
       </a>
     );
   }
+  if (entry.org) {
+    return (
+      <Link href={clubEventHref(entry.org.handle, entry.id)} className={glow ? undefined : "vibe-band-card"} aria-label={`${label}. Open the club page`} style={style}>
+        {body}
+      </Link>
+    );
+  }
   return (
     <div role="group" className={glow ? undefined : "vibe-band-card"} aria-label={label} style={style}>
       {body}
@@ -470,7 +484,8 @@ function BandCard({ entry, now, otherWeek, glow, t, onOpenRoom }: BandEntryProps
  * One item of the folded band (D3_Tuck step 1): the card's first line, then
  * the title, on one line; a long title ends in an ellipsis. The live item is
  * flat text with a plain coral dot: no chrome, no glow (3.2). A link when
- * `room_id` is set, else the same text.
+ * `room_id` is set; else a link to the club's page at that event when it has
+ * a club (Oct 19, 2026); else the same text.
  */
 function BandItem({ entry, now, otherWeek, t, onOpenRoom }: BandEntryProps) {
   const line = weekCardLine(entry, now, otherWeek);
@@ -489,6 +504,13 @@ function BandItem({ entry, now, otherWeek, t, onOpenRoom }: BandEntryProps) {
       <a {...roomLink(entry, entry.room_id, onOpenRoom)} aria-label={label} style={style}>
         {body}
       </a>
+    );
+  }
+  if (entry.org) {
+    return (
+      <Link href={clubEventHref(entry.org.handle, entry.id)} aria-label={`${label}. Open the club page`} style={style}>
+        {body}
+      </Link>
     );
   }
   return (

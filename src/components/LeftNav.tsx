@@ -12,15 +12,30 @@ import {
   type LoadFailure,
 } from "@/components/feedback/LoadFailed";
 import { NavIdentityChip } from "@/components/nav-identity-chip";
+import {
+  CAL_KIND_WORD,
+  calChipStyle,
+  calKind,
+  type CalKind,
+  dayMarkKind,
+  entryHref,
+  eventChatHref,
+  PERSONAL_COLOR_PRESETS,
+  PERSONAL_DEFAULT_COLOR,
+  upcomingCount,
+} from "@/lib/calendar/calendar-key";
+import {
+  CALENDAR_CHANGED_EVENT,
+  emitCalendarChanged,
+  shouldRefreshOnReturn,
+} from "@/lib/calendar/calendar-sync";
+import { CAL_MIN_DAY_HEIGHT, chipsThatFit, monthRowCount, rowHeightFor } from "@/lib/calendar/month-layout";
 import { downloadFile, vibeRequest } from "@/lib/feedback/request";
 
-/** Site-wide event so any component can ping the calendar to refetch. */
-export const CALENDAR_CHANGED_EVENT = "vibe:calendar-changed";
-export function emitCalendarChanged() {
-  if (typeof window !== "undefined") {
-    window.dispatchEvent(new CustomEvent(CALENDAR_CHANGED_EVENT));
-  }
-}
+/** Site-wide "the calendar changed" (Oct 19, 2026: it now also reaches the
+ *  Otto-corner window and the viewer's other tabs, calendar-sync.ts). Kept
+ *  exported from here so the existing imports keep working. */
+export { CALENDAR_CHANGED_EVENT, emitCalendarChanged };
 
 const navItems = [
   {
@@ -398,9 +413,11 @@ export type CalEntry =
       starts_at: string;
       ends_at: string;
       location: string;
-      color: string;
+      // No colour since Oct 19, 2026: an RSVP is painted by its status.
       viewer_status: "going" | "maybe";
       org: { handle: string; name: string; verified: boolean } | null;
+      // The event chat behind it (null with no club or no chat).
+      room_id?: string | null;
     }
   | {
       kind: "personal";
@@ -460,19 +477,38 @@ export function CalendarWidget() {
     year: today.getFullYear(),
     month: today.getMonth(),
   });
-  const [modalOpen, setModalOpen] = useState(false);
+  // Open, and on which day (a mini-calendar day opens the modal on it).
+  const [modal, setModal] = useState<{ day: string | null } | null>(null);
+  // When the last read was asked for, for the return-to-tab re-read below.
+  // Set when a re-read STARTS, so a return that also brings a message from
+  // another tab (calendar-sync.ts) costs one read, not two. Null until the
+  // first load answers.
+  const lastReadAtRef = useRef<number | null>(null);
+  // Only the newest read lands (Oct 19, 2026 repair). Messages from other
+  // tabs and frames and the return-to-tab re-read can start reads back to
+  // back (Going, then Not going, in another tab), and an older answer that
+  // arrives last would put the removed RSVP back until the next read.
+  const readSeqRef = useRef(0);
 
   // A mirror refresh (an RSVP elsewhere, a modal edit): quiet, and a refusal
   // keeps what's on screen rather than blanking the month.
   const reload = useCallback(async () => {
+    const seq = ++readSeqRef.current;
+    if (lastReadAtRef.current !== null) lastReadAtRef.current = Date.now();
     const r = await vibeRequest<{ entries?: CalEntry[] }>("/api/me/calendar", {
       cache: "no-store",
       quiet: true,
       failure: "Couldn't load your calendar.",
     });
+    if (seq !== readSeqRef.current) return;
     if (r.ok && Array.isArray(r.data.entries)) {
+      lastReadAtRef.current ??= Date.now();
       setLoadErr(null);
       setEntries(r.data.entries);
+    } else if (lastReadAtRef.current === null) {
+      // This read overtook the first load and failed: nothing is on screen
+      // yet, so say so (and offer Retry) instead of loading forever.
+      setLoadErr(asLoadFailure(r, "Couldn't load your calendar."));
     }
   }, []);
 
@@ -485,14 +521,16 @@ export function CalendarWidget() {
 
   useEffect(() => {
     let cancelled = false;
+    const seq = ++readSeqRef.current;
     (async () => {
       const r = await vibeRequest<{ entries?: CalEntry[] }>("/api/me/calendar", {
         cache: "no-store",
         quiet: true,
         failure: "Couldn't load your calendar.",
       });
-      if (cancelled) return;
+      if (cancelled || seq !== readSeqRef.current) return;
       if (r.ok && Array.isArray(r.data.entries)) {
+        lastReadAtRef.current = Date.now();
         setLoadErr(null);
         setEntries(r.data.entries);
       } else {
@@ -514,6 +552,25 @@ export function CalendarWidget() {
     return () => window.removeEventListener(CALENDAR_CHANGED_EVENT, handler);
   }, [reload]);
 
+  // Back to this tab (Oct 19, 2026, critique D12): an RSVP on the phone or
+  // another device has no channel to arrive on, so the calendar re-reads
+  // when the tab is looked at again, at most every 30 seconds. A first load
+  // that failed is left to its Retry.
+  useEffect(() => {
+    const onReturn = () => {
+      if (document.visibilityState !== "visible") return;
+      if (lastReadAtRef.current === null) return;
+      if (!shouldRefreshOnReturn(lastReadAtRef.current, Date.now())) return;
+      void reload();
+    };
+    document.addEventListener("visibilitychange", onReturn);
+    window.addEventListener("focus", onReturn);
+    return () => {
+      document.removeEventListener("visibilitychange", onReturn);
+      window.removeEventListener("focus", onReturn);
+    };
+  }, [reload]);
+
   const byDay = useMemo(() => {
     const out: Record<string, CalEntry[]> = {};
     for (const e of entries ?? []) {
@@ -523,7 +580,8 @@ export function CalendarWidget() {
     return out;
   }, [entries]);
 
-  const totalCount = entries?.length ?? 0;
+  // Upcoming only (critique D12): last month's RSVPs aren't news.
+  const totalCount = upcomingCount(entries ?? [], today);
   const todayKey = ymdKey(today);
   const monthLabel = `${CAL_MONTHS[view.month].slice(0, 3)} ${view.year}`;
   const cells = buildMonthCells(view.year, view.month);
@@ -542,7 +600,7 @@ export function CalendarWidget() {
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
         <button
           type="button"
-          onClick={() => setModalOpen(true)}
+          onClick={() => setModal({ day: null })}
           style={{
             display: "flex",
             alignItems: "center",
@@ -571,7 +629,7 @@ export function CalendarWidget() {
                 fontFamily: "DM Sans, sans-serif",
                 fontSize: 9,
                 fontWeight: 800,
-                background: "#FF5C35",
+                background: "var(--coral)",
                 // Dark on coral (6.3:1); white was 3.1:1.
                 color: "var(--on-coral, #160A06)",
                 padding: "1px 6px",
@@ -634,7 +692,8 @@ export function CalendarWidget() {
           <div
             style={{
               display: "grid",
-              gridTemplateColumns: "repeat(7, 1fr)",
+              // minmax(0, …): a column never grows to fit its contents.
+              gridTemplateColumns: "repeat(7, minmax(0, 1fr))",
               gap: 1,
             }}
           >
@@ -656,7 +715,8 @@ export function CalendarWidget() {
               </div>
             ))}
             {cells.map((cell, i) => {
-              const hasEvent = !!byDay[cell.key];
+              const dayEntries = byDay[cell.key] ?? [];
+              const mark = dayMarkKind(dayEntries);
               const isToday = cell.key === todayKey;
               const dayBg = isToday ? "var(--charcoal)" : "transparent";
               const dayColor = isToday ? "var(--paper)" : cell.otherMonth ? "var(--ink-muted)" : "var(--charcoal)";
@@ -665,8 +725,9 @@ export function CalendarWidget() {
                 <button
                   key={`c-${i}`}
                   type="button"
-                  onClick={() => setModalOpen(true)}
-                  aria-label={cell.date.toDateString()}
+                  // Opens My Calendar on this day (was: on no day).
+                  onClick={() => setModal({ day: cell.key })}
+                  aria-label={miniDayLabel(cell.date, dayEntries)}
                   style={{
                     aspectRatio: "1",
                     borderRadius: 6,
@@ -687,18 +748,7 @@ export function CalendarWidget() {
                   }}
                 >
                   {cell.date.getDate()}
-                  {hasEvent ? (
-                    <span
-                      style={{
-                        width: 4,
-                        height: 4,
-                        borderRadius: "50%",
-                        background: isToday ? "var(--paper)" : "#FF5C35",
-                        position: "absolute",
-                        bottom: 2,
-                      }}
-                    />
-                  ) : null}
+                  {mark ? <MiniDayMark kind={mark} onDark={isToday} /> : null}
                 </button>
               );
             })}
@@ -706,27 +756,68 @@ export function CalendarWidget() {
         )}
       </div>
 
-      {modalOpen ? (
+      {modal ? (
         <CalendarModal
           entries={entries ?? []}
+          initialDay={modal.day}
           failure={entries === null ? loadErr : null}
           onRetry={retryLoad}
-          onClose={() => setModalOpen(false)}
-          onChange={() => void reload()}
+          onClose={() => setModal(null)}
+          // An edit in the modal tells every calendar, here and in the
+          // viewer's other tabs; this widget hears it and re-reads.
+          onChange={emitCalendarChanged}
         />
       ) : null}
     </>
   );
 }
 
+/** "Tue Oct 21 2026, 1 going, 1 interested, 1 of yours": the dot's meaning, spoken. */
+function miniDayLabel(date: Date, entries: CalEntry[]): string {
+  const n = { going: 0, interested: 0, yours: 0 } as Record<CalKind, number>;
+  for (const e of entries) n[calKind(e)] += 1;
+  const parts = [date.toDateString()];
+  if (n.going) parts.push(`${n.going} going`);
+  if (n.interested) parts.push(`${n.interested} interested`);
+  if (n.yours) parts.push(`${n.yours} of yours`);
+  return parts.join(", ");
+}
+
+/**
+ * The mini calendar's one mark per day, in the key (Oct 19, 2026, D13): a
+ * solid coral dot for Going, a coral ring for Interested, a grey dot for
+ * your own entries. On today's dark disc all three are drawn in paper.
+ */
+function MiniDayMark({ kind, onDark }: { kind: CalKind; onDark: boolean }) {
+  const ink = onDark ? "var(--paper)" : kind === "yours" ? "var(--ink-muted)" : "var(--coral)";
+  return (
+    <span
+      aria-hidden
+      style={{
+        width: 5,
+        height: 5,
+        boxSizing: "border-box",
+        borderRadius: "50%",
+        background: kind === "interested" ? "transparent" : ink,
+        border: kind === "interested" ? `1.25px solid ${ink}` : "none",
+        position: "absolute",
+        bottom: 1.5,
+      }}
+    />
+  );
+}
+
 function CalendarModal({
   entries,
+  initialDay = null,
   failure,
   onRetry,
   onClose,
   onChange,
 }: {
   entries: CalEntry[];
+  /** `YYYY-MM-DD`: opened from that day of the mini calendar. */
+  initialDay?: string | null;
   // Set only while the first load failed, so the modal shows the failure
   // instead of a month with no dots.
   failure: LoadFailure | null;
@@ -735,11 +826,15 @@ function CalendarModal({
   onChange: () => void;
 }) {
   const today = new Date();
-  const [view, setView] = useState({
-    year: today.getFullYear(),
-    month: today.getMonth(),
+  const [view, setView] = useState(() => {
+    const d = initialDay ? new Date(`${initialDay}T00:00:00`) : today;
+    const ok = Number.isFinite(d.getTime());
+    return {
+      year: (ok ? d : today).getFullYear(),
+      month: (ok ? d : today).getMonth(),
+    };
   });
-  const [selected, setSelected] = useState<string | null>(null);
+  const [selected, setSelected] = useState<string | null>(initialDay);
   const [showAdd, setShowAdd] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
 
@@ -761,9 +856,24 @@ function CalendarModal({
     });
   };
 
-  const cells = buildMonthCells(view.year, view.month);
+  // Only the rows this month needs (Oct 19, 2026 repair): most months fit
+  // in five, which gives each day more room on a short laptop screen.
+  const rows = monthRowCount(view.year, view.month);
+  const cells = buildMonthCells(view.year, view.month).slice(0, rows * 7);
   const monthLabel = `${CAL_MONTHS[view.month]} ${view.year}`;
   const todayKey = ymdKey(today);
+  // The grid's height, measured, so each day shows the chips its row can
+  // hold (month-layout.ts). Null until measured: the full two.
+  const gridRef = useRef<HTMLDivElement | null>(null);
+  const [gridHeight, setGridHeight] = useState<number | null>(null);
+  useEffect(() => {
+    const el = gridRef.current;
+    if (!el || typeof ResizeObserver !== "function") return;
+    const ro = new ResizeObserver(() => setGridHeight(el.clientHeight));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [failure]);
+  const rowHeight = gridHeight === null ? null : rowHeightFor(gridHeight, rows);
   const selectedEntries = selected ? byDay[selected] ?? [] : [];
   const selectedDateLabel = selected
     ? new Date(`${selected}T00:00:00`).toLocaleDateString([], {
@@ -804,9 +914,12 @@ function CalendarModal({
       <div
         onClick={(e) => e.stopPropagation()}
         style={{
-          width: "100%",
-          maxWidth: 920,
-          maxHeight: "90vh",
+          // Wider (critique D11): seven equal columns plus the 280px day
+          // panel, with room for a title before it is cut. A set height
+          // (Oct 19, 2026 repair), so the month's rows can share it and the
+          // key stays on screen at 1366x768 and 1280x720.
+          width: "min(1040px, calc(100vw - 48px))",
+          height: "min(800px, calc(100vh - 48px))",
           background: "var(--paper)",
           borderRadius: 22,
           boxShadow:
@@ -952,27 +1065,35 @@ function CalendarModal({
           <div
             style={{
               display: "grid",
-              gridTemplateColumns: "1fr 280px",
+              gridTemplateColumns: "minmax(0, 1fr) 280px",
               gap: 0,
               flex: 1,
               minHeight: 0,
               overflow: "hidden",
             }}
           >
-            {/* Month grid */}
+            {/* Month grid (Oct 19, 2026, critique D11): seven equal columns
+                (`minmax(0, 1fr)`: a long title can't widen its day), so
+                Friday and Saturday never slide under the day panel. The
+                rows share the height (never under 64px; below that the
+                days scroll) and the key sits outside the scroller, so it is
+                always on screen. Up to two chips a day, then "+N more". */}
             <div
               style={{
                 padding: 18,
                 display: "flex",
                 flexDirection: "column",
                 gap: 8,
-                overflow: "auto",
+                overflow: "hidden",
+                minWidth: 0,
+                minHeight: 0,
               }}
             >
               <div
+                aria-hidden
                 style={{
                   display: "grid",
-                  gridTemplateColumns: "repeat(7, 1fr)",
+                  gridTemplateColumns: "repeat(7, minmax(0, 1fr))",
                   gap: 6,
                 }}
               >
@@ -992,104 +1113,37 @@ function CalendarModal({
                     {d}
                   </div>
                 ))}
-                {cells.map((cell, i) => {
-                  const dayEntries = byDay[cell.key] ?? [];
-                  const isToday = cell.key === todayKey;
-                  const isSelected = cell.key === selected;
-                  const cellBorder = isSelected
-                    ? "2px solid var(--charcoal)"
-                    : "1px solid var(--hairline)";
-                  return (
-                    <button
-                      key={`mc-${i}`}
-                      type="button"
-                      onClick={() => setSelected(cell.key)}
-                      style={{
-                        minHeight: 84,
-                        borderRadius: 12,
-                        padding: "6px 7px",
-                        display: "flex",
-                        flexDirection: "column",
-                        gap: 3,
-                        background: cell.otherMonth ? "rgba(var(--scrim-rgb),0.02)" : "var(--paper)",
-                        border: cellBorder,
-                        // Compensate for selected's heavier border so cells stay aligned.
-                        margin: isSelected ? "-1px" : 0,
-                        opacity: cell.otherMonth ? 0.45 : 1,
-                        cursor: "pointer",
-                        textAlign: "left",
-                        fontFamily: "inherit",
-                        transition: "border-color 120ms ease",
-                      }}
-                    >
-                      {isToday ? (
-                        <div
-                          style={{
-                            width: 24,
-                            height: 24,
-                            borderRadius: "50%",
-                            background: "var(--charcoal)",
-                            color: "var(--paper)",
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            fontFamily: "Fraunces, serif",
-                            fontSize: 13,
-                            fontWeight: 800,
-                            lineHeight: 1,
-                          }}
-                        >
-                          {cell.date.getDate()}
-                        </div>
-                      ) : (
-                        <div
-                          style={{
-                            fontFamily: "Fraunces, serif",
-                            fontSize: 14,
-                            fontWeight: 800,
-                            color: "var(--charcoal)",
-                            lineHeight: 1,
-                            padding: "4px 0 0 2px",
-                          }}
-                        >
-                          {cell.date.getDate()}
-                        </div>
-                      )}
-                      {/* Spacer pushes pills to the bottom. */}
-                      <div style={{ flex: 1 }} />
-                      {dayEntries.slice(0, 2).map((e) => (
-                        <div
-                          key={`${cell.key}-${e.id}`}
-                          style={{
-                            fontSize: 9.5,
-                            fontWeight: 700,
-                            color: "#fff",
-                            background: e.color,
-                            borderRadius: 6,
-                            padding: "2px 5px",
-                            whiteSpace: "nowrap",
-                            overflow: "hidden",
-                            textOverflow: "ellipsis",
-                          }}
-                        >
-                          {e.title}
-                        </div>
-                      ))}
-                      {dayEntries.length > 2 ? (
-                        <div
-                          style={{
-                            fontSize: 9,
-                            fontWeight: 700,
-                            color: "var(--ink-muted)",
-                          }}
-                        >
-                          +{dayEntries.length - 2} more
-                        </div>
-                      ) : null}
-                    </button>
-                  );
-                })}
               </div>
+              <div style={{ flex: 1, minHeight: 0, overflow: "auto", display: "flex", flexDirection: "column" }}>
+                <div
+                  ref={gridRef}
+                  style={{
+                    flex: "1 0 auto",
+                    display: "grid",
+                    gridTemplateColumns: "repeat(7, minmax(0, 1fr))",
+                    gridTemplateRows: `repeat(${rows}, minmax(${CAL_MIN_DAY_HEIGHT}px, 1fr))`,
+                    gap: 6,
+                  }}
+                >
+                  {cells.map((cell, i) => {
+                    const dayEntries = byDay[cell.key] ?? [];
+                    return (
+                      <CalModalDay
+                        key={`mc-${i}`}
+                        date={cell.date}
+                        otherMonth={cell.otherMonth}
+                        entries={dayEntries}
+                        maxChips={chipsThatFit(rowHeight, dayEntries.length)}
+                        isToday={cell.key === todayKey}
+                        isSelected={cell.key === selected}
+                        onSelect={() => setSelected(cell.key)}
+                        onNavigate={onClose}
+                      />
+                    );
+                  })}
+                </div>
+              </div>
+              <CalKey />
             </div>
 
             {/* Side panel: selected day details OR no-selection empty state. */}
@@ -1195,6 +1249,7 @@ function CalendarModal({
                         key={`${e.kind}-${e.id}`}
                         entry={e}
                         onDeleted={onChange}
+                        onNavigate={onClose}
                       />
                     ))
                   )}
@@ -1217,6 +1272,246 @@ function CalendarModal({
       </div>
     </div>,
     document.body,
+  );
+}
+
+/** A day of My Calendar is this tall, always (critique D11). */
+// The day's height comes from its grid row now, and the chip count from
+// month-layout.ts (Oct 19, 2026 repair).
+
+/** A plain left click: the modal closes as the page changes. A cmd/ctrl
+ *  click opens a new tab and leaves the modal where it is. */
+function plainLeftClick(e: React.MouseEvent): boolean {
+  return e.button === 0 && !e.metaKey && !e.ctrlKey && !e.shiftKey && !e.altKey;
+}
+
+/**
+ * One day of the modal's month (Oct 19, 2026, critique D11 + D13). A plain
+ * block, not one big button: the day number is the button that picks the
+ * day, and each event chip is its own link to the club page at that event,
+ * so clicking an event opens it instead of only picking its day. A click on
+ * the empty part of the day still picks it.
+ */
+function CalModalDay({
+  date,
+  otherMonth,
+  entries,
+  maxChips,
+  isToday,
+  isSelected,
+  onSelect,
+  onNavigate,
+}: {
+  date: Date;
+  otherMonth: boolean;
+  entries: CalEntry[];
+  /** How many chips this day's row can hold (month-layout.ts). */
+  maxChips: number;
+  isToday: boolean;
+  isSelected: boolean;
+  onSelect: () => void;
+  onNavigate: () => void;
+}) {
+  const shown = entries.slice(0, maxChips);
+  const more = entries.length - shown.length;
+  const spoken = date.toLocaleDateString([], { weekday: "long", month: "long", day: "numeric" });
+  const count = entries.length ? `, ${entries.length} ${entries.length === 1 ? "event" : "events"}` : "";
+  return (
+    <div
+      onClick={onSelect}
+      style={{
+        minHeight: 0,
+        minWidth: 0,
+        overflow: "hidden",
+        boxSizing: "border-box",
+        borderRadius: 12,
+        padding: "6px 6px 6px 7px",
+        display: "flex",
+        flexDirection: "column",
+        gap: 2,
+        background: otherMonth ? "rgba(var(--scrim-rgb),0.02)" : "var(--paper)",
+        // Selected: a 2px ring drawn inside, so the day never changes size.
+        border: `1px solid ${isSelected ? "var(--charcoal)" : "var(--hairline)"}`,
+        boxShadow: isSelected ? "inset 0 0 0 1px var(--charcoal)" : "none",
+        opacity: otherMonth ? 0.45 : 1,
+        cursor: "pointer",
+        transition: "border-color 120ms ease",
+      }}
+    >
+      <button
+        type="button"
+        onClick={onSelect}
+        aria-pressed={isSelected}
+        aria-label={`${spoken}${count}`}
+        style={{
+          alignSelf: "flex-start",
+          flexShrink: 0,
+          minWidth: 24,
+          height: 24,
+          boxSizing: "border-box",
+          padding: isToday ? 0 : "4px 2px 0",
+          borderRadius: 999,
+          border: "none",
+          background: isToday ? "var(--charcoal)" : "transparent",
+          color: isToday ? "var(--paper)" : "var(--charcoal)",
+          display: "flex",
+          alignItems: isToday ? "center" : "flex-start",
+          justifyContent: isToday ? "center" : "flex-start",
+          fontFamily: "Fraunces, serif",
+          fontSize: isToday ? 13 : 14,
+          fontWeight: 800,
+          lineHeight: 1,
+          cursor: "pointer",
+        }}
+      >
+        {date.getDate()}
+      </button>
+      {/* Spacer: the chips sit at the bottom of the day. */}
+      <div style={{ flex: 1, minHeight: 0 }} />
+      {shown.map((e) => (
+        <CalChip key={`${e.kind}-${e.id}`} entry={e} onNavigate={onNavigate} />
+      ))}
+      {more > 0 ? (
+        <button
+          type="button"
+          onClick={onSelect}
+          aria-label={`${more} more on ${spoken}`}
+          style={{
+            flexShrink: 0,
+            height: 12,
+            padding: 0,
+            border: "none",
+            background: "transparent",
+            textAlign: "left",
+            fontFamily: "inherit",
+            fontSize: 9.5,
+            fontWeight: 700,
+            lineHeight: "12px",
+            color: "var(--ink-muted)",
+            cursor: "pointer",
+          }}
+        >
+          +{more} more
+        </button>
+      ) : null}
+    </div>
+  );
+}
+
+const CHIP_BASE: React.CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: 3,
+  height: 18,
+  flexShrink: 0,
+  minWidth: 0,
+  boxSizing: "border-box",
+  padding: "0 6px",
+  borderRadius: 6,
+  fontSize: 10,
+  fontWeight: 700,
+  lineHeight: "18px",
+  textDecoration: "none",
+  fontFamily: "inherit",
+};
+
+const CHIP_TEXT: React.CSSProperties = {
+  minWidth: 0,
+  overflow: "hidden",
+  textOverflow: "ellipsis",
+  whiteSpace: "nowrap",
+};
+
+/** The Going check, drawn (never a glyph), in the chip's own ink. */
+function ChipCheck() {
+  return (
+    <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden style={{ flexShrink: 0 }}>
+      <path d="M5 12.5l4.5 4.5L19 7.5" />
+    </svg>
+  );
+}
+
+/**
+ * One entry on a day, in the key (critique D13): Going solid coral with a
+ * check, Interested a coral outline, yours plain with a bar in your colour.
+ * A long title ends in "…" and the whole title is in the tooltip. An event
+ * with a club is a link to the club page at that event; a personal entry
+ * isn't a link (a click on it picks its day, through the day).
+ */
+function CalChip({ entry, onNavigate }: { entry: CalEntry; onNavigate: () => void }) {
+  const kind = calKind(entry);
+  const href = entryHref(entry);
+  const style: React.CSSProperties = {
+    ...CHIP_BASE,
+    ...calChipStyle(kind, entry.kind === "personal" ? entry.color : null),
+    paddingLeft: kind === "yours" ? 8 : 6,
+  };
+  const body = (
+    <>
+      {kind === "going" ? <ChipCheck /> : null}
+      <span style={CHIP_TEXT}>{entry.title}</span>
+    </>
+  );
+  if (!href) {
+    return (
+      <span title={entry.title} style={style}>
+        {body}
+      </span>
+    );
+  }
+  const club = entry.kind === "rsvp" && entry.org ? `, ${entry.org.name}` : "";
+  return (
+    <Link
+      href={href}
+      title={entry.title}
+      aria-label={`${entry.title}, ${CAL_KIND_WORD[kind]}${club}`}
+      onClick={(e) => {
+        // The day under it isn't picked: the click was for the event.
+        e.stopPropagation();
+        if (plainLeftClick(e)) onNavigate();
+      }}
+      className="vibe-press"
+      style={style}
+    >
+      {body}
+    </Link>
+  );
+}
+
+/** The one-line key under the grid, drawn with the chips themselves. */
+function CalKey() {
+  const sample = (kind: CalKind) => (
+    <span
+      key={kind}
+      style={{
+        ...CHIP_BASE,
+        ...calChipStyle(kind, kind === "yours" ? PERSONAL_DEFAULT_COLOR : null),
+        paddingLeft: kind === "yours" ? 8 : 6,
+      }}
+    >
+      {kind === "going" ? <ChipCheck /> : null}
+      {CAL_KIND_WORD[kind]}
+    </span>
+  );
+  return (
+    <div
+      role="group"
+      aria-label="Colour key"
+      style={{
+        display: "flex",
+        alignItems: "center",
+        flexWrap: "wrap",
+        gap: 6,
+        paddingTop: 2,
+        fontSize: 11,
+        color: "var(--ink-muted)",
+      }}
+    >
+      {sample("going")}
+      {sample("interested")}
+      {sample("yours")}
+      <span style={{ marginLeft: 4 }}>Click an event to open its club.</span>
+    </div>
   );
 }
 
@@ -1363,12 +1658,20 @@ function ExportPopover({ onClose }: { onClose: () => void }) {
   );
 }
 
+/**
+ * One entry in the day panel. Oct 19, 2026 (critique D13): an event's title
+ * opens its club page at the event, "Event chat" opens its chat when it has
+ * one, and the club's name opens the club. A personal entry has no links and
+ * keeps its Delete. The chip at the top says which key it is.
+ */
 function CalModalEventCard({
   entry,
   onDeleted,
+  onNavigate,
 }: {
   entry: CalEntry;
   onDeleted: () => void;
+  onNavigate: () => void;
 }) {
   const start = new Date(entry.starts_at);
   const time = start.toLocaleTimeString([], {
@@ -1376,6 +1679,8 @@ function CalModalEventCard({
     minute: start.getMinutes() ? "2-digit" : undefined,
   });
   const isPersonal = entry.kind === "personal";
+  const kind = calKind(entry);
+  const href = entryHref(entry);
   const [busy, setBusy] = useState(false);
 
   const remove = async () => {
@@ -1392,12 +1697,29 @@ function CalModalEventCard({
     if (r.ok) onDeleted();
   };
 
+  const go = (e: React.MouseEvent) => {
+    if (plainLeftClick(e)) onNavigate();
+  };
+  const titleStyle: React.CSSProperties = {
+    fontFamily: "Fraunces, serif",
+    fontWeight: 800,
+    fontSize: 14,
+    color: "var(--charcoal)",
+    textDecoration: "none",
+    overflowWrap: "anywhere",
+  };
+  const linkStyle: React.CSSProperties = {
+    fontSize: 11,
+    fontWeight: 600,
+    color: "var(--tag-ink)",
+    textDecoration: "none",
+  };
+
   return (
     <div
       style={{
         background: "var(--paper)",
         border: "1px solid var(--hairline)",
-        borderLeft: `4px solid ${entry.color}`,
         borderRadius: 10,
         padding: "10px 12px",
         display: "flex",
@@ -1405,24 +1727,36 @@ function CalModalEventCard({
         gap: 4,
       }}
     >
-      <div
+      <span
         style={{
-          fontFamily: "Fraunces, serif",
-          fontWeight: 800,
-          fontSize: 14,
-          color: "var(--charcoal)",
+          ...CHIP_BASE,
+          ...calChipStyle(kind, isPersonal ? entry.color : null),
+          alignSelf: "flex-start",
+          paddingLeft: kind === "yours" ? 8 : 6,
         }}
       >
-        {entry.title}
-      </div>
+        {kind === "going" ? <ChipCheck /> : null}
+        {CAL_KIND_WORD[kind]}
+      </span>
+      {href ? (
+        <Link href={href} onClick={go} className="vibe-press" style={titleStyle}>
+          {entry.title}
+        </Link>
+      ) : (
+        <div style={titleStyle}>{entry.title}</div>
+      )}
       <div style={{ fontSize: 11, color: "var(--ink-muted)", fontWeight: 600 }}>
         {time}
         {entry.location ? ` · ${entry.location}` : ""}
       </div>
       {entry.kind === "rsvp" && entry.org ? (
-        <div style={{ fontSize: 11, color: "var(--ink-muted)" }}>
+        <Link
+          href={`/orgs/${encodeURIComponent(entry.org.handle)}`}
+          onClick={go}
+          style={{ fontSize: 11, color: "var(--ink-muted)", textDecoration: "none", alignSelf: "flex-start" }}
+        >
           {entry.org.name}
-        </div>
+        </Link>
       ) : null}
       {entry.kind === "personal" && entry.notes ? (
         <div
@@ -1438,18 +1772,14 @@ function CalModalEventCard({
           {entry.notes}
         </div>
       ) : null}
-      <div style={{ display: "flex", gap: 8, marginTop: 6 }}>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginTop: 6 }}>
+        {entry.kind === "rsvp" && entry.room_id ? (
+          <Link href={eventChatHref(entry.room_id)} onClick={go} style={linkStyle}>
+            Event chat
+          </Link>
+        ) : null}
         {entry.kind === "rsvp" ? (
-          <a
-            href={`/api/events/${entry.id}/ics`}
-            download
-            style={{
-              fontSize: 11,
-              fontWeight: 600,
-              color: "var(--tag-ink)",
-              textDecoration: "none",
-            }}
-          >
+          <a href={`/api/events/${entry.id}/ics`} download style={linkStyle}>
             Add to calendar app
           </a>
         ) : null}
@@ -1462,7 +1792,7 @@ function CalModalEventCard({
               background: "transparent",
               border: "none",
               padding: 0,
-              color: "#C42B1C",
+              color: "var(--danger-ink)",
               fontSize: 11,
               fontWeight: 600,
               cursor: busy ? "default" : "pointer",
@@ -1491,7 +1821,8 @@ function AddPersonalEventForm({
   const [time, setTime] = useState("09:00");
   const [location, setLocation] = useState("");
   const [notes, setNotes] = useState("");
-  const [color, setColor] = useState("#FF5C35");
+  // Blue by default (Oct 19, 2026): coral is the key's colour for RSVPs.
+  const [color, setColor] = useState(PERSONAL_DEFAULT_COLOR);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -1703,7 +2034,9 @@ function AddPersonalEventForm({
   );
 }
 
-const EVENT_COLOR_PRESETS = ["#FF5C35", "#5BD18C", "#5A9CFF", "#9B7BFF", "#FFB85A", "#1C1C1E"];
+/** Personal colours live in calendar-key.ts with the rest of the key (Oct
+ *  19, 2026 repair: coral is out, it means an RSVP now). */
+const EVENT_COLOR_PRESETS = PERSONAL_COLOR_PRESETS;
 
 const addEventInput: React.CSSProperties = {
   width: "100%",

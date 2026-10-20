@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { hasDeletedShape } from "@/lib/chat/deleted-note";
 import { chatV2For } from "@/lib/chat/flag-server";
 import { readLatestPerRoom } from "@/lib/chat/latest-per-room";
 import { latestShownPerRoom, orderFollowedBoards, type PreviewRow } from "@/lib/chat/reads";
@@ -32,7 +33,7 @@ const FOLLOWS_MAX = 50;
  * Board speaks for the club, so `latest.author_name` is always "" and the
  * screens print the club's name. No member's name leaves this route.
  */
-const PREVIEW_SELECT = "id, channel_id, content, created_at, user_id, kind, thread_root_id";
+const PREVIEW_SELECT = "id, channel_id, content, created_at, user_id, kind, thread_root_id, attachment_kind";
 
 const requestFailed = () => NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
 
@@ -199,9 +200,11 @@ async function withPreviews(l: Listed): Promise<FollowedBoard[] | null> {
   );
   if (error) console.error(`[${TAG} previews]`, error.code, error.message);
   const rows = (error ? [] : (data ?? [])) as unknown as PreviewRow[];
+  // A deleted post (Oct 19, 2026) is not shown to a follower: their Board
+  // leaves it out, so its preview does too (the post before it previews).
   const hidden = (row: PreviewRow): boolean => {
     const orgId = orgOfRoom.get(row.channel_id);
-    return !isFollowerBoardPost(row, orgId ? posters.get(orgId) : undefined);
+    return hasDeletedShape(row) || !isFollowerBoardPost(row, orgId ? posters.get(orgId) : undefined);
   };
   const latest = latestShownPerRoom(rows, hidden);
 

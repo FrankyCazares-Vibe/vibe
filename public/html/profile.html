@@ -243,12 +243,9 @@ html.vibe-pre-paint .profile-cover { opacity: 0; }
 }
 /* Night: the one hover that darkens a charcoal fill lightens it instead. */
 :root[data-theme="dark"] .action-btn.rec:hover { background: var(--ink-2); }
-/* Night: #1C1C1E fills (the black event colour, person search avatars)
-   vanish on Night paper; a hairline ring keeps their edge. */
-:root[data-theme="dark"] .color-swatch[data-color="#1C1C1E" i],
-:root[data-theme="dark"] .cal-event-dot[style*="#1C1C1E" i],
-:root[data-theme="dark"] .cal-modal-event-bar[style*="#1C1C1E" i],
-:root[data-theme="dark"] .cal-modal-event-pill[style*="#1C1C1E" i],
+/* Night: #1C1C1E fills (person search avatars) vanish on Night paper; a
+   hairline ring keeps their edge. (The black event colour is gone since Oct
+   19, 2026; an old entry in it follows var(--charcoal), vibeCalBar.) */
 :root[data-theme="dark"] .prof-search-wrap .sr-av[style*="#1C1C1E" i] { box-shadow: 0 0 0 1px rgba(255,255,255,0.35); }
 /* Night: the "Viewing <name>" pill flips light, so its coral link darkens
    (inline style, hence !important). */
@@ -2001,6 +1998,12 @@ body.owner-mode .shared-section .current-delete { display:none; }
   display:flex;border-bottom:1px solid var(--border);margin-bottom:20px;
   margin:-28px -28px 20px;padding:0 28px;
 }
+/* The -28px above pulls the tabs up into the card's padding, which is right
+   only when they are the card's first thing. On your own profile the
+   composer sits above them, and the tabs ended up 12px inside its box (D1,
+   Oct 19, 2026). There they keep a normal gap; the visitor view, where the
+   composer is hidden, stays flush. */
+body:not(.viewer-mode) .profile-composer + .content-tabs { margin-top:4px; }
 .content-tab {
   font-family:'DM Sans',sans-serif;font-size:14px;font-weight:600;
   color:var(--muted);padding:14px 18px;border:none;background:none;
@@ -2048,30 +2051,74 @@ body.edit-mode .vibe-grid-play { display:none; }
 .vibe-grid-title { font-size:11px;font-weight:600;color:white;line-height:1.3;margin-bottom:4px; }
 .vibe-grid-views { font-size:10px;color:rgba(255,255,255,.6); }
 
-/* ── Post thumbnail cell for the All tab (text-only) ── */
+/* ── Saved tiles (critique B6, Oct 19, 2026) ──
+   Why: Saved drew every post as a pastel text tile and never showed the
+   photo the server sends, while the phone did (D3), and the six pastels were
+   typed-in colours that glowed in Night. Now, as on the phone: a photo or a
+   video's poster fills a .vibe-grid-thumb tile, and a post with nothing to
+   show is a plain .post-thumb-cell in the page's own colours (decision 15).
+   Each tile is a <button>, so the browser's button look is reset here. */
+.saved-tile {
+  border:none;margin:0;font:inherit;color:inherit;width:100%;
+  text-align:left;cursor:none;-webkit-tap-highlight-color:transparent;
+}
+.saved-tile:focus-visible { outline:2px solid var(--accent);outline-offset:2px; }
+.vibe-grid-thumb.saved-tile { display:block;padding:0;background:var(--well); }
+.vibe-grid-thumb .vibe-grid-bg { background-position:center;background-size:cover;background-repeat:no-repeat; }
+/* The play badge marks a video even while the owner is in edit mode. */
+body.edit-mode #profileSavedGrid .vibe-grid-play { display:flex; }
+.vibe-grid-play svg { display:block; }
+/* Spoken, not shown: the name a photo tile is read out by. */
+.saved-tile-sr {
+  position:absolute;width:1px;height:1px;margin:-1px;padding:0;border:0;
+  overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;
+}
 .post-thumb-cell {
   aspect-ratio:1/1;border-radius:14px;overflow:hidden;
   position:relative;cursor:none;
-  display:flex;align-items:center;justify-content:center;
-  padding:14px;text-align:center;
+  display:flex;align-items:flex-start;
+  padding:14px;text-align:left;
+  background:rgba(var(--scrim-rgb),.06);color:var(--ink-post);
   transition:transform .22s,box-shadow .22s;
+  /* The tile is its text's size container: the clamp below is picked from
+     the room the tile really has (Oct 19, 2026 review, see the body rule). */
+  container:saved-tile / size;
 }
 .post-thumb-cell:hover {
   transform:translateY(-2px);
   box-shadow:0 8px 24px rgba(0,0,0,.08);
 }
+/* Its natural (clamped) height, never stretched to the tile: a stretched
+   -webkit-box paints the lines past its "…" (the phone's bug, D3).
+   Whole lines only (Oct 19, 2026 review): the page keeps its 3 columns down
+   to 761px wide, where a tile is about 97px. A fixed 6-line clamp with
+   max-height:100% then cut the last line through its letters, with no "…".
+   Now the clamp and the height are the same whole number of lines, picked by
+   the tile's own content height (a 13px/1.45 line is 18.85px): 6 lines from
+   113.1px, then 5, 4, 3 and 2, each step just under a whole line.
+   A word wraps whole when it can. In a tile under 90px of text width, where
+   many words are longer than the line, the browser hyphenates where English
+   allows (<html lang="en">); a word with no such place breaks anywhere. */
 .post-thumb-cell .post-thumb-body {
-  font-family:'Fraunces',serif;font-weight:600;
-  font-size:14px;line-height:1.35;
-  display:-webkit-box;-webkit-line-clamp:5;-webkit-box-orient:vertical;
-  overflow:hidden;
+  font-family:'DM Sans',sans-serif;font-weight:500;
+  font-size:13px;line-height:1.45;
+  white-space:pre-wrap;overflow-wrap:anywhere;
+  display:-webkit-box;-webkit-line-clamp:6;-webkit-box-orient:vertical;
+  overflow:hidden;max-height:calc(1.45em * 6);
 }
-.post-thumb-cell.theme-coral    { background:#FFE5DB;color:#C54323; }
-.post-thumb-cell.theme-purple   { background:#F0EDFF;color:#5b3fd9; }
-.post-thumb-cell.theme-mint     { background:#EAFFF5;color:#147A45; }
-.post-thumb-cell.theme-gold     { background:#FFF7D6;color:#A17500; }
-.post-thumb-cell.theme-sky      { background:#E5F4FF;color:#1A6FB5; }
-.post-thumb-cell.theme-lavender { background:#F3EAFF;color:#7C3FE0; }
+@container saved-tile (max-height: 113.09px) { .post-thumb-cell .post-thumb-body { -webkit-line-clamp:5;max-height:calc(1.45em * 5); } }
+@container saved-tile (max-height: 94.24px) { .post-thumb-cell .post-thumb-body { -webkit-line-clamp:4;max-height:calc(1.45em * 4); } }
+@container saved-tile (max-height: 75.39px) { .post-thumb-cell .post-thumb-body { -webkit-line-clamp:3;max-height:calc(1.45em * 3); } }
+@container saved-tile (max-height: 56.54px) { .post-thumb-cell .post-thumb-body { -webkit-line-clamp:2;max-height:calc(1.45em * 2); } }
+@container saved-tile (max-width: 90px) { .post-thumb-cell .post-thumb-body { hyphens:auto;-webkit-hyphens:auto; } }
+.post-thumb-cell.has-play .post-thumb-body { padding-right:26px; }
+/* Narrow tiles (the 3-column layout at 761-1023px wide): a thinner frame and
+   a smaller play badge, so a word keeps more of the line. */
+@media (min-width: 761px) and (max-width: 1023px) {
+  .post-thumb-cell { padding:10px; }
+  .post-thumb-cell.has-play .post-thumb-body { padding-right:20px; }
+  .post-thumb-cell .vibe-grid-play { top:6px;right:6px;width:20px;height:20px; }
+}
 
 /* ── Avatar-row right column: stats on top, Follow+Mutual below.
    Sits inside .avatar-row so the row's bottom border draws under the
@@ -2273,6 +2320,12 @@ body.viewer-mode .ppost-pin { display:none !important; }
 .ppost-readmore.show { display:inline-block; }
 .ppost-tags { display:flex;flex-wrap:wrap;gap:5px;margin-bottom:10px; }
 .ppost-tag { font-size:11px;font-weight:600;padding:3px 9px;border-radius:100px;background:var(--paper);color:var(--muted); }
+/* A saved tag inside the caption (decision 5, Oct 19, 2026): it opens the
+   campus feed filtered to that tag. The chip row above stays only for cards
+   cached before tags moved inline. */
+.ppost-tag-link { color:var(--tag-ink);font-weight:600;text-decoration:none;cursor:none;border-radius:4px; }
+.ppost-tag-link:hover { text-decoration:underline; }
+.ppost-tag-link:focus-visible { outline:2px solid var(--accent);outline-offset:1px; }
 .ppost-reactions { display:flex;align-items:center;justify-content:space-between;padding-top:8px;border-top:1px solid var(--border); }
 .ppost-left { display:flex;gap:5px; }
 .ppost-chip {
@@ -2723,7 +2776,9 @@ body.edit-mode:not(.viewer-mode) .ppost-pin-btn { display:block; }
 .cal-modal-backdrop.open { display: flex; }
 .cal-modal {
   background: var(--paper); border-radius: 24px;
-  width: min(860px, calc(100vw - 32px));
+  /* Wider since Oct 19, 2026 (critique D11/D12), as My Calendar: a day has
+     room for two chips and "+N more". */
+  width: min(1040px, calc(100vw - 48px));
   max-height: calc(100vh - 48px);
   display: flex; flex-direction: column;
   box-shadow: 0 24px 80px rgba(0,0,0,.18);
@@ -2788,7 +2843,7 @@ body.edit-mode:not(.viewer-mode) .ppost-pin-btn { display:block; }
   padding: 20px 24px; overflow-y: auto;
 }
 .cal-modal-day-names {
-  display: grid; grid-template-columns: repeat(7, 1fr);
+  display: grid; grid-template-columns: repeat(7, minmax(0, 1fr));
   margin-bottom: 6px;
 }
 .cal-modal-day-name {
@@ -2796,46 +2851,87 @@ body.edit-mode:not(.viewer-mode) .ppost-pin-btn { display:block; }
   text-align: center; padding: 4px 0;
   text-transform: uppercase; letter-spacing: .4px;
 }
+/* Even days (D11, Oct 19, 2026): seven equal columns that a long title can't
+   widen (minmax(0,1fr)), and fixed-height days. */
 .cal-modal-grid {
-  display: grid; grid-template-columns: repeat(7, 1fr);
-  grid-auto-rows: 1fr;
+  display: grid; grid-template-columns: repeat(7, minmax(0, 1fr));
+  grid-auto-rows: 96px;
   gap: 4px;
 }
 .cal-modal-day {
-  aspect-ratio: 1; border-radius: 12px;
+  min-width: 0; border-radius: 12px;
   border: 1px solid var(--border);
   padding: 6px; cursor: none;
-  transition: all .15s; position: relative;
+  transition: background-color .15s, border-color .15s; position: relative;
   display: flex; flex-direction: column; gap: 3px;
   background: var(--paper);
   overflow: hidden;
 }
 .cal-modal-day:hover { border-color: rgba(var(--scrim-rgb),.2); background: var(--cream); }
 .cal-modal-day.other-month { opacity: .35; }
-.cal-modal-day.today { border-color: var(--charcoal); border-width: 2px; }
-.cal-modal-day.selected { border-color: var(--accent); border-width: 2px; background: var(--wash-coral-pale); }
+/* A ring drawn inside, so today and the picked day never change size. */
+.cal-modal-day.today { border-color: var(--charcoal); box-shadow: inset 0 0 0 1px var(--charcoal); }
+.cal-modal-day.selected { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); background: var(--wash-coral-pale); }
+/* The day number is the day's button. */
 .cal-modal-day-num {
-  font-size: 13px; font-weight: 700; color: var(--charcoal);
+  font: 700 13px 'DM Sans', sans-serif; color: var(--charcoal);
   width: 26px; height: 26px; border-radius: 8px;
   display: flex; align-items: center; justify-content: center;
-  flex-shrink: 0;
+  flex-shrink: 0; border: none; background: none; padding: 0; cursor: none;
 }
+.cal-modal-day-num:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .cal-modal-day.today .cal-modal-day-num {
   background: var(--charcoal); color: var(--on-ink);
 }
 .cal-modal-day.selected .cal-modal-day-num {
   background: var(--accent); color: var(--on-coral, #160A06);
 }
-.cal-modal-event-pill {
-  font-size: 10px; font-weight: 700;
-  padding: 2px 6px; border-radius: 5px;
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-  color: white; cursor: none;
+.cal-modal-more { font-size: 9px; color: var(--muted); font-weight: 700; padding-left: 2px; }
+
+/* ── The calendar key (critique D13, Oct 19, 2026; Franky's decision 12) ──
+   The same paint as My Calendar (src/lib/calendar/calendar-key.ts
+   calChipStyle): Going solid coral with dark words and a drawn check,
+   Interested a coral outline on a faint coral wash (coral alone on white is
+   2.9:1), yours a plain chip with a straight 3px bar in your colour, painted
+   into the background so the rounded corner can't bend it. Tokens only. */
+.cal-chip {
+  display: flex; align-items: center; gap: 3px; height: 18px; padding: 0 6px;
+  border-radius: 6px; font-size: 10px; font-weight: 700; line-height: 18px;
+  min-width: 0; flex-shrink: 0; text-decoration: none; cursor: none;
 }
-/* Oct 12: an event left on the default orange gets the dark ink (white on
-   orange is 3.1:1, this is 6.3:1). The other event colours keep white. The
-   pill's fill is an inline style, hence the attribute match. */
-.cal-modal-event-pill[style*="#FF5C35" i] { color: var(--on-coral, #160A06); }
+.cal-chip > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cal-chip > svg { flex-shrink: 0; }
+.cal-chip--going { background: var(--coral); color: var(--on-coral); box-shadow: inset 0 0 0 1px var(--coral); }
+.cal-chip--interested { background: var(--tag-bg); color: var(--charcoal); box-shadow: inset 0 0 0 1.5px var(--coral); }
+.cal-chip--yours {
+  padding-left: 8px; color: var(--ink-post);
+  background: linear-gradient(90deg, var(--cal-bar, var(--ink-muted)) 0 3px, transparent 3px), rgba(var(--scrim-rgb),0.07);
+}
+a.cal-chip:hover { filter: brightness(1.06); }
+a.cal-chip:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.cal-key {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+  margin-top: 12px;
+}
+.cal-key .cal-chip { height: 20px; line-height: 20px; }
+.cal-key-hint { font-size: 11px; color: var(--muted); }
+/* The offer to move the old browser-only entries (D12). */
+.cal-move-offer {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px;
+  margin-bottom: 14px; padding: 12px 14px; border-radius: 14px;
+  background: var(--tag-bg); color: var(--charcoal); font-size: 12px; line-height: 1.5;
+}
+.cal-move-offer[hidden] { display: none; }
+.cal-move-text { flex: 1 1 260px; min-width: 0; overflow-wrap: anywhere; }
+.cal-move-actions { display: flex; gap: 8px; }
+.cal-move-go, .cal-move-drop {
+  font: 700 12px 'DM Sans', sans-serif; border: none; border-radius: 100px;
+  padding: 8px 14px; cursor: none; white-space: nowrap;
+}
+.cal-move-go { background: var(--accent); color: var(--on-coral, #160A06); }
+.cal-move-drop { background: var(--paper); color: var(--ink-2); box-shadow: inset 0 0 0 1px var(--border); }
+.cal-move-drop.armed { color: var(--error-ink); box-shadow: inset 0 0 0 1px var(--error-ink); }
+.cal-move-go:focus-visible, .cal-move-drop:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 /* Right panel */
 .cal-modal-sidebar {
@@ -2868,15 +2964,48 @@ body.edit-mode:not(.viewer-mode) .ppost-pin-btn { display:block; }
 .cal-modal-event-bar {
   width: 4px; border-radius: 100px; flex-shrink: 0; align-self: stretch;
 }
-.cal-modal-event-body { flex: 1; min-width: 0; }
-.cal-modal-event-name { font-size: 13px; font-weight: 700; margin-bottom: 3px; }
-.cal-modal-event-meta { font-size: 11px; color: var(--muted); line-height: 1.6; }
+/* The bar follows the key (D13): coral for Going, a coral line for
+   Interested, your colour for yours. */
+.cal-card--going .cal-modal-event-bar { background: var(--coral); }
+.cal-card--interested .cal-modal-event-bar { box-shadow: inset 0 0 0 1.5px var(--coral); }
+.cal-card--yours .cal-modal-event-bar { background: var(--cal-bar, var(--ink-muted)); }
+.cal-modal-event-body { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 2px; }
+.cal-card-key { margin-bottom: 4px; }
+.cal-modal-event-name {
+  font-size: 13px; font-weight: 700; color: var(--charcoal);
+  text-decoration: none; overflow-wrap: anywhere;
+}
+a.cal-modal-event-name:hover { text-decoration: underline; }
+.cal-modal-event-meta { font-size: 11px; color: var(--muted); line-height: 1.6; overflow-wrap: anywhere; }
+.cal-modal-event-club { font-size: 11px; color: var(--muted); text-decoration: none; }
+.cal-modal-event-club:hover { text-decoration: underline; }
+.cal-modal-event-notes { font-size: 12px; color: var(--ink-2); line-height: 1.4; white-space: pre-wrap; overflow-wrap: anywhere; margin-top: 2px; }
+.cal-modal-event-links { display: flex; flex-wrap: wrap; gap: 4px 10px; margin-top: 6px; }
+.cal-modal-event-links a { font-size: 11px; font-weight: 600; color: var(--tag-ink); text-decoration: none; cursor: none; }
+.cal-modal-event-links a:hover { text-decoration: underline; }
+.cal-modal-event-card a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
 .cal-modal-event-del {
   background: none; border: none; cursor: none;
   color: var(--muted); font-size: 16px; padding: 0 2px;
   transition: color .15s; align-self: flex-start;
 }
 .cal-modal-event-del:hover { color: var(--tag-ink); }
+.cal-modal-event-del:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; border-radius: 6px; }
+/* The second tap: the × becomes a red "Delete". */
+.cal-modal-event-del.armed {
+  font: 700 11px 'DM Sans', sans-serif; color: var(--error-ink);
+  padding: 4px 8px; border-radius: 100px; box-shadow: inset 0 0 0 1px var(--error-ink);
+}
+.cal-modal-add-more {
+  width: 100%; margin-top: 8px; padding: 10px; border-radius: 12px;
+  border: 1.5px dashed var(--border); background: none; color: var(--muted);
+  font: 700 12px 'DM Sans', sans-serif; cursor: none; transition: border-color .15s, color .15s;
+}
+.cal-modal-no-events .cal-modal-add-more { width: auto; border: none; padding: 0; margin-top: 8px; color: var(--tag-ink); font-size: 13px; }
+.cal-modal-add-more:hover { border-color: var(--accent); color: var(--tag-ink); }
+.cal-modal-add-more:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.cal-modal-load-fail { font-size: 12px; color: var(--ink-2); padding: 10px 12px; margin-bottom: 8px; border-radius: 12px; background: rgba(var(--scrim-rgb),.05); }
+.cal-modal-load-fail button { font: 700 12px 'DM Sans', sans-serif; color: var(--tag-ink); background: none; border: none; padding: 0; cursor: none; }
 .cal-modal-no-events {
   text-align: center; padding: 32px 16px;
   color: var(--muted); font-size: 13px; line-height: 1.6;
@@ -2924,8 +3053,9 @@ body.edit-mode:not(.viewer-mode) .ppost-pin-btn { display:block; }
 .color-swatch {
   width: 26px; height: 26px; border-radius: 8px; cursor: none;
   border: 2px solid transparent; transition: all .15s;
-  flex-shrink: 0;
+  flex-shrink: 0; padding: 0;
 }
+.color-swatch:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .color-swatch.active { border-color: var(--charcoal); transform: scale(1.15); }
 .create-event-footer {
   padding: 14px 22px 20px;
@@ -6547,18 +6677,6 @@ function switchContentTab(paneId, btn) {
 // Posts that aren't visible in the DOM (e.g. lazy-rendered) won't appear; the
 // ALL view derives from the same nodes the Posts pane renders so it's
 // always consistent with what the user can see in the other tabs.
-const POST_THEME_BUCKETS = ['coral', 'purple', 'mint', 'gold', 'sky', 'lavender'];
-function postThemeFor(card) {
-  const tag = card.querySelector('.ppost-tag');
-  const seed = (tag?.textContent || card.dataset.postId || '').replace(/\s+/g, '').toLowerCase();
-  let hash = 0;
-  for (let i = 0; i < seed.length; i++) hash = (hash * 31 + seed.charCodeAt(i)) | 0;
-  return POST_THEME_BUCKETS[Math.abs(hash) % POST_THEME_BUCKETS.length];
-}
-function postExcerpt(card) {
-  const body = card.querySelector('.ppost-body')?.textContent?.trim() || '';
-  return body.length > 180 ? body.slice(0, 177) + '…' : body;
-}
 // Build a prefill object so the modal paints something instantly while
 // the server fetch resolves. For app-shell users, /api/posts/[id] then
 // replaces the counts + viewer state.
@@ -6566,8 +6684,13 @@ function _profilePrefillFromCard(card) {
   const me = (typeof vibeLoad === 'function') ? vibeLoad('vibe_user_v1') : null;
   const bodyEl = card.querySelector('.ppost-body');
   const dateEl = card.querySelector('.ppost-date');
-  const tagEls = card.querySelectorAll('.ppost-tag');
-  const tags = Array.from(tagEls).map(t => (t.textContent || '').replace(/^#/, ''));
+  // The caption's tag links (Oct 19, 2026), plus the chips of a card cached
+  // before tags moved inline.
+  const tags = [];
+  card.querySelectorAll('.ppost-tag-link[data-tag], .ppost-tag').forEach(t => {
+    const tag = t.dataset.tag || (t.textContent || '').replace(/^#/, '');
+    if (tag && !tags.includes(tag)) tags.push(tag);
+  });
   return {
     id:        card.dataset.postId || '',
     type:      'post',
@@ -6587,7 +6710,8 @@ function _profilePrefillFromCard(card) {
 // escaped with _esc, never inserted as-is.
 function _applyPostEditToCard(card, content, tags, edited) {
   const body = card.querySelector('.ppost-body');
-  const textHTML = _esc(content).replace(/\n/g, '<br>');
+  // The saved tags become links inside the text (decision 5, Oct 19, 2026).
+  const textHTML = _profileCaptionHTML(content, tags);
   if (body) {
     const span = body.querySelector(':scope > .ppost-text');
     if (span) {
@@ -6601,18 +6725,8 @@ function _applyPostEditToCard(card, content, tags, edited) {
       body.innerHTML = '<span class="ppost-text">' + textHTML + '</span>' + media;
     }
   }
-  let tagsEl = card.querySelector('.ppost-tags');
-  if (tags.length) {
-    if (!tagsEl) {
-      tagsEl = document.createElement('div');
-      tagsEl.className = 'ppost-tags';
-      const anchor = card.querySelector('.ppost-readmore') || body;
-      if (anchor) anchor.after(tagsEl); else card.appendChild(tagsEl);
-    }
-    tagsEl.innerHTML = tags.map(t => '<span class="ppost-tag">#' + _esc(t) + '</span>').join('');
-  } else if (tagsEl) {
-    tagsEl.remove();
-  }
+  // Tags live in the caption now: a chip row left by an older cache goes.
+  card.querySelectorAll('.ppost-tags').forEach(el => el.remove());
   // Only an answer that says the post was edited marks it (an empty patch
   // echoes the row unchanged), and never twice.
   const dateEl = card.querySelector('.ppost-date');
@@ -6634,9 +6748,11 @@ window.addEventListener('vibe:post-edited', (ev) => {
   // escaping question. It can't add " · Edited": /api/me/bookmarks doesn't
   // return edited_at. Before the Posts-card guard below, because the Saved
   // grid is populated independently of #profilePostsList.
+  // Both tile kinds carry .post-thumb-body (Oct 19, 2026): visible on a text
+  // tile, spoken-only on a photo tile, whose name must follow the edit too.
   document
-    .querySelectorAll('.post-thumb-cell[data-source-post-id="' + CSS.escape(d.id) + '"] .post-thumb-body')
-    .forEach(el => { el.textContent = content.slice(0, 240); });
+    .querySelectorAll('#profileSavedGrid [data-source-post-id="' + CSS.escape(d.id) + '"] .post-thumb-body')
+    .forEach(el => { el.textContent = content.slice(0, 240) || el.dataset.empty || ''; });
   const cards = document.querySelectorAll('#profilePostsList .profile-post-card[data-post-id="' + CSS.escape(d.id) + '"]');
   if (!cards.length) return;
   cards.forEach(card => _applyPostEditToCard(card, content, tags, edited));
@@ -6777,20 +6893,101 @@ if (document.readyState === 'loading') {
 // Hashtags inside the body double as the tags array — chip input is a
 // later polish (P1-017+ noted in journal v4.7).
 
-const POST_TAG_RE = /(?:^|\s)#([\p{L}0-9_]{2,32})/gu;
-function _extractHashtags(text) {
-  const out = [];
+// tags-twin:start
+// The static twin of the post tag rule (critique batch B6, Oct 19, 2026).
+// Why: this page used to read tags its own way, so "#café" saved "caf" on the
+// phone and nothing here, a link's "#section" saved a tag, and up to 10 were
+// sent. The server reads the tags from the caption since Oct 19, so this copy
+// now decides only what the page shows before the server answers, and which
+// "#words" in a caption are links.
+// - VIBE_POST_TAG_IN_TEXT_RE and VIBE_POST_TAG_LINK_RE are copied character
+//   for character from POST_TAG_IN_TEXT_RE and POST_TAG_LINK_RE in
+//   src/lib/posts/edit.ts; vibeExtractPostTags is extractPostTags there.
+// - vibeCaptionTagRanges is captionTagRanges (src/lib/posts/caption-tag-
+//   ranges.ts): a "#word" is a link only when the post saved that tag.
+// - public/html/_postViewer.js carries the same block. static-profile-
+//   tags.test.ts runs every copy beside the TypeScript: change all together.
+// No lookbehind anywhere, so it parses on every browser. Read the regexes
+// through a fresh copy (new RegExp), never exec the shared objects.
+const VIBE_POST_TAG_MAX = 5;
+const VIBE_NEW_POST_TAG_RE = /^(?=[a-z0-9_]*[a-z])[a-z0-9_]{2,32}$/;
+const VIBE_POST_TAG_IN_TEXT_RE =
+  /(^|[\uFE0E\uFE0F\u20E3]|[^\p{L}\p{N}\p{M}_#/])#([A-Za-z0-9_]{2,32})(?![\p{L}\p{N}\p{M}_])/gu;
+const VIBE_POST_TAG_LINK_RE =
+  /(?::\/\/|[\p{L}\p{N}_-]+(?:\.[\p{L}\p{N}_-]+)*\.\p{L}{2,}(?::\d+)?\/)\S*/gu;
+function vibeIsNewPostTag(tag) {
+  return typeof tag === 'string' && VIBE_NEW_POST_TAG_RE.test(tag);
+}
+function vibeBlankPostLinks(text) {
+  if (!text.includes('/')) return text;
+  return text.replace(new RegExp(VIBE_POST_TAG_LINK_RE.source, 'gu'), (link) => ' '.repeat(link.length));
+}
+function vibeExtractPostTags(text) {
+  if (typeof text !== 'string' || !text.includes('#')) return [];
   const seen = new Set();
-  let m;
-  while ((m = POST_TAG_RE.exec(text || '')) !== null) {
-    const t = m[1].toLowerCase();
-    if (seen.has(t)) continue;
+  const out = [];
+  const scan = vibeBlankPostLinks(text);
+  for (const m of scan.matchAll(new RegExp(VIBE_POST_TAG_IN_TEXT_RE.source, 'gu'))) {
+    const t = m[2].toLowerCase();
+    if (seen.has(t) || !vibeIsNewPostTag(t)) continue;
     seen.add(t);
     out.push(t);
-    if (out.length >= 10) break;
+    if (out.length >= VIBE_POST_TAG_MAX) break;
   }
   return out;
 }
+function vibeCaptionTagRanges(text, savedTags) {
+  if (typeof text !== 'string' || !text.includes('#') || !Array.isArray(savedTags)) return [];
+  const saved = new Set();
+  for (const t of savedTags) if (typeof t === 'string' && t) saved.add(t.toLowerCase());
+  if (saved.size === 0) return [];
+  const out = [];
+  for (const m of vibeBlankPostLinks(text).matchAll(new RegExp(VIBE_POST_TAG_IN_TEXT_RE.source, 'gu'))) {
+    const tag = m[2].toLowerCase();
+    if (!saved.has(tag)) continue;
+    const start = (m.index || 0) + m[1].length;
+    out.push({ start, end: start + 1 + m[2].length, tag });
+  }
+  return out;
+}
+// tags-twin:end
+
+// The composer's tags: the shared rule above (was its own 10-tag reader).
+function _extractHashtags(text) {
+  return vibeExtractPostTags(text || '');
+}
+
+// A caption as HTML with its saved tags as links to the campus feed's tag
+// filter, inline (decision 5, Oct 19, 2026: no chip row under the post).
+// Every piece of the text goes through _esc; new lines become <br> as before.
+// The links are caught by the capture listener below, so a tap on one never
+// also opens the post.
+function _profileCaptionHTML(text, tags) {
+  const s = typeof text === 'string' ? text : '';
+  const plain = (part) => _esc(part).replace(/\n/g, '<br>');
+  let html = '';
+  let at = 0;
+  vibeCaptionTagRanges(s, tags).forEach(r => {
+    html += plain(s.slice(at, r.start)) +
+      '<a class="ppost-tag-link" href="/campus?tab=feed&amp;tag=' + encodeURIComponent(r.tag) +
+      '" data-tag="' + _esc(r.tag) + '">' + _esc(s.slice(r.start, r.end)) + '</a>';
+    at = r.end;
+  });
+  return html + plain(s.slice(at));
+}
+
+// Capture phase on the document, so the cards' own click handlers (open the
+// post viewer, the pinned card's onclick) never see a tap on a tag. A plain
+// click leaves through __vibeTopNav; a click with a modifier key keeps the
+// browser's own meaning (open in a new tab).
+document.addEventListener('click', (ev) => {
+  const a = ev.target && ev.target.closest ? ev.target.closest('a.ppost-tag-link') : null;
+  if (!a) return;
+  ev.stopPropagation();
+  if (ev.button !== 0 || ev.metaKey || ev.ctrlKey || ev.shiftKey || ev.altKey) return;
+  ev.preventDefault();
+  window.__vibeTopNav(a.getAttribute('href'));
+}, true);
 
 function _isAppShell() {
   const u = (typeof vibeLoad === 'function') ? vibeLoad('vibe_user_v1') : null;
@@ -6884,22 +7081,23 @@ async function publishProfilePost() {
 function _publishProfilePostLocal(text, serverPost) {
   const list = document.getElementById('profilePostsList');
   const input = document.getElementById('profilePostInput');
-  const tags = _extractHashtags(text);
-  const tagsHTML = tags.length
-    ? tags.map(t => `<span class="ppost-tag">#${_esc(t)}</span>`).join('')
-    : '';
+  // The server's tags when it answered (it reads them from the caption since
+  // Oct 19, 2026), so the new card links exactly what was saved.
+  const tags = serverPost && Array.isArray(serverPost.tags)
+    ? serverPost.tags.filter(t => typeof t === 'string')
+    : _extractHashtags(text);
   const imageHTML = _composerPendingImageUrl
     ? `<img src="${_esc(_composerPendingImageUrl)}" alt="" style="display:block;width:100%;border-radius:12px;margin-top:8px;">`
     : '';
-  const bodyText = _esc(text).replace(/\n/g, '<br>');
   if (list) {
     const card = _renderPostCard({
       id:       (serverPost && serverPost.id) || 'p' + Date.now() + Math.random().toString(36).slice(2,5),
       ottoType: '',
       date:     'Just now',
-      bodyHTML: '<span class="ppost-text">' + bodyText + '</span>' + imageHTML,
+      // Tags are links inside the caption (decision 5); no chip row.
+      bodyHTML: '<span class="ppost-text">' + _profileCaptionHTML(text, tags) + '</span>' + imageHTML,
       ottoBadgeHTML:     '',
-      tagsHTML,
+      tagsHTML:          '',
       platformStatsHTML: '',
       reactionsHTML:     '',
     });
@@ -7625,79 +7823,133 @@ function toggleMessenger() {
 // ══ END MINI MESSENGER ════════════════════════════════════════════════════
 
 
-let calYear=new Date().getFullYear(),calMonth=new Date().getMonth(),calSelectedKey=null,calVisible=true;
+// ══ MY CALENDAR: the real one (critique D12, Oct 19, 2026) ═══════════════
+// cal-real:start
+// Why: this calendar used to be its own list, kept only in this browser
+// (vibe_cal_events_v1). An RSVP never showed here, an entry added here never
+// reached My Calendar or the phone, and clearing site data lost it. It now
+// reads the real calendar (GET /api/me/calendar: your RSVPs and your own
+// entries), saves an entry with POST /api/me/personal-events and deletes one
+// with DELETE /api/me/personal-events/<id>. An RSVP has no delete here: it
+// changes on the event. The paint is My Calendar's key (Franky's decision
+// 12; src/lib/calendar/calendar-key.ts is the twin): Going solid coral,
+// Interested a coral outline, yours a plain chip with a bar in your colour.
+// static-profile-calendar.test.ts runs this block.
 const MONTHS=['January','February','March','April','May','June','July','August','September','October','November','December'];
 const DAYS=['Su','Mo','Tu','We','Th','Fr','Sa'];
+// 'YYYY-MM-DD' (this device's day) -> that day's entries, in start order.
 const calendarEvents = {};
-function _storeEvent(dateObj,name,time,location,notes,color){
-  color=color||'#FF5C35';
-  const key=dateKey(dateObj);
-  if(!calendarEvents[key])calendarEvents[key]=[];
-  if(!calendarEvents[key].find(e=>e.name===name))
-    calendarEvents[key].push({name,time:time||'',location:location||'',notes:notes||'',color});
-}
-function addCalEvent(dateObj,name,time,color,location,notes){
-  _storeEvent(dateObj,name,time||'',location||'',notes||'',color||'#FF5C35');
-  updateEventCountBadge(); renderCalendar();
-  if(modalOpen){renderModalGrid();renderModalSidebar();}
-}
+let calEntries = [];
+// 'idle' before the first read, then 'ready', or 'error' when no read worked.
+let _calState = 'idle';
+let _calReadAt = 0, _calReading = null, _calReadAgain = false;
 
 function dateKey(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
-function fmtTime(t){if(!t)return'All day';const[h,m]=t.split(':').map(Number);return`${h%12||12}:${String(m).padStart(2,'0')}${h>=12?'pm':'am'}`;}
-function updateEventCountBadge(){const total=Object.values(calendarEvents).reduce((s,a)=>s+a.length,0);const b=document.getElementById('calEventCount');if(b)b.textContent=total;}
+// Titles and places are other people's words (a club names its event), so
+// every one is escaped before it reaches innerHTML.
+function _calEsc(s){return String(s==null?'':s).replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));}
 
-function renderCalendar(){
-  const label=document.getElementById('calMonthLabel'),grid=document.getElementById('calGrid');
-  if(!label||!grid)return;
-  label.textContent=MONTHS[calMonth].slice(0,3)+' '+calYear;
-  const today=new Date(),firstDay=new Date(calYear,calMonth,1).getDay(),
-        dim=new Date(calYear,calMonth+1,0).getDate(),dip=new Date(calYear,calMonth,0).getDate();
-  let h=DAYS.map(d=>`<div class="cal-day-name">${d}</div>`).join('');
-  for(let i=firstDay-1;i>=0;i--){const d=dip-i,key=dateKey(new Date(calYear,calMonth-1,d));h+=`<div class="cal-day other-month${calendarEvents[key]?.length?' has-event':''}" onclick="miniSelectDay(${calYear},${calMonth-1},${d})">${d}</div>`;}
-  for(let d=1;d<=dim;d++){const key=dateKey(new Date(calYear,calMonth,d));const it=today.getFullYear()===calYear&&today.getMonth()===calMonth&&today.getDate()===d;const he=!!calendarEvents[key]?.length;const is=key===calSelectedKey;h+=`<div class="cal-day${it?' today':''}${he?' has-event':''}${is?' selected':''}" onclick="miniSelectDay(${calYear},${calMonth},${d})">${d}</div>`;}
-  const filled=firstDay+dim,tot=Math.ceil(filled/7)*7;
-  for(let d=1;d<=tot-filled;d++){const key=dateKey(new Date(calYear,calMonth+1,d));h+=`<div class="cal-day other-month${calendarEvents[key]?.length?' has-event':''}" onclick="miniSelectDay(${calYear},${calMonth+1},${d})">${d}</div>`;}
-  grid.innerHTML=h;
+// The key, hand-copied from B8's handoff (calendar-key.ts calKind, barColor,
+// entryHref). The stored RSVP value stays 'maybe'; the word is "Interested".
+function vibeCalKind(entry){
+  if(entry.kind==='personal')return 'yours';
+  return entry.viewer_status==='going'?'going':'interested';
 }
-function miniSelectDay(year,month,day){
-  const key=dateKey(new Date(year,month,day));
-  // Profile only has the full modal (no mini widget). Bail safely so callers
-  // like saveNewEvent don't crash on the missing #calEventsPanel/#calEventsList/etc.
-  if(!document.getElementById('calEventsPanel'))return;
-  if(calSelectedKey===key){calSelectedKey=null;document.getElementById('calEventsPanel').classList.remove('open');renderCalendar();return;}
-  calSelectedKey=key;renderCalendar();
-  const evts=calendarEvents[key]||[],panel=document.getElementById('calEventsPanel'),
-        list=document.getElementById('calEventsList'),title=document.getElementById('calPanelTitle');
-  title.textContent=new Date(year,month,day).toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'});
-  if(!evts.length){list.innerHTML=`<div class="cal-empty">No events &mdash; <button onclick="openCreateEventForKey('${key}')" style="background:none;border:none;color:var(--tag-ink);cursor:none;font-size:11px;font-weight:700;padding:0">+ Add</button></div>`;}
-  else{list.innerHTML=evts.map(e=>`<div class="cal-event-item"><div class="cal-event-dot" style="background:${e.color}"></div><div class="cal-event-info"><div class="cal-event-name">${e.name}</div><div class="cal-event-time">${fmtTime(e.time)}${e.location?' &middot; '+e.location:''}</div></div><button aria-label="Remove event" onclick="removeCalEvent('${key}','${e.name}')" style="background:none;border:none;color:var(--muted);cursor:none;font-size:14px;padding:2px 4px;border-radius:5px;transition:color .15s" onmouseover="this.style.color='var(--tag-ink)'" onmouseout="this.style.color='var(--muted)'">&times;</button></div>`).join('');}
-  panel.classList.add('open');
+var VIBE_CAL_WORD={going:'Going',interested:'Interested',yours:'Yours'};
+// A personal colour only when it is a plain hex. The old near-black preset
+// (#1C1C1E) follows the ink token, so Night shows it.
+function vibeCalBar(color){
+  if(typeof color!=='string'||!/^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i.test(color))return 'var(--ink-muted)';
+  if(color.toLowerCase()==='#1c1c1e')return 'var(--charcoal)';
+  // Coral means an RSVP now (Oct 19, 2026, calendar-key.ts barColor): an
+  // entry saved with the old default or the old coral swatch gets blue.
+  if(color.toLowerCase()==='#ff5c35'||color.toLowerCase()==='#f53')return '#5A9CFF';
+  return color;
 }
-function removeCalEvent(key,name){
-  if(!calendarEvents[key])return;
-  calendarEvents[key]=calendarEvents[key].filter(e=>e.name!==name);
-  if(!calendarEvents[key].length)delete calendarEvents[key];
-  updateEventCountBadge();
-  const p=key.split('-').map(Number);
-  miniSelectDay(p[0],p[1]-1,p[2]);
-  if(modalOpen){renderModalGrid();renderModalSidebar();}
-  if(typeof _calSave==='function')_calSave();
+// An RSVP opens its club's page at that event; a personal entry goes nowhere.
+function vibeCalHref(entry){
+  if(entry.kind!=='rsvp'||!entry.org||!entry.org.handle)return null;
+  return '/orgs/'+encodeURIComponent(entry.org.handle)+'?event='+encodeURIComponent(entry.id);
 }
-function changeMonth(dir){calMonth+=dir;if(calMonth>11){calMonth=0;calYear++;}if(calMonth<0){calMonth=11;calYear--;}calSelectedKey=null;document.getElementById('calEventsPanel').classList.remove('open');renderCalendar();}
-function toggleCalView(){calVisible=!calVisible;document.getElementById('calBody').style.display=calVisible?'':'none';document.getElementById('calToggleBtn').innerHTML=calVisible?'&#8964;':'&#8965;';}
+function _calChatHref(entry){
+  return entry.kind==='rsvp'&&typeof entry.room_id==='string'&&entry.room_id?'/messages?channel='+encodeURIComponent(entry.room_id):null;
+}
+// Going's drawn check (never a glyph).
+const _CAL_CHECK_SVG='<svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
+
+// Only the two shapes the route sends; anything else is dropped.
+function _calClean(entries){
+  return (Array.isArray(entries)?entries:[]).filter(e=>e&&(e.kind==='rsvp'||e.kind==='personal')&&typeof e.id==='string'&&typeof e.title==='string'&&typeof e.starts_at==='string'&&!isNaN(Date.parse(e.starts_at)));
+}
+function _calIndex(entries){
+  Object.keys(calendarEvents).forEach(k=>{delete calendarEvents[k];});
+  entries.forEach(e=>{const k=dateKey(new Date(e.starts_at));(calendarEvents[k]=calendarEvents[k]||[]).push(e);});
+  Object.keys(calendarEvents).forEach(k=>calendarEvents[k].sort((a,b)=>Date.parse(a.starts_at)-Date.parse(b.starts_at)));
+}
+function _calSet(entries){calEntries=_calClean(entries);_calIndex(calEntries);_calRepaint();}
+function _calRepaint(){if(modalOpen){renderModalGrid();renderModalSidebar();_calRenderOffer();}}
+
+// One read at a time. A change heard during a read reads once more after it.
+// A failed read keeps what was already shown; with nothing shown, the side
+// panel says so and offers a retry.
+function refreshCalendar(){
+  if(_calReading){_calReadAgain=true;return _calReading;}
+  _calReading=(async()=>{
+    const r=typeof window.vibeRequest==='function'?await window.vibeRequest('/api/me/calendar',{quiet:true}):{ok:false};
+    _calReading=null;
+    _calReadAt=Date.now();
+    if(r.ok&&r.data&&Array.isArray(r.data.entries)){_calState='ready';_calSet(r.data.entries);}
+    else if(_calState!=='ready'){_calState='error';_calRepaint();}
+    if(_calReadAgain){_calReadAgain=false;return refreshCalendar();}
+  })();
+  return _calReading;
+}
+
+// "7pm", "7:30pm", "7pm – 9pm" (same day only), on this device's clock.
+function _calClock(d){const h=d.getHours(),m=d.getMinutes();return (h%12||12)+(m?':'+String(m).padStart(2,'0'):'')+(h>=12?'pm':'am');}
+function _calWhen(e){
+  const s=new Date(e.starts_at);
+  let out=_calClock(s);
+  const en=e.ends_at?new Date(e.ends_at):null;
+  if(en&&!isNaN(en.getTime())&&en>s&&dateKey(en)===dateKey(s))out+=' – '+_calClock(en);
+  return out;
+}
+
+// One chip in a day. An RSVP chip is a link to its club page at the event.
+function _calChipHTML(e){
+  const kind=vibeCalKind(e),href=vibeCalHref(e),word=VIBE_CAL_WORD[kind];
+  const bar=kind==='yours'?' style="--cal-bar:'+_calEsc(vibeCalBar(e.color))+'"':'';
+  const inner=(kind==='going'?_CAL_CHECK_SVG:'')+'<span>'+_calEsc(e.title)+'</span>';
+  const attrs=' class="cal-chip cal-chip--'+kind+(href?' cal-nav-link':'')+'"'+bar+' title="'+_calEsc(e.title)+'"';
+  return href
+    ?'<a'+attrs+' href="'+_calEsc(href)+'" aria-label="'+_calEsc(e.title+', '+word.toLowerCase()+'. Opens the club page')+'">'+inner+'</a>'
+    :'<span'+attrs+'>'+inner+'</span>';
+}
+// A day is a plain block: the day number is its button, the chips are links.
+function _calDayHTML(y,m,d,cls){
+  const date=new Date(y,m,d),key=dateKey(date),evts=calendarEvents[key]||[];
+  const said=date.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'})+(evts.length?', '+evts.length+(evts.length===1?' event':' events'):'');
+  const more=evts.length>2?'<div class="cal-modal-more">+'+(evts.length-2)+' more</div>':'';
+  return '<div class="cal-modal-day'+cls+'" onclick="modalSelectDay('+date.getFullYear()+','+date.getMonth()+','+date.getDate()+')">'
+    +'<button type="button" class="cal-modal-day-num" aria-label="'+_calEsc(said)+'" aria-pressed="'+(key===modalSelectedKey)+'">'+d+'</button>'
+    +evts.slice(0,2).map(_calChipHTML).join('')+more+'</div>';
+}
 
 // FULL MODAL
 let modalOpen=false,modalYear=new Date().getFullYear(),modalMonth=new Date().getMonth(),modalSelectedKey=null;
 function openCalModal(){
-  modalOpen=true;modalYear=calYear;modalMonth=calMonth;modalSelectedKey=calSelectedKey;
+  modalOpen=true;
   document.getElementById('calModalBackdrop').classList.add('open');
   document.body.style.overflow='hidden';
   requestAnimationFrame(function(){
     requestAnimationFrame(function(){
       renderModalGrid();
       renderModalSidebar();
+      _calRenderOffer();
     });
   });
+  // Always a fresh read: an RSVP made anywhere since the page opened shows.
+  refreshCalendar();
 }
 function closeCalModal(){modalOpen=false;document.getElementById('calModalBackdrop').classList.remove('open');document.body.style.overflow='';}
 function modalChangeMonth(dir){modalMonth+=dir;if(modalMonth>11){modalMonth=0;modalYear++;}if(modalMonth<0){modalMonth=11;modalYear--;}modalSelectedKey=null;renderModalGrid();renderModalSidebar();}
@@ -7705,45 +7957,81 @@ function renderModalGrid(){
   const label=document.getElementById('modalMonthLabel'),grid=document.getElementById('modalCalGrid'),names=document.getElementById('modalDayNames');
   if(!label||!grid)return;
   label.textContent=MONTHS[modalMonth]+' '+modalYear;
-  names.innerHTML=DAYS.map(d=>`<div class="cal-modal-day-name">${d}</div>`).join('');
-  const today=new Date(),firstDay=new Date(modalYear,modalMonth,1).getDay(),
+  if(names)names.innerHTML=DAYS.map(d=>'<div class="cal-modal-day-name">'+d+'</div>').join('');
+  const todayKey=dateKey(new Date()),firstDay=new Date(modalYear,modalMonth,1).getDay(),
         dim=new Date(modalYear,modalMonth+1,0).getDate(),dip=new Date(modalYear,modalMonth,0).getDate();
+  const cell=(y,m,d,other)=>{
+    const key=dateKey(new Date(y,m,d));
+    return _calDayHTML(y,m,d,(other?' other-month':'')+(key===todayKey?' today':'')+(key===modalSelectedKey?' selected':''));
+  };
   let h='';
-  for(let i=firstDay-1;i>=0;i--){const d=dip-i,key=dateKey(new Date(modalYear,modalMonth-1,d)),evts=calendarEvents[key]||[];h+=`<div class="cal-modal-day other-month" onclick="modalSelectDay(${modalYear},${modalMonth-1},${d})"><div class="cal-modal-day-num">${d}</div>${evts.slice(0,2).map(e=>`<div class="cal-modal-event-pill" style="background:${e.color}">${e.name}</div>`).join('')}</div>`;}
-  for(let d=1;d<=dim;d++){const key=dateKey(new Date(modalYear,modalMonth,d));const evts=calendarEvents[key]||[];const it=today.getFullYear()===modalYear&&today.getMonth()===modalMonth&&today.getDate()===d;const is=key===modalSelectedKey;const extras=evts.length>2?`<div style="font-size:9px;color:var(--muted);font-weight:700">+${evts.length-2} more</div>`:'';h+=`<div class="cal-modal-day${it?' today':''}${is?' selected':''}" onclick="modalSelectDay(${modalYear},${modalMonth},${d})"><div class="cal-modal-day-num">${d}</div>${evts.slice(0,2).map(e=>`<div class="cal-modal-event-pill" style="background:${e.color}">${e.name}</div>`).join('')}${extras}</div>`;}
+  for(let i=firstDay-1;i>=0;i--)h+=cell(modalYear,modalMonth-1,dip-i,true);
+  for(let d=1;d<=dim;d++)h+=cell(modalYear,modalMonth,d,false);
   const filled=firstDay+dim,tot=Math.ceil(filled/7)*7;
-  for(let d=1;d<=tot-filled;d++){const key=dateKey(new Date(modalYear,modalMonth+1,d));const evts=calendarEvents[key]||[];h+=`<div class="cal-modal-day other-month" onclick="modalSelectDay(${modalYear},${modalMonth+1},${d})"><div class="cal-modal-day-num">${d}</div>${evts.slice(0,2).map(e=>`<div class="cal-modal-event-pill" style="background:${e.color}">${e.name}</div>`).join('')}</div>`;}
+  for(let d=1;d<=tot-filled;d++)h+=cell(modalYear,modalMonth+1,d,true);
   grid.innerHTML=h;
 }
-function modalSelectDay(year,month,day){modalSelectedKey=dateKey(new Date(year,month,day));renderModalGrid();renderModalSidebar();}
+function modalSelectDay(year,month,day){
+  // The grid is redrawn, so a keyboard user's focus moves to the new day's button.
+  const a=document.activeElement,hadFocus=!!(a&&a.classList&&a.classList.contains('cal-modal-day-num'));
+  modalSelectedKey=dateKey(new Date(year,month,day));renderModalGrid();renderModalSidebar();
+  if(hadFocus){const b=document.querySelector('#modalCalGrid .cal-modal-day.selected .cal-modal-day-num');if(b)b.focus();}
+}
+// One entry in the day panel: the key chip says which kind it is; an RSVP's
+// title opens its club page at the event, "Event chat" opens its chat when it
+// has one, and the club's name opens the club. Only your own entry has a
+// delete, and it asks once more before it goes.
+function _calCardHTML(e){
+  const kind=vibeCalKind(e),href=vibeCalHref(e),chat=_calChatHref(e);
+  const bar=kind==='yours'?' style="--cal-bar:'+_calEsc(vibeCalBar(e.color))+'"':'';
+  const key='<span class="cal-chip cal-chip--'+kind+' cal-card-key"'+bar+'>'+(kind==='going'?_CAL_CHECK_SVG:'')+'<span>'+VIBE_CAL_WORD[kind]+'</span></span>';
+  const title=href
+    ?'<a class="cal-modal-event-name cal-nav-link" href="'+_calEsc(href)+'">'+_calEsc(e.title)+'</a>'
+    :'<div class="cal-modal-event-name">'+_calEsc(e.title)+'</div>';
+  const meta='<div class="cal-modal-event-meta">'+_calEsc(_calWhen(e))+(e.location?' &middot; '+_calEsc(e.location):'')+'</div>';
+  const club=e.kind==='rsvp'&&e.org&&e.org.handle
+    ?'<a class="cal-modal-event-club cal-nav-link" href="/orgs/'+_calEsc(encodeURIComponent(e.org.handle))+'">'+_calEsc(e.org.name||'@'+e.org.handle)+'</a>':'';
+  const notes=e.kind==='personal'&&e.notes?'<div class="cal-modal-event-notes">'+_calEsc(e.notes)+'</div>':'';
+  const links=[];
+  if(chat)links.push('<a class="cal-nav-link" href="'+_calEsc(chat)+'">Event chat</a>');
+  if(e.kind==='rsvp')links.push('<a href="/api/events/'+_calEsc(encodeURIComponent(e.id))+'/ics" download>Add to calendar app</a>');
+  const del=e.kind==='personal'
+    ?'<button type="button" class="cal-modal-event-del" data-cal-del="'+_calEsc(e.id)+'" aria-label="'+_calEsc('Delete '+e.title)+'">&times;</button>':'';
+  return '<div class="cal-modal-event-card cal-card--'+kind+'"'+bar+'><div class="cal-modal-event-bar"></div><div class="cal-modal-event-body">'
+    +key+title+meta+club+notes+(links.length?'<div class="cal-modal-event-links">'+links.join('')+'</div>':'')+'</div>'+del+'</div>';
+}
+const _CAL_EMPTY_ICON='<svg width="36" height="36" viewBox="0 0 36 36" fill="none" aria-hidden="true" style="margin:0 auto 10px;display:block;opacity:.3"><rect x="3" y="6" width="30" height="27" rx="6" stroke="currentColor" stroke-width="2" fill="none"/><path d="M3 14h30" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M11 3v6M25 3v6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
 function renderModalSidebar(){
   const listEl=document.getElementById('modalEventsList'),dateEl=document.getElementById('modalSidebarDate');
   if(!listEl)return;
-  const noEvtHTML=`<div class="cal-modal-no-events"><svg width="36" height="36" viewBox="0 0 36 36" fill="none" style="margin:0 auto 10px;display:block;opacity:.3"><rect x="3" y="6" width="30" height="27" rx="6" stroke="currentColor" stroke-width="2" fill="none"/><path d="M3 14h30" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M11 3v6M25 3v6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>`;
-  if(!modalSelectedKey){dateEl.textContent='Click a day to see events';listEl.innerHTML=noEvtHTML+'Select a day to see<br>or add events</div>';return;}
+  const addBtn=(words)=>'<button type="button" class="cal-modal-add-more" onclick="openCreateEventForKey(\''+(modalSelectedKey||'')+'\')">'+words+'</button>';
+  const failNote=_calState==='error'?'<div class="cal-modal-load-fail" role="status">Couldn\'t load your calendar. <button type="button" onclick="refreshCalendar()">Try again</button></div>':'';
+  if(!modalSelectedKey){dateEl.textContent='Click a day to see events';listEl.innerHTML=failNote+'<div class="cal-modal-no-events">'+_CAL_EMPTY_ICON+'Select a day to see<br>or add events</div>';return;}
   const p=modalSelectedKey.split('-').map(Number),dateObj=new Date(p[0],p[1]-1,p[2]);
   dateEl.textContent=dateObj.toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'});
   const evts=calendarEvents[modalSelectedKey]||[];
-  if(!evts.length){listEl.innerHTML=noEvtHTML+`No events yet<br><button onclick="openCreateEventForKey('${modalSelectedKey}')" style="background:none;border:none;color:var(--tag-ink);cursor:none;font-size:13px;font-weight:700;margin-top:8px;padding:0">+ Add an event</button></div>`;}
-  else{listEl.innerHTML=evts.map(e=>`<div class="cal-modal-event-card"><div class="cal-modal-event-bar" style="background:${e.color}"></div><div class="cal-modal-event-body"><div class="cal-modal-event-name">${e.name}</div><div class="cal-modal-event-meta">${e.time?fmtTime(e.time)+'<br>':''}${e.location?'&#128205; '+e.location+'<br>':''}${e.notes?'&#128221; '+e.notes:''}</div></div><button class="cal-modal-event-del" onclick="removeCalEvent('${modalSelectedKey}','${e.name}')" aria-label="Remove event">&times;</button></div>`).join('')+`<button onclick="openCreateEventForKey('${modalSelectedKey}')" style="width:100%;margin-top:8px;padding:10px;border-radius:12px;border:1.5px dashed var(--border);background:none;color:var(--muted);font-family:'DM Sans',sans-serif;font-size:12px;font-weight:700;cursor:none;transition:all .15s" onmouseover="this.style.borderColor='var(--accent)';this.style.color='var(--tag-ink)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--muted)'">+ Add another event</button>`;}
+  if(!evts.length){listEl.innerHTML=failNote+'<div class="cal-modal-no-events">'+_CAL_EMPTY_ICON+'No events yet<br>'+addBtn('+ Add an event')+'</div>';return;}
+  listEl.innerHTML=failNote+evts.map(_calCardHTML).join('')+addBtn('+ Add another event');
 }
 
-// CREATE EVENT
-let selectedEventColor='#FF5C35',prefillDateKey=null;
+// CREATE EVENT (saved to your calendar, so My Calendar and the phone see it)
+const CAL_DEFAULT_COLOR='#5A9CFF';
+let selectedEventColor=CAL_DEFAULT_COLOR,prefillDateKey=null,_calSaving=false;
 function openCreateEvent(){prefillDateKey=modalSelectedKey;_openCreateForm();}
-function openCreateEventForKey(key){prefillDateKey=key;_openCreateForm();}
+function openCreateEventForKey(key){prefillDateKey=key||null;_openCreateForm();}
 function _openCreateForm(){
   document.getElementById('evtDate').value=prefillDateKey||dateKey(new Date());
-  document.getElementById('evtName').value='';document.getElementById('evtTime').value='';
+  document.getElementById('evtName').value='';document.getElementById('evtTime').value='09:00';
   document.getElementById('evtLocation').value='';document.getElementById('evtNotes').value='';
-  selectedEventColor='#FF5C35';
-  document.querySelectorAll('.color-swatch').forEach(s=>s.classList.toggle('active',s.dataset.color===selectedEventColor));
+  selectedEventColor=CAL_DEFAULT_COLOR;
+  document.querySelectorAll('.color-swatch').forEach(s=>{const on=s.dataset.color===selectedEventColor;s.classList.toggle('active',on);s.setAttribute('aria-pressed',String(on));});
   document.getElementById('createEventModal').classList.add('open');
   setTimeout(()=>document.getElementById('evtName').focus(),80);
 }
 function closeCreateEvent(){document.getElementById('createEventModal').classList.remove('open');}
-function pickColor(el){selectedEventColor=el.dataset.color;document.querySelectorAll('.color-swatch').forEach(s=>s.classList.remove('active'));el.classList.add('active');}
-function saveNewEvent(){
+function pickColor(el){selectedEventColor=el.dataset.color;document.querySelectorAll('.color-swatch').forEach(s=>{s.classList.remove('active');s.setAttribute('aria-pressed','false');});el.classList.add('active');el.setAttribute('aria-pressed','true');}
+async function saveNewEvent(){
+  if(_calSaving)return;
   const name=document.getElementById('evtName').value.trim();
   const dateStr=document.getElementById('evtDate').value;
   const time=document.getElementById('evtTime').value;
@@ -7751,71 +8039,198 @@ function saveNewEvent(){
   const notes=document.getElementById('evtNotes').value.trim();
   if(!name){document.getElementById('evtName').focus();return;}
   if(!dateStr){document.getElementById('evtDate').focus();return;}
-  const p=dateStr.split('-').map(Number),dateObj=new Date(p[0],p[1]-1,p[2]);
-  addCalEvent(dateObj,name,time,selectedEventColor,location,notes);
-  if(typeof _calSave==='function')_calSave();
-  if(modalOpen){modalSelectedKey=dateKey(dateObj);modalYear=p[0];modalMonth=p[1]-1;renderModalGrid();renderModalSidebar();}
-  calSelectedKey=dateKey(dateObj);calYear=p[0];calMonth=p[1]-1;
-  miniSelectDay(p[0],p[1]-1,p[2]);
+  // The calendar keeps a start time; the form starts on 9am, as My Calendar's does.
+  if(!time){document.getElementById('evtTime').focus();return;}
+  const start=new Date(dateStr+'T'+time+':00');
+  if(isNaN(start.getTime())){document.getElementById('evtDate').focus();return;}
+  const btn=document.querySelector('.btn-save-event');
+  _calSaving=true;if(btn){btn.disabled=true;btn.textContent='Saving…';}
+  const r=await window.vibeRequest('/api/me/personal-events',{method:'POST',json:{title:name,starts_at:start.toISOString(),location,notes,color:selectedEventColor},failure:"Couldn't save that event."});
+  _calSaving=false;if(btn){btn.disabled=false;btn.textContent='Save Event';}
+  if(!r.ok)return;
+  const ev=r.data&&r.data.event;
+  if(ev&&ev.id)_calSet(calEntries.concat([Object.assign({kind:'personal'},ev)]));
+  modalSelectedKey=dateKey(start);modalYear=start.getFullYear();modalMonth=start.getMonth();
+  _calRepaint();
   closeCreateEvent();
+  vibeCalEmit();
   if(typeof showToast==='function')showToast('Event saved');
 }
 
-// Calendar init
-// ══ CALENDAR SYNC (localStorage) ════════════════════════════════════════
-const CAL_KEY = 'vibe_cal_events_v1';
-
-function _calSave() {
-  try {
-    // Serialize calendarEvents — convert to plain object without Date keys
-    localStorage.setItem(CAL_KEY, JSON.stringify(calendarEvents));
-  } catch(e) {}
+// DELETE (your own entries only). The first tap turns × into "Delete"; the
+// second deletes. Redrawing the panel puts an unanswered one back to ×.
+const _calDeleting={};
+function _calDeleteTap(btn){
+  if(btn.dataset.armed!=='1'){
+    btn.dataset.armed='1';btn.classList.add('armed');btn.textContent='Delete';
+    btn.setAttribute('aria-label','Delete for good? '+(btn.getAttribute('aria-label')||'').replace(/^Delete /,''));
+    setTimeout(()=>{if(btn.isConnected&&btn.dataset.armed==='1'&&!_calDeleting[btn.dataset.calDel])renderModalSidebar();},4000);
+    return;
+  }
+  removeCalEvent(btn.dataset.calDel);
+}
+async function removeCalEvent(id){
+  const e=calEntries.find(x=>x.kind==='personal'&&x.id===id);
+  if(!e||_calDeleting[id])return;
+  _calDeleting[id]=true;
+  const r=await window.vibeRequest('/api/me/personal-events/'+encodeURIComponent(id),{method:'DELETE',failure:"Couldn't delete that event."});
+  delete _calDeleting[id];
+  if(!r.ok){renderModalSidebar();return;}
+  _calSet(calEntries.filter(x=>!(x.kind==='personal'&&x.id===id)));
+  vibeCalEmit();
+  if(typeof showToast==='function')showToast('Event deleted');
 }
 
-// Demo events an old build seeded into every calendar. Anyone who ever added
-// or removed an event saved them under CAL_KEY, so deleting the seed alone
-// left them forever. profile.html and messages.html carry this exact block:
-// change both or neither.
-const CAL_SEED_PURGE = [
-  ['IU Spring Career Fair', 'IMU Alumni Hall'],
-  ['Goldman Sachs Info Session', 'Kelley School of Business 100'],
-  ['Weekly Design Critique', 'Luddy Hall 1106'],
-  ['IU Hackathon 2025', 'Assembly Hall'],
+// Links in the calendar leave through __vibeTopNav (this page can sit inside
+// the app's frame); a click with a modifier key keeps the browser's meaning.
+// Capture phase, so a chip's tap never also selects its day.
+document.addEventListener('click',ev=>{
+  const t=ev.target&&ev.target.closest?ev.target:null;
+  if(!t)return;
+  const del=t.closest('[data-cal-del]');
+  if(del){ev.stopPropagation();_calDeleteTap(del);return;}
+  const a=t.closest('a.cal-nav-link');
+  if(!a)return;
+  ev.stopPropagation();
+  if(ev.button!==0||ev.metaKey||ev.ctrlKey||ev.shiftKey||ev.altKey)return;
+  ev.preventDefault();
+  closeCalModal();
+  if(typeof window.__vibeTopNav==='function')window.__vibeTopNav(a.getAttribute('href'));
+  else location.href=a.getAttribute('href');
+},true);
+// THE OLD BROWSER-ONLY LIST. Entries saved here before Oct 19, 2026 live in
+// localStorage under CAL_KEY and nowhere else. The calendar offers, once per
+// open until you answer, to move them into your calendar (one POST each, in
+// date order) or to discard them. Either answer clears what it handled: a
+// move that stops part way (the hourly limit, say) keeps the rest here and
+// says how many went. messages.html still carries its own copy of this list
+// for its old calendar, which shows only with chat_desktop off.
+const CAL_KEY='vibe_cal_events_v1';
+// Demo events an old build seeded into every calendar; never moved.
+// messages.html carries the same list.
+const CAL_SEED_PURGE=[
+  ['IU Spring Career Fair','IMU Alumni Hall'],
+  ['Goldman Sachs Info Session','Kelley School of Business 100'],
+  ['Weekly Design Critique','Luddy Hall 1106'],
+  ['IU Hackathon 2025','Assembly Hall'],
 ];
-function _calPurgeSeed(saved) {
-  let changed = false;
-  Object.keys(saved).forEach(k => {
-    const list = Array.isArray(saved[k]) ? saved[k] : [];
-    const kept = list.filter(e => !(e && CAL_SEED_PURGE.some(([n, l]) => e.name === n && e.location === l)));
-    if (kept.length) {
-      if (kept.length !== list.length) { saved[k] = kept; changed = true; }
-    } else {
-      delete saved[k];
-      changed = true;
-    }
+// The old list's entries that can move, oldest first, each with the body
+// POST /api/me/personal-events takes. A day with no time starts at 9am (the
+// calendar keeps a start time). Lengths are cut to the route's limits.
+function _calOldEntries(){
+  let saved=null;
+  try{const raw=localStorage.getItem(CAL_KEY);if(!raw)return [];saved=JSON.parse(raw);}catch(e){return [];}
+  if(!saved||typeof saved!=='object'||Array.isArray(saved))return [];
+  const out=[];
+  Object.keys(saved).sort().forEach(k=>{
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(k)||!Array.isArray(saved[k]))return;
+    saved[k].forEach(e=>{
+      if(!e||typeof e.name!=='string'||!e.name.trim())return;
+      if(CAL_SEED_PURGE.some(([n,l])=>e.name===n&&e.location===l))return;
+      const time=typeof e.time==='string'&&/^\d{2}:\d{2}$/.test(e.time)?e.time:'09:00';
+      const start=new Date(k+'T'+time+':00');
+      // Some engines roll "02-31" into March; a day that isn't real stays out.
+      if(isNaN(start.getTime())||dateKey(start)!==k)return;
+      out.push({day:k,old:e,body:{
+        title:e.name.trim().slice(0,120),
+        starts_at:start.toISOString(),
+        location:typeof e.location==='string'?e.location.trim().slice(0,200):'',
+        notes:typeof e.notes==='string'?e.notes.trim().slice(0,1000):'',
+        color:typeof e.color==='string'&&/^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i.test(e.color)?e.color:CAL_DEFAULT_COLOR,
+      }});
+    });
   });
-  return changed;
+  return out;
+}
+// Keep only `left` (entries not moved yet); none left clears the key.
+function _calKeepOld(left){
+  try{
+    if(!left.length){localStorage.removeItem(CAL_KEY);return;}
+    const o={};left.forEach(x=>{(o[x.day]=o[x.day]||[]).push(x.old);});
+    localStorage.setItem(CAL_KEY,JSON.stringify(o));
+  }catch(e){}
+}
+let _calMoving=false;
+function _calRenderOffer(){
+  const box=document.getElementById('calMoveOffer');
+  if(!box)return;
+  const old=_calMoving?null:_calOldEntries();
+  if(!_calMoving&&!old.length){box.hidden=true;box.innerHTML='';return;}
+  box.hidden=false;
+  if(_calMoving){box.innerHTML='<div class="cal-move-text" role="status">Moving your events…</div>';return;}
+  const n=old.length,names=old.slice(0,2).map(x=>_calEsc(x.body.title)).join(', ')+(n>2?' and '+(n-2)+' more':'');
+  box.innerHTML='<div class="cal-move-text"><b>'+(n===1?'1 event is':n+' events are')+' saved only in this browser</b> ('+names+'). Move '+(n===1?'it':'them')+' to your calendar so '+(n===1?'it shows':'they show')+' on your phone and in My Calendar too.</div>'
+    +'<div class="cal-move-actions"><button type="button" class="cal-move-go" onclick="_calMoveOld()">Move '+(n===1?'it':'them')+'</button>'
+    +'<button type="button" class="cal-move-drop" onclick="_calDropOld(this)">Discard</button></div>';
+}
+async function _calMoveOld(){
+  if(_calMoving)return;
+  const old=_calOldEntries();
+  if(!old.length){_calKeepOld([]);_calRenderOffer();return;}
+  _calMoving=true;_calRenderOffer();
+  let moved=0,fail=null;
+  for(const x of old){
+    const r=await window.vibeRequest('/api/me/personal-events',{method:'POST',json:x.body,quiet:true});
+    if(!r.ok){fail=r;break;}
+    moved++;
+  }
+  _calKeepOld(old.slice(moved));
+  _calMoving=false;
+  if(moved){vibeCalEmit();refreshCalendar();}
+  if(fail)window.vibeToast((moved?'Moved '+moved+' of '+old.length+'. The rest stay in this browser. ':'')+(fail.message||"Couldn't move your events."),{tone:'error'});
+  else if(typeof showToast==='function')showToast(moved===1?'Moved 1 event to your calendar':'Moved '+moved+' events to your calendar');
+  _calRenderOffer();
+}
+// Discard asks once more, like a delete.
+function _calDropOld(btn){
+  if(btn.dataset.armed!=='1'){btn.dataset.armed='1';btn.classList.add('armed');btn.textContent='Discard for good';return;}
+  _calKeepOld([]);_calRenderOffer();
+  if(typeof showToast==='function')showToast('Discarded');
 }
 
-function _calLoad() {
-  try {
-    const raw = localStorage.getItem(CAL_KEY);
-    if (!raw) return;
-    const saved = JSON.parse(raw);
-    if (!saved || typeof saved !== 'object' || Array.isArray(saved)) return;
-    // Runs on every load (idempotent): writes back only when it dropped one.
-    if (_calPurgeSeed(saved)) localStorage.setItem(CAL_KEY, JSON.stringify(saved));
-    Object.keys(saved).forEach(k => {
-      calendarEvents[k] = saved[k];
-    });
-  } catch(e) {}
+// SYNC (B8's twin of src/lib/calendar/calendar-sync.ts). An RSVP made in the
+// Otto-corner window (an iframe of /messages?mini=1), another tab or another
+// page posts {type:'calendar-changed',v:1} on BroadcastChannel('vibe-calendar').
+// A hidden tab waits and reads once when it is looked at again. Coming back
+// to the tab with the calendar open re-reads at most every 30 seconds (an
+// RSVP on the phone has no channel to arrive on).
+var vibeCalChannel=null;
+try{vibeCalChannel=typeof BroadcastChannel==='function'?new BroadcastChannel('vibe-calendar'):null;}catch(e){vibeCalChannel=null;}
+var vibeCalHeardHidden=false;
+function _calHeard(){
+  if(document.visibilityState==='hidden'){vibeCalHeardHidden=true;return;}
+  refreshCalendar();
 }
+if(vibeCalChannel){
+  vibeCalChannel.addEventListener('message',function(ev){
+    var d=ev.data;
+    if(!d||d.type!=='calendar-changed'||d.v!==1)return;
+    _calHeard();
+  });
+}
+// The app's own window event, for anything on this page that says the same.
+window.addEventListener('vibe:calendar-changed',_calHeard);
+function _calOnReturn(){
+  if(document.visibilityState!=='visible')return;
+  if(vibeCalHeardHidden){vibeCalHeardHidden=false;refreshCalendar();return;}
+  // focus and visibilitychange both fire on a return: a read in flight counts.
+  if(modalOpen&&!_calReading&&Date.now()-_calReadAt>=30000)refreshCalendar();
+}
+document.addEventListener('visibilitychange',_calOnReturn);
+window.addEventListener('focus',_calOnReturn);
+// After this page saves or deletes an entry: tell the other tabs and pages.
+// (The channel never delivers a post back to the page that sent it.)
+function vibeCalEmit(){
+  try{if(vibeCalChannel)vibeCalChannel.postMessage({type:'calendar-changed',v:1});}catch(e){}
+}
+// Page start: one read, so the calendar opens on real data.
+function _calStart(){refreshCalendar();}
+// cal-real:end
 
 // Load on startup
 document.addEventListener('DOMContentLoaded', function() {
-  _calLoad();
-  renderCalendar();
-  if (typeof updateEventCountBadge === 'function') updateEventCountBadge();
+  // The real calendar (critique D12, Oct 19, 2026), read once at the start.
+  _calStart();
   // Wire pointer-event drag-to-reorder on both lists. Event delegation
   // on the list element survives bootstrap rebuilds (list stays put,
   // children change), so we only register once.
@@ -10863,8 +11278,10 @@ function _profileRemovedNoticeHTML(removedAt, removedReason) {
 
 function _profileMapDbRow(row) {
   if (!row || row.type !== 'post') return null;
-  const tags = (row.tags || []).map(t => `<span class="ppost-tag">#${_esc(t)}</span>`).join('');
-  const bodyText = _esc(row.content || '').replace(/\n/g, '<br>');
+  // Saved tags are links inside the caption (decision 5, Oct 19, 2026): no
+  // chip row under the post any more.
+  const tags = Array.isArray(row.tags) ? row.tags.filter(t => typeof t === 'string') : [];
+  const bodyText = _profileCaptionHTML(row.content || '', tags);
   // Every post from the API carries media_kind ('image' | 'video', set by
   // withPostMediaUrls). A video gets a muted, metadata-only <video> with
   // its thumbnail as the poster; the card itself opens the post viewer.
@@ -10891,7 +11308,7 @@ function _profileMapDbRow(row) {
     // moderator took down gets no delete control (the route 409s it anyway).
     removed: !!row.removed_at,
     ottoBadgeHTML: '',
-    tagsHTML: tags,
+    tagsHTML: '',
     platformStatsHTML: '',
     reactionsHTML: '',
   };
@@ -10970,6 +11387,27 @@ async function hydrateRepostsPaneFromAPI() {
   }
 }
 
+// repost-banner:start
+const _REPOST_ICON_SVG = '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M2.5 6V5a1.5 1.5 0 0 1 1.5-1.5h7L9.5 2" /><path d="M13.5 10v1A1.5 1.5 0 0 1 12 12.5H5l1.5 1.5" /></svg>';
+// "Reposted 5d ago", "Reposted just now", "Reposted Sep 17"; just "Reposted"
+// when the row has no time.
+function _repostedLabel(at) {
+  if (!at) return 'Reposted';
+  const when = _formatRelativeDate(at);
+  return 'Reposted ' + (when === 'Just now' ? 'just now' : when);
+}
+function _buildRepostBanner(at) {
+  const banner = document.createElement('div');
+  banner.className = 'repost-banner';
+  banner.style.cssText = 'font-size:11.5px;color:var(--muted);font-weight:700;letter-spacing:.02em;display:flex;align-items:center;gap:6px;';
+  const label = document.createElement('span');
+  label.textContent = _repostedLabel(at);
+  banner.innerHTML = _REPOST_ICON_SVG;
+  banner.appendChild(label);
+  return banner;
+}
+// repost-banner:end
+
 // Renders one repost row: optional quote text, then the embedded original
 // post in a quoted block (greyed border, author handle + content + media).
 function _buildRepostCard(repost) {
@@ -10981,11 +11419,11 @@ function _buildRepostCard(repost) {
   card.style.cssText = 'padding:14px 16px;display:flex;flex-direction:column;gap:10px;cursor:pointer;';
   card.dataset.postId = post.id;
 
-  // "🔁 reposted" header
-  const banner = document.createElement('div');
-  banner.style.cssText = 'font-size:11px;color:var(--muted);font-weight:600;display:flex;align-items:center;gap:6px;';
-  banner.innerHTML = '<span style="font-size:13px">&#128257;</span><span>Reposted</span>';
-  card.appendChild(banner);
+  // The "Reposted 5d ago" line. It drew the repeat-arrows emoji (U+1F501,
+  // Apple's own picture on a Mac) and no time until Oct 19, 2026 (D7); now it is the phone's own
+  // two-arrow drawing (IconRepost in ProfileMobile.tsx, same paths, pinned by
+  // static-profile-saved.test.ts) and the phone's words.
+  card.appendChild(_buildRepostBanner(repost.reposted_at));
 
   // Optional quote
   if (repost.comment) {
@@ -11106,35 +11544,71 @@ async function hydrateSavedPaneFromAPI() {
   }
 }
 
-// Build a thumbnail cell for a saved post — the same themed text cell the
-// All grid uses. Clips are backlogged and /api/me/bookmarks filters them
-// out, so there's no video variant here.
+// saved-tiles:start
+// One Saved tile (critique batch B6, Oct 19, 2026), the same rule as the
+// phone's SavedGrid: _savedTileModel's picture is savedTileThumb in
+// src/lib/profile/saved-tile.ts, copied. /api/me/bookmarks sends media_kind
+// (withPostMediaUrls). A photo fills the tile; a video shows its poster and
+// a play badge; a post with no picture to show is a plain text tile. The
+// edit listener (vibe:post-edited) rewrites .post-thumb-body in either kind.
+// static-profile-saved.test.ts builds tiles from this block.
+function _savedTileModel(post) {
+  const p = post || {};
+  const isVideo = p.media_kind === 'video';
+  // A video's media_url is the video file, never a picture: only a poster
+  // (media_thumbnail_url) may fill its tile. Same rule as the phone.
+  const thumb = (typeof p.media_thumbnail_url === 'string' && p.media_thumbnail_url) ||
+    (p.media_kind === 'image' && typeof p.media_url === 'string' ? p.media_url : '') || '';
+  const text = (typeof p.content === 'string' ? p.content : '').slice(0, 240);
+  return { thumb, isVideo, text };
+}
+const _SAVED_PLAY_SVG = '<svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true" focusable="false"><path d="M2.5 1.4v7.2L8.6 5z" fill="currentColor"/></svg>';
 function _buildSavedCell(post) {
-  const id = post.id;
-  const wrap = document.createElement('div');
-  wrap.className = 'post-thumb-cell theme-' + _savedThemeFor(post);
-  wrap.dataset.sourcePostId = id;
-  const body = document.createElement('div');
+  const id = post && post.id;
+  const m = _savedTileModel(post);
+  const cell = document.createElement('button');
+  cell.type = 'button';
+  cell.dataset.sourcePostId = id || '';
+  const body = document.createElement('span');
   body.className = 'post-thumb-body';
-  body.textContent = (post.content || '').slice(0, 240);
-  wrap.appendChild(body);
-  wrap.style.cursor = 'pointer';
-  wrap.addEventListener('click', () => {
+  if (m.thumb) {
+    cell.className = 'vibe-grid-thumb saved-tile';
+    const bg = document.createElement('span');
+    bg.className = 'vibe-grid-bg';
+    bg.setAttribute('aria-hidden', 'true');
+    // JSON.stringify quotes the address for CSS; the CSSOM parses it.
+    bg.style.backgroundImage = 'url(' + JSON.stringify(m.thumb) + ')';
+    cell.appendChild(bg);
+    // The tile is read out as "Saved photo. <caption>". The words before the
+    // caption never change, so an edit that empties the caption still reads
+    // well ("Saved photo.").
+    const kind = document.createElement('span');
+    kind.className = 'saved-tile-sr';
+    kind.textContent = (m.isVideo ? 'Saved video. ' : 'Saved photo. ');
+    cell.appendChild(kind);
+    body.classList.add('saved-tile-sr');
+    body.textContent = m.text;
+  } else {
+    cell.className = 'post-thumb-cell saved-tile';
+    body.dataset.empty = 'Saved post';
+    body.textContent = m.text || 'Saved post';
+  }
+  cell.appendChild(body);
+  if (m.isVideo) {
+    // A text tile keeps its words clear of the badge (.has-play).
+    cell.classList.add('has-play');
+    const play = document.createElement('span');
+    play.className = 'vibe-grid-play';
+    play.setAttribute('aria-hidden', 'true');
+    play.innerHTML = _SAVED_PLAY_SVG;
+    cell.appendChild(play);
+  }
+  cell.addEventListener('click', () => {
     if (typeof openPostViewer === 'function') openPostViewer(id, _savedPrefill(post));
   });
-  return wrap;
+  return cell;
 }
-
-// Pick a color theme keyed off the first hashtag (mirrors postThemeFor
-// in the All grid). Falls back to coral when there's no tag.
-function _savedThemeFor(post) {
-  const themes = ['coral','purple','mint','gold','sky','lavender'];
-  const tag = (post.tags && post.tags[0]) || '';
-  if (!tag) return themes[0];
-  let h = 0;
-  for (let i = 0; i < tag.length; i++) h = (h * 31 + tag.charCodeAt(i)) >>> 0;
-  return themes[h % themes.length];
-}
+// saved-tiles:end
 
 function _savedPrefill(post) {
   return {
@@ -11144,6 +11618,8 @@ function _savedPrefill(post) {
     tags:                post.tags || [],
     media_url:           post.media_url || '',
     media_thumbnail_url: post.media_thumbnail_url || '',
+    // So the viewer's first paint picks <img> or <video> (Oct 19, 2026).
+    media_kind:          post.media_kind || null,
     created_at:          post.created_at,
     author:              post.author || null,
   };
@@ -11624,15 +12100,25 @@ function showWelcomeBanner() {
       </div>
       <div class="cal-modal-body">
         <div class="cal-modal-grid-wrap">
+          <!-- Entries an old build kept only in this browser: the offer to
+               move them (critique D12, Oct 19, 2026; _calRenderOffer). -->
+          <div class="cal-move-offer" id="calMoveOffer" hidden></div>
           <div class="cal-modal-day-names" id="modalDayNames"></div>
           <div class="cal-modal-grid" id="modalCalGrid"></div>
+          <!-- My Calendar's key (decision 12), drawn with the chips themselves. -->
+          <div class="cal-key">
+            <span class="cal-chip cal-chip--going"><svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg><span>Going</span></span>
+            <span class="cal-chip cal-chip--interested"><span>Interested</span></span>
+            <span class="cal-chip cal-chip--yours" style="--cal-bar:var(--ink-muted)"><span>Yours</span></span>
+            <span class="cal-key-hint">Click an event to open its club.</span>
+          </div>
         </div>
         <div class="cal-modal-sidebar">
           <div class="cal-modal-sidebar-hdr">
             Events
             <span id="modalSidebarDate">Click a day to see events</span>
           </div>
-          <div class="cal-modal-events-list" id="modalEventsList">
+          <div class="cal-modal-events-list" id="modalEventsList" aria-live="polite">
             <div class="cal-modal-no-events">
               <svg width="36" height="36" viewBox="0 0 36 36" fill="none" style="margin:0 auto 10px;display:block;opacity:.3"><rect x="3" y="6" width="30" height="27" rx="6" stroke="currentColor" stroke-width="2" fill="none"/><path d="M3 14h30" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M11 3v6M25 3v6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
               Select a day to see<br>or add events
@@ -11652,37 +12138,37 @@ function showWelcomeBanner() {
     </div>
     <div class="create-event-body">
       <div class="form-field">
-        <label class="form-label">Event name</label>
-        <input class="form-input" id="evtName" type="text" placeholder="e.g. Club info session">
+        <label class="form-label" for="evtName">Event name</label>
+        <input class="form-input" id="evtName" type="text" maxlength="120" placeholder="e.g. Club info session">
       </div>
       <div class="form-row">
         <div class="form-field">
-          <label class="form-label">Date</label>
+          <label class="form-label" for="evtDate">Date</label>
           <input class="form-input" id="evtDate" type="date">
         </div>
         <div class="form-field">
-          <label class="form-label">Time</label>
+          <label class="form-label" for="evtTime">Time</label>
           <input class="form-input" id="evtTime" type="time">
         </div>
       </div>
       <div class="form-field">
-        <label class="form-label">Location</label>
-        <input class="form-input" id="evtLocation" type="text" placeholder="e.g. Library, room 200">
+        <label class="form-label" for="evtLocation">Location</label>
+        <input class="form-input" id="evtLocation" type="text" maxlength="200" placeholder="e.g. Library, room 200">
       </div>
       <div class="form-field">
-        <label class="form-label">Notes</label>
-        <input class="form-input" id="evtNotes" type="text" placeholder="e.g. Bring resume, business casual">
+        <label class="form-label" for="evtNotes">Notes</label>
+        <input class="form-input" id="evtNotes" type="text" maxlength="1000" placeholder="e.g. Bring resume, business casual">
       </div>
       <div class="form-field">
         <label class="form-label">Color</label>
-        <div class="color-picker-row" id="colorPickerRow">
-          <div class="color-swatch active" style="background:#FF5C35" data-color="#FF5C35" onclick="pickColor(this)"></div>
-          <div class="color-swatch" style="background:#2563EB" data-color="#2563EB" onclick="pickColor(this)"></div>
-          <div class="color-swatch" style="background:#1A9E5B" data-color="#1A9E5B" onclick="pickColor(this)"></div>
-          <div class="color-swatch" style="background:#7C5CFC" data-color="#7C5CFC" onclick="pickColor(this)"></div>
-          <div class="color-swatch" style="background:#B07800" data-color="#B07800" onclick="pickColor(this)"></div>
-          <div class="color-swatch" style="background:#CC0000" data-color="#CC0000" onclick="pickColor(this)"></div>
-          <div class="color-swatch" style="background:#1C1C1E" data-color="#1C1C1E" onclick="pickColor(this)"></div>
+        <div class="color-picker-row" id="colorPickerRow" role="group" aria-label="Color">
+          <!-- My Calendar's colours (calendar-key.ts PERSONAL_COLOR_PRESETS, Oct 19, 2026):
+               no green, amber or coral, which mean RSVPs on the key. Blue first. -->
+          <button type="button" class="color-swatch active" style="background:#5A9CFF" data-color="#5A9CFF" aria-label="Blue" aria-pressed="true" onclick="pickColor(this)"></button>
+          <button type="button" class="color-swatch" style="background:#9B7BFF" data-color="#9B7BFF" aria-label="Purple" aria-pressed="false" onclick="pickColor(this)"></button>
+          <button type="button" class="color-swatch" style="background:#26A69A" data-color="#26A69A" aria-label="Teal" aria-pressed="false" onclick="pickColor(this)"></button>
+          <button type="button" class="color-swatch" style="background:#E0559B" data-color="#E0559B" aria-label="Pink" aria-pressed="false" onclick="pickColor(this)"></button>
+          <button type="button" class="color-swatch" style="background:#8A8580" data-color="#8A8580" aria-label="Grey" aria-pressed="false" onclick="pickColor(this)"></button>
         </div>
       </div>
     </div>

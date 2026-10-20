@@ -356,7 +356,7 @@ test("inbox: the happy path, field by field (7.1.2-7.1.9)", async () => {
   const previews = reads(cookieLog, "messages");
   assert.equal(previews.length, 3);
   for (const window of previews.slice(0, 2)) {
-    assert.equal(selectOf(window.calls), "id, channel_id, content, created_at, user_id, kind, thread_root_id, users:users!messages_user_id_fkey(name)");
+    assert.equal(selectOf(window.calls), "id, channel_id, content, created_at, user_id, kind, thread_root_id, attachment_kind, users:users!messages_user_id_fkey(name)");
     assert.deepEqual(window.calls.filter((c) => c[0] === "is"), [["is", "thread_root_id", null], ["is", "removed_at", null]], "top-level, and never the viewer's own removed row (7.1.4)");
     assert.deepEqual(window.calls.find((c) => c[0] === "order"), ["order", "created_at", { ascending: false }]);
     assert.equal(arg(window.calls, "limit"), 10);
@@ -379,7 +379,8 @@ test("inbox: the happy path, field by field (7.1.2-7.1.9)", async () => {
   const since = new Map<unknown, unknown>();
   for (const count of counts) {
     assert.deepEqual(count.calls[0], ["select", "id", { count: "exact", head: true }]);
-    assert.deepEqual(count.calls.filter((c) => c[0] === "is"), [["is", "thread_root_id", null], ["is", "removed_at", null]]);
+    // A deleted message's note is nothing new to read (B7 review, Oct 19, 2026).
+    assert.deepEqual(count.calls.filter((c) => c[0] === "is"), [["is", "thread_root_id", null], ["is", "removed_at", null], ["is", "deleted_at", null]]);
     assert.deepEqual(count.calls.find((c) => c[0] === "neq"), ["neq", "user_id", VIEWER]);
     since.set(arg(count.calls, "eq", "channel_id"), arg(count.calls, "gt", "created_at"));
   }
@@ -394,6 +395,22 @@ test("inbox: the happy path, field by field (7.1.2-7.1.9)", async () => {
   assert.deepEqual(events[0].calls.find((c) => c[0] === "order"), ["order", "starts_at", { ascending: true }]);
   assert.equal(arg(events[0].calls, "limit"), 20);
   assert.deepEqual(asked, [[["ev-1", "ev-2"], VIEWER, undefined]], "eventRefsFor over the first event per club, counts on");
+});
+
+test("inbox: a database without deleted_at (20261019150000) counts as before: the count is asked again without the filter (B7 review, Oct 19, 2026)", async () => {
+  const noColumn = { error: { code: "42703", message: "column messages.deleted_at does not exist" } };
+  const { serviceLog } = install({
+    cookie: inboxCookie,
+    service: (t, c, n) => (t === "messages" && c.some((x) => x[0] === "is" && x[1] === "deleted_at") ? noColumn : inboxService(t, c, n)),
+  });
+  const res = await inbox.GET(req(), ctx());
+  assert.equal(res.status, 200);
+  const salsa = (res.body.clubs as InboxClub[]).find((c) => c.org.id === ORG1)!;
+  assert.equal(salsa.board.unread, true);
+  assert.equal(salsa.lounge.unread_count, 99);
+  const counts = reads(serviceLog, "messages");
+  assert.equal(counts.length, 8, "each of the 4 counts asked twice: with the filter, then without");
+  assert.equal(counts.filter((q) => q.calls.some((x) => x[0] === "is" && x[1] === "deleted_at")).length, 4);
 });
 
 test("inbox: a failed preview window, a failed count, failed events or no service role never answer 500", async () => {
@@ -517,7 +534,7 @@ test("inbox, per room: one call per read on the cookie client, k rows of EACH ro
   assert.deepEqual(lounge[0], ["rpc", { p_channels: [L1, L2], p_per: 5, p_top_level_only: true, p_live_only: true }]);
   assert.deepEqual(events[0], ["rpc", { p_channels: [E1, E2], p_per: 1, p_top_level_only: true, p_live_only: true }]);
   for (const preview of [board, lounge]) {
-    assert.equal(selectOf(preview), "id, channel_id, content, created_at, user_id, kind, thread_root_id, users:users!messages_user_id_fkey(name)", "the same select list, the users embed included");
+    assert.equal(selectOf(preview), "id, channel_id, content, created_at, user_id, kind, thread_root_id, attachment_kind, users:users!messages_user_id_fkey(name)", "the same select list, the users embed included (attachment_kind since Oct 19, 2026: a shared post is not a deleted message)");
   }
   assert.equal(selectOf(events), "channel_id, created_at");
   for (const c of [board, lounge, events]) assert.deepEqual(c.find((x) => x[0] === "order"), ["order", "created_at", { ascending: false }]);
@@ -955,10 +972,14 @@ test("calendar: flag off → the three fields null on every rsvp entry, eventRef
   const entries = res.body.entries as Record<string, unknown>[];
   assert.deepEqual(entries.map((e) => e.id), ["pe", "ev-club", "ev-solo"]);
   assert.deepEqual(entries[1], {
-    kind: "rsvp", id: "ev-club", title: "ev-club", starts_at: T(8), ends_at: T(8, 12), location: "Hall", color: "#5BD18C", viewer_status: "going",
+    kind: "rsvp", id: "ev-club", title: "ev-club", starts_at: T(8), ends_at: T(8, 12), location: "Hall", viewer_status: "going",
     org: { handle: "salsa", name: "Salsa", verified: true }, org_id: null, room_id: null, room_state: null,
   });
-  assert.equal(entries[2].color, "#FFB85A");
+  // Oct 19, 2026 (critique D13): an RSVP carries its status and no fixed
+  // colour; the client paints it by `viewer_status`.
+  assert.equal(entries[2].viewer_status, "maybe");
+  assert.equal("color" in entries[1], false, "no green for Going");
+  assert.equal("color" in entries[2], false, "no amber for Interested");
   assert.deepEqual(entries[0], { kind: "personal", id: "pe", title: "Dentist", starts_at: T(3), ends_at: null, location: "", notes: "", color: "#fff" });
   assert.equal(asked, 0);
   assert.match(selectOf(reads(cookieLog, "rsvps")[0].calls), /event:events!inner\(id,title,starts_at,ends_at,location,org_id,org:orgs\(handle,name,verified\)\)/);
@@ -998,4 +1019,61 @@ test("calendar: flag on → eventRefsFor with counts: false; org_id, room_id, ro
 
   install({ user: null });
   assert.deepEqual(await calendar.GET(req("http://localhost/api/me/calendar"), ctx()), { status: 401, body: { ok: false, error: "Unauthorized" } });
+});
+
+// Oct 19, 2026 (critique B8 repair): the club behind an RSVP is named with the
+// SERVICE client when the viewer's embed hides it. `orgs_select` hides a
+// private club (SAE is `is_public = false`) from every non-member, so a
+// prospect's rush RSVP used to come back with `org: null` and no link.
+test("calendar: a private club's RSVP still carries its handle for a non-member; a hidden club stays unnamed; a failed read never 500s", async () => {
+  const ORG3 = "aaaaaaaa-0000-4000-8000-000000000003";
+  const prospectCookie: Answerer = (table) => {
+    if (table === "rsvps") {
+      return {
+        data: [
+          // The viewer's embed: null for the private club and the hidden one, the public club named.
+          { status: "going", event: { id: "ev-rush", title: "Rush", starts_at: T(8), ends_at: T(8, 12), location: "House", org_id: ORG1, org: null } },
+          { status: "maybe", event: { id: "ev-hidden", title: "Test", starts_at: T(9), ends_at: T(9, 12), location: "", org_id: ORG2, org: null } },
+          { status: "going", event: { id: "ev-public", title: "Salsa", starts_at: T(10), ends_at: T(10, 12), location: "", org_id: ORG3, org: { handle: "salsa", name: "Salsa", verified: true } } },
+        ],
+      };
+    }
+    return { data: [] };
+  };
+  const orgsService: Answerer = (table) =>
+    table === "orgs"
+      ? {
+          data: [
+            { id: ORG1, handle: "sae", name: "Sigma Alpha Epsilon", verified: true, hidden_at: null },
+            { id: ORG2, handle: "test_club", name: "Test club", verified: false, hidden_at: "2026-09-01T00:00:00Z" },
+          ],
+        }
+      : { data: [] };
+
+  const { serviceLog } = install({ cookie: prospectCookie, service: orgsService, flag: false });
+  const res = await calendar.GET(req("http://localhost/api/me/calendar"), ctx());
+  assert.equal(res.status, 200);
+  const byId = new Map((res.body.entries as Record<string, unknown>[]).map((e) => [e.id, e]));
+  assert.deepEqual(byId.get("ev-rush")!.org, { handle: "sae", name: "Sigma Alpha Epsilon", verified: true }, "a private club is still named, so the chip links to its page");
+  assert.equal(byId.get("ev-hidden")!.org, null, "a hidden club is never named to a non-member");
+  assert.deepEqual(byId.get("ev-public")!.org, { handle: "salsa", name: "Salsa", verified: true }, "the embed's answer is kept");
+  const orgReads = reads(serviceLog, "orgs");
+  assert.equal(orgReads.length, 1, "one read for every unnamed club");
+  assert.deepEqual(arg(orgReads[0].calls, "in", "id"), [ORG1, ORG2], "only the clubs the embed hid are asked for");
+  assert.equal(selectOf(orgReads[0].calls), "id,handle,name,verified,hidden_at");
+
+  // A failed service read, or no service key: the RSVP still lists, unnamed, 200.
+  install({ cookie: prospectCookie, service: () => ({ error: { code: "XX000", message: "boom" } }), flag: false });
+  const failed = await calendar.GET(req("http://localhost/api/me/calendar"), ctx());
+  assert.equal(failed.status, 200);
+  assert.equal((failed.body.entries as Record<string, unknown>[]).find((e) => e.id === "ev-rush")!.org, null);
+  install({ cookie: prospectCookie, service: null, flag: false });
+  const noKey = await calendar.GET(req("http://localhost/api/me/calendar"), ctx());
+  assert.equal(noKey.status, 200);
+  assert.equal((noKey.body.entries as Record<string, unknown>[]).length, 3);
+
+  // Every club already named by the embed: the service role is never asked.
+  const { serviceLog: quiet } = install({ cookie: calendarCookie, flag: false });
+  await calendar.GET(req("http://localhost/api/me/calendar"), ctx());
+  assert.equal(reads(quiet, "orgs").length, 0);
 });

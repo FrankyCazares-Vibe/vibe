@@ -104,19 +104,24 @@ export function badgeText(n: number): string {
  * `<Author>:`); nothing when both are null. An empty `author_name` (ROUTES-L8)
  * → the text alone, no `: `.
  */
-export type ClubPreview = { prefix: string | null; text: string; dot: boolean };
+// `deleted` (Oct 19, 2026, B7 review): the line is a deleted message's note
+// ("Post deleted" on the Board, "Message deleted" in the Lounge), drawn grey
+// italic like the note itself. Only present when true.
+export type ClubPreview = { prefix: string | null; text: string; dot: boolean; deleted?: true };
+
+const noted = (p: { deleted?: true }) => (p.deleted ? { deleted: true as const } : {});
 
 export function clubPreview(club: InboxClub): ClubPreview | null {
   const board = club.board.latest;
   const lounge = club.lounge.latest;
   const dot = club.board.unread;
-  if (dot && board) return { prefix: "Board:", text: board.text, dot };
+  if (dot && board) return { prefix: "Board:", text: board.text, dot, ...noted(board) };
   if (!board && !lounge) return null;
   const useBoard = !!board && (!lounge || time(board.created_at) >= time(lounge.created_at));
-  if (useBoard && board) return { prefix: "Board:", text: board.text, dot };
+  if (useBoard && board) return { prefix: "Board:", text: board.text, dot, ...noted(board) };
   if (!lounge) return null;
   const author = lounge.author_name.trim();
-  return { prefix: author ? `${author}:` : null, text: lounge.text, dot };
+  return { prefix: author ? `${author}:` : null, text: lounge.text, dot, ...noted(lounge) };
 }
 
 /** `Live now · <title>` (live chrome) or `<eventTimeShort> · <title>`, plus the RSVP mark (1.2, 11.1). */
@@ -183,8 +188,10 @@ export function spokenShort(short: string): string {
   return long ? [long, ...rest].join(" ") : short;
 }
 
+// "Interested", not "maybe", since Oct 19, 2026 (decision 12): the spoken
+// word matches the one on screen. The stored value is still `maybe`.
 const rsvpClause = (status: "going" | "maybe" | null): string | null =>
-  status === "going" ? "you're going" : status === "maybe" ? "you said maybe" : null;
+  status === "going" ? "you're going" : status === "maybe" ? "you're interested" : null;
 
 /** The state clause of an event in a label: `live now` / `ended` / the spoken time. */
 export function eventStateSpoken(state: RoomState | null | undefined, startsAt: string, now: Date): string {
@@ -196,7 +203,7 @@ export function eventStateSpoken(state: RoomState | null | undefined, startsAt: 
 /**
  * 1.2 club row `aria-label`: `<club>[, unread Board post][, N new in the
  * Lounge][, <title> is live now | <title> <spoken time>][, you're going | ,
- * you said maybe][, pinned][, <rowTimeSpoken>]` — each clause only when true.
+ * you're interested][, pinned][, <rowTimeSpoken>]` — each clause only when true.
  */
 export function clubRowLabel(club: InboxClub, now: Date): string {
   const parts: string[] = [club.org.name];
@@ -291,7 +298,7 @@ export function dayDot(entries: readonly WeekEntry[]): "going" | "maybe" | null 
 /**
  * 1.2 day `aria-label` (SCREENS-L2): `<Weekday>, <Month D>, nothing planned`
  * · `…, today, nothing planned` · `<Weekday>, <Month D>: <title>, going` /
- * `, maybe` / `, going, live now` · today with events `…, today: <title>,
+ * `, interested` / `, going, live now` · today with events `…, today: <title>,
  * going[, live now]`; two events joined with `; `.
  */
 export function dayLabel(day: Date, entries: readonly WeekEntry[], today: boolean): string {
@@ -300,7 +307,7 @@ export function dayLabel(day: Date, entries: readonly WeekEntry[], today: boolea
   } ${day.getDate()}`;
   if (entries.length === 0) return today ? `${date}, today, nothing planned` : `${date}, nothing planned`;
   const clauses = entries
-    .map((e) => `${e.title}, ${e.viewer_status}${e.room_state === "live" ? ", live now" : ""}`)
+    .map((e) => `${e.title}, ${e.viewer_status === "maybe" ? "interested" : e.viewer_status}${e.room_state === "live" ? ", live now" : ""}`)
     .join("; ");
   return today ? `${date}, today: ${clauses}` : `${date}: ${clauses}`;
 }
@@ -324,9 +331,11 @@ export function weekCardLine(e: WeekEntry, now: Date, otherWeek = false): { kind
   return { kind: "time", text: eventTimeShort(e.starts_at, now) };
 }
 
-/** 1.2 week card `aria-label`: `<title> room, <club>, live now, you're going` / `…, Friday 7 PM, you said maybe`; no club clause when `org` is null. */
+/** 1.2 week card `aria-label`: `<title> room, <club>, live now, you're going` / `…, Friday 7 PM, you're interested`; no club clause when `org` is null. */
 export function weekCardLabel(e: WeekEntry, now: Date): string {
-  const parts = [`${e.title} room`];
+  // "event" when there is no chat behind the card (Oct 19, 2026): the card
+  // then opens the club's page, not a room.
+  const parts = [`${e.title} ${e.room_id === null ? "event" : "room"}`];
   if (e.org) parts.push(e.org.name);
   parts.push(eventStateSpoken(e.room_state, e.starts_at, now));
   const r = rsvpClause(e.viewer_status);
@@ -380,8 +389,8 @@ export function isPastDay(day: Date, now: Date): boolean {
 /**
  * A grid day's `aria-label` (R3_Month:110-140): `<Weekday>, <Month D>[,
  * today][, selected], ` then `nothing planned` · `1 event you're going to` ·
- * `2 events you said maybe to` · `1 event you're going to, 1 you said maybe
- * to`, and `, live now` when one of them is.
+ * `2 events you're interested in` · `1 event you're going to, 1 you're
+ * interested in`, and `, live now` when one of them is.
  */
 export function monthDayLabel(day: Date, entries: readonly WeekEntry[], flags: { today: boolean; selected: boolean }): string {
   const parts = [`${WEEKDAY_LONG[WEEKDAY_SHORT[day.getDay()]]}, ${MONTH_LONG[MONTH_SHORT[day.getMonth()]]} ${day.getDate()}`];
@@ -392,8 +401,8 @@ export function monthDayLabel(day: Date, entries: readonly WeekEntry[], flags: {
   const events = (n: number) => `${n} ${n === 1 ? "event" : "events"}`;
   if (entries.length === 0) parts.push("nothing planned");
   else if (maybe === 0) parts.push(`${events(going)} you're going to`);
-  else if (going === 0) parts.push(`${events(maybe)} you said maybe to`);
-  else parts.push(`${events(going)} you're going to`, `${maybe} you said maybe to`);
+  else if (going === 0) parts.push(`${events(maybe)} you're interested in`);
+  else parts.push(`${events(going)} you're going to`, `${maybe} you're interested in`);
   if (entries.some((e) => e.room_state === "live")) parts.push("live now");
   return parts.join(", ");
 }
@@ -417,7 +426,7 @@ export function planRows(day: Date, entries: readonly WeekEntry[]): PlanRow[] {
     // `eventTimeShort` against the event's own day answers the clock alone.
     const time = eventTimeShort(entry.starts_at, new Date(entry.starts_at));
     const club = entry.org?.name?.trim() || null;
-    const said = entry.viewer_status === "going" ? "you're going" : "you said maybe";
+    const said = entry.viewer_status === "going" ? "you're going" : "you're interested";
     const spoken = [entry.title, ...(club ? [club] : []), `${spokenDay(new Date(entry.starts_at))} at ${time}`, said].join(", ");
     return {
       entry,

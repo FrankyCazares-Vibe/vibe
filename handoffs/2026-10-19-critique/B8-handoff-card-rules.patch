@@ -1,0 +1,51 @@
+diff -ru a/src/components/mobile/messages/cards/card-rules.test.ts b/src/components/mobile/messages/cards/card-rules.test.ts
+--- a/src/components/mobile/messages/cards/card-rules.test.ts	2026-10-19 21:46:54
++++ b/src/components/mobile/messages/cards/card-rules.test.ts	2026-10-19 21:46:55
+@@ -130,7 +130,7 @@
+   assert.equal(r.eventPlaceLine("  ", "Thu Oct 8, 7:30 PM"), "Thu Oct 8, 7:30 PM");
+   assert.equal(r.goingWord(18), "18 going");
+   assert.equal(r.rsvpSpoken("going"), "you're going");
+-  assert.equal(r.rsvpSpoken("maybe"), "you said maybe");
++  assert.equal(r.rsvpSpoken("maybe"), "you're interested");
+   assert.equal(r.rsvpSpoken(null), null);
+   assert.equal(r.showAppearLine({ viewer_status: null, room_id: null, state: "soon" }), true);
+   assert.equal(r.showAppearLine({ viewer_status: "going", room_id: null, state: "soon" }), false);
+@@ -141,7 +141,7 @@
+ test("eventCardLabel / cancelledEventLabel", () => {
+   const input = { title: "Fall Formal", location: "Campus Center 450", whenSpoken: "Thursday October 8, 7:30 PM", going: 18, status: "going" as const };
+   assert.equal(r.eventCardLabel(input, "Maya R.", false), "Event shared by Maya R.: Fall Formal, Campus Center 450, Thursday October 8, 7:30 PM. 18 going, you're going");
+-  assert.equal(r.eventCardLabel({ ...input, location: "", status: "maybe" }, null, false), "Event shared by someone: Fall Formal, Thursday October 8, 7:30 PM. 18 going, you said maybe");
++  assert.equal(r.eventCardLabel({ ...input, location: "", status: "maybe" }, null, false), "Event shared by someone: Fall Formal, Thursday October 8, 7:30 PM. 18 going, you're interested");
+   assert.equal(r.eventCardLabel({ ...input, status: null, going: 0 }, null, true), "Event you shared: Fall Formal, Campus Center 450, Thursday October 8, 7:30 PM. 0 going");
+   assert.equal(r.cancelledEventLabel("Fall Formal", "Maya R.", false), "Event shared by Maya R.: Fall Formal. This event was cancelled.");
+ });
+@@ -150,7 +150,7 @@
+   assert.equal(r.announceVotes(13), "13 voted");
+   assert.equal(r.announceFilled(4, 6), "4 of 6 filled");
+   assert.equal(r.announceRsvp("going"), "You're going");
+-  assert.equal(r.announceRsvp("maybe"), "You said maybe");
++  assert.equal(r.announceRsvp("maybe"), "You're interested");
+   assert.equal(r.announceRsvp(null), "RSVP removed");
+ });
+ 
+diff -ru a/src/components/mobile/messages/cards/card-rules.ts b/src/components/mobile/messages/cards/card-rules.ts
+--- a/src/components/mobile/messages/cards/card-rules.ts	2026-10-19 21:46:54
++++ b/src/components/mobile/messages/cards/card-rules.ts	2026-10-19 21:46:55
+@@ -211,7 +211,7 @@
+ /** The spoken RSVP clause of the card's label; null when the viewer has none. */
+ export function rsvpSpoken(status: EventRef["viewer_status"]): string | null {
+   if (status === "going") return "you're going";
+-  if (status === "maybe") return "you said maybe";
++  if (status === "maybe") return "you're interested";
+   return null;
+ }
+ 
+@@ -252,7 +252,7 @@
+ 
+ export function announceRsvp(status: EventRef["viewer_status"]): string {
+   if (status === "going") return "You're going";
+-  if (status === "maybe") return "You said maybe";
++  if (status === "maybe") return "You're interested";
+   return "RSVP removed";
+ }
+ 

@@ -37,8 +37,9 @@ import { SLIDE_CSS } from "./YourWeek";
  *   bottom sheet that hugged its content would move the grid under the
  *   finger whenever the picked day has more or fewer plans.
  * - Top to bottom: `October` `2026`, the `Today` pill, the two month
- *   chevrons; `Mon … Sun`; the grid (a dot under a day with plans — coral
- *   when any is Going, grey for Maybe only, `dayDot`; today's coral ring; the
+ *   chevrons; `Mon … Sun`; the grid (a mark under a day with plans — a
+ *   coral dot when any is Going, a coral ring for Interested only, the
+ *   calendar key since Oct 19, 2026, `dayDot`; today's coral ring; the
  *   picked day filled; other months' days blank; past days dim); the picked
  *   day (`Fri, Oct 9`, `Tomorrow · 1 plan`) and its plans by start; the
  *   line `Only events you RSVP'd to`.

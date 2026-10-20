@@ -9,6 +9,7 @@
  * PURE: `room-rules.ts` (a list) and types are the only imports.
  */
 
+import { DELETED_LINE, DELETED_POST_LINE, hasDeletedShape } from "./deleted-note";
 import { BOARD_POSTER_ROLES } from "./room-rules";
 import type {
   ClubRole,
@@ -34,6 +35,8 @@ export type PreviewRow = {
   user_id: string;
   kind?: unknown;
   thread_root_id?: string | null;
+  /** Read so a shared post with no words is never taken for a deleted message (Oct 19, 2026). */
+  attachment_kind?: unknown;
   users?: { name?: unknown } | null;
 };
 
@@ -42,15 +45,23 @@ export function messageKindOf(value: unknown): MessageKind {
   return value === "poll" || value === "event_card" ? value : "text";
 }
 
-/** `Preview = { id, text: content, author_name: row.users?.name ?? "", created_at, kind }` (7.1.4). */
-export function toPreview(row: PreviewRow): Preview {
+/**
+ * `Preview = { id, text: content, author_name: row.users?.name ?? "", created_at, kind }` (7.1.4).
+ * A message its sender deleted (Oct 19, 2026) previews as its note, never as
+ * an empty line after the name: "Message deleted", or "Post deleted" on the
+ * Board (`board`; the Board strip and the club panel say the same), with
+ * `deleted: true` so a list draws it like the note (review of Oct 19, 2026).
+ */
+export function toPreview(row: PreviewRow, board = false): Preview {
   const name = row.users?.name;
+  const deleted = hasDeletedShape(row);
   return {
     id: row.id,
-    text: typeof row.content === "string" ? row.content : "",
+    text: deleted ? (board ? DELETED_POST_LINE : DELETED_LINE) : typeof row.content === "string" ? row.content : "",
     author_name: typeof name === "string" ? name : "",
     created_at: row.created_at,
     kind: messageKindOf(row.kind),
+    ...(deleted ? { deleted: true as const } : {}),
   };
 }
 
@@ -58,14 +69,19 @@ export function toPreview(row: PreviewRow): Preview {
  * Per room, the newest row that is not hidden from the viewer: the rows come
  * newest first, so the first row per channel that `hidden` lets through is
  * the preview. A room whose window holds only hidden rows has no entry
- * (`latest: null`, 7.1.4).
+ * (`latest: null`, 7.1.4). `board`: the rooms are Boards (a deleted post
+ * previews as "Post deleted").
  */
-export function latestShownPerRoom(rows: PreviewRow[], hidden: (row: PreviewRow) => boolean): Map<string, Preview> {
+export function latestShownPerRoom(
+  rows: PreviewRow[],
+  hidden: (row: PreviewRow) => boolean,
+  opts: { board?: boolean } = {},
+): Map<string, Preview> {
   const latest = new Map<string, Preview>();
   for (const row of rows) {
     if (latest.has(row.channel_id)) continue;
     if (hidden(row)) continue;
-    latest.set(row.channel_id, toPreview(row));
+    latest.set(row.channel_id, toPreview(row, opts.board === true));
   }
   return latest;
 }

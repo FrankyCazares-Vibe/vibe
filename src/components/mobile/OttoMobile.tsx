@@ -18,6 +18,7 @@ import { OttoRequests } from "@/components/otto/OttoRequests";
 import { OttoSettings } from "@/components/otto/OttoSettings";
 import { OttoTellInput } from "@/components/otto/OttoTellInput";
 import { OttoUpcoming } from "@/components/otto/OttoUpcoming";
+import { useUpcomingFollowsCalendar } from "@/components/otto/use-upcoming-follows-calendar";
 import { PushAsk } from "@/components/push/PushAsk";
 import { OttoOrb } from "@/components/the-map/OttoOrb";
 import { vibeRequest } from "@/lib/feedback/request";
@@ -70,6 +71,9 @@ export function OttoMobile({ initial }: { initial: OttoPayload }) {
 
   const [activity] = useState<ActivityRow[]>(initial.activity);
   const [upcoming, setUpcoming] = useState<UpcomingRow[]>(initial.upcoming);
+  // An RSVP anywhere (the Otto-corner window, Messages, another tab) reads
+  // Upcoming again (Oct 19, 2026, critique B8 repair).
+  useUpcomingFollowsCalendar(setUpcoming);
   const [asking, setAsking] = useState<AskingRow[]>(initial.asking);
   const [settings] = useState<OttoSettingsT>(initial.settings);
 

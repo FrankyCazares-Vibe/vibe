@@ -144,11 +144,10 @@
     color: #FAF7F2; font-size: 13px; font-weight: 600; text-align: center;
     padding: 16px; box-sizing: border-box;
   }
-  .vpv-tags { margin-top: 10px; display: flex; flex-wrap: wrap; gap: 6px; }
-  .vpv-tag {
-    font-size: 11px; font-weight: 600; color: var(--tag-ink, #B83A1A);
-    background: rgba(255,92,53,.08); padding: 3px 8px; border-radius: 999px;
-  }
+  /* A saved tag inside the caption (Oct 19, 2026): opens the campus feed's
+     tag filter. Replaces the chip row that sat under the post. */
+  .vpv-tag-link { color: var(--tag-ink, #B83A1A); font-weight: 600; text-decoration: none; }
+  .vpv-tag-link:hover { text-decoration: underline; }
   .vpv-mention { color: var(--vpv-mention, #7B5FE0); font-weight: 600; text-decoration: none; }
   .vpv-mention:hover { text-decoration: underline; }
 
@@ -336,7 +335,7 @@
 
   /* ── Inline post editor (the owner's "Edit post") ──────────────────
      Same tokens as the comment composer above. It takes the place of
-     .vpv-text only; the photo, video and tag chips stay where they are. */
+     .vpv-text only; the photo or video stays where it is. */
   .vpv-edit {
     display: block; width: 100%; box-sizing: border-box;
     min-height: 120px; max-height: 360px; resize: vertical;
@@ -1074,13 +1073,66 @@
     else sub.removeAttribute("title");
   }
 
+  // tags-twin:start
+  // The static twin of the post tag rule (critique batch B6, Oct 19, 2026),
+  // the same block as in public/html/profile.html. VIBE_POST_TAG_IN_TEXT_RE
+  // and VIBE_POST_TAG_LINK_RE are copied character for character from
+  // src/lib/posts/edit.ts; vibeCaptionTagRanges is captionTagRanges
+  // (src/lib/posts/caption-tag-ranges.ts): a "#word" is a link only when the
+  // post saved that tag. static-profile-tags.test.ts runs this copy beside
+  // the TypeScript: change every copy together.
+  const VIBE_POST_TAG_MAX = 5;
+  const VIBE_NEW_POST_TAG_RE = /^(?=[a-z0-9_]*[a-z])[a-z0-9_]{2,32}$/;
+  const VIBE_POST_TAG_IN_TEXT_RE =
+    /(^|[\uFE0E\uFE0F\u20E3]|[^\p{L}\p{N}\p{M}_#/])#([A-Za-z0-9_]{2,32})(?![\p{L}\p{N}\p{M}_])/gu;
+  const VIBE_POST_TAG_LINK_RE =
+    /(?::\/\/|[\p{L}\p{N}_-]+(?:\.[\p{L}\p{N}_-]+)*\.\p{L}{2,}(?::\d+)?\/)\S*/gu;
+  function vibeIsNewPostTag(tag) {
+    return typeof tag === "string" && VIBE_NEW_POST_TAG_RE.test(tag);
+  }
+  function vibeBlankPostLinks(text) {
+    if (!text.includes("/")) return text;
+    return text.replace(new RegExp(VIBE_POST_TAG_LINK_RE.source, "gu"), (link) => " ".repeat(link.length));
+  }
+  // The viewer itself only links tags; this stays so both pages carry the
+  // whole twin, which static-profile-tags.test.ts runs (Oct 19, 2026).
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  function vibeExtractPostTags(text) {
+    if (typeof text !== "string" || !text.includes("#")) return [];
+    const seen = new Set();
+    const out = [];
+    const scan = vibeBlankPostLinks(text);
+    for (const m of scan.matchAll(new RegExp(VIBE_POST_TAG_IN_TEXT_RE.source, "gu"))) {
+      const t = m[2].toLowerCase();
+      if (seen.has(t) || !vibeIsNewPostTag(t)) continue;
+      seen.add(t);
+      out.push(t);
+      if (out.length >= VIBE_POST_TAG_MAX) break;
+    }
+    return out;
+  }
+  function vibeCaptionTagRanges(text, savedTags) {
+    if (typeof text !== "string" || !text.includes("#") || !Array.isArray(savedTags)) return [];
+    const saved = new Set();
+    for (const t of savedTags) if (typeof t === "string" && t) saved.add(t.toLowerCase());
+    if (saved.size === 0) return [];
+    const out = [];
+    for (const m of vibeBlankPostLinks(text).matchAll(new RegExp(VIBE_POST_TAG_IN_TEXT_RE.source, "gu"))) {
+      const tag = m[2].toLowerCase();
+      if (!saved.has(tag)) continue;
+      const start = (m.index || 0) + m[1].length;
+      out.push({ start, end: start + 1 + m[2].length, tag });
+    }
+    return out;
+  }
+  // tags-twin:end
+
   // Escape, then style @handles as orange links so mentions are visible
   // and clickable. Done after escaping so any HTML in the content is
   // already neutralized by the time we inject spans. The click goes through
   // __vibeTopNav: inside the /messages iframe a plain link would load the
   // profile in the frame, under a second sidebar.
-  function formatBodyText(s) {
-    const escaped = esc(s);
+  function formatMentions(escaped) {
     return escaped.replace(
       /(^|[^A-Za-z0-9_@])@([a-z0-9_]{3,20})/gi,
       (_m, prefix, handle) =>
@@ -1088,10 +1140,28 @@
     );
   }
 
-  // The tag chips, shared by paintBody and the post-edit repaint so the two
-  // can't drift.
-  function tagChipsHtml(tags) {
-    return tags.map(t => `<span class="vpv-tag">#${esc(t)}</span>`).join("");
+  // The caption as HTML: @handles as above, and the post's SAVED tags as
+  // links to the campus feed's tag filter, inside the text (decision 5,
+  // Oct 19, 2026: the chip row under the post is gone, and a "#word" the
+  // post didn't save is plain text). Each run of plain text is escaped on
+  // its own. A run that follows a tag is read with the tag's last character
+  // in front, so "#tag@name" stays as it was (no mention glued to a word).
+  function formatBodyText(s, tags) {
+    const text = String(s || "");
+    let html = "";
+    let at = 0;
+    let before = "";
+    const plain = (part) => {
+      const out = formatMentions(esc(before + part));
+      return out.slice(esc(before).length);
+    };
+    vibeCaptionTagRanges(text, tags).forEach(r => {
+      html += plain(text.slice(at, r.start)) +
+        `<a class="vpv-tag-link" href="/campus?tab=feed&amp;tag=${encodeURIComponent(r.tag)}" onclick="event.preventDefault();event.stopPropagation();window.__vibeTopNav(this.getAttribute('href'))">${esc(text.slice(r.start, r.end))}</a>`;
+      at = r.end;
+      before = text.charAt(r.end - 1);
+    });
+    return html + plain(text.slice(at));
   }
 
   // Mirror of editedPostFrom in src/lib/posts/edit.ts — change both together.
@@ -1144,7 +1214,7 @@
 
   function paintBody({ content, tags, media_url, type, media_kind, media_thumbnail_url }) {
     const body = document.getElementById("vpvBody");
-    const text = content ? `<div class="vpv-text">${formatBodyText(content)}</div>` : "";
+    const text = content ? `<div class="vpv-text">${formatBodyText(content, tags)}</div>` : "";
     let media = "";
     if (media_url && type === "post" && media_kind === "video") {
       // Video posts (an R2 clips/ key behind the /media proxy). The API says
@@ -1163,10 +1233,8 @@
         : (by && by !== "Unknown" ? "Photo posted by " + by : "Photo");
       media = `<img class="vpv-image" src="${esc(media_url)}" alt="${esc(alt)}">`;
     }
-    const tagBlock = (tags && tags.length)
-      ? `<div class="vpv-tags">${tagChipsHtml(tags)}</div>`
-      : "";
-    body.innerHTML = text + media + tagBlock;
+    // No chip row: the saved tags are links inside the text (Oct 19, 2026).
+    body.innerHTML = text + media;
   }
 
   function renderCommentsList(list) {
@@ -1415,7 +1483,7 @@
 
   // ── Edit post (owner only) ────────────────────────────────────────────
   // An inline editor takes the place of the post's text. Only the words
-  // change: the photo or video node and the tag chips are never re-rendered
+  // change: the photo or video node is never re-rendered
   // while editing, so a playing video keeps playing. The PATCH sends only
   // {content}; the server derives tags and stamps edited_at. After a save
   // the viewer fires the vibe:post-edited event on window so the page can
@@ -1538,28 +1606,11 @@
     if (state.content) {
       const div = document.createElement("div");
       div.className = "vpv-text";
-      div.innerHTML = formatBodyText(state.content);
+      div.innerHTML = formatBodyText(state.content, state.tags);
       wrap.replaceWith(div);
     } else {
       wrap.remove();
     }
-  }
-
-  // The chips after a save, in the place paintBody puts them (last in the body).
-  function repaintTags() {
-    const body = document.getElementById("vpvBody");
-    if (!body) return;
-    let block = body.querySelector(":scope > .vpv-tags");
-    if (!state.tags.length) {
-      if (block) block.remove();
-      return;
-    }
-    if (!block) {
-      block = document.createElement("div");
-      block.className = "vpv-tags";
-      body.appendChild(block);
-    }
-    block.innerHTML = tagChipsHtml(state.tags);
   }
 
   window.__vpvCancelEdit = function (force) {
@@ -1622,8 +1673,9 @@
       state.tags = p.tags;
       state.editedAt = p.edited_at;
       state.editing = false;
+      // The saved tags are links inside the text, so the text repaint after
+      // state.tags is all a save needs (no chip row since Oct 19, 2026).
       restoreText();
-      repaintTags();
       paintSub(state.authorHandle, state.createdAt, state.editedAt);
     } finally {
       // Only the newest save owns the flag. A save the student walked away

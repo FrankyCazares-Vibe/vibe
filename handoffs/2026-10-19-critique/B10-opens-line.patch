@@ -1,0 +1,112 @@
+B10 patch for the check-in owner (Oct 19, 2026). Not applied: these three
+files are outside B10. Apply from the repo root with `git apply <this file>`
+(checked with `git apply --check` against main a3215a1 + the B10 working tree).
+
+1. The student's check-in page names the day, in campus time, like the door.
+   Today, a link opened the night before says "Check-in opens at 6:00 PM, an
+   hour before the event." while the door says "Check-in opens tomorrow at
+   6:00 PM.". After: "Check-in opens tomorrow at 6:00 PM, an hour before the
+   event." The day-aware phrase comes from `checkinOpensWhen` in
+   src/components/events/checkin/door-screen.ts (pure, no React, B10's file),
+   which the door already uses.
+
+   Why not move it into src/lib/events/event-checkin.ts as the review asked:
+   it needs campus-time.ts, which imports "@/lib/push/event-notice". At least
+   six test files load event-checkin.ts with plain type stripping and no "@/"
+   resolve hook (event-checkin, qr-path, use-checkin-state, checkin-migration,
+   attendees-route...), so an "@/" import there would break them all. So
+   event-checkin.ts keeps only the wording (`opensAtLine(when)`) and stays
+   import-free.
+
+2. The shared `doorStartLead` gets the door's new words ("the QR code or the 4
+   numbers next to it"; "under the code" was wrong from 760 px wide). DoorView
+   now draws its own copy (DOOR_START_LEAD), so after this patch the shared key
+   is unused: keep it equal, or delete it. CONTRACT.md line 1324 has the old
+   words too.
+
+Checks run on a scratch copy: event-checkin.test.ts passes (its one source
+check that reads campus-home.tsx can't run outside the repo). Not run:
+tsc/eslint on CheckinLanding.tsx with the patch in.
+
+--- a/src/lib/events/event-checkin.ts
++++ b/src/lib/events/event-checkin.ts
+@@ -219,7 +219,10 @@
+   doorLead: "Scan with your phone's camera, or type the code in Vibe.",
+   doorBefore: "You can start check-in from an hour before the event.",
+   doorAfter: "Check-in has ended.",
+-  doorStartLead: "People check in by scanning this screen or typing the 4 numbers under the code. The code changes every 30 seconds.",
++  // Oct 19, 2026 (B10): no "under the code". From 760 px wide the numbers sit
++  // beside the QR, and before Start there is no QR yet. The door now draws
++  // its own copy of this line (door-screen.ts DOOR_START_LEAD); keep them equal.
++  doorStartLead: "People check in by scanning the QR\u00a0code or typing the 4\u00a0numbers next to it. Both change every 30 seconds.",
+   doorNotOfficer: "Only the club's owner and admins can run check-in.",
+   markHere: "Mark as here",
+   here: "Here",
+@@ -257,9 +260,14 @@
+   return `Check in to ${title}?`;
+ }
+ 
+-/** "Check-in opens at 6:00 PM, an hour before the event." */
+-export function opensAtLine(timeLabel: string): string {
+-  return `Check-in opens at ${timeLabel}, an hour before the event.`;
++/**
++ * "Check-in opens tomorrow at 6:00 PM, an hour before the event." `when` is
++ * checkinOpensWhen's phrase ("at 6:00 PM", "tomorrow at 6:00 PM", "Thu,
++ * Oct 22 at 6:00 PM"), in campus time, so the student's page names the day
++ * the way the door does (Oct 19, 2026).
++ */
++export function opensAtLine(when: string): string {
++  return `Check-in opens ${when}, an hour before the event.`;
+ }
+ 
+ /** "New code in 12 s" (the door's countdown; never announced). */
+--- a/src/lib/events/event-checkin.test.ts
++++ b/src/lib/events/event-checkin.test.ts
+@@ -182,7 +182,7 @@
+     ...Object.values(m.CHECKIN_ERRORS),
+     ...Object.values(m.CHECKIN_COPY),
+     m.checkInToLine("Fall Formal"),
+-    m.opensAtLine("6:00 PM"),
++    m.opensAtLine("tomorrow at 6:00 PM"),
+     m.newCodeInLine(12),
+     m.clearConfirmLine("Fall Formal"),
+   ];
+--- a/src/components/events/checkin/CheckinLanding.tsx
++++ b/src/components/events/checkin/CheckinLanding.tsx
+@@ -18,7 +18,7 @@
+ import { motion } from "motion/react";
+ import { useEffect, useId, useRef, useState } from "react";
+ 
+-import { campusClock, campusDateTime } from "@/components/campus/tonight/campus-time";
++import { campusDateTime } from "@/components/campus/tonight/campus-time";
+ import { useCampusNow } from "@/components/campus/tonight/use-campus-now";
+ import {
+   CHECKIN_COPY,
+@@ -36,6 +36,7 @@
+ import { SPRING_POP, SPRING_SOFT, RISE_PX } from "@/lib/motion/springs";
+ 
+ import { CheckinCodeForm } from "./CheckinCodeForm";
++import { checkinOpensWhen } from "./door-screen";
+ import { checkinApiPath, parseViewerState, useCheckinState } from "./use-checkin-state";
+ 
+ export type CheckinLandingEvent = {
+@@ -182,7 +183,9 @@
+             ? "form"
+             : "not_open";
+   const countLine = checkinCountLine(state.count, phase === "after", false);
+-  const opensMs = Date.parse(event.starts_at) - CHECKIN_OPENS_BEFORE_MS;
++  // Campus time with the day when it isn't today, the door's own words
++  // (Oct 19, 2026): a link opened the night before used to name no day.
++  const opensWhen = now > 0 ? checkinOpensWhen(Date.parse(event.starts_at) - CHECKIN_OPENS_BEFORE_MS, now) : null;
+ 
+   return (
+     <>
+@@ -258,7 +261,7 @@
+               </div>
+             ) : view === "before" ? (
+               <>
+-                <p style={lineStyle}>{Number.isFinite(opensMs) ? opensAtLine(campusClock(opensMs)) : CHECKIN_ERRORS.checkin_outside_window}</p>
++                <p style={lineStyle}>{opensWhen ? opensAtLine(opensWhen) : CHECKIN_ERRORS.checkin_outside_window}</p>
+                 {goToEvent}
+               </>
+             ) : view === "after" ? (

@@ -9,6 +9,7 @@ import { FONT, palette, SERIF } from "../v2-tokens";
 
 import { clubChip, clubPreview, clubQuietLine, clubRowLabel, clubRowTime, newCountText } from "./home-rules";
 import { PinIcon, ROW_FRAME, ROW_PICTURE, ROW_TEXT } from "./PersonRow";
+import { InterestedRing } from "./RsvpMark";
 
 /**
  * A club row of the Messages home (handoffs/chat-redesign/wave-2-contracts.md
@@ -16,7 +17,7 @@ import { PinIcon, ROW_FRAME, ROW_PICTURE, ROW_TEXT } from "./PersonRow";
  * 48px avatar (`logo_url` or initials on `clubGradient(org.id)`), the name
  * 16.5px/800 Fraunces, the time `rowTime(last_activity_at)`, the preview line
  * (SCREENS-L8, `clubPreview`), the chip line (`Live now · <title>` /
- * `<eventTimeShort> · <title>` + `Going` / `Maybe`, `N new` at the right).
+ * `<eventTimeShort> · <title>` + `Going` / `Interested`, `N new` at the right).
  * Tap → the club space on the Lounge, or on the Board when `board.unread`
  * and the Lounge has nothing new (11.1).
  *
@@ -163,7 +164,7 @@ export function ClubRow({
                 ) : null}
                 {preview.prefix ? <b style={{ fontWeight: 700 }}>{preview.prefix}</b> : null}
                 {preview.prefix ? " " : null}
-                {preview.text}
+                {preview.deleted ? <span style={{ fontStyle: "italic", color: t.muted }}>{preview.text}</span> : preview.text}
               </span>
               {pillOnPreview ? pill : null}
             </span>
@@ -212,8 +213,9 @@ export function ClubRow({
                 </span>
               ) : chip?.rsvp === "maybe" ? (
                 <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 12, fontWeight: 600, color: t.secondary, flexShrink: 0 }}>
-                  <span aria-hidden="true" style={{ width: 6, height: 6, borderRadius: 999, background: t.muted }} />
-                  Maybe
+                  {/* "Interested", not "Maybe", with the calendar key's coral ring (Oct 19, 2026, decision 12). */}
+                  <InterestedRing coral={t.coral} />
+                  Interested
                 </span>
               ) : null}
               {pill}

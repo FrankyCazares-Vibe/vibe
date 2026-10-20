@@ -117,7 +117,9 @@ export default function PrivacyPage() {
             <strong>Two words to know.</strong> When this policy says a post,
             comment, message or photo was <strong>removed</strong>, it means
             hidden by the Vibe team or by a club, and still stored.{" "}
-            <strong>Deleted</strong> means gone from Vibe&apos;s systems.
+            <strong>Deleted</strong> means gone from Vibe&apos;s systems. A
+            message you delete leaves a &ldquo;Message deleted&rdquo; note in
+            its place (<Sec to="8">section 8</Sec>).
           </>
         }
       />

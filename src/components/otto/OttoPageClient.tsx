@@ -20,6 +20,7 @@ import { OttoRequests } from "./OttoRequests";
 import { OttoSettings } from "./OttoSettings";
 import { OttoTellInput } from "./OttoTellInput";
 import { OttoUpcoming } from "./OttoUpcoming";
+import { useUpcomingFollowsCalendar } from "./use-upcoming-follows-calendar";
 
 type Props = { initial: OttoPayload };
 
@@ -70,6 +71,9 @@ export function OttoPageClient({ initial }: Props) {
 
   const [activity] = useState<ActivityRow[]>(initial.activity);
   const [upcoming, setUpcoming] = useState<UpcomingRow[]>(initial.upcoming);
+  // An RSVP anywhere (the Otto-corner window, Messages, another tab) reads
+  // Upcoming again (Oct 19, 2026, critique B8 repair).
+  useUpcomingFollowsCalendar(setUpcoming);
   const [asking, setAsking] = useState<AskingRow[]>(initial.asking);
   const [settings] = useState<OttoSettingsT>(initial.settings);
 

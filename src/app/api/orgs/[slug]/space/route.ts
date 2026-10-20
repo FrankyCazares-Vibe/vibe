@@ -98,19 +98,29 @@ async function readEventsById(service: SupabaseClient, ids: string[]): Promise<E
   return (data ?? []) as EventRow[];
 }
 
-/** The unread head count of 7.1.5 `> 0`; a failed count → false, logged. */
+/**
+ * The unread head count of 7.1.5 `> 0`; a failed count → false, logged. A
+ * message its sender deleted (Oct 19, 2026) is not counted: its note is
+ * nothing new (review of Oct 19, 2026). A database without `deleted_at`
+ * (20261019150000) has no note: the same count without the filter.
+ */
 async function unreadIn(service: SupabaseClient, channelId: string, viewerId: string, since: string, leftOut: readonly string[]): Promise<boolean> {
-  let query = service
-    .from("messages")
-    .select("id", { count: "exact", head: true })
-    .eq("channel_id", channelId)
-    .is("thread_root_id", null)
-    .is("removed_at", null)
-    .neq("user_id", viewerId)
-    .gt("created_at", since);
-  // Never a message the viewer cannot see (`unreadLeftOut`).
-  if (leftOut.length > 0) query = query.not("user_id", "in", notInList(leftOut));
-  const { count, error } = await query;
+  const run = (liveOnly: boolean) => {
+    let query = service
+      .from("messages")
+      .select("id", { count: "exact", head: true })
+      .eq("channel_id", channelId)
+      .is("thread_root_id", null)
+      .is("removed_at", null)
+      .neq("user_id", viewerId)
+      .gt("created_at", since);
+    if (liveOnly) query = query.is("deleted_at", null);
+    // Never a message the viewer cannot see (`unreadLeftOut`).
+    if (leftOut.length > 0) query = query.not("user_id", "in", notInList(leftOut));
+    return query;
+  };
+  let { count, error } = await run(true);
+  if (error && isMissingChatSchema(error)) ({ count, error } = await run(false));
   if (error) {
     console.error(`[${TAG} unread]`, error.code, error.message);
     return false;

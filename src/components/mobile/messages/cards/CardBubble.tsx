@@ -31,8 +31,8 @@ import { SignupCardView } from "./SignupCardView";
  * `SignupCardView` or `EventCardView`; the bubble owns the box (its
  * padding per type, the event card's full-bleed band, the 70 % opacity of a
  * closed poll or sign-up) and the ONE `aria-live="polite"` span per card
- * (1.2: `<N> voted` · `<taken> of <total> filled` · `You're going` / `You
- * said maybe` / `RSVP removed`), set by the views after each answer.
+ * (1.2: `<N> voted` · `<taken> of <total> filled` · `You're going` /
+ * `You're interested` / `RSVP removed`), set by the views after each answer.
  * `card === null` on a card kind (a stale cached answer; 9.1's 503 keeps a
  * fresh read from producing one) shows `message.content`, the stored
  * fallback text (cards/fallback.ts), as a plain bubble.
@@ -60,6 +60,12 @@ export type CardBubbleProps = {
   onRemove?: () => void;
   /** `Report` in the long-press picker; never passed for the viewer's own. */
   onReport?: () => void;
+  /**
+   * `Delete` in the long-press picker, last and red: the viewer's own card
+   * (Oct 19, 2026; delete-rules.ts). On the phone it also puts a ⋯ beside
+   * the viewer's own card in a room, so Delete is not behind the hold alone.
+   */
+  onDelete?: () => void;
   /**
    * An emoji picked in the long-press picker, and a tap on a chip under the
    * card: the text bubble's `onToggleReaction` (today's reaction flow,
@@ -154,7 +160,7 @@ function ReactionChips({ reactions, night, onToggle }: { reactions: ChatMessage[
   );
 }
 
-export function CardBubble({ message, roomId, room, isMine, night, onCard, onRefresh, onOpenEventChat, onRemove, onReport, onToggleReaction, onReply, layout = "bubble" }: CardBubbleProps) {
+export function CardBubble({ message, roomId, room, isMine, night, onCard, onRefresh, onOpenEventChat, onRemove, onReport, onDelete, onToggleReaction, onReply, layout = "bubble" }: CardBubbleProps) {
   const t = palette(night);
   const desktop = useChatSurface() === "desktop";
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -279,6 +285,31 @@ export function CardBubble({ message, roomId, room, isMine, night, onCard, onRef
     ? {}
     : { cursor: "pointer", WebkitTouchCallout: "none", WebkitUserSelect: "none", userSelect: "none", transition: "transform 120ms ease", transform: pickerOpen ? "scale(0.97)" : "scale(1)" };
 
+  // The phone's ⋯ beside the viewer's OWN card in a room (Oct 19, 2026): the
+  // picker it opens holds Delete. Only on their own (292 + 36px fits a 375px
+  // phone; beside someone else's card, after its avatar, it would not), never
+  // inside a Board post (the post has its own doors) and never on a laptop
+  // (the hover toolbar holds the same).
+  const moreButton =
+    !desktop && !post && isMine && !!onDelete && !temp ? (
+      <button
+        type="button"
+        aria-label="Message actions"
+        aria-expanded={pickerOpen}
+        onClick={(e) => {
+          e.stopPropagation();
+          setPickerOpen(true);
+        }}
+        style={{ flexShrink: 0, width: 32, height: 32, marginBottom: 2, padding: 0, borderRadius: 999, display: "inline-flex", alignItems: "center", justifyContent: "center", background: t.surface, border: `1px solid ${t.hairline}`, color: t.muted, cursor: "pointer", WebkitTapHighlightColor: "transparent" }}
+      >
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+          <circle cx="5" cy="12" r="1.9" />
+          <circle cx="12" cy="12" r="1.9" />
+          <circle cx="19" cy="12" r="1.9" />
+        </svg>
+      </button>
+    ) : null;
+
   return (
     <div style={{ display: "flex", flexDirection: "column", alignItems: theirs || post ? "flex-start" : "flex-end", maxWidth: "100%", fontFamily: FONT }}>
       <div
@@ -333,6 +364,7 @@ export function CardBubble({ message, roomId, room, isMine, night, onCard, onRef
         >
           {body}
         </div>
+        {moreButton}
         <span aria-live="polite" style={visuallyHiddenStyle}>
           {announce.text}
           {announce.n % 2 === 1 ? "​" : ""}
@@ -367,6 +399,14 @@ export function CardBubble({ message, roomId, room, isMine, night, onCard, onRef
                 ? () => {
                     setPickerOpen(false);
                     onRemove();
+                  }
+                : undefined
+            }
+            onDelete={
+              onDelete && !temp
+                ? () => {
+                    setPickerOpen(false);
+                    onDelete();
                   }
                 : undefined
             }

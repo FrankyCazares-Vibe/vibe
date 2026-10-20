@@ -100,6 +100,15 @@ export function Section5e() {
           club room as readable by every member, including someone you blocked.
         </li>
         <li>
+          <strong>Deleted messages.</strong> When someone deletes a message
+          they sent, everyone who can read that chat or room sees a grey
+          &ldquo;Message deleted&rdquo; note in its place, with the
+          sender&apos;s name and when it was sent. They may also be able to
+          tell when it was deleted. On the Board the note reads
+          &ldquo;Post deleted&rdquo;, and the replies under the post stay. A
+          follower reading the Board sees nothing in its place.
+        </li>
+        <li>
           <strong>Your chat settings.</strong> Other members of a chat may be
           able to tell when you last read it. They may also be able to tell
           whether you muted it, pinned it to the top of your list, hid it or

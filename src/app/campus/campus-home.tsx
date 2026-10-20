@@ -44,6 +44,8 @@ import {
   withCampus,
 } from "@/components/campus/viewing-campus";
 import { VisitingBanner } from "@/components/campus/VisitingBanner";
+import { FriendRepostLine } from "@/components/feed/FriendRepostLine";
+import { compactCount } from "@/lib/feed/compact-count";
 import { asLoadFailure, LoadFailed, type LoadFailure } from "@/components/feedback/LoadFailed";
 import { ImageCropperModal } from "@/components/ImageCropperModal";
 import { emitCalendarChanged } from "@/components/LeftNav";
@@ -107,6 +109,7 @@ import {
   showCheckinSplit,
   splitAttendees,
 } from "@/lib/events/event-checkin";
+import { captionSegments } from "@/lib/feed/caption-segments";
 import { copyText, type VibeFailure, type VibeResult, vibeRequest } from "@/lib/feedback/request";
 import { toast, type ToastInput } from "@/lib/feedback/toast";
 import {
@@ -166,6 +169,15 @@ import {
   editedPostFrom,
   POST_MAX_CHARS,
 } from "@/lib/posts/edit";
+import {
+  beginEngagementTap,
+  engagementFromFeedPost,
+  engagementReadToken,
+  patchEngagement,
+  readEngagement,
+  seedEngagementFromFeed,
+  usePostEngagement,
+} from "@/lib/posts/engagement-store";
 import { feedClubOf, muteClubRowLabel, type FeedClub, withoutClubPosts } from "@/lib/posts/feed-actions";
 import { CLUB_TITLE_MAX, clubFlairLabel, normalizeClubTitle } from "@/lib/profile/club-flair";
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser";
@@ -6916,14 +6928,16 @@ export type FeedPost = {
   // "image" for image posts, null for text-only.
   media_kind: "video" | "image" | null;
   view_count: number;
-  like_count: number;
-  comment_count: number;
-  repost_count: number;
-  viewer_liked: boolean;
-  viewer_reposted: boolean;
+  // null = the feed couldn't read it this time (Oct 19, 2026, critique B1):
+  // the shared engagement record skips a null instead of writing 0 / false.
+  like_count: number | null;
+  comment_count: number | null;
+  repost_count: number | null;
+  viewer_liked: boolean | null;
+  viewer_reposted: boolean | null;
   /** True when the viewer has bookmarked this post. The feed now
    *  hydrates this so saved state persists across page loads. */
-  viewer_saved?: boolean;
+  viewer_saved?: boolean | null;
   /** Up to 3 most-recent reposters that the viewer follows. Drives the
    *  Instagram-style "X reposted this" social-proof pill. */
   friend_reposters?: Array<{
@@ -7149,11 +7163,15 @@ function FeedTabBody({
   // After a post or a row change. The student started it, so a refusal
   // toasts (vibeRequest's, or ours for a bad body) and the feed stays put.
   const refresh = useCallback(async () => {
+    // Taken before the request: a like tapped while it's out wins over it.
+    const readToken = engagementReadToken();
     const r = await vibeRequest<{ feed?: FeedEntry[]; viewerId?: string }>(feedUrl, {
       cache: "no-store",
       failure: "Couldn't refresh the feed.",
     });
     if (r.ok && Array.isArray(r.data.feed)) {
+      // The shared like / save / repost record (Oct 19, 2026, critique M1).
+      seedEngagementFromFeed(r.data.feed.map((e) => e.post), readToken);
       setLoadErr(null);
       setEntries(
         withoutReportedPosts(r.data.feed, reportedPostIdsRef.current, (e) => e.post.id),
@@ -7192,6 +7210,7 @@ function FeedTabBody({
   useEffect(() => {
     let cancelled = false;
     (async () => {
+      const readToken = engagementReadToken();
       const r = await vibeRequest<{ feed?: FeedEntry[]; viewerId?: string }>(feedUrl, {
         cache: "no-store",
         quiet: true,
@@ -7199,6 +7218,7 @@ function FeedTabBody({
       });
       if (cancelled) return;
       if (r.ok && Array.isArray(r.data.feed)) {
+        seedEngagementFromFeed(r.data.feed.map((e) => e.post), readToken);
         setLoadErr(null);
         setEntries(
           withoutReportedPosts(r.data.feed, reportedPostIdsRef.current, (e) => e.post.id),
@@ -7920,60 +7940,42 @@ const composerRemoveButton: React.CSSProperties = {
 
 
 /**
- * Render a post body with `@handle` mentions and `#tags` linkified.
+ * Render a post body with `@handle` mentions and `#tags` linkified, with the
+ * same cutter as the phone card and the open post (src/lib/feed/
+ * caption-segments.ts, Oct 19, 2026). Plain runs stay as `<span>` so the
+ * surrounding `white-space: pre-wrap` keeps newlines.
  *
- * Splits the raw text on a single regex that matches either an @mention
- * or a #hashtag (each preceded by start-of-string or a non-word char so
- * we don't grab the @ in an email or a # inside a URL fragment). Each
- * matched token becomes a clickable element; plain runs stay as
- * `<span>` so the surrounding `white-space: pre-wrap` keeps newlines.
- *
- * - @mentions → /profile/<handle> via next/link
- * - #hashtags → onPickTag(tag) — switches the feed to the tag-filtered
- *   view (same path the trending pills use)
- *
- * Handles match the users.handle CHECK (lowercase a-z, 0-9, underscore,
- * 3–20 chars). Tags allow letters / digits / underscores up to 32 chars,
- * which matches the publish-post tag sanitizer.
+ * - @mentions → /profile/<handle> via next/link (3 to 32 characters, as
+ *   before).
+ * - #tags → onPickTag(tag), the tag-filtered feed (the trending pills' path),
+ *   and ONLY a tag the post saved (`savedTags`, its stored `tags`): "#café",
+ *   a link's "#section" or a 6th tag used to light up and open a filter that
+ *   didn't show this post (critique decisions 3-5).
  */
 function renderPostContent(
   text: string,
+  savedTags: string[] | null,
   onPickTag: (tag: string) => void,
 ): React.ReactNode {
-  if (!text) return null;
-  const re = /(^|[^A-Za-z0-9_@#])([@#][A-Za-z0-9_]{1,32})/g;
-  const nodes: React.ReactNode[] = [];
-  let lastIndex = 0;
-  let match: RegExpExecArray | null;
-  let key = 0;
-  while ((match = re.exec(text)) !== null) {
-    const leading = match[1] ?? "";
-    const token = match[2] ?? "";
-    // Position of the @ or # within the original string.
-    const tokenStart = match.index + leading.length;
-    if (tokenStart > lastIndex) {
-      nodes.push(
-        <span key={`t${key++}`}>{text.slice(lastIndex, tokenStart)}</span>,
-      );
-    }
-    const sigil = token[0];
-    const body = token.slice(1).toLowerCase();
-    if (sigil === "@" && body.length >= 3) {
-      nodes.push(
+  return captionSegments(text, savedTags).map((seg, i) => {
+    if (seg.kind === "mention") {
+      return (
         <Link
-          key={`m${key++}`}
-          href={`/profile/${encodeURIComponent(body)}`}
+          key={i}
+          href={`/profile/${encodeURIComponent(seg.handle)}`}
           style={{ color: COLORS.accentInk, fontWeight: 600, textDecoration: "none" }}
         >
-          {token}
-        </Link>,
+          {seg.text}
+        </Link>
       );
-    } else if (sigil === "#") {
-      nodes.push(
+    }
+    if (seg.kind === "tag") {
+      return (
         <button
-          key={`h${key++}`}
+          key={i}
           type="button"
-          onClick={() => onPickTag(body)}
+          onClick={() => onPickTag(seg.tag)}
+          aria-label={`Show posts tagged #${seg.tag}`}
           style={{
             background: "none",
             border: "none",
@@ -7986,19 +7988,12 @@ function renderPostContent(
             lineHeight: "inherit",
           }}
         >
-          {token}
-        </button>,
+          {seg.text}
+        </button>
       );
-    } else {
-      // Bare @ with no handle (1-2 chars) — keep as plain text.
-      nodes.push(<span key={`p${key++}`}>{token}</span>);
     }
-    lastIndex = tokenStart + token.length;
-  }
-  if (lastIndex < text.length) {
-    nodes.push(<span key={`t${key++}`}>{text.slice(lastIndex)}</span>);
-  }
-  return nodes;
+    return <span key={i}>{seg.text}</span>;
+  });
 }
 
 function FeedRow({
@@ -8071,14 +8066,15 @@ function FeedRow({
     .join("")
     .toUpperCase();
 
-  // Local engagement state — seeded from the feed payload, mutated optimistically
-  // on click. `onMutate` re-fetches the feed so other rows (and the repost UNION)
-  // stay in sync after a quote-repost.
-  const [liked, setLiked] = useState(post.viewer_liked);
-  const [likeCount, setLikeCount] = useState(post.like_count);
-  const [reposted, setReposted] = useState(post.viewer_reposted);
-  const [repostCount, setRepostCount] = useState(post.repost_count);
-  const [commentCount, setCommentCount] = useState(post.comment_count);
+  // Like, save, repost and the comment count live in the shared engagement
+  // record (Oct 19, 2026, critique M1; src/lib/posts/engagement-store.ts),
+  // the one the phone card and the open post read, so every row showing this
+  // post (and a feed refresh) agree. The feed seeds it; this row's own fields
+  // show until then. Taps flip the record first and a refusal rolls it back.
+  // `onMutate` still re-fetches the feed after a quote repost.
+  const engFallback = useMemo(() => engagementFromFeedPost(post), [post]);
+  const eng = usePostEngagement(post.id, engFallback);
+  const { liked, likeCount, reposted, repostCount, commentCount, saved } = eng;
   const [viewCount, setViewCount] = useState(post.view_count);
   const [showComments, setShowComments] = useState(false);
   const [showRepostMenu, setShowRepostMenu] = useState(false);
@@ -8274,51 +8270,42 @@ function FeedRow({
   }, [post.id]);
 
   // One like request at a time: a second tap while the first is out is
-  // dropped, so a fast double tap can't send two requests that each roll
-  // the count back by one.
-  const likingRef = useRef(false);
+  // dropped (beginEngagementTap answers null), so a fast double tap can't
+  // send two requests that each roll the count back by one. The heart flips
+  // first; a refusal (Terms not accepted, liking too fast, a post that's
+  // gone) puts it back on every screen and the toast says why, the same as
+  // the phone feed card (CampusMobile).
   const toggleLike = useCallback(async () => {
-    if (likingRef.current) return;
-    likingRef.current = true;
-    const nextLiked = !liked;
-    const prevLiked = liked;
-    const prevCount = likeCount;
-    setLiked(nextLiked);
-    setLikeCount((c) => Math.max(0, c + (nextLiked ? 1 : -1)));
-    // The heart flips first. A refusal (Terms not accepted, liking too fast,
-    // a post that's gone) used to flip it back without a word; now it goes
-    // back to exactly what it was and the toast says why, the same as the
-    // phone feed card (CampusMobile).
+    const tap = beginEngagementTap(post.id, "like", engFallback, (c) => ({
+      liked: !c.liked,
+      likeCount: c.likeCount + (c.liked ? -1 : 1),
+    }));
+    if (!tap) return;
+    const nextLiked = readEngagement(post.id)?.liked === true;
     const r = await vibeRequest(`/api/posts/${post.id}/like`, {
       method: nextLiked ? "POST" : "DELETE",
       failure: nextLiked ? "Couldn't like this post." : "Couldn't unlike this post.",
     });
-    if (!r.ok) {
-      setLiked(prevLiked);
-      setLikeCount(prevCount);
-    }
-    likingRef.current = false;
-  }, [liked, likeCount, post.id]);
+    if (r.ok) tap.commit();
+    else tap.rollback();
+  }, [engFallback, post.id]);
 
-  // Save (bookmark) state — seeded from the feed payload's
-  // viewer_saved so saves survive page reloads. Same
-  // optimistic-with-rollback pattern as like.
-  const [saved, setSaved] = useState(!!post.viewer_saved);
+  // Save (bookmark): the same tap-then-confirm as like. The save route can
+  // say no in ways worth a word (store wave S1): a 429 from its limiter, and
+  // a 404 for a post gone or across a block, so the toast says why.
   const toggleSave = useCallback(async () => {
-    const nextSaved = !saved;
-    setSaved(nextSaved);
-    // The save route can now say no in ways worth a word (store wave S1): a
-    // 429 from its limiter, and a 404 for a post gone or across a block. A
-    // silent flip-back read as a broken button, so the toast says why, the
-    // same as the phone card's save.
+    const tap = beginEngagementTap(post.id, "save", engFallback, (c) => ({ saved: !c.saved }));
+    if (!tap) return;
+    const nextSaved = readEngagement(post.id)?.saved === true;
     const r = await vibeRequest(`/api/posts/${post.id}/save`, {
       method: nextSaved ? "POST" : "DELETE",
       failure: nextSaved
         ? "Couldn't save this post."
         : "Couldn't remove this from your saved posts.",
     });
-    if (!r.ok) setSaved(!nextSaved);
-  }, [saved, post.id]);
+    if (r.ok) tap.commit();
+    else tap.rollback();
+  }, [engFallback, post.id]);
 
   const handleShare = useCallback(async () => {
     try {
@@ -8575,9 +8562,6 @@ function FeedRow({
           </div>
         ) : null}
       </div>
-      {entry.kind === "repost" ? (
-        <RepostBanner reposter={entry.reposter} />
-      ) : null}
       {entry.kind === "repost" && entry.quote ? (
         <p
           style={{
@@ -8592,10 +8576,18 @@ function FeedRow({
           {entry.quote}
         </p>
       ) : null}
-      {entry.kind === "post" &&
-      post.friend_reposters &&
-      post.friend_reposters.length > 0 ? (
-        <FriendRepostPill post={post} />
+      {/* "Maya and 6 others reposted", above the author (Oct 19, 2026,
+          critique M2): a quiet line, only as wide as its words and clear of
+          the ⋯ above it; a click opens the "Reposted by" pop-up. It replaces
+          the full-width green pill the ⋯ used to sit on. */}
+      {entry.kind === "post" ? (
+        <FriendRepostLine
+          postId={post.id}
+          reposters={post.friend_reposters}
+          repostCount={repostCount}
+          viewerReposted={reposted}
+          variant="desktop"
+        />
       ) : null}
       <div style={{ display: "flex", gap: 12 }}>
       {(() => {
@@ -8848,7 +8840,7 @@ function FeedRow({
               cursor: "pointer",
             }}
           >
-            {renderPostContent(post.content, onPickTag)}
+            {renderPostContent(post.content, post.tags, onPickTag)}
           </p>
         ) : null}
         {post.media_url && post.type === "post" && post.media_kind === "image" ? (
@@ -8963,12 +8955,17 @@ function FeedRow({
               onClose={() => setShowRepostMenu(false)}
               onDone={(action) => {
                 setShowRepostMenu(false);
+                // The menu already heard yes: the shared record follows.
                 if (action === "added") {
-                  setReposted(true);
-                  setRepostCount((c) => c + 1);
+                  patchEngagement(post.id, "repost", engFallback, (c) => ({
+                    reposted: true,
+                    repostCount: c.reposted ? c.repostCount : c.repostCount + 1,
+                  }));
                 } else if (action === "removed") {
-                  setReposted(false);
-                  setRepostCount((c) => Math.max(0, c - 1));
+                  patchEngagement(post.id, "repost", engFallback, (c) => ({
+                    reposted: false,
+                    repostCount: c.reposted ? c.repostCount - 1 : c.repostCount,
+                  }));
                 }
                 // Quote reposts add a new feed row — refresh so it appears.
                 onMutate();
@@ -8980,7 +8977,9 @@ function FeedRow({
           <CommentsDrawer
             postId={post.id}
             viewerId={viewerId}
-            onCommentAdded={() => setCommentCount((c) => c + 1)}
+            onCommentAdded={() =>
+              patchEngagement(post.id, "comment", engFallback, (c) => ({ commentCount: c.commentCount + 1 }))
+            }
           />
         ) : null}
       </div>
@@ -9220,101 +9219,6 @@ function feedRowMenuItemStyle(
     fontWeight: 600,
     cursor: "pointer",
   };
-}
-
-/** Instagram-style social proof on the original post: "Alice and 4
- *  others reposted this", with up to 3 stacked avatars. Only paints
- *  when at least one of the viewer's followings has reposted. */
-function FriendRepostPill({ post }: { post: FeedPost }) {
-  const samples = post.friend_reposters ?? [];
-  if (samples.length === 0) return null;
-  const total = post.friend_reposter_count ?? samples.length;
-  const first =
-    samples[0]!.name || (samples[0]!.handle ? `@${samples[0]!.handle}` : "Someone");
-  let label: string;
-  if (total <= 1) label = `${first} reposted this`;
-  else if (samples[1] && total === 2) {
-    const second =
-      samples[1].name ||
-      (samples[1].handle ? `@${samples[1].handle}` : "");
-    label = `${first} and ${second} reposted this`;
-  } else {
-    label = `${first} and ${total - 1} others reposted this`;
-  }
-  return (
-    <div
-      style={{
-        display: "inline-flex",
-        alignItems: "center",
-        gap: 8,
-        margin: "0 0 10px 0",
-        padding: "5px 10px 5px 6px",
-        borderRadius: 999,
-        background: "rgba(46,160,72,0.10)",
-        border: "1px solid rgba(46,160,72,0.22)",
-        color: "var(--ok-ink-2)",
-        fontFamily: "DM Sans, sans-serif",
-        fontSize: 12,
-        fontWeight: 700,
-      }}
-    >
-      <div style={{ display: "inline-flex" }}>
-        {samples.slice(0, 3).map((u, i) => (
-          <span
-            key={u.id}
-            aria-hidden
-            style={{
-              width: 20,
-              height: 20,
-              borderRadius: 999,
-              background: u.avatar_url
-                ? `url(${u.avatar_url}) center/cover`
-                : "#FFD3C2",
-              border: "2px solid var(--cream)",
-              marginLeft: i === 0 ? 0 : -7,
-            }}
-          />
-        ))}
-      </div>
-      {label}
-    </div>
-  );
-}
-
-function RepostBanner({ reposter }: { reposter: FeedAuthor }) {
-  const label = reposter.handle
-    ? `@${reposter.handle}`
-    : reposter.name || "Someone";
-  return (
-    <div
-      style={{
-        display: "flex",
-        alignItems: "center",
-        gap: 6,
-        marginBottom: 8,
-        marginLeft: 28,
-        color: COLORS.faint,
-        fontFamily: "DM Sans, sans-serif",
-        fontSize: 12,
-        fontWeight: 600,
-      }}
-    >
-      <RepostIcon />
-      <span>
-        {reposter.handle ? (
-          <Link
-            href={`/profile/${encodeURIComponent(reposter.handle)}`}
-            style={{ color: COLORS.faint, textDecoration: "none" }}
-          >
-            {label}
-          </Link>
-        ) : (
-          label
-        )}{" "}
-        reposted
-      </span>
-    </div>
-  );
 }
 
 function RepostMenu({
@@ -10229,12 +10133,11 @@ function viewsLabelForOwner(count: number | undefined): string {
   return formatted ? `See who saw this — ${formatted} views` : "See who saw this";
 }
 
+/** Nothing for 0; otherwise the feed's one count format (compactCount, Oct
+ *  19, 2026), the same one the repost line above the buttons prints. */
 function formatEngagementCount(n: number | undefined): string | null {
   if (typeof n !== "number" || !Number.isFinite(n) || n <= 0) return null;
-  if (n < 1000) return String(n);
-  if (n < 10_000) return `${(n / 1000).toFixed(1).replace(/\.0$/, "")}K`;
-  if (n < 1_000_000) return `${Math.round(n / 1000)}K`;
-  return `${(n / 1_000_000).toFixed(1).replace(/\.0$/, "")}M`;
+  return compactCount(n);
 }
 
 function SceneHeader({

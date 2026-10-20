@@ -182,7 +182,7 @@ test("no sentence uses the banned words or says anything about where someone is"
     ...Object.values(m.CHECKIN_ERRORS),
     ...Object.values(m.CHECKIN_COPY),
     m.checkInToLine("Fall Formal"),
-    m.opensAtLine("6:00 PM"),
+    m.opensAtLine("tomorrow at 6:00 PM"),
     m.newCodeInLine(12),
     m.clearConfirmLine("Fall Formal"),
   ];

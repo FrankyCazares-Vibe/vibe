@@ -6,6 +6,8 @@ import { AttendeesModal, type CampusEvent } from "@/app/campus/campus-home";
 import { CHECKIN_COPY, CHECKIN_ERRORS, checkinCountLine } from "@/lib/events/event-checkin";
 import { vibeRequest } from "@/lib/feedback/request";
 
+import { LinkedFlash, LinkedFocusStyle, useLinkedEvent, useLinkedEventParam } from "./linked-event";
+
 /**
  * Past events on a club page (event check-in, contract 4.6 and D10): the
  * club's events that ended in the last 30 days, newest first, from
@@ -17,28 +19,42 @@ import { vibeRequest } from "@/lib/feedback/request";
  * Quiet on purpose: signed out, a failed read or no past events, and the
  * block isn't drawn at all. The upcoming list above already says what a
  * visitor needs; an empty "Past events" would only be noise.
+ *
+ * `?event=<id>` (Oct 19, 2026, critique D13): a calendar link to an event
+ * that has ended lands on its row here, scrolled into view and flashed
+ * (linked-event.tsx). A read that failed can't say the event is gone.
+ * The read takes the route's full 20 rows and passes the id as `include`
+ * (Oct 19, 2026 repair): a club that meets three times a week has more than
+ * 10 events in the 30 days My Calendar looks back, and an RSVP from three
+ * weeks ago would otherwise be "not listed".
  */
 export function OrgPastEvents({ orgId, orgHandle }: { orgId: string; orgHandle: string }) {
   const [events, setEvents] = useState<CampusEvent[] | null>(null);
+  // The first read failed (the block stays hidden; the link stays quiet).
+  const [failed, setFailed] = useState(false);
   const [open, setOpen] = useState<{ id: string; title: string } | null>(null);
   // The "Who came" that opened the list, to hand focus back on close.
   const openerRef = useRef<HTMLButtonElement | null>(null);
   // Only the newest read lands (the opening one, or the re-read on close).
   const seqRef = useRef(0);
+  const linkedParam = useLinkedEventParam();
 
   // The state is set in the answer's callback, never in the effect's own
   // turn (the opening read runs from an effect).
   const load = useCallback(() => {
     const seq = ++seqRef.current;
     void vibeRequest<{ events?: CampusEvent[] }>(
-      `/api/events?org_id=${encodeURIComponent(orgId)}&when=past&limit=10`,
+      `/api/events?org_id=${encodeURIComponent(orgId)}&when=past&limit=20${
+        linkedParam ? `&include=${encodeURIComponent(linkedParam)}` : ""
+      }`,
       { cache: "no-store", quiet: true, failure: CHECKIN_ERRORS.request_failed },
     ).then((r) => {
       if (seq !== seqRef.current) return;
       // A failed re-read keeps what is on screen.
       if (r.ok && Array.isArray(r.data.events)) setEvents(r.data.events);
+      else setFailed(true);
     });
-  }, [orgId]);
+  }, [orgId, linkedParam]);
 
   useEffect(() => {
     load();
@@ -48,6 +64,8 @@ export function OrgPastEvents({ orgId, orgHandle }: { orgId: string; orgHandle: 
     };
   }, [load]);
 
+  const linkedId = useLinkedEvent("past", events ? events.map((e) => e.id) : failed ? "unknown" : null);
+
   if (!events || events.length === 0) return null;
 
   const headingId = `org-${orgHandle}-past-events`;
@@ -56,11 +74,22 @@ export function OrgPastEvents({ orgId, orgHandle }: { orgId: string; orgHandle: 
       <h2 id={headingId} style={headingStyle}>
         {CHECKIN_COPY.pastHeading}
       </h2>
+      {linkedId ? <LinkedFocusStyle /> : null}
       <ul style={listStyle}>
         {events.map((ev) => {
           const countLine = checkinCountLine(ev.checked_in_count, true, ev.viewer_can_manage);
           return (
-            <li key={ev.id} style={rowStyle}>
+            <li
+              key={ev.id}
+              // The anchor `?event=` scrolls to (EVENT_ANCHOR_ATTR).
+              data-event-anchor={ev.id}
+              tabIndex={ev.id === linkedId ? -1 : undefined}
+              // No `outline: none` (Oct 19, 2026 repair): LinkedFocusStyle
+              // keeps the focus mark after the flash fades.
+              style={{ ...rowStyle, position: "relative" }}
+            >
+              {/* Wider than the row: its text starts at the row's own edge. */}
+              {ev.id === linkedId ? <LinkedFlash radius={10} inset="-2px -10px" /> : null}
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={titleStyle}>{ev.title}</div>
                 <div style={dateStyle}>{pastEventDate(ev.starts_at)}</div>

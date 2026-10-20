@@ -1,5 +1,6 @@
 "use client";
 
+import { useSearchParams } from "next/navigation";
 import { useState, useSyncExternalStore } from "react";
 
 import { ReportSheet } from "@/components/safety/ReportSheet";
@@ -74,7 +75,11 @@ export function OrgContent({
    *  things rather than letting the route refuse it. */
   reportable?: { id: string; viewerIsOwner?: boolean } | null;
 }) {
-  const [tab, setTab] = useState<"posts" | "events" | "about">("posts");
+  // Opened at one event (`?event=<id>`, a calendar link; Oct 19, 2026,
+  // critique D13): the phone starts on the Events tab, or the card it
+  // scrolls to would be hidden. The desktop shows every column anyway.
+  const linkedEvent = useSearchParams().get("event");
+  const [tab, setTab] = useState<"posts" | "events" | "about">(linkedEvent ? "events" : "posts");
   const [reportOpen, setReportOpen] = useState(false);
   const phone = useSyncExternalStore(subscribePhone, isPhoneNow, serverSnapshot);
   const canReport = !!reportable && !reportable.viewerIsOwner;

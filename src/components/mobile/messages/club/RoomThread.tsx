@@ -4,12 +4,15 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react
 
 import { LoadFailed } from "@/components/feedback/LoadFailed";
 import { RemovedContentCard, ReportSheet, type ReportTargetRef } from "@/components/safety/ReportSheet";
-import type { ChatMessage, RemoveMessageResponse, RoomKind } from "@/lib/chat/types";
+import { asDeletedNote, withDeletedQuotes } from "@/lib/chat/deleted-note";
+import type { ChatMessage, DeleteOwnResponse, RemoveMessageResponse, RoomKind } from "@/lib/chat/types";
 import { useLayerHistory } from "@/lib/chat/use-layer-history";
 import type { RoomPoll } from "@/lib/chat/use-room-poll";
 import { vibeRequest } from "@/lib/feedback/request";
 
 import { CardBubble } from "../cards/CardBubble";
+import { DeleteConfirm, rowFocusTarget } from "../DeleteConfirm";
+import { canDeleteOwn, DELETE_FAILED, deleteConfirmCopy, leftNote } from "../delete-rules";
 import { MessageBubble } from "../MessageBubble";
 import { toastSendFailure } from "../send-failure";
 import { useChatSurface } from "../surface";
@@ -58,6 +61,14 @@ import type { ReplyTarget } from "./RoomComposer";
  * the Report sheet is the centred dialog (`variant="modal"`, not nested: no
  * drawer is under it). On the phone `HoverActions` is never mounted and
  * nothing below changes.
+ *
+ * Delete (Oct 19, 2026; batch B7, decision 8): the viewer's own row, text or
+ * card, gets a red `Delete` (the long-press picker and its ⋯ on the phone,
+ * `More` in the hover toolbar on the desktop) → `DeleteConfirm` → `DELETE
+ * …/messages/<mid>` → the row becomes the grey "Message deleted" note
+ * (`asDeletedNote`; the server's next full read sends the same note). A note
+ * has no menu and no toolbar. Other members' open screens get it with the
+ * next full read (every 5th tick, about 20 s).
  */
 
 export type RoomThreadProps = {
@@ -109,6 +120,7 @@ export function toMessageRow(m: ChatMessage): MessageRow {
     parent_preview: m.parent_preview,
     reactions: m.reactions ?? [],
     hidden: m.hidden,
+    deleted: m.deleted === true,
   };
 }
 
@@ -224,6 +236,9 @@ export function RoomThread({ poll, roomId, roomKind, clubName, night, now, ancho
   const [removeTarget, setRemoveTarget] = useState<ChatMessage | null>(null);
   const [removing, setRemoving] = useState(false);
   const [reportMessage, setReportMessage] = useState<ReportTargetRef | null>(null);
+  // The viewer's own message they asked to delete (Oct 19, 2026; delete-rules.ts).
+  const [deleteTarget, setDeleteTarget] = useState<ChatMessage | null>(null);
+  const [deleting, setDeleting] = useState(false);
   // ONE handler for the life of the thread: the desktop dialog (`ReportSheet
   // variant="modal"`) takes focus again whenever its `onClose` changes, and
   // this component renders again on every full read (20 s) and every new row,
@@ -304,6 +319,34 @@ export function RoomThread({ poll, roomId, roomKind, clubName, night, now, ancho
     poll.remove(target.id);
   };
 
+  // Delete for everyone (Oct 19, 2026): the row becomes the grey "Message
+  // deleted" note once the server says so (`poll.replace`; the next full
+  // read brings the same note), or goes when the server took it away whole.
+  const confirmDelete = async () => {
+    const target = deleteTarget;
+    if (!target || deleting) return;
+    setDeleting(true);
+    const r = await vibeRequest<DeleteOwnResponse>(
+      `/api/me/threads/${encodeURIComponent(roomId)}/messages/${encodeURIComponent(target.id)}`,
+      { method: "DELETE", failure: DELETE_FAILED, quiet: true },
+    );
+    setDeleting(false);
+    setDeleteTarget(null);
+    if (!r.ok) {
+      toastSendFailure(r);
+      return;
+    }
+    const note = leftNote(r.data);
+    if (note) poll.replace(target.id, asDeletedNote(target));
+    else poll.remove(target.id);
+    // A reply that quoted it stops showing its words now, not at the next
+    // full read about 20 s later (review of Oct 19, 2026; withDeletedQuotes).
+    const rows = messages ?? [];
+    withDeletedQuotes(rows, target.id, note).forEach((m, i) => {
+      if (m !== rows[i]) poll.replace(m.id, m);
+    });
+  };
+
   if (failure) {
     return (
       <div style={{ flexGrow: 1, minHeight: 0, boxSizing: "border-box", padding: "16px 12px", display: "flex", flexDirection: "column", justifyContent: anchor === "bottom" ? "flex-end" : "flex-start" }}>
@@ -373,7 +416,9 @@ export function RoomThread({ poll, roomId, roomKind, clubName, night, now, ancho
                 const report = canReport
                   ? () => setReportMessage({ type: "message", id: m.id, authorId: m.users?.id ?? m.user_id, authorName: m.users?.name || (m.users?.handle ? `@${m.users.handle}` : null), noun: "message" })
                   : undefined;
-                const remove = canRemove ? () => setRemoveTarget(m) : undefined;
+                const remove = canRemove && !m.deleted ? () => setRemoveTarget(m) : undefined;
+                // Delete: the viewer's own message or card (Oct 19, 2026).
+                const del = canDeleteOwn(m, viewerId) ? () => setDeleteTarget(m) : undefined;
                 let row: React.ReactNode;
                 if (m.removed !== null) {
                   row = (
@@ -398,6 +443,7 @@ export function RoomThread({ poll, roomId, roomKind, clubName, night, now, ancho
                         onOpenEventChat={onOpenEventChat}
                         onRemove={remove}
                         onReport={report}
+                        onDelete={del}
                         onToggleReaction={(emoji) => void toggleReaction(m, emoji)}
                         onReply={canReply ? () => onReply(replyTargetOf(m, isMine)) : undefined}
                       />
@@ -416,14 +462,16 @@ export function RoomThread({ poll, roomId, roomKind, clubName, night, now, ancho
                       listScrolledAtRef={listScrolledAtRef}
                       parentIsMine={!!viewerId && m.parent_preview?.user_id === viewerId}
                       onReply={canReply ? () => onReply(replyTargetOf(m, isMine)) : undefined}
-                      onReport={report}
+                      onReport={m.deleted ? undefined : report}
                       onRemove={remove}
+                      onDelete={del}
                     />
                   );
                 }
                 // Desktop: the hover toolbar around the row. A removed-content card and a row
                 // still sending get no handler, so no toolbar (the wrapper stays, bare).
-                const acts = !temp && m.removed === null;
+                // A deleted message's note has none either (Oct 19, 2026).
+                const acts = !temp && m.removed === null && !m.deleted;
                 return (
                   <div key={m.id} style={{ display: "flex", flexDirection: "column" }}>
                     {sep}
@@ -436,6 +484,7 @@ export function RoomThread({ poll, roomId, roomKind, clubName, night, now, ancho
                         onReply={acts && canReply ? () => onReply(replyTargetOf(m, isMine)) : undefined}
                         onReport={acts ? report : undefined}
                         onRemove={acts ? remove : undefined}
+                        onDelete={acts ? del : undefined}
                       >
                         {row}
                       </HoverActions>
@@ -450,6 +499,16 @@ export function RoomThread({ poll, roomId, roomKind, clubName, night, now, ancho
         </div>
       </div>
       {removeTarget ? <RemoveConfirm night={night} busy={removing} onConfirm={() => void confirmRemove()} onCancel={() => setRemoveTarget(null)} /> : null}
+      {deleteTarget ? (
+        <DeleteConfirm
+          night={night}
+          busy={deleting}
+          copy={deleteConfirmCopy()}
+          onConfirm={() => void confirmDelete()}
+          onCancel={() => setDeleteTarget(null)}
+          focusAfter={() => rowFocusTarget(scrollRef.current, deleteTarget.id)}
+        />
+      ) : null}
       {reportMessage ? (
         desktop ? (
           <ReportSheet variant="modal" target={reportMessage} onClose={closeReport} />

@@ -40,9 +40,34 @@ export function DeleteOneThing() {
           the edit keeps the text as it was.
         </li>
         <li>
-          <strong>A message</strong> is deleted right away for everyone, with
-          its reactions, any pin on it and, for a Board post, every reply under
-          it.
+          <strong>A message.</strong> When you delete a message:
+          <LegalUL bullets>
+            <li>
+              its words, its photo or video, any poll or sign-up in it (with
+              the votes and names), its reactions, any pin on it and the
+              notifications about it are deleted right away, for everyone. A
+              post or event it shared is not touched. A notification already on
+              someone&apos;s phone or computer can still show it there;
+            </li>
+            <li>
+              a grey &ldquo;Message deleted&rdquo; note stays in its place
+              (&ldquo;Post deleted&rdquo; on the Board). The note keeps that a
+              message was there, who sent it and when, and we store when it was
+              deleted. The note is kept as long as a message would be (the
+              table above);
+            </li>
+            <li>the replies under a Board post you delete stay;</li>
+            <li>
+              we then try to delete its photo or video file. If the Vibe team or
+              a club removed the message, or a report about it is open or was
+              acted on, the file is kept as evidence. It is also kept while
+              another message in the chat points to the same file. If the
+              delete fails, the file stays in our storage, even after you
+              delete your account.
+              While the file is still stored, a link to it opened before the
+              delete can work for up to an hour.
+            </li>
+          </LegalUL>
         </li>
         <li>
           <strong>A profile photo, cover or résumé file.</strong> When you
@@ -63,11 +88,6 @@ export function NotDeletedYet() {
         <strong>What Vibe does not delete yet.</strong>
       </LegalP>
       <LegalUL bullets>
-        <li>
-          The photo or video on a message you deleted. The app stops showing it,
-          but the file stays in our storage, even after you delete your
-          account. A link opened before the delete can work for up to an hour.
-        </li>
         <li>Group chat photos.</li>
         <li>
           A work logo you replaced, and a photo you uploaded but never used.

@@ -6,11 +6,14 @@ import { asLoadFailure, LoadFailed, type LoadFailure } from "@/components/feedba
 import { RemovedContentCard } from "@/components/safety/ReportSheet";
 import type { ChatMessage, ThreadMessagesResponse, ThreadRoom, ViewerInRoom } from "@/lib/chat/types";
 import type { RoomPoll } from "@/lib/chat/use-room-poll";
+import { DELETED_LINE, DELETED_POST_LINE } from "@/lib/chat/deleted-note";
 import { rowTime, rowTimeSpoken } from "@/lib/chat/when";
 import { vibeRequest } from "@/lib/feedback/request";
 
 import { personColor } from "../avatar";
 import { CardBubble } from "../cards/CardBubble";
+import { TrashIcon } from "../DeleteConfirm";
+import { canDeleteOwn, DELETE_LABEL } from "../delete-rules";
 import { initialsOf } from "../format";
 import { toastSendFailure } from "../send-failure";
 import { useChatSurface } from "../surface";
@@ -57,6 +60,13 @@ import { HoverActions } from "./HoverActions";
  * never arms) the hover toolbar the thread's rows have (`HoverActions`,
  * wave-3 contract 6.4): React, Reply, and `More` with the same `Report` and
  * `Remove`. The Board view renders the toolbar's CSS once.
+ *
+ * Delete (Oct 19, 2026; batch B7, decisions 8 and 9): the officer's own
+ * post (the byline "..." for text, the card's own door for a card) and the
+ * viewer's own reply (its "..." holds Delete only). A deleted post keeps its
+ * byline and shows "Post deleted" in place of its body; its replies stay
+ * readable and the reply field goes. A deleted reply keeps its name and
+ * shows "Message deleted".
  */
 export type BoardPostProps = {
   post: ChatMessage;
@@ -77,6 +87,10 @@ export type BoardPostProps = {
   onRemoveReply?: (reply: ChatMessage) => void;
   /** `Report` on one reply of this post; never offered on the viewer's own reply. */
   onReportReply?: (reply: ChatMessage) => void;
+  /** `Delete` on the post: the viewer's own (Oct 19, 2026, decision 9; delete-rules.ts `canDeleteBoardPost`). */
+  onDelete?: () => void;
+  /** `Delete` on one reply: offered only on the viewer's own (`canDeleteOwn`), decided here per reply. */
+  onDeleteReply?: (reply: ChatMessage) => void;
   /** An emoji picked on a card post (its picker or its chips): today's reaction flow (reactions.ts). */
   onToggleReaction?: (emoji: string) => void;
   /** A reply went in: the list re-reads the post (its server `reply_count`). */
@@ -180,7 +194,7 @@ const REPLY_TOUCH_PADDING = "11px 0 3px 10px";
  * closes it. A picked action closes the menu first and returns focus to the
  * button, so the confirm or the report sheet it opens hands focus back there.
  */
-function MoreMenu({ night, at, onReport, onRemove }: { night: boolean; at: keyof typeof MORE_AT; onReport?: () => void; onRemove?: () => void }) {
+function MoreMenu({ night, at, onReport, onRemove, onDelete }: { night: boolean; at: keyof typeof MORE_AT; onReport?: () => void; onRemove?: () => void; onDelete?: () => void }) {
   const t = palette(night);
   const { box, margin, menuRight } = MORE_AT[at];
   const [open, setOpen] = useState(false);
@@ -214,7 +228,7 @@ function MoreMenu({ night, at, onReport, onRemove }: { night: boolean; at: keyof
     return () => document.removeEventListener("pointerdown", onPress, true);
   }, [open]);
 
-  if (!onReport && !onRemove) return null;
+  if (!onReport && !onRemove && !onDelete) return null;
 
   const run = (action: () => void) => {
     setOpen(false);
@@ -276,13 +290,19 @@ function MoreMenu({ night, at, onReport, onRemove }: { night: boolean; at: keyof
               Remove
             </button>
           ) : null}
+          {onDelete ? (
+            <button type="button" role="menuitem" className="vibe-board-more-item" onClick={() => run(onDelete)} style={{ ...item, color: "var(--danger-ink)", display: "flex", alignItems: "center", gap: 8 }}>
+              <TrashIcon />
+              {DELETE_LABEL}
+            </button>
+          ) : null}
         </div>
       ) : null}
     </span>
   );
 }
 
-export function BoardPost({ post, roomId, room, viewer, viewerId, night, now, refreshToken, onCard, onRefresh, onOpenEventChat, onRemove, onReport, onRemoveReply, onReportReply, onToggleReaction, onReplied, onMissing }: BoardPostProps) {
+export function BoardPost({ post, roomId, room, viewer, viewerId, night, now, refreshToken, onCard, onRefresh, onOpenEventChat, onRemove, onReport, onRemoveReply, onReportReply, onDelete, onDeleteReply, onToggleReaction, onReplied, onMissing }: BoardPostProps) {
   const t = palette(night);
   const surface = useChatSurface();
   const [open, setOpen] = useState(false);
@@ -328,7 +348,11 @@ export function BoardPost({ post, roomId, room, viewer, viewerId, night, now, re
   const role = roleWord(post.author_role);
   const isMine = viewerId !== null && post.user_id === viewerId;
   const count = post.reply_count ?? 0;
-  const canReply = !!viewer?.can_reply && !temp;
+  // A deleted post (Oct 19, 2026): the "Post deleted" line in its body's
+  // place, its byline (who and when) and its replies stay; no menu, and no
+  // new replies under it (the database would still take one; the field goes).
+  const deleted = post.deleted === true;
+  const canReply = !!viewer?.can_reply && !temp && !deleted;
   const text = draft.trim();
   const canSend = text.length > 0 && !sending;
 
@@ -357,7 +381,7 @@ export function BoardPost({ post, roomId, room, viewer, viewerId, night, now, re
   // The byline's "..." (owed L3): on a text post, where nothing else names
   // Report or Remove. A card post has its own door (the long press, or the
   // hover toolbar below), so never both.
-  const bylineMore = post.kind === "text";
+  const bylineMore = post.kind === "text" && !deleted;
   // `Reply` on a card post, from the phone's picker or the desktop's toolbar:
   // the fold opens with the reply field focused.
   const replyFromCard = canReply
@@ -368,7 +392,13 @@ export function BoardPost({ post, roomId, room, viewer, viewerId, night, now, re
     : undefined;
   // A reply's "...": never on the viewer's own reply; Remove only for an
   // officer or a mod (the Board view passes it only then).
-  const replyMore = (m: ChatMessage) => viewerId !== null && m.user_id !== viewerId && m.removed === null && (!!onReportReply || (!!onRemoveReply && !!viewer?.can_moderate));
+  // Since Oct 19, 2026 the viewer's own reply has one too, with Delete only.
+  const replyMore = (m: ChatMessage) =>
+    m.deleted !== true &&
+    m.removed === null &&
+    (canDeleteOwn(m, viewerId)
+      ? !!onDeleteReply
+      : viewerId !== null && m.user_id !== viewerId && (!!onReportReply || (!!onRemoveReply && !!viewer?.can_moderate)));
   // The phone's fold once a row carries a "...": every row 44px apart, so
   // the 44px targets never touch (`MORE_AT.replyTouch`). A fold with none
   // (the viewer's own replies only) and the desktop keep the 28px rhythm.
@@ -388,6 +418,7 @@ export function BoardPost({ post, roomId, room, viewer, viewerId, night, now, re
         onOpenEventChat={onOpenEventChat}
         onRemove={onRemove}
         onReport={onReport}
+        onDelete={onDelete}
         onToggleReaction={onToggleReaction}
         onReply={replyFromCard}
       />
@@ -396,6 +427,9 @@ export function BoardPost({ post, roomId, room, viewer, viewerId, night, now, re
   return (
     <article
       aria-label={postAriaLabel(name, post.author_role, rowTimeSpoken(post.created_at, now))}
+      // A deleted post takes focus after its delete (DeleteConfirm's `focusAfter`; review of Oct 19, 2026).
+      data-chat-row={post.id}
+      tabIndex={deleted ? -1 : undefined}
       style={{
         flexShrink: 0,
         boxSizing: "border-box",
@@ -415,7 +449,7 @@ export function BoardPost({ post, roomId, room, viewer, viewerId, night, now, re
         <span style={{ fontSize: 13.5, fontWeight: 700, lineHeight: "18px", overflow: "hidden", textOverflow: "ellipsis" }}>{isMine && !post.users ? "You" : name}</span>
         {role ? <span style={{ fontSize: 12, fontWeight: 600, lineHeight: "18px", color: t.muted }}>{role}</span> : null}
         <span style={{ marginLeft: "auto", flexShrink: 0, fontSize: 12, fontWeight: 600, lineHeight: "18px", color: t.muted }}>{rowTime(post.created_at, now)}</span>
-        {bylineMore ? <MoreMenu night={night} at="byline" onReport={onReport} onRemove={onRemove} /> : null}
+        {bylineMore ? <MoreMenu night={night} at="byline" onReport={onReport} onRemove={onRemove} onDelete={onDelete} /> : null}
       </div>
       {card ? (
         // Desktop: the card's slot is the hover toolbar's size container (`vibe-hover-list`, HoverActions.tsx), so the pill stays inside the post.
@@ -431,6 +465,7 @@ export function BoardPost({ post, roomId, room, viewer, viewerId, night, now, re
               onReply={replyFromCard}
               onReport={temp ? undefined : onReport}
               onRemove={temp ? undefined : onRemove}
+              onDelete={temp ? undefined : onDelete}
             >
               {card}
             </HoverActions>
@@ -438,24 +473,31 @@ export function BoardPost({ post, roomId, room, viewer, viewerId, night, now, re
             card
           )}
         </div>
+      ) : deleted ? (
+        <p style={{ margin: "6px 0 0", fontSize: 14, fontStyle: "italic", fontWeight: 500, lineHeight: 1.35, color: t.muted }}>{DELETED_POST_LINE}</p>
       ) : (
         <p style={{ margin: "6px 0 0", fontSize: 15, fontWeight: 500, lineHeight: 1.35, textWrap: "pretty", whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>{post.content}</p>
       )}
-      <button
-        type="button"
-        aria-expanded={open}
-        aria-label={repliesToggleLabel(count, open)}
-        onClick={() => setOpen((o) => !o)}
-        style={{ width: "100%", height: 44, marginTop: 4, padding: 0, border: "none", borderTop: `1px solid ${t.hairline}`, background: "transparent", color: t.ink, fontFamily: "inherit", display: "flex", alignItems: "center", gap: 6, cursor: "pointer", WebkitTapHighlightColor: "transparent" }}
-      >
-        <span style={{ fontSize: 12.5, fontWeight: 700 }}>{repliesToggleText(count)}</span>
-        <Chevron up={open} color={t.secondary} />
-        <span style={{ marginLeft: "auto", display: "inline-flex", alignItems: "center", gap: 5, fontSize: 12, fontWeight: 600, color: t.muted }}>
-          <BellOff />
-          Replies stay quiet
-        </span>
-      </button>
-      {open ? (
+      {deleted && count === 0 ? (
+        <div aria-hidden="true" style={{ height: 10 }} />
+      ) : (
+        <button
+          type="button"
+          data-replies-toggle={post.id}
+          aria-expanded={open}
+          aria-label={repliesToggleLabel(count, open)}
+          onClick={() => setOpen((o) => !o)}
+          style={{ width: "100%", height: 44, marginTop: 4, padding: 0, border: "none", borderTop: `1px solid ${t.hairline}`, background: "transparent", color: t.ink, fontFamily: "inherit", display: "flex", alignItems: "center", gap: 6, cursor: "pointer", WebkitTapHighlightColor: "transparent" }}
+        >
+          <span style={{ fontSize: 12.5, fontWeight: 700 }}>{repliesToggleText(count)}</span>
+          <Chevron up={open} color={t.secondary} />
+          <span style={{ marginLeft: "auto", display: "inline-flex", alignItems: "center", gap: 5, fontSize: 12, fontWeight: 600, color: t.muted }}>
+            <BellOff />
+            Replies stay quiet
+          </span>
+        </button>
+      )}
+      {open && !(deleted && count === 0) ? (
         <>
           {replies.failure ? (
             <LoadFailed failure={replies.failure} compact tone={night ? "dark" : "light"} onRetry={() => setRetryToken((n) => n + 1)} />
@@ -479,17 +521,19 @@ export function BoardPost({ post, roomId, room, viewer, viewerId, night, now, re
                   );
                 }
                 return (
-                  <div key={m.id} style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
+                  <div key={m.id} data-chat-row={m.id} tabIndex={m.deleted ? -1 : undefined} style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
                     <Avatar person={m.users} fallbackId={m.user_id} size={22} fontSize={8.5} />
                     <p style={{ flexGrow: 1, minWidth: 0, margin: 0, paddingTop: 2, fontSize: 13, lineHeight: "18px", color: t.secondary, overflowWrap: "anywhere" }}>
-                      <span style={{ fontWeight: 700, color: t.ink }}>{viewerId !== null && m.user_id === viewerId && !m.users ? "You" : authorName(m.users)}</span> {m.content}
+                      <span style={{ fontWeight: 700, color: t.ink }}>{viewerId !== null && m.user_id === viewerId && !m.users ? "You" : authorName(m.users)}</span>{" "}
+                      {m.deleted ? <span style={{ fontStyle: "italic", color: t.muted }}>{DELETED_LINE}</span> : m.content}
                     </p>
                     {replyMore(m) ? (
                       <MoreMenu
                         night={night}
                         at={desktop ? "replyPointer" : "replyTouch"}
-                        onReport={onReportReply ? () => onReportReply(m) : undefined}
-                        onRemove={onRemoveReply && viewer?.can_moderate ? () => onRemoveReply(m) : undefined}
+                        onReport={onReportReply && !canDeleteOwn(m, viewerId) ? () => onReportReply(m) : undefined}
+                        onRemove={onRemoveReply && viewer?.can_moderate && !canDeleteOwn(m, viewerId) ? () => onRemoveReply(m) : undefined}
+                        onDelete={onDeleteReply && canDeleteOwn(m, viewerId) ? () => onDeleteReply(m) : undefined}
                       />
                     ) : null}
                   </div>

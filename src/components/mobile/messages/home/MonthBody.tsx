@@ -4,6 +4,7 @@ import Link from "next/link";
 import { type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 
 import { asLoadFailure, LoadFailed, type LoadFailure } from "@/components/feedback/LoadFailed";
+import { clubEventHref } from "@/lib/calendar/calendar-key";
 import { addMonths, clampMonth, compareMonths, isSameLocalDay, monthBounds, monthGrid, monthName, monthOf, type MonthRef, startOfLocalDay } from "@/lib/chat/week";
 import { vibeRequest } from "@/lib/feedback/request";
 
@@ -13,6 +14,7 @@ import { palette, type Palette, SERIF } from "../v2-tokens";
 
 import { CheckIcon } from "./ClubRow";
 import { calendarUrl, dayCaption, dayDot, dayHeading, dayWhen, entriesOn, isPastDay, monthDayLabel, type PlanRow, planRows, rsvpEntries, spokenDay, type WeekEntry } from "./home-rules";
+import { InterestedRing, RsvpDayMark } from "./RsvpMark";
 import { slideClass, useSwipe } from "./YourWeek";
 
 /**
@@ -196,7 +198,8 @@ export function MonthBody({ initialDay, now, night, onPicked, onOpenRoom, render
               >
                 <span style={{ width: cell, height: cell, boxSizing: "border-box", borderRadius: 14, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 3, background: selected ? "rgba(var(--scrim-rgb),0.12)" : "transparent", boxShadow: today ? `inset 0 0 0 2px ${t.coral}` : "none" }}>
                   <span style={{ fontSize: 15, fontWeight: today || selected ? 800 : 700, lineHeight: "16px", color: !selected && isPastDay(day, now) ? t.muted : t.ink }}>{day.getDate()}</span>
-                  <span aria-hidden="true" style={{ width: 5, height: 5, borderRadius: 999, background: dot === "going" ? t.coral : dot === "maybe" ? t.muted : "transparent", boxShadow: live && glow ? `0 0 6px ${t.coral}` : "none" }} />
+                  {/* The calendar key (Oct 19, 2026 repair): a coral ring for Interested. */}
+                  <RsvpDayMark kind={dot} coral={t.coral} glow={live && glow ? `0 0 6px ${t.coral}` : undefined} />
                 </span>
               </button>
             );
@@ -366,18 +369,32 @@ function DayPlans({
                 Going
               </span>
             ) : (
-              <span style={{ flexShrink: 0, height: 28, boxSizing: "border-box", padding: "0 10px 0 9px", borderRadius: 999, border: `1px solid ${t.chipBorder}`, background: "rgba(var(--scrim-rgb),0.06)", color: t.secondary, fontSize: 12.5, fontWeight: 700, display: "inline-flex", alignItems: "center", gap: 6 }}>
-                <span aria-hidden="true" style={{ width: 6, height: 6, borderRadius: 999, background: t.muted }} />
-                Maybe
+              // A coral outline with ink words (the calendar key, Oct 19, 2026
+              // repair); Going above is the filled coral pill.
+              <span style={{ flexShrink: 0, height: 28, boxSizing: "border-box", padding: "0 10px 0 9px", borderRadius: 999, border: `1.5px solid ${t.coral}`, background: "var(--tag-bg)", color: t.ink, fontSize: 12.5, fontWeight: 700, display: "inline-flex", alignItems: "center", gap: 6 }}>
+                <InterestedRing coral={t.coral} />
+                Interested
               </span>
             )}
           </>
         );
-        return e.room_id ? (
-          <button key={e.id} type="button" aria-label={row.label} onClick={() => onOpenRoom(e)} style={{ ...rowStyle, cursor: "pointer" }}>
-            {body}
-          </button>
-        ) : (
+        if (e.room_id) {
+          return (
+            <button key={e.id} type="button" aria-label={row.label} onClick={() => onOpenRoom(e)} style={{ ...rowStyle, cursor: "pointer" }}>
+              {body}
+            </button>
+          );
+        }
+        // No chat to open (Oct 19, 2026, critique D13): the row opens the
+        // club's page, scrolled to this event.
+        if (e.org) {
+          return (
+            <Link key={e.id} href={clubEventHref(e.org.handle, e.id)} aria-label={`${row.label}. Open the club page`} style={{ ...rowStyle, textDecoration: "none" }}>
+              {body}
+            </Link>
+          );
+        }
+        return (
           <div key={e.id} role="group" aria-label={row.label} style={rowStyle}>
             {body}
           </div>

@@ -41,6 +41,10 @@ import {
   withCampus,
 } from "@/components/campus/viewing-campus";
 import { VisitingBanner } from "@/components/campus/VisitingBanner";
+import { FriendRepostLine } from "@/components/feed/FriendRepostLine";
+// The phone card's counts print like the desktop row's and the repost line's
+// ("1.2K"), Oct 19, 2026 review r3, so "1.2K others" never sits over "1234".
+import { compactCount } from "@/lib/feed/compact-count";
 import { asLoadFailure, LoadFailed, type LoadFailure } from "@/components/feedback/LoadFailed";
 import { CampusConfirmBanner } from "@/components/mobile/CampusConfirmBanner";
 import { EditPostSheet } from "@/components/mobile/EditPostSheet";
@@ -57,6 +61,7 @@ import { OrgJoinControl } from "@/components/orgs/OrgJoinControl";
 import { PushAsk } from "@/components/push/PushAsk";
 import { RemovedContentCard, ReportSheet } from "@/components/safety/ReportSheet";
 import { useChatV2 } from "@/lib/chat/use-chat-v2";
+import { captionSegments } from "@/lib/feed/caption-segments";
 import { vibeRequest } from "@/lib/feedback/request";
 import { toast } from "@/lib/feedback/toast";
 import { campusRowById } from "@/lib/iu/campuses";
@@ -76,6 +81,14 @@ import {
 } from "@/lib/orgs/join-copy";
 import type { JoinPolicy, JoinState, OrgAudience, OrgRole } from "@/lib/orgs/join-state";
 import type { EditedPost } from "@/lib/posts/edit";
+import {
+  beginEngagementTap,
+  engagementFromFeedPost,
+  engagementReadToken,
+  readEngagement,
+  seedEngagementFromFeed,
+  usePostEngagement,
+} from "@/lib/posts/engagement-store";
 import {
   deletesAsOfficer,
   feedClubOf,
@@ -652,6 +665,8 @@ export function CampusMobile() {
   const feedSeqRef = useRef(0);
   const refetchFeed = useCallback(async (mode: "first" | "refresh") => {
     const seq = ++feedSeqRef.current;
+    // Taken before the request: a like tapped while it's out wins over it.
+    const readToken = engagementReadToken();
     const r = await vibeRequest<FeedBody>(feedUrl, {
       cache: "no-store",
       quiet: mode !== "refresh",
@@ -661,6 +676,9 @@ export function CampusMobile() {
     if (seq !== feedSeqRef.current) return;
     const posts = r.ok ? feedPostsFrom(r.data) : null;
     if (posts) {
+      // The shared like / save / repost record every card and the open post
+      // read (Oct 19, 2026, critique M1). Seeded before the cards render.
+      seedEngagementFromFeed(posts, readToken);
       feedLoadedRef.current = true;
       setFeedErr(null);
       // A load already out when a report landed can't bring the post back.
@@ -893,6 +911,7 @@ export function CampusMobile() {
         ? `Couldn't load every post tagged #${feedTag}.`
         : `Couldn't load posts tagged #${feedTag}.`;
     void (async () => {
+      const readToken = engagementReadToken();
       // `feedUrl` already carries `?limit=50` (and `campus=` when visiting).
       const r = await vibeRequest<FeedBody>(
         `${feedUrl}&tag=${encodeURIComponent(feedTag)}`,
@@ -906,6 +925,7 @@ export function CampusMobile() {
       if (cancelled) return;
       const posts = r.ok ? feedPostsFrom(r.data) : null;
       if (posts) {
+        seedEngagementFromFeed(posts, readToken);
         // A viewer whose main feed failed still gets Edit on their own cards.
         if (r.ok && typeof r.data.viewerId === "string") setViewerId(r.data.viewerId);
         setTagFeed({
@@ -1596,12 +1616,19 @@ function TabStrip({
  *  they are, so a 50-card load doesn't run 50 springs at once. */
 const REVEAL_SCREENFUL = 8;
 
-/** A #tag as publish-post stores it and /api/feed?tag= matches it: no
- *  leading #, lowercase, letters / digits / underscore, at most 32.
- *  Anything else (a hand-edited ?tag=) is no filter at all. */
+/** A #tag as the database stores it and /api/feed?tag= matches it: no
+ *  leading #, lowercase, `a-z 0-9 _`, 1 to 32. Anything else (a hand-edited
+ *  ?tag=) is no filter at all.
+ *
+ *  The READ rule, so an old stored tag like "#1" still filters (Oct 19, 2026,
+ *  critique B1). It is `POST_TAG_RE` / `isValidPostTag` in src/lib/posts/tags.ts
+ *  copied inline, its twin: tags.ts pulls the word list into the browser
+ *  bundle (batch-B3 note 3). It used to allow any letter ("#café"), which no
+ *  stored tag can be. */
+const FEED_TAG_READ_RE = /^[a-z0-9_]{1,32}$/;
 function normalizeFeedTag(raw: string | null | undefined): string | null {
   const t = (raw ?? "").trim().toLowerCase().replace(/^#+/, "");
-  return /^[\p{L}\p{N}_]{1,32}$/u.test(t) ? t : null;
+  return FEED_TAG_READ_RE.test(t) ? t : null;
 }
 
 /** `viewerId` is echoed on every 200, so a card knows which posts are yours. */
@@ -1870,54 +1897,48 @@ function FeedCard({
     post.org?.name || author?.name || (author?.handle ? `@${author.handle}` : null);
   const mediaLabel = `${isVideo ? "Video" : "Photo"}${mediaBy ? ` posted by ${mediaBy}` : ""}`;
 
-  // Local engagement state, seeded from the feed payload. Heart +
-  // double-tap-to-like + repost + save all flow through their own
-  // optimistic toggles with rollback on network failure. Save state
-  // isn't in the feed payload so it starts unsaved; tapping seeds it.
-  const [liked, setLiked] = useState(!!post.viewer_liked);
-  const [likeCount, setLikeCount] = useState(post.like_count ?? 0);
-  const [reposted, setReposted] = useState(!!post.viewer_reposted);
-  const [repostCount, setRepostCount] = useState(post.repost_count ?? 0);
-  const [saved, setSaved] = useState(!!post.viewer_saved);
+  // Like, save, repost and the comment count live in the shared engagement
+  // record (Oct 19, 2026, critique M1; src/lib/posts/engagement-store.ts),
+  // the same one the open post reads, so a like inside the post shows here
+  // the moment it's tapped, and one here shows there. The feed seeds it; the
+  // card's own fields show until then. Each tap flips the record first and a
+  // refusal rolls the record back (on every screen), with the toast saying
+  // why; a second tap while the first is out is dropped.
+  const fallback = useMemo(() => engagementFromFeedPost(post), [post]);
+  const eng = usePostEngagement(post.id, fallback);
+  const { liked, likeCount, reposted, repostCount, saved, commentCount } = eng;
   // Bumped by the person's own like (tap or double tap), not by `liked`
   // coming back on after a failed unlike: only a like pops the heart.
   const [likeBurst, setLikeBurst] = useState(0);
   const [menuOpen, setMenuOpen] = useState(false);
   const tapTimerRef = useRef<number | null>(null);
-  const likingRef = useRef(false);
-  const repostingRef = useRef(false);
-  const savingRef = useRef(false);
+  const captionRef = useRef<HTMLParagraphElement | null>(null);
+  useTagsPastClampOutOfTabOrder(captionRef, `${post.content ?? ""}\u0000${(post.tags ?? []).join(",")}`);
 
   const toggleLike = useCallback(async () => {
-    if (likingRef.current) return;
-    likingRef.current = true;
-    const targetLiked = !liked;
-    const prevLiked = liked;
-    const prevCount = likeCount;
-    setLiked(targetLiked);
+    const tap = beginEngagementTap(post.id, "like", fallback, (c) => ({
+      liked: !c.liked,
+      likeCount: c.likeCount + (c.liked ? -1 : 1),
+    }));
+    if (!tap) return;
+    const targetLiked = readEngagement(post.id)?.liked === true;
     if (targetLiked) setLikeBurst((n) => n + 1);
-    setLikeCount((n) => Math.max(0, n + (targetLiked ? 1 : -1)));
-    // The heart flips first; on a refusal it flips back and the toast says why.
     const r = await vibeRequest(`/api/posts/${post.id}/like`, {
       method: targetLiked ? "POST" : "DELETE",
       credentials: "include",
       failure: targetLiked ? "Couldn't like this post." : "Couldn't unlike this post.",
     });
-    if (!r.ok) {
-      setLiked(prevLiked);
-      setLikeCount(prevCount);
-    }
-    likingRef.current = false;
-  }, [liked, likeCount, post.id]);
+    if (r.ok) tap.commit();
+    else tap.rollback();
+  }, [fallback, post.id]);
 
   const toggleRepost = useCallback(async () => {
-    if (repostingRef.current) return;
-    repostingRef.current = true;
-    const target = !reposted;
-    const prevReposted = reposted;
-    const prevCount = repostCount;
-    setReposted(target);
-    setRepostCount((n) => Math.max(0, n + (target ? 1 : -1)));
+    const tap = beginEngagementTap(post.id, "repost", fallback, (c) => ({
+      reposted: !c.reposted,
+      repostCount: c.repostCount + (c.reposted ? -1 : 1),
+    }));
+    if (!tap) return;
+    const target = readEngagement(post.id)?.reposted === true;
     // Reposting is terms-gated: an un-consented account used to watch it
     // silently undo itself. Now it flips back and the toast says why.
     const r = await vibeRequest(`/api/posts/${post.id}/repost`, {
@@ -1925,19 +1946,14 @@ function FeedCard({
       credentials: "include",
       failure: target ? "Couldn't repost this." : "Couldn't undo your repost.",
     });
-    if (!r.ok) {
-      setReposted(prevReposted);
-      setRepostCount(prevCount);
-    }
-    repostingRef.current = false;
-  }, [reposted, repostCount, post.id]);
+    if (r.ok) tap.commit();
+    else tap.rollback();
+  }, [fallback, post.id]);
 
   const toggleSave = useCallback(async () => {
-    if (savingRef.current) return;
-    savingRef.current = true;
-    const target = !saved;
-    const prev = saved;
-    setSaved(target);
+    const tap = beginEngagementTap(post.id, "save", fallback, (c) => ({ saved: !c.saved }));
+    if (!tap) return;
+    const target = readEngagement(post.id)?.saved === true;
     const r = await vibeRequest(`/api/posts/${post.id}/save`, {
       method: target ? "POST" : "DELETE",
       credentials: "include",
@@ -1945,9 +1961,9 @@ function FeedCard({
         ? "Couldn't save this post."
         : "Couldn't remove this from your saved posts.",
     });
-    if (!r.ok) setSaved(prev);
-    savingRef.current = false;
-  }, [saved, post.id]);
+    if (r.ok) tap.commit();
+    else tap.rollback();
+  }, [fallback, post.id]);
 
   useEffect(() => {
     return () => {
@@ -2024,8 +2040,23 @@ function FeedCard({
         boxShadow: "var(--card-shadow)",
         position: "relative",
         overflow: "hidden",
+        // A column, so the repost line above the author is only as wide as
+        // its words (its `alignSelf`); every other child still fills the row.
+        display: "flex",
+        flexDirection: "column",
       }}
     >
+      {/* "Maya and 6 others reposted", above the author (Oct 19, 2026,
+          critique M2): tap it for "Reposted by". Only when someone you
+          follow reposted it; never generic popularity. */}
+      <FriendRepostLine
+        postId={post.id}
+        reposters={post.friend_reposters}
+        repostCount={repostCount}
+        viewerReposted={reposted}
+        variant="phone"
+        onPress={cancelPendingOpen}
+      />
       <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
         <AuthorLink
           handle={author?.handle ?? null}
@@ -2120,6 +2151,7 @@ function FeedCard({
 
       {post.content ? (
         <p
+          ref={captionRef}
           style={{
             margin: "10px 0 0",
             fontFamily: "DM Sans, sans-serif",
@@ -2134,7 +2166,29 @@ function FeedCard({
             wordBreak: "break-word",
           }}
         >
-          {post.content}
+          {/* Tags are tappable right in the caption, and only the ones the
+              post saved (Oct 19, 2026, critique decisions 3-5): the chip row
+              that used to sit under the photo is gone. A tag filters the
+              feed instead of opening the post. */}
+          {captionSegments(post.content, post.tags).map((seg, i) =>
+            seg.kind === "tag" ? (
+              <button
+                key={i}
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  cancelPendingOpen();
+                  onPickTag(seg.tag);
+                }}
+                aria-label={`Show posts tagged #${seg.tag}`}
+                style={CAPTION_TAG_STYLE}
+              >
+                {seg.text}
+              </button>
+            ) : (
+              <span key={i}>{seg.text}</span>
+            ),
+          )}
         </p>
       ) : null}
 
@@ -2179,89 +2233,6 @@ function FeedCard({
               </svg>
             </span>
           ) : null}
-        </div>
-      ) : null}
-
-      {post.tags && post.tags.length > 0 ? (
-        <div
-          style={{
-            marginTop: 10,
-            display: "flex",
-            flexWrap: "wrap",
-            gap: 6,
-          }}
-        >
-          {post.tags.slice(0, 4).map((t) => (
-            <button
-              key={t}
-              type="button"
-              onClick={(e) => {
-                // Filters the feed to this tag instead of opening the post.
-                e.stopPropagation();
-                cancelPendingOpen();
-                onPickTag(t);
-              }}
-              aria-label={`Show posts tagged #${t}`}
-              style={{
-                padding: "3px 9px",
-                borderRadius: 999,
-                border: "none",
-                background: "var(--tag-bg)",
-                color: "var(--tag-ink)",
-                fontFamily: "DM Sans, sans-serif",
-                fontSize: 11.5,
-                fontWeight: 700,
-                cursor: "pointer",
-                WebkitTapHighlightColor: "transparent",
-              }}
-            >
-              #{t}
-            </button>
-          ))}
-        </div>
-      ) : null}
-
-      {/* Friend-repost social proof — Instagram-style "X reposted this"
-          pill. Only renders when at least one of the viewer's friends
-          reposted; we never show generic popularity here. */}
-      {post.friend_reposters && post.friend_reposters.length > 0 ? (
-        <div
-          style={{
-            marginTop: 10,
-            display: "inline-flex",
-            alignItems: "center",
-            gap: 6,
-            padding: "4px 8px 4px 4px",
-            borderRadius: 999,
-            background: "rgba(46,160,72,0.10)",
-            border: "1px solid rgba(46,160,72,0.22)",
-            // Deep green ink. Until globals.css defines --ok-ink-2 (a light
-            // green in Night), the fallback keeps today's Light colour.
-            color: "var(--ok-ink-2)",
-            fontFamily: "DM Sans, sans-serif",
-            fontSize: 11.5,
-            fontWeight: 700,
-          }}
-        >
-          <div style={{ display: "inline-flex", marginRight: 2 }}>
-            {post.friend_reposters.slice(0, 3).map((u, i) => (
-              <span
-                key={u.id}
-                aria-hidden
-                style={{
-                  width: 18,
-                  height: 18,
-                  borderRadius: 999,
-                  background: u.avatar_url
-                    ? `url(${u.avatar_url}) center/cover`
-                    : "#FFD3C2",
-                  border: "1.5px solid var(--cream)",
-                  marginLeft: i === 0 ? 0 : -6,
-                }}
-              />
-            ))}
-          </div>
-          {friendRepostLabel(post)}
         </div>
       ) : null}
 
@@ -2326,7 +2297,7 @@ function FeedCard({
               />
             </svg>
           </LikeBurst>
-          {likeCount}
+          {compactCount(likeCount)}
         </button>
 
         {/* Comment — opens the post viewer (which has the comments
@@ -2373,7 +2344,7 @@ function FeedCard({
           >
             <path d="M2.5 4a1.5 1.5 0 0 1 1.5-1.5h8a1.5 1.5 0 0 1 1.5 1.5v6A1.5 1.5 0 0 1 12 11.5H5.6L2.5 14V4z" />
           </svg>
-          {post.comment_count}
+          {compactCount(commentCount)}
         </button>
 
         <button
@@ -2418,7 +2389,7 @@ function FeedCard({
             <path d="M4 9V7a2 2 0 0 1 2-2h10l-2.5-2.5" />
             <path d="M18 13v2a2 2 0 0 1-2 2H6l2.5 2.5" />
           </svg>
-          {repostCount}
+          {compactCount(repostCount)}
         </button>
 
         {/* Views — small inline metric. Kept subtle so the three
@@ -4450,23 +4421,58 @@ function ActionSheetRow({
   );
 }
 
-/** "Alice reposted this" / "Alice and 4 others reposted this" — names
- *  for up to 2 friends, then collapse the tail into "and N others". */
-function friendRepostLabel(post: FeedPost): string {
-  const samples = post.friend_reposters ?? [];
-  const total = post.friend_reposter_count ?? samples.length;
-  if (samples.length === 0) return "Reposted by your network";
-  const first = samples[0]!.name || (samples[0]!.handle ? `@${samples[0]!.handle}` : "Someone");
-  if (total <= 1) return `${first} reposted this`;
-  if (samples.length === 1 || total === 2) {
-    const second = samples[1]
-      ? samples[1].name || (samples[1].handle ? `@${samples[1].handle}` : null)
-      : null;
-    if (second && total === 2) return `${first} and ${second} reposted this`;
-    return `${first} and ${total - 1} other${total - 1 === 1 ? "" : "s"} reposted this`;
-  }
-  return `${first} and ${total - 1} others reposted this`;
+/** A #tag inside a feed card's caption (Oct 19, 2026, decision 5): reads as
+ *  the caption's own words in --tag-ink, no chip. A real button, so it takes
+ *  the tap (the card around it opens the post), with no box of its own. */
+/**
+ * A caption tag cut off by the card's 4-line clamp leaves the Tab order (Oct
+ * 19, 2026, review r3). Tags became buttons inside the clamped caption, so a
+ * tag on line 5 or later was invisible but still took keyboard focus (with no
+ * ring you could see) and Enter filtered the feed from a control nobody could
+ * see. Only the Tab order changes: a screen reader still reads the whole
+ * caption, as with any clamped text, and the open post shows every tag.
+ * Re-measured when the caption or tags change, the card resizes, or the
+ * fonts finish loading (both move where lines break).
+ */
+function useTagsPastClampOutOfTabOrder(
+  ref: React.RefObject<HTMLParagraphElement | null>,
+  contentKey: string,
+): void {
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    let live = true;
+    const apply = () => {
+      if (!live) return;
+      const bottom = el.getBoundingClientRect().bottom;
+      for (const b of el.querySelectorAll<HTMLButtonElement>("button")) {
+        b.tabIndex = b.getBoundingClientRect().top < bottom - 1 ? 0 : -1;
+      }
+    };
+    apply();
+    const ro = typeof ResizeObserver === "function" ? new ResizeObserver(apply) : null;
+    ro?.observe(el);
+    void document.fonts?.ready.then(apply, () => {});
+    return () => {
+      live = false;
+      ro?.disconnect();
+    };
+  }, [ref, contentKey]);
 }
+
+const CAPTION_TAG_STYLE: React.CSSProperties = {
+  display: "inline",
+  margin: 0,
+  padding: 0,
+  border: "none",
+  background: "none",
+  color: "var(--tag-ink)",
+  font: "inherit",
+  fontWeight: 600,
+  lineHeight: "inherit",
+  cursor: "pointer",
+  WebkitTapHighlightColor: "transparent",
+};
 
 function relativeTime(iso: string): string {
   const ms = Date.now() - Date.parse(iso);

@@ -5,6 +5,8 @@ import { useRef, useState } from "react";
 
 import { RemovedContentCard } from "@/components/safety/ReportSheet";
 
+import { DELETED_LINE } from "@/lib/chat/deleted-note";
+
 import { initialsOf, quotedBody } from "./format";
 import { ReactionPicker } from "./ReactionPicker";
 import { useChatSurface } from "./surface";
@@ -26,6 +28,7 @@ export function MessageBubble({
   pinLabel,
   onReport,
   onRemove,
+  onDelete,
 }: {
   message: MessageRow;
   isMine: boolean;
@@ -70,6 +73,11 @@ export function MessageBubble({
   /** "Remove" in the same picker: an officer's or a mod's removal of someone
    *  else's message in a club room (wave-2 contract 11.5). A pass-through. */
   onRemove?: () => void;
+  /** "Delete" in the same picker, last and red: the viewer's own message
+   *  (Oct 19, 2026; delete-rules.ts `canDeleteOwn`). The caller confirms
+   *  and asks the server. It also puts the ⋯ beside the viewer's own
+   *  bubble, so Delete is never behind the hold alone. */
+  onDelete?: () => void;
 }) {
   const sender = message.users ?? null;
   const senderName = sender?.name || sender?.handle || "Member";
@@ -575,11 +583,48 @@ export function MessageBubble({
       >
         ↩ {parentIsMine ? "You" : parent.author?.name || parent.author?.handle || "message"}
       </div>
-      <div style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+      <div style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", fontStyle: parent.deleted ? "italic" : undefined }}>
         {quotedBody(parent)}
       </div>
     </div>
   ) : null;
+
+  // The note in a deleted message's place (Oct 19, 2026, decision 8): one
+  // grey line on the sender's side, no words, no file, no quote, no
+  // reactions, no menu. The sender's name and picture above it stay (the
+  // group header), and so does its place in the thread.
+  // `data-chat-row` + tabIndex -1 (review of Oct 19, 2026): the More button
+  // that opened the delete goes with the row, so the confirm hands focus to
+  // the note itself (DeleteConfirm's `focusAfter`) instead of the page body.
+  const deletedLine = (
+    <div
+      data-chat-row={message.id}
+      tabIndex={-1}
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 6,
+        maxWidth: "100%",
+        boxSizing: "border-box",
+        padding: "7px 12px",
+        borderRadius: 18,
+        border: darkMode ? "1px solid rgba(255,255,255,0.14)" : "1px solid rgba(var(--scrim-rgb),0.14)",
+        background: "transparent",
+        color: darkMode ? "rgba(255,255,255,0.58)" : "var(--ink-muted)",
+        fontFamily: "DM Sans, sans-serif",
+        fontSize: 13.5,
+        fontStyle: "italic",
+        fontWeight: 500,
+        lineHeight: 1.35,
+      }}
+    >
+      <svg width="13" height="13" viewBox="0 0 16 16" fill="none" aria-hidden="true" style={{ flexShrink: 0 }}>
+        <circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="1.4" />
+        <path d="M3.8 12.2l8.4-8.4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+      </svg>
+      {DELETED_LINE}
+    </div>
+  );
 
   // A ⋯ beside the bubble, opening the same picker the long press opens.
   // Report lived only behind that hold: nothing on the screen named it, and
@@ -589,7 +634,10 @@ export function MessageBubble({
   // own, never on a row still sending, both already decided by `onReport`).
   // Not on the desktop surface: the hover toolbar has its own ⋯ ("More"),
   // and two would be the same control twice.
-  const showMore = !desktop && !!onReport && !message.id.startsWith("temp_");
+  // Since Oct 19, 2026 it shows on the viewer's own message too, for Delete.
+  // A deleted message's note has no menu at all.
+  const deleted = message.deleted === true;
+  const showMore = !desktop && !deleted && (!!onReport || !!onDelete) && !message.id.startsWith("temp_");
   const moreButton = showMore ? (
     <button
       type="button"
@@ -725,18 +773,24 @@ export function MessageBubble({
               minWidth: 0,
             }}
           >
-            {quote}
-            {captionAbove ? textBubble : null}
-            {media}
-            {card}
-            {captionAbove ? null : textBubble}
-            {isEmpty ? noticeTile("Attachment") : null}
+            {deleted ? (
+              deletedLine
+            ) : (
+              <>
+                {quote}
+                {captionAbove ? textBubble : null}
+                {media}
+                {card}
+                {captionAbove ? null : textBubble}
+                {isEmpty ? noticeTile("Attachment") : null}
+              </>
+            )}
           </div>
           {moreButton}
         </div>
 
         {/* Existing reactions — tappable to toggle. Wraps below the bubble. */}
-        {message.reactions && message.reactions.length > 0 ? (
+        {!deleted && message.reactions && message.reactions.length > 0 ? (
           <div
             style={{
               display: "flex",
@@ -794,7 +848,7 @@ export function MessageBubble({
         {/* Emoji picker — pops out on long-press. Anchored above the
             bubble on the same side, or below it when the list has no
             room above. */}
-        {pickerOpen ? (
+        {pickerOpen && !deleted ? (
           <ReactionPicker
             darkMode={darkMode}
             isMine={isMine}
@@ -838,6 +892,15 @@ export function MessageBubble({
                 ? () => {
                     setPickerOpen(false);
                     onRemove();
+                  }
+                : undefined
+            }
+            // Same temp_ guard: a row still sending has no id to delete.
+            onDelete={
+              onDelete && !message.id.startsWith("temp_")
+                ? () => {
+                    setPickerOpen(false);
+                    onDelete();
                   }
                 : undefined
             }

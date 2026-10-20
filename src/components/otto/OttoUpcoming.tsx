@@ -63,7 +63,8 @@ export function OttoUpcoming({ rows, onDismissReminder, onActReminder, failed }:
                     {whenLabel(r.starts_at)}
                     {r.location ? <span> · {r.location}</span> : null}
                     <span className="otto-room-pill otto-room-pill--rsvp">
-                      {r.viewer_status === "going" ? "RSVP'd" : "Maybe"}
+                      {/* The calendar's words (Oct 19, 2026, decision 12). */}
+                      {r.viewer_status === "going" ? "Going" : "Interested"}
                     </span>
                   </p>
                 </div>

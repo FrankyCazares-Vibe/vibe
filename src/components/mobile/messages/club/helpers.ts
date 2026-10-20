@@ -263,9 +263,11 @@ export function eventTimeSpoken(starts_at: string, now: Date): string {
   return `${day} ${time}`;
 }
 
-/** The RSVP word on an Up next card and a week card: `Going` / `Maybe` / null. */
-export function rsvpWord(status: EventRef["viewer_status"]): "Going" | "Maybe" | null {
-  return status === "going" ? "Going" : status === "maybe" ? "Maybe" : null;
+/** The RSVP word on an Up next card and a week card: `Going` / `Interested` / null.
+ *  "Interested", not "Maybe", since Oct 19, 2026 (decision 12): the Policy's
+ *  and the event card's word. The stored value is still `maybe`. */
+export function rsvpWord(status: EventRef["viewer_status"]): "Going" | "Interested" | null {
+  return status === "going" ? "Going" : status === "maybe" ? "Interested" : null;
 }
 
 /** An Up next card's line 1: `Live now` / `Tonight · 7:30 PM` / `Tue · 7 PM` (`eventTime`). */
@@ -275,7 +277,7 @@ export function upNextLine(event: EventTimes, now: Date): string {
 
 /**
  * `"<title> room, soon, tonight 7:30 PM, you're going"` /
- * `"<title> room, Tuesday 7 PM, you said maybe"`; `soon` only when `isSoon`,
+ * `"<title> room, Tuesday 7 PM, you're interested"`; `soon` only when `isSoon`,
  * `live now` on `live`, the RSVP clause only when the viewer RSVP'd.
  */
 export function upNextAriaLabel(event: EventTimes & Pick<EventRef, "title" | "viewer_status"> & { room_id?: string | null }, now: Date): string {
@@ -284,7 +286,7 @@ export function upNextAriaLabel(event: EventTimes & Pick<EventRef, "title" | "vi
   if (isSoon(event.starts_at, event.ends_at, now)) parts.push("soon");
   parts.push(event.state === "live" ? "live now" : eventTimeSpoken(event.starts_at, now));
   if (event.viewer_status === "going") parts.push("you're going");
-  else if (event.viewer_status === "maybe") parts.push("you said maybe");
+  else if (event.viewer_status === "maybe") parts.push("you're interested");
   return parts.join(", ");
 }
 
@@ -367,15 +369,15 @@ export function pillState(state: RoomState | string): RoomState {
   return state === "soon" || state === "live" || state === "after" ? state : "closed";
 }
 
-/** `Who's going: N going, M maybe`. */
+/** `Who's going: N going, M interested`. */
 export function whoIsGoingLabel(going: number, maybe: number): string {
-  return `Who's going: ${going} going, ${maybe} maybe`;
+  return `Who's going: ${going} going, ${maybe} interested`;
 }
 
 /** The RSVP pill's text and `aria-label` (1.2). */
 export function rsvpPill(status: EventRef["viewer_status"]): { text: string; label: string } {
   if (status === "going") return { text: "Going", label: "You're going. Change your RSVP" };
-  if (status === "maybe") return { text: "Maybe", label: "You said maybe. Change your RSVP" };
+  if (status === "maybe") return { text: "Interested", label: "You're interested. Change your RSVP" };
   return { text: "RSVP", label: "RSVP to this event" };
 }
 

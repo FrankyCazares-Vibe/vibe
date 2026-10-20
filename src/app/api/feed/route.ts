@@ -559,12 +559,15 @@ export async function GET(req: Request) {
       // `honestViews === null` means the ledger was unreadable, not that
       // nobody looked — hence the stored-counter fallback noted above.
       view_count: honestViews ? (honestViews.get(row.id) ?? 0) : (row.view_count ?? 0),
-      like_count: e.like_count,
-      comment_count: e.comment_count,
-      repost_count: e.repost_count,
-      viewer_liked: engagement.likedByViewer.has(row.id),
-      viewer_reposted: engagement.repostedByViewer.has(row.id),
-      viewer_saved: engagement.savedByViewer.has(row.id),
+      // null = "couldn't read it" (Oct 19, 2026, critique B1 review r2): the
+      // client's shared engagement record skips a null, so a failed sub-read
+      // no longer writes 0 / false over the card's good value on every screen.
+      like_count: engagement.unread.counts ? null : e.like_count,
+      comment_count: engagement.unread.comments ? null : e.comment_count,
+      repost_count: engagement.unread.counts ? null : e.repost_count,
+      viewer_liked: engagement.unread.liked ? null : engagement.likedByViewer.has(row.id),
+      viewer_reposted: engagement.unread.reposted ? null : engagement.repostedByViewer.has(row.id),
+      viewer_saved: engagement.unread.saved ? null : engagement.savedByViewer.has(row.id),
       friend_reposters: fr.samples,
       friend_reposter_count: fr.totalFriends,
       // Keys stay `{id,handle,name,logo_url,verified,is_public}`; `hidden_at`
@@ -660,14 +663,17 @@ async function loadEngagement(
   likedByViewer: Set<string>;
   repostedByViewer: Set<string>;
   savedByViewer: Set<string>;
+  /** Which sub-reads failed: their fields go out as null, not 0 / false. */
+  unread: { counts: boolean; comments: boolean; liked: boolean; reposted: boolean; saved: boolean };
 }> {
   const counts = new Map<string, EngagementCounts>();
   const likedByViewer = new Set<string>();
   const repostedByViewer = new Set<string>();
   const savedByViewer = new Set<string>();
 
+  const unread = { counts: false, comments: false, liked: false, reposted: false, saved: false };
   if (postIds.length === 0) {
-    return { counts, likedByViewer, repostedByViewer, savedByViewer };
+    return { counts, likedByViewer, repostedByViewer, savedByViewer, unread };
   }
 
   const ensure = (id: string): EngagementCounts => {
@@ -708,6 +714,7 @@ async function loadEngagement(
   // still loads.
   if (likesAndReposts === null) {
     console.error("[feed engagement counts]");
+    unread.counts = true;
   } else {
     for (const [postId, e] of likesAndReposts) {
       const entry = ensure(postId);
@@ -715,6 +722,16 @@ async function loadEngagement(
       entry.repost_count = e.reposts;
     }
   }
+  if (commentsAll.error) {
+    console.error("[feed engagement comments]", commentsAll.error);
+    unread.comments = true;
+  }
+  if (likesMine.error) {
+    console.error("[feed engagement liked]", likesMine.error);
+    unread.liked = true;
+  }
+  unread.reposted = !!repostsMine.error;
+  unread.saved = !!savesMine.error;
   for (const row of commentsAll.data ?? []) {
     ensure((row as { post_id: string }).post_id).comment_count += 1;
   }
@@ -733,7 +750,7 @@ async function loadEngagement(
     }
   }
 
-  return { counts, likedByViewer, repostedByViewer, savedByViewer };
+  return { counts, likedByViewer, repostedByViewer, savedByViewer, unread };
 }
 
 /**

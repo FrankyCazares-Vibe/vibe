@@ -65,7 +65,7 @@ type Client = Parameters<typeof readChatMessages>[0];
 type Call = unknown[];
 type Answer = { data?: unknown; error?: unknown; count?: number | null };
 type Logged = { table: string; calls: Call[] };
-const METHODS = ["select", "eq", "in", "is", "or", "order", "limit", "range", "neq", "gte", "lt", "gt"] as const;
+const METHODS = ["select", "eq", "in", "is", "or", "order", "limit", "range", "neq", "gte", "lt", "gt", "not"] as const;
 
 function fakeClient(answer: (table: string, calls: Call[]) => Answer) {
   const log: Logged[] = [];
@@ -506,4 +506,72 @@ test("loadRoom: a database without channels.kind fails both selects (null, as to
   assert.equal(await loadRoom(CHANNEL), null);
   assert.deepEqual(selectsOf(dm.log), [ROOM_SELECT]);
   forgetPostPolicyColumnMissing();
+});
+
+// ── The "Message deleted" note (Oct 19, 2026, decision 8; batch B7) ─────────
+
+const D1 = row(21, VIEWER, { content: "", media_url: null, media_kind: null, attachment_id: null, attachment_kind: null, card_event_id: null });
+const Q1 = row(22, FRIEND, { parent_message_id: D1.id });
+const SHAPE_ONLY = row(23, FRIEND, { content: "" });
+
+/** The cookie client of a dm, its deleted_at read answered by `deleted` (ids) or an error. */
+function dmWithDeleted(page: MessageRow[], deleted: string[] | { code: string; message: string }) {
+  return cookieClient(page, (table, calls) => {
+    if (table !== "messages" || !has(calls, "not", "deleted_at")) return undefined;
+    if (!Array.isArray(deleted)) return { error: deleted };
+    const ids = arg(calls, "in", "id") as string[];
+    return { data: deleted.filter((id) => ids.includes(id)).map((id) => ({ id })) };
+  });
+}
+
+test("a deleted message is the note: who and when stay, nothing written does; its quote reads Message deleted", async () => {
+  installService(serviceAnswers);
+  const cookie = dmWithDeleted([R1, D1, Q1], [D1.id]);
+  const read = await readChatMessages(cookie.client as unknown as Client, CHANNEL, { limit: 50 }, { viewerId: VIEWER, access: DM_ACCESS, room: null });
+  assert.ok(read.ok);
+  const [m1, d, q] = read.messages;
+  assert.equal(m1.deleted, undefined, "a live message carries no flag");
+  assert.equal(d.deleted, true);
+  assert.equal(d.content, "");
+  assert.equal(d.user_id, VIEWER);
+  assert.equal(d.users?.id, VIEWER);
+  assert.equal(d.created_at, D1.created_at);
+  assert.deepEqual(d.reactions, []);
+  assert.equal(q.parent_preview?.content, "Message deleted");
+  assert.equal(q.parent_preview?.deleted, true);
+  // One deleted_at read, asking only about rows (and quotes) with the deleted shape.
+  const asked = cookie.log.filter((l) => l.table === "messages" && has(l.calls, "not", "deleted_at"));
+  assert.equal(asked.length, 1);
+  assert.deepEqual(arg(asked[0].calls, "in", "id"), [D1.id]);
+});
+
+test("the shape alone is not a note: a row with no deleted_at stays a message", async () => {
+  installService(serviceAnswers);
+  const cookie = dmWithDeleted([R1, SHAPE_ONLY], []);
+  const read = await readChatMessages(cookie.client as unknown as Client, CHANNEL, { limit: 50 }, { viewerId: VIEWER, access: DM_ACCESS, room: null });
+  assert.ok(read.ok);
+  assert.equal(read.messages[1].deleted, undefined);
+});
+
+test("a page with no row of the deleted shape makes no deleted_at read at all", async () => {
+  installService(serviceAnswers);
+  const cookie = dmWithDeleted([R1, R2, R3], []);
+  const read = await readChatMessages(cookie.client as unknown as Client, CHANNEL, { limit: 50 }, { viewerId: VIEWER, access: DM_ACCESS, room: null });
+  assert.ok(read.ok);
+  assert.equal(cookie.log.filter((l) => has(l.calls, "not", "deleted_at")).length, 0);
+});
+
+test("a database without messages.deleted_at: no notes, said once; any other failed read trusts the shape", async (t) => {
+  const warn = t.mock.method(console, "warn", () => {});
+  t.mock.method(console, "error", () => {});
+  installService(serviceAnswers);
+  let cookie = dmWithDeleted([D1], { code: "42703", message: "column messages.deleted_at does not exist" });
+  let read = await readChatMessages(cookie.client as unknown as Client, CHANNEL, { limit: 50 }, { viewerId: VIEWER, access: DM_ACCESS, room: null });
+  assert.ok(read.ok);
+  assert.equal(read.messages[0].deleted, undefined);
+  assert.ok(warn.mock.calls.some((c) => String(c.arguments[0]).includes("deleted_at")));
+  cookie = dmWithDeleted([D1], { code: "XX000", message: "boom" });
+  read = await readChatMessages(cookie.client as unknown as Client, CHANNEL, { limit: 50 }, { viewerId: VIEWER, access: DM_ACCESS, room: null });
+  assert.ok(read.ok);
+  assert.equal(read.messages[0].deleted, true);
 });

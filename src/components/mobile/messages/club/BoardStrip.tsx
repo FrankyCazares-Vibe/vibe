@@ -1,5 +1,6 @@
 "use client";
 
+import { DELETED_POST_LINE } from "@/lib/chat/deleted-note";
 import type { ChatMessage } from "@/lib/chat/types";
 
 import { FONT, palette } from "../v2-tokens";
@@ -25,7 +26,8 @@ export type BoardStripProps = {
 export function BoardStrip({ latest, unread, night, margin = "6px 12px 0", onOpen }: BoardStripProps) {
   const t = palette(night);
   const author = authorName(latest.users);
-  const text = latest.content;
+  // A deleted post (Oct 19, 2026) reads as its note, never as an empty line.
+  const text = latest.deleted ? DELETED_POST_LINE : latest.content;
   return (
     <button
       type="button"

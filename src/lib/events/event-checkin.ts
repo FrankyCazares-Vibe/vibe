@@ -219,7 +219,10 @@ export const CHECKIN_COPY = {
   doorLead: "Scan with your phone's camera, or type the code in Vibe.",
   doorBefore: "You can start check-in from an hour before the event.",
   doorAfter: "Check-in has ended.",
-  doorStartLead: "People check in by scanning this screen or typing the 4 numbers under the code. The code changes every 30 seconds.",
+  // Oct 19, 2026 (B10): no "under the code". From 760 px wide the numbers sit
+  // beside the QR, and before Start there is no QR yet. The door now draws
+  // its own copy of this line (door-screen.ts DOOR_START_LEAD); keep them equal.
+  doorStartLead: "People check in by scanning the QR\u00a0code or typing the 4\u00a0numbers next to it. Both change every 30 seconds.",
   doorNotOfficer: "Only the club's owner and admins can run check-in.",
   markHere: "Mark as here",
   here: "Here",
@@ -257,9 +260,14 @@ export function checkInToLine(title: string): string {
   return `Check in to ${title}?`;
 }
 
-/** "Check-in opens at 6:00 PM, an hour before the event." */
-export function opensAtLine(timeLabel: string): string {
-  return `Check-in opens at ${timeLabel}, an hour before the event.`;
+/**
+ * "Check-in opens tomorrow at 6:00 PM, an hour before the event." `when` is
+ * checkinOpensWhen's phrase ("at 6:00 PM", "tomorrow at 6:00 PM", "Thu,
+ * Oct 22 at 6:00 PM"), in campus time, so the student's page names the day
+ * the way the door does (Oct 19, 2026).
+ */
+export function opensAtLine(when: string): string {
+  return `Check-in opens ${when}, an hour before the event.`;
 }
 
 /** "New code in 12 s" (the door's countdown; never announced). */

@@ -127,7 +127,7 @@ test("upNextLine / upNextAriaLabel / eventTimeSpoken", () => {
   assert.equal(h.upNextAriaLabel(soon, NOW), "Fall Formal room, soon, tonight 10:30 PM, you're going");
   const maybe = { title: "Open Practice", viewer_status: "maybe" as const, ...ev(local(2026, 9, 13, 19, 0), local(2026, 9, 13, 21, 0), "soon") };
   assert.equal(h.upNextLine(maybe, NOW), "Tue · 7 PM");
-  assert.equal(h.upNextAriaLabel(maybe, NOW), "Open Practice room, Tuesday 7 PM, you said maybe");
+  assert.equal(h.upNextAriaLabel(maybe, NOW), "Open Practice room, Tuesday 7 PM, you're interested");
   const live = { title: "Fall Formal", viewer_status: null, ...ev(local(2026, 9, 8, 19, 0), local(2026, 9, 8, 23, 0), "live") };
   assert.equal(h.upNextLine(live, NOW), "Live now");
   assert.equal(h.upNextAriaLabel(live, NOW), "Fall Formal room, live now");
@@ -174,9 +174,13 @@ test("replies toggle, post label, pill, who's going, RSVP pill", () => {
   assert.equal(h.statePillText(ev(local(2026, 9, 7, 19, 0), local(2026, 9, 7, 21, 0), "after"), NOW), "Ended · chat open 6 more days");
   assert.equal(h.statePillText(ev(local(2026, 9, 1, 19, 0), local(2026, 9, 1, 22, 0), "after"), NOW), "Ended · chat open 1 more day");
   assert.equal(h.statePillText(ev(local(2026, 8, 1, 19, 0), local(2026, 8, 1, 22, 0), "closed"), NOW), "Closed");
-  assert.equal(h.whoIsGoingLabel(18, 6), "Who's going: 18 going, 6 maybe");
+  assert.equal(h.whoIsGoingLabel(18, 6), "Who's going: 18 going, 6 interested");
   assert.deepEqual(h.rsvpPill("going"), { text: "Going", label: "You're going. Change your RSVP" });
-  assert.deepEqual(h.rsvpPill("maybe"), { text: "Maybe", label: "You said maybe. Change your RSVP" });
+  // "Interested", not "Maybe" (Oct 19, 2026, decision 12).
+  assert.equal(h.rsvpWord("going"), "Going");
+  assert.equal(h.rsvpWord("maybe"), "Interested");
+  assert.equal(h.rsvpWord(null), null);
+  assert.deepEqual(h.rsvpPill("maybe"), { text: "Interested", label: "You're interested. Change your RSVP" });
   assert.deepEqual(h.rsvpPill(null), { text: "RSVP", label: "RSVP to this event" });
 });
 

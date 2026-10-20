@@ -15,10 +15,12 @@ import { pillState, rsvpPill, statePillText, whoIsGoingLabel } from "./helpers";
  * `live`), the state pill (`role="status"`: `Soon · starts 7:30 PM` ·
  * `Live now` · `Ended · chat open N more days` · `Closed`), the Plans grid
  * (`Where` = `location` or `No place yet`; `When` = `eventTime`), then
- * Who's going (`role="group" aria-label="Who's going: N going, M maybe"`):
+ * Who's going (`role="group" aria-label="Who's going: N going, M interested"`):
  * up to five stacked 30px avatars from `going` (the first 8 visible people,
- * 8.3), `<N> going`, `· <M> maybe` (the counts, blocked people included), and
- * the RSVP pill (`Going` check / `Maybe` dot / `RSVP`) that opens the sheet.
+ * 8.3), `<N> going`, `· <M> interested` (the counts, blocked people included),
+ * and the RSVP pill (`Going` check / `Interested` dot / `RSVP`) that opens the
+ * sheet. "Interested", not "Maybe", since Oct 19, 2026 (decision 12); the
+ * stored value is still `maybe`.
  * Drawn INSIDE the event chat's scroller, above the rows (`EventChat` hands it
  * to `RoomThread` as `header`; S71 amendment 3, E): it scrolls away with the
  * messages.
@@ -148,7 +150,7 @@ export function EventAbout({ event, night, now, onRsvp }: EventAboutProps) {
           </div>
         ) : null}
         <span style={{ minWidth: 0, fontSize: 14, fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-          {event.going_count} going <span style={{ fontSize: 13, fontWeight: 600, color: t.muted }}>· {event.maybe_count} maybe</span>
+          {event.going_count} going <span style={{ fontSize: 13, fontWeight: 600, color: t.muted }}>· {event.maybe_count} interested</span>
         </span>
         <button type="button" aria-label={pill.label} aria-disabled={closed || undefined} onClick={closed ? undefined : onRsvp} style={{ marginLeft: "auto", flexShrink: 0, height: 44, padding: 0, border: "none", background: "transparent", fontFamily: "inherit", cursor: closed ? "default" : "pointer", display: "flex", alignItems: "center", WebkitTapHighlightColor: "transparent" }}>
           <span style={{ height: 34, boxSizing: "border-box", padding: event.viewer_status ? "0 12px 0 8px" : "0 14px", borderRadius: 999, border: event.viewer_status === "going" ? "1px solid rgba(255,92,53,0.50)" : `1px solid ${t.hairline}`, background: event.viewer_status === "going" ? "rgba(255,92,53,0.16)" : t.surface, color: t.ink, fontSize: 13, fontWeight: 700, display: "inline-flex", alignItems: "center", gap: 6 }}>

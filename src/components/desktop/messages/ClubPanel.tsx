@@ -17,6 +17,7 @@ import {
 } from "@/components/mobile/messages/club/helpers";
 import { initialsOf } from "@/components/mobile/messages/format";
 import { FONT, palette, type Palette, SERIF } from "@/components/mobile/messages/v2-tokens";
+import { DELETED_POST_LINE } from "@/lib/chat/deleted-note";
 import type { ChatMessage, EventRef, Person } from "@/lib/chat/types";
 import { eventTime, rowTime, rowTimeSpoken } from "@/lib/chat/when";
 import { ORG_COPY } from "@/lib/orgs/join-copy";
@@ -254,7 +255,8 @@ function EventRow({ event, t, now, onOpenRoom }: { event: EventRef; t: Palette; 
 function PostRow({ post, unread, t, now, onOpen }: { post: ChatMessage; unread: boolean; t: Palette; now: Date; onOpen: () => void }) {
   const name = authorName(post.users);
   const role = roleWord(post.author_role);
-  const text = post.content.trim();
+  // A deleted post (Oct 19, 2026) says so, quietly, where its words were.
+  const text = post.deleted ? DELETED_POST_LINE : post.content.trim();
   const replies = (post.reply_count ?? 0) > 0 ? repliesToggleText(post.reply_count) : "";
   const disc = personColor(post.users?.id || post.user_id);
   const label = [
@@ -285,7 +287,7 @@ function PostRow({ post, unread, t, now, onOpen }: { post: ChatMessage; unread: 
         <span style={{ marginLeft: "auto", flexShrink: 0 }}>{rowTime(post.created_at, now)}</span>
         {unread ? <span aria-hidden="true" style={{ width: 7, height: 7, flexShrink: 0, borderRadius: 999, background: t.coral }} /> : null}
       </span>
-      {text ? <span style={{ fontSize: 13.5, fontWeight: 500, lineHeight: "19px", color: unread ? t.ink : t.secondary, overflowWrap: "anywhere", ...TWO_LINES }}>{text}</span> : null}
+      {text ? <span style={{ fontSize: 13.5, fontWeight: 500, lineHeight: "19px", color: post.deleted ? t.muted : unread ? t.ink : t.secondary, fontStyle: post.deleted ? "italic" : undefined, overflowWrap: "anywhere", ...TWO_LINES }}>{text}</span> : null}
       {replies ? <span style={{ fontSize: 12, fontWeight: 600, lineHeight: "15px", color: t.muted }}>{replies}</span> : null}
     </button>
   );

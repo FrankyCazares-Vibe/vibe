@@ -59,7 +59,7 @@ export function trayCaption(roomKind: RoomKind, roomName: string): string {
 const ROWS: { kind: CardTrayKind; title: string; line: string }[] = [
   { kind: "poll", title: "Poll", line: "Ask the room a question" },
   { kind: "signup", title: "Sign-up", line: "Shifts, rides, who brings what" },
-  { kind: "event", title: "Event", line: "Share an event with Going / Maybe" },
+  { kind: "event", title: "Event", line: "Share an event with Going / Interested" },
 ];
 
 function RowIcon({ kind }: { kind: CardTrayKind }) {

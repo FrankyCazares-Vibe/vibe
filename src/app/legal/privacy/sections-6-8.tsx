@@ -100,7 +100,7 @@ export function Sections6To8() {
           ],
           [
             "Messages",
-            "The sender deletes the message or their account. In club rooms, also when the post above it, the room, the event or the club is deleted",
+            "The sender deletes the message (a \u201cMessage deleted\u201d note stays in its place) or their account. In club rooms, also when the room, the event or the club is deleted, or the account that wrote the Board post above it",
           ],
           [
             "A pin on a message",

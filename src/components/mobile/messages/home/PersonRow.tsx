@@ -2,6 +2,7 @@
 
 import type { CSSProperties } from "react";
 
+import { DELETED_LINE } from "@/lib/chat/deleted-note";
 import { rowTime } from "@/lib/chat/when";
 
 import { personColor } from "../avatar";
@@ -99,7 +100,16 @@ export function PersonRow({ thread, now, onTap }: { thread: ThreadEntry; now: Da
             >
               {boldPrefix ? <b style={{ fontWeight: 700 }}>{boldPrefix}</b> : null}
               {boldPrefix ? " " : null}
-              {body}
+              {/* A deleted last message reads like its note: grey italic, never
+                  as words someone typed (review of Oct 19, 2026). */}
+              {thread.last_message?.deleted === true && body.endsWith(DELETED_LINE) ? (
+                <>
+                  {body.slice(0, body.length - DELETED_LINE.length)}
+                  <span style={{ fontStyle: "italic", fontWeight: 400, color: t.muted }}>{DELETED_LINE}</span>
+                </>
+              ) : (
+                body
+              )}
             </span>
             {unread ? (
               // The unread pill (`W0_Home:76`). `GET /api/me/threads` sends

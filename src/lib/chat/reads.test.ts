@@ -282,3 +282,24 @@ test("unreadLeftOut: everyone blocked is left out of a count, but a blocked offi
   assert.deepEqual(unreadLeftOut(new Set(), "board", officers), []);
   assert.equal(notInList(["a", "b"]), "(a,b)");
 });
+
+test("toPreview: a message its sender deleted previews as its note; a shared post with no words does not (Oct 19, 2026)", () => {
+  assert.equal(toPreview(row({ content: "", kind: "text" })).text, "Message deleted");
+  assert.equal(toPreview(row({ content: "", kind: "text", attachment_kind: "post" })).text, "");
+  assert.equal(toPreview(row({ content: "", kind: "poll" })).text, "");
+  assert.equal(toPreview(row({ content: "hi" })).text, "hi");
+});
+
+test("toPreview: the note is flagged `deleted`, and a Board post's says \"Post deleted\" (B7 review, Oct 19, 2026)", () => {
+  const note = toPreview(row({ content: "", kind: "text" }));
+  assert.equal(note.deleted, true, "a list draws it like the note, never as typed words");
+  assert.equal(toPreview(row({ content: "", kind: "text" }), true).text, "Post deleted");
+  assert.equal(toPreview(row({ content: "", kind: "text" }), true).deleted, true);
+  assert.ok(!("deleted" in toPreview(row({ content: "hi" }))), "a live message carries no flag (the wire shape is unchanged)");
+  assert.ok(!("deleted" in toPreview(row({ content: "Message deleted" }))), "typed words that say it are not a note");
+  assert.equal(toPreview(row({ content: "hi" }), true).text, "hi");
+  const rows = [row({ id: "p2", channel_id: "board", content: "", created_at: "2026-10-19T12:00:00Z" }), row({ id: "p1", channel_id: "board", content: "older", created_at: "2026-10-19T11:00:00Z" })];
+  const latest = latestShownPerRoom(rows, () => false, { board: true }).get("board");
+  assert.equal(latest?.text, "Post deleted");
+  assert.equal(latestShownPerRoom(rows, () => false).get("board")?.text, "Message deleted", "a Lounge says Message deleted");
+});

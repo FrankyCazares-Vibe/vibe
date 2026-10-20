@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { deleteOwnMessage } from "@/lib/chat/delete-own";
 import { roomOf } from "@/lib/chat/message-read";
 import { OFFICER_REMOVED_REASON, ROOM_MODERATOR_ROLES, outranks } from "@/lib/chat/room-rules";
 import { clubRole } from "@/lib/chat/rooms";
@@ -31,10 +32,14 @@ function removed(already: boolean) {
 /**
  * Delete a single message.
  *
- * THE SENDER: unchanged. RLS (`messages_delete_own`) restricts the hard
- * delete to the original sender; the cascade takes the reactions, a card's
- * side rows (`chat_polls` → options → votes, `chat_event_cards`) and, for a
- * Board post, its replies. Answers `{ ok: true }` as it always has.
+ * THE SENDER (Oct 19, 2026; decision 8): `deleteOwnMessage`
+ * (src/lib/chat/delete-own.ts). One call to `delete_own_message`
+ * (20261019150000) takes the words, the file, a card's side rows, the
+ * reactions, pins and notifications and leaves a "Message deleted" note:
+ * `{ ok: true, deleted: true }`. A Board post's replies stay under its note.
+ * A database without that function gets the old hard delete (RLS
+ * `messages_delete_own`; the cascade, a Board post's replies included):
+ * `{ ok: true }`, as it always answered.
  *
  * AN OFFICER OR A MOD OF THE CLUB (wave-2 contract 6.1, the gates in its
  * order): someone else's message in a club room is not deleted but marked
@@ -93,19 +98,12 @@ export async function DELETE(_req: Request, ctx: RouteCtx) {
     msg = (data as Row | null) ?? null;
   }
 
-  // The sender's own delete: today's path, unlimited, also for a card and
-  // also when a report is open (wave-1 contract 12.6).
+  // The sender's own delete: unlimited, also for a card and also when a
+  // report is open (wave-1 contract 12.6). Since Oct 19, 2026 it leaves a
+  // "Message deleted" note in the message's place (delete-own.ts; on a
+  // database without 20261019150000 it is today's hard delete).
   if (msg && msg.user_id === user.id) {
-    const { error } = await supabase
-      .from("messages")
-      .delete()
-      .eq("id", messageId)
-      .eq("user_id", user.id);
-    if (error) {
-      console.error(`[${LOG}]`, error);
-      return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
-    }
-    return NextResponse.json({ ok: true });
+    return deleteOwnMessage(supabase, { channelId, messageId, userId: user.id });
   }
 
   // 3. someone else's row, or no row: a member of the channel, and a club room

@@ -7,7 +7,7 @@ import { Drawer } from "vaul";
 import { asLoadFailure, LoadFailed, type LoadFailure } from "@/components/feedback/LoadFailed";
 import { PushAsk } from "@/components/push/PushAsk";
 import { ReportSheet, type ReportTargetRef } from "@/components/safety/ReportSheet";
-import { REFUSAL_SENTENCES, type RoomKind, type ThreadMessagesResponse } from "@/lib/chat/types";
+import { REFUSAL_SENTENCES, type DeleteOwnResponse, type RoomKind, type ThreadMessagesResponse } from "@/lib/chat/types";
 import { useMessagePins } from "@/lib/chat/use-message-pins";
 import { vibeRequest } from "@/lib/feedback/request";
 import { toast } from "@/lib/feedback/toast";
@@ -19,6 +19,8 @@ import {
 } from "@/lib/media/shrink-photo";
 
 import { ConversationActionSheet } from "./ConversationActionSheet";
+import { DeleteConfirm, rowFocusTarget } from "./DeleteConfirm";
+import { canDeleteOwn, DELETE_FAILED, deleteConfirmCopy, listAfterDelete } from "./delete-rules";
 import { entryCanPost, quotedBody, threadAvatar, threadTitle } from "./format";
 import { GroupSettingsView } from "./GroupSettingsView";
 import { MessageBubble } from "./MessageBubble";
@@ -135,6 +137,10 @@ export function ConversationView({
   // One message, reported from the long-press picker. A single message is a
   // `message` target; the whole chat is handled by the ⋯ sheet.
   const [reportMessage, setReportMessage] = useState<ReportTargetRef | null>(null);
+  // The viewer's own message they asked to delete, while the confirm is up
+  // (Oct 19, 2026; delete-rules.ts).
+  const [deleteTarget, setDeleteTarget] = useState<MessageRow | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const [staged, setStaged] = useState<StagedMedia | null>(null);
   const [replyTo, setReplyTo] = useState<ReplyTarget | null>(null);
   // Where a message request stands once the viewer answers it here, so
@@ -177,6 +183,7 @@ export function ConversationView({
     setCanPost(entryCanPost(thread));
     setPostLine(null);
     setPinnedOpen(false);
+    setDeleteTarget(null);
   }
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
@@ -667,6 +674,31 @@ export function ConversationView({
     [threadId],
   );
 
+  // Delete for everyone (Oct 19, 2026): the confirm said yes. The bubble
+  // stays until the server answers, then becomes the grey "Message deleted"
+  // note (or goes, when the server took it away whole). A reply being
+  // written to it lets go, the pin list is read again (the pin went with
+  // it), and the thread list re-reads so its preview says the same.
+  const confirmDelete = async () => {
+    const target = deleteTarget;
+    if (!target || deleting) return;
+    setDeleting(true);
+    const r = await vibeRequest<DeleteOwnResponse>(
+      `/api/me/threads/${encodeURIComponent(threadId)}/messages/${encodeURIComponent(target.id)}`,
+      { method: "DELETE", failure: DELETE_FAILED, quiet: true },
+    );
+    setDeleting(false);
+    setDeleteTarget(null);
+    if (!r.ok) {
+      toastSendFailure(r);
+      return;
+    }
+    setMessages((prev) => (prev ? [...listAfterDelete(prev, target.id, r.data)] : prev));
+    setReplyTo((cur) => (cur?.parent.id === target.id ? null : cur));
+    if (pinControls) pins.reload();
+    onThreadsChanged?.();
+  };
+
   const peer = thread?.peer;
   const title = thread ? threadTitle(thread) : "Conversation";
   const avatar = thread ? threadAvatar(thread) : { url: null, initials: "?" };
@@ -971,6 +1003,8 @@ export function ConversationView({
                   pinLabel={
                     pinControls ? (pins.isPinned(m.id) ? "Unpin message" : "Pin message") : undefined
                   }
+                  // Delete for everyone: the viewer's own message only.
+                  onDelete={canDeleteOwn(m, meId) ? () => setDeleteTarget(m) : undefined}
                   // Never on their own message, and never before the thread
                   // has told us who they are.
                   onReport={
@@ -1488,6 +1522,18 @@ export function ConversationView({
           nested
           target={reportMessage}
           onClose={() => setReportMessage(null)}
+        />
+      ) : null}
+
+      {/* Delete for everyone? Inside the drawer, so its focus trap holds. */}
+      {deleteTarget ? (
+        <DeleteConfirm
+          night={night}
+          busy={deleting}
+          copy={deleteConfirmCopy()}
+          onConfirm={() => void confirmDelete()}
+          onCancel={() => setDeleteTarget(null)}
+          focusAfter={() => rowFocusTarget(scrollRef.current, deleteTarget.id)}
         />
       ) : null}
 

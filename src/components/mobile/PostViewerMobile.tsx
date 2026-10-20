@@ -15,6 +15,7 @@ import {
   ReportSheet,
   type ReportTargetRef,
 } from "@/components/safety/ReportSheet";
+import { captionSegments } from "@/lib/feed/caption-segments";
 import { copyText, vibeRequest } from "@/lib/feedback/request";
 import { toast } from "@/lib/feedback/toast";
 import { LikeBurst } from "@/lib/motion/LikeBurst";
@@ -23,6 +24,15 @@ import { SPRING_SOFT } from "@/lib/motion/springs";
 import { nativeShare } from "@/lib/native/bridge";
 import { useAppShell } from "@/lib/native/use-app-shell";
 import { EDITED_LABEL, type EditedPost } from "@/lib/posts/edit";
+import {
+  applyServerEngagement,
+  beginEngagementTap,
+  engagementReadToken,
+  patchEngagement,
+  readEngagement,
+  usePostEngagement,
+  type PostEngagement,
+} from "@/lib/posts/engagement-store";
 import {
   clubMutedLine,
   clubMuteUrl,
@@ -43,11 +53,12 @@ import {
  * Layout:
  *   - Top bar (safe-area padded): close × + author avatar/name/handle
  *     + the post's relative timestamp.
- *   - Scrollable body: image or video (if any), content with @handle / #tag
- *     linkified, tag chips, then the engagement bar.
+ *   - Scrollable body: image or video (if any), content with @handle and
+ *     saved #tags linkified inline (no chip row since Oct 19, 2026), then the
+ *     engagement bar.
  *   - Engagement bar: Like (heart + count), Comment (chat + count),
- *     Repost (loop + count), Views (eye + count — public, and for the
- *     author a tap through to who they were), Saves (author only, when
+ *     Repost (loop + count, on/off since Oct 19, 2026), Views (eye +
+ *     count — public, and for the author a tap through to who they were), Saves (author only, when
  *     the count could be read), Save (bookmark). Hits the same
  *     /api/posts/[id]/{like,repost,save,comments,view} endpoints the
  *     desktop FeedRow uses, so all the counts stay consistent across
@@ -63,15 +74,17 @@ import {
  *     post's club — S68 officer tools, C3). A removed post offers neither.
  *     On someone else's club post, "Mute <club>'s posts" too (club model,
  *     Oct 16; `useClubMute` below), named by the caller or the post read.
- *     A saved edit patches the body, the #tag chips and the
+ *     A saved edit patches the body, its #tags and the
  *     " · Edited" marker here, then tells the caller through `onEdited`.
  *     Until wave 4 wires `onEdited` into CampusMobile and ProfileMobile,
  *     the card underneath keeps its old text until the next load (critic
  *     W3 L9).
  *
  * Hit the single-post endpoint /api/posts/[id] on mount so we get the
- * server-side counts + viewer state in one roundtrip; rolls back
- * optimistically on a failed mutation.
+ * server-side counts + viewer state in one roundtrip. Like, save, repost and
+ * the comment count go into the shared engagement record the feed card reads
+ * (src/lib/posts/engagement-store.ts, Oct 19, 2026), so the two never
+ * disagree; a failed tap rolls that record back.
  */
 
 type Author = {
@@ -127,13 +140,27 @@ type Comment = {
  * dropped — never `posts.view_count`.
  */
 type Counts = {
-  likes: number;
-  comments: number;
+  /** Likes, comments and reposts are left out too when they couldn't be
+   *  counted (Oct 19, 2026, review r2), so the shared record keeps its value. */
+  likes?: number;
+  comments?: number;
   views: number;
-  reposts: number;
+  reposts?: number;
   saves?: number;
 };
-type Viewer = { liked: boolean; saved: boolean };
+/** Each flag is OPTIONAL: an older server omits `reposted`, and since Oct 19,
+ *  2026 the server leaves out any flag whose own-row read failed. */
+type Viewer = { liked?: boolean; saved?: boolean; reposted?: boolean };
+
+/** Before the post read lands (and the store has nothing for this post). */
+const NO_ENGAGEMENT: PostEngagement = Object.freeze({
+  liked: false,
+  likeCount: 0,
+  saved: false,
+  reposted: false,
+  repostCount: 0,
+  commentCount: 0,
+});
 
 /** A count we can't read as a finite number renders as 0, never as the word
  *  "undefined". Deliberately NOT applied to `saves`, whose absence is a claim
@@ -190,13 +217,13 @@ export function PostViewerMobile({
   onEdited?: (p: EditedPost) => void;
 }) {
   const [post, setPost] = useState<PostDetail | null>(null);
-  const [counts, setCounts] = useState<Counts>({
-    likes: 0,
-    comments: 0,
-    views: 0,
-    reposts: 0,
-  });
-  const [viewer, setViewer] = useState<Viewer>({ liked: false, saved: false });
+  // Views and the author's saves count stay this screen's own. Like, save,
+  // repost and the comment count live in the shared engagement record (Oct 19,
+  // 2026, critique M1; src/lib/posts/engagement-store.ts), the one the feed
+  // card under this sheet reads too: a like here shows on the card at once,
+  // and the other way round. `eng` is the live record.
+  const [counts, setCounts] = useState<Pick<Counts, "views" | "saves">>({ views: 0 });
+  const eng = usePostEngagement(postId, NO_ENGAGEMENT);
   // Server-computed (`is_owner` from /api/posts/[id]), not the `canDelete`
   // prop: only ProfileMobile passes that one, so on the feed and on a shared
   // link the author was treated as a stranger. The owner-only audience sheets
@@ -253,8 +280,6 @@ export function PostViewerMobile({
   // Whether the latest pointerdown landed on the app toast; the drawer's
   // onPointerDownOutside reads it (see the effect below).
   const toastTapRef = useRef(false);
-  // A like request is out; toggleLike drops taps until it settles.
-  const likingRef = useRef(false);
 
   const handleDelete = async () => {
     if (deleting) return;
@@ -319,6 +344,9 @@ export function PostViewerMobile({
   useEffect(() => {
     let cancelled = false;
     (async () => {
+      // Taken before the request: a tap made while it's out (here or on the
+      // card underneath) wins over its answer.
+      const readToken = engagementReadToken();
       const r = await vibeRequest<{
         post?: PostDetail;
         counts?: Counts;
@@ -345,19 +373,35 @@ export function PostViewerMobile({
       // once, rather than at each call site. `saves` keeps its three-way
       // meaning: a number, or absent = "we couldn't count", which shows as
       // nothing at all rather than as 0.
-      if (r.data.counts) {
-        const c = r.data.counts as Partial<Counts>;
+      const c = (r.data.counts ?? null) as Partial<Counts> | null;
+      const v = (r.data.viewer ?? null) as Partial<Viewer> | null;
+      if (c) {
         setCounts({
-          likes: num(c.likes),
-          comments: num(c.comments),
           views: num(c.views),
-          reposts: num(c.reposts),
           ...(typeof c.saves === "number" && Number.isFinite(c.saves)
             ? { saves: c.saves }
             : {}),
         });
       }
-      if (r.data.viewer) setViewer(r.data.viewer);
+      // The fresh read overwrites the shared record (the feed card's copy
+      // too), except a group with a tap still out. Only values the server
+      // actually read go in (Oct 19, 2026, review r2): a count or flag the
+      // answer leaves out (it couldn't count, an own-row read failed, an
+      // older cached answer) leaves the card's good number alone instead of
+      // writing a 0 into every screen. So no num() on this path.
+      const real = (x: unknown): x is number => typeof x === "number" && Number.isFinite(x);
+      applyServerEngagement(
+        postId,
+        {
+          ...(real(c?.likes) ? { likeCount: c.likes } : {}),
+          ...(real(c?.comments) ? { commentCount: c.comments } : {}),
+          ...(real(c?.reposts) ? { repostCount: c.reposts } : {}),
+          ...(typeof v?.liked === "boolean" ? { liked: v.liked } : {}),
+          ...(typeof v?.saved === "boolean" ? { saved: v.saved } : {}),
+          ...(typeof v?.reposted === "boolean" ? { reposted: v.reposted } : {}),
+        },
+        readToken,
+      );
       // Fails closed: anything but an explicit true leaves the owner-only
       // affordances off.
       setIsOwner(r.data.is_owner === true);
@@ -412,52 +456,59 @@ export function PostViewerMobile({
   }, [commentsOpen, comments, commentsErr, postId]);
 
   // The heart flips first. A refusal (Terms not accepted, liking too fast, a
-  // post that's gone) used to flip it back without a word; now it goes back
-  // to exactly what it was and the toast says why, the same as the feed card
-  // (CampusMobile). One request at a time, so a fast double tap can't send
-  // two requests that each roll the count back by one.
+  // post that's gone) goes back to exactly what it was and the toast says
+  // why, the same as the feed card (CampusMobile). Both write the shared
+  // record, so the card under this sheet flips with it, and a rollback puts
+  // both back. One request at a time per button: a second tap while the
+  // first is out is dropped (beginEngagementTap returns null).
   const toggleLike = async () => {
-    if (likingRef.current) return;
-    likingRef.current = true;
-    const next = !viewer.liked;
-    const prevLiked = viewer.liked;
-    const prevLikes = counts.likes;
-    setViewer((v) => ({ ...v, liked: next }));
-    setCounts((c) => ({ ...c, likes: Math.max(0, c.likes + (next ? 1 : -1)) }));
+    const tap = beginEngagementTap(postId, "like", eng, (c) => ({
+      liked: !c.liked,
+      likeCount: c.likeCount + (c.liked ? -1 : 1),
+    }));
+    if (!tap) return;
+    const next = readEngagement(postId)?.liked === true;
     const r = await vibeRequest(`/api/posts/${postId}/like`, {
       method: next ? "POST" : "DELETE",
       failure: next ? "Couldn't like this post." : "Couldn't unlike this post.",
     });
-    if (!r.ok) {
-      setViewer((v) => ({ ...v, liked: prevLiked }));
-      setCounts((c) => ({ ...c, likes: prevLikes }));
-    }
-    likingRef.current = false;
+    if (r.ok) tap.commit();
+    else tap.rollback();
   };
   // Same wording as the feed card's save (CampusMobile). A refusal — the
-  // post is gone or behind a block (404), or too many saves (429) — now
-  // says so instead of quietly flipping the bookmark back.
+  // post is gone or behind a block (404), or too many saves (429) — says so
+  // instead of quietly flipping the bookmark back.
   const toggleSave = async () => {
-    const next = !viewer.saved;
-    setViewer((v) => ({ ...v, saved: next }));
+    const tap = beginEngagementTap(postId, "save", eng, (c) => ({ saved: !c.saved }));
+    if (!tap) return;
+    const next = readEngagement(postId)?.saved === true;
     const r = await vibeRequest(`/api/posts/${postId}/save`, {
       method: next ? "POST" : "DELETE",
       failure: next
         ? "Couldn't save this post."
         : "Couldn't remove this from your saved posts.",
     });
-    if (!r.ok) setViewer((v) => ({ ...v, saved: !next }));
+    if (r.ok) tap.commit();
+    else tap.rollback();
   };
-  const repost = async () => {
-    // Simple repost (no quote on mobile v1) — POST adds, server treats
-    // a re-post by the same user as a no-op. Nothing on screen changes,
-    // so the toast is the only sign it worked (or was refused).
-    await vibeRequest(`/api/posts/${postId}/repost`, {
-      method: "POST",
-      json: {},
-      failure: "Couldn't repost this.",
-      success: "Reposted",
+  // An on/off toggle with its count since Oct 19, 2026 (critique M1): it
+  // used to only ever add a repost, with no undo, no count and a "Reposted"
+  // toast as the only sign. Plain repost, no quote (the desktop menu has
+  // quotes): POST to add, DELETE to take it back, the feed card's calls.
+  const toggleRepost = async () => {
+    const tap = beginEngagementTap(postId, "repost", eng, (c) => ({
+      reposted: !c.reposted,
+      repostCount: c.repostCount + (c.reposted ? -1 : 1),
+    }));
+    if (!tap) return;
+    const next = readEngagement(postId)?.reposted === true;
+    const r = await vibeRequest(`/api/posts/${postId}/repost`, {
+      method: next ? "POST" : "DELETE",
+      ...(next ? { json: {} } : {}),
+      failure: next ? "Couldn't repost this." : "Couldn't undo your repost.",
     });
+    if (r.ok) tap.commit();
+    else tap.rollback();
   };
   // "Share to other apps", store apps only. The native share sheet first:
   // Android's web view has no `navigator.share`, and the plugin's sheet is
@@ -504,7 +555,8 @@ export function PostViewerMobile({
       // the viewer's id without a second request.
       if (posted?.user_id) setSelfId(posted.user_id);
       setCommentsErr(null);
-      setCounts((c) => ({ ...c, comments: c.comments + 1 }));
+      // The shared record, so the feed card's comment count goes up too.
+      patchEngagement(postId, "comment", eng, (c) => ({ commentCount: c.commentCount + 1 }));
       setDraft("");
     }
     setPosting(false);
@@ -647,8 +699,10 @@ export function PostViewerMobile({
           gap: 10,
           padding:
             "calc(env(safe-area-inset-top, 0px) + 10px) 14px 10px",
-          borderBottom: "1px solid rgba(28,28,30,0.06)",
-          background: "rgba(255,253,248,0.92)",
+          // Theme tokens (Oct 19, 2026): the bar, the ⋯ menu and the comment
+          // box were fixed Light colours, a pale strip on a Night page.
+          borderBottom: "1px solid rgba(var(--scrim-rgb),0.06)",
+          background: "var(--cream-92)",
           backdropFilter: "blur(12px)",
           WebkitBackdropFilter: "blur(12px)",
         }}
@@ -661,9 +715,9 @@ export function PostViewerMobile({
             width: 34,
             height: 34,
             borderRadius: 999,
-            border: "1px solid rgba(28,28,30,0.10)",
-            background: "rgba(255,255,255,0.7)",
-            color: "#1C1C1E",
+            border: "1px solid rgba(var(--scrim-rgb),0.10)",
+            background: "var(--paper-70)",
+            color: "var(--charcoal)",
             fontSize: 18,
             cursor: "pointer",
             display: "inline-flex",
@@ -716,7 +770,7 @@ export function PostViewerMobile({
                   fontFamily: "Fraunces, serif",
                   fontWeight: 800,
                   fontSize: 14,
-                  color: "#1C1C1E",
+                  color: "var(--charcoal)",
                   overflow: "hidden",
                   textOverflow: "ellipsis",
                   whiteSpace: "nowrap",
@@ -756,11 +810,11 @@ export function PostViewerMobile({
               width: 34,
               height: 34,
               borderRadius: 999,
-              border: "1px solid rgba(28,28,30,0.10)",
+              border: "1px solid rgba(var(--scrim-rgb),0.10)",
               background: menuOpen
-                ? "#1C1C1E"
-                : "rgba(255,255,255,0.7)",
-              color: menuOpen ? "#fff" : "#1C1C1E",
+                ? "var(--charcoal)"
+                : "var(--paper-70)",
+              color: menuOpen ? "var(--cream)" : "var(--charcoal)",
               display: "inline-flex",
               alignItems: "center",
               justifyContent: "center",
@@ -799,10 +853,10 @@ export function PostViewerMobile({
                   top: 40,
                   right: 0,
                   minWidth: 180,
-                  background: "rgba(255,253,248,0.98)",
+                  background: "var(--paper)",
                   backdropFilter: "blur(14px)",
                   WebkitBackdropFilter: "blur(14px)",
-                  border: "1px solid rgba(28,28,30,0.10)",
+                  border: "1px solid rgba(var(--scrim-rgb),0.10)",
                   borderRadius: 12,
                   boxShadow:
                     "0 14px 30px rgba(0,0,0,0.16), 0 2px 6px rgba(0,0,0,0.08)",
@@ -1001,34 +1055,13 @@ export function PostViewerMobile({
                   color: "var(--charcoal)",
                 }}
               >
-                {renderInlineContent(post.content)}
+                {renderInlineContent(post.content, post.tags)}
               </p>
             ) : null}
 
-            {post.tags && post.tags.length > 0 ? (
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                {post.tags.map((t) => (
-                  <Link
-                    key={t}
-                    href={`/campus?tab=feed&tag=${encodeURIComponent(t)}`}
-                    style={{
-                      padding: "5px 10px",
-                      borderRadius: 999,
-                      background: "var(--tag-bg)",
-                      border: "1px solid rgba(255,92,53,0.22)",
-                      // As the feed's tag chip: raw coral is 2.6:1 on it.
-                      color: "var(--tag-ink)",
-                      fontFamily: "DM Sans, sans-serif",
-                      fontSize: 12,
-                      fontWeight: 700,
-                      textDecoration: "none",
-                    }}
-                  >
-                    #{t}
-                  </Link>
-                ))}
-              </div>
-            ) : null}
+            {/* No tag chips under the caption (Oct 19, 2026, critique
+                decision 5): the tags are tappable inside it, and the screen
+                no longer shows each tag twice. */}
 
             {/* Engagement bar. Spacing is tighter than the four-item bar it
                 grew out of: with Views — and, on the author's own post, the
@@ -1049,8 +1082,10 @@ export function PostViewerMobile({
               }}
             >
               <EngagementButton
-                label={String(counts.likes)}
-                active={viewer.liked}
+                label={String(eng.likeCount)}
+                active={eng.liked}
+                pressed={eng.liked}
+                ariaLabel={`${eng.liked ? "Unlike" : "Like"}, ${eng.likeCount} ${eng.likeCount === 1 ? "like" : "likes"}`}
                 onTap={toggleLike}
                 // The count is words, so it reads --tag-ink (raw coral is
                 // 2.9:1 on cream). The heart keeps its coral (HeartIcon).
@@ -1058,13 +1093,13 @@ export function PostViewerMobile({
                 // Pops on a like (not on load: the bar first mounts with
                 // the loaded value). LikeBurst's coral is the heart's own.
                 icon={
-                  <LikeBurst liked={viewer.liked}>
-                    <HeartIcon filled={viewer.liked} />
+                  <LikeBurst liked={eng.liked}>
+                    <HeartIcon filled={eng.liked} />
                   </LikeBurst>
                 }
               />
               <EngagementButton
-                label={String(counts.comments)}
+                label={String(eng.commentCount)}
                 // Reopening remounts the list, so forget which comments were
                 // posted here: they'd rise in again. Nothing posts while
                 // it's closed (the composer goes with it).
@@ -1074,9 +1109,15 @@ export function PostViewerMobile({
                 }}
                 icon={<ChatIcon />}
               />
+              {/* On/off with its count, green when on (the feed card's colour
+                  for a repost), Oct 19, 2026. */}
               <EngagementButton
-                label="Repost"
-                onTap={repost}
+                label={String(eng.repostCount)}
+                active={eng.reposted}
+                pressed={eng.reposted}
+                activeColor="var(--ok-ink)"
+                ariaLabel={`${eng.reposted ? "Undo repost" : "Repost"}, ${eng.repostCount} ${eng.repostCount === 1 ? "repost" : "reposts"}`}
+                onTap={toggleRepost}
                 icon={<RepostIcon />}
               />
               {/* Views. The number is public — the feed card shows it to
@@ -1126,10 +1167,12 @@ export function PostViewerMobile({
               >
                 <EngagementButton
                   label=""
-                  active={viewer.saved}
+                  active={eng.saved}
+                  pressed={eng.saved}
+                  ariaLabel={eng.saved ? "Unsave" : "Save"}
                   onTap={toggleSave}
                   activeColor="var(--charcoal)"
-                  icon={<BookmarkIcon filled={viewer.saved} />}
+                  icon={<BookmarkIcon filled={eng.saved} />}
                 />
               </div>
             </div>
@@ -1218,10 +1261,10 @@ export function PostViewerMobile({
             bottom: 0,
             padding:
               "8px 12px calc(8px + env(safe-area-inset-bottom, 0px))",
-            background: "rgba(255,253,248,0.94)",
+            background: "var(--cream-92)",
             backdropFilter: "blur(14px)",
             WebkitBackdropFilter: "blur(14px)",
-            borderTop: "1px solid rgba(28,28,30,0.08)",
+            borderTop: "1px solid rgba(var(--scrim-rgb),0.08)",
             display: "flex",
             gap: 8,
             alignItems: "center",
@@ -1241,12 +1284,12 @@ export function PostViewerMobile({
               flex: 1,
               padding: "10px 14px",
               borderRadius: 999,
-              border: "1px solid rgba(28,28,30,0.10)",
-              background: "#fff",
+              border: "1px solid rgba(var(--scrim-rgb),0.10)",
+              background: "var(--paper)",
               fontFamily: "DM Sans, sans-serif",
               fontSize: 14,
               outline: "none",
-              color: "#1C1C1E",
+              color: "var(--charcoal)",
             }}
           />
           <button
@@ -1257,7 +1300,7 @@ export function PostViewerMobile({
               padding: "9px 16px",
               borderRadius: 999,
               background:
-                draft.trim() && !posting ? "#FF5C35" : "rgba(28,28,30,0.10)",
+                draft.trim() && !posting ? "#FF5C35" : "rgba(var(--scrim-rgb),0.10)",
               // Dark words on orange (6.3:1; white was 3.1:1). The grey is
               // the switched-off button's own dimming, left as it was.
               color: draft.trim() && !posting ? "var(--on-coral, #160A06)" : "#8A8580",
@@ -1448,7 +1491,7 @@ function ViewerMenuItem({
         fontFamily: "DM Sans, sans-serif",
         fontSize: 14,
         fontWeight: 600,
-        color: tone === "danger" ? "#C42B1C" : "#1C1C1E",
+        color: tone === "danger" ? "var(--error-ink)" : "var(--charcoal)",
         cursor: disabled ? "default" : "pointer",
         opacity: disabled ? 0.6 : 1,
       }}
@@ -1572,6 +1615,7 @@ function EngagementButton({
   active,
   activeColor,
   ariaLabel,
+  pressed,
 }: {
   label: string;
   icon: React.ReactNode;
@@ -1581,12 +1625,15 @@ function EngagementButton({
   /** For a button whose visible text is only a number — "12" says nothing
    *  about what tapping it does. */
   ariaLabel?: string;
+  /** An on/off button (Like, Repost, Save): its state, for screen readers. */
+  pressed?: boolean;
 }) {
   return (
     <button
       type="button"
       onClick={onTap}
       aria-label={ariaLabel}
+      aria-pressed={pressed}
       className="vibe-press"
       style={engagementItemStyle(active && activeColor ? activeColor : "var(--ink-2)", true)}
     >
@@ -1677,51 +1724,34 @@ function PostViewerSkeleton() {
   );
 }
 
-// Inline @handle / #tag linkifier — matches the desktop feed's
-// renderPostContent behavior. Mentions route to /profile/<handle>;
-// tags route to the campus feed filtered to that hashtag. Both read
-// --tag-ink: as words, raw coral is only 2.9:1 on the cream page.
-function renderInlineContent(text: string): React.ReactNode {
-  if (!text) return null;
-  const re = /(^|[^A-Za-z0-9_@#])([@#][A-Za-z0-9_]{1,32})/g;
-  const nodes: React.ReactNode[] = [];
-  let lastIndex = 0;
-  let m: RegExpExecArray | null;
-  let key = 0;
-  while ((m = re.exec(text)) !== null) {
-    const leading = m[1] ?? "";
-    const token = m[2] ?? "";
-    const start = m.index + leading.length;
-    if (start > lastIndex) nodes.push(<span key={`t${key++}`}>{text.slice(lastIndex, start)}</span>);
-    const sigil = token[0];
-    const body = token.slice(1).toLowerCase();
-    if (sigil === "@" && body.length >= 3) {
-      nodes.push(
-        <Link
-          key={`m${key++}`}
-          href={`/profile/${encodeURIComponent(body)}`}
-          style={{ color: "var(--tag-ink)", fontWeight: 600, textDecoration: "none" }}
-        >
-          {token}
-        </Link>,
-      );
-    } else if (sigil === "#") {
-      nodes.push(
-        <Link
-          key={`h${key++}`}
-          href={`/campus?tab=feed&tag=${encodeURIComponent(body)}`}
-          style={{ color: "var(--tag-ink)", fontWeight: 600, textDecoration: "none" }}
-        >
-          {token}
-        </Link>,
-      );
-    } else {
-      nodes.push(<span key={`p${key++}`}>{token}</span>);
-    }
-    lastIndex = start + token.length;
-  }
-  if (lastIndex < text.length) nodes.push(<span key={`t${key++}`}>{text.slice(lastIndex)}</span>);
-  return nodes;
+// Inline @handle / #tag linkifier, the same cutter as the feed card and the
+// desktop row (src/lib/feed/caption-segments.ts, Oct 19, 2026). Mentions route
+// to /profile/<handle>; a #tag routes to the campus feed filtered to it, and
+// only a tag the post SAVED lights up, so what you can tap always filters to
+// this post. Both read --tag-ink: as words, raw coral is only 2.9:1 on cream.
+function renderInlineContent(text: string, savedTags: string[] | null): React.ReactNode {
+  return captionSegments(text, savedTags).map((seg, i) =>
+    seg.kind === "mention" ? (
+      <Link
+        key={i}
+        href={`/profile/${encodeURIComponent(seg.handle)}`}
+        style={{ color: "var(--tag-ink)", fontWeight: 600, textDecoration: "none" }}
+      >
+        {seg.text}
+      </Link>
+    ) : seg.kind === "tag" ? (
+      <Link
+        key={i}
+        href={`/campus?tab=feed&tag=${encodeURIComponent(seg.tag)}`}
+        aria-label={`Show posts tagged #${seg.tag}`}
+        style={{ color: "var(--tag-ink)", fontWeight: 600, textDecoration: "none" }}
+      >
+        {seg.text}
+      </Link>
+    ) : (
+      <span key={i}>{seg.text}</span>
+    ),
+  );
 }
 
 function initialsOf(s: string | null | undefined): string {

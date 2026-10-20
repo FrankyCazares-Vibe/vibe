@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { DELETED_LINE, hasDeletedShape } from "@/lib/chat/deleted-note";
 import { readLatestPerRoom } from "@/lib/chat/latest-per-room";
 import { BOARD_POSTER_ROLES, clubRoomLabel, isClubRole, isRoomKind } from "@/lib/chat/room-rules";
 import { isMissingChatSchema, warnMissingChatSchemaOnce } from "@/lib/chat/schema";
@@ -75,6 +76,8 @@ type ThreadEntry = {
     user_id: string;
     media_kind: "image" | "video" | null;
     attachment_kind: "post" | "clip" | null;
+    /** Its sender deleted it (Oct 19, 2026): `content` is "Message deleted"; the row draws it like the note. */
+    deleted?: true;
   } | null;
   unread: boolean;
   accepted_at: string | null;
@@ -726,12 +729,19 @@ export async function GET(req: Request) {
     const cid = m.channel_id as string;
     if (clubRoomIds.has(cid) && blockedPeerIds.has(m.user_id as string)) continue;
     if (!lastByChannel.has(cid)) {
+      // A message its sender deleted (Oct 19, 2026) previews as the note
+      // the thread shows in its place, not as "Attachment", flagged so the
+      // row draws it quietly (review of Oct 19, 2026). Only on the wide
+      // read: the fallback select has no media columns, and a photo with no
+      // caption must not read as deleted there.
+      const deleted = "media_kind" in m && hasDeletedShape(m);
       lastByChannel.set(cid, {
-        content: m.content as string,
+        content: deleted ? DELETED_LINE : (m.content as string),
         created_at: m.created_at as string,
         user_id: m.user_id as string,
         media_kind: m.media_kind ?? null,
         attachment_kind: m.attachment_kind ?? null,
+        ...(deleted ? { deleted: true as const } : {}),
       });
     }
   }

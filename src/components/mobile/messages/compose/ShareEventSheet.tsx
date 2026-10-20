@@ -23,7 +23,7 @@ import { charCount, eventValid, NOTE_MAX, shareCta, sheetRoomLine } from "./shee
  * (the CTA stays disabled); the read failing → `LoadFailed compact`
  * (`Couldn't load your events.`) in the list's place, Retry re-reads, the
  * CTA disabled (SCREENS-L9). Then the note input (`Add a line (optional)`,
- * 200 max, the counter), the helper `Members who tap Going or Maybe join the
+ * 200 max, the counter), the helper `Members who tap Going or Interested join the
  * event chat.`, the CTA `Share to <room>` → `POST …/cards { type: "event",
  * event_id, note? }`. The `New event · Officers only` link is not built
  * (open point 14.19).
@@ -189,7 +189,7 @@ export function ShareEventSheet({ roomId, roomKind, roomName, clubName, orgHandl
             <Counter n={charCount(note)} max={NOTE_MAX} night={night} />
           </span>
         </div>
-        <p style={{ margin: 0, fontSize: 12.5, lineHeight: 1.35, fontWeight: 500, color: t.secondary }}>Members who tap Going or Maybe join the event chat.</p>
+        <p style={{ margin: 0, fontSize: 12.5, lineHeight: 1.35, fontWeight: 500, color: t.secondary }}>Members who tap Going or Interested join the event chat.</p>
       </div>
     </CardSheet>
   );

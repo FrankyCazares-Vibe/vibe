@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { blockedIdsFor } from "@/lib/chat/blocks";
+import { DELETED_SHAPE_COLUMNS, hasDeletedShape, type DeletedShapeInput } from "@/lib/chat/deleted-note";
 import { limitFor } from "@/lib/limits/budgets";
 import { isAllowedReactionEmoji } from "@/lib/messages/reaction-emoji";
 import { tooManyRequests } from "@/lib/rate-limit";
@@ -102,17 +103,19 @@ export async function POST(req: Request, ctx: RouteCtx) {
   // The author and the message's club, as the viewer may read them (RLS):
   // no row, nothing to react to. The club rides on the same read, named by
   // its foreign key like the `users` embed elsewhere, so a dm or a group
-  // costs nothing more.
+  // costs nothing more. A message its sender deleted (its "Message deleted"
+  // note, told by its shape) takes no reaction either: the other person's
+  // open chat may still show the old bubble (review of Oct 19, 2026).
   const { data: message, error: readErr } = await auth.supabase
     .from("messages")
-    .select("user_id, channels:channels!messages_channel_id_fkey(org_id)")
+    .select(`user_id, ${DELETED_SHAPE_COLUMNS}, channels:channels!messages_channel_id_fkey(org_id)`)
     .eq("id", messageId)
     .maybeSingle();
   if (readErr) {
     console.error("[messages/:id/react POST read]", readErr.code, readErr.message);
     return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
   }
-  if (!message) {
+  if (!message || hasDeletedShape(message as DeletedShapeInput)) {
     return NextResponse.json({ ok: false, error: "That message is no longer there." }, { status: 404 });
   }
   const row = message as { user_id: string; channels?: { org_id?: unknown } | null };

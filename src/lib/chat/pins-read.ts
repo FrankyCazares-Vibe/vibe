@@ -23,6 +23,7 @@
 
 import "server-only";
 
+import { DELETED_SHAPE_COLUMNS, hasDeletedShape } from "./deleted-note";
 import { prepareForClient, type MessageRow } from "./message-read";
 import { afterCleared, pinQuote } from "./pin-rules";
 import type { Person, PinnedMessage, SharedItem } from "./types";
@@ -34,7 +35,7 @@ import type { Person, PinnedMessage, SharedItem } from "./types";
  */
 export const PIN_LIST_SELECT =
   "message_id, pinned_at, " +
-  "message:messages!chat_message_pins_message_id_fkey(id, content, created_at, user_id, media_url, media_kind, attachment_id, removed_at)";
+  `message:messages!chat_message_pins_message_id_fkey(id, created_at, user_id, removed_at, ${DELETED_SHAPE_COLUMNS})`;
 
 /**
  * The authors' read, on the viewer's COOKIE client: `users` by the ids of
@@ -42,8 +43,11 @@ export const PIN_LIST_SELECT =
  */
 export const PIN_AUTHOR_SELECT = "id, handle, name, avatar_url";
 
-/** The cap's read: which messages are pinned, and whether each is still live. */
-export const PIN_LIVE_SELECT = "message_id, message:messages!chat_message_pins_message_id_fkey(removed_at)";
+/**
+ * The cap's read: which messages are pinned, and whether each is still live
+ * (not removed, not a "Message deleted" note: its shape is read too).
+ */
+export const PIN_LIVE_SELECT = `message_id, message:messages!chat_message_pins_message_id_fkey(removed_at, ${DELETED_SHAPE_COLUMNS})`;
 
 /**
  * The most pin rows one read asks for. A chat holds `PIN_CAP` live pins (21
@@ -74,7 +78,21 @@ export type PinMessageRow = {
   media_kind?: string | null;
   attachment_id?: string | null;
   removed_at?: string | null;
+  /** Read to tell a "Message deleted" note (`hasDeletedShape`), never sent. */
+  kind?: string | null;
+  attachment_kind?: string | null;
+  card_event_id?: string | null;
 };
+
+/**
+ * A pinned message that is still there to show: not removed and not its
+ * sender's "Message deleted" note (review of Oct 19, 2026: the delete takes
+ * its pins, but a pin made a moment after, on a stale screen, would have
+ * shown as an empty "Attachment" and taken one of the 20 slots).
+ */
+function live(message: PinMessageRow | null): message is PinMessageRow {
+  return !!message && !message.removed_at && !hasDeletedShape(message);
+}
 
 /** One row of `chat_message_pins` with its message embedded (an object; PostgREST's types say it may be a list). */
 export type PinRow = {
@@ -102,7 +120,7 @@ function person(value: unknown): Person | null {
 
 /** A pin the viewer gets: its message came with it, is not removed, and is after their "Clear chat history" mark. */
 function shown(message: PinMessageRow | null, clearedAt: string | null): message is PinMessageRow & { created_at: string } {
-  if (!message || message.removed_at) return false;
+  if (!live(message)) return false;
   return typeof message.created_at === "string" && afterCleared(message.created_at, clearedAt);
 }
 
@@ -187,19 +205,19 @@ export function toPinnedMessages(
 /**
  * The cap's two facts from `PIN_LIVE_SELECT` rows: how many pins sit on a
  * message that is still live (a pin on a removed message takes no slot: the
- * wave-1 review), and whether `messageId` is pinned already (re-pinning at
+ * wave-1 review; nor one on a deleted message's note, Oct 19, 2026), and whether `messageId` is pinned already (re-pinning at
  * the cap answers `already`, not `pin_limit`).
  */
 export function pinSlots(rows: PinRow[] | null, messageId: string): { live: number; among: boolean } {
   const wanted = messageId.toLowerCase();
-  let live = 0;
+  let count = 0;
   let among = false;
   for (const row of rows ?? []) {
     if (typeof row.message_id === "string" && row.message_id.toLowerCase() === wanted) among = true;
     const message = embedded(row.message);
-    if (message && !message.removed_at) live += 1;
+    if (live(message)) count += 1;
   }
-  return { live, among };
+  return { live: count, among };
 }
 
 /** `?limit=` as the shared read takes it: a whole number from 1 to 60; anything else is 30. */

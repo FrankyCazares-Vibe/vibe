@@ -18,7 +18,7 @@
 import { motion } from "motion/react";
 import { useEffect, useId, useRef, useState } from "react";
 
-import { campusClock, campusDateTime } from "@/components/campus/tonight/campus-time";
+import { campusDateTime } from "@/components/campus/tonight/campus-time";
 import { useCampusNow } from "@/components/campus/tonight/use-campus-now";
 import {
   CHECKIN_COPY,
@@ -36,6 +36,7 @@ import { vibeRequest } from "@/lib/feedback/request";
 import { SPRING_POP, SPRING_SOFT, RISE_PX } from "@/lib/motion/springs";
 
 import { CheckinCodeForm } from "./CheckinCodeForm";
+import { checkinOpensWhen } from "./door-screen";
 import { checkinApiPath, parseViewerState, useCheckinState } from "./use-checkin-state";
 
 export type CheckinLandingEvent = {
@@ -182,7 +183,9 @@ function LandingBody({ event, initial, token }: { event: CheckinLandingEvent; in
             ? "form"
             : "not_open";
   const countLine = checkinCountLine(state.count, phase === "after", false);
-  const opensMs = Date.parse(event.starts_at) - CHECKIN_OPENS_BEFORE_MS;
+  // Campus time with the day when it isn't today, the door's own words
+  // (Oct 19, 2026): a link opened the night before used to name no day.
+  const opensWhen = now > 0 ? checkinOpensWhen(Date.parse(event.starts_at) - CHECKIN_OPENS_BEFORE_MS, now) : null;
 
   return (
     <>
@@ -258,7 +261,7 @@ function LandingBody({ event, initial, token }: { event: CheckinLandingEvent; in
               </div>
             ) : view === "before" ? (
               <>
-                <p style={lineStyle}>{Number.isFinite(opensMs) ? opensAtLine(campusClock(opensMs)) : CHECKIN_ERRORS.checkin_outside_window}</p>
+                <p style={lineStyle}>{opensWhen ? opensAtLine(opensWhen) : CHECKIN_ERRORS.checkin_outside_window}</p>
                 {goToEvent}
               </>
             ) : view === "after" ? (

@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { asLoadFailure, LoadFailed, type LoadFailure } from "@/components/feedback/LoadFailed";
 import type { FollowedBoard, FollowedBoardsResponse, InboxClub, InboxResponse, RoomKind } from "@/lib/chat/types";
 import { clampWeekOffset, sheetStartDay, weekOffsetOf, weekRange, weekRangeAt, type WeekRange } from "@/lib/chat/week";
+import { CALENDAR_CHANGED_EVENT } from "@/lib/calendar/calendar-sync";
 import { vibeRequest } from "@/lib/feedback/request";
 import { ORG_COPY } from "@/lib/orgs/join-copy";
 
@@ -355,6 +356,24 @@ export function MessagesHome({ filter, onFilter, refreshKey, onThreads, onOpenCl
   const night = useNightTheme();
   const t = palette(night);
   const d = useHomeData(refreshKey, onThreads);
+  // An RSVP made anywhere (Oct 19, 2026, critique B8 repair): the page this
+  // window sits on, another tab, or a view inside it. The week on screen is
+  // read again, the way MessagesDesktop does for the desktop shell (which
+  // holds its own useHomeData, so the listener lives here and not in the
+  // hook: one read per change, never two). Before, the Otto-corner window's
+  // home kept the old week until one of its own views closed.
+  const homeRef = useRef(d);
+  useEffect(() => {
+    homeRef.current = d;
+  });
+  useEffect(() => {
+    const onCalendar = () => {
+      const h = homeRef.current;
+      void h.refreshWeek(h.range);
+    };
+    window.addEventListener(CALENDAR_CHANGED_EVENT, onCalendar);
+    return () => window.removeEventListener(CALENDAR_CHANGED_EVENT, onCalendar);
+  }, []);
   const badge = useMemo(() => allBadgeCount(d.threads ?? [], d.clubs ?? [], d.now), [d.threads, d.clubs, d.now]);
   const requestCount = d.requests?.length ?? 0;
   // 11.1 States: the skeleton until BOTH threads and inbox answered.

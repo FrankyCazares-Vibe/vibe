@@ -211,7 +211,7 @@ export function goingWord(n: number): string {
 /** The spoken RSVP clause of the card's label; null when the viewer has none. */
 export function rsvpSpoken(status: EventRef["viewer_status"]): string | null {
   if (status === "going") return "you're going";
-  if (status === "maybe") return "you said maybe";
+  if (status === "maybe") return "you're interested";
   return null;
 }
 
@@ -252,7 +252,7 @@ export function announceFilled(taken: number, total: number): string {
 
 export function announceRsvp(status: EventRef["viewer_status"]): string {
   if (status === "going") return "You're going";
-  if (status === "maybe") return "You said maybe";
+  if (status === "maybe") return "You're interested";
   return "RSVP removed";
 }
 

@@ -2,6 +2,8 @@
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 
+import { TrashIcon } from "./DeleteConfirm";
+import { DELETE_LABEL } from "./delete-rules";
 import { type MessageReaction } from "./types";
 
 export const REACTION_EMOJIS = ["❤️", "👍", "👎", "😂", "🔥", "😮", "😢"] as const;
@@ -43,6 +45,7 @@ export function ReactionPicker({
   pinLabel,
   onReport,
   onRemove,
+  onDelete,
   onClose,
 }: {
   darkMode: boolean;
@@ -64,6 +67,9 @@ export function ReactionPicker({
   /** Adds "Remove", under Report: an officer's or a mod's removal of
    *  someone else's message in a club room (wave-2 contract 11.5). */
   onRemove?: () => void;
+  /** Adds a red "Delete", last: the viewer's own message, card or reply
+   *  (Oct 19, 2026; delete-rules.ts `canDeleteOwn`). The caller confirms. */
+  onDelete?: () => void;
   onClose: () => void;
 }) {
   const pickerRef = useRef<HTMLDivElement | null>(null);
@@ -138,7 +144,7 @@ export function ReactionPicker({
         // A pill for the emoji row alone; a card once Reply (or Report)
         // joins it. They get their own rows because beside the emojis the
         // picker ran past a phone's width and scrolled the list sideways.
-        borderRadius: onReply || onPin || onReport || onRemove ? 20 : 999,
+        borderRadius: onReply || onPin || onReport || onRemove || onDelete ? 20 : 999,
         background: darkMode
           ? "rgba(20,16,28,0.92)"
           : "rgba(255,255,255,0.96)",
@@ -188,7 +194,7 @@ export function ReactionPicker({
           );
         })}
       </div>
-      {onReply || onPin || onReport || onRemove ? (
+      {onReply || onPin || onReport || onRemove || onDelete ? (
         <>
           <div
             aria-hidden
@@ -261,13 +267,26 @@ export function ReactionPicker({
               Remove
             </button>
           ) : null}
+          {onDelete ? (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onDelete();
+              }}
+              style={pickerRowStyle(darkMode, true)}
+            >
+              <TrashIcon />
+              {DELETE_LABEL}
+            </button>
+          ) : null}
         </>
       ) : null}
     </div>
   );
 }
 
-/** Reply, the pin row, Report and Remove, so the rows in the long-press picker can't drift. */
+/** Reply, the pin row, Report, Remove and Delete, so the rows in the long-press picker can't drift. */
 function pickerRowStyle(darkMode: boolean, danger: boolean): React.CSSProperties {
   return {
     display: "flex",

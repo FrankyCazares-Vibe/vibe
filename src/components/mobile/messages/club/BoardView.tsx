@@ -4,12 +4,15 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { LoadFailed } from "@/components/feedback/LoadFailed";
 import { RemovedContentCard, ReportSheet, type ReportTargetRef } from "@/components/safety/ReportSheet";
-import type { ChatMessage, RemoveMessageResponse } from "@/lib/chat/types";
+import { asDeletedNote, withDeletedQuotes } from "@/lib/chat/deleted-note";
+import type { ChatMessage, DeleteOwnResponse, RemoveMessageResponse } from "@/lib/chat/types";
 import { useLayerHistory } from "@/lib/chat/use-layer-history";
 import { ROOM_FULL_READ_EVERY, ROOM_POLL_MS, type RoomPoll } from "@/lib/chat/use-room-poll";
 import { vibeRequest } from "@/lib/feedback/request";
 import { ORG_COPY, fillCopy } from "@/lib/orgs/join-copy";
 
+import { DeleteConfirm, rowFocusTarget } from "../DeleteConfirm";
+import { canDeleteBoardPost, DELETE_FAILED, deleteConfirmCopy, leftNote } from "../delete-rules";
 import { toastSendFailure } from "../send-failure";
 import { useChatSurface } from "../surface";
 import { FONT, palette } from "../v2-tokens";
@@ -88,6 +91,9 @@ export function BoardView({ poll, roomId, night, now, onOpenEventChat, scrollTok
   const [removeTarget, setRemoveTarget] = useState<ChatMessage | null>(null);
   const [removing, setRemoving] = useState(false);
   const [reportMessage, setReportMessage] = useState<ReportTargetRef | null>(null);
+  // The viewer's own post or reply they asked to delete (Oct 19, 2026; decision 9).
+  const [deleteTarget, setDeleteTarget] = useState<ChatMessage | null>(null);
+  const [deleting, setDeleting] = useState(false);
   // ONE handler for the life of the Board, as in `RoomThread`: the desktop
   // dialog (`ReportSheet variant="modal"`) takes focus again whenever its
   // `onClose` changes, and the Board renders again on every poll, which would
@@ -134,6 +140,40 @@ export function BoardView({ poll, roomId, night, now, onOpenEventChat, scrollTok
     }
     // A reply is not in the hook's rows (top-level only): the open folds
     // read again now, and its post is re-read for the server's `reply_count`.
+    setRefreshToken((n) => n + 1);
+    const root = messages?.find((m) => m.id === target.thread_root_id);
+    if (root) void poll.refreshOne(root.created_at);
+  };
+
+  // Delete for everyone (Oct 19, 2026). A post becomes its "Post deleted"
+  // note in place (its replies stay; `asDeletedNote` keeps `reply_count`), or
+  // goes when the server took it away whole. A reply is not in the hook's
+  // rows: the open folds read again and show its note.
+  const confirmDelete = async () => {
+    const target = deleteTarget;
+    if (!target || deleting) return;
+    setDeleting(true);
+    const r = await vibeRequest<DeleteOwnResponse>(
+      `/api/me/threads/${encodeURIComponent(roomId)}/messages/${encodeURIComponent(target.id)}`,
+      { method: "DELETE", failure: DELETE_FAILED, quiet: true },
+    );
+    setDeleting(false);
+    setDeleteTarget(null);
+    if (!r.ok) {
+      toastSendFailure(r);
+      return;
+    }
+    if (target.thread_root_id === null) {
+      const note = leftNote(r.data);
+      if (note) poll.replace(target.id, asDeletedNote(target));
+      else poll.remove(target.id);
+      // Any post that quoted it quotes the note now (review of Oct 19, 2026).
+      const rows = messages ?? [];
+      withDeletedQuotes(rows, target.id, note).forEach((m, i) => {
+        if (m !== rows[i]) poll.replace(m.id, m);
+      });
+      return;
+    }
     setRefreshToken((n) => n + 1);
     const root = messages?.find((m) => m.id === target.thread_root_id);
     if (root) void poll.refreshOne(root.created_at);
@@ -201,8 +241,10 @@ export function BoardView({ poll, roomId, night, now, onOpenEventChat, scrollTok
                 onCard={poll.replaceCard}
                 onRefresh={(createdAt) => void poll.refreshOne(createdAt)}
                 onOpenEventChat={onOpenEventChat}
-                onRemove={canRemove ? () => setRemoveTarget(post) : undefined}
-                onReport={canReport ? () => setReportMessage(reportRef(post)) : undefined}
+                onRemove={canRemove && !post.deleted ? () => setRemoveTarget(post) : undefined}
+                onReport={canReport && !post.deleted ? () => setReportMessage(reportRef(post)) : undefined}
+                onDelete={canDeleteBoardPost(post, viewerId) ? () => setDeleteTarget(post) : undefined}
+                onDeleteReply={viewerId && !temp ? setDeleteTarget : undefined}
                 onRemoveReply={viewer?.can_moderate && !temp ? setRemoveTarget : undefined}
                 onReportReply={viewerId && !temp ? (reply) => setReportMessage(reportRef(reply)) : undefined}
                 onReplied={() => void poll.refreshOne(post.created_at)}
@@ -223,6 +265,16 @@ export function BoardView({ poll, roomId, night, now, onOpenEventChat, scrollTok
         ) : null}
       </section>
       {removeTarget ? <RemoveConfirm night={night} busy={removing} onConfirm={() => void confirmRemove()} onCancel={() => setRemoveTarget(null)} /> : null}
+      {deleteTarget ? (
+        <DeleteConfirm
+          night={night}
+          busy={deleting}
+          copy={deleteConfirmCopy(deleteTarget.thread_root_id === null ? { boardPost: true, replies: deleteTarget.reply_count } : {})}
+          onConfirm={() => void confirmDelete()}
+          onCancel={() => setDeleteTarget(null)}
+          focusAfter={() => rowFocusTarget(scrollRef.current, deleteTarget.id, deleteTarget.thread_root_id)}
+        />
+      ) : null}
       {reportMessage ? (
         // The desktop pane has no drawer above it: the modal form there (a nested vaul sheet without a parent drawer throws).
         surface === "desktop" ? (

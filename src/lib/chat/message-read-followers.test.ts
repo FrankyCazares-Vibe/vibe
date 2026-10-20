@@ -366,3 +366,44 @@ test("a follower's shared posts come from their own login: one the posts rules h
   );
   assert.equal(failed.ok, false);
 });
+
+// ── Deleted posts (decision 8, Oct 19, 2026; B7 review findings 4 and 7) ────
+
+test("a follower's Board leaves a deleted post out IN THE READ, so a full page stays full and Earlier stays reachable", async () => {
+  // The Board as the database holds it: 50 live posts by the officer and one
+  // the officer deleted, newest first; the service read honours `deleted_at is null`.
+  const live = Array.from({ length: 50 }, (_, i) => row(100 + i, OFFICER, { created_at: at(i) }));
+  const note = row(99, OFFICER, { content: "", kind: "text", media_url: null, media_kind: null, attachment_id: null, attachment_kind: null, card_event_id: null });
+  const service = installService((table, calls) => {
+    if (table !== "messages") return serviceAnswers(table, calls);
+    const liveOnly = calls.some((c) => c[0] === "is" && c[1] === "deleted_at" && c[2] === null);
+    const board = liveOnly ? live : [note, ...live];
+    const limit = calls.find((c) => c[0] === "limit")?.[1] as number;
+    return { data: board.slice(0, limit).map((r) => ({ ...r })) };
+  });
+  const cookie = cookieClient([]);
+  const read = await readChatMessages(cookie.client as unknown as Client, CHANNEL, { limit: 50 }, known());
+  assert.ok(read.ok, JSON.stringify(read));
+  assert.equal(read.messages.length, 50, "the page is full: use-room-poll keeps Earlier (hasEarlier = length >= 50)");
+  assert.ok(!read.messages.some((m) => m.id === note.id));
+  const page = service.log.find((l) => l.table === "messages")!;
+  assert.ok(page.calls.some((c) => c[0] === "is" && c[1] === "deleted_at" && c[2] === null), "the read itself leaves deleted posts out");
+  assert.ok(!cookie.log.some((l) => l.table === "messages"), "no deleted_at read on the follower's own client");
+});
+
+test("a follower never sees a deleted post's note, even when the read could not filter (no deleted_at yet, or a row of that shape)", async () => {
+  const note = row(98, OFFICER, { content: "", kind: "text", media_url: null, media_kind: null, attachment_id: null, attachment_kind: null, card_event_id: null });
+  const noColumn = { error: { code: "42703", message: "column messages.deleted_at does not exist" } };
+  const service = installService((table, calls) => {
+    if (table !== "messages") return serviceAnswers(table, calls);
+    if (calls.some((c) => c[0] === "is" && c[1] === "deleted_at")) return noColumn;
+    return { data: [note, POST, POLL].map((r) => ({ ...r })) };
+  });
+  const cookie = cookieClient([]);
+  const read = await readChatMessages(cookie.client as unknown as Client, CHANNEL, { limit: 50 }, known());
+  assert.ok(read.ok, JSON.stringify(read));
+  assert.deepEqual(read.messages.map((m) => m.id).sort(), [POST.id, POLL.id].sort(), "nothing in its place for a follower");
+  assert.ok(!JSON.stringify(read).includes("Post deleted") && !JSON.stringify(read).includes("Message deleted"));
+  assert.equal(service.log.filter((l) => l.table === "messages").length, 2, "asked with the filter, then again without it");
+  assert.ok(!cookie.log.some((l) => l.table === "messages" && has(l.calls, "in", "id")), "no deleted_at read for a follower");
+});

@@ -5,6 +5,7 @@ import Link from "next/link";
 import type { EventRef } from "@/lib/chat/types";
 import { isSoon } from "@/lib/chat/when";
 
+import { InterestedRing } from "../home/RsvpMark";
 import { FONT, palette, SERIF } from "../v2-tokens";
 import { isHot, rsvpWord, upNextAriaLabel, upNextLine } from "./helpers";
 
@@ -15,13 +16,17 @@ import { isHot, rsvpWord, upNextAriaLabel, upNextLine } from "./helpers";
  * `up_next.slice(0, 2)` in a 2-column grid of 50px cards (the third event is
  * reachable by its chip; SCREENS-L6): line 1 `eventTime` (`Live now` when
  * live) + ` · ` + the RSVP mark when the viewer RSVP'd, line 2 the title.
- * At 375 a card is 167.5px outside; the mockup's 12px line with 5px gaps in
- * `7px 10px` does not hold `Tonight · 9:30 PM · ● Maybe` (≈160 in 146), so
- * line 1 is 11.5px/600 at -0.15 tracking with 3px gaps in `7px 8px` (150
- * inside; measured 148.7 in DM Sans; VIS-S2-1), and the RSVP word is never
- * cut: the separator, the mark and the word keep their width, the time span
- * ellipsises in the rare overlong case (`Tomorrow · 7:30 P… · ● Maybe`); the
- * `aria-label` carries the whole line either way. The live
+ * At 375 a card is 167.5px outside, 150 inside `7px 8px`; line 1 is
+ * 11.5px/600 at -0.15 tracking with 3px gaps (VIS-S2-1).
+ *
+ * The mark only, no word (Oct 19, 2026, critique B8 repair). The word
+ * became "Interested" (decision 12), and `Tonight · 9:30 PM · ● Interested`
+ * is 169px, `Tomorrow · 7:30 PM · ● Interested` 182px, against 150: the
+ * time was the part that shrank, so a student couldn't see when the event
+ * was. Line 1 now ends in the calendar key's mark (a coral check for Going,
+ * a coral ring for Interested; `Tomorrow · 7:30 PM · ✓` is about 125px), the
+ * word is the mark's tooltip, and the card's `aria-label` says it in full
+ * ("you're going" / "you're interested"). The live
  * chrome only on `state === "live"` or `isSoon` (SCREENS-M2); the `Soon`
  * ring only when `isSoon`; every other card the quiet chrome. The bloom
  * behind the block only when a DRAWN card is hot. A tap opens the event chat
@@ -123,9 +128,13 @@ export function UpNext({ clubName, events, night, now, officerEmpty, onOpenEvent
                 {word ? (
                   <>
                     <span aria-hidden="true" style={{ flexShrink: 0, color: t.muted }}>·</span>
-                    <span style={{ flexShrink: 0, display: "inline-flex", alignItems: "center", gap: word === "Going" ? 3 : 4, fontWeight: 700, color: word === "Going" ? t.coralMark : t.secondary }}>
-                      <span style={{ flexShrink: 0, display: "inline-flex" }}>{word === "Going" ? <Check color={t.coralMark} /> : <span aria-hidden="true" style={{ width: 6, height: 6, borderRadius: 999, background: t.muted }} />}</span>
-                      <span>{word}</span>
+                    {/* The key's mark; the word is in the card's aria-label. */}
+                    <span title={word} aria-hidden="true" style={{ flexShrink: 0, display: "inline-flex", alignItems: "center", justifyContent: "center", width: 11, height: 11 }}>
+                      {word === "Going" ? (
+                        <Check color={t.coralMark} />
+                      ) : (
+                        <InterestedRing coral={t.coralMark} size={8} />
+                      )}
                     </span>
                   </>
                 ) : null}

@@ -10,6 +10,11 @@
  * dark on white in every theme, because cameras misread inverted codes.
  * No tab bar and no portal. `data-holds-reload` holds a new build's reload
  * while check-in is open, so a deploy never blanks the screen mid-line.
+ *
+ * Oct 19, 2026 (B10): one way out per screen. Officers get the header's Done
+ * on every screen (the open door used to draw a second Done beside Stop);
+ * everyone else gets "Go to the event" and no Done. The rules, the "opens"
+ * line and the after-the-end count live in door-screen.ts, with tests.
  */
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -29,12 +34,12 @@ import {
   checkinCountLine,
   eventAnchorPath,
   newCodeInLine,
-  opensAtLine,
   spokenCode,
   type CheckinErrorCode,
 } from "@/lib/events/event-checkin";
 import { RISE_PX, SPRING_POP, SPRING_SOFT } from "@/lib/motion/springs";
 
+import { DOOR_START_LEAD, doorAfterLine, doorExits, doorOpensLine, doorScreen, doorWhoCameLabel } from "./door-screen";
 import { QrCode } from "./QrCode";
 import { useDoorFeed, type DoorFeedState } from "./use-door-feed";
 import { useWakeLock } from "./use-wake-lock";
@@ -91,6 +96,8 @@ const BODY: CSSProperties = {
 };
 
 const LINE: CSSProperties = { margin: 0, fontSize: 16, lineHeight: 1.45, color: "var(--ink-2)", maxWidth: 440 };
+/** A screen's first, stronger line ("Couldn't load check-in.", "Check-in has ended."). */
+const HEAD_LINE: CSSProperties = { ...LINE, color: "var(--charcoal)", fontWeight: 600 };
 const MUTED: CSSProperties = { margin: 0, fontSize: 15, color: "var(--ink-muted)" };
 
 /**
@@ -102,10 +109,6 @@ function refusalLine(code: string | null): string | null {
   if (!code || code === "request_failed") return null;
   if (!Object.prototype.hasOwnProperty.call(CHECKIN_ERRORS, code)) return null;
   return CHECKIN_ERRORS[code as CheckinErrorCode];
-}
-
-function timeLabel(iso: string): string {
-  return new Date(iso).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
 }
 
 /**
@@ -175,12 +178,23 @@ export function DoorView({
   // What the screen reader hears: the live code, digit by digit. Empty when
   // no code shows, so the first code after Start is a change and is read out.
   const spoken = open && door.step ? `Code ${spokenCode(door.step.code)}` : "";
+  const screen = doorScreen({
+    loadFailed,
+    canManage,
+    hasFeed: feed !== null,
+    failed: door.failed,
+    failCode: door.failCode,
+    phase,
+    open,
+  });
+  // One way back to the event per screen (door-screen.ts says why, Oct 19, 2026).
+  const exits = doorExits(screen, event.org !== null);
 
   let body: ReactNode;
-  if (loadFailed) {
+  if (screen === "loadFailed") {
     body = (
       <>
-        <p style={{ ...LINE, color: "var(--charcoal)", fontWeight: 600 }}>{CHECKIN_COPY.doorLoadFailed}</p>
+        <p style={HEAD_LINE}>{CHECKIN_COPY.doorLoadFailed}</p>
         {/* Re-runs the page's own reads on the server; client state stays. */}
         <button
           type="button"
@@ -195,55 +209,42 @@ export function DoorView({
         </button>
       </>
     );
-  } else if (!canManage) {
+  } else if (screen === "notOfficer") {
+    body = <p style={LINE}>{CHECKIN_COPY.doorNotOfficer}</p>;
+  } else if (screen === "failed") {
     body = (
       <>
-        <p style={LINE}>{CHECKIN_COPY.doorNotOfficer}</p>
-        <Link href={eventLink} className="vibe-press" style={doorPill}>
-          {CHECKIN_COPY.goToEvent}
-        </Link>
-      </>
-    );
-  } else if (!feed) {
-    body = door.failed ? (
-      <>
-        <p style={{ ...LINE, color: "var(--charcoal)", fontWeight: 600 }}>{CHECKIN_COPY.doorLoadFailed}</p>
+        <p style={HEAD_LINE}>{CHECKIN_COPY.doorLoadFailed}</p>
         {refusalLine(door.failCode) ? <p style={LINE}>{refusalLine(door.failCode)}</p> : null}
         <button type="button" className="vibe-press" style={doorPill} onClick={door.reload}>
           {CHECKIN_COPY.tryAgain}
         </button>
       </>
-    ) : (
-      <p style={MUTED}>{CHECKIN_COPY.doorGettingCode}</p>
     );
-  } else if (phase === "before") {
+  } else if (screen === "loading" || !feed) {
+    body = <p style={MUTED}>{CHECKIN_COPY.doorGettingCode}</p>;
+  } else if (screen === "before") {
+    // The time first, then why: "an hour before" is said once (Oct 19, 2026).
+    const opens = doorOpensLine(Date.parse(feed.opens_at), serverNowMs);
     body = (
       <>
-        <p style={{ ...LINE, color: "var(--charcoal)", fontWeight: 600 }}>{CHECKIN_COPY.doorBefore}</p>
-        <p style={LINE}>{opensAtLine(timeLabel(feed.opens_at))}</p>
+        {opens ? <p style={HEAD_LINE}>{opens}</p> : null}
+        <p style={LINE}>{CHECKIN_COPY.doorBefore}</p>
       </>
     );
-  } else if (phase === "after") {
-    const line = count > 0 ? checkinCountLine(count, true, true) : CHECKIN_COPY.doorNobodyYet;
+  } else if (screen === "after") {
     body = (
       <>
-        <p style={{ ...LINE, color: "var(--charcoal)", fontWeight: 600 }}>{CHECKIN_COPY.doorAfter}</p>
-        <p style={{ margin: 0, fontSize: 20, fontWeight: 700 }}>{line}</p>
-        <Link
-          href={event.org ? `/orgs/${encodeURIComponent(event.org.handle)}` : eventLink}
-          className="vibe-press"
-          style={doorPill}
-        >
-          {event.org ? CHECKIN_COPY.seeWhoCame : CHECKIN_COPY.goToEvent}
-        </Link>
+        <p style={HEAD_LINE}>{CHECKIN_COPY.doorAfter}</p>
+        <p style={{ margin: 0, fontSize: 20, fontWeight: 700 }}>{doorAfterLine(count)}</p>
       </>
     );
-  } else if (open) {
-    body = <OpenDoor title={event.title} doneHref={eventLink} door={door} stopRef={stopRef} onStop={onStop} />;
+  } else if (screen === "open") {
+    body = <OpenDoor title={event.title} door={door} stopRef={stopRef} onStop={onStop} />;
   } else {
     body = (
       <>
-        <p style={LINE}>{CHECKIN_COPY.doorStartLead}</p>
+        <p style={LINE}>{DOOR_START_LEAD}</p>
         <button
           ref={startRef}
           type="button"
@@ -266,9 +267,20 @@ export function DoorView({
       </>
     );
   }
+  // The body's own link: never a second way to the event's card (Done is that).
+  const bodyLink =
+    exits.bodyLink === "event" ? (
+      <Link href={eventLink} className="vibe-press" style={doorPill}>
+        {CHECKIN_COPY.goToEvent}
+      </Link>
+    ) : exits.bodyLink === "whoCame" && event.org ? (
+      <Link href={`/orgs/${encodeURIComponent(event.org.handle)}`} className="vibe-press" style={doorPill}>
+        {doorWhoCameLabel(count)}
+      </Link>
+    ) : null;
 
   return (
-    <main style={ROOT} data-holds-reload={open ? "" : "false"}>
+    <main className={screen === "open" ? "vibe-door is-open" : "vibe-door"} style={ROOT} data-holds-reload={open ? "" : "false"}>
       <style>{DOOR_CSS}</style>
       {/*
         The code's live region sits here, always mounted, so the first code
@@ -279,8 +291,10 @@ export function DoorView({
       <div role="status" aria-live="polite" aria-atomic="true" style={SR_ONLY}>
         {spoken}
       </div>
-      <header style={{ display: "flex", alignItems: "center", gap: 12, width: "100%", maxWidth: 960, margin: "0 auto" }}>
+      <header style={{ display: "flex", alignItems: "center", gap: 12, width: "100%", maxWidth: 960, minHeight: 44, margin: "0 auto" }}>
         <div style={{ flex: 1, minWidth: 0, textAlign: "left" }}>
+          {/* Two lines before the "…" (Oct 19, 2026): the line at the door reads
+              the title to know they're at the right event. */}
           <h1
             style={{
               margin: 0,
@@ -288,9 +302,11 @@ export function DoorView({
               fontSize: 20,
               fontWeight: 600,
               lineHeight: 1.25,
-              whiteSpace: "nowrap",
+              display: "-webkit-box",
+              WebkitLineClamp: 2,
+              WebkitBoxOrient: "vertical",
               overflow: "hidden",
-              textOverflow: "ellipsis",
+              overflowWrap: "anywhere",
             }}
           >
             {/* No title when the event couldn't be read (loadFailed). */}
@@ -300,15 +316,23 @@ export function DoorView({
             <p style={{ margin: "2px 0 0", fontSize: 13, color: "var(--ink-2)" }}>{event.org.name}</p>
           ) : null}
         </div>
-        {/* Done only hides the screen: check-in stays open for the people still coming. */}
-        <Link ref={doneRef} href={eventLink} className="vibe-press" style={{ ...doorPill, minHeight: 40, padding: "0 16px", fontSize: 14 }}>
-          {CHECKIN_COPY.done}
-        </Link>
+        {/* The screen's one Done. It only hides the screen: check-in stays open
+            for the people still coming (Stop is what closes it). 44 px tall,
+            a full touch target (it was 40). */}
+        {exits.headerDone ? (
+          <Link ref={doneRef} href={eventLink} className="vibe-press" style={{ ...doorPill, flexShrink: 0, padding: "0 18px" }}>
+            {CHECKIN_COPY.done}
+          </Link>
+        ) : null}
       </header>
-      <div style={BODY}>
+      <div className="vibe-door-body" style={BODY}>
         {body}
-        {/* The read failed but codes are on screen: they stay valid for up to a minute. */}
-        {canManage && feed && door.failed ? <p style={{ ...MUTED, fontSize: 13 }}>{CHECKIN_COPY.doorReconnecting}</p> : null}
+        {bodyLink}
+        {/* A read failed but the last good feed is still on screen. The open
+            door says it beside its code instead (OpenDoor, Oct 19, 2026). */}
+        {canManage && feed && door.failed && screen !== "open" ? (
+          <p style={{ ...MUTED, fontSize: 13 }}>{CHECKIN_COPY.doorReconnecting}</p>
+        ) : null}
       </div>
     </main>
   );
@@ -323,13 +347,46 @@ export function DoorView({
  * A phone held sideways (844 x 390 and the like) is wide but short, so the
  * 300 px floor gives way to 62dvh there and the code shrinks with the height
  * (18dvh): otherwise the tile's bottom sits under the browser's bar.
+ *
+ * Oct 19, 2026 (B10): every line wraps balanced, so no line ends on one
+ * lonely word ("...type the code in / Vibe."); the white QR tile gets a
+ * hairline ring, so it has an edge on Light's cream (in Night the ring is
+ * a faint light line on the dark page). With no code to show, the tile
+ * (`is-empty`) keeps its size as a faint tint of the page with a dashed
+ * edge (not white, and not the card colour, which is white in Light).
+ *
+ * PORTRAIT PHONES (Oct 19, 2026). A flat 46dvh tile pushed Stop under the
+ * fold in Safari with its bars showing (390 x 664, 375 x 553), and more so
+ * when the title wraps to two lines. Now, under 760 px wide, the open door
+ * is exactly one screen tall and the QR takes the height that's left after
+ * the header and the code column: its box (`vibe-door-qr-box`) starts at the
+ * old size and shrinks when the screen is short, never under 160 px, and the
+ * tile is the box's smaller side (container units). On a short screen
+ * (under 740 px tall) the column's gaps tighten and the code shrinks with
+ * the height, so the QR keeps as much room as it can.
  */
 const DOOR_CSS = `
+.vibe-door p { text-wrap: balance; }
 .vibe-door-open { display: flex; flex-direction: column; align-items: center; gap: 16px; width: 100%; }
-.vibe-door-qr { --vibe-door-qr: min(78vw, 46dvh, 420px); width: var(--vibe-door-qr); height: var(--vibe-door-qr); box-sizing: border-box; padding: 12px; border-radius: 16px; background: #fff; }
+.vibe-door-qr { --vibe-door-qr: min(78vw, 46dvh, 420px); width: var(--vibe-door-qr); height: var(--vibe-door-qr); box-sizing: border-box; padding: 12px; border-radius: 16px; background: #fff; box-shadow: 0 0 0 1px var(--hairline); }
+.vibe-door-qr.is-empty { display: flex; align-items: center; justify-content: center; background: rgba(var(--scrim-rgb), 0.05); box-shadow: none; border: 1.5px dashed rgba(var(--scrim-rgb), 0.22); }
 .vibe-door-side { display: flex; flex-direction: column; align-items: center; gap: 10px; min-width: 0; text-align: center; }
 .vibe-door-buttons { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin-top: 6px; }
 .vibe-door-code { font-size: clamp(64px, 20vw, 128px); }
+@media (max-width: 759px) {
+  .vibe-door.is-open { height: 100dvh; }
+  .vibe-door.is-open .vibe-door-body { min-height: 0; }
+  .vibe-door.is-open .vibe-door-open { flex: 0 1 auto; min-height: 0; }
+  .vibe-door-qr-box { align-self: stretch; flex: 0 1 min(78vw, 420px); min-height: 160px; container-type: size; display: flex; align-items: center; justify-content: center; }
+  .vibe-door-qr { --vibe-door-qr: min(100cqw, 100cqh); }
+  .vibe-door-side { flex-shrink: 0; }
+}
+@media (max-width: 759px) and (max-height: 740px) {
+  .vibe-door-open { gap: 12px; }
+  .vibe-door-side { gap: 6px; }
+  .vibe-door-buttons { margin-top: 2px; }
+  .vibe-door-code { font-size: clamp(56px, min(20vw, 11dvh), 128px); }
+}
 @media (min-width: 760px) {
   .vibe-door-code { font-size: clamp(64px, min(11vw, 18dvh), 128px); }
   .vibe-door-open { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 40px; max-width: 960px; margin: 0 auto; }
@@ -352,16 +409,27 @@ const SR_ONLY: CSSProperties = {
   border: 0,
 };
 
-/** The live door: the QR, the code, the countdown, the count and the two buttons. */
+/**
+ * The live door: the QR, the code, the countdown, the count and Stop. Its
+ * own Done is gone (Oct 19, 2026): the header's Done is the screen's one way
+ * out, in the same spot as before Start.
+ *
+ * NO CODE ON SCREEN (Oct 19, 2026). When reads fail long enough for both of
+ * the feed's steps to run out (30 to 60 s of bad signal), there is no code to
+ * show. The tile used to stay a bare white square under "Scan with your
+ * phone's camera", which looked broken. Now the tile keeps its size (nothing
+ * jumps when the code comes back), turns a faint tint of the page and says
+ * "Reconnecting…" or "Getting the code…" inside, and the scan line hides
+ * until there is something to scan. While codes still show, "Reconnecting…"
+ * sits under the countdown, next to the code it is about.
+ */
 function OpenDoor({
   title,
-  doneHref,
   door,
   stopRef,
   onStop,
 }: {
   title: string;
-  doneHref: string;
   door: DoorFeedState;
   /** DoorView moves focus here after a start (the Start button is gone). */
   stopRef: RefObject<HTMLButtonElement | null>;
@@ -372,19 +440,27 @@ function OpenDoor({
   const countLine = n > 0 ? checkinCountLine(n, false, true) : CHECKIN_COPY.doorNobodyYet;
   return (
     <div className="vibe-door-open">
-      <div className="vibe-door-qr">
+      <div className="vibe-door-qr-box">
         {step ? (
-          // Keyed by the step, so each new code rises in (enter only, no exit).
-          <motion.div
-            key={step.starts_at}
-            initial={{ opacity: 0, y: RISE_PX }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={SPRING_SOFT}
-            style={{ width: "100%", height: "100%" }}
-          >
-            <QrCode text={step.link} size="100%" label={`QR code to check in at ${title}`} />
-          </motion.div>
-        ) : null}
+          <div className="vibe-door-qr">
+            {/* Keyed by the step, so each new code rises in (enter only, no exit). */}
+            <motion.div
+              key={step.starts_at}
+              initial={{ opacity: 0, y: RISE_PX }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={SPRING_SOFT}
+              style={{ width: "100%", height: "100%" }}
+            >
+              <QrCode text={step.link} size="100%" label={`QR code to check in at ${title}`} />
+            </motion.div>
+          </div>
+        ) : (
+          <div className="vibe-door-qr is-empty">
+            <p style={{ ...MUTED, color: "var(--ink-2)" }}>
+              {door.failed ? CHECKIN_COPY.doorReconnecting : CHECKIN_COPY.doorGettingCode}
+            </p>
+          </div>
+        )}
       </div>
       <div className="vibe-door-side">
         {/* Screen readers hear the code from DoorView's status line ("Code 4 8 1 2"), not these digits. */}
@@ -400,18 +476,19 @@ function OpenDoor({
               fontWeight: 800,
               lineHeight: 1,
               letterSpacing: "0.12em",
+              // The spacing also trails the last digit, which pushed the
+              // centred code 0.06em left of the QR's middle on a phone.
+              marginRight: "-0.12em",
               fontVariantNumeric: "tabular-nums",
               color: "var(--charcoal)",
             }}
           >
             {step.code}
           </motion.div>
-        ) : door.failed ? null : (
-          // The next step's code is on its way (the page's own line says
-          // "Reconnecting…" when the read failed).
-          <p style={MUTED}>{CHECKIN_COPY.doorGettingCode}</p>
-        )}
+        ) : null}
         {step ? <p style={{ margin: 0, fontSize: 15, color: "var(--ink-muted)" }}>{newCodeInLine(door.secondsLeft)}</p> : null}
+        {/* The codes on screen stay valid for up to a minute after a failed read. */}
+        {step && door.failed ? <p style={{ ...MUTED, fontSize: 13 }}>{CHECKIN_COPY.doorReconnecting}</p> : null}
         <motion.p
           key={n}
           initial={{ scale: 0.92 }}
@@ -421,11 +498,10 @@ function OpenDoor({
         >
           {countLine}
         </motion.p>
-        <p style={{ margin: 0, fontSize: 14, lineHeight: 1.45, color: "var(--ink-2)", maxWidth: 360 }}>{CHECKIN_COPY.doorLead}</p>
+        {step ? (
+          <p style={{ margin: 0, fontSize: 14, lineHeight: 1.45, color: "var(--ink-2)", maxWidth: 360 }}>{CHECKIN_COPY.doorLead}</p>
+        ) : null}
         <div className="vibe-door-buttons">
-          <Link href={doneHref} className="vibe-press" style={doorPill}>
-            {CHECKIN_COPY.done}
-          </Link>
           {/* No confirm: starting again gives a fresh code, so a mis-tap costs nothing. */}
           <button
             ref={stopRef}

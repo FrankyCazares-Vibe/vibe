@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { DELETED_SHAPE_COLUMNS, hasDeletedShape, type DeletedShapeInput } from "@/lib/chat/deleted-note";
 import { chatV2For } from "@/lib/chat/flag-server";
 import { PIN_CAP, afterCleared } from "@/lib/chat/pin-rules";
 import { PIN_LIVE_SELECT, PIN_ROWS_MAX, pinSlots, type PinRow } from "@/lib/chat/pins-read";
@@ -116,10 +117,14 @@ export async function PUT(_req: Request, ctx: RouteCtx) {
   }
   if (check.blocked) return refuse("pin_not_allowed", 403);
 
-  // 8. the message, on the viewer's client, in THIS chat
+  // 8. the message, on the viewer's client, in THIS chat. A message its
+  // sender deleted (its "Message deleted" note) is not there to pin: the
+  // other person's open chat may still show the old bubble and its menu
+  // (review of Oct 19, 2026). Told by the note's shape (DELETED_SHAPE_COLUMNS):
+  // a row with no words, no file and no card holds nothing to pin anyway.
   const { data: found, error: lookupErr } = await supabase
     .from("messages")
-    .select("id, created_at, removed_at")
+    .select(`id, created_at, removed_at, ${DELETED_SHAPE_COLUMNS}`)
     .eq("id", messageId)
     .eq("channel_id", channelId)
     .maybeSingle();
@@ -128,8 +133,8 @@ export async function PUT(_req: Request, ctx: RouteCtx) {
     console.error(`[${LOG} lookup]`, lookupErr.code, lookupErr.message);
     return refuse("try_again", 503);
   }
-  const message = found as { id: string; created_at: string; removed_at: string | null } | null;
-  if (!message || message.removed_at) return refuse("not_found", 404);
+  const message = found as ({ id: string; created_at: string; removed_at: string | null } & DeletedShapeInput) | null;
+  if (!message || message.removed_at || hasDeletedShape(message)) return refuse("not_found", 404);
   if (!afterCleared(message.created_at, member.cleared_at)) return refuse("not_found", 404);
 
   // 9. the cap, over pins whose message is still live

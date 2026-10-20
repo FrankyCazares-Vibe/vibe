@@ -39,7 +39,7 @@ This page says what Vibe knows about you, who can see it and how to delete it. I
 - What happens when I delete something, or my account? Sections 8 and 9.
 - I only joined the waitlist. Section 11.
 
-**Two words to know.** When this policy says a post, comment, message or photo was **removed**, it means hidden by the Vibe team or by a club, and still stored. **Deleted** means gone from Vibe's systems.
+**Two words to know.** When this policy says a post, comment, message or photo was **removed**, it means hidden by the Vibe team or by a club, and still stored. **Deleted** means gone from Vibe's systems. A message you delete leaves a "Message deleted" note in its place (section 8).
 
 ## 1. Who runs Vibe, and who there can see my information?
 
@@ -282,6 +282,7 @@ New members can read a room's whole history. A follower who can read the Board a
 
 - **Polls and sign-ups.** With names on, the members who can open the room see who picked what, and sign-ups always show them the names. A follower reading the Board sees only the totals. In an "Anonymous" poll nobody in the club can see who voted. Your vote is still stored with your account, so the cofounder with direct access (section 1) could see how you voted.
 - **Blocks in club rooms.** You each see a blank in place of the other's messages. One exception: a post on the Board by the club's owner or an admin shows to every member, and to every follower who can read the Board, block or not. If the club's owner, an admin or a mod blocks a follower, that follower can no longer read the Board. The blank only hides messages on screen, so treat what you write in a club room as readable by every member, including someone you blocked.
+- **Deleted messages.** When someone deletes a message they sent, everyone who can read that chat or room sees a grey "Message deleted" note in its place, with the sender's name and when it was sent. They may also be able to tell when it was deleted. On the Board the note reads "Post deleted", and the replies under the post stay. A follower reading the Board sees nothing in its place.
 - **Your chat settings.** Other members of a chat may be able to tell when you last read it. They may also be able to tell whether you muted it, pinned it to the top of your list, hid it or cleared it.
 
 ### 5f. What can the people who run a club see?
@@ -396,7 +397,7 @@ Vibe does not delete things just because they are old. They stay until you, a cl
 | What | Kept until |
 |---|---|
 | Who viewed a profile or post | Either account or the post is deleted |
-| Messages | The sender deletes the message or their account. In club rooms, also when the post above it, the room, the event or the club is deleted |
+| Messages | The sender deletes the message (a "Message deleted" note stays in its place) or their account. In club rooms, also when the room, the event or the club is deleted, or the account that wrote the Board post above it |
 | A pin on a message | Someone in the chat unpins it, the message is deleted, or the Vibe team removes the message |
 | An event's chat | Deleted with the event. It closes to new messages 7 days after the event ends |
 | RSVPs | You take yours back, the club takes you out (upcoming events only), or the event, the club or your account is deleted |
@@ -417,12 +418,15 @@ Vibe does not delete things just because they are old. They stay until you, a cl
 
   You cannot delete or edit a post the Vibe team removed.
 - **An edit** replaces the old text. A report filed before the edit keeps the text as it was.
-- **A message** is deleted right away for everyone, with its reactions, any pin on it and, for a Board post, every reply under it.
+- **A message.** When you delete a message:
+  - its words, its photo or video, any poll or sign-up in it (with the votes and names), its reactions, any pin on it and the notifications about it are deleted right away, for everyone. A post or event it shared is not touched. A notification already on someone's phone or computer can still show it there;
+  - a grey "Message deleted" note stays in its place ("Post deleted" on the Board). The note keeps that a message was there, who sent it and when, and we store when it was deleted. The note is kept as long as a message would be (the table above);
+  - the replies under a Board post you delete stay;
+  - we then try to delete its photo or video file. If the Vibe team or a club removed the message, or a report about it is open or was acted on, the file is kept as evidence. It is also kept while another message in the chat points to the same file. If the delete fails, the file stays in our storage, even after you delete your account. While the file is still stored, a link to it opened before the delete can work for up to an hour.
 - **A profile photo, cover or résumé file.** When you replace a profile photo or cover, we try to delete the old file, or we keep it as evidence if a report about you is open. When you take a résumé file off your profile, we try to delete it. If a delete fails, the file stays until you delete your account.
 
 **What Vibe does not delete yet.**
 
-- The photo or video on a message you deleted. The app stops showing it, but the file stays in our storage, even after you delete your account. A link opened before the delete can work for up to an hour.
 - Group chat photos.
 - A work logo you replaced, and a photo you uploaded but never used. They stay at their public links until you delete your account.
 - The files of posts you made as a club, when you delete your account. The posts go. The files stay until the club is deleted.

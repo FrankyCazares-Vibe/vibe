@@ -41,6 +41,8 @@ import {
 } from "@/lib/people/follow-label";
 import type { EditedPost } from "@/lib/posts/edit";
 import { DEFAULT_COVER_THEME_CSS, resolveCoverThemeCss } from "@/lib/profile/cover-themes";
+import { postOpenLabel, profileCaptionParts } from "@/lib/profile/profile-caption";
+import { savedTileLabel, savedTileThumb } from "@/lib/profile/saved-tile";
 import {
   LOOKING_FOR_PROFILE_COPY,
   LOOKING_FOR_VALUES,
@@ -195,6 +197,8 @@ type PostRow = {
   content?: string | null;
   media_url?: string | null;
   media_thumbnail_url?: string | null;
+  /** From withPostMediaUrls: says a video from a photo (the open button's name). */
+  media_kind?: "image" | "video" | null;
   created_at?: string | null;
   tags?: string[] | null;
   /** Stamped by the database on every edit; the card adds " · Edited". */
@@ -226,6 +230,9 @@ type RepostEntry = {
     tags: string[] | null;
     media_url: string | null;
     media_thumbnail_url: string | null;
+    /** Which kind media_url is (withPostMediaUrls). A video's media_url is
+     *  the video file, never a picture (Oct 19, 2026). */
+    media_kind?: "image" | "video" | null;
     view_count: number | null;
     created_at: string;
     author: {
@@ -251,6 +258,8 @@ type SavedPost = {
   tags: string[] | null;
   media_url: string | null;
   media_thumbnail_url: string | null;
+  /** /api/me/bookmarks sends it (withPostMediaUrls); see RepostEntry. */
+  media_kind?: "image" | "video" | null;
   created_at: string;
   saved_at: string;
   author: {
@@ -3038,16 +3047,27 @@ function PostFeedCard({
   const showActions = isOwner && !post.removed_at;
   const thumb = post.media_thumbnail_url || post.media_url || "";
   const isImage = !!thumb;
-  // The ⋯ is a SIBLING of the card button, never inside it (a button in a
-  // button is invalid and its tap would also open the viewer). The sheet
-  // mounts in this wrapper, outside the card button too: React bubbles a
-  // tap inside its portal up to this div, which has no handler.
+  // The card's words sit outside its button, so the button's name carries
+  // them: "Open post: <caption>, 2d ago" (Oct 19, 2026 review). Without the
+  // caption, a screen reader moving through buttons heard the same "Open
+  // post, 2d ago" for every post. No caption: "Open photo post, 2d ago".
+  const openLabel = postOpenLabel(post, post.created_at ? relTimeForCard(post.created_at) : "");
+  // The ⋯ is a SIBLING of the card, never inside its tap target (a button in
+  // a button is invalid and its tap would also open the viewer). The sheet
+  // mounts in this wrapper, outside the card too: React bubbles a tap inside
+  // its portal up to this div, which has no handler.
+  //
+  // Why the card is a box with a full-size button in it, not one <button>
+  // (Oct 19, 2026, critique B6): its saved #tags are links now, and a link
+  // inside a button is invalid. The button covers the card (zIndex 1) and
+  // opens the post; the tag links sit above it (zIndex 2). `isolation` keeps
+  // those layers inside the card, so the ⋯ after it still paints on top.
   return (
     <div style={{ position: "relative" }}>
-      <button
-        type="button"
-        onClick={onTap}
+      <div
         style={{
+          position: "relative",
+          isolation: "isolate",
           width: "100%",
           display: "flex",
           flexDirection: "column",
@@ -3075,11 +3095,28 @@ function PostFeedCard({
             "0 6px 18px rgba(124,92,252,0.10)",
           ].join(", "),
           textAlign: "left",
-          cursor: "pointer",
           fontFamily: "DM Sans, sans-serif",
           color: "var(--charcoal)",
+          boxSizing: "border-box",
         }}
       >
+        <button
+          type="button"
+          onClick={onTap}
+          aria-label={openLabel}
+          style={{
+            position: "absolute",
+            inset: 0,
+            zIndex: 1,
+            margin: 0,
+            padding: 0,
+            border: "none",
+            borderRadius: 16,
+            background: "transparent",
+            cursor: "pointer",
+            WebkitTapHighlightColor: "transparent",
+          }}
+        />
         {post.content ? (
           <p
             style={{
@@ -3096,7 +3133,7 @@ function PostFeedCard({
               paddingRight: showActions ? 34 : undefined,
             }}
           >
-            {renderInlineContentInline(post.content)}
+            {renderInlineContentInline(post.content, post.tags)}
           </p>
         ) : null}
         {isImage ? (
@@ -3121,7 +3158,7 @@ function PostFeedCard({
             ? relTimeForCard(post.created_at) + (post.edited_at ? " · Edited" : "")
             : ""}
         </div>
-      </button>
+      </div>
       {showActions ? (
         <button
           type="button"
@@ -3182,33 +3219,42 @@ function PostFeedCard({
   );
 }
 
-// Inline @handle / #tag linkifier for the profile post card. Renders
-// non-link spans for now (the entire card is one big <button>, so
-// nested links would interfere); the linkified version lives in the
-// post viewer modal which has independent click targets.
-function renderInlineContentInline(text: string): React.ReactNode {
+// The profile post card's caption. Since Oct 19, 2026 (critique B6, decision
+// 5) a SAVED tag is a link to the campus feed's tag filter, inside the text,
+// and a "#word" the post didn't save is plain text. Mentions are coloured
+// words, not links (they open the post, like the rest of the card). The parts
+// come from profileCaptionParts, which is the feed's own captionSegments, so
+// a caption reads the same here as on the feed card and in the open post
+// (review, Oct 19: the card had its own 1-32 mention rule). The card is no
+// longer one big <button>, so a link here is valid; it sits above the card's
+// own tap target (zIndex 2).
+function renderInlineContentInline(text: string, tags: string[] | null | undefined): React.ReactNode {
   if (!text) return null;
-  const re = /(^|[^A-Za-z0-9_@#])([@#][A-Za-z0-9_]{1,32})/g;
-  const nodes: React.ReactNode[] = [];
-  let lastIndex = 0;
-  let m: RegExpExecArray | null;
-  let key = 0;
-  while ((m = re.exec(text)) !== null) {
-    const leading = m[1] ?? "";
-    const token = m[2] ?? "";
-    const start = m.index + leading.length;
-    if (start > lastIndex)
-      nodes.push(<span key={`t${key++}`}>{text.slice(lastIndex, start)}</span>);
-    nodes.push(
-      <span key={`tok${key++}`} style={{ color: "var(--tag-ink)", fontWeight: 600 }}>
-        {token}
-      </span>,
-    );
-    lastIndex = start + token.length;
-  }
-  if (lastIndex < text.length)
-    nodes.push(<span key={`t${key++}`}>{text.slice(lastIndex)}</span>);
-  return nodes;
+  return profileCaptionParts(text, tags).map((part) =>
+    part.kind === "tag" && part.href ? (
+      <Link
+        key={part.key}
+        href={part.href}
+        prefetch={false}
+        style={{
+          position: "relative",
+          zIndex: 2,
+          color: "var(--tag-ink)",
+          fontWeight: 600,
+          textDecoration: "none",
+          WebkitTapHighlightColor: "transparent",
+        }}
+      >
+        {part.text}
+      </Link>
+    ) : part.kind === "mention" ? (
+      <span key={part.key} style={{ color: "var(--tag-ink)", fontWeight: 600 }}>
+        {part.text}
+      </span>
+    ) : (
+      <span key={part.key}>{part.text}</span>
+    ),
+  );
 }
 
 function relTimeForCard(iso: string): string {
@@ -3407,7 +3453,9 @@ function RepostRow({
       .slice(0, 2)
       .map((s) => s[0]?.toUpperCase() ?? "")
       .join("") || "?";
-  const thumb = p.media_thumbnail_url || (p.type === "post" ? p.media_url : null);
+  // Same picture rule as the Saved grid (Oct 19, 2026).
+  const thumb = savedTileThumb(p);
+  const isVideo = p.media_kind === "video";
   return (
     <button
       type="button"
@@ -3429,13 +3477,16 @@ function RepostRow({
       {thumb ? (
         <div
           style={{
+            position: "relative",
             width: 72,
             height: 72,
             borderRadius: 12,
             background: `url(${thumb}) center/cover, #1C1C1E`,
             flexShrink: 0,
           }}
-        />
+        >
+          {isVideo ? <TilePlayBadge /> : null}
+        </div>
       ) : (
         <div
           style={{
@@ -3455,7 +3506,7 @@ function RepostRow({
             textTransform: "uppercase",
           }}
         >
-          Post
+          {isVideo ? "Video" : "Post"}
         </div>
       )}
       <div style={{ flex: 1, minWidth: 0 }}>
@@ -3474,6 +3525,28 @@ function RepostRow({
           <IconRepost />
           Reposted {relTimeForCard(entry.reposted_at)}
         </div>
+        {entry.comment ? (
+          // Their own words on the repost, above the post they shared, as
+          // the desktop profile shows them (D3 phone, Oct 19, 2026).
+          <div
+            style={{
+              marginTop: 4,
+              fontFamily: "DM Sans, sans-serif",
+              fontSize: 13.5,
+              fontWeight: 500,
+              color: "var(--charcoal)",
+              lineHeight: 1.4,
+              whiteSpace: "pre-wrap",
+              wordBreak: "break-word",
+              display: "-webkit-box",
+              WebkitLineClamp: 3,
+              WebkitBoxOrient: "vertical",
+              overflow: "hidden",
+            }}
+          >
+            {entry.comment}
+          </div>
+        ) : null}
         <div
           style={{
             marginTop: 4,
@@ -3581,8 +3654,13 @@ function SavedGrid({
       }}
     >
       {posts.map((p, i) => {
-        const thumb =
-          p.media_thumbnail_url || (p.type === "post" ? p.media_url : null);
+        // Only a photo's media_url is a picture; a video's is the video file,
+        // so a video tile shows its poster or falls back to text (Oct 19,
+        // 2026: this read `type === "post"`, which every saved post is). The
+        // rule is savedTileThumb (src/lib/profile/saved-tile.ts), and the
+        // desktop twin is _savedTileModel in public/html/profile.html.
+        const thumb = savedTileThumb(p);
+        const isVideo = p.media_kind === "video";
         // Tiles fade and rise in (motion pass). The wrapper is a one-cell
         // grid so the tile keeps the size it had as a cell of the grid above.
         return (
@@ -3590,6 +3668,8 @@ function SavedGrid({
             <button
               type="button"
               onClick={() => onOpenPost({ id: p.id })}
+              // A picture tile has no words of its own to be read out by.
+              aria-label={thumb ? savedTileLabel(p, isVideo) : undefined}
               style={{
                 position: "relative",
                 width: "100%",
@@ -3607,12 +3687,21 @@ function SavedGrid({
             >
               {!thumb ? (
                 <span
+                  // At its own clamped height, with the 8px gap OUTSIDE it: a
+                  // clamped box only clips at its padding edge, so stretched
+                  // to the tile (inset: 0) or with padding of its own it
+                  // painted the lines past its "…" (D3, Oct 19, 2026). A
+                  // video's words stay clear of the play badge.
                   style={{
                     position: "absolute",
-                    inset: 0,
-                    padding: 8,
+                    top: 8,
+                    left: 8,
+                    right: isVideo ? 32 : 8,
+                    maxHeight: "calc(100% - 16px)",
                     fontFamily: "DM Sans, sans-serif",
                     fontSize: 11.5,
+                    // 5 lines fit a 93px tile (a 320px phone) above its gap.
+                    lineHeight: 1.35,
                     color: "var(--ink-body)",
                     textAlign: "left",
                     display: "-webkit-box",
@@ -3625,11 +3714,41 @@ function SavedGrid({
                   {p.content || "Saved post"}
                 </span>
               ) : null}
+              {isVideo ? <TilePlayBadge /> : null}
             </button>
           </MaybeReveal>
         );
       })}
     </div>
+  );
+}
+
+/** The small play mark on a video's tile (drawn, never the ▶ character,
+ *  which iOS can show as an emoji). The desktop twin is .vibe-grid-play. */
+function TilePlayBadge() {
+  return (
+    <span
+      aria-hidden
+      style={{
+        position: "absolute",
+        top: 6,
+        right: 6,
+        width: 22,
+        height: 22,
+        borderRadius: 999,
+        background: "rgba(0,0,0,0.55)",
+        color: "#fff",
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
+        paddingLeft: 2,
+        boxSizing: "border-box",
+      }}
+    >
+      <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden focusable="false">
+        <path d="M2.5 1.4v7.2L8.6 5z" fill="currentColor" />
+      </svg>
+    </span>
   );
 }
 

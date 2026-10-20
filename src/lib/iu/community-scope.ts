@@ -522,9 +522,11 @@ export function scoreFeedRow(
   post: {
     user_id: string;
     created_at: string;
-    like_count: number;
-    comment_count: number;
-    repost_count: number;
+    // null = /api/feed couldn't read that count (Oct 19, 2026, critique B1):
+    // it scores as 0, the same as before the feed started sending null.
+    like_count: number | null;
+    comment_count: number | null;
+    repost_count: number | null;
     friend_reposter_count?: number;
     campus_id?: string | null;
     org_id?: string | null;

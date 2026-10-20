@@ -189,7 +189,7 @@ type Setup = {
   block?: State["block"];
   service?: false;
   /** PUT's cookie read of the message (null: no row in this chat) or its error. */
-  message?: { id: string; created_at: string; removed_at: string | null } | null;
+  message?: ({ id: string; created_at: string; removed_at: string | null } & Record<string, unknown>) | null;
   messageError?: { code: string; message: string };
   /** The service read of `chat_message_pins` (the list, or PUT's cap count) or its error. */
   pinRows?: PinRow[];
@@ -588,6 +588,19 @@ test("toPinnedMessages: equal milliseconds are ordered by the microseconds; an e
   assert.deepEqual(toPinnedMessages(null, null, AVERY_ONLY), []);
 });
 
+test("toPinnedMessages and pinSlots: a pin on a deleted message's note is not listed and takes no slot (B7 review, Oct 19, 2026)", () => {
+  const note = { content: "", kind: "text", media_url: null, media_kind: null, attachment_id: null, attachment_kind: null, card_event_id: null };
+  const rows = [
+    pinRow(1, "2026-10-02T10:00:00+00:00", said(1, "", "2026-09-22T09:00:00+00:00", note)),
+    pinRow(2, "2026-10-01T10:00:00+00:00", said(2, "still here", "2026-09-21T09:00:00+00:00")),
+  ];
+  assert.deepEqual(toPinnedMessages(rows, null, AVERY_ONLY).map((p) => p.message_id), [mid(2)], "no empty \"Attachment\" pin");
+  assert.deepEqual(pinAuthorIds(rows, null), [AVERY]);
+  const live: PinRow[] = [...pinsOf(19), { message_id: mid(60), pinned_at: "2026-10-02T00:00:00+00:00", message: { removed_at: null, ...note } }];
+  assert.deepEqual(pinSlots(live, MESSAGE), { live: 19, among: false }, "the note's pin frees its slot");
+  assert.ok(PIN_LIVE_SELECT.includes("attachment_kind") && PIN_LIST_SELECT.includes("attachment_kind"), "both reads can tell a shared post from a note");
+});
+
 test("pinSlots: a pin on a removed message takes no slot; `among` ignores case", () => {
   const rows = [...pinsOf(19), livePin(7, "2026-09-30T00:00:00+00:00"), { message_id: mid(8), pinned_at: "x", message: null }];
   assert.deepEqual(pinSlots(rows, mid(7).toUpperCase()), { live: 19, among: true });
@@ -614,7 +627,12 @@ test("PUT: the whole gate order, then the pin → { ok, pinned }", async () => {
     ["dmSendBlocked", CHANNEL, ME],
   ]);
   assert.deepEqual(steps(queries), ["cookie:messages:select", "service:chat_message_pins:select", "service:chat_message_pins:insert"]);
-  assert.deepEqual(queries[0].calls, [["select", "id, created_at, removed_at"], ["eq", "id", MESSAGE], ["eq", "channel_id", CHANNEL], ["maybeSingle"]]);
+  assert.deepEqual(queries[0].calls, [
+    ["select", "id, created_at, removed_at, content, kind, media_url, media_kind, attachment_id, attachment_kind, card_event_id"],
+    ["eq", "id", MESSAGE],
+    ["eq", "channel_id", CHANNEL],
+    ["maybeSingle"],
+  ]);
   assert.deepEqual(queries[1].calls, [["select", PIN_LIVE_SELECT], ["eq", "channel_id", CHANNEL], ["limit", PIN_ROWS_MAX]]);
   assert.deepEqual(queries[2].calls, [["insert", { message_id: MESSAGE, channel_id: CHANNEL, pinned_by: ME }]]);
 });
@@ -678,6 +696,17 @@ test("PUT: a removed message its author can still read → 404 not_found, never 
   const r = await put();
   assert.deepEqual([r.status, r.body], [404, NOT_FOUND]);
   assert.deepEqual(steps(queries), ["cookie:messages:select"]);
+});
+
+test("PUT: a message its sender deleted (its \"Message deleted\" note) → 404 not_found, no cap read, never pinned (B7 review, Oct 19, 2026)", async () => {
+  const note = { ...LIVE_MESSAGE, content: "", kind: "text", media_url: null, media_kind: null, attachment_id: null, attachment_kind: null, card_event_id: null };
+  const { queries } = setup({ message: note });
+  const r = await put();
+  assert.deepEqual([r.status, r.body], [404, NOT_FOUND]);
+  assert.deepEqual(steps(queries), ["cookie:messages:select"]);
+  // A shared post with no words is not a note: it pins.
+  setup({ message: { ...note, attachment_id: mid(50), attachment_kind: "post" } });
+  assert.deepEqual((await put()).body, { ok: true, pinned: true });
 });
 
 test("PUT: a message read that fails → 503 try_again", async () => {

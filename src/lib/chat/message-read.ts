@@ -58,6 +58,7 @@ import type { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseServiceClient, isSupabaseServiceConfigured } from "@/lib/supabase/service";
 
 import { blockedIdsFor } from "./blocks";
+import { asDeletedNote, asDeletedQuote, hasDeletedShape } from "./deleted-note";
 import { hydrateCards, type CardRow } from "./cards/hydrate";
 import { OFFICER_REMOVED_REASON, canModerate, isClubRole, postRuleLine } from "./room-rules";
 import { roomState } from "./room-state";
@@ -166,6 +167,12 @@ export type ParentPreview = {
   author: { id: string; handle: string | null; name: string | null; avatar_url: string | null } | null;
   media_kind: "image" | "video" | null;
   attachment_kind: "post" | "clip" | null;
+  /**
+   * The quoted message was deleted by its sender (Oct 19, 2026): `content`
+   * is then the words "Message deleted", so every screen's quote stub says
+   * it with no change, and this flag lets a screen draw it quietly.
+   */
+  deleted?: boolean;
 };
 
 /**
@@ -723,10 +730,33 @@ async function buildChatMessages(client: ServerClient, rows: MessageRow[], ctx: 
     hydrateParentPreviews(client, shown),
   ]);
   const follower = standing === "follower";
-  // After hydration, so the empty defaults only fill what hydration left.
-  prepareForClient(shown, channelId);
 
-  const messages = shown.map((row): ChatMessage => {
+  // Deleted notes (Oct 19, 2026, decision 8). Only rows with the deleted
+  // shape, and quoted parents with it, are asked about (`readDeletedIds`),
+  // before `prepareForClient` rewrites `media_url`. A quoted deleted message
+  // reads "Message deleted" in every screen's quote stub. A follower's own
+  // client reads no message row, and a deleted post is not news: their
+  // Board leaves a row of that shape out.
+  const shapeIds = new Set(shown.filter((row) => hasDeletedShape(row)).map((row) => row.id));
+  const quotedIds = shown
+    .map((row) => row.parent_preview ?? null)
+    .filter((p): p is ParentPreview => p !== null && hasDeletedShape({ content: p.content, media_kind: p.media_kind, attachment_kind: p.attachment_kind }))
+    .map((p) => p.id);
+  const asked = follower ? [] : [...shapeIds, ...quotedIds];
+  const deletedRead = asked.length > 0 ? await readDeletedIds(client, asked) : new Set<string>();
+  const isDeleted = (id: string) => (deletedRead === "shape" ? asked.includes(id) : deletedRead.has(id));
+  for (const row of shown) {
+    const quoted = row.parent_preview;
+    if (quoted && isDeleted(quoted.id)) {
+      row.parent_preview = asDeletedQuote(quoted);
+    }
+  }
+  const listed = follower ? shown.filter((row) => !shapeIds.has(row.id)) : shown;
+
+  // After hydration, so the empty defaults only fill what hydration left.
+  prepareForClient(listed, channelId);
+
+  const messages = listed.map((row): ChatMessage => {
     const authorRole = roles ? (roles.get(row.user_id) ?? null) : null;
     if (isHiddenFrom(row, blocked, room, authorRole)) return asStub(row);
     const topLevel = !row.thread_root_id;
@@ -742,7 +772,7 @@ async function buildChatMessages(client: ServerClient, rows: MessageRow[], ctx: 
     // non-members; 20261017110000's "what the app owes"): no author, no
     // author id, no role. The screens draw the club (`room.org`) in their
     // place. The stub rule above already ran on the real author.
-    return {
+    const message: ChatMessage = {
       id: row.id,
       content: row.content,
       created_at: row.created_at,
@@ -764,6 +794,7 @@ async function buildChatMessages(client: ServerClient, rows: MessageRow[], ctx: 
       hidden: false,
       removed: removedInfo(row, viewerId),
     };
+    return isDeleted(row.id) ? asDeletedNote(message) : message;
   });
   return {
     messages,
@@ -771,6 +802,40 @@ async function buildChatMessages(client: ServerClient, rows: MessageRow[], ctx: 
     roles,
     standing,
   };
+}
+
+let warnedNoDeletedColumn = false;
+
+/**
+ * Which of `ids` the sender deleted (`deleted_at` set; Oct 19, 2026), read on
+ * the viewer's own client: the ids came from a read the viewer was allowed,
+ * and only rows with the deleted shape are asked about, so a page with no
+ * deleted message makes no extra read at all.
+ *
+ *   a database without the column   nothing is deleted (none can be: the
+ *                                   route hard-deletes there), said once
+ *   any other failed read           "shape": the caller trusts the shape (a
+ *                                   row the send route never stores)
+ */
+async function readDeletedIds(client: ServerClient, ids: string[]): Promise<Set<string> | "shape"> {
+  const deleted = new Set<string>();
+  const unique = Array.from(new Set(ids.filter((id) => isUuid(id))));
+  for (const chunk of inChunks(unique, IDS_PER_READ)) {
+    const { data, error } = await client.from("messages").select("id").in("id", chunk).not("deleted_at", "is", null);
+    if (error && (isMissingChatSchema(error) || error.code === "42703")) {
+      if (!warnedNoDeletedColumn) {
+        warnedNoDeletedColumn = true;
+        console.warn("[chat/message-read] messages.deleted_at is not in this database yet (20261019150000): no deleted notes");
+      }
+      return new Set<string>();
+    }
+    if (error) {
+      console.error("[chat/message-read.deleted]", error.code, error.message);
+      return "shape";
+    }
+    for (const row of (data ?? []) as { id: string }[]) deleted.add(row.id);
+  }
+  return deleted;
 }
 
 /** The block set of a dm or a group: nothing, and nothing read. */

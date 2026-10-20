@@ -1,0 +1,44 @@
+diff -ru a/src/components/mobile/messages/home/ClubRow.tsx b/src/components/mobile/messages/home/ClubRow.tsx
+--- a/src/components/mobile/messages/home/ClubRow.tsx	2026-10-19 22:40:40
++++ b/src/components/mobile/messages/home/ClubRow.tsx	2026-10-19 22:40:40
+@@ -164,7 +164,7 @@
+                 ) : null}
+                 {preview.prefix ? <b style={{ fontWeight: 700 }}>{preview.prefix}</b> : null}
+                 {preview.prefix ? " " : null}
+-                {preview.text}
++                {preview.deleted ? <span style={{ fontStyle: "italic", color: t.muted }}>{preview.text}</span> : preview.text}
+               </span>
+               {pillOnPreview ? pill : null}
+             </span>
+diff -ru a/src/components/mobile/messages/home/home-rules.ts b/src/components/mobile/messages/home/home-rules.ts
+--- a/src/components/mobile/messages/home/home-rules.ts	2026-10-19 22:40:40
++++ b/src/components/mobile/messages/home/home-rules.ts	2026-10-19 22:40:40
+@@ -104,19 +104,24 @@
+  * `<Author>:`); nothing when both are null. An empty `author_name` (ROUTES-L8)
+  * → the text alone, no `: `.
+  */
+-export type ClubPreview = { prefix: string | null; text: string; dot: boolean };
++// `deleted` (Oct 19, 2026, B7 review): the line is a deleted message's note
++// ("Post deleted" on the Board, "Message deleted" in the Lounge), drawn grey
++// italic like the note itself. Only present when true.
++export type ClubPreview = { prefix: string | null; text: string; dot: boolean; deleted?: true };
+ 
++const noted = (p: { deleted?: true }) => (p.deleted ? { deleted: true as const } : {});
++
+ export function clubPreview(club: InboxClub): ClubPreview | null {
+   const board = club.board.latest;
+   const lounge = club.lounge.latest;
+   const dot = club.board.unread;
+-  if (dot && board) return { prefix: "Board:", text: board.text, dot };
++  if (dot && board) return { prefix: "Board:", text: board.text, dot, ...noted(board) };
+   if (!board && !lounge) return null;
+   const useBoard = !!board && (!lounge || time(board.created_at) >= time(lounge.created_at));
+-  if (useBoard && board) return { prefix: "Board:", text: board.text, dot };
++  if (useBoard && board) return { prefix: "Board:", text: board.text, dot, ...noted(board) };
+   if (!lounge) return null;
+   const author = lounge.author_name.trim();
+-  return { prefix: author ? `${author}:` : null, text: lounge.text, dot };
++  return { prefix: author ? `${author}:` : null, text: lounge.text, dot, ...noted(lounge) };
+ }
+ 
+ /** `Live now · <title>` (live chrome) or `<eventTimeShort> · <title>`, plus the RSVP mark (1.2, 11.1). */

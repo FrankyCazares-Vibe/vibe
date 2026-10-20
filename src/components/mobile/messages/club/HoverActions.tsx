@@ -2,6 +2,8 @@
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
 
+import { TrashIcon } from "../DeleteConfirm";
+import { DELETE_LABEL } from "../delete-rules";
 import { REACTION_EMOJIS } from "../ReactionPicker";
 import { FONT, palette } from "../v2-tokens";
 import { authorName } from "./helpers";
@@ -17,7 +19,8 @@ import { authorName } from "./helpers";
  * (`role="toolbar"`, `Message actions`) at the row's outer top corner: the
  * far side from the bubble's own edge, kept inside the thread's width. One
  * button per handler passed: React (the seven `REACTION_EMOJIS` in a row),
- * Reply, and "..." (`More`: a small menu, `Report` and `Remove`). A row with
+ * Reply, and "..." (`More`: a small menu, `Report`, `Remove` and, on the
+ * viewer's own row since Oct 19, 2026, a red `Delete`). A row with
  * no handler at all (a removed-content card, a `temp_` row still sending)
  * gets the bare wrapper: no pill, no Tab stop, the same element, so the
  * bubble is not remounted when its row turns real.
@@ -49,6 +52,8 @@ export type HoverActionsProps = {
   onReply?: () => void;
   onReport?: () => void;
   onRemove?: () => void;
+  /** "Delete" in the More menu, last and red: the viewer's own row (Oct 19, 2026; delete-rules.ts). */
+  onDelete?: () => void;
   children: ReactNode;
   /** The row's spoken line (`Message from <name>`); `RoomThread` builds it per row. */
   label?: string;
@@ -141,7 +146,7 @@ function scrollerTop(row: HTMLElement): number {
   return list ? list.getBoundingClientRect().top : 0;
 }
 
-export function HoverActions({ night, isMine, onReact, onReply, onReport, onRemove, children, label }: HoverActionsProps) {
+export function HoverActions({ night, isMine, onReact, onReply, onReport, onRemove, onDelete, children, label }: HoverActionsProps) {
   const t = palette(night);
   const [open, setOpen] = useState<OpenLayer | null>(null);
   const rowRef = useRef<HTMLDivElement | null>(null);
@@ -150,7 +155,7 @@ export function HoverActions({ night, isMine, onReact, onReply, onReport, onRemo
   const reactRef = useRef<HTMLButtonElement | null>(null);
   const moreRef = useRef<HTMLButtonElement | null>(null);
 
-  const hasMore = !!onReport || !!onRemove;
+  const hasMore = !!onReport || !!onRemove || !!onDelete;
   const count = (onReact ? 1 : 0) + (onReply ? 1 : 0) + (hasMore ? 1 : 0);
   // A layer whose button is gone (the row lost its handlers under it) is not open.
   const layer = open && (open.kind === "react" ? !!onReact : hasMore) ? open : null;
@@ -194,7 +199,7 @@ export function HoverActions({ night, isMine, onReact, onReply, onReport, onRemo
     }
     // Above the pill, unless the thread's top edge would cut it: then under it.
     const row = rowRef.current;
-    const height = next === "react" ? EMOJI + 10 : (onReport ? MENU_ROW : 0) + (onRemove ? MENU_ROW : 0) + 10;
+    const height = next === "react" ? EMOJI + 10 : (onReport ? MENU_ROW : 0) + (onRemove ? MENU_ROW : 0) + (onDelete ? MENU_ROW : 0) + 10;
     const below = row ? row.getBoundingClientRect().top - scrollerTop(row) < height + BAR_RISE + POP_GAP : false;
     setOpen({ kind: next, below });
   };
@@ -353,6 +358,23 @@ export function HoverActions({ night, isMine, onReact, onReply, onReport, onRemo
               style={{ ...button, justifyContent: "flex-start", height: MENU_ROW, padding: "0 10px", borderRadius: 10, fontSize: 13.5, fontWeight: 600 }}
             >
               Remove
+            </button>
+          ) : null}
+          {onDelete ? (
+            <button
+              type="button"
+              role="menuitem"
+              tabIndex={-1}
+              className="vibe-hover-btn"
+              onMouseDown={keepFocus}
+              onClick={() => {
+                leave(moreRef);
+                onDelete();
+              }}
+              style={{ ...button, justifyContent: "flex-start", gap: 8, height: MENU_ROW, padding: "0 10px", borderRadius: 10, fontSize: 13.5, fontWeight: 600, color: "var(--danger-ink)" }}
+            >
+              <TrashIcon />
+              {DELETE_LABEL}
             </button>
           ) : null}
         </div>

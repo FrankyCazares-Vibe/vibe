@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 
-import { emitCalendarChanged } from "@/components/LeftNav";
+import { emitCalendarChanged } from "@/lib/calendar/calendar-sync";
 import type { EventCard, ThreadRoom } from "@/lib/chat/types";
 import { eventWhen, eventWhenSpoken } from "@/lib/chat/when";
 import { vibeRequest } from "@/lib/feedback/request";
@@ -29,7 +29,7 @@ import { Chevron, ClubDisc, CoralDisc, PillSpinner, Ring } from "./card-parts";
  * mockup W0_Cards 7.4): the 48px club band over the gradient (the club's
  * logo or initials, its name), the `<Name> · Event` line, the 19px/700
  * Fraunces title, `<place> · <Thu Oct 8, 7:30 PM>` (the place omitted when
- * empty), the note line when present, `Going` / `Maybe` pills
+ * empty), the note line when present, `Going` / `Interested` pills
  * (`aria-pressed`) in `role="group" aria-label="Your RSVP"`, the line
  * `You'll appear in the event chat.` while the viewer has no RSVP and no
  * room (14.41), `<N> going`, and `Open event chat` when `room_id` is set.
@@ -164,7 +164,8 @@ export function EventCardView({ card, content, room, createdAt, author, isMine, 
         {!closed ? (
           <div role="group" aria-label="Your RSVP" style={{ marginTop: 10, display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 8 }}>
             {pill("going", "Going")}
-            {pill("maybe", "Maybe")}
+            {/* "Interested", not "Maybe" (Oct 19, 2026, decision 12). */}
+            {pill("maybe", "Interested")}
           </div>
         ) : null}
         {showAppearLine(event) ? <div style={{ marginTop: 6, fontSize: 12, fontWeight: 500, lineHeight: 1.35, color: t.secondary }}>{APPEAR_LINE}</div> : null}

@@ -111,6 +111,18 @@ function fail(status: number, code: string, error: string) {
  * shows once a card has gone. Without `org_id`, `when` is ignored; the
  * hidden-club and uuid rules of the org branch apply the same.
  *
+ * `?org_id=<uuid>&include=<event uuid>` (Oct 19, 2026, critique B8 repair):
+ * the club page opened at one event from My Calendar
+ * (`/orgs/<handle>?event=<id>`). My Calendar reads 180 days ahead and both
+ * club lists are capped (60 days and 50 rows upcoming, 20 rows past), so a
+ * January formal or a busy club's older practice wasn't in either list and
+ * the page said "That event isn't listed anymore." `include` adds that one
+ * event when it belongs to this club and to the view asked for (upcoming:
+ * not ended yet; past: ended), whatever its date or the row cap. It is read
+ * with the VIEWER's client, so it is only ever an event they could already
+ * see, and every later rule here (hidden clubs, attribution, counts) applies
+ * to it the same. Without `org_id`, or not a uuid, it is ignored.
+ *
  * EVENT CHECK-IN. Every item also carries checkin_open, checked_in_count
  * (the database's from-5 floor already applied; exact for the event's
  * officers) and viewer_checked_in, from the `event_checkin_state` RPC. A
@@ -260,6 +272,27 @@ async function listEvents(req: Request): Promise<Response> {
       return failed();
     }
     rows = (data as unknown as EventRow[]) ?? [];
+    // `include` (see the docblock): the one linked event the caps left out.
+    // Not fatal: a failed read leaves the list as it was.
+    const includeId = (url.searchParams.get("include") ?? "").trim().toLowerCase();
+    if (isUuid(includeId) && !rows.some((r) => r.id === includeId)) {
+      const extraQuery = supabase
+        .from("events")
+        .select(`${EVENT_ROW_COLUMNS},${CLUB_CREATOR_EMBED}`)
+        .eq("id", includeId)
+        .eq("org_id", orgIdFilter);
+      const { data: extra, error: extraErr } = await (past
+        ? extraQuery.lt("ends_at", nowIso)
+        : extraQuery.gte("ends_at", nowIso)
+      ).limit(1);
+      if (extraErr) {
+        console.error("[events GET include]", extraErr);
+      } else if (Array.isArray(extra) && extra.length > 0) {
+        // Same order as the list it joins: upcoming soonest first, past newest first.
+        const byStart = (a: EventRow, b: EventRow) => (a.starts_at < b.starts_at ? -1 : a.starts_at > b.starts_at ? 1 : 0);
+        rows = [...rows, ...(extra as unknown as EventRow[])].sort((a, b) => (past ? byStart(b, a) : byStart(a, b)));
+      }
+    }
   } else {
     const campusIds = scopeCampusIds(scope);
     if (campusIds.length === 0) return answer([]);
