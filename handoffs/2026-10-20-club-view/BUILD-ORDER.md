@@ -2,7 +2,7 @@
 
 What must work on launch night (Thu Oct 29) and what follows in the first weeks. The decisions are in
 `DECISIONS.md`; what exists today, with file references, is in `INVENTORY.md`. Sizes are S / M / L, not hours.
-A first draft Franky can change.
+**Approved by Franky, Oct 20.** Wave 1 starts now in its own session.
 
 **The idea behind the order:** clubs come first, so the first thing to work is a club getting on Vibe. Franky
 can start onboarding the first clubs on **Fri Oct 23**. Then officers running the club from their phone, then
