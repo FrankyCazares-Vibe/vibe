@@ -33,7 +33,7 @@ export function ShortVersion() {
           added later can read everything sent before they joined. In a club
           room, treat what you write as readable by every member, even one you
           blocked. A club&apos;s followers with a verified school email can also
-          read the posts its owner and admins put on its Board, unless the club
+          read the posts its owner and officers put on its Board, unless the club
           turns that off. Members&apos; replies stay with members.
         </li>
         <li>

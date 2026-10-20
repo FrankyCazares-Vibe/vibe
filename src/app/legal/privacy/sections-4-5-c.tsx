@@ -8,8 +8,8 @@ export function Sections5fTo5g() {
     <>
       <SubH3 n="5f" />
       <LegalP>
-        A club is run by its owner, its admins and its mods (moderators the club
-        picks).
+        A club is run by its owner and its officers. Only the owner makes a
+        member an officer, or takes that back.
       </LegalP>
       <LegalUL bullets>
         <li>
@@ -17,7 +17,8 @@ export function Sections5fTo5g() {
           handle, photo, role, title and join date.
         </li>
         <li>
-          <strong>The club&apos;s owner and admins</strong> see five more lists:
+          <strong>The club&apos;s owner and officers</strong> see five more
+          lists:
           <LegalUL bullets>
             <li>
               followers, with the date each first followed. You are on it from
@@ -44,12 +45,13 @@ export function Sections5fTo5g() {
           </LegalP>
         </li>
         <li>
-          <strong>The club&apos;s owner, admins and mods</strong> see pending
+          <strong>The club&apos;s owner and officers</strong> also see pending
           requests to join, with your message. If the club took you out before,
-          the request carries a &ldquo;Removed before&rdquo; mark. Mods can also
-          read the list of people added to a room. Owners, admins and mods can
-          remove a club room message. It is then hidden from everyone but its
-          author, not deleted, and we record who removed it.
+          the request carries a &ldquo;Removed before&rdquo; mark. They see how
+          many people joined the club through its members&apos; link, never
+          who (<Sec to="11">section 11</Sec>). They can remove a club room
+          message. It is then hidden from everyone but its author, not deleted,
+          and we record who removed it.
         </li>
         <li>
           Nobody who runs a club is shown email addresses, reports or who muted
@@ -72,7 +74,7 @@ export function Sections5fTo5g() {
         <li>
           the clubs you hid from your profile (the club&apos;s members still see
           you in its member list) and your list of the clubs you follow (a
-          club&apos;s owner and admins still see that you follow it);
+          club&apos;s owner and officers still see that you follow it);
         </li>
         <li>Otto settings and reminders;</li>
         <li>

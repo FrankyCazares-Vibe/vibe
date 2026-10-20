@@ -115,8 +115,8 @@ export function Section3d() {
           That signal holds no page address and nothing about your account.
           <LegalP>
             Our own code does not put your name, account or email on these
-            reports, and we strip sign-in links, access codes and profile
-            handles from web addresses. A report can still hold things that
+            reports, and we strip sign-in links, access codes, club link codes
+            and profile handles from web addresses. A report can still hold things that
             point to you. It can include a club&apos;s handle, the ID (a random
             label) of a post or chat, or search words. It also carries a short
             trail of what happened just before it. The trail lists the pages you

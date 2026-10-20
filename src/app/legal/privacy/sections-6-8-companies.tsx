@@ -34,7 +34,7 @@ export function CompanyList() {
         carry personal details, such as search words or the link in one of our
         emails. Checking in at an event, with the link or the code, puts that
         event in the log, with the time and your IP address. When the
-        club&apos;s owner or an admin marks you as here, or takes your check-in
+        club&apos;s owner or an officer marks you as here, or takes your check-in
         off, the log holds that event and your account ID (a random label),
         with the time. It also stores the
         short film on our front page. Your browser

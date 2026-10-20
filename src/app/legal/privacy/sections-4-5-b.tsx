@@ -52,32 +52,31 @@ export function Section5e() {
         rows={[
           [
             "Board",
-            "Every member reads. The club's owner and admins post. Any member can reply under a post. Its followers with a verified school email read the posts too, not the replies, shown as the club's. Not if the club turned that off, removed them as a follower or from the club, or its owner, an admin or a mod blocked them",
+            "Every member reads. The club's owner and officers post. Any member can reply under a post. Its followers with a verified school email read the posts too, not the replies, shown as the club's. Not if the club turned that off, removed them as a follower or from the club, or its owner or an officer blocked them",
           ],
           ["Lounge", "Every member reads and posts"],
           [
             "Officers",
-            "The club's owner, its admins and people they add. Everyone in it can post",
+            "The club's owner, its officers and people they add. Everyone in it can post",
           ],
           [
             "Extra rooms",
-            "The club's owner and admins create them and choose who can open each one: every member, or only people they pick. They also choose who can post: everyone who can open it, only the owner and admins, or the owner, admins and people they pick",
+            "The club's owner and officers create them and choose who can open each one: every member, or only people they pick. They also choose who can post: everyone who can open it, only the owner and officers, or the owner, officers and people they pick",
           ],
           [
             "An event's chat",
-            "Club members who marked Going or Interested, and the club's owner and admins. Its member list shows their names. The top of the chat shows the first few who marked Going (up to 8)",
+            "Club members who marked Going or Interested, and the club's owner and officers. Its member list shows their names. The top of the chat shows the first few who marked Going (up to 8)",
           ],
         ]}
       />
       <LegalP>
-        In the app, the &ldquo;only the owner and admins&rdquo; choice reads
-        &ldquo;Only officers post&rdquo;. There, &ldquo;officers&rdquo; means
-        the club&apos;s owner and admins, not its mods.
+        In the app, the &ldquo;only the owner and officers&rdquo; choice reads
+        &ldquo;Only officers post&rdquo;.
       </LegalP>
       <LegalP>
         New members can read a room&apos;s whole history. A follower who can
         read the Board also sees its earlier posts by the club&apos;s current
-        owner and admins. In a room where the club chose who can post, you can still read, vote in polls and take a
+        owner and officers. In a room where the club chose who can post, you can still read, vote in polls and take a
         sign-up spot. The room tells you the rule, for example &ldquo;Only
         officers post here.&rdquo; It does not list the people who were picked.
       </LegalP>
@@ -93,9 +92,9 @@ export function Section5e() {
         <li>
           <strong>Blocks in club rooms.</strong> You each see a blank in place
           of the other&apos;s messages. One exception: a post on the Board by
-          the club&apos;s owner or an admin shows to every member, and to every
-          follower who can read the Board, block or not. If the club&apos;s
-          owner, an admin or a mod blocks a follower, that follower can no
+          the club&apos;s owner or an officer shows to every member, and to
+          every follower who can read the Board, block or not. If the
+          club&apos;s owner or an officer blocks a follower, that follower can no
           longer read the Board. The blank only hides messages on screen, so treat what you write in a
           club room as readable by every member, including someone you blocked.
         </li>

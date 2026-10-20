@@ -105,7 +105,8 @@ export function Sections9To10() {
             </li>
             <li>the records of what you viewed and of who viewed you;</li>
             <li>
-              your notifications, and your waitlist entry.
+              your notifications, your waitlist entry and the record of which
+              club link let you in.
             </li>
           </LegalUL>
           <LegalP>
@@ -160,7 +161,7 @@ export function Sections9To10() {
             </li>
             <li>
               a photo or video you sent in a chat, if the Vibe team or a
-              club&apos;s owner, admin or mod removed that message or if a report
+              club&apos;s owner or officer removed that message or if a report
               on it is open or was acted on;
             </li>
             <li>a photo, cover or logo the Vibe team removed;</li>
@@ -183,7 +184,7 @@ export function Sections9To10() {
         </li>
         <li>
           <strong>
-            Club records of things you did as a club owner, admin or mod,
+            Club records of things you did as a club owner or officer,
           </strong>{" "}
           such as titles you gave and followers you removed, with your name
           taken off. A club you owned stays, with no owner.

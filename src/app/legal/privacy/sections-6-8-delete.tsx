@@ -123,7 +123,7 @@ export function NotDeletedYet() {
           The date you first followed a club. It stays after you unfollow,
           until the club or your account is deleted. While you are not
           following, no other user is shown it. If you follow again, the
-          club&apos;s owner and admins see that first date (
+          club&apos;s owner and officers see that first date (
           <Sec to="5f">section 5f</Sec>).
         </li>
         <li>

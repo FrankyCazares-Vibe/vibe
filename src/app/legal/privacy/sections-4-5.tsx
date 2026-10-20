@@ -118,15 +118,15 @@ export function Sections4To5() {
           ],
           [
             "A club's follower list, who RSVP'd to its events and who checked in at them",
-            "The club's owner and admins. The people in an event's chat also see who is in it, and the first few who marked Going (up to 8)",
+            "The club's owner and officers. The people in an event's chat also see who is in it, and the first few who marked Going (up to 8)",
           ],
           [
             "How many people checked in at an event",
-            "Any signed-in account that can see the event, once at least 5 have checked in. The club's owner and admins see the exact number. So does anyone who can see the check-in screen at the door",
+            "Any signed-in account that can see the event, once at least 5 have checked in. The club's owner and officers see the exact number. So does anyone who can see the check-in screen at the door",
           ],
           [
             "Drafts, saved posts, your mute list, your personal calendar, the clubs you hid from your profile and your list of the clubs you follow",
-            "Only you. A club's owner and admins still see that you follow it",
+            "Only you. A club's owner and officers still see that you follow it",
           ],
           [
             "Your sign-in email, school email and personal email",

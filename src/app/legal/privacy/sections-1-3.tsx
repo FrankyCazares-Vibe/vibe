@@ -81,8 +81,9 @@ export function Sections1To3() {
       <LegalP>
         <strong>Making an account.</strong> Sign-up asks for your school email,
         a password and the checkbox. While we let people in one group at a time
-        (a wave), it also asks for the access code we emailed you. We email a
-        code to your school email. Typing it confirms your account and verifies
+        (a wave), it also asks for the access code we emailed you. Signing up
+        through a club link needs no access code (
+        <Sec to="11">section 11</Sec>). We email a code to your school email. Typing it confirms your account and verifies
         your school email in one step, and you then set up a profile. Some
         accounts sign in with a different email and verify a school email as a
         separate step: accounts made before sign-up worked this way, and a few
@@ -150,7 +151,8 @@ export function Sections1To3() {
         </li>
         <li>
           <strong>Proof that you agreed</strong> (<Sec to="13">section 13</Sec>)
-          and, if you joined with an access code, a record of it (
+          and, if you joined with an access code or a club link, a record of
+          it (
           <Sec to="11">section 11</Sec>).
         </li>
       </LegalUL>
@@ -189,10 +191,10 @@ export function Sections1To3() {
         <li>Posts, drafts, comments, likes, reposts and saves.</li>
         <li>Who you follow and who follows you.</li>
         <li>
-          Clubs: memberships and roles, the title a club&apos;s owner or admin
-          gave you, clubs you follow, requests to join with your message, and
-          invites. Asking to join a club also follows it. If a club&apos;s owner
-          or admin takes you out of the club, adds you to a room, gives you a
+          Clubs: memberships and roles, the title a club&apos;s owner or an
+          officer gave you, clubs you follow, requests to join with your
+          message, and invites. Asking to join a club also follows it. If a
+          club&apos;s owner or an officer takes you out of the club, adds you to a room, gives you a
           title or removes you as a follower, we store who did it and when.
         </li>
         <li>
@@ -202,8 +204,8 @@ export function Sections1To3() {
         <li>
           Event check-ins: the club events you checked in at. You check in
           yourself, with the 4-digit code or the QR code on the club&apos;s
-          check-in screen, or the club&apos;s owner or an admin marks you as
-          here. Our database does not store the time you checked in or which
+          check-in screen, or the club&apos;s owner or an officer marks you
+          as here. Our database does not store the time you checked in or which
           way you did it, but Vercel&apos;s visit logs can show both
           (<Sec to="6">section 6</Sec>).
         </li>

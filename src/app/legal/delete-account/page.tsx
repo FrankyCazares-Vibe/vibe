@@ -218,9 +218,10 @@ export default function DeleteAccountPage() {
           sign-in log&quot; below).
         </li>
         <li>
-          <strong>Your waitlist entry,</strong> if you have one, and your
-          address on the list of addresses that can sign up without an access
-          code, if it is there.
+          <strong>Your waitlist entry,</strong> if you have one, your address
+          on the list of addresses that can sign up without an access code, if
+          it is there, and the record of which club link let you in, if one
+          did.
         </li>
         <li>
           <strong>Your files:</strong> the photos, videos and documents in your
@@ -314,7 +315,7 @@ export default function DeleteAccountPage() {
         </li>
         <li>
           <strong>Club records.</strong> Records of things you did as a club
-          owner, admin or mod stay, with your name taken off.
+          owner or officer stay, with your name taken off.
         </li>
         <li>
           <strong>Our email log.</strong> For each email our software sent

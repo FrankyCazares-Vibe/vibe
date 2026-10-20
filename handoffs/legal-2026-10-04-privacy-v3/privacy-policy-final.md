@@ -1,6 +1,6 @@
 # Vibe Privacy Policy
 
-Effective October 19, 2026
+Effective <SHIP DAY>
 
 Vibe is a campus social app for people with an Indiana University or Purdue University email address. It is run by **CONNECTVIBE. LLC**, an Indiana limited liability company. In this policy, "we" means that company. Vibe is independent. It is not run or backed by Indiana University, Purdue University, or any campus, school or club.
 
@@ -12,7 +12,7 @@ This page says what Vibe knows about you, who can see it and how to delete it. I
 
 1. **Your profile and your posts are public.** Anyone on the internet can open most of your profile and read your posts, and search engines can list them. A block does not hide them from someone who is signed out.
 2. **Club pages are public too.** They show the club's 12 newest posts and who wrote each one. Your profile also lists the clubs you are in, with any title a club gave you and the month you joined it on Vibe, unless you hide one. What you join, follow and post can show personal things about you, such as your religion, your politics or your health.
-3. **Everyone in a chat sees every message in it.** A person added later can read everything sent before they joined. In a club room, treat what you write as readable by every member, even one you blocked. A club's followers with a verified school email can also read the posts its owner and admins put on its Board, unless the club turns that off. Members' replies stay with members.
+3. **Everyone in a chat sees every message in it.** A person added later can read everything sent before they joined. In a club room, treat what you write as readable by every member, even one you blocked. A club's followers with a verified school email can also read the posts its owner and officers put on its Board, unless the club turns that off. Members' replies stay with members.
 4. **Vibe can read messages, and does so only in six cases:**
    - when one is reported;
    - when someone in the chat asks us to or agrees;
@@ -64,7 +64,7 @@ When and why we read private messages is in section 5h.
 
 **Age and agreement.** You must be 18 or older (section 12). Sign-up has one checkbox: "I'm 18 or older and I agree to the Terms of Service and Privacy Policy." Checking it is how you agree to this policy. We do not ask for a date of birth or check age any other way.
 
-**Making an account.** Sign-up asks for your school email, a password and the checkbox. While we let people in one group at a time (a wave), it also asks for the access code we emailed you. We email a code to your school email. Typing it confirms your account and verifies your school email in one step, and you then set up a profile. Some accounts sign in with a different email and verify a school email as a separate step: accounts made before sign-up worked this way, and a few that we add ourselves.
+**Making an account.** Sign-up asks for your school email, a password and the checkbox. While we let people in one group at a time (a wave), it also asks for the access code we emailed you. Signing up through a club link needs no access code (section 11). We email a code to your school email. Typing it confirms your account and verifies your school email in one step, and you then set up a profile. Some accounts sign in with a different email and verify a school email as a separate step: accounts made before sign-up worked this way, and a few that we add ourselves.
 
 **What "verified" means.** We send a verification code to your school email and you type it into Vibe. That proves you could read mail at that address at that moment. It does not prove that you are enrolled, employed or admitted, or that you are who your profile says. A school email here means an address whose part after the @ is iu.edu or purdue.edu, or ends in .iu.edu or .purdue.edu. University staff and faculty have these addresses too. We do not contact the university. One school email is meant to verify one account. Your campus is your own choice, and we do not check it.
 
@@ -81,7 +81,7 @@ One exception: we can mark a test account that we run ourselves as verified by h
 - **Starter name.** If you made your account before October 8, 2026 and have not chosen a name, your display name is the part of your sign-in email before the @. Anyone who sees your name on Vibe can read it. An account made since then starts with the name "Member".
 - **School email.** Stored once you confirm it. No other user is shown it. Section 10 names one gap.
 - **Personal email.** Optional. After sign-up you can add a personal email, so that your account stays yours when your school closes your school inbox. We email it a code first, and store it once you type the code. It is shown to you in Settings, where you can remove it. No other user is shown it.
-- **Proof that you agreed** (section 13) and, if you joined with an access code, a record of it (section 11).
+- **Proof that you agreed** (section 13) and, if you joined with an access code or a club link, a record of it (section 11).
 
 ### 3b. What is on my profile?
 
@@ -99,9 +99,9 @@ Your profile holds:
 
 - Posts, drafts, comments, likes, reposts and saves.
 - Who you follow and who follows you.
-- Clubs: memberships and roles, the title a club's owner or admin gave you, clubs you follow, requests to join with your message, and invites. Asking to join a club also follows it. If a club's owner or admin takes you out of the club, adds you to a room, gives you a title or removes you as a follower, we store who did it and when.
+- Clubs: memberships and roles, the title a club's owner or an officer gave you, clubs you follow, requests to join with your message, and invites. Asking to join a club also follows it. If a club's owner or an officer takes you out of the club, adds you to a room, gives you a title or removes you as a follower, we store who did it and when.
 - Club events, your RSVPs (Going or Interested) and personal calendar entries.
-- Event check-ins: the club events you checked in at. You check in yourself, with the 4-digit code or the QR code on the club's check-in screen, or the club's owner or an admin marks you as here. Our database does not store the time you checked in or which way you did it, but Vercel's visit logs can show both (section 6).
+- Event check-ins: the club events you checked in at. You check in yourself, with the 4-digit code or the QR code on the club's check-in screen, or the club's owner or an officer marks you as here. Our database does not store the time you checked in or which way you did it, but Vercel's visit logs can show both (section 6).
 - Messages and everything in them.
 - Which messages are pinned in a chat, who pinned each one, and when.
 - Your settings in each chat, and your poll votes and sign-ups in club rooms.
@@ -128,7 +128,7 @@ Posts and club pages are public (section 5a), so a location inside one of those 
 - **Email log.** We log each email our own software sends. The log holds its kind, your account if there is one, the part of the address after the @ and the time. It also holds whether it worked, and the reference number that our email service (Resend) gives the message. In place of the address, the log holds a scrambled code. Nobody can turn the scrambled code back into the address. Our servers do hold a secret key that lets us test whether a particular address matches it.
 - **Error reports.** When something breaks, a report goes to Sentry, the service we use to find bugs. A speed report also goes for about one page load in ten, and for about one in ten requests to our servers. (A request is your browser or app asking our servers for something.) Sentry also gets a small signal each time you open or change a page, so it can count what share of visits hit an error. That signal holds no page address and nothing about your account.
 
-  Our own code does not put your name, account or email on these reports, and we strip sign-in links, access codes and profile handles from web addresses. A report can still hold things that point to you. It can include a club's handle, the ID (a random label) of a post or chat, or search words. It also carries a short trail of what happened just before it. The trail lists the pages you opened, the requests your browser made and lines our own software logs. Until October 8, 2026 it also listed the buttons you tapped, by their labels and never what you typed. Until October 12, 2026 a speed report could also name the thing you tapped, or the largest thing on your screen, by its label, and some labels hold a person's name, such as the button that opens their profile.
+  Our own code does not put your name, account or email on these reports, and we strip sign-in links, access codes, club link codes and profile handles from web addresses. A report can still hold things that point to you. It can include a club's handle, the ID (a random label) of a post or chat, or search words. It also carries a short trail of what happened just before it. The trail lists the pages you opened, the requests your browser made and lines our own software logs. Until October 8, 2026 it also listed the buttons you tapped, by their labels and never what you typed. Until October 12, 2026 a speed report could also name the thing you tapped, or the largest thing on your screen, by its label, and some labels hold a person's name, such as the button that opens their profile.
 
   Until our release of October 5, 2026, an error report or a speed report about a request to our servers could also hold four things:
 
@@ -210,9 +210,9 @@ One paid feature lets a person see who looked at them. With Vibe+, they see the 
 | Your messages | Everyone in that chat, including people added later |
 | The posts on a club's Board | The club's members. Also its followers with a verified school email, unless the club turned that off. Followers do not see the replies (section 5e) |
 | A club's member list | The club's members. For a club that anyone can join, any signed-in account also sees on the Map the members who show that club on their profile |
-| A club's follower list, who RSVP'd to its events and who checked in at them | The club's owner and admins. The people in an event's chat also see who is in it, and the first few who marked Going (up to 8) |
-| How many people checked in at an event | Any signed-in account that can see the event, once at least 5 have checked in. The club's owner and admins see the exact number. So does anyone who can see the check-in screen at the door |
-| Drafts, saved posts, your mute list, your personal calendar, the clubs you hid from your profile and your list of the clubs you follow | Only you. A club's owner and admins still see that you follow it |
+| A club's follower list, who RSVP'd to its events and who checked in at them | The club's owner and officers. The people in an event's chat also see who is in it, and the first few who marked Going (up to 8) |
+| How many people checked in at an event | Any signed-in account that can see the event, once at least 5 have checked in. The club's owner and officers see the exact number. So does anyone who can see the check-in screen at the door |
+| Drafts, saved posts, your mute list, your personal calendar, the clubs you hid from your profile and your list of the clubs you follow | Only you. A club's owner and officers still see that you follow it |
 | Your sign-in email, school email and personal email | Only you, except your starter name (section 3a). A short form of your sign-in email can be emailed to your own school or personal inbox (section 4) |
 
 The Vibe team and the cofounder with direct access can see more than this table shows. Sections 1 and 5h say what.
@@ -270,27 +270,27 @@ Vibe has direct chats, group chats and club rooms.
 
 | Room | Who can read it, and who can post |
 |---|---|
-| Board | Every member reads. The club's owner and admins post. Any member can reply under a post. Its followers with a verified school email read the posts too, not the replies, shown as the club's. Not if the club turned that off, removed them as a follower or from the club, or its owner, an admin or a mod blocked them |
+| Board | Every member reads. The club's owner and officers post. Any member can reply under a post. Its followers with a verified school email read the posts too, not the replies, shown as the club's. Not if the club turned that off, removed them as a follower or from the club, or its owner or an officer blocked them |
 | Lounge | Every member reads and posts |
-| Officers | The club's owner, its admins and people they add. Everyone in it can post |
-| Extra rooms | The club's owner and admins create them and choose who can open each one: every member, or only people they pick. They also choose who can post: everyone who can open it, only the owner and admins, or the owner, admins and people they pick |
-| An event's chat | Club members who marked Going or Interested, and the club's owner and admins. Its member list shows their names. The top of the chat shows the first few who marked Going (up to 8) |
+| Officers | The club's owner, its officers and people they add. Everyone in it can post |
+| Extra rooms | The club's owner and officers create them and choose who can open each one: every member, or only people they pick. They also choose who can post: everyone who can open it, only the owner and officers, or the owner, officers and people they pick |
+| An event's chat | Club members who marked Going or Interested, and the club's owner and officers. Its member list shows their names. The top of the chat shows the first few who marked Going (up to 8) |
 
-In the app, the "only the owner and admins" choice reads "Only officers post". There, "officers" means the club's owner and admins, not its mods.
+In the app, the "only the owner and officers" choice reads "Only officers post".
 
-New members can read a room's whole history. A follower who can read the Board also sees its earlier posts by the club's current owner and admins. In a room where the club chose who can post, you can still read, vote in polls and take a sign-up spot. The room tells you the rule, for example "Only officers post here." It does not list the people who were picked.
+New members can read a room's whole history. A follower who can read the Board also sees its earlier posts by the club's current owner and officers. In a room where the club chose who can post, you can still read, vote in polls and take a sign-up spot. The room tells you the rule, for example "Only officers post here." It does not list the people who were picked.
 
 - **Polls and sign-ups.** With names on, the members who can open the room see who picked what, and sign-ups always show them the names. A follower reading the Board sees only the totals. In an "Anonymous" poll nobody in the club can see who voted. Your vote is still stored with your account, so the cofounder with direct access (section 1) could see how you voted.
-- **Blocks in club rooms.** You each see a blank in place of the other's messages. One exception: a post on the Board by the club's owner or an admin shows to every member, and to every follower who can read the Board, block or not. If the club's owner, an admin or a mod blocks a follower, that follower can no longer read the Board. The blank only hides messages on screen, so treat what you write in a club room as readable by every member, including someone you blocked.
+- **Blocks in club rooms.** You each see a blank in place of the other's messages. One exception: a post on the Board by the club's owner or an officer shows to every member, and to every follower who can read the Board, block or not. If the club's owner or an officer blocks a follower, that follower can no longer read the Board. The blank only hides messages on screen, so treat what you write in a club room as readable by every member, including someone you blocked.
 - **Deleted messages.** When someone deletes a message they sent, everyone who can read that chat or room sees a grey "Message deleted" note in its place, with the sender's name and when it was sent. They may also be able to tell when it was deleted. On the Board the note reads "Post deleted", and the replies under the post stay. A follower reading the Board sees nothing in its place.
 - **Your chat settings.** Other members of a chat may be able to tell when you last read it. They may also be able to tell whether you muted it, pinned it to the top of your list, hid it or cleared it.
 
 ### 5f. What can the people who run a club see?
 
-A club is run by its owner, its admins and its mods (moderators the club picks).
+A club is run by its owner and its officers. Only the owner makes a member an officer, or takes that back.
 
 - **Every member** sees the club's member list: name, handle, photo, role, title and join date.
-- **The club's owner and admins** see five more lists:
+- **The club's owner and officers** see five more lists:
   - followers, with the date each first followed. You are on it from the moment you ask to join, unless one of you blocked the other;
   - invites and their outcome;
   - who RSVP'd to the club's events;
@@ -298,7 +298,7 @@ A club is run by its owner, its admins and its mods (moderators the club picks).
   - the people added to a room, with the date each was added.
 
   They can give a member a title, which shows on that member's profile unless the member hides the club or the title. They can stop followers reading the Board. They can remove a follower without that person being told: that person can follow again, but cannot read the Board until they join. They can mark a person who marked Going or Interested as here, take one person's check-in off, and clear all of an event's check-ins. And they can delete any post made as the club.
-- **The club's owner, admins and mods** see pending requests to join, with your message. If the club took you out before, the request carries a "Removed before" mark. Mods can also read the list of people added to a room. Owners, admins and mods can remove a club room message. It is then hidden from everyone but its author, not deleted, and we record who removed it.
+- **The club's owner and officers** also see pending requests to join, with your message. If the club took you out before, the request carries a "Removed before" mark. They see how many people joined the club through its members' link, never who (section 11). They can remove a club room message. It is then hidden from everyone but its author, not deleted, and we record who removed it.
 - Nobody who runs a club is shown email addresses, reports or who muted the club's posts. If they try to remove a message that has an open report, the app tells them one is open.
 
 ### 5g. What can only I see?
@@ -309,7 +309,7 @@ No other user is shown these:
 - personal calendar entries;
 - your notifications;
 - your mute list, including clubs whose posts you muted, and the suggested people you dismissed;
-- the clubs you hid from your profile (the club's members still see you in its member list) and your list of the clubs you follow (a club's owner and admins still see that you follow it);
+- the clubs you hid from your profile (the club's members still see you in its member list) and your list of the clubs you follow (a club's owner and officers still see that you follow it);
 - Otto settings and reminders;
 - your redaction bars, your list of hidden profile parts and your "here for" answers.
 
@@ -355,7 +355,7 @@ Before a message is saved, software checks its text against a short list of bloc
 These outside companies hold your information or are contacted by your device. We use them to run Vibe. Each works under its own published terms and privacy policy. We have given none of them permission to sell your information or to use it for advertising. Vibe uses no advertising company. Each company your browser contacts sees your IP address and browser.
 
 - **Supabase** (database, sign-in, file storage). It holds the whole database. That includes what the sign-in system keeps: your email, a scrambled password and the sign-in records in section 3d. It also holds public photos, private résumés and the photos we keep as evidence. Evidence files are photos and videos we keep because of a report or a removal (section 9). On some pages your browser talks to Supabase directly. They are the pages where you sign in, sign up, confirm or verify an email, set a new password or read a suspension notice. During set-up on a phone, the account sheet (Sign out and Delete account) does the same. Your browser also talks to Supabase when a profile page checks that you are signed in, and each time a profile or post photo loads. Supabase writes the "confirm your account" email and passes it to Resend to send. When you sign in, sign up or ask for a new email, Supabase sends the one-time code from the check that you are a person, with your IP address, to Cloudflare to confirm it.
-- **Vercel** (hosting). It runs the site, our server software and the daily waitlist clean-up. Its visit logs record the web address requested, your IP address and browser. Some web addresses carry personal details, such as search words or the link in one of our emails. Checking in at an event, with the link or the code, puts that event in the log, with the time and your IP address. When the club's owner or an admin marks you as here, or takes your check-in off, the log holds that event and your account ID (a random label), with the time. It also stores the short film on our front page. Your browser loads the film from Vercel's file storage when the film comes into view or you press Play.
+- **Vercel** (hosting). It runs the site, our server software and the daily waitlist clean-up. Its visit logs record the web address requested, your IP address and browser. Some web addresses carry personal details, such as search words or the link in one of our emails. Checking in at an event, with the link or the code, puts that event in the log, with the time and your IP address. When the club's owner or an officer marks you as here, or takes your check-in off, the log holds that event and your account ID (a random label), with the time. It also stores the short film on our front page. Your browser loads the film from Vercel's file storage when the film comes into view or you press Play.
 - **Cloudflare** (media storage, incoming mail and the check that you are a person). It holds post videos, a club's photos and videos, chat photos and videos, and group chat photos, including ones kept as evidence. Your browser fetches them straight from Cloudflare. It also serves the small program that shows a résumé PDF, and looks after the connectvibe.app name. And it forwards every email sent to hello@ or help@ (section 3g). It also runs the check that you are a person. The sign-up page, the sign-in page and any page that shows "Send a new email" load a small box straight from Cloudflare. The check starts when the page shows the box, not when you press the button. So on the "Check your email" screen it runs even if you never ask for a new email. Through the box Cloudflare sees your IP address, details of your browser and device, the address of the Vibe page you are on, and which of the three forms it is. We send Cloudflare nothing you type. Cloudflare says it uses what it sees only to tell people from bots and to make the check better. The box gives your browser a one-time code that lasts five minutes, and your browser sends that code to Supabase with the form. Cloudflare tells us pass or fail for each try. We also see totals of passes and fails, never who. We have turned off the box's link for sending feedback to Cloudflare. Cloudflare publishes its own notice for this check, the Turnstile Privacy Addendum.
 - **Resend** (sending email). It gets the address and full content of every automatic email Vibe sends, with the access codes and links inside. Resend sends them through Amazon's email service.
 - **Sentry** (finding bugs). It gets the error reports, speed reports and visit signals in section 3d. That section says what a report can hold, and what our release of October 5, 2026 changed.
@@ -401,10 +401,10 @@ Vibe does not delete things just because they are old. They stay until you, a cl
 | A pin on a message | Someone in the chat unpins it, the message is deleted, or the Vibe team removes the message |
 | An event's chat | Deleted with the event. It closes to new messages 7 days after the event ends |
 | RSVPs | You take yours back, the club takes you out (upcoming events only), or the event, the club or your account is deleted |
-| Event check-ins | You remove yours, the club's owner or an admin takes it off or clears the event's check-ins, or the event, the club or your account is deleted. Leaving the club, or being taken out of it, does not remove them |
-| Events | An owner or admin cancels the event, or the club or the account that made it is deleted |
+| Event check-ins | You remove yours, the club's owner or an officer takes it off or clears the event's check-ins, or the event, the club or your account is deleted. Leaving the club, or being taken out of it, does not remove them |
+| Events | An owner or officer cancels the event, or the club or the account that made it is deleted |
 | Join requests and invites | The club or your account is deleted |
-| A title a club gave you | An owner or admin changes or removes it, you leave or are taken out of the club, or the club or your account is deleted |
+| A title a club gave you | An owner or officer changes or removes it, you leave or are taken out of the club, or the club or your account is deleted |
 | A mute on a club's posts | You unmute it, or the club or your account is deleted |
 | A club removing you as a follower | You join the club, or the club or your account is deleted |
 
@@ -436,7 +436,7 @@ Vibe does not delete things just because they are old. They stay until you, a cl
   For a comment, or for your messages in a chat or club you have left, you need not delete your account. Write to help@connectvibe.app from your sign-in email. We reply to that address, and once you answer that reply we aim to delete the comment or the messages by hand.
 - A direct or group chat itself. "Clear chat history" and "Delete conversation" only clear your view.
 - A request to join a club. You cannot take it back. Asking also follows the club. If the club says no, you keep following until you unfollow.
-- The date you first followed a club. It stays after you unfollow, until the club or your account is deleted. While you are not following, no other user is shown it. If you follow again, the club's owner and admins see that first date (section 5f).
+- The date you first followed a club. It stays after you unfollow, until the club or your account is deleted. While you are not following, no other user is shown it. If you follow again, the club's owner and officers see that first date (section 5f).
 - An account that never confirmed its email or never finished setting up. If you cannot sign in to delete it, write to help@connectvibe.app.
 - Our email log, the abuse counts, the sign-in log and emails you send us (section 9).
 - Reports, the moderation log (our record of what moderators did), suspension and ban records, and evidence files. No end date is set yet (section 9).
@@ -468,7 +468,7 @@ What happens, in order:
    - everything you posted, sent, liked, saved or voted on;
    - your follows, club memberships and titles, RSVPs, event check-ins, blocks and mutes, club mutes included;
    - the records of what you viewed and of who viewed you;
-   - your notifications, and your waitlist entry.
+   - your notifications, your waitlist entry and the record of which club link let you in.
 
    One log is not tied to the account, so step 3 does not reach it. It can still hold your email address (see "The sign-in log" below).
 
@@ -483,14 +483,14 @@ If step 1 or 2 fails, the account is not deleted and you can try again. If step 
 - **The moderation log:** your old account ID, your handle at the time and, for a photo that was removed, the old photo's address.
 - **Evidence files.** These are:
   - the photos and videos of a post, if the Vibe team removed it or if a report on it is open or was acted on;
-  - a photo or video you sent in a chat, if the Vibe team or a club's owner, admin or mod removed that message or if a report on it is open or was acted on;
+  - a photo or video you sent in a chat, if the Vibe team or a club's owner or officer removed that message or if a report on it is open or was acted on;
   - a photo, cover or logo the Vibe team removed;
   - your profile photo and cover, if a report about you was open.
 
   A photo already kept as evidence stays, even if the report was dismissed.
 - **The files that deleting your account misses** (section 8).
 - **Messages you pinned.** A message someone else wrote stays pinned. The record of who pinned it is emptied.
-- **Club records of things you did as a club owner, admin or mod,** such as titles you gave and followers you removed, with your name taken off. A club you owned stays, with no owner.
+- **Club records of things you did as a club owner or officer,** such as titles you gave and followers you removed, with your name taken off. A club you owned stays, with no owner.
 - **Our email log,** without the scrambled code or your account ID. It keeps the reference number Resend gave each message.
 - **The sign-in log.** The sign-in system's log of sign-in activity (section 3d) sits in our database at Supabase. It can hold your email address and IP address. It is not tied to your account, and nothing in Vibe clears it today.
 - **Abuse counts,** until they are cleared.
@@ -567,6 +567,8 @@ One more place could hold what you typed. Sentry is the service we use to find b
 | An entry you never confirm, with no access code sent | Up to 30 days after its last confirm email |
 | The confirm link | Works for 7 days |
 | An access code | Works once, for up to 14 days |
+| A club setup link | Works once, for up to 7 days |
+| A club's members' link | Works for 3 weeks and up to 150 sign-ups, while the club leaves it on |
 
 The 40 days are the longest any entry stays, whether or not you confirmed, got an access code or made an account. One thing starts them again: the form being sent again for your address before you confirm. That also replaces the answers, and anyone who types your address can do it. A clean-up is scheduled to run once a day and delete the whole entry.
 
@@ -584,6 +586,17 @@ The 40 days are the longest any entry stays, whether or not you confirmed, got a
 **When you sign up with an access code.** The email you sign up with is stored on your waitlist entry, linked to your new account, until the entry is deleted. Your account keeps a record of the access code you used and a wave note. The note holds your wave, how you got in (through the form or added by a cofounder), the day your access code was sent and the day you joined. Both are deleted with the account. Your waitlist answers are not copied into your profile.
 
 We keep a short list of addresses that can sign up without an access code. For each one the list holds the address, the reason, an optional short note and the date. Deleting your account in Settings takes your address off the list. If we delete your account for you, we take it off by hand.
+
+**When you sign up through a club link.** A club link lets someone with a school email sign up, even while sign-up is closed. There are two kinds:
+
+- **A club setup link.** A cofounder makes it in the admin tools and hands it, in person, to the person who will run a new club. It works once, for up to 7 days. The person who signs up with it, or who opens it signed in and taps "Make me the owner", becomes the owner of the new club.
+- **A club's members' link.** A club that Vibe has checked can have one. Its owner and officers share it. It stops working 3 weeks after it was made, once 150 people have signed up through it, or when they turn it off. It asks the person who opens it to join the club.
+
+While your sign-up is under way, we store the email address you typed and the time, with the link. That keeps one link from being used by two people at once, and counts the 150. Once your account is set up, we drop the address. Your account then keeps a record of which link let you in and when, whether you joined or made the club through it and when, and when you chose "Not now", if you did. If you already have an account and join a club or make one through a club link, your account keeps a record of that link and when. The sign-in system does not keep the link's code with your account, only a scrambled form of it. The record is deleted with your account.
+
+If no account is made with the address, its place on the link is let go after 15 minutes. A place never tied to an account is let go after 30 days. A place that is let go is deleted, with its address, the next time someone signs up through that link. After a link stops working, nothing deletes such a place yet. Deleting an account also deletes any place its address still holds.
+
+For each link we keep who made it, a cofounder or an officer, and when. We also keep a members' link's code, so its owner and officers can show the link again. They see how many people joined the club through it, never who. Our database stores no IP address for any of this. When you open a club link, Vercel's visit logs record its web address, including the code inside it (section 6).
 
 **Questions,** or want a copy of your entry? Write to hello@connectvibe.app from the address you joined with.
 

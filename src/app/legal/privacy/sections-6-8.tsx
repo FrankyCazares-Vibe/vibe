@@ -116,11 +116,11 @@ export function Sections6To8() {
           ],
           [
             "Event check-ins",
-            "You remove yours, the club's owner or an admin takes it off or clears the event's check-ins, or the event, the club or your account is deleted. Leaving the club, or being taken out of it, does not remove them",
+            "You remove yours, the club's owner or an officer takes it off or clears the event's check-ins, or the event, the club or your account is deleted. Leaving the club, or being taken out of it, does not remove them",
           ],
           [
             "Events",
-            "An owner or admin cancels the event, or the club or the account that made it is deleted",
+            "An owner or officer cancels the event, or the club or the account that made it is deleted",
           ],
           [
             "Join requests and invites",
@@ -128,7 +128,7 @@ export function Sections6To8() {
           ],
           [
             "A title a club gave you",
-            "An owner or admin changes or removes it, you leave or are taken out of the club, or the club or your account is deleted",
+            "An owner or officer changes or removes it, you leave or are taken out of the club, or the club or your account is deleted",
           ],
           [
             "A mute on a club's posts",

@@ -142,6 +142,11 @@ export function Section11Waitlist() {
           ],
           ["The confirm link", "Works for 7 days"],
           ["An access code", "Works once, for up to 14 days"],
+          ["A club setup link", "Works once, for up to 7 days"],
+          [
+            "A club's members' link",
+            "Works for 3 weeks and up to 150 sign-ups, while the club leaves it on",
+          ],
         ]}
       />
       <LegalP>
@@ -208,6 +213,56 @@ export function Section11Waitlist() {
         short note and the date. Deleting your account in Settings takes your
         address off the list. If we delete your account for you, we take it off
         by hand.
+      </LegalP>
+
+      <LegalP>
+        <strong>When you sign up through a club link.</strong> A club link lets
+        someone with a school email sign up, even while sign-up is closed. There
+        are two kinds:
+      </LegalP>
+      <LegalUL bullets>
+        <li>
+          <strong>A club setup link.</strong> A cofounder makes it in the admin
+          tools and hands it, in person, to the person who will run a new club.
+          It works once, for up to 7 days. The person who signs up with it, or
+          who opens it signed in and taps &ldquo;Make me the owner&rdquo;,
+          becomes the owner of the new club.
+        </li>
+        <li>
+          <strong>A club&apos;s members&apos; link.</strong> A club that Vibe
+          has checked can have one. Its owner and officers share it. It stops
+          working 3 weeks after it was made, once 150 people have signed up
+          through it, or when they turn it off. It asks the person who opens it
+          to join the club.
+        </li>
+      </LegalUL>
+      <LegalP>
+        While your sign-up is under way, we store the email address you typed
+        and the time, with the link. That keeps one link from being used by two
+        people at once, and counts the 150. Once your account is set up, we drop
+        the address. Your account then keeps a record of which link let you in
+        and when, whether you joined or made the club through it and when, and
+        when you chose &ldquo;Not now&rdquo;, if you did. If you already have an
+        account and join a club or make one through a club link, your account
+        keeps a record of that link and when. The sign-in system does not keep
+        the link&apos;s code with your account, only a scrambled form of it.
+        The record is deleted with your account.
+      </LegalP>
+      <LegalP>
+        If no account is made with the address, its place on the link is let go
+        after 15 minutes. A place never tied to an account is let go after 30
+        days. A place that is let go is deleted, with its address, the next time
+        someone signs up through that link. After a link stops working, nothing
+        deletes such a place yet. Deleting an account also deletes any place
+        its address still holds.
+      </LegalP>
+      <LegalP>
+        For each link we keep who made it, a cofounder or an officer, and when.
+        We also keep a members&apos; link&apos;s code, so its owner and officers
+        can show the link again. They see how many people joined the club
+        through it, never who. Our database stores no IP address for any of
+        this. When you open a club link, Vercel&apos;s visit logs record its web
+        address, including the code inside it (<Sec to="6">section 6</Sec>).
       </LegalP>
 
       <LegalP>
