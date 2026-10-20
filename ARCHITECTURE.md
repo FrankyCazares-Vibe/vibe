@@ -1,7 +1,7 @@
 # Vibe architecture
 
 How the code works and where each part lives. Written for a developer who is new to the repo.
-Every path below was checked against the code on October 13, 2026. File headers in this repo are long and current; when this page and a header disagree, trust the header.
+Every path below was checked against the code on October 19, 2026. File headers in this repo are long and current; when this page and a header disagree, trust the header.
 
 Contents:
 
@@ -29,18 +29,25 @@ Routes are folders under `src/app/`. API routes are `src/app/api/**/route.ts`. "
 | Sign-in, sign-up, password pages | `src/app/auth/`, `src/components/auth/`, `src/lib/auth/` |
 | The "are you a person" box | `src/lib/auth/captcha.ts`, `src/components/auth/TurnstileBox.tsx` |
 | The waitlist and access codes | `src/app/waitlist/`, `src/app/api/waitlist/`, `src/lib/waitlist/`, `supabase/migrations/20261003*_waitlist*.sql` |
-| School email check and the yearly check-in | `src/app/auth/school-email/`, `src/app/api/auth/school-email/`, `src/lib/auth/school-*.ts` |
+| School email check and the yearly school check-in | `src/app/auth/school-email/`, `src/app/api/auth/school-email/`, `src/lib/auth/school-*.ts` |
 | Who may open the signed-in pages (Terms, school, onboarding) | `src/lib/auth/campus-access.ts` |
 | Onboarding | Phone: `src/components/mobile/OnboardingMobile.tsx`, `src/components/mobile/onboarding/`. Desktop: `public/html/onboarding.html` served by `src/app/onboarding/classic/route.ts`. Shared: `src/lib/onboarding/` |
 | The campus feed | Phone: `src/components/mobile/CampusMobile.tsx`. Desktop: `src/app/campus/campus-home.tsx`. API: `src/app/api/feed/`, `src/app/api/posts/` |
 | Writing a post | Phone: `src/components/mobile/PostComposerMobile.tsx`. Desktop: inside `campus-home.tsx`. API: `src/app/api/me/publish-post/`. Shared: `src/lib/composer/`, `src/lib/posts/` |
 | Opening one post | `src/app/posts/[id]/`, `src/components/mobile/PostViewerMobile.tsx`, `public/html/_postViewer.js` (static profile) |
+| Likes, saves and reposts staying in step between the feed and the open post | `src/lib/posts/engagement-store.ts` |
+| The "Reposted by" list | `src/app/api/posts/[id]/reposters/`, `src/lib/posts/reposters.ts` |
+| The hashtag rule (how many, which characters) | `src/lib/posts/edit.ts` (`extractPostTags`, `isNewPostTag`), its copies in `public/html/profile.html` and `public/html/_postViewer.js`; trending in `src/lib/trending/count-tags.ts` |
 | Video and photo storage | `src/lib/r2.ts`, `src/lib/media/`, `src/lib/post-media-url.ts`, upload-url routes under `src/app/api/me/` |
 | Clubs (orgs): page, join, follow, invites | `src/app/orgs/[handle]/`, `src/app/api/orgs/`, `src/lib/orgs/`, `src/lib/club-routes/`, `src/components/orgs/` |
 | Events, RSVP, calendar files | `src/app/api/events/`, `src/app/api/me/calendar/`, `src/lib/events/`, `src/app/orgs/[handle]/OrgEventsSection.tsx` |
+| Event check-in (door code, QR, "Mark as here") | `src/lib/events/event-checkin.ts`, `src/lib/events/checkin-route.ts`, `src/app/api/events/[id]/checkin/` (with `door/` and `marks/`), `src/app/api/me/event-checkins/`, `src/app/campus/checkin/[id]/` (with `door/`), `src/components/events/checkin/`, `src/components/settings/CheckinsCard.tsx`, `supabase/migrations/20261019120000_event_checkins.sql` |
+| "What's the vibe tonight?", "Your clubs" and the school calendars | `src/lib/school-events/`, `src/app/api/school-events/`, `src/components/campus/tonight/` |
+| My Calendar: colours, event links, the month grid, other tabs hearing an RSVP | `src/lib/calendar/` (`calendar-key.ts`, `month-layout.ts`, `calendar-sync.ts`) |
 | Messages on a phone | `src/components/mobile/MessagesMobile.tsx`, `src/components/mobile/messages/` |
 | Messages on desktop | `src/components/desktop/messages/` (new chat), `public/html/messages.html` (old, shown when the new chat is off) |
 | Chat rules, rooms, cards, the on/off switches | `src/lib/chat/`, `src/lib/messages/`, `src/app/api/me/threads/`, `src/app/api/orgs/[slug]/channels/` |
+| Deleting your own message (the "Message deleted" note) | `src/lib/chat/delete-own.ts`, `src/lib/chat/deleted-note.ts`, `src/app/api/me/threads/[id]/messages/[messageId]/`, `supabase/migrations/20261019150000_message_deleted_note.sql` |
 | The small Messages window on desktop | `src/components/desktop/messages/MiniMessenger.tsx` and its twin `public/html/_miniMessenger.js` |
 | Network (people, follows, suggestions) | `src/app/network/`, `src/components/network/`, `src/components/mobile/NetworkMobile.tsx`, `src/lib/connections/`, `src/app/api/me/follow*`, `src/app/api/users/` |
 | Profile | Phone: `src/components/mobile/ProfileMobile.tsx`. Desktop: `public/html/profile.html`. Shared: `src/lib/profile/`, `src/app/api/me/profile*`, `src/app/api/users/[handle]/` |
@@ -55,8 +62,11 @@ Routes are folders under `src/app/`. API routes are `src/app/api/**/route.ts`. "
 | Legal pages, cookie notice, Terms acceptance | `src/app/legal/`, `src/components/legal/`, `src/lib/legal/`, `src/app/auth/terms/` |
 | The page-open tally (admin "Numbers") | `src/lib/tally/`, `src/components/tally/OpenBeacon.tsx`, `src/app/api/tally/open/`, `src/app/admin/numbers-client.tsx` |
 | The usage summary (admin "Usage") | `src/lib/usage/`, `src/app/api/admin/usage/`, `src/app/admin/usage-client.tsx`, `supabase/migrations/20261014120000_admin_usage_summary.sql` |
-| The use totals (the check-in, and "Counted from launch on" in Usage) | `src/lib/usage/touch.ts`, `touch-client.ts`, `src/components/usage/ActivityTouch.tsx`, `src/app/api/me/heartbeat/`, `public/html/_usageTouch.js`, `supabase/migrations/20261014150000_usage_day_tally.sql` |
+| The use totals (the usage heartbeat, and "Counted from launch on" in Usage) | `src/lib/usage/touch.ts`, `touch-client.ts`, `src/components/usage/ActivityTouch.tsx`, `src/app/api/me/heartbeat/`, `public/html/_usageTouch.js`, `supabase/migrations/20261014150000_usage_day_tally.sql` |
 | Colours, Light and Night | `src/app/globals.css`, `src/lib/theme/` |
+| Fonts and the logo's own font file | `src/lib/theme/fonts.ts` (+ `fonts.test.ts`), `public/fonts/vibe-wordmark-v1.woff2`, the landing's `src/components/landing/soft-font.ts` |
+| Motion (springs, press feedback, reduced motion) | `src/lib/motion/`, the `.vibe-press` / `.vibe-toggle` block in `globals.css` |
+| Each phone tab keeping its own scroll place | `src/components/mobile/use-tab-scroll-memory.ts`, `tab-scroll-memory.ts` |
 | The moving coral glow | `src/components/bloom/VibeBloom.tsx` + the `vibe-bloom-*` block at the end of `globals.css` |
 | The animated "vibe." wordmark | `src/components/brand/KineticWordmark.tsx` + the `vibe-kinetic` block in `globals.css` |
 | Email text and sending | `src/lib/resend.ts`, `src/lib/email/`, `src/lib/waitlist/email-content.ts`, `supabase/templates/` |
@@ -109,6 +119,7 @@ The server cannot see a window, so it guesses from the request headers (`src/lib
 | `/onboarding` | `src/components/mobile/OnboardingMobile.tsx` | An iframe of `/onboarding/classic`, which serves `public/html/onboarding.html` |
 | `/orgs/[handle]` | One React page, `src/app/orgs/[handle]/OrgContent.tsx`, that adapts with `useIsMobile` | same |
 | `/settings`, `/feed` | One React page inside `CampusAppShell` | same |
+| `/campus/checkin/[id]`, `/campus/checkin/[id]/door` | One React page each: where a student types the code or the QR lands, and the officers' door screen | same |
 
 The frames around the screens:
 
@@ -117,9 +128,10 @@ The frames around the screens:
 
 Things to know before editing:
 
-- `campus-home.tsx` is about 17,000 lines and `CampusMobile.tsx` about 4,500. They are separate implementations of the same page. A change to the feed, the composer, the club list or the map usually has to be made in both.
+- `campus-home.tsx` is about 18,400 lines and `CampusMobile.tsx` about 5,100 (October 19, 2026). They are separate implementations of the same page. A change to the feed, the composer, the club list or the map usually has to be made in both.
 - `CampusMobile.tsx` still imports shared pieces from `campus-home.tsx`, so a phone downloads part of the desktop file. Moving those pieces out is planned work (see the newest handoff).
 - A feature can be right on one screen and broken on the other. Check both, and check a width near 900px.
+- On a phone, the swipeable tabs of a page sit side by side under one page scroll. Each tab keeps its own place through `use-tab-scroll-memory.ts` (Campus, Network, Otto and Profile use it), kept for the browser tab's session. Without it, a long Feed left a short tab such as Orgs scrolled past its end, on a blank screen.
 
 ## 4. The static pages and their twins
 
@@ -140,6 +152,10 @@ Because the static pages cannot import TypeScript, several pieces of logic exist
 | React or TypeScript side | Static twin |
 |---|---|
 | `THEME_BOOT_SCRIPT` in `src/lib/theme/theme.ts` | Pasted into the head of the three pages and `public/offline.html` (`theme.test.ts` fails on drift) |
+| `GOOGLE_FONTS_HREF` in `src/lib/theme/fonts.ts`, the logo's `@font-face` in `globals.css` | Pasted into the head of the three pages (`fonts.test.ts`) |
+| `POST_TAG_IN_TEXT_RE`, `POST_TAG_LINK_RE`, `extractPostTags` and `blankPostLinks` in `src/lib/posts/edit.ts`, `captionTagRanges` in `caption-tag-ranges.ts` | The `tags-twin:start` / `tags-twin:end` block in `public/html/profile.html` and `public/html/_postViewer.js` (`static-profile-tags.test.ts` fails on drift) |
+| `DELETED_LINE` in `src/lib/chat/deleted-note.ts` (the "Message deleted" note) | Drawn by hand in `public/html/messages.html` (`.dm-deleted`) |
+| `src/lib/calendar/calendar-sync.ts` (the `vibe-calendar` channel message), the colour key in `calendar-key.ts` | A hand copy in `public/html/profile.html` |
 | `src/lib/build/build-refresh.ts`, `src/components/build/BuildRefresh.tsx` | `public/html/_buildRefresh.js` (`static-build-refresh.test.ts`) |
 | `src/lib/usage/touch.ts`, `src/lib/usage/touch-client.ts`, `src/components/usage/ActivityTouch.tsx` | `public/html/_usageTouch.js` (`static-usage-touch.test.ts`) |
 | `src/components/desktop/messages/MiniMessenger.tsx` | `public/html/_miniMessenger.js` |
@@ -195,7 +211,7 @@ The database stores storage keys, not public URLs. "Clips" in code names means v
 
 ### Migrations
 
-- One SQL file per change in `supabase/migrations/`, named `<UTC timestamp>_<name>.sql`. There are over 100. Never edit an applied file; add a new one.
+- One SQL file per change in `supabase/migrations/`, named `<UTC timestamp>_<name>.sql`. There are 128 (October 19, 2026). Never edit an applied file; add a new one.
 - Each file opens with a plain-English header: why, what it does, a pre-flight check and a post-check. Follow that shape.
 - **Local:** `supabase start` (first run) or `supabase db reset` applies every file, then `supabase/seed.sql`. Run `node scripts/local-seed.mjs` afterwards.
 - **Production:** a deploy does not touch the database. A maintainer applies each new file to the production project by hand and records it under the file's own version. The exact steps in use are in the newest handoff, under "Things a new session must know".
@@ -229,7 +245,7 @@ Sign-in is Supabase Auth with email and password. The browser talks to Supabase 
 - A person signs up with their school email. Confirming that address is the school check (`src/lib/auth/school-sign-in.ts`).
 - Accounts that sign in with a personal address verify a school address separately: `src/app/auth/school-email/`, `src/app/api/auth/school-email/` (`request`, `confirm`, `confirm-code`), signed with `SCHOOL_EMAIL_VERIFY_SECRET`.
 - Which domains count, and which school system and campus they map to: `src/lib/auth/school-email-domains.ts`, `src/lib/iu/campuses.ts`. `SCHOOL_EMAIL_DOMAINS` can narrow the list but never add to it.
-- The yearly check-in for school-email-only accounts: rules in `src/lib/auth/school-checkin.ts`, the daily job in `src/app/api/cron/school-checkin/`.
+- The yearly school check-in for school-email-only accounts: rules in `src/lib/auth/school-checkin.ts`, the daily job in `src/app/api/cron/school-checkin/` (`src/lib/auth/school-checkin-job.ts`), the person's side in `src/app/api/me/school-checkin/`. It has nothing to do with checking in at an event (section 7).
 - Forgot password works on the sign-in address: `src/app/auth/forgot-password/`, `src/app/api/auth/password-reset/`.
 
 ### After sign-in
@@ -242,9 +258,24 @@ Short notes on how each area works. For file locations use the index in section 
 
 **Feed and posts.** The feed is the main tab of `/campus`. `/feed` is a separate "global feed" page that is off unless `NEXT_PUBLIC_SHOW_GLOBAL_FEED` is `true` (`src/lib/feature-flags.ts`). Posts are published through `POST /api/me/publish-post`; likes, saves, reposts, comments and view counts are under `/api/posts/[id]/`. Tag and trending logic is in `src/lib/posts/` and `src/lib/trending/`.
 
+- **One record per post on screen.** The phone feed card, the open post and the desktop feed row all read and write one like / save / repost / comment-count record in `src/lib/posts/engagement-store.ts`, so a tap in one shows in the others at once. A server read never overwrites a tap that is still in flight. It lives in the tab's memory only.
+- **Reposts.** A post shows one quiet line ("Maya and 6 others reposted"). Tapping it opens "Reposted by", from `GET /api/posts/[id]/reposters`: it names only the people the viewer follows and gives everyone else as a number.
+- **One hashtag rule.** A new post or an edit keeps at most 5 tags, each 2 to 32 of `a-z`, `0-9`, `_` with at least one letter (`isNewPostTag`). `extractPostTags` in `src/lib/posts/edit.ts` reads them from the caption. Both composers and the edit route use it, and `publish-post` ignores the tags a composer sends and reads the caption itself. Older posts keep their stored tags (the looser read rule, `isValidPostTag` in `tags.ts`). Tags are tappable inside the caption. The trending strip shows 5 and needs `TRENDING_MIN_AUTHORS` different people per tag: 1 during the pilot, raised to 2 on launch morning (launch checklist).
+
 **Clubs (orgs).** The code says "org"; the product says "club". Following a club and being a member are different things (`src/lib/orgs/following.ts`, `membership.ts`). Clubs can be hidden; the access rules for hidden clubs are in `src/lib/orgs/hidden-gate.ts` and in a migration. Officer-only actions go through `src/lib/club-routes/officer-guard.ts`.
 
 **Events.** Created by clubs, with RSVP, attendee lists and `.ics` calendar files (`/api/events/[id]/`). A person's own calendar is `/api/me/calendar` and `/api/me/personal-events`.
+
+- **My Calendar** (`src/lib/calendar/`). The colour key: solid coral for Going, a coral outline for Interested, a plain chip with a thin bar in the person's colour for their own entries. The stored RSVP value is still `maybe`; the screen says "Interested". There is no event page yet, so clicking an event opens its club page at that event (`/orgs/<handle>?event=<id>`). `emitCalendarChanged()` in `calendar-sync.ts` tells this page and, over the `vibe-calendar` BroadcastChannel, other tabs and the framed Messages window, so an RSVP made anywhere reaches My Calendar without a reload.
+- **Event check-in** (live since October 19, 2026). An officer taps "Start check-in" and the door screen (`/campus/checkin/<id>/door`) shows a 4-digit code and a QR code that change every 30 seconds. A student checks in by typing the code or opening the QR link, which lands on `/campus/checkin/<id>`. Officers can also tick "Mark as here" for people who said Going or Interested. Check-in is open from an hour before the start to an hour after the end. Officers see who came; everyone else sees only how many, and only from 5 up. Nothing records where a person is or when they checked in. A student can see and remove their own check-ins in Settings ("Event check-ins"). The tables are `event_checkins` (the record) and `event_checkin_sessions` (one secret per open check-in; closing it kills every code shown). Only the database functions write them, and the student's own check-in goes through `event_checkin_self_as`, which only the service role can call, so the route's limit on guesses can't be skipped. The numbers in `event-checkin.ts` mirror the migration, and `checkin-migration.test.ts` keeps them equal.
+- **Tonight and the school calendars.** "What's the vibe tonight?" shows tonight's events: on the desktop Feed as the right-hand panel (with "Your clubs", the newest Board line of each club, on the left; `FeedSideLayout.tsx`), on the phone Feed as one card that opens a sheet, and as a "Tonight" block on both Events tabs. The first item is the school's own featured pick (only Indianapolis's Featured calendar counts as one), else tonight's home game (from 5 PM, or one on now), else the school event on now or starting soonest. Then come the other school events, then club events. Never by popularity (`tonight-view.ts`). Club counts show only from 5. `GET /api/school-events?campus=<id>` reads the school's own public iCal feeds on the server (`src/lib/school-events/sources.ts`, a fixed list a request can't change), each campus only its own: Indianapolis has IU Indy Jaguars athletics (iuindyjags.com) and IU Indianapolis events (events.iu.edu); Bloomington, on since October 19, 2026, has IU Athletics home games (iuhoosiers.com) and IU Bloomington Student Life and Featured (events.iu.edu). A calendar that is down is just missing; the route never answers 500 for it. Other campuses get `school_on: false` and the screens hide every school part.
+- **The school calendars' off switch** (`src/lib/school-events/switch.ts`). Either of two things turns calendars off: the server env value `SCHOOL_EVENTS_OFF` (from the next deploy) or the `public.app_settings` row `school_events_off` (within about 30 seconds, no deploy). `true` turns all off. A list of calendar keys or campus ids (`indianapolis`, `iu-bloomington`) turns only those off: a comma list in the env value, a JSON array in the row (`'["iu-bloomington"]'`). A word the build doesn't know turns nothing off. Nothing set means on. Writing that row is a production write; the SQL and the rollback warning are in the file's header.
+
+**Three things called "check-in".** Keep the names apart in code and in docs:
+
+- **Event check-in:** a student checking in at an event (above). `src/lib/events/event-checkin.ts`, `/api/events/[id]/checkin`, `/api/me/event-checkins`, the `event_checkins` tables.
+- **The yearly school check-in:** once a year, an account that signs in with a school email and has no personal email is sent a code to prove the address still works (section 6). `src/lib/auth/school-checkin.ts`, the daily cron `/api/cron/school-checkin`, `/api/me/school-checkin`.
+- **The usage heartbeat:** a signed-in tab telling `POST /api/me/heartbeat` it is in use, for the use totals (below). Older comments call it "the check-in"; it has nothing to do with either of the others.
 
 **Messages and club chat ("chat v2").** One Messages area holds direct messages, group chats and club rooms. The data and rules are in `src/lib/chat/` (rooms, pins, cards such as polls and sign-ups, read state). The UI polls for new messages (`use-room-poll.ts`). Two per-person switches control the screens, both server-only env values read by `src/lib/chat/flag.ts`:
 
@@ -252,6 +283,8 @@ Short notes on how each area works. For file locations use the index in section 
 - `chat_desktop` (`CHAT_DESKTOP_ENABLED`, `CHAT_DESKTOP_ALLOWLIST`): the React desktop Messages. It needs `chat_v2` too.
 
 A screen learns `chat_v2` from `GET /api/me/features`; the desktop pages get `chat_desktop` as a server prop. The old screens remain as the fallback when a switch is off. The database side of chat is not behind the switches.
+
+**Deleting your own message.** A sender can delete their own message in DMs, group chats, club rooms, event chats and the Board, on phone and desktop. `DELETE /api/me/threads/[id]/messages/[messageId]` calls `src/lib/chat/delete-own.ts`, which makes one database call, `public.delete_own_message`. In one transaction it removes the words, the file's key, a shared post, a card, the reactions, pins, notification rows and unsent phone notifications, and stamps `messages.deleted_at`. The row stays, and a grey "Message deleted" note shows in its place (a message the Vibe team or a club had removed stays hidden from everyone but its author) ("Post deleted" for a Board post, whose replies stay under it; `src/lib/chat/deleted-note.ts`). A database check, `messages_deleted_is_empty`, refuses a deleted row that still holds anything, and a browser login can no longer hard-delete a message through the REST API. The function hands back the file's storage key only when nothing else needs it (no other message uses it, the Vibe team or a club did not remove the message, and no report about it is open or was acted on); the route then deletes the file. Without the migration the route falls back to the old hard delete.
 
 **Network.** People search, follows, mutuals and suggestions.
 
@@ -267,7 +300,7 @@ A screen learns `chat_v2` from `GET /api/me/features`; the desktop pages get `ch
 
 **The page-open tally.** Vibe's own visit counter, with no outside analytics tool. `OpenBeacon` posts once per page load from three pages (`/`, `/waitlist`, `/auth/signup`) to `/api/tally/open`. The table `page_open_tally` holds a day, a page name, a link label and a number, and nothing about the visitor. Its rate limit is keyed on a daily scrambled code, not on an IP address (`src/lib/tally/network-code.ts`).
 
-**The use totals.** How many people use Vibe each day and week, counted as it happens. While a signed-in tab is on screen it checks in at most once every four minutes, from any page: `<ActivityTouch />` in the root layout, its twin `_usageTouch.js` on the static profile, and `countOpen` where Otto and the map are opened (at most once per feature per tab every ten minutes). The check-in posts only a device kind worked out from the screen (phone, desktop, installed) and the open, if any, to `POST /api/me/heartbeat`. The route calls `public.usage_touch` with the service role and the id from `getUser()`; the function refuses anon and authenticated inside. It moves the last-active time forward ("active now") and, on a person's first check-in of a UTC day or Monday week, adds one to the day, school, device, week and sign-up-week rows of `usage_day_tally`. A day's Otto or map opens stop at ten times that day's active people, and an open turned away leaves a mark on the day. The table holds a day, a metric, a key and a number, and nothing about a person; founders and store-review accounts are never counted. Browsers can no longer write the last-active time themselves. The Usage tab reads it through `admin_usage_tally`. The Privacy Policy, section 3d ("Use totals"), says what is counted. "Active now" is shown only from 5 up, because every page checks in: `users_active_count` counts each campus on its own and leaves out any where fewer than 5 people other than the caller are active, or fewer than 5 other than the caller are not (so a campus under 10 people never shows, no list of campuses uncovers a small one, and the caller's own check-in can't either), `/api/stats/campus` floors its answer at 5 too (that covers only what the header prints until the migration is applied), and the campus header drops " · N active now" under 5 (`src/lib/usage/active-now.ts`, Privacy Policy 3d "Last active").
+**The use totals.** How many people use Vibe each day and week, counted as it happens. While a signed-in tab is on screen it sends a heartbeat at most once every four minutes, from any page: `<ActivityTouch />` in the root layout, its twin `_usageTouch.js` on the static profile, and `countOpen` where Otto and the map are opened (at most once per feature per tab every ten minutes). The heartbeat posts only a device kind worked out from the screen (phone, desktop, installed) and the open, if any, to `POST /api/me/heartbeat`. The route calls `public.usage_touch` with the service role and the id from `getUser()`; the function refuses anon and authenticated inside. It moves the last-active time forward ("active now") and, on a person's first heartbeat of a UTC day or Monday week, adds one to the day, school, device, week and sign-up-week rows of `usage_day_tally`. A day's Otto or map opens stop at ten times that day's active people, and an open turned away leaves a mark on the day. The table holds a day, a metric, a key and a number, and nothing about a person; founders and store-review accounts are never counted. Browsers can no longer write the last-active time themselves. The Usage tab reads it through `admin_usage_tally`. The Privacy Policy, section 3d ("Use totals"), says what is counted. "Active now" is shown only from 5 up, because every page sends the heartbeat: `users_active_count` counts each campus on its own and leaves out any where fewer than 5 people other than the caller are active, or fewer than 5 other than the caller are not (so a campus under 10 people never shows, no list of campuses uncovers a small one, and the caller's own heartbeat can't either), `/api/stats/campus` floors its answer at 5 too (that covers only what the header prints until the migration is applied), and the campus header drops " · N active now" under 5 (`src/lib/usage/active-now.ts`, Privacy Policy 3d "Last active").
 
 **Installable app and push.** `public/sw.js` is the service worker; it registers on the production host only, or locally with `NEXT_PUBLIC_SW_DEV=1`. `scripts/pwa/sw-killswitch.js` is the emergency replacement. Push covers browsers (Web Push) and the store apps (FCM) through one pipeline in `src/lib/push/`, off unless `PUSH_ENABLED` is `true`.
 
@@ -284,7 +317,10 @@ A screen learns `chat_v2` from `GET /api/me/features`; the desktop pages get `ch
 - **The living bloom.** The page backdrop is a coral glow (`--feed-backdrop`, `--network-backdrop`). `src/components/bloom/VibeBloom.tsx` makes it drift slowly. Give the page container the `VIBE_BLOOM_HOST` class instead of a background and render `<VibeBloom />` as its first child. With reduced motion it is a still gradient. A wrapper with its own opaque background around the page will hide it; the component's header explains why.
 - **The kinetic wordmark.** `src/components/brand/KineticWordmark.tsx`: the letters of "vibe." land one by one and the dot drops in, once per page load. Used on sign-in, sign-up and the landing bar.
 - **The landing is always Night**, whatever the app theme (`data-theme-lock`, see `theme.ts`). It has its own stylesheet, `src/components/landing/landing.css`.
-- Fonts: Fraunces and DM Sans from Google Fonts, and JetBrains Mono through `next/font`, all set in `src/app/layout.tsx`.
+- **Fonts.** Two faces: Fraunces for titles (with its SOFT axis on every title, upright and italic) and DM Sans for everything else. They come from one Google Fonts link, `GOOGLE_FONTS_HREF` in `src/lib/theme/fonts.ts`, which `src/app/layout.tsx` loads and the three static pages paste (`fonts.test.ts` fails on drift). It asks for weight ranges, not lists, so real bold shows on the static pages too, and bold is never faked (`font-synthesis-weight: none`). A coral accent word inside a bold title stays upright.
+- **The logo's own font file.** The "vibe." wordmark draws from `public/fonts/vibe-wordmark-v1.woff2` (`WORDMARK_FONT_PATH`): Fraunces cut to its five characters, self-hosted, declared in `globals.css` and the static pages, and preloaded on sign-in and sign-up. It is cached for a year, so a re-cut ships under a new name (`-v2`).
+- **JetBrains Mono stays off the app.** It loads only on the landing and the waitlist pages (which share the landing's look), from `src/components/landing/soft-font.ts`, together with the landing's own soft headline face (`fraunces-soft.woff2`). No other page loads it.
+- **Motion** (`src/lib/motion/`). Three springs cover the app: `SPRING_SNAPPY` (taps, toggles), `SPRING_SOFT` (things arriving) and `SPRING_POP` (the like heart). Use those names; don't invent numbers in a component. Animate transform and opacity only, never blur. `MotionRoot`, mounted once in the root layout, makes every Motion animation follow the device's reduce-motion setting. CSS press feedback is `.vibe-press` and `.vibe-toggle` in `globals.css`: the snappy spring sampled into a `linear()` curve (`spring-curve.ts`; change both together), with a plain ease-out on older Safari.
 
 ## 9. Observability
 
@@ -349,6 +385,7 @@ Each of these has broken something, or would, without warning.
 - Vercel Preview builds use the production database. Billing, push and chat switches are Production-only for that reason.
 - The seed scripts refuse any database that is not local. Keep that guard in any new script that writes.
 - Switches that take a list (`CHAT_V2_ALLOWLIST`, `PUSH_ALLOWLIST`) treat blank as nobody and `*` as everybody.
+- `public.app_settings` holds the switches that act without a deploy: `signup_open` (section 6) and `school_events_off` (section 7). Changing either on production is a production database write, so it needs a founder's OK at that moment.
 
 **Repo layout**
 

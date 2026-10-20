@@ -1,7 +1,7 @@
 # Vibe
 
 Vibe is a campus social app for students and clubs at the shared IU and Purdue campus in Indianapolis.
-Students sign up with a school email, follow and join clubs, post to a campus feed, RSVP to events and message each other and their clubs.
+Students sign up with a school email, follow and join clubs, post to a campus feed, RSVP to events and check in at the door, see what's on tonight from their clubs and the school's own calendars, and message each other and their clubs.
 The live site is https://www.connectvibe.app, run by CONNECTVIBE. LLC.
 
 This README is the map. How the pieces work is in [ARCHITECTURE.md](ARCHITECTURE.md).
@@ -19,6 +19,7 @@ This README is the map. How the pieces work is in [ARCHITECTURE.md](ARCHITECTURE
 | Email | Resend | `src/lib/resend.ts`, `src/lib/email/` |
 | Error reports | Sentry | `src/instrumentation*.ts`, `src/sentry.*.config.ts`, `src/lib/sentry-config.ts` |
 | Payments (Vibe+) | Stripe. Built, switched off in production | `src/lib/billing/` |
+| School and athletics calendars ("What's the vibe tonight?") | Public iCal feeds from iuindyjags.com and events.iu.edu (Indianapolis) and iuhoosiers.com and events.iu.edu (Bloomington), read on the server, never from the browser | `src/lib/school-events/` |
 | Store apps | Capacitor shell that opens the live site | `mobile/` (see `mobile/README.md`) |
 
 > This Next.js version differs from older ones. Read `AGENTS.md` first.
@@ -62,8 +63,9 @@ The minimum to run against the local stack:
 | `SCHOOL_EMAIL_VERIFY_SECRET` | Signs school-email verification tokens (16 characters or more) |
 | `NEXT_PUBLIC_SITE_URL` | The site's own address, used in email links |
 
-Optional groups, all described in `.env.example`: `R2_*` (video and chat media), `RESEND_API_KEY` and `RESEND_FROM` (email), `NEXT_PUBLIC_SENTRY_DSN`, `NEXT_PUBLIC_TURNSTILE_SITE_KEY`, `STRIPE_*` and `BILLING_ENABLED`, `PUSH_*` / `VAPID_*` / `FCM_SERVICE_ACCOUNT_B64`, `CHAT_V2_*` and `CHAT_DESKTOP_*`, `RESTRICTION_PEPPER`, `CRON_SECRET`, `WAITLIST_*`.
+Optional groups, all described in `.env.example`: `R2_*` (video and chat media), `RESEND_API_KEY` and `RESEND_FROM` (email), `NEXT_PUBLIC_SENTRY_DSN`, `NEXT_PUBLIC_TURNSTILE_SITE_KEY`, `STRIPE_*` and `BILLING_ENABLED`, `PUSH_*` / `VAPID_*` / `FCM_SERVICE_ACCOUNT_B64`, `CHAT_V2_*` and `CHAT_DESKTOP_*`, `RESTRICTION_PEPPER`, `CRON_SECRET`, `WAITLIST_*`, `SCHOOL_EVENTS_OFF` and `SCHOOL_EVENTS_FIXTURES`.
 Without a Resend key the dev server sends no email. Without a Turnstile key there is no box and local sign-in works as is.
+The school calendars are on unless something turns them off: `SCHOOL_EVENTS_OFF` (server only, from the next deploy; `true`, or a comma list of calendar keys or campus ids) or the `app_settings` row `school_events_off`, which acts without a deploy (rules in `src/lib/school-events/switch.ts`). In `next dev`, `SCHOOL_EVENTS_FIXTURES=1` reads saved copies from `src/lib/school-events/fixtures/` instead of the live sites, and `fail` shows the screens with every calendar down.
 
 ### Checks
 

@@ -15,7 +15,7 @@
  *     Back on:
  *       delete from public.app_settings where key = 'school_events_off';
  *     Before rolling production back to a build older than this rule
- *     (9117dc6 or before), delete a row that holds a Bloomington word: that
+ *     (a3215a1; 7c35593 or before), delete a row that holds a Bloomington word: that
  *     build reads an unknown word as "everything off", Indy included.
  *
  * The words a list understands (Oct 19, 2026): a calendar key

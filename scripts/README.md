@@ -25,9 +25,18 @@ Each file starts with a long comment that is the real manual: read it before run
 
 | Folder | What is in it |
 |---|---|
-| `sql/` | SQL checks for specific migrations (chat rooms, cards, pins, the waitlist gate) and two read-only counts. Most are local only, write and roll back test rows, and refuse a non-local connection. Each file's first lines say which kind it is and give the exact command |
+| `sql/` | SQL checks for specific migrations (chat rooms, cards, pins, the waitlist gate, event check-in, the "Message deleted" note) and two read-only counts. Most are local only, write and roll back test rows, and refuse a non-local connection. Each file's first lines say which kind it is and give the exact command |
 | `pwa/` | `sw-killswitch.js`: the emergency replacement for `public/sw.js`. It is not served from here. The drill is in its header |
 | `demo-video/` | The recorder for the landing page's demo film. Local only. See `demo-video/README.md` |
+
+### The two newest SQL checks (October 19, 2026)
+
+Both are local only. Each runs in one transaction that ends in `ROLLBACK`, refuses any connection that is not the local socket, and ends with `all N cases passed`. Apply the migration to the local stack first, and run one check at a time (not beside another check or the seed).
+
+| File | What it checks | How to run it |
+|---|---|---|
+| `sql/event-checkins-check.sql` | Event check-in (`20261019120000_event_checkins.sql`): starting and stopping check-in, the 30-second codes and QR links, who may check in and when, "Mark as here", the count from 5 up, the table's policies, removing one or all, and a student's own list | `docker exec -i supabase_db_vibe psql -U postgres -d postgres -v ON_ERROR_STOP=1 < scripts/sql/event-checkins-check.sql` |
+| `sql/message-deleted-note-check.sql` | Deleting your own message (`20261019150000_message_deleted_note.sql`): what goes and what stays, when the file is kept, a Board post's replies, someone else's message, no hard delete from a browser login, and that a deleted row can't hold words | `docker exec -i supabase_db_vibe psql -U postgres -d postgres -v ON_ERROR_STOP=1 < scripts/sql/message-deleted-note-check.sql` |
 
 ## Rules for a new script
 

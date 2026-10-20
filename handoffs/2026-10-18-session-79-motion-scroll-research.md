@@ -1,6 +1,8 @@
 # Session 79 (Oct 18, 2026): the motion pass, per-tab scroll, and the sponsor research
 
-Read this first in session 80. The S78 close (`2026-10-18-session-78-close-and-next-up.md`) still holds for
+**Session 80: read `2026-10-19-session-79-close-checkin-and-critique.md` first** (event check-in, the
+17-item critique, the doc update, the open calls); this file still holds for motion, scroll, research,
+the side space, fonts and Tonight. The S78 close (`2026-10-18-session-78-close-and-next-up.md`) still holds for
 the older owed items.
 
 **Where things stand.** Main is `d4bffc2`, deployed (Vercel success; the live CSS carries the new press
