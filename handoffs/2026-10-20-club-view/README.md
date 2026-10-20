@@ -5,6 +5,7 @@ see and do in Vibe, phone and desktop. Board first, no building; Franky picks.
 
 - **The board (private Design canvas):** https://claude.ai/artifact/FZQgjLYfoBojmPFuKF3NKe
 - **Decisions:** `DECISIONS.md`.
+- **Build order:** `BUILD-ORDER.md` (four waves before launch night, then weeks 1 to 3; the cut order if late). Also the `R2_Build` board.
 - **Start on `Main`:** the four options, the pick (B, with D's event card and the share kit) and 11 calls, each with a recommendation.
 - **What exists today, with file references:** `INVENTORY.md` (and the `Today` board).
 - **The builders' brief:** `SPEC.md` (sample club, look, rules, the three jobs).
