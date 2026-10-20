@@ -1,0 +1,245 @@
+{
+ "v": 3,
+ "createdOnFiles": {
+  "v": 1,
+  "at": "2026-10-20T22:40:00Z"
+ },
+ "title": "The club's view",
+ "launch": {
+  "view": "canvas"
+ },
+ "pages": [],
+ "boards": {
+  "Main.dc.html": {
+   "x": 0,
+   "y": 0,
+   "w": 1440,
+   "h": 3740,
+   "expand": "fill",
+   "title": "Start here: options, my pick, your calls"
+  },
+  "Today.dc.html": {
+   "x": 1760,
+   "y": 0,
+   "w": 1440,
+   "h": 1400,
+   "expand": "fill",
+   "title": "Where officers are today (from the code)"
+  },
+  "Paths.dc.html": {
+   "x": 3280,
+   "y": 0,
+   "w": 1440,
+   "h": 1180,
+   "expand": "fill",
+   "title": "Three officer jobs, today vs shortest"
+  },
+  "A_Desk_Phone.dc.html": {
+   "x": 1760,
+   "y": 1800,
+   "w": 390,
+   "h": 1240,
+   "title": "A · Officer desk · phone"
+  },
+  "A_Desk_Desktop.dc.html": {
+   "x": 2230,
+   "y": 1800,
+   "w": 1440,
+   "h": 1080,
+   "expand": "fill",
+   "title": "A · Officer desk · desktop"
+  },
+  "B_Board_Phone.dc.html": {
+   "x": 1760,
+   "y": 3400,
+   "w": 390,
+   "h": 1240,
+   "title": "B · The Board, officer view · phone"
+  },
+  "B_Board_Tools.dc.html": {
+   "x": 2230,
+   "y": 3400,
+   "w": 390,
+   "h": 844,
+   "title": "B · Club tools sheet (⋯) · phone"
+  },
+  "B_Board_Desktop.dc.html": {
+   "x": 2700,
+   "y": 3400,
+   "w": 1440,
+   "h": 960,
+   "expand": "fill",
+   "title": "B · Messages with the officer panel · desktop"
+  },
+  "C_Page_Phone.dc.html": {
+   "x": 1760,
+   "y": 5000,
+   "w": 390,
+   "h": 1240,
+   "title": "C · The club page, officer view · phone"
+  },
+  "C_Page_Desktop.dc.html": {
+   "x": 2230,
+   "y": 5000,
+   "w": 1440,
+   "h": 1000,
+   "expand": "fill",
+   "title": "C · The club page, officer view · desktop"
+  },
+  "D_Week_Phone.dc.html": {
+   "x": 1760,
+   "y": 6600,
+   "w": 390,
+   "h": 1240,
+   "title": "D · The club's week · phone"
+  },
+  "D_Week_Desktop.dc.html": {
+   "x": 2230,
+   "y": 6600,
+   "w": 1440,
+   "h": 1000,
+   "expand": "fill",
+   "title": "D · The club's week · desktop"
+  },
+  "M_Share_Sheet.dc.html": {
+   "x": 1760,
+   "y": 8200,
+   "w": 390,
+   "h": 844,
+   "title": "Share the club · phone"
+  },
+  "M_Invite_Sheet.dc.html": {
+   "x": 2230,
+   "y": 8200,
+   "w": 390,
+   "h": 844,
+   "title": "Invite your members · phone"
+  },
+  "M_Cards.dc.html": {
+   "x": 2700,
+   "y": 8200,
+   "w": 1440,
+   "h": 900,
+   "title": "Story cards and the table QR"
+  },
+  "Pick_UpNext.dc.html": {
+   "x": 0,
+   "y": 4040,
+   "w": 1440,
+   "h": 760,
+   "title": "My pick up close: B's Up next with D's steps"
+  }
+ },
+ "order": [
+  "Main.dc.html",
+  "Today.dc.html",
+  "Paths.dc.html",
+  "Pick_UpNext.dc.html",
+  "A_Desk_Phone.dc.html",
+  "A_Desk_Desktop.dc.html",
+  "B_Board_Phone.dc.html",
+  "B_Board_Tools.dc.html",
+  "B_Board_Desktop.dc.html",
+  "C_Page_Phone.dc.html",
+  "C_Page_Desktop.dc.html",
+  "D_Week_Phone.dc.html",
+  "D_Week_Desktop.dc.html",
+  "M_Share_Sheet.dc.html",
+  "M_Invite_Sheet.dc.html",
+  "M_Cards.dc.html"
+ ],
+ "notes": {
+  "t_start": {
+   "x": 0,
+   "y": -260,
+   "text": "Start here.",
+   "kind": "title1",
+   "maxW": 1440
+  },
+  "t_today": {
+   "x": 1760,
+   "y": -260,
+   "text": "Today, and the three jobs.",
+   "kind": "title1",
+   "maxW": 2960
+  },
+  "t_a": {
+   "x": 1760,
+   "y": 1540,
+   "text": "A · Officer desk.",
+   "kind": "title1",
+   "maxW": 1910
+  },
+  "t_b": {
+   "x": 1760,
+   "y": 3140,
+   "text": "B · Run it from the Board. My pick.",
+   "kind": "title1",
+   "maxW": 2380
+  },
+  "t_c": {
+   "x": 1760,
+   "y": 4740,
+   "text": "C · Your page is the storefront.",
+   "kind": "title1",
+   "maxW": 1910
+  },
+  "t_d": {
+   "x": 1760,
+   "y": 6340,
+   "text": "D · The club's week.",
+   "kind": "title1",
+   "maxW": 1910
+  },
+  "t_m": {
+   "x": 1760,
+   "y": 7940,
+   "text": "Share and invite: how clubs market for us.",
+   "kind": "title1",
+   "maxW": 2380
+  },
+  "s_a": {
+   "x": 3750,
+   "y": 1800,
+   "w": 360,
+   "fill": "gray",
+   "text": "Good for: the president's setup; one place for everything.\n\nCosts: a new place to find (a \"Your club\" item in the nav), apart from where officers talk.\n\nSize: medium."
+  },
+  "s_b": {
+   "x": 4220,
+   "y": 3400,
+   "w": 360,
+   "fill": "orange",
+   "text": "My pick, with D's event stages on Up next and the share kit.\n\nGood for: daily running; phone officers finally get members, followers and requests (the Club tools sheet).\n\nCosts: setup and numbers are tighter; the public page stays separate.\n\nSize: smallest."
+  },
+  "s_c": {
+   "x": 3750,
+   "y": 5000,
+   "w": 360,
+   "fill": "gray",
+   "text": "Good for: setup and marketing; what officers make is what visitors see. Events tab first.\n\nCosts: running the night (check-in, posting) still means going to Messages.\n\nSize: medium."
+  },
+  "s_d": {
+   "x": 3750,
+   "y": 6600,
+   "w": 360,
+   "fill": "gray",
+   "text": "Good for: event-led clubs; each event shows its next step, from posted to thank-you.\n\nCosts: clubs that mostly talk get less; the biggest build.\n\nSize: largest."
+  },
+  "s_m": {
+   "x": 4220,
+   "y": 8200,
+   "w": 360,
+   "fill": "gray",
+   "text": "Shared by every option.\n\nThe members' link (call 3) and the story cards (call 7) are new: both need your yes. Cards carry no names or faces, and a count shows only from 5 up."
+  },
+  "t_pick": {
+   "x": 0,
+   "y": 3800,
+   "text": "My pick, up close.",
+   "kind": "title1",
+   "maxW": 1440
+  }
+ },
+ "designSystems": []
+}

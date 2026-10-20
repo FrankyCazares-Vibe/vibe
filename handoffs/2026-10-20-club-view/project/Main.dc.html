@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>The club's view</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,300..800;1,400&amp;family=Fraunces:ital,wght,SOFT@0,400..900,100;1,400,100&amp;display=swap">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{margin:0;font-family:"DM Sans",system-ui,sans-serif;-webkit-font-smoothing:antialiased;background:#0C0B0B}
+a{color:inherit;text-decoration:none}
+a:hover{color:inherit}
+</style>
+</helmet>
+<div style="min-height: 3740px; position: relative; isolation: isolate; background: #0C0B0B; color: #F6F1EA; font-family: 'DM Sans', system-ui, sans-serif; padding: 64px 24px 72px">
+  <div aria-hidden="true" style="position: absolute; inset: 0; z-index: -1; pointer-events: none; background: radial-gradient(900px 760px at 0% 0%, rgba(255,92,53,0.30), rgba(255,92,53,0.06) 45%, transparent 70%), radial-gradient(560px 420px at 100% 60%, rgba(255,92,53,0.12), transparent 60%)"></div>
+  <div style="max-width: 1240px; margin: 0 auto; display: flex; flex-direction: column; gap: 48px">
+
+    <header style="display: flex; flex-direction: column; gap: 14px; max-width: 920px">
+      <div style="font-size: 12px; letter-spacing: 0.14em; text-transform: uppercase; color: #CFC8BE"><span style="color: #FF5C35">●</span> Design board · Oct 20 · nothing built yet</div>
+      <h1 style="font-family: Fraunces, serif; font-weight: 900; font-size: 84px; letter-spacing: -0.035em; line-height: 0.98">The <span style="color: #FF5C35">club’s</span> view.</h1>
+      <p style="font-size: 20px; line-height: 1.5; color: #CFC8BE">What a club’s officers see and do on Vibe, on the phone and on a laptop. Four options, each built on the same three officer jobs. Pick one, then answer the calls at the bottom. The club and people are invented.</p>
+    </header>
+
+    <section aria-label="From Parker" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(270px, 100%), 1fr)); gap: 12px">
+      <sc-for list="{{heard}}" as="h" hint-placeholder-count="4">
+        <div style="border-top: 2px solid rgba(255,92,53,0.6); padding-top: 12px; display: flex; flex-direction: column; gap: 4px">
+          <div style="font-family: Fraunces, serif; font-weight: 800; font-size: 19px; letter-spacing: -0.02em; line-height: 1.2">{{h.t}}</div>
+          <div style="font-size: 14.5px; line-height: 1.45; color: #CFC8BE">{{h.d}}</div>
+        </div>
+      </sc-for>
+    </section>
+
+    <section aria-label="The four options" style="display: flex; flex-direction: column; gap: 16px">
+      <h2 style="font-family: Fraunces, serif; font-weight: 800; font-size: 40px; letter-spacing: -0.03em">Four ways to run a club.</h2>
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(560px, 100%), 1fr)); gap: 14px">
+        <sc-for list="{{options}}" as="o" hint-placeholder-count="4">
+          <article style="border-radius: 18px; background: rgba(22,21,21,0.88); border: 1px solid {{o.border}}; padding: 22px; display: flex; flex-direction: column; gap: 14px">
+            <div style="display: flex; align-items: center; gap: 12px">
+              <div style="width: 44px; height: 44px; border-radius: 12px; background: rgba(255,255,255,0.06); display: flex; align-items: center; justify-content: center; font-family: Fraunces, serif; font-weight: 900; font-size: 22px">{{o.letter}}</div>
+              <h3 style="flex: 1; font-family: Fraunces, serif; font-weight: 800; font-size: 25px; letter-spacing: -0.02em; line-height: 1.1">{{o.name}}</h3>
+              <sc-if value="{{o.pick}}" hint-placeholder-val="{{false}}">
+                <div style="height: 30px; padding: 0 12px; border-radius: 999px; background: #FF5C35; color: #160A06; font-size: 13px; font-weight: 700; display: flex; align-items: center">My pick</div>
+              </sc-if>
+            </div>
+            <p style="font-size: 16px; line-height: 1.45; color: #E4DDD3">{{o.line}}</p>
+            <dl style="display: grid; grid-template-columns: 116px minmax(0, 1fr); gap: 8px 14px; font-size: 14.5px; line-height: 1.4">
+              <dt style="color: #9C958C">First screen</dt><dd style="color: #E4DDD3">{{o.first}}</dd>
+              <dt style="color: #9C958C">Behind a tap</dt><dd style="color: #E4DDD3">{{o.behind}}</dd>
+              <dt style="color: #9C958C">Good for</dt><dd style="color: #E4DDD3">{{o.good}}</dd>
+              <dt style="color: #9C958C">Costs</dt><dd style="color: #E4DDD3">{{o.cost}}</dd>
+              <dt style="color: #9C958C">Size</dt><dd style="color: #FF8A66">{{o.size}}</dd>
+            </dl>
+          </article>
+        </sc-for>
+      </div>
+      <p style="font-size: 14.5px; color: #9C958C">Every option shares the same Share and Invite pieces (the last row of the canvas). Nothing is taken away in any of them; moved things say where they went.</p>
+    </section>
+
+    <section aria-label="My pick" style="border-radius: 22px; padding: 28px; background: rgba(22,21,21,0.92); border: 1px solid rgba(255,92,53,0.5); box-shadow: 0 0 40px rgba(255,92,53,0.16); display: flex; flex-direction: column; gap: 14px">
+      <div style="font-size: 13px; color: #FF8A66; font-weight: 600">My pick</div>
+      <h2 style="font-family: Fraunces, serif; font-weight: 800; font-size: 36px; letter-spacing: -0.03em; line-height: 1.1">B, with D’s event card and the share kit.</h2>
+      <ul style="list-style: none; display: flex; flex-direction: column; gap: 8px; font-size: 16.5px; line-height: 1.5; color: #E4DDD3; max-width: 980px">
+        <li>· Officers already live in the club’s space in Messages. B puts the tools there, so nobody learns a new place, and members see the same Board they always did.</li>
+        <li>· D’s event card (posted, going, check-in, who came, thank-you) goes on B’s Up next. That one card is Noor’s whole job.</li>
+        <li>· The share kit is how clubs market for us: a link, a story card, a table QR and a members’ link.</li>
+        <li>· It is the smallest build before Oct 29: it grows screens that exist. A’s desk can come later on desktop if bigger clubs ask for it.</li>
+      </ul>
+      <p style="font-size: 14.5px; color: #9C958C">Up close on the board under this one: the same card on Monday, at the door, and after the night.</p>
+    </section>
+
+    <section aria-label="Every option needs" style="display: flex; flex-direction: column; gap: 14px">
+      <h2 style="font-family: Fraunces, serif; font-weight: 800; font-size: 32px; letter-spacing: -0.03em">Whatever you pick, these come with it.</h2>
+      <ol style="list-style: none; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(380px, 100%), 1fr)); gap: 10px">
+        <sc-for list="{{needs}}" as="n" hint-placeholder-count="7">
+          <li style="border-radius: 14px; background: rgba(22,21,21,0.86); border: 1px solid rgba(255,255,255,0.07); padding: 14px 16px; display: flex; gap: 12px; font-size: 15px; line-height: 1.45">
+            <span style="font-family: Fraunces, serif; font-weight: 800; color: #FF8A66; width: 18px; flex-shrink: 0">{{n.n}}</span>
+            <span>{{n.t}}</span>
+          </li>
+        </sc-for>
+      </ol>
+    </section>
+
+    <section aria-label="Calls" style="display: flex; flex-direction: column; gap: 14px">
+      <h2 style="font-family: Fraunces, serif; font-weight: 800; font-size: 40px; letter-spacing: -0.03em">Your calls.</h2>
+      <p style="font-size: 16px; color: #CFC8BE">Each has my recommendation. One word back per call is enough.</p>
+      <ol style="list-style: none; display: flex; flex-direction: column">
+        <sc-for list="{{calls}}" as="c" hint-placeholder-count="10">
+          <li style="display: grid; grid-template-columns: 44px minmax(0, 1fr); gap: 4px 12px; padding: 18px 0; border-bottom: 1px solid rgba(255,255,255,0.08)">
+            <div style="font-family: Fraunces, serif; font-weight: 800; font-size: 26px; color: #FF8A66; line-height: 1.1">{{c.n}}</div>
+            <div style="display: flex; flex-direction: column; gap: 6px">
+              <div style="font-family: Fraunces, serif; font-weight: 800; font-size: 21px; letter-spacing: -0.02em; line-height: 1.25">{{c.q}}</div>
+              <div style="font-size: 15px; line-height: 1.45; color: #9C958C"><span style="color: #CFC8BE">Today:</span> {{c.today}}</div>
+              <div style="font-size: 15.5px; line-height: 1.45; color: #F6F1EA"><span style="color: #FF8A66; font-weight: 600">Recommend:</span> {{c.rec}}</div>
+            </div>
+          </li>
+        </sc-for>
+      </ol>
+    </section>
+
+    <footer style="font-size: 13.5px; line-height: 1.5; color: #9C958C; max-width: 920px">Rules held on every board: counts show from 5 up and names stay with officers; Otto is a notifications list, never shown as an AI; “video posts”, never clips; no school names or marks; nothing removed without your call. Read from the code on Oct 20; the Today board has the detail.</footer>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":3740}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const plain = 'rgba(255,255,255,0.07)';
+    return {
+      heard: [
+        { t: 'Clubs first.', d: 'Twenty clubs on Vibe before students are invited.' },
+        { t: 'Members become users.', d: 'Clubs want to reach the members they already have. Give them the tool.' },
+        { t: 'One goal at a time.', d: 'People open the app for one thing. Map each job and cut what’s off the path.' },
+        { t: 'Let clubs market for you.', d: 'A club sharing its page is our best ad.' }
+      ],
+      options: [
+        { letter: 'A', name: 'Officer desk', pick: false, border: plain, line: 'A separate page just for officers: what needs you, the setup list, the next event, quick actions and this week’s numbers.', first: 'Needs you, setup, Up next with Start check-in, four quick actions, three numbers', behind: 'Members, followers, officers and titles, past events, settings', good: 'Clearest for the president; one place for everything', cost: 'A new place to find (a “Your club” item in the nav), apart from where officers talk', size: 'Medium' },
+        { letter: 'B', name: 'Run it from the Board', pick: true, border: 'rgba(255,92,53,0.55)', line: 'No new page. The club’s space in Messages gains officer tools where officers already post and talk.', first: 'An officer line (requests, new followers), Up next with Start check-in, the setup card, the Board with Post · Event · Poll', behind: 'Club tools sheet: share, invite, requests, members, followers, officers, edit page, past events, settings', good: 'Daily running; members and officers in one place; phone officers finally get the tools', cost: 'Setup and numbers are tighter; the public page stays a separate place', size: 'Smallest' },
+        { letter: 'C', name: 'Your page is the storefront', pick: false, border: plain, line: 'The public club page is the officer’s home, edited in place like your own profile, with Share up front.', first: 'Edit page, Share page, +, an officer numbers line, setup, Events first', behind: 'The Board and chat stay in Messages; settings behind Edit page', good: 'Setup and marketing: what officers make is exactly what visitors see', cost: 'Running the night (check-in, posting) still means going to Messages', size: 'Medium' },
+        { letter: 'D', name: 'The club’s week', pick: false, border: plain, line: 'The home is a timeline of the club’s events, each showing where it is: posted, going, check-in, who came, thank-you.', first: '+ New event, this week’s events on a timeline, the current step’s button', behind: 'Board and People tabs; last week’s “who came”', good: 'Event-led clubs; matches what students come for', cost: 'Clubs that mostly talk get less; the biggest build', size: 'Largest' }
+      ],
+      needs: [
+        { n: '1', t: 'Start a club on the phone, and land on the new club with its setup list.' },
+        { n: '2', t: 'Make an event from the phone and from the club’s space, not only Campus on a laptop.' },
+        { n: '3', t: 'Start check-in from Up next and the event chat, not only the Events tab.' },
+        { n: '4', t: 'One club settings place on the phone: members, followers, requests, titles, the Board switch.' },
+        { n: '5', t: 'Tell officers about join requests, mods included.' },
+        { n: '6', t: 'A Share button on the club and on every event.' },
+        { n: '7', t: 'Fix the Board line “Everyone in the club sees this”: followers read it too.' }
+      ],
+      calls: [
+        { n: '1', q: 'Which home: A, B, C or D?', today: 'tools are in five places, most on a laptop.', rec: 'B, with D’s event card and the share kit. A on desktop later if clubs ask.' },
+        { n: '2', q: 'What can a mod do?', today: 'a mod can’t post on the Board, start check-in or reach join requests.', rec: 'mods post on the Board, run check-in and see requests. Settings, roles and deleting stay with the owner and admins.' },
+        { n: '3', q: 'A members’ link that gets past the waitlist?', today: 'invite links are off (one person at a time) and sign-up needs a one-person code.', rec: 'yes. One link per checked club; it lets the person in and asks them to join; officers can turn it off; it ends after 3 weeks; officers see only how many joined. Needs a line in the Privacy Policy.' },
+        { n: '4', q: 'How does a new club get checked?', today: 'a Vibe admin verifies it before events and invites work, and the club isn’t told.', rec: 'we check the first 20 in person while setting them up. The setup list shows the step, with “Ask Vibe to check” for anyone else.' },
+        { n: '5', q: 'Flyers on the Board?', today: 'photos are off in every club room.', rec: 'yes: officers can add one picture to a Board post. The Lounge stays text for now.' },
+        { n: '6', q: 'How do members hear about posts and events?', today: 'no notice for either; members see an unread dot, followers nothing.', rec: 'a notice in the notifications list (the Otto page) now; a phone push when Apple accepts the app. At most one a day per club; followers get new events only.' },
+        { n: '7', q: 'The share kit?', today: 'no share button, a generic link picture, no page for an event.', rec: 'yes to all four: the club’s own link picture, three story cards (club, event, after), a table QR, and a page for each event. Made from what the club posted; no names or faces; counts from 5.' },
+        { n: '8', q: 'Does the club page open on Events?', today: 'the phone page opens on Posts.', rec: 'yes, Events first for everyone. Posts stays one tap away.' },
+        { n: '9', q: 'Which numbers do officers get?', today: 'scattered, and the follower count under 5 is hidden even from officers.', rec: 'exact followers, members, going and who came, with this week’s change. No “seen by” on posts: that is new data about people.' },
+        { n: '10', q: 'Handing the club to next year’s president?', today: 'not possible (“coming soon”).', rec: 'build it after launch, before spring officer elections.' },
+        { n: '11', q: 'Phone or laptop first?', today: 'most tools need a laptop.', rec: 'phone first for running the club (post, check-in, requests). Laptop for setup, the members list and the door screen on a TV.' }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

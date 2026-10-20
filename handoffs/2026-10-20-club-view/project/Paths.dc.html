@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Three officer jobs</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,300..800;1,400&amp;family=Fraunces:ital,wght,SOFT@0,400..900,100;1,400,100&amp;display=swap">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{margin:0;font-family:"DM Sans",system-ui,sans-serif;-webkit-font-smoothing:antialiased;background:#0C0B0B}
+a{color:inherit;text-decoration:none}
+a:hover{color:inherit}
+</style>
+</helmet>
+<div style="min-height: 1180px; position: relative; isolation: isolate; background: #0C0B0B; color: #F6F1EA; font-family: 'DM Sans', system-ui, sans-serif; padding: 56px 24px 64px">
+  <div aria-hidden="true" style="position: absolute; inset: 0; z-index: -1; pointer-events: none; background: radial-gradient(720px 620px at 0% 100%, rgba(255,92,53,0.30), rgba(255,92,53,0.06) 40%, transparent 68%)"></div>
+  <div style="max-width: 1320px; margin: 0 auto; display: flex; flex-direction: column; gap: 32px">
+    <header style="display: flex; flex-direction: column; gap: 10px; max-width: 900px">
+      <div style="font-size: 12px; letter-spacing: 0.14em; text-transform: uppercase; color: #CFC8BE"><span style="color: #FF5C35">●</span> One goal at a time</div>
+      <h1 style="font-family: Fraunces, serif; font-weight: 800; font-size: 52px; letter-spacing: -0.03em; line-height: 1.02">Three officer jobs.</h1>
+      <p style="font-size: 18px; line-height: 1.5; color: #CFC8BE">Each officer opens Vibe for one thing. Here is each job today, and the shortest path every option below is built on. Invented people, one sample club: Sixty-Four Chess.</p>
+    </header>
+
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(400px, 100%), 1fr)); gap: 16px; align-items: start">
+      <sc-for list="{{people}}" as="p" hint-placeholder-count="3">
+        <section style="border-radius: 18px; background: rgba(22,21,21,0.86); border: 1px solid rgba(255,255,255,0.07); padding: 22px; display: flex; flex-direction: column; gap: 18px">
+          <div style="display: flex; align-items: center; gap: 12px">
+            <div aria-hidden="true" style="width: 48px; height: 48px; border-radius: 999px; background: {{p.color}}; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 16px; color: #0C0B0B; flex-shrink: 0">{{p.initials}}</div>
+            <div style="display: flex; flex-direction: column">
+              <h2 style="font-family: Fraunces, serif; font-weight: 800; font-size: 22px; letter-spacing: -0.02em; line-height: 1.15">{{p.name}}</h2>
+              <div style="font-size: 14px; color: #CFC8BE">{{p.role}}</div>
+            </div>
+          </div>
+          <p style="font-family: Fraunces, serif; font-weight: 400; font-style: italic; font-size: 20px; line-height: 1.3; color: #F6F1EA">“{{p.goal}}”</p>
+
+          <div style="display: flex; flex-direction: column; gap: 8px">
+            <div style="display: flex; align-items: baseline; justify-content: space-between"><h3 style="font-size: 13px; letter-spacing: 0.1em; text-transform: uppercase; color: #9C958C; font-weight: 600">Today</h3><div style="font-size: 13px; color: #FF8A66">{{p.todayCount}}</div></div>
+            <ol style="list-style: none; display: flex; flex-direction: column; gap: 6px">
+              <sc-for list="{{p.today}}" as="s" hint-placeholder-count="6">
+                <li style="display: flex; gap: 10px; font-size: 14.5px; line-height: 1.4; color: {{s.ink}}">
+                  <span aria-hidden="true" style="width: 8px; height: 8px; border-radius: 999px; margin-top: 7px; flex-shrink: 0; background: {{s.dot}}"></span>
+                  <span>{{s.t}}</span>
+                </li>
+              </sc-for>
+            </ol>
+          </div>
+
+          <div style="display: flex; flex-direction: column; gap: 10px; padding-top: 14px; border-top: 1px solid rgba(255,255,255,0.08)">
+            <div style="display: flex; align-items: baseline; justify-content: space-between"><h3 style="font-size: 13px; letter-spacing: 0.1em; text-transform: uppercase; color: #F6F1EA; font-weight: 600">Shortest path</h3><div style="font-size: 13px; color: #6FDB9A">{{p.newCount}}</div></div>
+            <ol style="list-style: none; display: flex; flex-direction: column; gap: 6px">
+              <sc-for list="{{p.next}}" as="s" hint-placeholder-count="5">
+                <li style="display: flex; align-items: center; gap: 10px; min-height: 40px; padding: 8px 12px; border-radius: 12px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.07); font-size: 14.5px; line-height: 1.35">
+                  <span style="font-family: Fraunces, serif; font-weight: 800; color: #FF8A66; width: 16px; flex-shrink: 0">{{s.n}}</span>
+                  <span>{{s.t}}</span>
+                </li>
+              </sc-for>
+            </ol>
+          </div>
+        </section>
+      </sc-for>
+    </div>
+
+    <p style="font-size: 15px; line-height: 1.5; color: #9C958C; max-width: 900px"><span style="color: #FF8A66">●</span> a step that breaks or needs a laptop today. Theo is a mod on purpose: most social chairs won’t be admins, and today a mod can’t post on the Board (call 2 on the first board).</p>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1180}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const ok = (t) => ({ t, ink: '#CFC8BE', dot: 'rgba(246,241,234,0.3)' });
+    const bad = (t) => ({ t, ink: '#F6F1EA', dot: '#FF5C35' });
+    const n = (list) => list.map((t, i) => ({ n: String(i + 1), t }));
+    return {
+      people: [
+        {
+          name: 'Priya Raman', role: 'President · Owner · new to Vibe', initials: 'PR', color: '#E8B26A',
+          goal: 'Get my club on Vibe so our members can find us.',
+          todayCount: '7 steps, 2 walls',
+          today: [
+            bad('On the phone, “Start a club” leads to a list. She needs a laptop.'),
+            ok('Desktop pop-up: name, handle, about, who can join. No photo step.'),
+            bad('It closes and leaves her on Campus. She finds the club under Clubs › Yours.'),
+            ok('Club page officer bar: Logo, Banner, Edit details.'),
+            bad('Officers and titles: Messages › the club › Manage club › Members.'),
+            bad('Invite and first event: blocked until Vibe verifies the club. The hint is “Message Vibe”.'),
+            ok('Then invites go one person at a time.')
+          ],
+          newCount: 'one screen, about 5 minutes',
+          next: n(['Start a club, on the phone or a laptop', 'Land on the new club with its setup list', 'Photo and cover, one line about, who can join, officers', 'Vibe checks the club: in person for the first 20', 'Post the first event, then share the members’ link'])
+        },
+        {
+          name: 'Noor Haddad', role: 'Events chair · Admin', initials: 'NH', color: '#96BAFF',
+          goal: 'Post Thursday’s night, get people there, and know who came.',
+          todayCount: '4 places, check-in 3 taps and a scroll',
+          today: [
+            bad('Create the event on desktop Campus › Events or the club page. Not on the phone Events tab.'),
+            ok('No cover picture. Then share it into the Board by hand from the + tray.'),
+            bad('No link to post outside Vibe. An event has no page of its own.'),
+            bad('At the door: Campus › Events › scroll › Start check-in, only inside the window.'),
+            bad('After: club page › Past events › Who came, for 30 days.'),
+            ok('Thank-you: back to Messages › the Board.')
+          ],
+          newCount: 'one card, from post to thank-you',
+          next: n(['New event from the club home: title, when, where, cover', 'It reaches the Board, Events, Tonight and calendars on its own', 'Share: link or a story card', 'On the day, the same card says Start check-in', 'After: “18 came”, See who, Post a thank-you'])
+        },
+        {
+          name: 'Theo Lindqvist', role: 'Social chair · Mod', initials: 'TL', color: '#C4B2FF',
+          goal: 'Get the word out, and get our members onto Vibe.',
+          todayCount: 'mostly blocked',
+          today: [
+            bad('As a mod he can’t post on the Board or post as the club.'),
+            bad('He approves join requests, but can’t reach the Requests tab.'),
+            bad('Members aren’t told about new posts; they see an unread dot.'),
+            bad('No share button, no link preview with the club’s picture, no QR.'),
+            bad('Invites are for owners and admins, one person at a time.')
+          ],
+          newCount: 'three taps for each',
+          next: n(['Write to members: a Board post or a poll', 'Members hear about it (once push is on)', 'Share the club: story card, link, table QR', 'The members’ link lets members in and asks them to join', 'See requests and new followers in one line'])
+        }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

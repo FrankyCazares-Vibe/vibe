@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Where officers are today</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,300..800;1,400&amp;family=Fraunces:ital,wght,SOFT@0,400..900,100;1,400,100&amp;display=swap">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{margin:0;font-family:"DM Sans",system-ui,sans-serif;-webkit-font-smoothing:antialiased;background:#0C0B0B}
+a{color:inherit;text-decoration:none}
+a:hover{color:inherit}
+</style>
+</helmet>
+<div style="min-height: 1400px; position: relative; isolation: isolate; background: #0C0B0B; color: #F6F1EA; font-family: 'DM Sans', system-ui, sans-serif; padding: 56px 24px 64px">
+  <div aria-hidden="true" style="position: absolute; inset: 0; z-index: -1; pointer-events: none; background: radial-gradient(560px 420px at 100% 0%, rgba(255,92,53,0.16), transparent 60%)"></div>
+  <div style="max-width: 1320px; margin: 0 auto; display: flex; flex-direction: column; gap: 36px">
+    <header style="display: flex; flex-direction: column; gap: 10px; max-width: 860px">
+      <div style="font-size: 12px; letter-spacing: 0.14em; text-transform: uppercase; color: #CFC8BE"><span style="color: #FF5C35">●</span> Read from the code, Oct 20</div>
+      <h1 style="font-family: Fraunces, serif; font-weight: 800; font-size: 52px; letter-spacing: -0.03em; line-height: 1.02">Where officers are today.</h1>
+      <p style="font-size: 18px; line-height: 1.5; color: #CFC8BE">Officer tools are spread over five places, and most of them only work on a laptop. Nothing here is broken; it was built piece by piece.</p>
+    </header>
+
+    <section aria-label="Five places" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(240px, 100%), 1fr)); gap: 12px">
+      <sc-for list="{{places}}" as="p" hint-placeholder-count="5">
+        <div style="border-radius: 16px; background: rgba(22,21,21,0.86); border: 1px solid rgba(255,255,255,0.07); padding: 18px; display: flex; flex-direction: column; gap: 12px">
+          <div style="display: flex; flex-direction: column; gap: 4px">
+            <div style="font-size: 13px; color: #FF8A66; font-weight: 600">{{p.n}}</div>
+            <h2 style="font-family: Fraunces, serif; font-weight: 800; font-size: 21px; letter-spacing: -0.02em; line-height: 1.15">{{p.name}}</h2>
+            <div style="font-size: 13px; color: #9C958C">{{p.where}}</div>
+          </div>
+          <ul style="list-style: none; display: flex; flex-direction: column; gap: 7px">
+            <sc-for list="{{p.items}}" as="i" hint-placeholder-count="5">
+              <li style="font-size: 14.5px; line-height: 1.35; color: #E4DDD3">{{i}}</li>
+            </sc-for>
+          </ul>
+          <div style="margin-top: auto; display: inline-flex; align-self: flex-start; height: 26px; align-items: center; padding: 0 10px; border-radius: 999px; font-size: 12.5px; font-weight: 600; background: {{p.tagBg}}; color: {{p.tagInk}}">{{p.tag}}</div>
+        </div>
+      </sc-for>
+    </section>
+
+    <section aria-label="Where officers get lost" style="display: flex; flex-direction: column; gap: 16px">
+      <h2 style="font-family: Fraunces, serif; font-weight: 800; font-size: 32px; letter-spacing: -0.03em">Where an officer gets lost.</h2>
+      <ol style="list-style: none; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(560px, 100%), 1fr)); gap: 10px 28px">
+        <sc-for list="{{lost}}" as="l" hint-placeholder-count="12">
+          <li style="display: flex; gap: 14px; padding: 12px 0; border-bottom: 1px solid rgba(255,255,255,0.07)">
+            <div style="font-family: Fraunces, serif; font-weight: 800; font-size: 20px; color: #FF8A66; width: 28px; flex-shrink: 0; line-height: 1.2">{{l.n}}</div>
+            <div style="display: flex; flex-direction: column; gap: 3px">
+              <div style="font-size: 16px; font-weight: 600; line-height: 1.35">{{l.t}}</div>
+              <div style="font-size: 14.5px; line-height: 1.45; color: #CFC8BE">{{l.d}}</div>
+            </div>
+          </li>
+        </sc-for>
+      </ol>
+    </section>
+
+    <section aria-label="Missing entirely" style="border-radius: 16px; border: 1px dashed rgba(246,241,234,0.22); padding: 18px 20px; display: flex; flex-wrap: wrap; gap: 10px 24px; align-items: baseline">
+      <div style="font-family: Fraunces, serif; font-weight: 800; font-size: 20px; letter-spacing: -0.02em">Not there at all:</div>
+      <sc-for list="{{missing}}" as="m" hint-placeholder-count="6">
+        <div style="font-size: 15px; color: #E4DDD3">{{m}}</div>
+      </sc-for>
+    </section>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1400}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const both = { tagBg: 'rgba(79,208,138,0.14)', tagInk: '#6FDB9A' };
+    const desk = { tagBg: 'rgba(255,92,53,0.14)', tagInk: '#FF8A66' };
+    return {
+      places: [
+        Object.assign({ n: '1', name: 'The club page', where: 'Campus › Clubs › the club', tag: 'Phone and desktop', items: ['Officer bar: Invite, Banner, Logo, Edit details, New post', '+ Create event', 'Delete a club post', 'Who came, past 30 days'] }, both),
+        Object.assign({ n: '2', name: 'The club in Messages', where: 'Messages › the club', tag: 'Rooms tools on desktop only', items: ['Board posts (owner and admin)', 'Up next, polls, sign-ups', 'Desktop: Manage rooms, members list', 'Desktop: the Manage club link'] }, desk),
+        Object.assign({ n: '3', name: 'The settings window', where: 'Messages › club › Manage club', tag: 'Desktop only', items: ['Name and backdrop', 'Members, roles, titles', 'Followers and remove', 'Join requests, delete the club'] }, desk),
+        Object.assign({ n: '4', name: 'The ⋯ menu', where: 'On the club page', tag: 'Phone and desktop', items: ['Let followers read the Board', 'Mute posts', 'Leave the club'] }, both),
+        Object.assign({ n: '5', name: 'Campus › Events', where: 'The Events tab', tag: 'Create on desktop only', items: ['Create event (not on the phone tab)', 'Start check-in, in the window', 'Manage attendees, Mark as here', 'Edit, cancel'] }, desk)
+      ],
+      lost: [
+        { n: '1', t: 'No club tools on the phone.', d: 'Members, roles, titles, followers, requests, renaming and deleting all live in a desktop window.' },
+        { n: '2', t: 'You can’t start a club on the phone.', d: '“Start a club” leads to the clubs list; creating is a desktop pop-up with no photo step, and it doesn’t take you to the new club.' },
+        { n: '3', t: 'New clubs hit a wall.', d: 'Events and invites wait until Vibe verifies the club. The buttons still show, and the only hint is “Message Vibe”.' },
+        { n: '4', t: 'Three places to say one thing.', d: 'An announcement goes on the Board, an event on Campus or the club page, a feed post on the club page. Then the event is shared into chat by hand.' },
+        { n: '5', t: '“Add your first event” is a dead end on the phone.', d: 'It opens the Events tab, which has no create button.' },
+        { n: '6', t: 'Check-in is hard to find.', d: 'Campus › Events › scroll to the card › Start check-in, and only inside the window. Never on Up next or in the event chat.' },
+        { n: '7', t: 'Who came is three screens away.', d: 'Door screen › club page › Past events › Who came, and only for 30 days.' },
+        { n: '8', t: 'Mods can’t reach their one tool.', d: 'Mods approve join requests, but the Requests tab sits behind Manage club, which only owners and admins see. Mods also can’t post on the Board.' },
+        { n: '9', t: 'Nobody hears about join requests.', d: 'No notification. On the phone a request is a row mixed into followers.' },
+        { n: '10', t: 'Members miss Board posts and new events.', d: 'No notification for either; members get an unread dot, followers nothing.' },
+        { n: '11', t: 'No way to share the club.', d: 'No share button, link or QR. A pasted link shows the generic Vibe picture, and an event has no page of its own.' },
+        { n: '12', t: 'No flyers.', d: 'Photos are off in every club room, so the Board can’t carry the flyer clubs already make.' }
+      ],
+      missing: ['A share tool', 'Officer numbers in one place', 'Handing the club to the next president', 'Closing a poll', 'Editing a Board post', 'A cancelled event that stays visible']
+    };
+  }
+}
+</script>
+</body>
+</html>

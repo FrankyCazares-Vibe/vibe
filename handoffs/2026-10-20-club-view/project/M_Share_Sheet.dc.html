@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>M · Share the club · phone</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,300..800;1,400&amp;family=Fraunces:ital,wght,SOFT@0,400..900,100;1,400,100&amp;display=swap">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{margin:0;font-family:"DM Sans",system-ui,sans-serif;-webkit-font-smoothing:antialiased;background:#0C0B0B}
+button{font:inherit;color:inherit;background:transparent;border:0;cursor:pointer}
+a{color:inherit;text-decoration:none}
+a:hover{color:inherit}
+svg{display:block}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; position: relative; isolation: isolate; overflow: hidden; display: flex; flex-direction: column; background: #0C0B0B; color: #F6F1EA; font-family: 'DM Sans', system-ui, sans-serif">
+  <div aria-hidden="true" style="position: absolute; inset: 0; z-index: -1; pointer-events: none; background: radial-gradient(560px 420px at 100% 0%, rgba(255,92,53,0.20), transparent 60%), radial-gradient(620px 560px at 0% 70%, rgba(255,92,53,0.22), rgba(255,92,53,0.05) 45%, transparent 70%)"></div>
+
+  <div aria-hidden="true" style="display: flex; flex-direction: column">
+    <div style="display: flex; align-items: center; gap: 12px; padding: 14px 16px 10px">
+      <div style="width: 44px; height: 44px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.09); display: flex; align-items: center; justify-content: center; flex-shrink: 0"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"></path></svg></div>
+      <div style="flex: 1; min-width: 0; font-family: Fraunces, serif; font-weight: 800; font-size: 20px; letter-spacing: -0.02em">Sixty-Four Chess</div>
+      <div style="width: 44px; height: 44px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.3); display: flex; align-items: center; justify-content: center; flex-shrink: 0"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7 8l5-5 5 5M5 14v5a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-5"></path></svg></div>
+    </div>
+    <div style="margin: 4px 16px 0; height: 150px; border-radius: 18px; background: linear-gradient(160deg, rgba(42,138,142,0.85), rgba(28,94,98,0.55) 55%, rgba(12,11,11,0.9)), repeating-conic-gradient(rgba(255,255,255,0.10) 0 25%, transparent 0 50%) 0 0 / 36px 36px"></div>
+    <div style="display: flex; align-items: flex-end; gap: 12px; padding: 0 28px; margin-top: -30px">
+      <div style="width: 64px; height: 64px; border-radius: 999px; border: 3px solid #0C0B0B; background: linear-gradient(135deg, #2A8A8E, #1C5E62); display: flex; align-items: center; justify-content: center; font-family: Fraunces, serif; font-weight: 800; font-size: 22px">SC</div>
+      <div style="padding-bottom: 6px; font-size: 13px; color: #CFC8BE">@sixtyfour · Open club</div>
+    </div>
+  </div>
+  <div aria-hidden="true" style="position: absolute; inset: 0; background: rgba(0,0,0,0.6)"></div>
+
+  <section role="dialog" aria-modal="true" aria-labelledby="share-title" style="position: absolute; left: 0; right: 0; bottom: 0; background: #161515; border-radius: 24px 24px 0 0; border-top: 1px solid rgba(255,255,255,0.07); box-shadow: 0 -12px 40px rgba(0,0,0,0.45); display: flex; flex-direction: column; padding: 8px 0 20px">
+    <div aria-hidden="true" style="width: 40px; height: 5px; border-radius: 999px; background: rgba(255,255,255,0.22); align-self: center"></div>
+
+    <div style="display: flex; align-items: center; gap: 8px; padding: 10px 8px 0 20px">
+      <h2 id="share-title" style="flex: 1; font-family: Fraunces, serif; font-weight: 800; font-size: 22px; letter-spacing: -0.02em; line-height: 1.15">Share Sixty-Four Chess</h2>
+      <button type="button" aria-label="Close" style="width: 44px; height: 44px; border-radius: 999px; display: flex; align-items: center; justify-content: center; color: #CFC8BE"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg></button>
+    </div>
+    <p style="padding: 0 20px; font-size: 13px; color: #9C958C; line-height: 1.4">Made from your club page. No names or faces.</p>
+
+    <div role="group" aria-label="Pick a picture" style="display: flex; gap: 12px; padding: 14px 16px 4px; overflow: hidden">
+      <sc-for list="{{previews}}" as="p" hint-placeholder-count="4">
+        <button type="button" aria-pressed="{{p.pressed}}" style="flex: 0 0 96px; display: flex; flex-direction: column; align-items: center; gap: 8px">
+          <span aria-hidden="true" style="width: 96px; height: 170px; border-radius: 12px; overflow: hidden; position: relative; display: flex; flex-direction: column; gap: 5px; padding: 10px 8px 8px; text-align: left; background: {{p.bg}}; box-shadow: {{p.ring}}">
+            <span style="font-size: 6px; letter-spacing: 0.14em; color: #CFC8BE; white-space: nowrap"><span style="color: {{p.dot}}">●</span> {{p.kicker}}</span>
+            <span style="width: 18px; height: 18px; border-radius: 999px; background: linear-gradient(135deg, #2A8A8E, #1C5E62); display: flex; align-items: center; justify-content: center; font-family: Fraunces, serif; font-weight: 800; font-size: 7px; margin-top: 4px">SC</span>
+            <span style="font-family: Fraunces, serif; font-weight: 900; font-size: 15px; letter-spacing: -0.03em; line-height: 0.98">{{p.lead}}<span style="color: #FF5C35">{{p.hot}}</span>{{p.rest}}</span>
+            <span style="font-size: 7px; color: #CFC8BE; line-height: 1.3">{{p.line}}</span>
+            <span style="margin-top: auto; display: flex; align-items: flex-end; justify-content: space-between">
+              <span style="font-family: Fraunces, serif; font-weight: 900; font-size: 13px; letter-spacing: -0.03em">vibe<span style="color: #FF5C35">.</span></span>
+              <svg width="21" height="21" viewBox="0 0 21 21" shape-rendering="crispEdges" style="opacity: {{p.qr}}"><path d="{{p.qrPath}}" fill="#F6F1EA"></path></svg>
+            </span>
+          </span>
+          <span style="font-size: 12.5px; font-weight: 600; color: {{p.labelColor}}; white-space: nowrap">{{p.label}}</span>
+        </button>
+      </sc-for>
+    </div>
+
+    <div style="display: flex; flex-direction: column; margin-top: 10px; border-top: 1px solid rgba(255,255,255,0.06)">
+      <sc-for list="{{rows}}" as="r" hint-placeholder-count="4">
+        <button type="button" style="min-height: 52px; padding: 6px 16px 6px 20px; display: flex; align-items: center; gap: 14px; text-align: left; border-bottom: 1px solid rgba(255,255,255,0.06)">
+          <span aria-hidden="true" style="width: 36px; height: 36px; border-radius: 999px; background: rgba(255,255,255,0.06); display: flex; align-items: center; justify-content: center; flex-shrink: 0"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="{{r.icon}}"></path></svg></span>
+          <span style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px">
+            <span style="font-size: 15px; font-weight: 500">{{r.label}}</span>
+            <span style="font-size: 13px; color: #9C958C; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{r.detail}}</span>
+          </span>
+        </button>
+      </sc-for>
+    </div>
+
+    <div style="display: flex; flex-direction: column; gap: 10px; padding: 14px 16px 0">
+      <div style="font-size: 12.5px; color: #9C958C; text-align: center">Saves the Club card to your photos.</div>
+      <button type="button" style="height: 52px; border-radius: 999px; background: #FF5C35; color: #160A06; font-weight: 700; font-size: 16px; display: flex; align-items: center; justify-content: center; gap: 8px"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"></path></svg>Save for Instagram</button>
+    </div>
+  </section>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() {
+    var q = '';
+    for (var r = 0; r < 21; r++) {
+      for (var c = 0; c < 21; c++) {
+        var rr = r < 7 ? r : r - 14, cc = c < 7 ? c : c - 14, on;
+        if ((r < 7 && c < 7) || (r < 7 && c > 13) || (r > 13 && c < 7)) {
+          on = rr === 0 || rr === 6 || cc === 0 || cc === 6 || (rr > 1 && rr < 5 && cc > 1 && cc < 5);
+        } else if ((r === 7 && (c < 8 || c > 12)) || (c === 7 && (r < 8 || r > 12)) || (r === 13 && c < 8) || (c === 13 && r < 8)) {
+          on = false;
+        } else if (r === 6 || c === 6) {
+          on = (r + c) % 2 === 0;
+        } else {
+          var h = Math.imul((r * 21 + c + 7) ^ 0x5bd1e995, 0x27d4eb2d); h ^= h >>> 15;
+          on = (h & 255) < 118;
+        }
+        if (on) q += 'M' + c + ' ' + r + 'h1v1h-1z';
+      }
+    }
+    var ring = '0 0 0 2px #161515, 0 0 0 4px #FF5C35';
+    var flat = 'inset 0 0 0 1px rgba(255,255,255,0.08)';
+    return {
+      previews: [
+        { label: 'Club card', pressed: 'true', ring: ring, labelColor: '#F6F1EA', kicker: 'INDIANAPOLIS', dot: '#FF5C35', lead: 'Sixty-Four Chess.', hot: '', rest: '', line: 'Weekly games. Beginners welcome.', qr: '1', qrPath: q,
+          bg: 'radial-gradient(150px 150px at 0% 100%, rgba(255,92,53,0.55), rgba(255,92,53,0.10) 50%, transparent 74%), #0C0B0B' },
+        { label: 'Event card', pressed: 'false', ring: flat, labelColor: '#CFC8BE', kicker: 'THIS THURSDAY', dot: '#F6C468', lead: 'Blitz Night.', hot: '', rest: '', line: '7 PM · The Lantern Room', qr: '0', qrPath: q,
+          bg: 'radial-gradient(150px 150px at 100% 0%, rgba(246,196,104,0.42), rgba(246,196,104,0.08) 50%, transparent 74%), #0C0B0B' },
+        { label: 'Recap card', pressed: 'false', ring: flat, labelColor: '#CFC8BE', kicker: 'LAST THURSDAY', dot: '#CFC8BE', lead: '', hot: '18 came', rest: ' to Rapid Night.', line: 'Next: Blitz Night, Thursday.', qr: '0', qrPath: q,
+          bg: 'radial-gradient(150px 150px at 0% 0%, rgba(255,92,53,0.45), rgba(255,92,53,0.08) 50%, transparent 74%), #0C0B0B' },
+        { label: 'Event card', pressed: 'false', ring: flat, labelColor: '#CFC8BE', kicker: 'THU OCT 29', dot: '#F6C468', lead: 'Rapid Night.', hot: '', rest: '', line: '7 PM · The Lantern Room', qr: '0', qrPath: q,
+          bg: 'radial-gradient(150px 150px at 100% 0%, rgba(246,196,104,0.42), rgba(246,196,104,0.08) 50%, transparent 74%), #0C0B0B' }
+      ],
+      rows: [
+        { label: 'Instagram story', detail: 'Saves the picture, opens Instagram', icon: 'M7 3h10a4 4 0 0 1 4 4v10a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4V7a4 4 0 0 1 4-4zM12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8zM17.5 6.5h.01' },
+        { label: 'Copy link', detail: 'connectvibe.app/orgs/sixtyfour', icon: 'M10 13a5 5 0 0 0 7.07 0l3-3a5 5 0 0 0-7.07-7.07l-1.5 1.5M14 11a5 5 0 0 0-7.07 0l-3 3a5 5 0 0 0 7.07 7.07l1.5-1.5' },
+        { label: 'QR for your table', detail: 'Print or show on a screen', icon: 'M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3zM14 14h3v3h-3zM20 20h1M17 20h.01M20 14v3' },
+        { label: 'Send in a group chat', detail: 'GroupMe, iMessage', icon: 'M17 8h2a2 2 0 0 1 2 2v9l-3-3h-6a2 2 0 0 1-2-2v-1M3 5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2H7l-4 4z' }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

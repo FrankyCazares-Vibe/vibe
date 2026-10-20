@@ -1,0 +1,236 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>B · Run it from the Board · desktop</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,300..800;1,400&amp;family=Fraunces:ital,wght,SOFT@0,400..900,100;1,400,100&amp;display=swap">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{margin:0;font-family:"DM Sans",system-ui,sans-serif;-webkit-font-smoothing:antialiased;background:#0C0B0B}
+button,textarea,input{font:inherit;color:inherit;background:transparent;border:0}
+button{cursor:pointer}
+a{color:inherit;text-decoration:none}
+a:hover{color:inherit}
+svg{display:block}
+textarea::placeholder,input::placeholder{color:#9C958C;opacity:1}
+</style>
+</helmet>
+<div style="min-height: 960px; position: relative; isolation: isolate; display: flex; flex-wrap: wrap; background: #0C0B0B; color: #F6F1EA; font-family: 'DM Sans', system-ui, sans-serif">
+  <div aria-hidden="true" style="position: absolute; inset: 0; z-index: -1; pointer-events: none; background: radial-gradient(720px 620px at 0% 100%, rgba(255,92,53,0.36), rgba(255,92,53,0.08) 40%, transparent 68%), radial-gradient(560px 420px at 100% 0%, rgba(255,92,53,0.16), transparent 60%)"></div>
+
+  <nav aria-label="App" style="flex: 0 0 216px; padding: 24px 14px; display: flex; flex-direction: column; gap: 4px; border-right: 1px solid rgba(255,255,255,0.06)">
+    <div style="font-family: Fraunces, serif; font-weight: 900; font-size: 30px; letter-spacing: -0.03em; padding: 0 10px 18px">vibe<span style="color: #FF5C35">.</span></div>
+    <sc-for list="{{nav}}" as="n" hint-placeholder-count="5">
+      <a href="#" style="height: 44px; border-radius: 12px; padding: 0 12px; display: flex; align-items: center; gap: 12px; font-size: 15px; color: {{n.color}}; background: {{n.bg}}">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{n.icon}}"></path></svg>
+        <span>{{n.label}}</span>
+      </a>
+    </sc-for>
+  </nav>
+
+  <main style="flex: 999 1 560px; min-width: 0; display: flex; flex-direction: column">
+    <header aria-label="Your week" style="min-height: 60px; padding: 10px 28px; border-bottom: 1px solid rgba(255,255,255,0.06); display: flex; flex-wrap: wrap; align-items: center; gap: 8px 28px">
+      <button type="button" style="height: 40px; display: flex; align-items: center; gap: 6px; font-family: Fraunces, serif; font-weight: 800; font-size: 18px; letter-spacing: -0.02em">Your week<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"></path></svg></button>
+      <a href="#" style="display: flex; align-items: baseline; gap: 8px; white-space: nowrap"><span style="font-size: 13px; color: #CFC8BE">Thu 7 PM</span><span style="font-family: Fraunces, serif; font-weight: 700; font-size: 16px">Blitz Night</span></a>
+      <a href="#" style="display: flex; align-items: baseline; gap: 8px; white-space: nowrap"><span style="font-size: 13px; color: #CFC8BE">Thu Oct 29</span><span style="font-family: Fraunces, serif; font-weight: 700; font-size: 16px">Rapid Night</span></a>
+    </header>
+
+    <div style="flex: 1; display: flex; flex-wrap: wrap; align-items: stretch; gap: 20px; padding: 16px 20px 20px">
+      <nav aria-label="Messages" style="flex: 0 1 260px; min-width: 0; display: flex; flex-direction: column; gap: 4px">
+        <div style="height: 48px; display: flex; align-items: center; gap: 8px; padding: 0 6px">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#CFC8BE" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"></path></svg>
+          <h2 style="font-family: Fraunces, serif; font-weight: 800; font-size: 22px; letter-spacing: -0.02em">Messages</h2>
+        </div>
+        <a href="#" aria-current="page" style="height: 52px; border-radius: 12px; padding: 0 10px; background: rgba(255,255,255,0.07); display: flex; align-items: center; gap: 12px">
+          <div aria-hidden="true" style="width: 34px; height: 34px; border-radius: 999px; background: linear-gradient(135deg, #2A8A8E, #1C5E62); display: flex; align-items: center; justify-content: center; font-family: Fraunces, serif; font-weight: 800; font-size: 13px; flex-shrink: 0">SC</div>
+          <span style="flex: 1; min-width: 0; font-family: Fraunces, serif; font-weight: 700; font-size: 16.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">Sixty-Four Chess</span>
+        </a>
+        <sc-for list="{{chats}}" as="c" hint-placeholder-count="3">
+          <a href="#" style="height: 52px; border-radius: 12px; padding: 0 10px; display: flex; align-items: center; gap: 12px">
+            <div aria-hidden="true" style="width: 34px; height: 34px; border-radius: 999px; background: {{c.bg}}; color: {{c.ink}}; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; flex-shrink: 0">{{c.init}}</div>
+            <span style="flex: 1; min-width: 0; font-size: 15.5px; color: #F6F1EA; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{c.name}}</span>
+          </a>
+        </sc-for>
+      </nav>
+
+      <section aria-label="Sixty-Four Chess, Board" style="flex: 999 1 380px; min-width: 0; display: flex; flex-direction: column; gap: 14px">
+        <div style="display: flex; align-items: center; gap: 12px; min-height: 48px">
+          <div aria-hidden="true" style="width: 44px; height: 44px; border-radius: 999px; background: linear-gradient(135deg, #2A8A8E, #1C5E62); display: flex; align-items: center; justify-content: center; font-family: Fraunces, serif; font-weight: 800; font-size: 16px; flex-shrink: 0">SC</div>
+          <div style="flex: 1; min-width: 0">
+            <a href="#" style="display: inline-flex; align-items: center; gap: 6px; font-family: Fraunces, serif; font-weight: 800; font-size: 24px; letter-spacing: -0.02em; line-height: 1.1">Sixty-Four Chess<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#CFC8BE" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"></path></svg></a>
+            <div style="font-size: 13.5px; color: #CFC8BE">Your hat: Owner</div>
+          </div>
+        </div>
+        <nav aria-label="Rooms" style="display: flex; flex-wrap: wrap; gap: 6px; padding-bottom: 12px; border-bottom: 1px solid rgba(255,255,255,0.07)">
+          <a href="#" style="height: 36px; padding: 0 14px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.14); display: flex; align-items: center; font-size: 14px; font-weight: 600; color: #CFC8BE">Lounge</a>
+          <a href="#" aria-current="page" style="height: 36px; padding: 0 14px 0 12px; border-radius: 999px; background: #F6F1EA; color: #0C0B0B; display: flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 700"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 11v2a1 1 0 0 0 1 1h2l5 4V6L6 10H4a1 1 0 0 0-1 1zM15 9a3 3 0 0 1 0 6M18 6a7 7 0 0 1 0 12"></path></svg>Board</a>
+          <a href="#" style="height: 36px; padding: 0 14px 0 12px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.14); display: flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 600; color: #CFC8BE"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2.5"></rect><path d="M8 11V8a4 4 0 0 1 8 0v3"></path></svg>Officers</a>
+          <a href="#" style="height: 36px; padding: 0 14px 0 12px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.14); display: flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 600; color: #CFC8BE"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="3"></rect><path d="M3 10h18M8 3v4M16 3v4"></path></svg>Blitz Night</a>
+        </nav>
+        <section aria-label="Finish setting up, only officers see this" style="background: rgba(22,21,21,0.86); border: 1px dashed rgba(246,241,234,0.22); border-radius: 16px; padding: 12px 16px; display: flex; flex-direction: column; gap: 8px">
+          <div style="display: flex; align-items: baseline; justify-content: space-between; gap: 10px">
+            <h3 style="font-family: Fraunces, serif; font-weight: 800; font-size: 18px; letter-spacing: -0.02em">Finish setting up</h3>
+            <span style="font-size: 13px; color: #CFC8BE; white-space: nowrap">5 of 6</span>
+          </div>
+          <div aria-hidden="true" style="height: 4px; border-radius: 999px; background: rgba(255,255,255,0.09); overflow: hidden"><div style="width: 83%; height: 100%; background: #F6F1EA"></div></div>
+          <div style="display: flex; align-items: center; gap: 10px; padding-top: 2px">
+            <div aria-hidden="true" style="width: 20px; height: 20px; border-radius: 999px; border: 1.5px solid #9C958C; flex-shrink: 0"></div>
+            <div style="flex: 1; min-width: 0; display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 10px"><span style="font-size: 15px; font-weight: 600">Invite your members</span><span style="font-size: 12.5px; color: #9C958C">Only officers see this card.</span></div>
+            <button type="button" style="height: 36px; padding: 0 14px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.14); font-size: 14px; font-weight: 600; flex-shrink: 0">Invite</button>
+          </div>
+        </section>
+
+        <article aria-label="Priya Raman, Owner, yesterday" style="border-radius: 16px; background: rgba(22,21,21,0.86); border: 1px solid rgba(255,255,255,0.07); padding: 14px 16px 4px; display: flex; flex-direction: column; gap: 8px">
+          <div style="display: flex; align-items: center; gap: 8px">
+            <div aria-hidden="true" style="width: 28px; height: 28px; border-radius: 999px; background: #5A4428; color: #E9D3B0; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; flex-shrink: 0">PR</div>
+            <span style="font-size: 15px; font-weight: 700">Priya Raman</span>
+            <span style="font-size: 13px; color: #9C958C">Owner</span>
+            <span style="flex: 1"></span>
+            <span style="font-size: 13px; color: #9C958C">Yesterday</span>
+            <button type="button" aria-label="More" style="width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; color: #CFC8BE"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" aria-hidden="true"><path d="M5 12h.01M12 12h.01M19 12h.01"></path></svg></button>
+          </div>
+          <p style="font-size: 15px; line-height: 1.45">Blitz Night is Thursday at 7, the Lantern Room. Doors at 6:45. New players, find me and I will pair you up.</p>
+          <div style="border-top: 1px solid rgba(255,255,255,0.07); display: flex; align-items: center; justify-content: space-between; height: 42px">
+            <button type="button" style="height: 40px; display: flex; align-items: center; gap: 6px; font-size: 14.5px; font-weight: 700">Reply<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"></path></svg></button>
+            <button type="button" style="height: 40px; font-size: 14px; color: #CFC8BE">3 replies</button>
+          </div>
+        </article>
+
+        <article aria-label="Poll by Theo Lindqvist, Mod" style="border-radius: 16px; background: rgba(22,21,21,0.86); border: 1px solid rgba(255,255,255,0.07); padding: 14px 16px 10px; display: flex; flex-direction: column; gap: 8px">
+          <div style="display: flex; align-items: center; gap: 8px">
+            <div aria-hidden="true" style="width: 28px; height: 28px; border-radius: 999px; background: #F3D9C9; color: #5A2E1A; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; flex-shrink: 0">TL</div>
+            <span style="font-size: 15px; font-weight: 700">Theo Lindqvist</span>
+            <span style="font-size: 13px; color: #9C958C">Mod · Poll</span>
+            <span style="flex: 1"></span>
+            <span style="font-size: 13px; color: #9C958C">2h</span>
+          </div>
+          <p style="font-size: 15.5px; font-weight: 600">What should we play next week?</p>
+          <div role="group" aria-label="Poll options" style="display: flex; flex-direction: column; gap: 6px">
+            <sc-for list="{{options}}" as="o" hint-placeholder-count="3">
+              <button type="button" style="position: relative; isolation: isolate; height: 38px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.08); background: rgba(255,255,255,0.03); overflow: hidden; display: flex; align-items: center; gap: 10px; padding: 0 12px; text-align: left">
+                <span aria-hidden="true" style="position: absolute; left: 0; top: 0; bottom: 0; z-index: -1; width: {{o.w}}; background: {{o.bar}}"></span>
+                <span style="flex: 1; font-size: 14.5px; font-weight: {{o.weight}}">{{o.label}}</span>
+                <span style="font-size: 14px; font-weight: 700; color: #CFC8BE">{{o.n}}</span>
+              </button>
+            </sc-for>
+          </div>
+          <div style="display: flex; align-items: center; justify-content: space-between; font-size: 13px; color: #9C958C"><span>20 voted</span><button type="button" style="height: 32px; font-size: 14px; font-weight: 600; color: #CFC8BE">Reply</button></div>
+        </article>
+
+        <section aria-label="Write to the Board" style="margin-top: auto; border-radius: 16px; background: rgba(22,21,21,0.86); border: 1px solid rgba(255,255,255,0.08); padding: 12px; display: flex; flex-direction: column; gap: 10px">
+          <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 6px">
+            <sc-for list="{{kinds}}" as="k" hint-placeholder-count="4">
+              <button type="button" style="height: 34px; padding: 0 14px; border-radius: 999px; border: 1px solid {{k.border}}; background: {{k.bg}}; color: {{k.ink}}; font-size: 13.5px; font-weight: 700">{{k.label}}</button>
+            </sc-for>
+          </div>
+          <div style="display: flex; align-items: center; gap: 8px">
+            <label for="bd-compose" style="flex: 1; min-width: 0; height: 44px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.12); background: rgba(255,255,255,0.03); display: flex; align-items: center; padding: 0 18px">
+              <span style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0)">Write to members</span>
+              <input id="bd-compose" type="text" placeholder="Write to members…" style="width: 100%; font-size: 15px; outline: none">
+            </label>
+            <button type="button" aria-label="Post to the Board" style="width: 44px; height: 44px; border-radius: 999px; background: rgba(246,241,234,0.10); border: 1px solid rgba(255,255,255,0.12); display: flex; align-items: center; justify-content: center; flex-shrink: 0"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5M5 12l7-7 7 7"></path></svg></button>
+          </div>
+          <div style="font-size: 12.5px; color: #9C958C; padding-left: 4px">Members and followers with a school email read the Board.</div>
+        </section>
+      </section>
+
+      <aside aria-label="Run Sixty-Four Chess" style="flex: 0 1 340px; min-width: 0; border-radius: 20px; background: rgba(22,21,21,0.86); border: 1px solid rgba(255,255,255,0.07); padding: 18px 18px 16px; display: flex; flex-direction: column; gap: 16px">
+        <div style="display: flex; align-items: flex-start; gap: 8px">
+          <div style="flex: 1; min-width: 0">
+            <h2 style="font-family: Fraunces, serif; font-weight: 800; font-size: 21px; letter-spacing: -0.02em; line-height: 1.15">Run Sixty-Four Chess</h2>
+            <div style="font-size: 12.5px; color: #9C958C">Only officers see this panel. Members see club events here.</div>
+          </div>
+        </div>
+
+        <section aria-label="Needs you" style="border-radius: 12px; background: rgba(255,255,255,0.035); border: 1px solid rgba(255,255,255,0.07); padding: 4px 4px 4px 12px; display: flex; align-items: center; gap: 10px">
+          <div aria-hidden="true" style="width: 8px; height: 8px; border-radius: 999px; background: #FF5C35; flex-shrink: 0"></div>
+          <div style="flex: 1; min-width: 0; font-size: 14.5px"><strong style="font-weight: 600">2 want to join</strong></div>
+          <button type="button" style="height: 36px; padding: 0 14px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.14); font-size: 14px; font-weight: 600">Review</button>
+        </section>
+
+        <section aria-label="Up next" style="border-radius: 16px; padding: 14px; background: rgba(12,11,11,0.6); border: 1px solid rgba(255,92,53,0.55); box-shadow: 0 0 24px rgba(255,92,53,0.18); display: flex; flex-direction: column; gap: 8px">
+          <div style="font-size: 12.5px; font-weight: 600; color: #CFC8BE">Up next · Thu · 7 PM · The Lantern Room</div>
+          <div style="font-family: Fraunces, serif; font-weight: 800; font-size: 22px; letter-spacing: -0.02em; line-height: 1.1">Blitz Night</div>
+          <div style="display: flex; flex-direction: column; gap: 2px; font-size: 13.5px; color: #CFC8BE"><span><strong style="color: #F6F1EA">14</strong> going · <strong style="color: #F6F1EA">6</strong> interested</span><span style="color: #FF8A66">Check-in opens 6:00, an hour before</span></div>
+          <button type="button" style="height: 44px; margin-top: 2px; border-radius: 999px; background: #FF5C35; color: #160A06; font-weight: 700; font-size: 15px; display: flex; align-items: center; justify-content: center; gap: 8px"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect><path d="M14 14h3v3h-3zM20 20h1M17 20h.01M20 14v3"></path></svg>Start check-in</button>
+          <div style="display: flex; gap: 8px">
+            <button type="button" style="flex: 1 1 auto; height: 40px; padding: 0 12px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.14); font-weight: 600; font-size: 14px; white-space: nowrap">Open door screen</button>
+            <button type="button" style="flex: 0 0 auto; height: 40px; padding: 0 16px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.14); font-weight: 600; font-size: 14px">Share</button>
+          </div>
+        </section>
+
+        <section aria-label="This week" style="display: flex; flex-direction: column; gap: 8px">
+          <h3 style="font-family: Fraunces, serif; font-weight: 800; font-size: 17px; letter-spacing: -0.02em">This week</h3>
+          <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px">
+            <sc-for list="{{stats}}" as="s" hint-placeholder-count="3">
+              <div style="border-radius: 12px; background: rgba(255,255,255,0.035); border: 1px solid rgba(255,255,255,0.07); padding: 10px; display: flex; flex-direction: column; gap: 2px">
+                <div style="display: flex; align-items: baseline; gap: 5px"><span style="font-family: Fraunces, serif; font-weight: 800; font-size: 24px; letter-spacing: -0.02em; line-height: 1.1">{{s.n}}</span><span style="font-size: 12.5px; font-weight: 700; color: #FF8A66">{{s.delta}}</span></div>
+                <div style="font-size: 12.5px; color: #CFC8BE; line-height: 1.25">{{s.label}}</div>
+              </div>
+            </sc-for>
+          </div>
+          <div style="font-size: 12.5px; line-height: 1.35; color: #9C958C">Exact numbers for officers. Everyone else sees counts from 5 up, never names.</div>
+        </section>
+
+        <section aria-label="Bring people in" style="display: flex; flex-direction: column; gap: 8px">
+          <h3 style="font-family: Fraunces, serif; font-weight: 800; font-size: 17px; letter-spacing: -0.02em">Bring people in</h3>
+          <div style="display: flex; align-items: center; gap: 8px; border-radius: 12px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); padding: 5px 5px 5px 12px">
+            <div style="flex: 1; min-width: 0; font-size: 13.5px; color: #CFC8BE; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">connectvibe.app/orgs/<strong style="color: #F6F1EA">sixtyfour</strong></div>
+            <button type="button" style="height: 34px; padding: 0 14px; border-radius: 999px; background: #F6F1EA; color: #0C0B0B; font-size: 13.5px; font-weight: 700; flex-shrink: 0">Copy</button>
+          </div>
+          <div style="display: flex; gap: 6px; flex-wrap: wrap">
+            <button type="button" style="height: 36px; padding: 0 14px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.14); font-size: 13.5px; font-weight: 600">Instagram story</button>
+            <button type="button" style="height: 36px; padding: 0 14px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.14); font-size: 13.5px; font-weight: 600">QR for your table</button>
+          </div>
+        </section>
+
+        <a href="#" style="margin-top: auto; height: 44px; border-top: 1px solid rgba(255,255,255,0.07); display: flex; align-items: center; justify-content: space-between; font-size: 14.5px; font-weight: 600; padding-top: 4px">All club tools<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#CFC8BE" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"></path></svg></a>
+      </aside>
+    </div>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":960}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const quiet = { color: '#CFC8BE', bg: 'transparent' };
+    return {
+      nav: [
+        Object.assign({ label: 'Campus', icon: 'M3 21h18M5 21V10M19 21V10M9 21V10M15 21V10M2 10l10-6 10 6z' }, quiet),
+        Object.assign({ label: 'Network', icon: 'M12 7a3 3 0 1 0 0-.01M5 19a3 3 0 1 0 0-.01M19 19a3 3 0 1 0 0-.01M10.5 9.5l-4 7M13.5 9.5l4 7M8 19h8' }, quiet),
+        { label: 'Messages', color: '#F6F1EA', bg: 'rgba(255,255,255,0.06)', icon: 'M4 5h16v11H9l-5 4z' },
+        Object.assign({ label: 'otto', icon: 'M12 10a2 2 0 1 0 0 4 2 2 0 0 0 0-4z' }, quiet),
+        Object.assign({ label: 'Settings', icon: 'M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1' }, quiet)
+      ],
+      chats: [
+        { name: 'Maya Okafor', init: 'MO', bg: '#2F4A3A', ink: '#CFE7D6' },
+        { name: 'Leo Fischer', init: 'LF', bg: '#5A4428', ink: '#E9D3B0' },
+        { name: 'Elena Cruz', init: 'EC', bg: '#4A2E2A', ink: '#F0C9BE' }
+      ],
+      options: [
+        { label: 'Blitz again', n: '9', w: '45%', bar: 'rgba(246,241,234,0.16)', weight: '700' },
+        { label: 'Rapid, 15 min', n: '7', w: '35%', bar: 'rgba(246,241,234,0.09)', weight: '500' },
+        { label: 'Team chess', n: '4', w: '20%', bar: 'rgba(246,241,234,0.09)', weight: '500' }
+      ],
+      kinds: [
+        { label: 'Post', bg: '#F6F1EA', ink: '#0C0B0B', border: '#F6F1EA' },
+        { label: 'Event', bg: 'transparent', ink: '#CFC8BE', border: 'rgba(255,255,255,0.14)' },
+        { label: 'Poll', bg: 'transparent', ink: '#CFC8BE', border: 'rgba(255,255,255,0.14)' },
+        { label: 'Photo', bg: 'transparent', ink: '#CFC8BE', border: 'rgba(255,255,255,0.14)' }
+      ],
+      stats: [
+        { n: '41', label: 'followers', delta: '+6' },
+        { n: '23', label: 'members', delta: '' },
+        { n: '18', label: 'came to Rapid Night', delta: '' }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

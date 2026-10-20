@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>My pick up close: one card for the night</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,300..800;1,400&amp;family=Fraunces:ital,wght,SOFT@0,400..900,100;1,400,100&amp;display=swap">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{margin:0;font-family:"DM Sans",system-ui,sans-serif;-webkit-font-smoothing:antialiased;background:#0C0B0B}
+button{font:inherit;color:inherit;background:transparent;border:0;cursor:pointer}
+svg{display:block}
+</style>
+</helmet>
+<div style="width: 1440px; height: 760px; position: relative; isolation: isolate; overflow: hidden; background: #0C0B0B; color: #F6F1EA; font-family: 'DM Sans', system-ui, sans-serif; padding: 56px 60px; display: flex; flex-direction: column; gap: 28px">
+  <div aria-hidden="true" style="position: absolute; inset: 0; z-index: -1; pointer-events: none; background: radial-gradient(720px 620px at 0% 100%, rgba(255,92,53,0.32), rgba(255,92,53,0.07) 40%, transparent 68%), radial-gradient(560px 420px at 100% 0%, rgba(255,92,53,0.14), transparent 60%)"></div>
+  <header style="display: flex; flex-direction: column; gap: 8px; max-width: 980px">
+    <div style="font-size: 12px; letter-spacing: 0.14em; text-transform: uppercase; color: #CFC8BE"><span style="color: #FF5C35">●</span> My pick, up close</div>
+    <h1 style="font-family: Fraunces, serif; font-weight: 800; font-size: 44px; letter-spacing: -0.03em; line-height: 1.05">One card for the whole night.</h1>
+    <p style="font-size: 17px; line-height: 1.5; color: #CFC8BE">B’s Up next, at the top of the club’s space, carries D’s steps. The button is always the next thing to do, so Noor never goes looking.</p>
+  </header>
+
+  <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 28px; align-items: start">
+    <sc-for list="{{states}}" as="s" hint-placeholder-count="3">
+      <section style="display: flex; flex-direction: column; gap: 12px">
+        <div style="display: flex; align-items: baseline; gap: 10px">
+          <div style="font-family: Fraunces, serif; font-weight: 800; font-size: 22px; color: #FF8A66">{{s.n}}</div>
+          <h2 style="font-family: Fraunces, serif; font-weight: 800; font-size: 22px; letter-spacing: -0.02em">{{s.when}}</h2>
+        </div>
+        <div style="border-radius: 28px; border: 1px solid rgba(255,255,255,0.10); background: #0C0B0B; padding: 14px 14px 18px; display: flex; flex-direction: column; gap: 12px; box-shadow: 0 24px 60px rgba(0,0,0,0.5)">
+          <div style="display: flex; align-items: center; gap: 10px">
+            <div aria-hidden="true" style="width: 34px; height: 34px; border-radius: 999px; background: linear-gradient(135deg, #2A8A8E, #1C5E62); display: flex; align-items: center; justify-content: center; font-family: Fraunces, serif; font-weight: 800; font-size: 13px">SC</div>
+            <div style="flex: 1; display: flex; flex-direction: column">
+              <div style="font-family: Fraunces, serif; font-weight: 800; font-size: 17px; letter-spacing: -0.02em">Sixty-Four Chess</div>
+              <div style="font-size: 12.5px; color: #CFC8BE">Your hat: Admin</div>
+            </div>
+          </div>
+          <div style="border-radius: 18px; padding: 14px; background: rgba(22,21,21,0.92); border: 1px solid rgba(255,92,53,0.55); box-shadow: 0 0 26px rgba(255,92,53,0.2); display: flex; flex-direction: column; gap: 12px">
+            <div style="display: flex; justify-content: space-between; align-items: baseline; gap: 8px">
+              <div style="font-size: 12.5px; color: #CFC8BE">Thu · 7 PM · The Lantern Room</div>
+              <div style="font-size: 12.5px; color: #F6C468; white-space: nowrap">{{s.tag}}</div>
+            </div>
+            <div style="font-family: Fraunces, serif; font-weight: 800; font-size: 24px; letter-spacing: -0.02em; line-height: 1.1">Blitz Night</div>
+            <ol aria-label="Steps" style="list-style: none; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 2px">
+              <sc-for list="{{s.steps}}" as="t" hint-placeholder-count="5">
+                <li style="display: flex; flex-direction: column; align-items: center; gap: 5px; text-align: center">
+                  <div aria-hidden="true" style="width: 26px; height: 26px; border-radius: 999px; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; background: {{t.bg}}; border: 1.5px solid {{t.ring}}; color: {{t.ink}}; box-shadow: {{t.glow}}"><sc-if value="{{t.done}}" hint-placeholder-val="{{false}}"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5L20 7"></path></svg></sc-if><sc-if value="{{t.open}}" hint-placeholder-val="{{true}}">{{t.mark}}</sc-if></div>
+                  <div style="font-size: 11.5px; line-height: 1.2; color: {{t.label}}">{{t.name}}</div>
+                </li>
+              </sc-for>
+            </ol>
+            <div style="font-size: 14px; line-height: 1.4; color: #E4DDD3">{{s.line}}</div>
+            <div style="display: flex; gap: 8px; flex-wrap: wrap">
+              <button type="button" style="height: 42px; padding: 0 16px; border-radius: 999px; background: #FF5C35; color: #160A06; font-weight: 700; font-size: 14.5px">{{s.main}}</button>
+              <sc-for list="{{s.more}}" as="m" hint-placeholder-count="2">
+                <button type="button" style="height: 42px; padding: 0 14px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.14); font-weight: 600; font-size: 14.5px">{{m}}</button>
+              </sc-for>
+            </div>
+          </div>
+          <div style="display: flex; gap: 6px">
+            <sc-for list="{{chips}}" as="c" hint-placeholder-count="4">
+              <div style="height: 32px; padding: 0 12px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.10); font-size: 13px; display: flex; align-items: center; background: {{c.bg}}; color: {{c.ink}}">{{c.name}}</div>
+            </sc-for>
+          </div>
+        </div>
+        <p style="font-size: 14px; line-height: 1.45; color: #9C958C">{{s.note}}</p>
+      </section>
+    </sc-for>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":760}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const names = ['Posted', 'Going', 'Check-in', 'Who came', 'Thank-you'];
+    const rail = (cur) => names.map((name, i) => {
+      if (i < cur) return { name, done: true, open: false, mark: '', bg: '#F6F1EA', ring: '#F6F1EA', ink: '#0C0B0B', label: '#CFC8BE', glow: 'none' };
+      if (i === cur) return { name, done: false, open: true, mark: String(i + 1), bg: 'rgba(255,92,53,0.18)', ring: '#FF5C35', ink: '#FF8A66', label: '#FF8A66', glow: '0 0 12px rgba(255,92,53,0.45)' };
+      return { name, done: false, open: true, mark: String(i + 1), bg: 'transparent', ring: 'rgba(255,255,255,0.22)', ink: '#9C958C', label: '#9C958C', glow: 'none' };
+    });
+    return {
+      chips: [
+        { name: 'Lounge', bg: 'transparent', ink: '#CFC8BE' },
+        { name: 'Board', bg: '#F6F1EA', ink: '#0C0B0B' },
+        { name: 'Officers', bg: 'transparent', ink: '#CFC8BE' },
+        { name: 'Blitz Night', bg: 'transparent', ink: '#CFC8BE' }
+      ],
+      states: [
+        { n: '1', when: 'Monday, after posting', tag: 'In 3 days', steps: rail(1), line: '14 going · 6 interested. It’s on the Board, Events, Tonight and members’ calendars.', main: 'Share the event', more: ['Edit'], note: 'Share opens the sheet with the event’s story card and link.' },
+        { n: '2', when: 'Thursday 6:00, at the door', tag: 'Check-in open', steps: rail(2), line: 'Check-in is open until 10. 9 here so far.', main: 'Start check-in', more: ['Mark as here'], note: 'Opens the door screen you have today: the QR and the 4-digit code.' },
+        { n: '3', when: 'Thursday 9:30, after', tag: 'Done', steps: rail(4), line: '18 came · 4 walked in without an RSVP.', main: 'Post a thank-you', more: ['See who', 'Recap card'], note: 'See who is officers only. The recap card shows the count, never names.' }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>
