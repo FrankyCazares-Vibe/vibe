@@ -85,6 +85,9 @@ delete function starts clearing push rows on its own.
 
 ## Owed by Franky (a real phone)
 
+**Done Oct 20** (Franky did his phone walk; no findings reported yet). The outreach emails below are
+still his to send.
+
 Check in with the camera at a test event; Tonight on Feed and Events; the soft titles; the motion feel;
 pick Bloomington under Campuses (if iuhoosiers.com's Imperva refuses Vercel, it loses only its games; Student Life and Featured still show);
 delete a message in a DM and a club; like inside a post, then back to the feed. Send the outreach emails
@@ -150,15 +153,18 @@ already sends, and one more refusal.
 
 ## Next (Franky's order)
 
-1. His phone walk (above), then the open calls.
-2. **The Otto page redesign** (Franky, Oct 20: "dont forget about the otto page redesign"). Not started.
+1. ~~His phone walk~~ (done Oct 20), then the open calls.
+2. **Design the club's view of the app** (Franky, Oct 20, after his meeting with Parker of IU Innovates:
+   "something that stood out to me is the clubs view of this app. we need to design that"). His meeting
+   notes are coming; design from them. Not started.
+3. **The Otto page redesign** (Franky, Oct 20: "dont forget about the otto page redesign"). Not started.
    The plan is `handoffs/2026-10-19-critique/PLAN.md` D8 and decision 10: a design board first (the
    feed's background instead of the purple starfield, flat Tonight-style trays, Fraunces headings, a hero
    where Otto says something real, stats as one number with a 7-day bar strip, Light mode), then its own
    plan; it owns `.otto-room-*` in globals.css, `OttoHero`, `OttoSection`, `OttoPageClient` and
    `OttoMobile`'s hero. Build after launch unless Franky wants it sooner. Otto stays a notifications and
    reminders hub: never show an AI agent as live.
-3. The pipeline tracker when Franky gives the detail; security wave 4; the feed speed second half.
+4. The pipeline tracker when Franky gives the detail; security wave 4; the feed speed second half.
 
 ## Docs updated this session (two workflows, every batch fact-checked and repaired)
 
