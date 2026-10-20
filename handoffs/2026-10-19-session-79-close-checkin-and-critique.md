@@ -151,8 +151,14 @@ already sends, and one more refusal.
 ## Next (Franky's order)
 
 1. His phone walk (above), then the open calls.
-2. The pipeline tracker when Franky gives the detail; security wave 4; the feed speed second half.
-3. The Otto design board.
+2. **The Otto page redesign** (Franky, Oct 20: "dont forget about the otto page redesign"). Not started.
+   The plan is `handoffs/2026-10-19-critique/PLAN.md` D8 and decision 10: a design board first (the
+   feed's background instead of the purple starfield, flat Tonight-style trays, Fraunces headings, a hero
+   where Otto says something real, stats as one number with a 7-day bar strip, Light mode), then its own
+   plan; it owns `.otto-room-*` in globals.css, `OttoHero`, `OttoSection`, `OttoPageClient` and
+   `OttoMobile`'s hero. Build after launch unless Franky wants it sooner. Otto stays a notifications and
+   reminders hub: never show an AI agent as live.
+3. The pipeline tracker when Franky gives the detail; security wave 4; the feed speed second half.
 
 ## Docs updated this session (two workflows, every batch fact-checked and repaired)
 
