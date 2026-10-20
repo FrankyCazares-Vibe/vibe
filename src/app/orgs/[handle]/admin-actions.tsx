@@ -84,6 +84,7 @@ export function OrgProfileAdminBar({
   initialDescription,
   initialLinks,
   initialPhilanthropy,
+  verified,
 }: {
   orgHandle: string;
   orgName: string;
@@ -94,6 +95,8 @@ export function OrgProfileAdminBar({
   initialDescription: string;
   initialLinks: Link[];
   initialPhilanthropy: string;
+  /** A checked club: only it has a members' link (the club's view, wave 1). */
+  verified: boolean;
 }) {
   const [openModal, setOpenModal] = useState<
     null | "invite" | "edit" | "banner" | "logo" | "post"
@@ -164,6 +167,23 @@ export function OrgProfileAdminBar({
             {b.label}
           </button>
         ))}
+        {/* The members' link lives on the setup page (wave 1), for checked
+            clubs only; a hidden club can't take anyone new. */}
+        {verified && !hidden ? (
+          <a
+            href={`/orgs/${encodeURIComponent(orgHandle)}/setup#members-link`}
+            style={{
+              ...buttonStyle("ghost"),
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 6,
+              textDecoration: "none",
+            }}
+          >
+            <LinkIcon />
+            Members&rsquo; link
+          </a>
+        ) : null}
       </div>
 
       {openModal === "invite" && !hidden ? (
@@ -347,14 +367,22 @@ function EditDetailsModal({
 
 // ─── Banner / Logo upload ────────────────────────────────────────────────
 
-function UploadAssetModal({
+/**
+ * Exported for the setup list (/orgs/<h>/setup, the club's view wave 1),
+ * which opens the logo and then the cover with it. `onSaved`, when given,
+ * runs instead of `onClose` after a successful save, so the caller can go
+ * on to the next picture.
+ */
+export function UploadAssetModal({
   orgHandle,
   kind,
   onClose,
+  onSaved,
 }: {
   orgHandle: string;
   kind: "banner" | "logo";
   onClose: () => void;
+  onSaved?: () => void;
 }) {
   const router = useRouter();
   const [file, setFile] = useState<File | null>(null);
@@ -429,7 +457,8 @@ function UploadAssetModal({
       }
 
       router.refresh();
-      onClose();
+      if (onSaved) onSaved();
+      else onClose();
     } catch (e) {
       console.error("[orgs admin] upload", e);
       setErr("Network error");
@@ -1117,6 +1146,21 @@ function PersonPlusIcon() {
         stroke="currentColor"
         strokeWidth="1.4"
         strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
+function LinkIcon() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 16 16" aria-hidden>
+      <path
+        d="M6.5 9.5l3-3M7 4.5l1.2-1.2a2.6 2.6 0 013.7 3.7L10.7 8.2M9 11.5l-1.2 1.2a2.6 2.6 0 01-3.7-3.7L5.3 7.8"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
       />
     </svg>
   );

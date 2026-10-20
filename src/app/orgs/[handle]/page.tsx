@@ -5,6 +5,8 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { Arrow } from "@/components/brand/Arrow";
 import { LoadFailed } from "@/components/feedback/LoadFailed";
+import { clubSetupPath } from "@/lib/club-links/redeem";
+import { loadClubSetup } from "@/lib/club-links/setup";
 import { MobileTabBar } from "@/components/mobile/MobileTabBar";
 import { OrgInviteBanner } from "@/components/orgs/OrgInviteBanner";
 import { OrgMenu } from "@/components/orgs/OrgMenu";
@@ -289,7 +291,7 @@ export default async function OrgProfilePage({ params }: Params) {
   // same role rule and restriction check DELETE /api/posts/[id] makes
   // (clubOfficerMayDelete), so the button and the route agree. Only an owner
   // or admin pays for the read; a failed one shows no button.
-  const [memberRes, followerCount, clubPosts, invitedByName, officerMayDeletePosts, boardFacts, mutedRes] = await Promise.all([
+  const [memberRes, followerCount, clubPosts, invitedByName, officerMayDeletePosts, boardFacts, mutedRes, setup] = await Promise.all([
     service
       .from("org_members")
       .select("user_id", { count: "exact", head: true })
@@ -331,6 +333,17 @@ export default async function OrgProfilePage({ params }: Params) {
     // The ⋯ menu's Mute / Unmute. A failed read reads as not muted: a second
     // mute is harmless (the route answers `already`).
     user && ctx?.ok ? loadMutedOrgSet(supabase, user.id, [orgId]) : Promise.resolve(null),
+    // The setup list's progress, for the owner and officers only (the club's
+    // view, wave 1): null for a club no setup link made, or a failed read,
+    // and then the "Finish setting up" line simply doesn't show.
+    isSettingsOfficer(viewerRole)
+      ? loadClubSetup(service, {
+          id: orgId,
+          logo_url: (orgRaw.logo_url as string | null) ?? null,
+          banner_url: (orgRaw.banner_url as string | null) ?? null,
+          description: (orgRaw.description as string | null) ?? null,
+        })
+      : Promise.resolve(null),
   ]);
   const { posts: postsRes, blocked: blockedAuthors } = clubPosts;
   if (memberRes.error) {
@@ -469,7 +482,11 @@ export default async function OrgProfilePage({ params }: Params) {
             initialDescription={org.description}
             initialLinks={org.links ?? []}
             initialPhilanthropy={org.philanthropy}
+            verified={org.verified}
           />
+        ) : null}
+        {setup && !setup.complete ? (
+          <FinishSetupLine href={clubSetupPath(org.handle)} done={setup.done} total={setup.total} />
         ) : null}
 
         <Banner org={org} />
@@ -592,6 +609,45 @@ async function loadInviterFirstName(
   return visibleInviterFirstName(
     (inviterRes.data as { id: string; name: string | null } | null) ?? null,
     hiddenRes.ok ? new Set(hiddenRes.hidden.ids) : [inviterId],
+  );
+}
+
+/**
+ * "Finish setting up · 2 of 6", under the officer bar while a new club's
+ * setup list has steps left (the club's view, wave 1). Officers only.
+ */
+function FinishSetupLine({ href, done, total }: { href: string; done: number; total: number }) {
+  return (
+    <Link
+      href={href}
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 8,
+        minHeight: 44,
+        marginBottom: 12,
+        padding: "0 14px",
+        borderRadius: 14,
+        border: "1px solid rgba(255,255,255,0.14)",
+        background: "rgba(255,255,255,0.06)",
+        color: "#fff",
+        textDecoration: "none",
+        fontSize: 14,
+        fontWeight: 600,
+      }}
+    >
+      <span
+        aria-hidden
+        style={{ width: 8, height: 8, borderRadius: 999, background: "#FF5C35", flexShrink: 0 }}
+      />
+      <span style={{ flex: 1, minWidth: 0 }}>
+        Finish setting up{" "}
+        <span style={{ color: "rgba(255,255,255,0.65)", fontWeight: 500 }}>
+          · {done} of {total}
+        </span>
+      </span>
+      <Arrow direction="right" />
+    </Link>
   );
 }
 
