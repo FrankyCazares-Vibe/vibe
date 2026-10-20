@@ -159,17 +159,17 @@
    "x": 0,
    "y": 0,
    "w": 1440,
-   "h": 1560,
+   "h": 1600,
    "expand": "fill",
    "title": "Round 2: less going on (answers + 4 calls)",
    "page": "r2"
   },
   "R2_Club_Phone.dc.html": {
-   "x": 1600,
+   "x": 2540,
    "y": 0,
    "w": 390,
    "h": 844,
-   "title": "Club tab · phone",
+   "title": "3 · Switched: the club's home, the tab shows the club",
    "page": "r2"
   },
   "R2_Switcher_Phone.dc.html": {
@@ -177,31 +177,49 @@
    "y": 0,
    "w": 390,
    "h": 844,
-   "title": "Several clubs: the switcher · phone",
+   "title": "2 · Switch to: you, then the clubs you run",
    "page": "r2"
   },
   "R2_Club_Desktop.dc.html": {
-   "x": 2540,
-   "y": 0,
+   "x": 1600,
+   "y": 1400,
    "w": 1440,
    "h": 900,
    "expand": "fill",
-   "title": "Clubs you run · desktop",
+   "title": "Desktop: Clubs you run in the nav",
    "page": "r2"
   },
   "R2_Setup.dc.html": {
    "x": 1600,
-   "y": 1220,
+   "y": 2560,
    "w": 1600,
    "h": 1050,
    "title": "How a club gets on Vibe",
+   "page": "r2"
+  },
+  "R2_Profile_Phone.dc.html": {
+   "x": 1600,
+   "y": 0,
+   "w": 390,
+   "h": 844,
+   "title": "1 · You, on your profile (tap your name)",
+   "page": "r2"
+  },
+  "R2_Entry_Others.dc.html": {
+   "x": 3010,
+   "y": 0,
+   "w": 960,
+   "h": 1080,
+   "title": "Two other ways in, for comparison",
    "page": "r2"
   }
  },
  "order": [
   "R2_Main.dc.html",
-  "R2_Club_Phone.dc.html",
+  "R2_Profile_Phone.dc.html",
   "R2_Switcher_Phone.dc.html",
+  "R2_Club_Phone.dc.html",
+  "R2_Entry_Others.dc.html",
   "R2_Club_Desktop.dc.html",
   "R2_Setup.dc.html",
   "Main.dc.html",
@@ -337,17 +355,25 @@
   "r2_tab": {
    "x": 1600,
    "y": -260,
-   "text": "The Club tab.",
+   "text": "On the phone: switch on the Profile tab.",
    "kind": "title1",
-   "maxW": 2380,
+   "maxW": 2370,
    "page": "r2"
   },
   "r2_setup": {
    "x": 1600,
-   "y": 980,
+   "y": 2320,
    "text": "Setting up a club.",
    "kind": "title1",
    "maxW": 1600,
+   "page": "r2"
+  },
+  "r2_desk": {
+   "x": 1600,
+   "y": 1160,
+   "text": "On desktop.",
+   "kind": "title1",
+   "maxW": 1440,
    "page": "r2"
   }
  },

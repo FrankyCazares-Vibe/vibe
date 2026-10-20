@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>Round 2 · Your club · phone</title>
+<title>Round 2 · The club, switched in · phone</title>
 <script src="./support.js"></script>
 </head>
 <body>
@@ -88,13 +88,17 @@ input::placeholder{color:#9C958C;opacity:1}
     </a>
   </main>
 
-  <nav aria-label="Tabs" style="flex-shrink: 0; height: 84px; border-top: 1px solid rgba(255,255,255,0.08); background: rgba(12,11,11,0.96); display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); padding-top: 10px">
-    <sc-for list="{{tabs}}" as="t" hint-placeholder-count="6">
-      <a href="#" style="display: flex; flex-direction: column; align-items: center; gap: 4px; font-size: 11.5px; color: {{t.color}}">
+  <nav aria-label="Tabs" style="flex-shrink: 0; height: 84px; border-top: 1px solid rgba(255,255,255,0.08); background: rgba(12,11,11,0.96); display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); padding-top: 10px">
+    <sc-for list="{{tabs}}" as="t" hint-placeholder-count="4">
+      <a href="#" style="display: flex; flex-direction: column; align-items: center; gap: 4px; font-size: 12px; color: #9C958C">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{t.icon}}"></path></svg>
         <span>{{t.label}}</span>
       </a>
     </sc-for>
+    <a href="#" aria-current="page" aria-label="Sixty-Four Chess. Hold to switch back to you." style="display: flex; flex-direction: column; align-items: center; gap: 4px; font-size: 12px; color: #F6F1EA">
+      <span style="width: 24px; height: 24px; border-radius: 7px; background: linear-gradient(135deg, #2A8A8E, #1C5E62); color: #F6F1EA; display: flex; align-items: center; justify-content: center; font-family: Fraunces, serif; font-size: 9.5px; font-weight: 800; box-shadow: 0 0 0 1.5px #F6F1EA">SC</span>
+      <span>Club</span>
+    </a>
   </nav>
 </div>
 </x-dc>
@@ -111,12 +115,10 @@ class Component extends DCLogic {
     return {
       steps,
       tabs: [
-        { label: 'Campus', color: '#9C958C', icon: 'M3 21h18M5 21V10M19 21V10M9 21V10M15 21V10M2 10l10-6 10 6z' },
-        { label: 'Network', color: '#9C958C', icon: 'M12 7a3 3 0 1 0 0-.01M5 19a3 3 0 1 0 0-.01M19 19a3 3 0 1 0 0-.01M10.5 9.5l-4 7M13.5 9.5l4 7M8 19h8' },
-        { label: 'otto', color: '#9C958C', icon: 'M12 10a2 2 0 1 0 0 4 2 2 0 0 0 0-4z' },
-        { label: 'Messages', color: '#9C958C', icon: 'M4 5h16v11H9l-5 4z' },
-        { label: 'Club', color: '#F6F1EA', icon: 'M5 21V4M5 4h12l-2.5 4L17 12H5' },
-        { label: 'Profile', color: '#9C958C', icon: 'M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4 21a8 8 0 0 1 16 0' }
+        { label: 'Campus', icon: 'M3 21h18M5 21V10M19 21V10M9 21V10M15 21V10M2 10l10-6 10 6z' },
+        { label: 'Network', icon: 'M12 7a3 3 0 1 0 0-.01M5 19a3 3 0 1 0 0-.01M19 19a3 3 0 1 0 0-.01M10.5 9.5l-4 7M13.5 9.5l4 7M8 19h8' },
+        { label: 'otto', icon: 'M12 10a2 2 0 1 0 0 4 2 2 0 0 0 0-4z' },
+        { label: 'Messages', icon: 'M4 5h16v11H9l-5 4z' }
       ]
     };
   }

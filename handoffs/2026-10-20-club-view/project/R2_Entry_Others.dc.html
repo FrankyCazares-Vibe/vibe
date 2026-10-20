@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Round 2 · Two other ways in · phone</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,300..800;1,400&amp;family=Fraunces:ital,wght,SOFT@0,400..900,100;1,400,100&amp;display=swap">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{margin:0;font-family:"DM Sans",system-ui,sans-serif;-webkit-font-smoothing:antialiased;background:#0C0B0B}
+a{color:inherit;text-decoration:none}
+a:hover{color:inherit}
+svg{display:block}
+</style>
+</helmet>
+<div style="width: 960px; height: 1080px; position: relative; isolation: isolate; overflow: hidden; background: #0C0B0B; color: #F6F1EA; font-family: 'DM Sans', system-ui, sans-serif; padding: 56px; display: flex; flex-direction: column; gap: 28px">
+  <div aria-hidden="true" style="position: absolute; inset: 0; z-index: -1; pointer-events: none; background: radial-gradient(560px 420px at 100% 0%, rgba(255,92,53,0.14), transparent 60%)"></div>
+  <header style="display: flex; flex-direction: column; gap: 8px">
+    <div style="font-size: 12px; letter-spacing: 0.14em; text-transform: uppercase; color: #CFC8BE"><span style="color: #FF5C35">●</span> For comparison, not my pick</div>
+    <h1 style="font-family: Fraunces, serif; font-weight: 800; font-size: 40px; letter-spacing: -0.03em; line-height: 1.05">Two other ways in.</h1>
+  </header>
+
+  <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 48px; align-items: start">
+    <section style="display: flex; flex-direction: column; gap: 14px">
+      <h2 style="font-family: Fraunces, serif; font-weight: 800; font-size: 22px; letter-spacing: -0.02em">A row at the top of Messages</h2>
+      <div style="height: 700px; border-radius: 30px; border: 1px solid rgba(255,255,255,0.12); overflow: hidden; display: flex; flex-direction: column; background: #0C0B0B">
+        <div style="padding: 20px 16px 12px; display: flex; flex-direction: column; gap: 12px; flex: 1">
+          <div style="font-family: Fraunces, serif; font-weight: 800; font-size: 26px; letter-spacing: -0.02em">Messages</div>
+          <a href="#" style="min-height: 64px; border-radius: 16px; background: rgba(22,21,21,0.9); border: 1px solid rgba(255,92,53,0.45); padding: 10px 12px; display: flex; align-items: center; gap: 12px">
+            <span aria-hidden="true" style="width: 40px; height: 40px; border-radius: 10px; background: linear-gradient(135deg, #2A8A8E, #1C5E62); display: flex; align-items: center; justify-content: center; font-family: Fraunces, serif; font-weight: 800; font-size: 14px; flex-shrink: 0">SC</span>
+            <span style="flex: 1; display: flex; flex-direction: column"><span style="font-weight: 700; font-size: 15px">Run Sixty-Four Chess</span><span style="font-size: 13px; color: #FF8A66">2 want to join</span></span>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#9C958C" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"></path></svg>
+          </a>
+          <sc-for list="{{chats}}" as="c" hint-placeholder-count="5">
+            <div style="min-height: 60px; display: flex; align-items: center; gap: 12px; border-bottom: 1px solid rgba(255,255,255,0.06)">
+              <span aria-hidden="true" style="width: 44px; height: 44px; border-radius: 999px; background: {{c.color}}; display: flex; align-items: center; justify-content: center; font-family: Fraunces, serif; font-weight: 800; font-size: 14px; flex-shrink: 0">{{c.i}}</span>
+              <span style="flex: 1; min-width: 0; display: flex; flex-direction: column"><span style="font-weight: 600; font-size: 15px">{{c.name}}</span><span style="font-size: 13px; color: #9C958C; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{c.last}}</span></span>
+            </div>
+          </sc-for>
+        </div>
+        <div aria-hidden="true" style="height: 64px; border-top: 1px solid rgba(255,255,255,0.08); display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); align-items: center; text-align: center; font-size: 11.5px; color: #9C958C">
+          <span>Campus</span><span>Network</span><span>otto</span><span style="color: #F6F1EA">Messages</span><span>Profile</span>
+        </div>
+      </div>
+      <p style="font-size: 15px; line-height: 1.5; color: #E4DDD3"><strong style="color: #6FDB9A">Good:</strong> officers are in Messages every day, and it’s one tap.</p>
+      <p style="font-size: 15px; line-height: 1.5; color: #E4DDD3"><strong style="color: #FF8A66">Costs:</strong> Messages gets busier, chats and tools mix, and two or three clubs mean two or three rows above your chats.</p>
+    </section>
+
+    <section style="display: flex; flex-direction: column; gap: 14px">
+      <h2 style="font-family: Fraunces, serif; font-weight: 800; font-size: 22px; letter-spacing: -0.02em">A card on your profile</h2>
+      <div style="height: 700px; border-radius: 30px; border: 1px solid rgba(255,255,255,0.12); overflow: hidden; display: flex; flex-direction: column; background: #0C0B0B">
+        <div style="height: 130px; background: linear-gradient(160deg, #6B5A4A 0%, #3A3029 55%, #1E1A17 100%); position: relative; flex-shrink: 0">
+          <span aria-hidden="true" style="position: absolute; left: 16px; bottom: -36px; width: 76px; height: 76px; border-radius: 20px; background: #E8B26A; border: 4px solid #0C0B0B; display: flex; align-items: center; justify-content: center; font-family: Fraunces, serif; font-weight: 900; font-size: 28px; color: #0C0B0B">PR</span>
+        </div>
+        <div style="padding: 48px 16px 12px; display: flex; flex-direction: column; gap: 12px; flex: 1">
+          <div style="font-family: Fraunces, serif; font-weight: 800; font-size: 26px; letter-spacing: -0.02em">Priya Raman</div>
+          <a href="#" style="min-height: 64px; border-radius: 16px; background: rgba(22,21,21,0.9); border: 1px solid rgba(255,92,53,0.45); padding: 10px 12px; display: flex; align-items: center; gap: 12px">
+            <span aria-hidden="true" style="width: 40px; height: 40px; border-radius: 10px; background: linear-gradient(135deg, #2A8A8E, #1C5E62); display: flex; align-items: center; justify-content: center; font-family: Fraunces, serif; font-weight: 800; font-size: 14px; flex-shrink: 0">SC</span>
+            <span style="flex: 1; display: flex; flex-direction: column"><span style="font-weight: 700; font-size: 15px">Run Sixty-Four Chess</span><span style="font-size: 13px; color: #FF8A66">2 want to join</span></span>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#9C958C" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"></path></svg>
+          </a>
+          <div style="border-radius: 16px; background: rgba(22,21,21,0.86); border: 1px solid rgba(255,255,255,0.07); padding: 14px 16px; display: flex; flex-direction: column; gap: 6px">
+            <div style="font-family: Fraunces, serif; font-weight: 800; font-size: 17px">Bio</div>
+            <div style="font-size: 15px; color: #E4DDD3">Chess, coffee, too many tabs open.</div>
+          </div>
+        </div>
+        <div aria-hidden="true" style="height: 64px; border-top: 1px solid rgba(255,255,255,0.08); display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); align-items: center; text-align: center; font-size: 11.5px; color: #9C958C">
+          <span>Campus</span><span>Network</span><span>otto</span><span>Messages</span><span style="color: #F6F1EA">Profile</span>
+        </div>
+      </div>
+      <p style="font-size: 15px; line-height: 1.5; color: #E4DDD3"><strong style="color: #6FDB9A">Good:</strong> the smallest build; it works the way Admin is reached today.</p>
+      <p style="font-size: 15px; line-height: 1.5; color: #E4DDD3"><strong style="color: #FF8A66">Costs:</strong> always two taps, even at the door on event night, and the club never feels like its own place.</p>
+    </section>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":960,"height":1080}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {
+      chats: [
+        { i: 'SC', name: 'Sixty-Four Chess', last: 'Theo: voted blitz, the clock stops me overthinking', color: 'linear-gradient(135deg, #2A8A8E, #1C5E62)' },
+        { i: 'MO', name: 'Maya Okafor', last: 'see you thursday', color: '#5A3A2E' },
+        { i: 'QH', name: 'Quiet Hours', last: 'Board: study room is booked till 2', color: 'linear-gradient(135deg, #3E6FA8, #26476E)' },
+        { i: 'LF', name: 'Leo Fischer', last: 'haha fair', color: '#4A4636' },
+        { i: 'EC', name: 'Elena Cruz', last: 'sent a photo', color: '#3B3550' }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

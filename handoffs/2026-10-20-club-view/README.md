@@ -10,9 +10,9 @@ see and do in Vibe, phone and desktop. Board first, no building; Franky picks.
 
 ## Round 2 (Oct 20, after Franky's notes: "a lot going on", club emails, an owner tab, several clubs)
 The canvas opens on Round 2 (`R2_*` boards); Round 1 is its own page.
-- A **Club tab only officers see**: a sixth phone tab; "Clubs you run" in the desktop nav, next to Admin (Admin stays founders-only).
+- **The club on the phone (revised the same evening: a sixth tab crowded the bar):** no new tab. Tap your name on your profile, or hold the Profile tab, and switch to a club, like switching to a club's Instagram account; the Profile tab then shows the club's picture and opens its home until you switch back. A row in Messages and a card on the profile are drawn for comparison (`R2_Entry_Others`). Desktop: "Clubs you run" in the left nav, next to Admin (Admin stays founders-only).
 - Its first screen has three things: Needs you, Up next (one card from posted to thank-you), Write to members. Everything else is in Club tools.
-- **Several clubs:** a switcher on the club name (phone), one nav line per club (desktop), a dot where you're needed; only clubs where you're an officer.
+- **Several clubs:** the same switcher lists you first, then each club you run (phone); one nav line per club (desktop); a dot where you're needed; only clubs where you're an officer.
 - **Setup:** people sign in as themselves, never with a shared club login; the club's email is optional (proof and recovery). The first 20 get a one-time setup link from Admin › Clubs, handed over in person (checks the club, gets the president past the waitlist, makes them owner).
 - Four calls on `R2_Main`, each with a recommendation; Round 1's other calls still stand.
 
