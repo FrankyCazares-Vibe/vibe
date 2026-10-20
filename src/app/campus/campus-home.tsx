@@ -269,7 +269,8 @@ function parseInitialTab(raw: string | null): CampusTab {
   return "feed";
 }
 
-type Role = "owner" | "admin" | "mod" | "member";
+// `admin` is shown as "Officer". No `mod` since 20261021100000 (Franky, Oct 20).
+type Role = "owner" | "admin" | "member";
 
 type Org = {
   id: string;
@@ -1735,23 +1736,22 @@ function OrgSettingsModal({
   onChannelRemoved: (channelId: string) => void;
 }) {
   const canManage = org.role === "owner" || org.role === "admin";
-  const isStaff = canManage || org.role === "mod";
   const isOwner = org.role === "owner";
   // Invites are refused for a hidden club (the org page's officer bar drops
   // "Invite people" too), so the tab and the Followers button go with it.
   const canInvite = canManage && !org.hidden;
   const baseAudience: OrgAudience = org.audience ?? "both";
 
-  // Followers: owner/admin only, the same roles the followers route allows
-  // (mods get 403). Requests: every staff role under every policy, because a
-  // visiting student can still request an open club.
+  // Followers: the owner and officers, the same roles the followers route
+  // allows. Requests: the same people under every policy, because a visiting
+  // student can still request an open club.
   const tabs: { key: SettingsTab; label: string; show: boolean }[] = [
     { key: "overview", label: "Overview", show: true },
     { key: "channels", label: "Channels", show: canManage },
     { key: "members", label: "Members", show: true },
     { key: "followers", label: "Followers", show: canManage },
     { key: "invites", label: "Invites", show: canInvite },
-    { key: "requests", label: "Requests", show: isStaff },
+    { key: "requests", label: "Requests", show: canManage },
     { key: "danger", label: "Danger", show: true },
   ];
   const visibleTabs = tabs.filter((t) => t.show);
@@ -2002,7 +2002,7 @@ function SettingsOverview({
   };
 
   if (!canManage) {
-    // Mods and members get a read-only view.
+    // Members get a read-only view.
     const whoCanJoin = whoCanJoinFact(org.join_policy);
     const openTo = openToFact(org.audience);
     return (
@@ -2415,7 +2415,7 @@ function SettingsMembers({
   const loadedRef = useRef(false);
   // Whose title is being edited (club model, Oct 16): one row at a time.
   const [titleFor, setTitleFor] = useState<string | null>(null);
-  // Who is looking, for an admin's own row: an admin titles mods, members and
+  // Who is looking, for an officer's own row: an officer titles members and
   // themselves (the PATCH route's rule, which decides). Read from the session
   // already in this browser, no request; null leaves an admin's own row
   // without the button, never another admin's with it.
@@ -2519,12 +2519,16 @@ function SettingsMembers({
       <RoleLegend />
       {err ? <div style={modalErrorStyle}>{err}</div> : null}
       {members.map((m) => {
+        // Kick: the owner removes anyone but themselves; an officer removes
+        // members only. Roles: the owner alone makes or removes officers
+        // (Franky, Oct 20; the PATCH route refuses an officer), so an officer
+        // sees the role as a chip.
         const canTouchThisRow =
           canManage &&
           m.role !== "owner" &&
           (m.role !== "admin" || isOwner);
-        const roleOptions: string[] =
-          isOwner ? ["admin", "mod", "member"] : ["mod", "member"];
+        const canChangeRole = isOwner && m.role !== "owner";
+        const roleOptions: string[] = ["admin", "member"];
         const canTitle = mayTitleMember({ canManage, isOwner, selfId }, m);
         const title = m.title?.trim() || null;
         return (
@@ -2589,7 +2593,7 @@ function SettingsMembers({
                   {title ? <span style={{ color: "#fff" }}>{` · ${title}`}</span> : null}
                 </div>
               </div>
-              {canTouchThisRow ? (
+              {canChangeRole ? (
                 <select
                   value={m.role}
                   disabled={busyId === m.user_id}
@@ -2667,16 +2671,16 @@ function SettingsMembers({
   );
 }
 
-/** A role as Settings says it: Owner, Officer (an admin), Mod, Member. */
+/** A role as Settings says it: Owner, Officer (an admin), Member. */
 function roleLabel(role: string): string {
   return role in ROLE_META ? ROLE_META[role as Role].label : role;
 }
 
 /**
  * May this viewer give `m` a title? The PATCH route's rule (`members/[userId]`,
- * which decides): the owner titles anyone, themselves included; an admin
- * titles mods, members and themselves. `selfId` null: an admin's own row
- * goes without the button rather than another admin's getting one.
+ * which decides): the owner titles anyone, themselves included; an officer
+ * titles members and themselves. `selfId` null: an officer's own row goes
+ * without the button rather than another officer's getting one.
  */
 function mayTitleMember(
   viewer: { canManage: boolean; isOwner: boolean; selfId: string | null },
@@ -2684,7 +2688,7 @@ function mayTitleMember(
 ): boolean {
   if (!viewer.canManage) return false;
   if (viewer.isOwner) return true;
-  if (m.role === "mod" || m.role === "member") return true;
+  if (m.role === "member") return true;
   return viewer.selfId !== null && m.user_id === viewer.selfId;
 }
 
@@ -3224,8 +3228,8 @@ type RequestRow = {
   eligible?: boolean;
   ineligible_reason?: "audience_iu" | "audience_purdue" | "unverified" | null;
   // An officer removed them before and nobody let them back (S67 sec wave 2
-  // #15). Letting them back takes an owner or admin, so `can_approve` is
-  // false for a mod; they can still Deny.
+  // #15). Letting them back takes the invite roles (`canApproveRequest`):
+  // `can_approve` false means this viewer can't; they can still Deny.
   removed_before?: boolean;
   can_approve?: boolean;
 };
@@ -4174,8 +4178,8 @@ function ChannelAccess({ org, channel }: { org: Org; channel: Channel }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
       <p style={{ ...modalSubtitleStyle, margin: 0 }}>
-        Owner and admin always see <code>#{channel.name}</code>. Anyone else —
-        including mods — has to be invited here. Useful for designated leads
+        The owner and officers always see <code>#{channel.name}</code>. Anyone
+        else has to be invited here. Useful for designated leads
         (e.g. a chair who&apos;s a regular member but needs to see <code>#exec</code>).
       </p>
 
@@ -17969,8 +17973,8 @@ const ROLE_META: Record<
   owner: { label: "Owner", color: "#F0C84A", tint: "rgba(240,200,74,0.18)" },
   // One word for an admin everywhere (club model, Oct 16): Messages already
   // says Officer (`roleWord` in club/helpers.ts). The stored role stays `admin`.
+  // Clubs have an Owner and Officers, no mods (Franky, Oct 20).
   admin: { label: "Officer", color: "#FF7355", tint: "rgba(255,115,85,0.18)" },
-  mod: { label: "Mod", color: "#9B7BFF", tint: "rgba(155,123,255,0.18)" },
   member: { label: "Member", color: "#9DD8FF", tint: "rgba(157,216,255,0.18)" },
 };
 
@@ -17978,8 +17982,9 @@ const ROLE_PERMS: Record<Role, string[]> = {
   owner: [
     "Edit name, description, who can join, backdrop",
     "Create / rename / delete channels",
-    "Promote, demote, and remove anyone",
+    "Make or remove officers, and remove anyone",
     "Give members titles, like President",
+    "Post on the Board, make events, run check-in",
     "See followers, remove them, and invite people",
     "Choose whether followers can read the Board",
     "Approve or deny join requests",
@@ -17988,17 +17993,12 @@ const ROLE_PERMS: Record<Role, string[]> = {
   admin: [
     "Edit org overview + backdrop",
     "Create / rename / delete channels",
-    "Promote/demote mods + members; remove mods and members",
-    "Give mods, members and yourself titles",
+    "Remove members (only the owner makes officers)",
+    "Give members and yourself titles",
+    "Post on the Board, make events, run check-in",
     "See followers, remove them, and invite people",
     "Choose whether followers can read the Board",
     "Approve or deny join requests",
-  ],
-  mod: [
-    "Chat in every public channel",
-    "Private channels only when an officer adds you",
-    "Approve or deny join requests",
-    "Can't change channels or roles",
   ],
   member: [
     "Chat in every public channel",

@@ -175,9 +175,13 @@ test("followerArmHolds is can_view_org_channel's follower arm, condition for con
   const top = arm.split("\n").filter((l) => l.startsWith(`${indent}AND `) && !l.startsWith(`${indent} `)).map((l) => l.trim());
   const mirrored = Object.values(facts.FOLLOWER_ARM_SQL).filter((l) => l.startsWith("AND "));
   assert.deepEqual(top.filter((l) => l !== "AND f.user_id = uid").map((l) => mirrored.find((m) => l.startsWith(m)) ?? l).sort(), [...mirrored].sort(), `${newest}: a new SQL condition needs a field in FollowerArmFacts`);
-  // The block test's officers are loadOrgBlocks's side.
-  assert.ok(flat.includes("m.role IN ('owner','admin','mod')"));
-  assert.deepEqual([...OFFICER_ROLES].sort(), ["admin", "mod", "owner"]);
+  // The block test's officers are loadOrgBlocks's side. The SQL still lists
+  // 'mod': 20261021100000 turned every mod into an officer and made the role
+  // impossible, but left that branch in place (dead, so the function was not
+  // restated). The list minus 'mod' is the TS list.
+  const sqlRoles = /m\.role IN \(([^)]*)\)/.exec(flat)?.[1].split(",").map((r) => r.trim().replace(/'/g, ""));
+  assert.ok(sqlRoles, `${newest}: the block test's role list`);
+  assert.deepEqual(sqlRoles.filter((r) => r !== "mod").sort(), [...OFFICER_ROLES].sort());
   // And each field matters.
   const all = { board: true, boardPrivate: false, verified: true, hidden: false, switchOn: true, barred: false, removed: false, blockedByOfficer: false };
   assert.equal(facts.followerArmHolds(all), true);

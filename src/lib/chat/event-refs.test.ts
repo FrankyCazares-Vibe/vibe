@@ -211,9 +211,9 @@ test("the four reads, and every EventRef field per the rules of 5.5", async () =
   assert.equal(refs.get(EV_C)?.state, "soon");
 });
 
-test("a member (or a mod) without a row on the room does not get room_id", async () => {
+test("a member without a row on the room does not get room_id", async () => {
   install((table, calls) => {
-    if (table === "org_members") return { data: [{ org_id: ORG1, role: "mod" }, { org_id: ORG2, role: "member" }] };
+    if (table === "org_members") return { data: [{ org_id: ORG1, role: "member" }, { org_id: ORG2, role: "member" }] };
     if (table === "channel_members") return { data: [] };
     return happy(table, calls);
   });

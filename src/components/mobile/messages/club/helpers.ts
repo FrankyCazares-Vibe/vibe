@@ -25,8 +25,6 @@ export function roleWord(role: ClubRole | null | undefined): string {
       return "Owner";
     case "admin":
       return "Officer";
-    case "mod":
-      return "Mod";
     case "member":
       return "Member";
     default:
@@ -34,7 +32,7 @@ export function roleWord(role: ClubRole | null | undefined): string {
   }
 }
 
-/** An officer in 1.1's sense: owner or admin (a mod is not one). */
+/** An officer in 1.1's sense: owner or admin. */
 export function isOfficer(role: ClubRole | null | undefined): boolean {
   return role === "owner" || role === "admin";
 }
@@ -44,7 +42,7 @@ export function countWord(n: number, one: string, many = `${one}s`): string {
   return `${n} ${n === 1 ? one : many}`;
 }
 
-/** `Your hat: <Owner|Officer|Mod|Member> · <N> members` (1.2). */
+/** `Your hat: <Owner|Officer|Member> · <N> members` (1.2). */
 export function hatLine(role: ClubRole | null | undefined, memberCount: number): string {
   return `Your hat: ${roleWord(role)} · ${countWord(memberCount, "member")}`;
 }
@@ -126,7 +124,7 @@ export function boardsMatching<T extends Pick<FollowedBoard, "org">>(boards: rea
 }
 
 const JOIN_STATES = ["member", "invited", "requested", "can_join", "can_request", "invite_only", "audience_blocked", "unverified", "hidden"] as const;
-const ROLES = ["owner", "admin", "mod", "member"] as const;
+const ROLES = ["owner", "admin", "member"] as const;
 
 function oneOf<T extends string>(value: unknown, list: readonly T[]): T | null {
   return typeof value === "string" && (list as readonly string[]).includes(value) ? (value as T) : null;

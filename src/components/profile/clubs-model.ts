@@ -8,7 +8,7 @@
  *     default and are hidden one by one.
  *   - On your own profile (`/api/me/clubs`): every club you're in, hidden
  *     ones marked, plus "Following", which only you see.
- *   - Role words (Owner, Officer, Mod) never show. A title the officers gave
+ *   - Role words (Owner, Officer) never show. A title the officers gave
  *     does ("President · SAE"), unless the member hid it.
  *   - "Member since Sep 2026" only in the Clubs section, never on the chips.
  *

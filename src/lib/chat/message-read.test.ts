@@ -129,7 +129,7 @@ const LOUNGE: Room = { id: CHANNEL, kind: "lounge", name: "Lounge", org_id: ORG,
 const BOARD: Room = { id: CHANNEL, kind: "board", name: "Board", org_id: ORG, event: null };
 const ACCESS = { ok: true as const, isOrgChannel: true as const, orgId: ORG, accepted_at: null, cleared_at: null, kind: "lounge" as const };
 const DM_ACCESS = { ok: true as const, isOrgChannel: false as const, orgId: null, accepted_at: "2026-01-01T00:00:00+00:00", cleared_at: null };
-const ROLES: Record<string, string> = { [VIEWER]: "member", [OTHER]: "member", [FRIEND]: "mod", [OFFICER]: "owner", [EX]: "member" };
+const ROLES: Record<string, string> = { [VIEWER]: "member", [OTHER]: "member", [FRIEND]: "admin", [OFFICER]: "owner", [EX]: "member" };
 
 const person = (id: string, name: string) => ({ id, handle: name.toLowerCase(), name, avatar_url: null });
 const at = (n: number) => `2026-10-08T20:${String(n).padStart(2, "0")}:00+00:00`;
@@ -425,7 +425,8 @@ test("viewerInRoom: post_line only for an extra room whose rule the viewer fails
   assert.deepEqual(viewerInRoom(extraRoom("everyone"), "member", false), { role: "member", can_post: false, can_reply: false, can_moderate: false });
   // The rule keeps the viewer out: the sentence.
   assert.deepEqual(viewerInRoom(extraRoom("officers"), "member", false), { role: "member", can_post: false, can_reply: false, can_moderate: false, post_line: OFFICERS_LINE });
-  assert.deepEqual(viewerInRoom(extraRoom("officers"), "mod", false), { role: "mod", can_post: false, can_reply: false, can_moderate: true, post_line: OFFICERS_LINE });
+  // An officer the database refused (the send raced a demotion): the line, and still moderating until the role reads member.
+  assert.deepEqual(viewerInRoom(extraRoom("officers"), "admin", false), { role: "admin", can_post: false, can_reply: false, can_moderate: true, post_line: OFFICERS_LINE });
   assert.deepEqual(viewerInRoom(extraRoom("listed"), "member", false), { role: "member", can_post: false, can_reply: false, can_moderate: false, post_line: LISTED_LINE });
   // The rule lets the viewer in (an officer, or someone on the list): no line.
   for (const viewer of [viewerInRoom(extraRoom("officers"), "admin", true), viewerInRoom(extraRoom("listed"), "member", true), viewerInRoom(extraRoom("listed"), "owner", true)]) {

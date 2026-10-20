@@ -56,7 +56,8 @@ const ORG = "923896fb-0000-4000-8000-000000000002";
 const STUDENT = "6979e030-690b-4092-bb91-fd6f00a6a988";
 const OWNER = "c3b9dbb5-df1f-4674-9a9b-134a487ae1a2";
 const ADMIN = "be3e2af2-f457-4414-8f22-8746bdf9bf59";
-const MOD = "8dc49662-65fd-437f-9692-20741e00a298";
+// A second officer (`admin`): a mod before 20261021100000 turned mods into officers.
+const OFFICER2 = "8dc49662-65fd-437f-9692-20741e00a298";
 const MEMBER = "017339fe-1c2d-4e5f-8a9b-0c1d2e3f4a5b";
 const STUDENT2 = "5a1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d";
 
@@ -92,7 +93,7 @@ function fakeClient(answer: (table: string, calls: Call[]) => Result) {
 
 const hasEq = (calls: Call[], col: string) => calls.some((c) => c[0] === "eq" && c[1] === col);
 
-/** A club with an owner, an admin, a mod and a plain member, and some blocks. */
+/** A club with an owner, two officers (admin) and a plain member, and some blocks. */
 function clubWith(blocks: Array<{ blocker_id: string; blocked_id: string }>, opts: { fail?: string } = {}) {
   return fakeClient((table, calls) => {
     if (opts.fail === table) return { data: null, error: { message: "boom" } };
@@ -101,7 +102,7 @@ function clubWith(blocks: Array<{ blocker_id: string; blocked_id: string }>, opt
       const rows = [
         { user_id: OWNER, role: "owner" },
         { user_id: ADMIN, role: "admin" },
-        { user_id: MOD, role: "mod" },
+        { user_id: OFFICER2, role: "admin" },
       ];
       return { data: rows, error: null };
     }
@@ -119,34 +120,34 @@ function clubWith(blocks: Array<{ blocker_id: string; blocked_id: string }>, opt
 
 // ── pure ────────────────────────────────────────────────────────────────────
 
-test("orgSideIds: owner plus owner/admin/mod rows, never plain members or the person", () => {
+test("orgSideIds: owner plus owner/admin rows, never plain members or the person", () => {
   const side = orgSideIds(
     OWNER,
     [
       { user_id: OWNER, role: "owner" },
       { user_id: ADMIN.toUpperCase(), role: "admin" },
-      { user_id: MOD, role: "mod" },
+      { user_id: OFFICER2, role: "admin" },
       { user_id: MEMBER, role: "member" },
       { user_id: "not-a-uuid", role: "admin" },
       { user_id: STUDENT, role: "admin" },
     ],
     STUDENT,
   );
-  assert.deepEqual(side.sort(), [OWNER, ADMIN, MOD].sort());
+  assert.deepEqual(side.sort(), [OWNER, ADMIN, OFFICER2].sort());
 });
 
 test("orgSideIds: a missing owner still leaves the officers", () => {
-  assert.deepEqual(orgSideIds(null, [{ user_id: MOD, role: "mod" }], STUDENT), [MOD]);
+  assert.deepEqual(orgSideIds(null, [{ user_id: OFFICER2, role: "admin" }], STUDENT), [OFFICER2]);
 });
 
 test("summarizeOrgBlocks: an officer blocking the student keeps them out", () => {
-  const r = summarizeOrgBlocks([OWNER, MOD], [], [MOD]);
+  const r = summarizeOrgBlocks([OWNER, OFFICER2], [], [OFFICER2]);
   assert.deepEqual(r, { blockedByOfficer: true, personBlocked: [] });
 });
 
 test("summarizeOrgBlocks: the student blocking an officer does NOT keep them out", () => {
-  const r = summarizeOrgBlocks([OWNER, MOD], [MOD.toUpperCase()], []);
-  assert.deepEqual(r, { blockedByOfficer: false, personBlocked: [MOD] });
+  const r = summarizeOrgBlocks([OWNER, OFFICER2], [OFFICER2.toUpperCase()], []);
+  assert.deepEqual(r, { blockedByOfficer: false, personBlocked: [OFFICER2] });
 });
 
 test("summarizeOrgBlocks: rows about people off the org side never count", () => {
@@ -156,8 +157,8 @@ test("summarizeOrgBlocks: rows about people off the org side never count", () =>
 
 // ── reads ───────────────────────────────────────────────────────────────────
 
-test("loadOrgBlocks: a mod's block counts (the whole officer list, not just the owner)", async () => {
-  const { client } = clubWith([{ blocker_id: MOD, blocked_id: STUDENT }]);
+test("loadOrgBlocks: another officer's block counts (the whole officer list, not just the owner)", async () => {
+  const { client } = clubWith([{ blocker_id: OFFICER2, blocked_id: STUDENT }]);
   const r = await loadOrgBlocks(client, ORG, STUDENT);
   assert.deepEqual(r, { ok: true, blockedByOfficer: true, personBlocked: [] });
 });
@@ -180,7 +181,7 @@ test("loadOrgBlocks: officers are read by role from org_members", async () => {
   const members = log.find((q) => q.table === "org_members")!;
   assert.ok(members.calls.some((c) => c[0] === "in" && c[1] === "role"));
   const roles = members.calls.find((c) => c[0] === "in" && c[1] === "role")![2];
-  assert.deepEqual(roles, ["owner", "admin", "mod"]);
+  assert.deepEqual(roles, ["owner", "admin"]);
 });
 
 test("loadOrgBlocks FAILS CLOSED on any read error", async () => {
@@ -233,7 +234,7 @@ test("inviteRefusedByBlocks: the invitee blocking the SENDER refuses", () => {
 });
 
 test("inviteRefusedByBlocks: the invitee blocking the owner or another officer does NOT refuse", () => {
-  assert.equal(inviteRefusedByBlocks({ blockedByOfficer: false, personBlocked: [OWNER, MOD] }, ADMIN), false);
+  assert.equal(inviteRefusedByBlocks({ blockedByOfficer: false, personBlocked: [OWNER, OFFICER2] }, ADMIN), false);
   assert.equal(inviteRefusedByBlocks({ blockedByOfficer: false, personBlocked: [] }, ADMIN), false);
 });
 
@@ -254,8 +255,8 @@ test("loadInviteBlocks: the sender blocked the invitee, or the invitee blocked t
   assert.deepEqual(await loadInviteBlocks(b.client, ORG, ADMIN, STUDENT), { ok: true, refused: true });
 });
 
-test("loadInviteBlocks: the owner or a mod blocked the invitee, an admin sends: refused", async () => {
-  for (const blocker of [OWNER, MOD]) {
+test("loadInviteBlocks: the owner or another officer blocked the invitee, an admin sends: refused", async () => {
+  for (const blocker of [OWNER, OFFICER2]) {
     const { client } = clubWith([{ blocker_id: blocker, blocked_id: STUDENT }]);
     assert.deepEqual(await loadInviteBlocks(client, ORG, ADMIN, STUDENT), { ok: true, refused: true }, blocker);
   }
@@ -288,19 +289,19 @@ test("loadInviteBlocks FAILS CLOSED; a bad sender id costs no query", async () =
 
 // ── the invite picker (reviewer F1: hidden == refused) ──────────────────────
 
-const PICKER_SIDE = [OWNER, ADMIN, MOD];
+const PICKER_SIDE = [OWNER, ADMIN, OFFICER2];
 const row = (blocker_id: string, blocked_id: string) => ({ blocker_id, blocked_id });
 
 test("inviteRefusedIds: a student who blocked the OWNER stays in an admin's picker", () => {
   assert.deepEqual([...inviteRefusedIds(ADMIN, PICKER_SIDE, [row(STUDENT, OWNER)])], []);
-  assert.deepEqual([...inviteRefusedIds(ADMIN, PICKER_SIDE, [row(STUDENT, MOD)])], []);
+  assert.deepEqual([...inviteRefusedIds(ADMIN, PICKER_SIDE, [row(STUDENT, OFFICER2)])], []);
   // ...but not in the OWNER's own picker (sender pair).
   assert.deepEqual([...inviteRefusedIds(OWNER, PICKER_SIDE, [row(STUDENT, OWNER)])], [STUDENT]);
 });
 
-test("inviteRefusedIds: blocked the sender, or blocked by the owner, a mod or the sender: hidden", () => {
+test("inviteRefusedIds: blocked the sender, or blocked by the owner, another officer or the sender: hidden", () => {
   assert.deepEqual([...inviteRefusedIds(ADMIN, PICKER_SIDE, [row(STUDENT, ADMIN)])], [STUDENT]);
-  for (const blocker of [OWNER, MOD, ADMIN]) {
+  for (const blocker of [OWNER, OFFICER2, ADMIN]) {
     assert.deepEqual([...inviteRefusedIds(ADMIN, PICKER_SIDE, [row(blocker, STUDENT)])], [STUDENT], blocker);
   }
 });
@@ -312,7 +313,7 @@ test("inviteRefusedIds: stray rows never count; never the sender; case and junk 
     row(STUDENT2, STUDENT),
     row(STUDENT, STUDENT), // a stray self row
     { blocker_id: "junk", blocked_id: STUDENT },
-    { blocker_id: MOD },
+    { blocker_id: OFFICER2 },
     row(STUDENT2.toUpperCase(), ADMIN.toUpperCase()),
   ]);
   assert.deepEqual([...got], [STUDENT2]);
@@ -321,14 +322,14 @@ test("inviteRefusedIds: stray rows never count; never the sender; case and junk 
 
 test("inviteRefusedIds agrees with the send's one-at-a-time answer, and with the picker's two reads", () => {
   const pairs: Array<[string, string]> = [
-    [STUDENT, ADMIN], [ADMIN, STUDENT], [STUDENT, OWNER], [OWNER, STUDENT], [STUDENT, MOD],
-    [MOD, STUDENT], [MEMBER, STUDENT], [STUDENT2, ADMIN], [OWNER, STUDENT2], [STUDENT, STUDENT2],
+    [STUDENT, ADMIN], [ADMIN, STUDENT], [STUDENT, OWNER], [OWNER, STUDENT], [STUDENT, OFFICER2],
+    [OFFICER2, STUDENT], [MEMBER, STUDENT], [STUDENT2, ADMIN], [OWNER, STUDENT2], [STUDENT, STUDENT2],
     [STUDENT2, STUDENT], [STUDENT2, OWNER],
   ];
   const members = [
     { user_id: OWNER, role: "owner" },
     { user_id: ADMIN, role: "admin" },
-    { user_id: MOD, role: "mod" },
+    { user_id: OFFICER2, role: "admin" },
     { user_id: MEMBER, role: "member" },
   ];
   const candidates = [STUDENT, STUDENT2];

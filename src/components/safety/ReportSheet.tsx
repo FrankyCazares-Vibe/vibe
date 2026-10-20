@@ -672,8 +672,8 @@ export function RemovedContentCard({
   removedReason?: string | null;
   compact?: boolean;
   /**
-   * Who removed it (wave-2 contract 6.2). "officer": a club officer or mod
-   * over the remove route — the card says so, shows no reason (an officer's
+   * Who removed it (wave-2 contract 6.2). "officer": a club's owner or officer
+   * (or a mod, before 20261021100000) over the remove route — the card says so, shows no reason (an officer's
    * is null) and offers no email and no Community Guidelines link (a club's
    * own moderation has no appeal path). Absent or "moderator": today's copy,
    * unchanged, so every caller that passes nothing keeps it.

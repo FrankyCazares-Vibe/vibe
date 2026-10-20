@@ -794,7 +794,7 @@ async function loadHiddenClubAccess(
 /**
  * The clubs on this page whose posts the viewer may delete as an officer
  * (S68 officer tools, C3): the ones they are a CURRENT owner / admin of
- * (CLUB_POST_DELETE_ROLES: mods can't), and none at all while a suspension or
+ * (CLUB_POST_DELETE_ROLES), and none at all while a suspension or
  * ban is in force. Feeds `viewer_can_delete` with the same rule
  * `clubOfficerMayDelete` applies in `src/app/api/posts/[id]/route.ts`, so the
  * card and DELETE agree.

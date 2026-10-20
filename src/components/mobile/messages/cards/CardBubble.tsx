@@ -56,7 +56,7 @@ export type CardBubbleProps = {
   onRefresh: (createdAt: string) => void;
   /** `Open event chat` → the event chat layer over the space (11.6). */
   onOpenEventChat: (roomId: string) => void;
-  /** `Remove` in the long-press picker: an officer's or a mod's removal. */
+  /** `Remove` in the long-press picker: the owner's or an officer's removal. */
   onRemove?: () => void;
   /** `Report` in the long-press picker; never passed for the viewer's own. */
   onReport?: () => void;

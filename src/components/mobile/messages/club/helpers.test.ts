@@ -51,12 +51,13 @@ const ev = (starts: Date, ends: Date, state: "soon" | "live" | "after" | "closed
 test("roleWord / hatLine / isOfficer", () => {
   assert.equal(h.roleWord("owner"), "Owner");
   assert.equal(h.roleWord("admin"), "Officer");
-  assert.equal(h.roleWord("mod"), "Mod");
+  assert.equal(h.roleWord("mod" as never), "", "no mods since 20261021100000");
   assert.equal(h.roleWord("member"), "Member");
   assert.equal(h.roleWord(null), "");
   assert.equal(h.hatLine("admin", 48), "Your hat: Officer · 48 members");
   assert.equal(h.hatLine("owner", 1), "Your hat: Owner · 1 member");
-  assert.equal(h.isOfficer("mod"), false);
+  assert.equal(h.isOfficer("member"), false);
+  assert.equal(h.isOfficer("owner"), true);
   assert.equal(h.isOfficer("admin"), true);
 });
 

@@ -13,8 +13,8 @@ const OFFICER_BUSY = "Too many club changes at once. Try again in a few minutes.
 
 /**
  * DELETE /api/orgs/[slug]/channels/[channelId]/members/[userId]
- * Removes a user from the per-channel allow list. Owner/admin only — mods
- * can't revoke channel access (matches the INSERT policy). Not while
+ * Removes a user from the per-channel allow list. The owner or an officer
+ * only (matches the INSERT policy). Not while
  * restricted (the delete is service-role, so the route asks), and a stranger
  * asking about a hidden club gets 404 (security wave 2, `loadClubOfficer`).
  */

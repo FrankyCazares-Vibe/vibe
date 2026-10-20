@@ -61,8 +61,12 @@ export type JoinPolicy = "open" | "request" | "invite";
 /** Which verified universities may join. Mirrors `orgs.audience` (M1c). */
 export type OrgAudience = "both" | "iu" | "purdue";
 
-/** A row in `org_members.role`. */
-export type OrgRole = "owner" | "admin" | "mod" | "member";
+/**
+ * A row in `org_members.role`. `admin` is shown as "Officer". There is no
+ * `mod` since 20261021100000: clubs have an Owner and Officers, and today's
+ * mods became officers (Franky, Oct 20).
+ */
+export type OrgRole = "owner" | "admin" | "member";
 
 /**
  * The viewer's verified university (`users.school_system`), or null when they
@@ -146,26 +150,21 @@ export type OrgJoinStateInput = {
 // ── Settings that are one line to change ────────────────────────────────────
 
 /**
- * Who may approve or deny a join request, and who sees the officer tools bar.
- * Matches today's live gate (`orgs/[slug]/requests/[id]/route.ts:57`).
- *
- * PENDING DEFAULT (Franky, being asked 2026-09-16). Change this array and
- * nothing else to move the approve gate.
+ * Who may approve or deny a join request, and who sees the officer tools bar:
+ * the owner and officers (`admin`). Matches today's live gate
+ * (`orgs/[slug]/requests/[id]/route.ts`). Change this array and nothing else
+ * to move the approve gate.
  */
-export const OFFICER_ROLES: readonly OrgRole[] = Object.freeze(["owner", "admin", "mod"]);
+export const OFFICER_ROLES: readonly OrgRole[] = Object.freeze(["owner", "admin"]);
 
 /**
- * Who may SEND and REVOKE invites. Owner and admin only — critic C2 overrides
- * the spec body's mod inclusion, because a mod could otherwise re-invite
- * somebody an owner had just removed or denied (critic A8). Removals are
- * recorded since S67 security wave 2 (`org_removals`), and letting a removed
- * person back takes these same roles ({@link canApproveRequest}); adding mods
- * here is still Franky's call.
- *
- * PENDING DEFAULT (Franky, being asked 2026-09-16). To let mods invite, add
- * "mod" here — this array, and only this array, is the invite gate. Keep it
- * separate from {@link OFFICER_ROLES}: approving a request the student filed
- * is not the same power as adding a notification to a stranger's Otto.
+ * Who may SEND and REVOKE invites: the owner and officers. Since mods became
+ * officers (20261021100000) this is the same list as {@link OFFICER_ROLES},
+ * but it stays its own array, and this array alone is the invite gate:
+ * approving a request the student filed is not the same power as adding a
+ * notification to a stranger's Otto. Letting back somebody an officer
+ * removed (`org_removals`, S67 security wave 2) takes these same roles
+ * ({@link canApproveRequest}).
  */
 export const INVITE_ROLES: readonly OrgRole[] = Object.freeze(["owner", "admin"]);
 
@@ -229,7 +228,7 @@ export function isOrgAudience(value: unknown): value is OrgAudience {
 
 export function isOrgRole(value: unknown): value is OrgRole {
   return (
-    value === "owner" || value === "admin" || value === "mod" || value === "member"
+    value === "owner" || value === "admin" || value === "member"
   );
 }
 
@@ -238,7 +237,7 @@ export function isOfficer(role: OrgRole | null | undefined): boolean {
   return role != null && OFFICER_ROLES.includes(role);
 }
 
-/** Can this role send or revoke invites? (critic C2: owner/admin in v1) */
+/** Can this role send or revoke invites? (the owner and officers) */
 export function canInvite(role: OrgRole | null | undefined): boolean {
   return role != null && INVITE_ROLES.includes(role);
 }
@@ -249,11 +248,11 @@ export function isSettingsOfficer(role: OrgRole | null | undefined): boolean {
 }
 
 /**
- * Can this role approve a join request? Any officer, except that letting back
- * somebody an officer REMOVED takes an owner or admin ({@link INVITE_ROLES}),
- * the same people who can invite them back (S67 sec wave 2 #15). Otherwise a
- * mod could quietly undo an admin's removal, which is the reason mods can't
- * invite today. Denying stays open to every officer.
+ * Can this role approve a join request? Any officer. Letting back somebody an
+ * officer REMOVED takes the invite roles ({@link INVITE_ROLES}), the same
+ * people who can invite them back (S67 sec wave 2 #15). The two lists are the
+ * same since mods became officers, so today this only matters if they part
+ * again. Denying stays open to every officer.
  */
 export function canApproveRequest(
   role: OrgRole | null | undefined,

@@ -523,7 +523,8 @@ export function OrgInviteSheet({
 
   // Deny (wave B, B5): one tap, no confirm, like the desktop Requests tab.
   // The route takes deny even where it refuses approve (another officer's
-  // block, "Removed before" for a mod), so the queue can always be cleared.
+  // block, "Removed before" without the invite roles), so the queue can
+  // always be cleared.
   // Afterwards the list reads "none" for them; the row shows "Denied" instead
   // of an Invite pill, so the thumb that just denied can't invite by accident.
   const deny = async (c: Candidate) => {

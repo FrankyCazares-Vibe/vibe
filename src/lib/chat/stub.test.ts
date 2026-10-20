@@ -40,7 +40,7 @@ type ClubRole = import("./types").ClubRole;
 type Room = import("./types").Room;
 type RoomKind = import("./types").RoomKind;
 
-const ROLES: (ClubRole | null)[] = ["owner", "admin", "mod", "member", null];
+const ROLES: (ClubRole | null)[] = ["owner", "admin", "member", null];
 const KINDS: RoomKind[] = ["board", "lounge", "officers", "event", "room"];
 
 function room(kind: RoomKind): Room {
@@ -85,8 +85,8 @@ test("a blocked person is hidden in every room but for an officer's top-level Bo
   }
 });
 
-test("the exception is for a current owner or admin only: a mod, a member, or no role at all stubs", () => {
-  assert.equal(isHiddenFrom({ user_id: "casey", thread_root_id: null }, blocked, room("board"), "mod"), true);
+test("the exception is for a current owner or officer only: a member, or no role at all, stubs", () => {
+  assert.equal(isHiddenFrom({ user_id: "casey", thread_root_id: null }, blocked, room("board"), "mod" as never), true, "a mod read from an old row");
   assert.equal(isHiddenFrom({ user_id: "casey", thread_root_id: null }, blocked, room("board"), "member"), true);
   assert.equal(isHiddenFrom({ user_id: "casey", thread_root_id: null }, blocked, room("board"), null), true, "left the club");
   assert.equal(isHiddenFrom({ user_id: "casey" }, blocked, room("board"), "admin"), false, "thread_root_id absent = top-level");

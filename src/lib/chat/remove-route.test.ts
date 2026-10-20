@@ -218,7 +218,7 @@ function setup(s: Setup) {
     service,
     member: s.member ?? CLUB_MEMBER,
     roomOf: s.roomOf ?? { room: ROOM, failed: false },
-    roles: s.roles ?? { [ME]: "mod" },
+    roles: s.roles ?? { [ME]: "admin" },
     rateAllowed: s.rateAllowed ?? true,
     restricted: s.restricted ?? false,
     r2Configured: s.r2Configured ?? true,
@@ -447,15 +447,14 @@ test("7: a service read that fails → 503 try_again", async () => {
 
 test("8: outranked → 403 not_allowed; equal rank and a departed author pass", async () => {
   const cases: [string, string | undefined, number][] = [
-    ["mod", "admin", 403],
-    ["mod", "owner", 403],
+    // The owner and officers only (no mods since 20261021100000).
     ["admin", "owner", 403],
-    ["mod", "mod", 200],
     ["admin", "admin", 200],
     ["owner", "owner", 200],
-    ["mod", "member", 200],
-    ["mod", undefined, 200],
-    ["owner", "mod", 200],
+    ["admin", "member", 200],
+    ["admin", undefined, 200],
+    ["owner", "admin", 200],
+    ["owner", "member", 200],
   ];
   for (const [caller, author, status] of cases) {
     const roles: Record<string, string> = { [ME]: caller };
@@ -538,8 +537,8 @@ const messageUpdates = (queries: Query[]) => queries.filter((q) => q.table === "
 
 test("11: a removal that marked one row upserts chat_removals with the caller's id and club role, on message_id", async () => {
   const roleCases: [string, string][] = [
-    ["mod", "member"],
-    ["admin", "mod"],
+    ["admin", "member"],
+    ["admin", "admin"],
     ["owner", "admin"],
   ];
   for (const [role, authorRole] of roleCases) {
@@ -584,7 +583,7 @@ test("11: the upsert comes after the mark, on the service client (the cookie cli
 });
 
 test("11: the mark never carries the caller's id; only chat_removals does", async () => {
-  const { queries } = setup({ cookieRow: OTHERS_ROW, roles: { [ME]: "mod", [AUTHOR]: "member" } });
+  const { queries } = setup({ cookieRow: OTHERS_ROW, roles: { [ME]: "admin", [AUTHOR]: "member" } });
   await call();
   const [update] = messageUpdates(queries);
   assert.ok(!JSON.stringify(update.calls).includes(ME), "no caller id anywhere in the message update");
@@ -595,7 +594,7 @@ test("11: an upsert that fails still answers the success answer, and logs the co
   t.mock.method(console, "error", (...args: unknown[]) => void errors.push(args));
   const { queries } = setup({
     cookieRow: OTHERS_ROW,
-    roles: { [ME]: "mod", [AUTHOR]: "member" },
+    roles: { [ME]: "admin", [AUTHOR]: "member" },
     removalsError: { code: "XX000", message: "boom" },
   });
   assert.deepEqual(await call(), { status: 200, body: { ok: true, removed: true } });
@@ -627,7 +626,7 @@ test("11: a missing table (a database without migration B) is tolerated: the sam
 test("11: an upsert that throws is swallowed too: the same answer", async (t) => {
   const errors: unknown[][] = [];
   t.mock.method(console, "error", (...args: unknown[]) => void errors.push(args));
-  setup({ cookieRow: OTHERS_ROW, roles: { [ME]: "mod", [AUTHOR]: "member" }, removalsThrows: true });
+  setup({ cookieRow: OTHERS_ROW, roles: { [ME]: "admin", [AUTHOR]: "member" }, removalsThrows: true });
   assert.deepEqual(await call(), { status: 200, body: { ok: true, removed: true } });
   assert.equal(errors.length, 1);
   assert.ok(!JSON.stringify(errors).includes(ME));
@@ -647,7 +646,7 @@ test("11: an update that fails (503) writes no chat_removals row", async () => {
 
 test("11: every refusal and the 'removed already' answer write no chat_removals row", async () => {
   const runs: [string, Setup][] = [
-    ["outranked", { cookieRow: OTHERS_ROW, roles: { [ME]: "mod", [AUTHOR]: "admin" } }],
+    ["outranked", { cookieRow: OTHERS_ROW, roles: { [ME]: "admin", [AUTHOR]: "owner" } }],
     ["a member", { cookieRow: OTHERS_ROW, roles: { [ME]: "member" } }],
     ["an open report", { cookieRow: OTHERS_ROW, reports: "open" }],
     ["a dm", { cookieRow: OTHERS_ROW, member: DM_MEMBER }],

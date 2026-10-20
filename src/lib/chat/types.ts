@@ -24,8 +24,12 @@ export type RoomKind = "board" | "lounge" | "officers" | "event" | "room";
 /** Where an event's chat is in its life; see room-state.ts `roomState`. */
 export type RoomState = "soon" | "live" | "after" | "closed";
 
-/** `org_members.role`. Chat never imports `OFFICER_ROLES`; see room-rules.ts. */
-export type ClubRole = "owner" | "admin" | "mod" | "member";
+/**
+ * `org_members.role`; `admin` is shown as "Officer". No `mod` since
+ * 20261021100000 (mods became officers). Chat never imports `OFFICER_ROLES`;
+ * see room-rules.ts.
+ */
+export type ClubRole = "owner" | "admin" | "member";
 
 /**
  * `channels.post_policy` (wave 3, handoffs/chat-redesign/wave-3-desktop/contract.md
@@ -82,7 +86,7 @@ export type ViewerInRoom = {
   can_post: boolean;
   /** True only in a Board. */
   can_reply: boolean;
-  /** Owner / admin / mod in a club room. */
+  /** Owner / officer (admin) in a club room. */
   can_moderate: boolean;
   /**
    * `postRuleLine` of the room, only on an extra room whose rule keeps this
@@ -123,7 +127,7 @@ export type RefusalCode =
   | "try_again"
   // Wave 2, section 1.3.
   | "not_found" // 404: a gated route with the flag off or the schema missing; a vote on a message that is not a live poll of this room; the remove route; a non-uuid [messageId]
-  | "not_allowed" // 403: the remove route (not the sender in a dm or group; below mod; outranked)
+  | "not_allowed" // 403: the remove route (not the sender in a dm or group; below officer; outranked)
   | "report_open" // 409: the remove route
   | "invalid_card" // 400: a card with a bad shape, from the route or the RPC's P0C22; the body carries `field`
   | "event_not_found" // 404: an Event card for a missing, foreign or ended event
@@ -439,9 +443,9 @@ export type ThreadMessagesResponse = {
   viewer: ViewerInRoom;
 };
 
-// ── 6.3 Officer / mod remove (wave 2 or 3; pinned now) ───────────────────────
+// ── 6.3 Officer remove (wave 2 or 3; pinned now) ─────────────────────────────
 
-/** A message removed by an officer or a mod; `already` when it was removed before this call. */
+/** A message removed by the owner or an officer; `already` when it was removed before this call. */
 export type RemoveMessageResponse = { ok: true; removed: true; already?: true };
 
 /**

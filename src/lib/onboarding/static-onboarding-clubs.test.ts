@@ -290,9 +290,10 @@ const RAW_CLUBS: unknown = [
   { id: "o3", handle: "run", name: "Run Club", logo_url: null, join_policy: "open", audience: "both", join_state: "can_join", join_reason: null, role: null, pending_invite: null },
   { id: "o4", handle: "film", name: "Film", logo_url: null, join_policy: "request", audience: "iu", join_state: "requested", join_reason: "policy", role: null, pending_invite: null, org_follow_state: "following" },
   { id: "o5", handle: "band", name: "Band", logo_url: null, join_policy: "invite", audience: "both", join_state: "invited", join_reason: null, role: null, pending_invite: { id: "i1", expires_at: "2026-10-20T00:00:00Z", invited_by_name: "Sam Lee" } },
-  { id: "o6", handle: "crew", name: "Crew", logo_url: null, join_policy: "open", audience: "purdue", join_state: "member", join_reason: null, role: "mod", pending_invite: null },
+  { id: "o6", handle: "crew", name: "Crew", logo_url: null, join_policy: "open", audience: "purdue", join_state: "member", join_reason: null, role: "admin", pending_invite: null },
   { id: "o7", handle: "visit", name: "Visit", logo_url: null, join_policy: "open", audience: "both", join_state: "can_request", join_reason: "visiting", role: null, pending_invite: null },
-  { id: "o8", handle: "odd", name: "Odd", join_policy: "weird", audience: "mars", join_state: "can_join", org_follow_state: "maybe" },
+  // "mod" is no role since 20261021100000: both halves drop it.
+  { id: "o8", handle: "odd", name: "Odd", join_policy: "weird", audience: "mars", join_state: "can_join", org_follow_state: "maybe", role: "mod" },
   { id: "o9", handle: "noname", join_state: "can_join" },
   { id: "o2", handle: "dupe", name: "Dupe", join_state: "can_join" },
   "not a row",

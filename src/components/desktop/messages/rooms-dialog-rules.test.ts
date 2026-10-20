@@ -163,7 +163,7 @@ test("the pinned sentences, word for word", () => {
   assert.equal(rules.deleteConfirmLine({ kind: "room", name: "study-group" }), "Delete Study group? Its messages are deleted too.");
   assert.equal(rules.savedAsLine("exec-only"), "Saved as exec-only");
   assert.equal(rules.TOPIC_MAX, 200);
-  assert.deepEqual([...rules.OFFICER_SKIP_ROLES], ["owner", "admin"], "officers are owner and admin; a mod is listed like anyone");
+  assert.deepEqual([...rules.OFFICER_SKIP_ROLES], ["owner", "admin"], "officers are owner and admin (no mods since 20261021100000)");
 });
 
 // ── The two questions ────────────────────────────────────────────────────────

@@ -153,7 +153,7 @@ test("orderInboxClubs: pinned first (newest pin first), then last_activity desc 
 
 test("spaceCanPost: board by role, event by state, others always", () => {
   assert.equal(spaceCanPost("board", "admin", null), true);
-  assert.equal(spaceCanPost("board", "mod", null), false);
+  assert.equal(spaceCanPost("board", "member", null), false);
   assert.equal(spaceCanPost("board", null, null), false);
   assert.equal(spaceCanPost("event", "member", "closed"), false);
   assert.equal(spaceCanPost("event", "member", "after"), true);
@@ -166,17 +166,16 @@ test("spaceCanPost: an extra room by its post_policy (wave 3, 4c.2); every other
   assert.equal(spaceCanPost("room", "member", null), true);
   assert.equal(spaceCanPost("room", "member", null, "everyone"), true);
   assert.equal(spaceCanPost("room", "member", null, "everyone", true), true);
-  // officers: owner and admin; a mod is not an officer here; the room's list changes nothing.
+  // officers: owner and admin; the room's list changes nothing.
   assert.equal(spaceCanPost("room", "member", null, "officers"), false);
   assert.equal(spaceCanPost("room", "member", null, "officers", true), false);
-  assert.equal(spaceCanPost("room", "mod", null, "officers"), false);
   assert.equal(spaceCanPost("room", "admin", null, "officers"), true);
   assert.equal(spaceCanPost("room", "owner", null, "officers"), true);
   assert.equal(spaceCanPost("room", null, null, "officers"), false);
   // listed: owner, admin, and anyone on the room's list.
   assert.equal(spaceCanPost("room", "member", null, "listed"), false);
   assert.equal(spaceCanPost("room", "member", null, "listed", true), true);
-  assert.equal(spaceCanPost("room", "mod", null, "listed", false), false);
+  assert.equal(spaceCanPost("room", "member", null, "listed", false), false);
   assert.equal(spaceCanPost("room", "admin", null, "listed"), true);
   assert.equal(spaceCanPost("room", "owner", null, "listed", false), true);
   // The fixed rooms and event chats keep their own rule whatever is passed.

@@ -465,7 +465,8 @@ async function ensureOrgFollow(orgId, userId, source) {
 //                    holds a row on the two public rooms only.
 //   chat_seed_club = every other club: public `general` (3 messages and 1
 //                    reply) and `announcements` (one message written by a
-//                    plain member), the owner + an admin, a mod and a member
+//                    plain member), the owner + two officers (admin; no mods
+//                    since 20261021100000) and a member
 //                    (none of them holds a room row before the migration),
 //                    a `going` and a `maybe` RSVP to an upcoming event, one
 //                    event that ended 3 days ago and one that ended 10.
@@ -488,7 +489,7 @@ const CHAT_CLUBS = [
 
 const CHAT_MEMBERS = [
   { club: "chat_seed_club", user: "E", role: "admin" },
-  { club: "chat_seed_club", user: "C", role: "mod" },
+  { club: "chat_seed_club", user: "C", role: "admin" },
   { club: "chat_seed_club", user: "B", role: "member" },
 ];
 

@@ -33,11 +33,10 @@ import { createSupabaseServiceClient } from "@/lib/supabase/service";
  *   POST /api/orgs/[slug]/invites   — send one
  *
  * WHO MAY SEND. {@link canInvite}, i.e. `INVITE_ROLES` in
- * `src/lib/orgs/join-state.ts` — owner and admin, NOT mod (critic C2). That
- * one array is also critic A8's fix: a mod could otherwise re-invite somebody
- * an owner had just removed or denied. Removals are recorded since S67 sec
- * wave 2 (`org_removals`); letting mods invite is still Franky's call, made
- * in `INVITE_ROLES` alone — nothing in this file names a role.
+ * `src/lib/orgs/join-state.ts` — the owner and officers (clubs have no mods
+ * since 20261021100000; critic C2 kept mods out). Removals are recorded since
+ * S67 sec wave 2 (`org_removals`). Who may invite is decided in
+ * `INVITE_ROLES` alone — nothing in this file names a role.
  *
  * WHY EVERY QUERY USES THE SERVICE ROLE. M1c revoked the writes from
  * `authenticated`: `org_invites` is read-only for them, `org_members` INSERT

@@ -422,7 +422,7 @@ type ClubOfficerDelete =
 
 /**
  * May `userId` delete a post in club `orgId` that someone else wrote? Only a
- * CURRENT owner / admin (isClubPostDeleteRole: mods can't) with no suspension
+ * CURRENT owner / officer (isClubPostDeleteRole) with no suspension
  * or ban in force, as posts_delete_club_officer says.
  *
  * ONE CHECK FOR BOTH HANDLERS (S68 officer tools, C3): DELETE refuses on it

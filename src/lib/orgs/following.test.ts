@@ -126,7 +126,6 @@ test("only owners and admins see followers", () => {
   assert.equal(Object.isFrozen(FOLLOWER_LIST_ROLES), true);
   assert.equal(canSeeFollowers("owner"), true);
   assert.equal(canSeeFollowers("admin"), true);
-  assert.equal(canSeeFollowers("mod"), false);
   assert.equal(canSeeFollowers("member"), false);
   assert.equal(canSeeFollowers(null), false);
   assert.equal(canSeeFollowers(undefined), false);
@@ -149,7 +148,7 @@ test("followMadeByJoining: join and request alike (leaving drops both; the leave
 });
 
 test("publicMemberCount: exact for any member, null below 5 for everyone else, never a fake 0", () => {
-  for (const role of ["owner", "admin", "mod", "member"] as const) assert.equal(publicMemberCount(1, role), 1, role);
+  for (const role of ["owner", "admin", "member"] as const) assert.equal(publicMemberCount(1, role), 1, role);
   assert.equal(publicMemberCount(4, null), null);
   assert.equal(publicMemberCount(FOLLOWER_COUNT_FLOOR, null), FOLLOWER_COUNT_FLOOR);
   assert.equal(publicMemberCount(0, undefined), null);
@@ -177,7 +176,6 @@ test("publicFollowerCount hides small counts from everyone but officers", () => 
   assert.equal(publicFollowerCount(1, "owner"), 1);
   assert.equal(publicFollowerCount(null, "admin"), null);
   assert.equal(publicFollowerCount(0, "admin"), 0);
-  assert.equal(publicFollowerCount(4, "mod"), null);
   assert.equal(publicFollowerCount(4, "member"), null);
   assert.equal(publicFollowerCount(undefined, null), null);
   assert.equal(publicFollowerCount(Number.NaN, "owner"), null);

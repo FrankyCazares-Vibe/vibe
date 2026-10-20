@@ -39,8 +39,8 @@ import { chatEntry } from "./desktop-rules";
  *   the Board; NOT drawn while the Board is the open room (C13: the same
  *   posts would be on screen twice);
  *   the members: five faces, the count, `See all`;
- *   for an owner or an admin only (`onManageRooms` not null; never a mod,
- *   C11): `Manage club` and `Manage rooms`.
+ *   for an owner or an admin only (`onManageRooms` not null; C11):
+ *   `Manage club` and `Manage rooms`.
  *
  * It never fetches and holds no state: everything on it is `space` (the
  * space read made with `?panel=1`) and `faces` (the roster's first five),

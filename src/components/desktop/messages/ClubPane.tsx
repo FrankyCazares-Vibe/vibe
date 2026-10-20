@@ -311,7 +311,7 @@ export function ClubPane({ orgHandle, roomId, roomKind, initialPage, night, cont
   // The thread read knows the room; before it answers, the space; before that, the shell's word.
   const kind: RoomKind | null = live?.kind ?? listed?.kind ?? roomKind;
   const event = kind === "event" ? (live?.event ?? null) : null;
-  // "Officers" is owner and admin (4c.2): `Manage club`, `Manage rooms` and the `+` are theirs, never a mod's.
+  // "Officers" is owner and admin (4c.2): `Manage club`, `Manage rooms` and the `+` are theirs, never a member's.
   const role = data?.viewer.role ?? null;
   const officer = role !== null && BOARD_POSTER_ROLES.includes(role);
   // A follower (club model, Oct 16): the Board alone, read only. No chips, no

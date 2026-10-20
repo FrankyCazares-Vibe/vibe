@@ -1416,7 +1416,7 @@ function changeAfter(rel, kind) {
 
 /** join-state.ts isOrgRole. */
 function isOrgRole(value) {
-  return value === "owner" || value === "admin" || value === "mod" || value === "member";
+  return value === "owner" || value === "admin" || value === "member";
 }
 
 /** `audience_mismatch` names the university only in its sentence. */
@@ -1471,7 +1471,7 @@ const CLUB_JOIN_STATES = Object.freeze([
   "member", "invited", "requested", "can_join", "can_request",
   "invite_only", "audience_blocked", "unverified", "hidden",
 ]);
-const CLUB_ORG_ROLES = Object.freeze(["owner", "admin", "mod", "member"]);
+const CLUB_ORG_ROLES = Object.freeze(["owner", "admin", "member"]);
 
 function asRecord(value) {
   return value !== null && typeof value === "object" && !Array.isArray(value) ? value : null;

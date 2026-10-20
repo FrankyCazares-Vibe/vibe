@@ -306,7 +306,38 @@ test("title: an admin can't title the owner or another admin (403, nothing writt
   const write = writes(w, "org_members", "update")[0];
   assert.equal((argOf(write, "update") as { title_set_by: string }).title_set_by, ME, "who set it is stamped");
   const reach = write.calls.find((c) => c[0] === "in" && c[1] === "role")?.[2];
-  assert.deepEqual(reach, ["admin", "mod", "member"], "the write re-asks the reach: never the owner's row");
+  assert.deepEqual(reach, ["admin", "member"], "the write re-asks the reach: never the owner's row");
+});
+
+// ── Roles (club view, Franky, Oct 20): only the owner makes or removes officers ─
+
+const setRole = (target: string, role: unknown) => member.PATCH(req("PATCH", { role }), params({ slug: "chess", userId: target }));
+
+test("role: an officer can't make an officer or demote one (403, nothing read about the member, nothing written)", async () => {
+  for (const [targetRole, role] of [["member", "admin"], ["admin", "member"], ["member", "member"]]) {
+    const w = titleWorld("admin", targetRole);
+    const res = await json(await setRole(PEER, role));
+    assert.deepEqual(res, { status: 403, body: { ok: false, error: "Only the owner can make or remove officers." } }, `${targetRole} → ${role}`);
+    assert.equal(writes(w, "org_members", "update").length, 0, `${targetRole} → ${role}`);
+    const targetReads = w.queries.filter((q) => q.table === "org_members" && q.calls.some((c) => c[0] === "eq" && c[1] === "user_id" && c[2] === PEER));
+    assert.equal(targetReads.length, 0, "refused before the target is read");
+  }
+});
+
+test("role: the owner makes a member an officer and back; the write never reaches the owner's row; no mods", async () => {
+  for (const [targetRole, role] of [["member", "admin"], ["admin", "member"]]) {
+    const w = titleWorld("owner", targetRole);
+    assert.deepEqual(await json(await setRole(PEER, role)), { status: 200, body: { ok: true } }, `${targetRole} → ${role}`);
+    const write = writes(w, "org_members", "update")[0];
+    assert.deepEqual(argOf(write, "update"), { role });
+    assert.deepEqual(write.calls.find((c) => c[0] === "in" && c[1] === "role")?.[2], ["admin", "member"]);
+  }
+  const mod = titleWorld("owner", "member");
+  assert.equal((await setRole(PEER, "mod")).status, 400, "mod is not a role any more");
+  assert.equal(writes(mod, "org_members", "update").length, 0);
+  const owner = titleWorld("owner", "owner");
+  assert.equal((await setRole(OWNER, "member")).status, 400, "the owner's row is never changed here");
+  assert.equal(writes(owner, "org_members", "update").length, 0);
 });
 
 test("title: role and title together are refused (400) before anything is read about the member", async () => {

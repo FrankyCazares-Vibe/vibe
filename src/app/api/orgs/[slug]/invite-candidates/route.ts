@@ -626,9 +626,9 @@ export async function GET(req: Request, { params }: Params) {
   const { org, role } = gate;
   // Who may see FOLLOWERS is its own rule (`FOLLOWER_LIST_ROLES`, the
   // `org_followers_select` policy), separate from who may invite. Today they
-  // name the same roles; checking both here means adding "mod" to
-  // `INVITE_ROLES` can't hand mods the follower list through this
-  // service-role read.
+  // name the same roles (the owner and officers); checking both here means
+  // widening `INVITE_ROLES` later can't hand the follower list to anyone new
+  // through this service-role read.
   const seesFollowers = canSeeFollowers(role);
   const audience: OrgAudience = narrowInviteOrg(org).audience;
 

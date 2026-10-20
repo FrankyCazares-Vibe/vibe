@@ -449,12 +449,12 @@ test("remove follower: a bar that fails leaves the follow in place (500); a data
   }
 });
 
-test("remove follower: a member (409) and a mod asking (403) write no bar", async () => {
+test("remove follower: a member (409) and a plain member asking (403) write no bar", async () => {
   const member = removeWorld({ targetRole: "member" });
   assert.equal((await json(await removeFollower())).body.code, "member_follows");
-  const mod = removeWorld({ viewerRole: "mod" });
+  const asker = removeWorld({ viewerRole: "member" });
   assert.equal((await json(await removeFollower())).body.code, "officers_only");
-  for (const w of [member, mod]) assert.ok(!ops(w).some((op) => op.startsWith("org_board_bars")));
+  for (const w of [member, asker]) assert.ok(!ops(w).some((op) => op.startsWith("org_board_bars")));
 });
 
 // ── /api/orgs/[slug]: the club setting `followers_read_board` ───────────────
@@ -500,8 +500,8 @@ test("PATCH: an owner or admin turns the Board off for followers; the save reads
   assert.ok(updateOf(hidden));
 });
 
-test("PATCH: a mod or a member can't change it (403); anything but a boolean is 400; nothing is written", async () => {
-  for (const role of ["mod", "member"]) {
+test("PATCH: a member can't change it (403); anything but a boolean is 400; nothing is written", async () => {
+  for (const role of ["member"]) {
     const w = patchWorld({ role });
     assert.deepEqual((await json(await patchOrg({ followers_read_board: false }))).body.code, "settings_officers_only", role);
     assert.equal(updateOf(w), undefined, role);
@@ -579,7 +579,7 @@ test("GET: `board_readable` is the database's answer for THIS viewer; a barred f
   assert.equal(barred.followers_read_board, null, "the club's switch never reaches a non-member: next to board_readable false it would tell them they were barred");
   getWorld(false, { role: null, canView: true });
   assert.equal((await org()).followers_read_board, null, "a follower who reads it doesn't get the switch either");
-  for (const role of ["member", "mod", "admin", "owner"]) {
+  for (const role of ["member", "admin", "owner"]) {
     getWorld(false, { role });
     assert.equal((await org()).followers_read_board, true, role);
   }

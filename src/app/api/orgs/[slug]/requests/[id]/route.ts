@@ -24,7 +24,7 @@ type Body = { action?: unknown };
 /**
  * POST /api/orgs/[slug]/requests/[id] — approve or deny a pending join request.
  * Body: { action: 'approve' | 'deny' }
- * Permissions: org owner/admin/mod (`OFFICER_ROLES`).
+ * Permissions: the org's owner or an officer (`OFFICER_ROLES`).
  *
  * On approve the request is re-checked against the org's CURRENT rules before
  * anybody is let in (spec §4.2, §3.2). THREE 409 codes, in this order:
@@ -75,8 +75,9 @@ type Body = { action?: unknown };
  *   - approve re-checks whether the owner or any officer has blocked the
  *     requester since they asked: 409 `approve_unavailable`, copy that never
  *     names the block (deny still works, so the queue can be cleared);
- *   - letting back somebody an officer REMOVED takes an owner or admin
- *     (`canApproveRequest`): 403 `removed_needs_admin` for a mod;
+ *   - letting back somebody an officer REMOVED takes the invite roles
+ *     (`canApproveRequest`): 403 `removed_needs_admin` otherwise (nobody,
+ *     since mods became officers; kept in case the two lists part);
  *   - a suspended or banned officer can neither approve nor deny: 403
  *     `account_restricted` (`requireNotRestricted`, ruling 16).
  */

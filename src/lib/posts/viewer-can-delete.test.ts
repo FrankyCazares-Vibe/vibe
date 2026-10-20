@@ -24,7 +24,7 @@ test("only owners and admins may delete another student's club post", () => {
   assert.deepEqual([...CLUB_POST_DELETE_ROLES], ["owner", "admin"]);
   assert.equal(isClubPostDeleteRole("owner"), true);
   assert.equal(isClubPostDeleteRole("admin"), true);
-  assert.equal(isClubPostDeleteRole("mod"), false);
+  assert.equal(isClubPostDeleteRole("mod" as never), false, "no mods since 20261021100000");
   assert.equal(isClubPostDeleteRole("member"), false);
   assert.equal(isClubPostDeleteRole(null), false);
   assert.equal(isClubPostDeleteRole(undefined), false);

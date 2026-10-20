@@ -9,7 +9,7 @@
  *     profiles are public (Privacy Policy 5a).
  *   - "Following": only the person themselves (`/api/me/clubs`). It never
  *     goes through the public profile loader.
- *   - A role word (Owner, Officer, Mod) never shows. "Owner" only means
+ *   - A role word (Owner, Officer) never shows. "Owner" only means
  *     whoever made the club on Vibe. A title the officers gave ("President")
  *     shows instead, unless the member hid it (`org_members.show_title`).
  *   - "Member since" is the month they joined on Vibe, shown in the Clubs

@@ -83,7 +83,7 @@ export type BoardPostProps = {
   onOpenEventChat: (roomId: string) => void;
   onRemove?: () => void;
   onReport?: () => void;
-  /** `Remove` on one reply of this post: passed only to an officer or a mod; never offered on the viewer's own reply. */
+  /** `Remove` on one reply of this post: passed only to the owner or an officer; never offered on the viewer's own reply. */
   onRemoveReply?: (reply: ChatMessage) => void;
   /** `Report` on one reply of this post; never offered on the viewer's own reply. */
   onReportReply?: (reply: ChatMessage) => void;
@@ -180,7 +180,7 @@ const REPLY_TOUCH_PADDING = "11px 0 3px 10px";
  * 2.5 row 10 (d); the owed 17.2 L3): until now `Report` and `Remove` were
  * reachable only from a card post's long press. A button named `More` and a
  * small menu under it with the actions it was given (`Report`: never on the
- * viewer's own; `Remove`: an officer or a mod, never on their own; the
+ * viewer's own; `Remove`: the owner or an officer, never on their own; the
  * caller decides and passes a handler or not). Nothing is drawn with no
  * handler.
  *
@@ -390,8 +390,8 @@ export function BoardPost({ post, roomId, room, viewer, viewerId, night, now, re
         setFocusReply((n) => n + 1);
       }
     : undefined;
-  // A reply's "...": never on the viewer's own reply; Remove only for an
-  // officer or a mod (the Board view passes it only then).
+  // A reply's "...": never on the viewer's own reply; Remove only for the
+  // owner or an officer (the Board view passes it only then).
   // Since Oct 19, 2026 the viewer's own reply has one too, with Delete only.
   const replyMore = (m: ChatMessage) =>
     m.deleted !== true &&

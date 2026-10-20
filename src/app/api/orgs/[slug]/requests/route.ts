@@ -28,7 +28,7 @@ type IneligibleReason = "audience_iu" | "audience_purdue" | "unverified";
 
 /**
  * GET /api/orgs/[slug]/requests — list pending join requests for officers
- * (owner/admin/mod) of an org. Includes the requesting user's profile.
+ * (the owner and officers) of an org. Includes the requesting user's profile.
  *
  * ELIGIBILITY IS SHOWN, NOT HIDDEN (spec §4.2, §5.2). Audience is re-checked
  * when the request is approved, not when it was filed, so a request that was
@@ -63,8 +63,8 @@ type IneligibleReason = "audience_iu" | "audience_purdue" | "unverified";
  * REMOVED BEFORE (#15). `removed_before: true` marks a request from somebody
  * an officer removed; the UI shows "Removed before" (`ORG_COPY.meta.
  * removedBefore`). `can_approve` is false when this officer's role can't let
- * them back (a mod, for a removed person: `canApproveRequest`); the approve
- * route answers 403 `removed_needs_admin` for the same case.
+ * them back (`canApproveRequest`; nobody since mods became officers); the
+ * approve route answers 403 `removed_needs_admin` for the same case.
  */
 export async function GET(_req: Request, { params }: Params) {
   const { slug } = await params;

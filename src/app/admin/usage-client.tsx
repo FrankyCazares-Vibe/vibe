@@ -892,7 +892,7 @@ function ClubsSection({ view }: { view: UsageView }) {
 
       <div style={{ display: "flex", flexDirection: "column", gap: 6, ...noteStyle }}>
         <div>
-          An officer is a club’s owner, admin or mod. Did something means they made a post for the club, sent a message
+          An officer here is a club’s owner or one of its officers. Did something means they made a post for the club, sent a message
           in one of its rooms or made an event, in the last 7 days. Founders’ own activity is left out, so a club a
           founder helps run can read low.
         </div>

@@ -394,29 +394,29 @@ test("isOrgAudience accepts the three audiences and nothing else", () => {
   }
 });
 
-test("isOrgRole accepts the four roles and nothing else", () => {
-  for (const good of ["owner", "admin", "mod", "member"]) {
+test("isOrgRole accepts the three roles and nothing else (no mods since 20261021100000)", () => {
+  for (const good of ["owner", "admin", "member"]) {
     assert.equal(isOrgRole(good), true, good);
   }
-  for (const bad of ["Owner", "staff", "", null, undefined]) {
+  for (const bad of ["mod", "Owner", "staff", "", null, undefined]) {
     assert.equal(isOrgRole(bad), false, String(bad));
   }
 });
 
-// ── Role gates (critic C2: invites are owner/admin in v1) ───────────────────
+// ── Role gates: the owner and officers (Franky, Oct 20) ──────────────────────
 
-test("OFFICER_ROLES approves requests and includes mods", () => {
-  assert.deepEqual([...OFFICER_ROLES], ["owner", "admin", "mod"]);
-  assert.equal(isOfficer("mod"), true);
+test("OFFICER_ROLES approves requests: the owner and officers", () => {
+  assert.deepEqual([...OFFICER_ROLES], ["owner", "admin"]);
+  assert.equal(isOfficer("owner"), true);
+  assert.equal(isOfficer("admin"), true);
   assert.equal(isOfficer("member"), false);
   assert.equal(isOfficer(null), false);
 });
 
-test("INVITE_ROLES is owner/admin only — a mod cannot invite (critic C2)", () => {
+test("INVITE_ROLES is the owner and officers", () => {
   assert.deepEqual([...INVITE_ROLES], ["owner", "admin"]);
   assert.equal(canInvite("owner"), true);
   assert.equal(canInvite("admin"), true);
-  assert.equal(canInvite("mod"), false);
   assert.equal(canInvite("member"), false);
   assert.equal(canInvite(null), false);
 });
@@ -425,7 +425,7 @@ test("the two gates are separate arrays, so changing one cannot move the other",
   assert.notEqual(OFFICER_ROLES, INVITE_ROLES);
   assert.notEqual(SETTINGS_ROLES, INVITE_ROLES);
   assert.equal(isSettingsOfficer("admin"), true);
-  assert.equal(isSettingsOfficer("mod"), false);
+  assert.equal(isSettingsOfficer("member"), false);
 });
 
 test("the role arrays are frozen, so a route cannot push a role at runtime", () => {
@@ -607,15 +607,14 @@ test("removed: never outranks member, hidden, unverified or audience", () => {
   assert.equal(decide({ removed: true, org: { audience: "purdue" } }).state, "audience_blocked");
 });
 
-test("canApproveRequest: any officer, but a removed person needs owner or admin", () => {
-  for (const role of ["owner", "admin", "mod"] as const) {
+test("canApproveRequest: any officer, and a removed person needs the invite roles (the same two today)", () => {
+  for (const role of ["owner", "admin"] as const) {
     assert.equal(canApproveRequest(role, false), true, role);
   }
   assert.equal(canApproveRequest("member", false), false);
   assert.equal(canApproveRequest(null, false), false);
   assert.equal(canApproveRequest("owner", true), true);
   assert.equal(canApproveRequest("admin", true), true);
-  assert.equal(canApproveRequest("mod", true), false);
   assert.equal(canApproveRequest("member", true), false);
   assert.equal(canApproveRequest(undefined, true), false);
 });

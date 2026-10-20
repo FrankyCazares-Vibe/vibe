@@ -129,7 +129,11 @@ export const OFFICER_FOLLOW_HELP =
 export const AUDIENCE_HELP =
   "Checked against each student's verified school email when they join.";
 
-/** Settings fields a mod sees but can't change. */
+/**
+ * Said when someone who is not the owner or an officer tries to change a
+ * setting. The name is from when mods saw the fields read-only; clubs have
+ * no mods since 20261021100000.
+ */
 export const MOD_READONLY = "Only the owner and officers can change this.";
 
 // ── The strings ─────────────────────────────────────────────────────────────
@@ -1209,7 +1213,7 @@ export function joinOutcome(
     ({ kind: "change", next: { state, following: rel.following, role: rel.role }, audience, welcome: false }) as const;
   if (r.ok) {
     if (r.data.joined === true) {
-      const role = typeof r.data.role === "string" && ["owner", "admin", "mod", "member"].includes(r.data.role) ? (r.data.role as OrgRole) : "member";
+      const role = typeof r.data.role === "string" && ["owner", "admin", "member"].includes(r.data.role) ? (r.data.role as OrgRole) : "member";
       return { kind: "change", next: { state: "member", following: true, role }, audience: rel.audience, welcome: kind === "accept" };
     }
     if (r.data.pending === true) {

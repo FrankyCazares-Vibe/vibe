@@ -6,7 +6,7 @@
  * `viewer_can_delete` is true iff the post is NOT moderator-removed AND the
  * viewer is its author (an ex-officer included, for a club post they wrote),
  * OR the viewer is a CURRENT owner / admin of the post's club with no
- * suspension or ban in force. Mods can't; nobody deletes a removed post.
+ * suspension or ban in force. Nobody deletes a removed post.
  *
  * `GET /api/posts/[id]` computes the flag and `DELETE /api/posts/[id]` refuses
  * with the same role rule ({@link isClubPostDeleteRole}) and the same officer
@@ -21,9 +21,8 @@
 import type { OrgRole } from "../orgs/join-state";
 
 /**
- * The club roles that may delete any post in their club: owner and admin
- * (the same roles that may publish and edit as the club). Mods moderate chat,
- * not content, so they can't.
+ * The club roles that may delete any post in their club: the owner and
+ * officers (`admin`; the same roles that may publish and edit as the club).
  */
 export const CLUB_POST_DELETE_ROLES: readonly OrgRole[] = Object.freeze(["owner", "admin"]);
 

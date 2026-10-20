@@ -70,8 +70,8 @@ export function MessageBubble({
    *  message: the route answers that with a 400 the student never reads as a
    *  sentence. */
   onReport?: () => void;
-  /** "Remove" in the same picker: an officer's or a mod's removal of someone
-   *  else's message in a club room (wave-2 contract 11.5). A pass-through. */
+  /** "Remove" in the same picker: the owner's or an officer's removal of
+   *  someone else's message in a club room (wave-2 contract 11.5). A pass-through. */
   onRemove?: () => void;
   /** "Delete" in the same picker, last and red: the viewer's own message
    *  (Oct 19, 2026; delete-rules.ts `canDeleteOwn`). The caller confirms

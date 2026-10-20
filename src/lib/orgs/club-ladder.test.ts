@@ -140,7 +140,7 @@ test("leave: the owner can't leave, keep following or not, and nothing about the
 });
 
 test("unfollow: every member is told to leave instead (409), and their follow stays", async () => {
-  for (const role of ["member", "mod", "admin", "owner"]) {
+  for (const role of ["member", "admin", "owner"]) {
     const w = clubWorld(role === "owner", role);
     const res = await json(await follow.DELETE(req("DELETE"), params("chess")));
     assert.equal(res.status, 409, role);

@@ -71,7 +71,7 @@ const JOIN_STATES: readonly JoinState[] = [
   "unverified",
   "hidden",
 ];
-const ORG_ROLES: readonly OrgRole[] = ["owner", "admin", "mod", "member"];
+const ORG_ROLES: readonly OrgRole[] = ["owner", "admin", "member"];
 
 function asRecord(value: unknown): Record<string, unknown> | null {
   return value !== null && typeof value === "object" && !Array.isArray(value)

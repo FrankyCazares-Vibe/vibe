@@ -889,8 +889,8 @@ test("space: can_post follows an extra room's post_policy; the by-name list is O
   // An admin posts under both rules, on no list.
   spaceWorld({ cookie: cookieWith("listed", "officers", { data: [] }), service: spaceService("admin") });
   assert.deepEqual(extras(await space.GET(req(), ctx())), [[SP.alpha, true, "officers", true], [SP.zeta, false, "listed", true]]);
-  // A mod is not an officer.
-  spaceWorld({ cookie: cookieWith("officers", "everyone", { data: [] }), service: spaceService("mod") });
+  // A member is not an officer.
+  spaceWorld({ cookie: cookieWith("officers", "everyone", { data: [] }), service: spaceService("member") });
   assert.deepEqual(extras(await space.GET(req(), ctx())), [[SP.alpha, true, "everyone", true], [SP.zeta, false, "officers", false]]);
 
   // No `listed` room: the list is never read. A failed list read: the closed side, still 200.

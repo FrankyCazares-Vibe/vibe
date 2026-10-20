@@ -103,7 +103,7 @@ type World = {
   updateError?: Err;
   deleteRows?: { id: string }[];
   deleteError?: Err;
-  role?: "owner" | "admin" | "mod" | "member" | null;
+  role?: "owner" | "admin" | "member" | null;
   /** Live Event cards of the event, as the messages read answers them. */
   cardIds?: string[];
   notes?: Record<string, string | null>;
@@ -333,9 +333,9 @@ test("DELETE: a database without the chat schema (no cards table) deletes as bef
   assert.deepEqual(writes, []);
 });
 
-test("DELETE: the refusals are untouched (a mod is not an officer: 403, nothing read)", async (t) => {
+test("DELETE: the refusals are untouched (a member is not an officer: 403, nothing read)", async (t) => {
   quiet(t);
-  const { log } = setup({ event: UPCOMING, cardIds: CARDS, notes: NOTES, role: "mod" });
+  const { log } = setup({ event: UPCOMING, cardIds: CARDS, notes: NOTES, role: "member" });
   const res = await del();
   assert.equal(res.status, 403);
   assert.deepEqual(log, []);
@@ -418,9 +418,9 @@ test("PATCH: the refusals touch no card (ended 409, not an officer 403, invalid 
   const ended = setup({ event: ENDED, updatedEvent: EDITED_TITLE, cardIds: CARDS, notes: NOTES });
   assert.equal((await patch({ title: "Fall Formal 2" })).status, 409);
   assert.deepEqual(ended.log, []);
-  const mod = setup({ event: UPCOMING, updatedEvent: EDITED_TITLE, cardIds: CARDS, notes: NOTES, role: "mod" });
+  const member = setup({ event: UPCOMING, updatedEvent: EDITED_TITLE, cardIds: CARDS, notes: NOTES, role: "member" });
   assert.equal((await patch({ title: "Fall Formal 2" })).status, 403);
-  assert.deepEqual(mod.log, []);
+  assert.deepEqual(member.log, []);
   const times = setup({ event: UPCOMING, updatedEvent: EDITED_TITLE, cardIds: CARDS, notes: NOTES });
   assert.equal((await patch({ starts_at: "2026-10-12T00:00:00Z" })).status, 400);
   assert.deepEqual(times.log, []);

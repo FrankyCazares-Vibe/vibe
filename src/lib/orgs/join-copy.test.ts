@@ -694,7 +694,7 @@ test("⋯ menu: Mute or Unmute for everyone signed in, Leave for members but the
   assert.deepEqual(kinds({ signedIn: true, role: null, muted: false }), ["mute"]);
   assert.deepEqual(kinds({ signedIn: true, role: null, muted: true }), ["unmute"]);
   assert.deepEqual(kinds({ signedIn: true, role: "member", muted: false }), ["mute", "leave"]);
-  assert.deepEqual(kinds({ signedIn: true, role: "mod", muted: true }), ["unmute", "leave"]);
+  assert.deepEqual(kinds({ signedIn: true, role: "member", muted: true }), ["unmute", "leave"]);
   assert.deepEqual(kinds({ signedIn: true, role: "admin", muted: false }), ["mute", "leave"]);
   assert.deepEqual(kinds({ signedIn: true, role: "owner", muted: false }), ["mute"]);
   assert.deepEqual(

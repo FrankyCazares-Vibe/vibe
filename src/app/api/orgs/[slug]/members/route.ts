@@ -14,7 +14,7 @@ type Params = { params: Promise<{ slug: string }> };
  *
  * Returns: [{ user_id, role, joined_at, title, name, handle, avatar_url, school_verified }]
  * (`title` null when none was given, or on a database without the column)
- * sorted by role precedence (owner → admin → mod → member) then joined_at.
+ * sorted by role precedence (owner → admin, an officer → member) then joined_at.
  *
  * THE ORG IS LOADED WITH THE SERVICE ROLE (spec §4.2). It used to be read
  * with the VIEWER's client, so `org_members_select` decided whether the row
@@ -116,7 +116,7 @@ export async function GET(req: Request, { params }: Params) {
     );
   }
 
-  const ROLE_RANK: Record<string, number> = { owner: 0, admin: 1, mod: 2, member: 3 };
+  const ROLE_RANK: Record<string, number> = { owner: 0, admin: 1, member: 2 };
   const rows = ((data || []) as unknown as Record<string, unknown>[]).map((r) => {
     const u = r.users as unknown as {
       id: string;

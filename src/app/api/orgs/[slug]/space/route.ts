@@ -155,7 +155,7 @@ const membersOnly = () => NextResponse.json(refusalBody("members_only"), { statu
  * the service role (a fact about the club), then `can_view_org_channel` is
  * asked about it as the viewer, once. Its follower arm holds every rule
  * (following, the club's `followers_read_board`, not hidden, not removed,
- * not barred, not blocked by the club's owner, admins or mods). Any no is
+ * not barred, not blocked by the club's owner or officers). Any no is
  * the same 403 `members_only` a stranger gets, so a barred follower is
  * never told they were barred. A database without the function or the
  * column has no follower arm: also 403.

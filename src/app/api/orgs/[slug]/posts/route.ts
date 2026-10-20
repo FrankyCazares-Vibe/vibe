@@ -24,16 +24,16 @@ type Body = {
 const MAX_CONTENT = 2000;
 
 /**
- * Who may speak AS the org in public. Owner and admin — mods run the chats,
- * they don't publish to the campus feed under the org's name.
+ * Who may speak AS the org in public: the owner and officers (`admin`).
+ * Members chat; they don't publish to the campus feed under the org's name.
  *
  * It lives here rather than in `join-state.ts` next to `OFFICER_ROLES` /
  * `INVITE_ROLES` / `SETTINGS_ROLES` because it is a different power that today
  * happens to have the same membership as the settings one: approving a request
  * somebody filed, adding a notification to a stranger's Otto, changing the join
  * policy and putting words in the org's mouth are four separate questions, and
- * collapsing them onto one array is how "let mods post" quietly becomes "let
- * mods change the audience". One constant either way, so moving it is one line.
+ * collapsing them onto one array is how "let X post" quietly becomes "let X
+ * change the audience". One constant either way, so moving it is one line.
  */
 const POST_AS_ORG_ROLES: readonly OrgRole[] = Object.freeze(["owner", "admin"]);
 
@@ -51,8 +51,8 @@ const POST_AS_ORG_ROLES: readonly OrgRole[] = Object.freeze(["owner", "admin"]);
  * makes it surface on the org's profile + give the campus feed an
  * "Org · @handle" attribution.
  *
- * Permissions: {@link POST_AS_ORG_ROLES} — owner / admin. Mods can chat in
- * channels but don't speak as the org publicly. Rate limited per author
+ * Permissions: {@link POST_AS_ORG_ROLES} — the owner or an officer. Members
+ * can chat in channels but don't speak as the org publicly. Rate limited per author
  * (429), because one org post reaches the whole campus feed.
  *
  * A HIDDEN ORG CANNOT POST (spec §3.4). Hiding takes an org out of Discover,

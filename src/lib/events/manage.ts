@@ -64,7 +64,7 @@ export function eventTimesProblem(
  * A CLUB event follows the club's CURRENT owner and admins, never the row's
  * creator: an officer who is demoted or removed loses it the moment their
  * role changes, and every current officer has it whoever made the event.
- * Moderators ('mod') moderate chat, not content, so they don't.
+ * (Clubs have no mods since 20261021100000; they became officers.)
  * An org-less (legacy) event is managed by its creator.
  *
  * The database says the same thing in public.can_manage_event and the

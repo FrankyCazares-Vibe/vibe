@@ -161,7 +161,7 @@ const CASES: Case[] = [
   officer("reorder the rooms", "channels/reorder", "POST", {}, { channel_ids: [ROOM] }),
   officer("add someone to a room", "channels/[channelId]/members", "POST", { channelId: ROOM }, { user_id: OTHER }),
   officer("take someone off a room", "channels/[channelId]/members/[userId]", "DELETE", { channelId: ROOM, userId: OTHER }),
-  officer("change a role", "members/[userId]", "PATCH", { userId: OTHER }, { role: "mod" }),
+  officer("change a role", "members/[userId]", "PATCH", { userId: OTHER }, { role: "member" }),
   officer("remove a member", "members/[userId]", "DELETE", { userId: OTHER }),
   officer("take an invite back", "invites/[id]", "DELETE", { id: INVITE }),
   {

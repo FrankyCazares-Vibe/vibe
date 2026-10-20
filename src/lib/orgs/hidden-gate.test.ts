@@ -14,8 +14,10 @@ import { test } from "node:test";
 const specifier = "./hidden-gate.ts";
 const { officerGate } = (await import(specifier)) as typeof import("./hidden-gate");
 
-const OFFICERS = ["owner", "admin", "mod"] as const;
+// The owner and officers (`admin`): clubs have no mods since 20261021100000.
+const OFFICERS = ["owner", "admin"] as const;
 const OWNER_ADMIN = ["owner", "admin"] as const;
+const OWNER_ONLY = ["owner"] as const;
 
 test("a stranger to a hidden club gets 404, never 403", () => {
   assert.equal(officerGate({ hidden: true, role: null, allowed: OFFICERS }), "not_found");
@@ -31,9 +33,10 @@ test("a plain member of a hidden club knows it exists, so 403", () => {
   assert.equal(officerGate({ hidden: false, role: "member", allowed: OFFICERS }), "forbidden");
 });
 
-test("a mod on an owner/admin route is forbidden, hidden or not", () => {
-  assert.equal(officerGate({ hidden: true, role: "mod", allowed: OWNER_ADMIN }), "forbidden");
-  assert.equal(officerGate({ hidden: false, role: "mod", allowed: OWNER_ADMIN }), "forbidden");
+test("an officer on an owner-only list is forbidden, hidden or not", () => {
+  assert.equal(officerGate({ hidden: true, role: "admin", allowed: OWNER_ONLY }), "forbidden");
+  assert.equal(officerGate({ hidden: false, role: "admin", allowed: OWNER_ONLY }), "forbidden");
+  assert.equal(officerGate({ hidden: true, role: "owner", allowed: OWNER_ONLY }), "ok");
 });
 
 test("an allowed role passes, hidden or not (each route keeps its own hidden rules)", () => {
@@ -78,8 +81,6 @@ test("an owner-only route (empty allow-list) gives an admin of a hidden club a 4
 
 test("members who aren't owner/admin get 403 on hidden and visible clubs alike", () => {
   for (const hidden of [true, false]) {
-    for (const role of ["member", "mod"] as const) {
-      assert.equal(officerGate({ hidden, role, allowed: OWNER_ADMIN }), "forbidden", `${role} hidden=${hidden}`);
-    }
+    assert.equal(officerGate({ hidden, role: "member", allowed: OWNER_ADMIN }), "forbidden", `member hidden=${hidden}`);
   }
 });

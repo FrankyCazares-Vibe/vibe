@@ -40,7 +40,7 @@ function fail(status: number, code: string, error: string) {
  * officers can see this next to Follow on request and invite-only clubs.
  *
  * WHO: `canSeeFollowers` (owner, admin), the same roles as the
- * `org_followers_select` policy. Mods get 403. A hidden club is 404 to anyone
+ * `org_followers_select` policy. A member gets 403. A hidden club is 404 to anyone
  * who isn't a member.
  *
  * WHICH CLIENT: the org, the list, the roles and the count are all SERVICE

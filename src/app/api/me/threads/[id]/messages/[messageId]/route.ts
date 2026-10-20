@@ -41,13 +41,13 @@ function removed(already: boolean) {
  * `messages_delete_own`; the cascade, a Board post's replies included):
  * `{ ok: true }`, as it always answered.
  *
- * AN OFFICER OR A MOD OF THE CLUB (wave-2 contract 6.1, the gates in its
+ * THE CLUB'S OWNER OR AN OFFICER (wave-2 contract 6.1, the gates in its
  * order): someone else's message in a club room is not deleted but marked
  * `removed_at` / `removed_reason = OFFICER_REMOVED_REASON` with the service
  * role, so its author still reads it (with `removed: { by: "officer" }`) and
- * everyone else stops seeing it. The caller must be at least a mod, must not
- * be outranked by the author, and the message must carry no open report
- * (Vibe's moderators handle those). Never a hard delete, no
+ * everyone else stops seeing it. The caller must be at least an officer
+ * (no mods since 20261021100000), must not be outranked by the author, and
+ * the message must carry no open report (Vibe's moderators handle those). Never a hard delete, no
  * `moderation_actions` row, no report closed.
  *
  * WHO REMOVED IT is not on the message (S71 amendment, F02): the author
@@ -126,7 +126,7 @@ export async function DELETE(_req: Request, ctx: RouteCtx) {
   if (found.failed) return refuse("try_again", 503);
   if (found.room === null) return refuse("not_found", 404);
 
-  // 6. the caller's role: at least a mod (checked before the rank)
+  // 6. the caller's role: at least an officer (checked before the rank)
   const callerRole = await clubRole(member.orgId, user.id);
   if (callerRole === null || !ROOM_MODERATOR_ROLES.includes(callerRole)) return refuse("not_allowed", 403);
 
@@ -138,8 +138,8 @@ export async function DELETE(_req: Request, ctx: RouteCtx) {
 
   // 7. no row on the viewer's client: RLS hides someone else's removed
   // message. One service read tells "removed already" (200) from "cannot
-  // read it" (a private room they are not in, the Officers room to a mod:
-  // 404) and from "no such message" (404).
+  // read it" (a private room they are not in: 404) and from "no such
+  // message" (404).
   if (!msg) {
     const { data, error } = await service
       .from("messages")

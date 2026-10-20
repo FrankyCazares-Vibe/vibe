@@ -42,7 +42,7 @@ type PostPolicy = import("./types").PostPolicy;
 type Room = import("./types").Room;
 type RoomKind = import("./types").RoomKind;
 
-const ROLES: (ClubRole | null)[] = ["owner", "admin", "mod", "member", null];
+const ROLES: (ClubRole | null)[] = ["owner", "admin", "member", null];
 
 /** A value the types forbid but the database or a caller could still send. */
 const odd = <T>(value: unknown) => value as T;
@@ -64,9 +64,9 @@ function extraRoom(policy: PostPolicy, name = "exec-only"): Room {
 // The two lists and the reason
 // ---------------------------------------------------------------------------
 
-test("only owners and admins post on a Board; mods moderate but do not post there", () => {
+test("the owner and officers post on a Board and moderate; there are no mods (20261021100000)", () => {
   assert.deepEqual([...BOARD_POSTER_ROLES], ["owner", "admin"]);
-  assert.deepEqual([...ROOM_MODERATOR_ROLES], ["owner", "admin", "mod"]);
+  assert.deepEqual([...ROOM_MODERATOR_ROLES], ["owner", "admin"]);
 });
 
 test("the two lists cannot be changed by a caller", () => {
@@ -84,8 +84,8 @@ test("room kinds and club roles are told from anything else", () => {
   for (const bad of ["Board", " board", "general", "announcements", "dm", "", null, undefined, 1, {}]) {
     assert.equal(isRoomKind(bad), false, String(bad));
   }
-  for (const role of ["owner", "admin", "mod", "member"]) assert.equal(isClubRole(role), true, role);
-  for (const bad of ["Owner", "officer", "moderator", "guest", "", null, undefined, 3, []]) {
+  for (const role of ["owner", "admin", "member"]) assert.equal(isClubRole(role), true, role);
+  for (const bad of ["mod", "Owner", "officer", "moderator", "guest", "", null, undefined, 3, []]) {
     assert.equal(isClubRole(bad), false, String(bad));
   }
 });
@@ -137,16 +137,15 @@ test("each line reads as a sentence and keeps to the product's words", () => {
 // canModerate
 // ---------------------------------------------------------------------------
 
-test("owners, admins and mods moderate; members and strangers do not", () => {
+test("the owner and officers moderate; members and strangers do not", () => {
   assert.equal(canModerate("owner"), true);
   assert.equal(canModerate("admin"), true);
-  assert.equal(canModerate("mod"), true);
   assert.equal(canModerate("member"), false);
   assert.equal(canModerate(null), false);
 });
 
 test("an unknown role never moderates", () => {
-  for (const bad of ["Owner", "ADMIN", "officer", "moderator", "", " mod", undefined, 3, true, {}]) {
+  for (const bad of ["mod", "Owner", "ADMIN", "officer", "moderator", "", " mod", undefined, 3, true, {}]) {
     assert.equal(canModerate(odd<ClubRole>(bad)), false, String(bad));
   }
 });
@@ -156,13 +155,12 @@ test("an unknown role never moderates", () => {
 // ---------------------------------------------------------------------------
 
 test("the rank table: who may remove whose message", () => {
-  // Rows = the caller, columns = the author: owner, admin, mod, member, gone.
+  // Rows = the caller, columns = the author: owner, admin, member, gone.
   const expected: Record<string, boolean[]> = {
-    owner: [true, true, true, true, true],
-    admin: [false, true, true, true, true],
-    mod: [false, false, true, true, true],
-    member: [false, false, false, false, false],
-    null: [false, false, false, false, false],
+    owner: [true, true, true, true],
+    admin: [false, true, true, true],
+    member: [false, false, false, false],
+    null: [false, false, false, false],
   };
   for (const caller of ROLES) {
     ROLES.forEach((author, column) => {
@@ -175,9 +173,9 @@ test("the rank table: who may remove whose message", () => {
   }
 });
 
-test("equal rank is allowed only from mod up", () => {
-  assert.equal(outranks("mod", "mod"), true);
-  assert.equal(outranks("admin", "admin"), true);
+test("equal rank is allowed only from officer up", () => {
+  assert.equal(outranks("admin", "admin"), true, "an officer may remove another officer's message");
+  assert.equal(outranks("admin", "owner"), false, "an officer can't remove the owner's");
   assert.equal(outranks("owner", "owner"), true);
   assert.equal(outranks("member", "member"), false);
   assert.equal(outranks(null, null), false);
@@ -189,8 +187,10 @@ test("an unknown role ranks with someone who left", () => {
   assert.equal(outranks(odd<ClubRole>("superadmin"), "member"), false, "an unknown caller removes nothing");
   assert.equal(outranks(odd<ClubRole>("OWNER"), "member"), false, "roles are not matched by case");
   assert.equal(outranks(odd<ClubRole>(undefined), null), false);
-  assert.equal(outranks("mod", odd<ClubRole>("superadmin")), true, "an unknown author has no rank");
-  assert.equal(outranks("mod", odd<ClubRole>(undefined)), true);
+  assert.equal(outranks("admin", odd<ClubRole>("superadmin")), true, "an unknown author has no rank");
+  assert.equal(outranks("admin", odd<ClubRole>(undefined)), true);
+  assert.equal(outranks(odd<ClubRole>("mod"), "member"), false, "a mod read from an old row removes nothing");
+  assert.equal(outranks("admin", odd<ClubRole>("mod")), true, "and ranks with a member");
 });
 
 // ---------------------------------------------------------------------------
@@ -255,7 +255,7 @@ test("no label carries the old wording", () => {
 
 test("Board, a new post by someone who is not an owner or admin: officers only", () => {
   assert.equal(postRefusal(room("board"), null, "member"), "board_officers_only");
-  assert.equal(postRefusal(room("board"), null, "mod"), "board_officers_only", "a mod does not post on a Board");
+  assert.equal(postRefusal(room("board"), null, odd<ClubRole>("mod")), "board_officers_only", "a mod read from an old row does not post on a Board");
   assert.equal(postRefusal(room("board"), null, null), "board_officers_only");
   assert.equal(postRefusal(room("board"), null, odd<ClubRole>("Owner")), "board_officers_only");
   assert.equal(postRefusal(room("board"), null, odd<ClubRole>(undefined)), "board_officers_only");

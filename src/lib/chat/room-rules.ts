@@ -10,9 +10,10 @@
  * decide who may post; nothing here lets anyone in. `postRefusal` only picks
  * the words for a send the database already refused.
  *
- * "Officer" means two different lists elsewhere in the repo (`OFFICER_ROLES`
- * has mods, `CHANNEL_ADMIN_ROLES` does not). Chat imports neither and uses
- * the two lists below.
+ * Clubs have an Owner and Officers (`admin`) since 20261021100000; there are
+ * no mods. `OFFICER_ROLES` and `CHANNEL_ADMIN_ROLES` elsewhere in the repo
+ * are now the same two roles, but chat imports neither and uses the two
+ * lists below.
  */
 
 import type { ClubRole, PostPolicy, PostRefusalCode, Room, RoomKind } from "./types";
@@ -21,12 +22,13 @@ import type { ClubRole, PostPolicy, PostRefusalCode, Room, RoomKind } from "./ty
 export const BOARD_POSTER_ROLES: readonly ClubRole[] = Object.freeze(["owner", "admin"]);
 
 /** Who may remove someone else's message in a club room. */
-export const ROOM_MODERATOR_ROLES: readonly ClubRole[] = Object.freeze(["owner", "admin", "mod"]);
+export const ROOM_MODERATOR_ROLES: readonly ClubRole[] = Object.freeze(["owner", "admin"]);
 
 /**
- * `messages.removed_reason` of a message an officer or a mod removed. The
- * thread read tells an officer's removal from a Vibe moderator's by this
- * exact text, so it is never reworded.
+ * `messages.removed_reason` of a message the owner or an officer removed
+ * (mods made some before 20261021100000; same text). The thread read tells an
+ * officer's removal from a Vibe moderator's by this exact text, so it is
+ * never reworded.
  */
 export const OFFICER_REMOVED_REASON = "Removed by a club officer.";
 
@@ -41,7 +43,7 @@ export const EXTRA_ROOM_CAP = 5;
 export const POST_POLICIES = Object.freeze(["everyone", "officers", "listed"] as const);
 
 const ROOM_KINDS: readonly RoomKind[] = Object.freeze(["board", "lounge", "officers", "event", "room"]);
-const CLUB_ROLES: readonly ClubRole[] = Object.freeze(["owner", "admin", "mod", "member"]);
+const CLUB_ROLES: readonly ClubRole[] = Object.freeze(["owner", "admin", "member"]);
 
 /** A `channels.kind` value read from the database. Null (a dm, a group, an old database) is not one. */
 export function isRoomKind(value: unknown): value is RoomKind {
@@ -69,26 +71,28 @@ export function postRuleLine(policy: PostPolicy): string | null {
   return null;
 }
 
-/** Owner, admin or mod. Null (not a member, or a dm / group) and anything unknown: no. */
+/** The owner or an officer (admin). Null (not a member, or a dm / group) and anything unknown: no. */
 export function canModerate(role: ClubRole | null): boolean {
   return isClubRole(role) && ROOM_MODERATOR_ROLES.includes(role);
 }
 
-/** Owner 3, admin 2, mod 1; a member, someone who left, or an unknown role 0. */
+/**
+ * Owner 2, admin (an officer) 1; a member, someone who left, or an unknown
+ * role 0. A `mod` read from an old row is unknown: no row can hold it since
+ * 20261021100000.
+ */
 function rank(role: unknown): number {
-  if (role === "owner") return 3;
-  if (role === "admin") return 2;
-  if (role === "mod") return 1;
+  if (role === "owner") return 2;
+  if (role === "admin") return 1;
   return 0;
 }
 
 /**
  * May `callerRole` remove a message written by `authorRole` (section 6.3)?
- * The caller must be at least a mod, and the author must not rank above
- * them. Equal rank is allowed: a mod may remove a mod's message, an admin an
- * admin's. A mod cannot remove an owner's or an admin's; an admin cannot
- * remove the owner's. A plain member removes nobody's, another member's
- * included.
+ * The caller must be at least an officer, and the author must not rank above
+ * them. Equal rank is allowed: an officer may remove another officer's
+ * message. An officer cannot remove the owner's. A plain member removes
+ * nobody's, another member's included.
  */
 export function outranks(callerRole: ClubRole | null, authorRole: ClubRole | null): boolean {
   const caller = rank(callerRole);

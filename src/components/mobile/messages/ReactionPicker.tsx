@@ -64,7 +64,7 @@ export function ReactionPicker({
   /** Adds "Report", under Reply. Absent on the viewer's own message and on
    *  one still sending. */
   onReport?: () => void;
-  /** Adds "Remove", under Report: an officer's or a mod's removal of
+  /** Adds "Remove", under Report: the owner's or an officer's removal of
    *  someone else's message in a club room (wave-2 contract 11.5). */
   onRemove?: () => void;
   /** Adds a red "Delete", last: the viewer's own message, card or reply

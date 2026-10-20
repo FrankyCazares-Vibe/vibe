@@ -9,7 +9,7 @@ import { OFFICER_ROLES } from "./join-state";
  * ask the same question the same way.
  *
  * THE ORG SIDE is the owner (`orgs.owner_id`) plus every member whose role is
- * in {@link OFFICER_ROLES} (owner, admin, mod).
+ * in {@link OFFICER_ROLES} (owner, admin).
  *
  * ONE-DIRECTIONAL FOR GETTING IN (waveA-build product call 9):
  *   - an officer blocked the student → they can't join, request, accept an
@@ -230,7 +230,7 @@ export async function loadInviteBlocks(
  * invites) and would keep a victim out of reach in the app; hiding fewer
  * would offer a tap that 404s.
  *
- * `blockerSide` is the org side plus the sender (owner, admin, mod, sender).
+ * `blockerSide` is the org side plus the sender (owner, admin, sender).
  * `rows` are block rows `{blocker_id, blocked_id}`; a person is refused when
  *   - they blocked the SENDER (their block of the owner or another officer
  *     does not count), or

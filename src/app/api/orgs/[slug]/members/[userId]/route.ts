@@ -15,25 +15,31 @@ import { createSupabaseServiceClient } from "@/lib/supabase/service";
 type Params = { params: Promise<{ slug: string; userId: string }> };
 type PatchBody = { role?: unknown; title?: unknown };
 
-const VALID_ROLES = ["admin", "mod", "member"] as const;
+/** The roles PATCH may set: officer (stored `admin`) or member. No `mod` since 20261021100000. */
+const VALID_ROLES = ["admin", "member"] as const;
 
 /** The `orgOfficer` refusal, the same line on every club officer route. */
 const OFFICER_BUSY = "Too many club changes at once. Try again in a few minutes.";
 
-/** Who may change roles or remove members here (the route's own rule). */
+/** Who may use this route at all: the owner and officers (`admin`). */
 const STAFF_ROLES: readonly OrgRole[] = ["owner", "admin"];
 
 /**
- * The rows each officer may change or remove, by the target's role. The owner
- * row is never one; only the owner acts on an admin (in the database too,
- * org_members_update). THE WRITE FILTERS ON THIS, not just the read before it
- * (S67 sec wave 2 integration): an admin's PATCH/DELETE that raced the owner
- * promoting that member to admin matches 0 rows instead of acting on an admin.
+ * The rows each of them may act on (remove, title), by the target's role.
+ * The owner row is never one; only the owner acts on an officer. Role changes
+ * are the owner's alone (PATCH below; org_members_update says so in the
+ * database too, 20261021100000). THE WRITE FILTERS ON THIS, not just the read
+ * before it (S67 sec wave 2 integration): an officer's DELETE that raced the
+ * owner making that member an officer matches 0 rows instead of removing an
+ * officer.
  */
 const ACTABLE_ROLES: Record<"owner" | "admin", readonly OrgRole[]> = {
-  owner: ["admin", "mod", "member"],
-  admin: ["mod", "member"],
+  owner: ["admin", "member"],
+  admin: ["member"],
 };
+
+/** An officer asking to change anyone's role (Franky, Oct 20: only the owner makes officers). */
+const OWNER_ONLY_ROLES = "Only the owner can make or remove officers.";
 
 /** 0 rows changed: why. Still a member (their role moved) or gone. */
 async function standingAfterMiss(
@@ -96,7 +102,7 @@ type StaffGuard = Extract<Awaited<ReturnType<typeof requireStaff>>, { viewerRole
  * the member's public profile next to the club, if they show the club; the
  * role word never does.
  *
- * WHO: the owner titles anyone, themselves included; an admin titles mods,
+ * WHO: the owner titles anyone, themselves included; an officer titles
  * members and themselves. The same reach as roles ({@link ACTABLE_ROLES}),
  * plus your own row, and the write filters on it, so a title can't land on
  * someone whose role moved out of reach meanwhile.
@@ -183,17 +189,19 @@ async function patchTitle(guard: StaffGuard, actorId: string, userId: string, ra
 /**
  * PATCH /api/orgs/[slug]/members/[userId] — change a member's role, OR give
  * them a title.
- * Body: { role: 'admin' | 'mod' | 'member' } or { title: string | null }
+ * Body: { role: 'admin' | 'member' } or { title: string | null }
  * (one at a time; the title rules are on {@link patchTitle}).
  *
  * Permissions:
- *  - Admin/owner only.
+ *  - Titles: the owner or an officer ({@link patchTitle}).
+ *  - Roles: THE OWNER ONLY. Making a member an officer (`admin`) or an
+ *    officer a member again is the owner's call (Franky, Oct 20; the club's
+ *    view, DECISIONS.md Round 1 call 1). An officer gets 403.
  *  - Cannot change the owner's row (transfer-ownership flow not in v1).
- *  - Admins cannot demote/promote each other; only the owner can manage admins.
  *
  * The write re-asks the role rule ({@link ACTABLE_ROLES}) and returns the rows
- * it changed: 0 rows answers 409 when their role moved out of this officer's
- * reach meanwhile, 404 when they are no longer a member.
+ * it changed: 0 rows answers 409 when their row moved out of reach meanwhile,
+ * 404 when they are no longer a member.
  */
 export async function PATCH(req: Request, { params }: Params) {
   const { slug, userId } = await params;
@@ -238,10 +246,13 @@ export async function PATCH(req: Request, { params }: Params) {
     }
     return patchTitle(guard, user.id, userId, body.title);
   }
+  if (guard.viewerRole !== "owner") {
+    return NextResponse.json({ ok: false, error: OWNER_ONLY_ROLES }, { status: 403 });
+  }
   const role = typeof body.role === "string" ? body.role : "";
   if (!(VALID_ROLES as readonly string[]).includes(role)) {
     return NextResponse.json(
-      { ok: false, error: "Role must be admin, mod, or member" },
+      { ok: false, error: "Role must be admin (Officer) or member" },
       { status: 400 }
     );
   }
@@ -267,22 +278,10 @@ export async function PATCH(req: Request, { params }: Params) {
       { status: 400 }
     );
   }
-  if (target.role === "admin" && guard.viewerRole !== "owner") {
-    return NextResponse.json(
-      { ok: false, error: "Only the owner can demote admins" },
-      { status: 403 }
-    );
-  }
-  if (role === "admin" && guard.viewerRole !== "owner") {
-    return NextResponse.json(
-      { ok: false, error: "Only the owner can promote to admin" },
-      { status: 403 }
-    );
-  }
 
-  // The checks above read the target a moment ago; the write asks again. It
-  // only touches a row whose role this officer may still act on, and says
-  // which rows it changed.
+  // The check above read the target a moment ago; the write asks again. It
+  // only touches a row the owner may still act on (never the owner's), and
+  // says which rows it changed.
   const { data: changed, error } = await guard.service
     .from("org_members")
     .update({ role })
@@ -308,11 +307,11 @@ export async function PATCH(req: Request, { params }: Params) {
 
 /**
  * DELETE /api/orgs/[slug]/members/[userId] — remove a member.
- * Permissions: admin/owner. Owner row is non-removable.
- * Admins cannot remove other admins (only owner can). Since 20260928100000
- * the database lets the data API delete only your OWN membership (leaving),
- * so this service-role route is the only way anyone is removed, and every
- * removal is recorded. The delete re-asks the role rule, like PATCH: 409 when
+ * Permissions: the owner or an officer. Owner row is non-removable.
+ * Officers cannot remove other officers (only the owner can). Since
+ * 20260928100000 the database lets the data API delete only your OWN
+ * membership (leaving), so this service-role route is the only way anyone is
+ * removed, and every removal is recorded. The delete re-asks the role rule, like PATCH: 409 when
  * their role moved out of reach meanwhile, 404 when they are already gone.
  *
  * A REMOVAL IS RECORDED FIRST (S67 sec wave 2 #15). `org_removals` gets the
@@ -369,7 +368,7 @@ export async function DELETE(_req: Request, { params }: Params) {
   }
   if (target.role === "admin" && guard.viewerRole !== "owner") {
     return NextResponse.json(
-      { ok: false, error: "Only the owner can remove admins" },
+      { ok: false, error: "Only the owner can remove officers" },
       { status: 403 }
     );
   }
