@@ -45,6 +45,15 @@ const COPIES: ReadonlyArray<readonly [string, () => string]> = [
 const CLUB_PAGE_FIELDS = "name, description, links, philanthropy, logo, banner, who can join, when it meets, and the member and follower counts once each reaches 5";
 
 for (const [name, read] of COPIES) {
+  test(`${name}: section 7 says the browser keeps which club the Profile tab shows`, () => {
+    // club-switch.ts PROFILE_AS_CLUB_KEY, cleared at sign-out (leave-device-clean.ts).
+    const text = oneLine(read());
+    assert.ok(
+      text.includes("follow list, recent searches and which of the clubs you run your Profile tab shows. They are cleared when you sign out"),
+      `${name} does not say the browser keeps which club the Profile tab shows`,
+    );
+  });
+
   test(`${name}: section 5a lists when a club meets among what its page shows`, () => {
     const text = oneLine(read());
     assert.ok(text.includes(CLUB_PAGE_FIELDS), `${name} is missing "${CLUB_PAGE_FIELDS}"`);

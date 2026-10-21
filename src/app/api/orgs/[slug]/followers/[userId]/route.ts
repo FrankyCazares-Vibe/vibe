@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { requireNotRestricted } from "@/lib/moderation/access";
 import { canSeeFollowers, loadFollowerCount, loadOrgRole } from "@/lib/orgs/following";
 import { isUuid } from "@/lib/pgrest";
 import { rateLimit, tooManyRequests } from "@/lib/rate-limit";
@@ -45,7 +46,8 @@ function fail(status: number, code: string, error: string) {
  *
  * RESPONSES
  *   200 {ok, removed, follower_count}   removed:false when they didn't follow
- *   400 invalid_user_id · 401 unauthorized · 403 officers_only ·
+ *   400 invalid_user_id · 401 unauthorized · 403 officers_only (or the
+ *   Terms / restriction refusal) ·
  *   404 not_found · 409 member_follows · 429 · 500 remove_failed
  */
 export async function DELETE(_req: Request, { params }: Params) {
@@ -58,6 +60,13 @@ export async function DELETE(_req: Request, { params }: Params) {
   if (!rl.allowed) return tooManyRequests(rl, "Too many tries. Try again in a minute.");
 
   if (!isUuid(userId)) return fail(400, "invalid_user_id", "Invalid user id");
+
+  // This route writes with the service role, which skips the policies that
+  // refuse a suspended or banned officer, and the proxy's 403 leans on the
+  // app_metadata mirror: ask here, as the members route does (wave 2
+  // security pass L5; Club tools puts this one tap away on the phone).
+  const restricted = await requireNotRestricted(user.id);
+  if (restricted) return restricted;
 
   const service = createSupabaseServiceClient();
   const { data: orgRow, error: orgErr } = await service

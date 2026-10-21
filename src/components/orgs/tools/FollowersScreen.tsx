@@ -166,7 +166,9 @@ export function FollowersScreen({ club }: { club: ToolsClub }) {
                 sub={followsSinceText(row.follows_since) ?? undefined}
                 end={
                   row.member_role != null ? (
-                    <span style={chipStyle}>Member</span>
+                    <span style={chipStyle}>
+                      {row.member_role === "owner" ? "Owner" : row.member_role === "admin" ? "Officer" : "Member"}
+                    </span>
                   ) : (
                     <button
                       type="button"

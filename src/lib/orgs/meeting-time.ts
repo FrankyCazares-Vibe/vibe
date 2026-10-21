@@ -27,8 +27,11 @@ const INVISIBLE_OR_BIDI = /(?!‍)\p{Cf}/gu;
 
 /** Any control character left once whitespace became spaces (NUL, BEL, DEL, …). */
 const CONTROL = /\p{Cc}/gu;
+/** Letters that draw nothing, used to fake an empty line. */
+const HANGUL_FILLERS = /[\u115F\u1160\u3164\uFFA0]/gu;
 
 const TOO_LONG = `Keep it to ${MEETING_TIME_MAX} characters.`;
+const NEEDS_WORDS = "Say when you meet in words or numbers.";
 
 function refuse(message: string): MeetingTimeCheck {
   return { ok: false, code: "meeting_time_invalid", message };
@@ -45,11 +48,18 @@ export function normalizeMeetingTime(raw: unknown): MeetingTimeCheck {
   if (typeof raw !== "string") return refuse("When you meet is one line of text.");
   const value = raw
     .replace(INVISIBLE_OR_BIDI, "")
+    .replace(HANGUL_FILLERS, "")
     .replace(/\s+/g, " ")
     .replace(CONTROL, "")
     .replace(/ {2,}/g, " ")
     .trim();
   if (Array.from(value).length > MEETING_TIME_MAX) return refuse(TOO_LONG);
+  // A line that draws nothing (a Hangul filler, a braille blank) or a tower
+  // of stacked marks would make an empty or very tall chip on the page
+  // (security pass L3): it needs a letter or a number, and no more than three
+  // marks on one character.
+  if (value && !/[\p{L}\p{N}]/u.test(value)) return refuse(NEEDS_WORDS);
+  if (/\p{M}{4,}/u.test(value)) return refuse(NEEDS_WORDS);
   return { ok: true, value };
 }
 

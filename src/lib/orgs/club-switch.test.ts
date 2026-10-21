@@ -2,15 +2,15 @@
  * Tests for `club-switch.ts` (wave 2, WAVE2-DESIGN.md C1 and C2): the shape
  * checks, lower-cased handles, the remembered club in a fake localStorage
  * (junk and blocked storage read as "not switched"), and the two-minute
- * clubs-you-run cache in a fake sessionStorage. The hooks need React to
- * render and are left to the browser pass.
+ * clubs-you-run cache, which lives in page memory only. The hooks need React
+ * to render and are left to the browser pass.
  *
  * Run with:
  *   node --test src/lib/orgs/club-switch.test.ts
  *
  * WHY THE RESOLVE HOOK: Node's type stripping doesn't resolve the "@/…"
- * alias. The request wrapper is stubbed (it pulls in the native bridge);
- * nothing here makes a request.
+ * alias. The request wrapper is stubbed (it pulls in the native bridge):
+ * it answers whatever `globalThis.__answer` holds, and nothing goes out.
  */
 
 import test from "node:test";
@@ -28,7 +28,9 @@ if (typeof registerHooks !== "function") {
 }
 const stub = (source: string) => `data:text/javascript,${encodeURIComponent(source)}`;
 const STUBS: Record<string, string> = {
-  "@/lib/feedback/request": stub("export async function vibeRequest() { throw new Error('not in this test'); }"),
+  "@/lib/feedback/request": stub(
+    "export async function vibeRequest(url) { globalThis.__asked = (globalThis.__asked || 0) + 1; return globalThis.__answer; }",
+  ),
 };
 registerHooks({
   resolve(specifier, context, nextResolve) {
@@ -162,22 +164,29 @@ test("junk or blocked storage reads as not switched, never throws", () => {
   }
 });
 
-test("the clubs cache: fresh for two minutes, gone with its session copy, cleared by a switch", () => {
+test("the clubs cache: page memory only, fresh for two minutes, emptied by a sign-out answer or a switch", async () => {
+  const g = globalThis as unknown as { __answer: unknown; __asked: number };
   const club = { org_id: "a", handle: "sae", name: "SAE", logo_url: null, role: "owner", title: null, requests: 1 };
-  const at = 1_000_000;
-  session.map.set(m.CLUBS_YOU_RUN_CACHE_KEY, JSON.stringify({ at, clubs: [club] }));
-  assert.deepEqual(m.readClubsYouRunCache(at + 1000)?.map((c) => c.handle), ["sae"]);
-  assert.equal(m.readClubsYouRunCache(at + m.CLUBS_YOU_RUN_CACHE_MS), null, "two minutes on, it asks again");
-  assert.equal(m.readClubsYouRunCache(at - 1), null, "a clock that went back is not fresh");
-  // Signing out removes the session copy; the page's memory copy goes too.
-  session.map.delete(m.CLUBS_YOU_RUN_CACHE_KEY);
-  assert.equal(m.readClubsYouRunCache(at + 1000), null);
-  session.map.set(m.CLUBS_YOU_RUN_CACHE_KEY, "{junk");
-  assert.equal(m.readClubsYouRunCache(at + 1000), null);
-  session.map.set(m.CLUBS_YOU_RUN_CACHE_KEY, JSON.stringify({ at: Date.now(), clubs: [club] }));
+  g.__asked = 0;
+  g.__answer = { ok: true, status: 200, data: { ok: true, clubs: [club] } };
+  assert.equal(m.readClubsYouRunCache(), null, "nothing cached at first");
+  const first = await m.loadClubsYouRun(false);
+  assert.deepEqual(first.ok && first.clubs.map((c) => c.handle), ["sae"]);
+  assert.equal(session.map.size, 0, "nothing goes to sessionStorage");
+  await m.loadClubsYouRun(false);
+  assert.equal(g.__asked, 1, "a second reader takes the cache");
+  assert.equal(m.readClubsYouRunCache(Date.now() + m.CLUBS_YOU_RUN_CACHE_MS), null, "two minutes on, it asks again");
+  assert.equal(m.readClubsYouRunCache(0), null, "a clock that went back is not fresh");
+  // Signed out (another tab signed out, the cookie is gone): no clubs, and the cache empties.
+  g.__answer = { ok: false, status: 401 };
+  const out = await m.loadClubsYouRun(true);
+  assert.deepEqual(out, { ok: true, clubs: [] });
+  assert.equal(m.readClubsYouRunCache(), null);
+  // A switch asks again too.
+  g.__answer = { ok: true, status: 200, data: { ok: true, clubs: [club] } };
+  await m.loadClubsYouRun(true);
   assert.ok(m.readClubsYouRunCache());
   m.setSwitchedClub({ handle: "sae", name: "SAE", logo_url: null });
-  assert.equal(session.map.has(m.CLUBS_YOU_RUN_CACHE_KEY), false, "a switch asks again");
-  assert.equal(m.readClubsYouRunCache(), null);
+  assert.equal(m.readClubsYouRunCache(), null, "a switch asks again");
   m.setSwitchedClub(null);
 });

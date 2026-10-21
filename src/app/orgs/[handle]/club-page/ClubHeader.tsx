@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import type { CSSProperties, ReactNode } from "react";
 
 import { ORG_COPY, audienceChip, policyChip } from "@/lib/orgs/join-copy";
 import type { JoinPolicy } from "@/lib/orgs/join-state";
@@ -260,7 +260,15 @@ export function ClubHeader({
         {joinChip ? (
           <ChipPill icon={org.join_policy === "open" ? null : <LockGlyph size={10} />}>{joinChip}</ChipPill>
         ) : null}
-        {org.meeting_time ? <ChipPill>{org.meeting_time}</ChipPill> : null}
+        {/* The club's own words, so a clock marks them as when it meets and
+            they can't pass for one of the page's own chips ("Anyone can
+            join", "Verified"): security pass L2. */}
+        {org.meeting_time ? (
+          <ChipPill icon={<ClockGlyph />}>
+            <span style={visuallyHidden}>Meets </span>
+            {org.meeting_time}
+          </ChipPill>
+        ) : null}
         {moreAboutUs}
       </div>
     </header>
@@ -325,6 +333,24 @@ function Chip({ color, children }: { color: string; children: ReactNode }) {
     >
       {children}
     </span>
+  );
+}
+
+const visuallyHidden: CSSProperties = {
+  position: "absolute",
+  width: 1,
+  height: 1,
+  overflow: "hidden",
+  clip: "rect(0 0 0 0)",
+  whiteSpace: "nowrap",
+};
+
+function ClockGlyph() {
+  return (
+    <svg width="11" height="11" viewBox="0 0 16 16" aria-hidden style={{ flexShrink: 0 }}>
+      <circle cx="8" cy="8" r="6.25" fill="none" stroke="currentColor" strokeWidth="1.6" />
+      <path d="M8 4.5V8l2.4 1.6" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+    </svg>
   );
 }
 

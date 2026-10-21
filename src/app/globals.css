@@ -2552,6 +2552,26 @@ html {
 .vibe-club-join > * {
   justify-content: stretch !important;
 }
+/* It often holds two actions (Following and Joined, Follow and Request to
+   join): they sit side by side, sharing the slot, which takes the row but
+   for Share page's 44px square. */
+.vibe-club-actions > .vibe-club-join {
+  flex: 1 1 0;
+}
+.vibe-club-actions > button[aria-label="Share page"] {
+  flex: 0 0 44px;
+}
+.vibe-club-join > * {
+  flex-wrap: nowrap !important;
+  gap: 8px !important;
+}
+.vibe-club-join > * > * {
+  flex: 1 1 0;
+  min-width: 0;
+}
+.vibe-club-join > * > * button {
+  width: 100%;
+}
 .vibe-club-tabs {
   display: flex;
   margin-top: 22px;

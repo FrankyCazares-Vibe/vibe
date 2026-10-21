@@ -576,7 +576,9 @@ export default async function OrgProfilePage({ params }: Params) {
                   )}
                 </div>
               )}
-              {org.hidden ? null : <SharePageButton orgHandle={org.handle} orgName={org.name} />}
+              {org.hidden ? null : (
+                <SharePageButton orgHandle={org.handle} orgName={org.name} compact={!officerRole} />
+              )}
             </div>
 
             {setup && !setup.complete ? (

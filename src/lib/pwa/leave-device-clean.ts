@@ -67,13 +67,6 @@ const ACCOUNT_KEYS = [
 ] as const;
 
 /**
- * Per-account sessionStorage, by name: the clubs I run, cached two minutes
- * for the tab bar and the desktop menu (club-switch.ts). Without this the next
- * person signing in on the same tab would see my clubs until it ran out.
- */
-const SESSION_ACCOUNT_KEYS = ["vibe.clubs-you-run.v1"] as const;
-
-/**
  * In order (critic-w3.md item 21): the server DELETE (when `serverDelete`) →
  * unsubscribe / deleteToken → shown notifications (the worker's SIGNED_OUT, or
  * the app's delivered list) → the badge → storage → the onboarding draft.
@@ -92,13 +85,6 @@ async function leave(serverDelete: boolean): Promise<void> {
   for (const key of ACCOUNT_KEYS) {
     try {
       window.localStorage.removeItem(key);
-    } catch {
-      // Blocked storage holds nothing to remove.
-    }
-  }
-  for (const key of SESSION_ACCOUNT_KEYS) {
-    try {
-      window.sessionStorage.removeItem(key);
     } catch {
       // Blocked storage holds nothing to remove.
     }

@@ -117,7 +117,20 @@ export function EditPageButton(props: EditProps): JSX.Element {
   );
 }
 
-export function SharePageButton({ orgHandle, orgName }: { orgHandle: string; orgName: string }): JSX.Element {
+/**
+ * `compact`: a 44px square with the share glyph, for the row a visitor or a
+ * member sees, where the join control often holds two actions with a line
+ * under each and needs the room; officers keep the two halves.
+ */
+export function SharePageButton({
+  orgHandle,
+  orgName,
+  compact = false,
+}: {
+  orgHandle: string;
+  orgName: string;
+  compact?: boolean;
+}): JSX.Element {
   // One sheet at a time: a second tap while one is up would be refused and
   // fall through to a copy.
   const sharing = useRef(false);
@@ -131,8 +144,14 @@ export function SharePageButton({ orgHandle, orgName }: { orgHandle: string; org
     }
   };
   return (
-    <button type="button" className="vibe-press" onClick={() => void share()} style={halfPillStyle}>
-      Share page
+    <button
+      type="button"
+      className="vibe-press"
+      onClick={() => void share()}
+      aria-label={compact ? "Share page" : undefined}
+      style={compact ? squarePillStyle : halfPillStyle}
+    >
+      {compact ? <ShareGlyph /> : "Share page"}
     </button>
   );
 }
@@ -224,6 +243,21 @@ const halfPillStyle: CSSProperties = {
   cursor: "pointer",
   WebkitTapHighlightColor: "transparent",
 };
+
+const squarePillStyle: CSSProperties = {
+  ...halfPillStyle,
+  flex: "0 0 44px",
+  width: 44,
+  padding: 0,
+};
+
+function ShareGlyph() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M12 3v12M7 8l5-5 5 5M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6" />
+    </svg>
+  );
+}
 
 /** A 44px target around the drawn 40px circle. */
 const roundHitStyle: CSSProperties = {

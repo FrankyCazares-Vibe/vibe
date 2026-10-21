@@ -71,8 +71,8 @@ test("at most 60 characters, counted as Postgres counts them (code points)", () 
   assert.equal(ok("a".repeat(60)).length, 60);
   assert.equal(refused("a".repeat(61)), "Keep it to 60 characters.");
   // An emoji is one code point (two UTF-16 units): 60 pass, 61 do not.
-  assert.equal(Array.from(ok("😀".repeat(60))).length, 60);
-  assert.equal(refused("😀".repeat(61)), "Keep it to 60 characters.");
+  assert.equal(Array.from(ok(`7${"😀".repeat(59)}`)).length, 60);
+  assert.equal(refused(`7${"😀".repeat(60)}`), "Keep it to 60 characters.");
   // The count is taken after trimming and collapsing.
   assert.equal(ok(`  ${"a".repeat(30)}     ${"b".repeat(29)}  `).length, 60);
   assert.equal(ok(`${"a".repeat(60)}​​`).length, 60);
@@ -236,4 +236,14 @@ test("PATCH: a database without the column: meeting_time is 503, every other sav
   assert.equal(saved.status, 200);
   assert.equal("meeting_time" in (saved.body.org as Record<string, unknown>), false);
   assert.ok(!String(other.update()!.calls.find((c) => c[0] === "select")![1]).includes("meeting_time"));
+});
+
+test("a line that draws nothing, or a tower of marks, is refused; fillers go", () => {
+  assert.equal(refused("\u2800\u2800"), "Say when you meet in words or numbers.");
+  assert.equal(refused("😀😀"), "Say when you meet in words or numbers.");
+  assert.equal(ok("\u3164 \u3164"), "");
+  assert.equal(ok("Thursdays\u3164 7 PM"), "Thursdays 7 PM");
+  assert.equal(refused("Thursdays e\u0301\u0301\u0301\u0301"), "Say when you meet in words or numbers.");
+  assert.equal(ok("Café, mañana 7 PM"), "Café, mañana 7 PM");
+  assert.equal(ok("Thursdays 🎉"), "Thursdays 🎉");
 });

@@ -21,8 +21,6 @@ import { vibeRequest } from "@/lib/feedback/request";
 
 export const PROFILE_AS_CLUB_KEY = "vibe.profile-as-club.v1";
 export const PROFILE_AS_CLUB_EVENT = "vibe:profile-as-club";
-/** sessionStorage: the last clubs-you-run answer, two minutes. Cleared at sign-out too. */
-export const CLUBS_YOU_RUN_CACHE_KEY = "vibe.clubs-you-run.v1";
 /** Same-tab: a fresh clubs-you-run answer landed (the sheet refreshed). */
 export const CLUBS_YOU_RUN_EVENT = "vibe:clubs-you-run";
 export const CLUBS_YOU_RUN_CACHE_MS = 2 * 60 * 1000;
@@ -197,8 +195,6 @@ export function useSwitchedClub(): SwitchedClub | null {
 
 type CacheEntry = { at: number; clubs: ClubYouRun[] };
 let memo: CacheEntry | null = null;
-/** The stored string `memo` was read from or written as. */
-let memoRaw: string | null = null;
 /** Bumped on every clear, so an answer already on its way can't refill it. */
 let cacheGen = 0;
 let inflight: Promise<LoadResult> | null = null;
@@ -206,65 +202,37 @@ let inflight: Promise<LoadResult> | null = null;
 type LoadResult = { ok: true; clubs: ClubYouRun[] } | { ok: false };
 
 /**
- * The cached clubs while fresh, else null. While sessionStorage works, its
- * copy is the one that counts: signing out removes it (leave-device-clean.ts)
- * and this page's memory copy goes with it. Blocked storage: memory alone.
+ * The cached clubs while fresh, else null. Page memory only, never
+ * sessionStorage (security pass L1, Oct 21): sessionStorage is per tab, so a
+ * sign-out in one tab would leave another tab's copy of one person's clubs
+ * for the next person on that computer. Memory lasts as long as the page:
+ * client navigations keep it, and signing out reloads the page
+ * (SettingsClient's `window.location.href`), which drops it.
  */
 export function readClubsYouRunCache(now: number = Date.now()): ClubYouRun[] | null {
-  const fresh = (e: CacheEntry | null) => (e && now - e.at >= 0 && now - e.at < CLUBS_YOU_RUN_CACHE_MS ? e : null);
-  let raw: string | null;
-  try {
-    raw = window.sessionStorage.getItem(CLUBS_YOU_RUN_CACHE_KEY);
-  } catch {
-    return fresh(memo)?.clubs ?? null;
-  }
-  if (!raw) {
-    memo = null;
-    return null;
-  }
-  if (memo && raw === memoRaw) return fresh(memo)?.clubs ?? null;
-  try {
-    const o = obj(JSON.parse(raw));
-    const clubs = o ? readClubsYouRun(o) : null;
-    if (!o || !clubs || typeof o.at !== "number") return null;
-    memo = { at: o.at, clubs };
-    memoRaw = raw;
-    return fresh(memo)?.clubs ?? null;
-  } catch {
-    return null;
-  }
+  if (!memo || now - memo.at < 0 || now - memo.at >= CLUBS_YOU_RUN_CACHE_MS) return null;
+  return memo.clubs;
 }
 
 function writeCache(clubs: ClubYouRun[]): void {
   memo = { at: Date.now(), clubs };
-  memoRaw = JSON.stringify(memo);
-  try {
-    window.sessionStorage.setItem(CLUBS_YOU_RUN_CACHE_KEY, memoRaw);
-  } catch {
-    // Blocked storage: module memory still spares this page a second ask.
-  }
 }
 
-/** Forget the cached clubs (a switch, sign-out); the next reader asks the route. */
+/** Forget the cached clubs (a switch, a signed-out answer); the next reader asks the route. */
 export function clearClubsYouRunCache(): void {
   memo = null;
-  memoRaw = null;
   cacheGen += 1;
-  try {
-    window.sessionStorage.removeItem(CLUBS_YOU_RUN_CACHE_KEY);
-  } catch {
-    // Nothing kept to remove.
-  }
 }
 
 const LOAD_FAILED = "Couldn't load your clubs.";
 
 /**
  * The cache when fresh (unless `force`), else one ask of the route, shared by
- * every caller while it is on its way. Signed out reads as no clubs and is
- * never cached, so signing in shows them at once.
+ * every caller while it is on its way. Signed out reads as no clubs, empties
+ * the cache and is never cached, so signing in shows them at once. Exported
+ * for club-switch.test.ts.
  */
-function loadClubsYouRun(force: boolean): Promise<LoadResult> {
+export function loadClubsYouRun(force: boolean): Promise<LoadResult> {
   if (!force) {
     const cached = readClubsYouRunCache();
     if (cached) return Promise.resolve({ ok: true, clubs: cached });
@@ -273,7 +241,12 @@ function loadClubsYouRun(force: boolean): Promise<LoadResult> {
   const gen = cacheGen;
   inflight = (async (): Promise<LoadResult> => {
     const r = await vibeRequest<unknown>("/api/me/clubs-you-run", { cache: "no-store", failure: LOAD_FAILED, quiet: true });
-    if (!r.ok) return r.status === 401 ? { ok: true, clubs: [] } : { ok: false };
+    if (!r.ok) {
+      if (r.status !== 401) return { ok: false };
+      // Signed out: nobody's clubs stay in this page's memory.
+      clearClubsYouRunCache();
+      return { ok: true, clubs: [] };
+    }
     const clubs = readClubsYouRun(r.data);
     if (!clubs) return { ok: false };
     if (gen === cacheGen) {

@@ -51,8 +51,8 @@ export function Sections6To8() {
       <LegalP>
         <strong>Kept in your browser.</strong> To load faster, Vibe keeps
         copies of some of your own information in your browser, such as your
-        profile card, your own posts, follow list and recent searches. They are
-        cleared when you sign out or delete your account in that browser, and
+        profile card, your own posts, follow list, recent searches and which of
+        the clubs you run your Profile tab shows. They are cleared when you sign out or delete your account in that browser, and
         stay in your other browsers until you sign out there. Your theme, the
         email you just signed up with, the note that you closed the cookie
         notice and a few similar notes can stay until you clear your browser

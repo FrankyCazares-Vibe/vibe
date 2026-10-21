@@ -35,15 +35,13 @@ test("the club titles I've seen and the Boards I follow are cleared with my acco
   for (const key of [titles, boards]) assert.ok(accountKeys.includes(key), `${key} stays after sign-out`);
 });
 
-test("the club the Profile tab stands for, and the cached clubs I run, are cleared at sign-out", () => {
+test("the club the Profile tab stands for is cleared at sign-out", () => {
   const switched = keyNamed("src/lib/orgs/club-switch.ts", "PROFILE_AS_CLUB_KEY");
   assert.equal(switched, "vibe.profile-as-club.v1");
   assert.ok(accountKeys.includes(switched), `${switched} stays after sign-out`);
-  const cache = keyNamed("src/lib/orgs/club-switch.ts", "CLUBS_YOU_RUN_CACHE_KEY");
-  const session = /const SESSION_ACCOUNT_KEYS = \[([\s\S]*?)\] as const;/.exec(clean);
-  assert.ok(session, "SESSION_ACCOUNT_KEYS is missing from leave-device-clean.ts");
-  assert.ok(session[1].includes(`"${cache}"`), `${cache} (sessionStorage) stays after sign-out`);
-  assert.match(clean, /window\.sessionStorage\.removeItem\(key\)/);
+  // The clubs I run are cached in page memory only (club-switch.ts), which a
+  // sign-out's reload drops: nothing of them is kept in the browser.
+  assert.doesNotMatch(repoFile("src/lib/orgs/club-switch.ts"), /sessionStorage\.(get|set)Item/);
 });
 
 test("the static profile writes the same titles key, so the same line clears it", () => {
