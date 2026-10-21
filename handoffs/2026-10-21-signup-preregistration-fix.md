@@ -44,6 +44,15 @@ links already let people in, and sign-up opens to everyone on Oct 31. Reproduced
   the student's works, the planted name is gone, the Terms tick is recorded again. The public code page leads to
   "Choose your password", then onboarding.
 
+Production read Oct 21 (counts only, no records): 20 accounts, 0 confirmed without a password, 0 pending email
+changes, all 20 passwords standard bcrypt (database password encryption off), 1 unconfirmed account (left alone),
+2 triggers on auth.users, wave 1 not applied. Production's Auth was v2.197.0 on Oct 20 (same behaviour as the local
+v2.189.0 on every path here).
+
+To rehearse with confirmation ON again: `prereg-testing.md` section 2 in the side-session notes (a second local Auth
+container, a small proxy, codes from Mailpit), then `node --no-warnings scripts/prereg-e2e.mjs --rehearsal
+http://127.0.0.1:54331 --app <dev server>`.
+
 ## What Franky must approve (production database: one bundle with wave 1's)
 Wave 1's three files, then these three:
 1. `20261022100000_password_needed_column.sql` (inert: a private column, the "confirm" consent source, a helper).
