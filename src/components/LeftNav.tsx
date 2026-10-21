@@ -179,7 +179,13 @@ export type VibeNavItem = {
 };
 export const VIBE_NAV_ITEMS: VibeNavItem[] = navItems;
 
-export default function LeftNav() {
+/**
+ * `campusHref`: where the Campus item goes, when not `/campus`. The club
+ * pages pass Campus → Orgs (the campus a visiting student was browsing
+ * included), the job their own "Return to Organizations" did before they
+ * moved into this frame.
+ */
+export default function LeftNav({ campusHref }: { campusHref?: string } = {}) {
   const pathname = usePathname();
   const [isPlatformAdmin, setIsPlatformAdmin] = useState(false);
 
@@ -309,14 +315,19 @@ export default function LeftNav() {
 
       <nav style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
         {visibleNavItems.map((item) => {
+          // A club's pages (/orgs/…) sit under Campus, as on the phone's tab
+          // bar (mobile-tab-active.ts): the left menu is their frame too
+          // since Oct 21, 2026.
           const isActive =
             pathname === item.href ||
             (item.href !== "/" &&
-              pathname.startsWith(`${item.href}/`));
+              pathname.startsWith(`${item.href}/`)) ||
+            (item.href === "/campus" &&
+              (pathname === "/orgs" || pathname.startsWith("/orgs/")));
           return (
             <Link
               key={item.href}
-              href={item.href}
+              href={item.href === "/campus" && campusHref ? campusHref : item.href}
               style={{
                 display: "flex",
                 alignItems: "center",

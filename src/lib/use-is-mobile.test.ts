@@ -439,3 +439,23 @@ for (const s of SWITCHES) {
     }
   });
 }
+
+// The club pages (Oct 21, 2026) choose the frame on the server instead of
+// with a Switch (`ClubAppFrame`, club-frame.tsx), but the rule is the same:
+// a phone, which is never framed, must not download the frame.
+test("the club pages' app frame is fetched on demand, never imported at the top", () => {
+  const shell = "@/components/campus-app-shell";
+  const wrapper = read("src/app/orgs/[handle]/ClubShell.tsx");
+  assert.equal(staticImports(wrapper).includes(shell), false, "ClubShell imports the shell at the top");
+  assert.ok(/\bdynamic\(\(\) =>\s*orLoadFailed\(\s*import\("@\/components\/campus-app-shell"\)/.test(wrapper));
+  const code = wrapper.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+  for (const banned of ["Suspense", "loading:", "ssr: false"]) assert.equal(code.includes(banned), false, banned);
+  for (const file of [
+    "src/app/orgs/[handle]/club-frame.tsx",
+    "src/app/orgs/[handle]/page.tsx",
+    "src/app/orgs/[handle]/setup/page.tsx",
+    "src/app/orgs/[handle]/tools/frame.tsx",
+  ]) {
+    assert.equal(staticImports(read(file)).includes(shell), false, `${file} imports the shell at the top`);
+  }
+});

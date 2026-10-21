@@ -155,3 +155,27 @@ Shipped from the wave 1 session (`busy-aryabhata-7b6991`); this branch's own ses
   iframe, only the menu or page scrolling closes it, the fading list catches no clicks, labelled groups, the last
   answer holds the row's place between pages, fresh on open, hover). tsc clean, 3,730 tests pass, walked headless at
   1280x800 in Night, Light and reduced motion.
+- **Evening, Oct 21 (Franky: on a computer, going to a club page felt like leaving the app):** on a computer, the
+  club page, its setup list and Club tools (members, followers, officers, requests, settings) now sit in the same
+  app frame as Campus, Network and Messages: the left menu with "Your clubs" and My Calendar, then the club page in
+  the middle, unchanged. The club's own colours now stop at the middle column; the left menu and the right column
+  keep the app's Light or Night. The page's old top bar ("vibe." and "Return to Organizations") is gone on a
+  computer. The left menu does its job: Campus is lit on a club's pages (as on the phone's tab bar), and from them it
+  goes back to Campus → Orgs, to the visited campus's list when a student is browsing another campus.
+  **Right column:** the owner and officers get the Club tools card there from 1100px wide; under 1100px it hides and
+  the cover's Club tools button is still there. **Everyone else gets no right column:** Up next, the club's link
+  and More about us are already on the page, a second copy would only repeat them, and the page keeps the room.
+  **Phones are unchanged:** a phone gets the page with no frame at all and never downloads the frame's code (the
+  server's phone-or-computer guess, the one Campus and Network use). A computer window under 900px draws the
+  same page pixel for pixel (checked headless, Night and Light: club page as officer, member and signed out, setup,
+  tools, members). **Signed-out visitors** keep the standalone page with "Sign in", since every place in the left
+  menu is a signed-in one. The Otto orb, new on these pages, stands down while one of their dialogs is open (it sat
+  above Edit page, and one Escape could close both and lose the typing). Code: `src/app/orgs/[handle]/club-frame.tsx`
+  and `ClubShell.tsx`, `CampusAppShell`'s new `pageTabBar` and `campusHref`, the right column's 1100px start (no
+  other page used it). Reviewed by four lenses with a skeptic per finding: 8 of 11 findings held, all fixed (the
+  four above: officers' narrow-window width, the phone download, the orb over dialogs, the way back to
+  Organizations). tsc clean, 3,731 tests pass. Walked headless at 900, 1100, 1280, 1440 and 375 as Maya (officer),
+  Blake (member) and signed out, Night and Light, no sideways scroll. No database change, no Privacy Policy change
+  (nothing new is collected or shown). **Not checked:** a real iPad held upright (it reads as a computer, so it
+  gets the frame, which steps aside under 900px), and the signed-in views on production (Franky: open a club you
+  run on a computer and on your phone).

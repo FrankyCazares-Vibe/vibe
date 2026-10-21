@@ -9,8 +9,23 @@ import { OttoCorner } from "@/components/network/OttoCorner";
 
 type Props = {
   children: ReactNode;
-  /** Optional right column (e.g. feed widgets). Omit for simple two-column layouts. */
+  /**
+   * Optional right column (e.g. feed widgets). Omit for simple two-column
+   * layouts. It shows from 1100px wide (globals.css `--with-rail`).
+   */
   sidebar?: ReactNode;
+  /**
+   * The page draws its own <MobileTabBar /> inside its <main> and pads
+   * itself for it: the club pages (/orgs/<handle>, its setup and Club tools),
+   * standalone pages until they moved into this frame (Oct 21, 2026). Their
+   * bar sits inside <main> so `.vibe-tabbar-page:has([aria-modal])` can hide
+   * it under the page's inline dialogs. The shell then draws no bar and,
+   * below 900px, steps aside (globals.css), so a narrow window lays the page
+   * out exactly as it did on its own.
+   */
+  pageTabBar?: boolean;
+  /** Where the left menu's Campus item goes, when not `/campus` (the club pages: Campus → Orgs). */
+  campusHref?: string;
 };
 
 /**
@@ -30,21 +45,32 @@ type Props = {
  * fork individual routes to use the new MobileShell + dedicated
  * mobile components, this legacy path will be retired per-route.
  */
-export function CampusAppShell({ children, sidebar }: Props) {
+export function CampusAppShell({ children, sidebar, pageTabBar = false, campusHref }: Props) {
   const pathname = usePathname();
   const showOttoCorner = !pathname?.startsWith("/messages");
 
   return (
     <div
-      className={
-        sidebar ? "vibe-app-shell vibe-app-shell--with-rail" : "vibe-app-shell"
-      }
+      className={[
+        "vibe-app-shell",
+        sidebar ? "vibe-app-shell--with-rail" : null,
+        pageTabBar ? "vibe-app-shell--page-tabbar" : null,
+      ]
+        .filter(Boolean)
+        .join(" ")}
     >
-      <LeftNav />
+      <LeftNav campusHref={campusHref} />
       {children}
       {sidebar ? <div className="vibe-right-rail">{sidebar}</div> : null}
-      <MobileTabBar />
-      {showOttoCorner ? <OttoCorner /> : null}
+      {pageTabBar ? null : <MobileTabBar />}
+      {/* `display: contents`, so the orb, its panel and its toast are still
+          the shell's own fixed layers; the class lets a club page stand them
+          down under its dialogs (globals.css). */}
+      {showOttoCorner ? (
+        <div className="vibe-shell-otto">
+          <OttoCorner />
+        </div>
+      ) : null}
     </div>
   );
 }

@@ -2385,6 +2385,39 @@ a.otto-room-row-title:hover {
 .vibe-right-rail {
   min-width: 0;
 }
+/* Under 1100px the 320px rail beside the 200px menu would leave the page
+   less than 580px, so the rail hides there (Oct 21, 2026). Its one user,
+   the club page, keeps Club tools on its cover at every width. */
+@media (min-width: 900px) and (max-width: 1099px) {
+  .vibe-app-shell--with-rail {
+    grid-template-columns: 200px 1fr;
+  }
+  .vibe-right-rail { display: none !important; }
+}
+/* A page that draws its own tab bar (CampusAppShell `pageTabBar`: the club
+   pages). Its <main> is the middle column, which may never grow past it.
+   Below 900px the shell steps aside: no grid, no reserved height, no
+   padding, so the page lays out exactly as it did on its own. */
+.vibe-app-shell--page-tabbar > main {
+  min-width: 0;
+}
+/* The shell's Otto layers (orb 9990, toast 9991, panel 9998-9999), in a box
+   that draws nothing. A club page's own dialogs sit at 1000, under them: the
+   layers stand down while one is open, so the orb can't open Otto over an
+   unsaved Edit page (review, Oct 21, 2026). */
+.vibe-shell-otto {
+  display: contents;
+}
+body:has([aria-modal="true"]) .vibe-app-shell--page-tabbar .vibe-shell-otto > * {
+  display: none !important;
+}
+@media (max-width: 899px) {
+  .vibe-app-shell.vibe-app-shell--page-tabbar {
+    display: block;
+    min-height: 0;
+    padding-bottom: 0;
+  }
+}
 .vibe-mobile-only { display: none; }
 
 /* Campus header Messages button — phone-only. Desktop already has a
@@ -2642,6 +2675,32 @@ html {
   .vibe-club-switch {
     display: none;
   }
+  /* Inside the app frame (signed in, on a computer: Oct 21, 2026) the left
+     menu does the top bar's job (its Campus goes back to Campus → Orgs), so
+     the bar goes and the cover starts below a little air. Club tools are in
+     the frame's right column then (`.vibe-club-rail`), not this page's own,
+     so the officers' page is one column too. Under 900px nothing here
+     applies: the frame steps aside and the page is as it was. */
+  .vibe-app-shell .vibe-club-topnav {
+    display: none !important;
+  }
+  .vibe-app-shell .vibe-org-shell {
+    max-width: 760px !important;
+    padding-top: 16px !important;
+  }
+}
+/* The frame's right column on a club page, for the owner and officers: the
+   app's own Light or Night (it is outside the club's colours, like the left
+   menu), pinned while the page scrolls. */
+.vibe-club-rail {
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  overflow-y: auto;
+  box-sizing: border-box;
+  padding: 28px 20px;
+  border-left: 1px solid var(--hairline);
+  background: var(--cream);
 }
 @media (max-width: 720px) {
   .vibe-org-shell {

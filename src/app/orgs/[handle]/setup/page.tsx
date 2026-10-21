@@ -11,6 +11,7 @@ import { officerGate } from "@/lib/orgs/hidden-gate";
 import { SETTINGS_ROLES, isJoinPolicy, isOrgAudience, isOrgRole } from "@/lib/orgs/join-state";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 
+import { ClubAppFrame } from "../club-frame";
 import { SetupScreen, type SetupClub } from "./SetupScreen";
 
 /**
@@ -26,7 +27,7 @@ import { SetupScreen, type SetupClub } from "./SetupScreen";
  *
  * Signed-in only. The owner and officers only: a hidden club is a 404 to
  * anyone outside it (as the club page is), and a member or a visitor goes
- * to the club page.
+ * to the club page. On a computer it sits in the app frame (club-frame.tsx).
  */
 export const metadata: Metadata = {
   title: "Set up your club · Vibe",
@@ -38,12 +39,14 @@ type Props = { params: Promise<{ handle: string }> };
 /** The page's frame when the club couldn't be read: the line and a Retry (a reload). */
 function Failed() {
   return (
-    <main className="vibe-tabbar-page" style={pageStyle}>
-      <div style={columnStyle}>
-        <LoadFailed failure={{ message: "Couldn't load your club. Try again." }} />
-      </div>
-      <MobileTabBar />
-    </main>
+    <ClubAppFrame>
+      <main className="vibe-tabbar-page" style={pageStyle}>
+        <div style={columnStyle}>
+          <LoadFailed failure={{ message: "Couldn't load your club. Try again." }} />
+        </div>
+        <MobileTabBar />
+      </main>
+    </ClubAppFrame>
   );
 }
 
@@ -101,15 +104,17 @@ export default async function ClubSetupPage({ params }: Props) {
   };
 
   return (
-    <main className="vibe-tabbar-page" style={pageStyle}>
-      <SetupScreen
-        club={club}
-        role={role}
-        setup={setup ? { steps: setup.steps, done: setup.done, total: setup.total, complete: setup.complete } : null}
-      />
-      {/* Inside <main>, so `.vibe-tabbar-page:has([aria-modal])` hides the
-          bar while one of this page's inline dialogs is open. */}
-      <MobileTabBar />
-    </main>
+    <ClubAppFrame>
+      <main className="vibe-tabbar-page" style={pageStyle}>
+        <SetupScreen
+          club={club}
+          role={role}
+          setup={setup ? { steps: setup.steps, done: setup.done, total: setup.total, complete: setup.complete } : null}
+        />
+        {/* Inside <main>, so `.vibe-tabbar-page:has([aria-modal])` hides the
+            bar while one of this page's inline dialogs is open. */}
+        <MobileTabBar />
+      </main>
+    </ClubAppFrame>
   );
 }

@@ -49,6 +49,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 
 import { BoardSection, ChannelsSection } from "./ChannelsSection";
+import { ClubAppFrame, showsAppFrame } from "./club-frame";
 import { AboutDetails, fmtDate } from "./club-page/AboutDetails";
 import { ClubCover, ClubHeader, LockGlyph } from "./club-page/ClubHeader";
 import { ClubEventsProvider } from "./club-page/ClubEventsProvider";
@@ -196,6 +197,9 @@ export default async function OrgProfilePage({ params }: Params) {
   const {
     data: { user },
   } = await supabase.auth.getUser();
+  // Signed in on a computer, the page sits in the app frame, the left menu
+  // beside it (club-frame.tsx). A visitor and a phone get it as before.
+  const framed = !!user && (await showsAppFrame());
   const [ctx, followRes] = user
     ? await Promise.all([
         loadViewerOrgContext(service, orgId, user.id),
@@ -478,6 +482,9 @@ export default async function OrgProfilePage({ params }: Params) {
   // the switch chevron, their two lines and, on a wide screen, the Club
   // tools card. Not the cover buttons on a hidden club.
   const officerRole = officerView && (viewerRole === "owner" || viewerRole === "admin") ? viewerRole : null;
+  // In the app frame the Club tools card is the frame's right column; out of
+  // it, the page's own, beside the club as before.
+  const toolsInPage = !!officerRole && !framed;
   const needsYou = officerCounts ? needsYouText(officerCounts) : null;
   // "Report this club", in More about us. Signed out there is nobody to file
   // a report as, so the row stays off. `isOfficer` and not the club's
@@ -494,7 +501,16 @@ export default async function OrgProfilePage({ params }: Params) {
   // the rest.
   const reportable = user && ctx?.ok ? { id: org.id, viewerIsOwner: isOfficer(viewerRole) } : null;
 
-  return (
+  const toolsCard = officerRole ? (
+    <ClubToolsCard
+      handle={org.handle}
+      requests={officerCounts?.pendingRequests ?? null}
+      members={org.member_count}
+      followers={org.follower_count}
+    />
+  ) : null;
+
+  const page = (
     <main
       className={user ? "vibe-tabbar-page vibe-mobile-safe-top" : "vibe-mobile-safe-top"}
       style={{
@@ -509,8 +525,12 @@ export default async function OrgProfilePage({ params }: Params) {
         // page's content takes Night's tokens as an island (globals.css).
         // The island stops here, not at <main>, so the phone tab bar below
         // keeps the app's own theme, cream in Light, as on every other page
-        // (review F4). One centred column; the owner and officers get room
-        // for the Club tools column on a wide screen.
+        // (review F4). In the app frame the island is the middle column
+        // only: the left menu and the right column keep the app's theme.
+        // One centred column; outside the frame, the owner and officers get
+        // room for the Club tools column on a wide screen (in it, globals.css
+        // keeps theirs at 760 from 900px up, the card being in the frame's
+        // right column).
         className="vibe-org-shell vibe-night-island"
         style={{
           maxWidth: officerRole ? 1100 : 760,
@@ -535,7 +555,7 @@ export default async function OrgProfilePage({ params }: Params) {
           ) : null}
         </ClubCover>
 
-        <div className="vibe-club-layout" data-tools={officerRole ? "true" : undefined}>
+        <div className="vibe-club-layout" data-tools={toolsInPage ? "true" : undefined}>
           <div style={{ minWidth: 0 }}>
             <ClubHeader
               org={org}
@@ -652,16 +672,7 @@ export default async function OrgProfilePage({ params }: Params) {
             </ClubEventsProvider>
           </div>
 
-          {officerRole ? (
-            <aside className="vibe-club-aside">
-              <ClubToolsCard
-                handle={org.handle}
-                requests={officerCounts?.pendingRequests ?? null}
-                members={org.member_count}
-                followers={org.follower_count}
-              />
-            </aside>
-          ) : null}
+          {toolsInPage ? <aside className="vibe-club-aside">{toolsCard}</aside> : null}
         </div>
       </div>
 
@@ -683,6 +694,21 @@ export default async function OrgProfilePage({ params }: Params) {
           of this page's inline dialogs is open. */}
       {user ? <MobileTabBar /> : null}
     </main>
+  );
+
+  // The frame's right column: Club tools for the owner and officers, from
+  // 1100px wide. Nothing for anyone else: Up next, the club's link and More
+  // about us are already in the page, and the column gives the page its
+  // room back. The left menu's Campus goes where the top bar's "Return to
+  // Organizations" went (the visited campus's list, when visiting).
+  if (!framed) return page;
+  return (
+    <ClubAppFrame
+      sidebar={toolsCard ? <aside className="vibe-club-rail">{toolsCard}</aside> : undefined}
+      campusHref={backHref}
+    >
+      {page}
+    </ClubAppFrame>
   );
 }
 
@@ -773,6 +799,7 @@ function FinishSetupLine({ href, done, total }: { href: string; done: number; to
 function TopNav({ signedIn, backHref }: { signedIn: boolean; backHref: string }) {
   return (
     <nav
+      className="vibe-club-topnav"
       style={{
         display: "flex",
         justifyContent: "space-between",
