@@ -11,7 +11,6 @@ import { loadOrgBlocks } from "@/lib/orgs/org-blocks";
 import {
   clubLinkState,
   dismissMembersLink,
-  findClubLinkById,
   pendingClubLink,
   recordMembersLinkJoin,
   redeemSetupLink,
@@ -190,28 +189,24 @@ export function clubSetupPath(handle: string): string {
 
 /**
  * Where a sign-up goes when onboarding finishes, if a club link let it in:
- * a setup link makes the club now and opens its setup list; a members' link
- * opens the question "Join <club>?". Null when no link is waiting (the usual
+ * the welcome page, which asks once, "Set up <club>?" (a setup link) or
+ * "Join <club>?" (a members' link). Null when no link is waiting (the usual
  * next page then). Never throws: a failure here must not cost the person
- * their finished onboarding, so it falls back to the welcome page, which
- * asks again.
+ * their finished onboarding.
+ *
+ * Never makes a club on its own (sign-up pre-registration fix, Oct 21): the
+ * place on a link belongs to the ADDRESS that signed up through it, and
+ * whoever signed an address up first may not be the person who now holds
+ * it, so the person confirms with one tap.
  */
 export async function clubLinkNextAfterOnboarding(
   service: SupabaseClient,
   userId: string,
-  /** Asked only when a setup link is waiting: may this account make a club? */
-  canPublish: () => Promise<boolean>,
 ): Promise<string | null> {
   try {
-    const pending = await pendingClubLink(service, userId);
-    if (!pending) return null;
-    if (pending.kind === "members" || !(await canPublish())) return CLUB_LINK_WELCOME_PATH;
-    const link = await findClubLinkById(service, pending.linkId);
-    if (!link) return null;
-    const outcome = await redeemClubLink(service, link, userId, { claimed: true });
-    return outcome.ok ? clubSetupPath(outcome.handle) : CLUB_LINK_WELCOME_PATH;
+    return (await pendingClubLink(service, userId)) ? CLUB_LINK_WELCOME_PATH : null;
   } catch (e) {
     console.error("[club-links] after onboarding", e);
-    return CLUB_LINK_WELCOME_PATH;
+    return null;
   }
 }

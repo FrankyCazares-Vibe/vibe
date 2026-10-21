@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 
 import { isMissingColumnError } from "@/lib/db/missing-column";
 import { clubLinkNextAfterOnboarding } from "@/lib/club-links/redeem";
-import { requireCanPublish, requireNotRestricted } from "@/lib/moderation/access";
+import { requireNotRestricted } from "@/lib/moderation/access";
 import {
   ONBOARDING_NEXT_PATH,
   finishDecision,
@@ -190,13 +190,9 @@ async function finishV2(userId: string, body: Body) {
     );
   }
 
-  // A sign-up a club link let in (the club's view, wave 1) goes to its club:
-  // a setup link's owner to the setup list, a members' link to "Join it?".
-  const clubNext = await clubLinkNextAfterOnboarding(
-    service,
-    userId,
-    async () => (await requireCanPublish(userId)) === null,
-  );
+  // A sign-up a club link let in (the club's view, wave 1) is asked once:
+  // "Set up <club>?" or "Join <club>?".
+  const clubNext = await clubLinkNextAfterOnboarding(service, userId);
 
   return NextResponse.json({ ok: true, next: clubNext ?? ONBOARDING_NEXT_PATH });
 }

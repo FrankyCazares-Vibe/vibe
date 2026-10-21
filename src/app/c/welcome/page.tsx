@@ -17,10 +17,11 @@ export const metadata: Metadata = { title: "Your club · Vibe", robots: { index:
 
 /**
  * Where a sign-up a club link let in lands when onboarding finishes (POST
- * /api/me/onboarding-complete), for a members' link: "Join <club>?" with Join
- * and Not now. A setup link's club is usually made before this page, so it
- * only shows here when making it failed: one button tries again, and the
- * route's words say why it can't. Nothing waiting: Campus.
+ * /api/me/onboarding-complete): "Set up <club>?" with Make me the owner (a
+ * setup link), or "Join <club>?" with Join and Not now (a members' link).
+ * Asked, never done for them: the place on the link belongs to the address
+ * that signed up, which may not be the person holding it now. A refusal
+ * comes back in the route's own words. Nothing waiting: Campus.
  */
 export default async function ClubLinkWelcomePage() {
   const { userId } = await enforceCampusAccess("/c/welcome");
