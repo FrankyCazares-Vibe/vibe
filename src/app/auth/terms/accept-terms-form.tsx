@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
+import { choosePasswordHref } from "@/lib/auth/choose-password-path";
 import { MIN_AGE, TERMS_VERSION } from "@/lib/legal/terms";
 import { openInBrowser } from "@/lib/native/bridge";
 import { appShellOnClient } from "@/lib/native/detect";
@@ -54,11 +55,14 @@ export function AcceptTermsForm({ next }: { next: string }) {
   const [loading, setLoading] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
 
-  // Sign out holds both buttons while the page navigates away; re-arm them if
-  // the browser restores this page from the back/forward cache.
+  // Sign out holds both buttons while the page navigates away, and so does
+  // Continue on its way to the choose screen; re-arm them if the browser
+  // restores this page from the back/forward cache.
   useEffect(() => {
     const onPageShow = (e: PageTransitionEvent) => {
-      if (e.persisted) setSigningOut(false);
+      if (!e.persisted) return;
+      setSigningOut(false);
+      setLoading(false);
     };
     window.addEventListener("pageshow", onPageShow);
     return () => window.removeEventListener("pageshow", onPageShow);
@@ -88,8 +92,18 @@ export function AcceptTermsForm({ next }: { next: string }) {
       }
       const data = (await res.json().catch(() => ({}))) as {
         ok?: boolean;
+        code?: string;
         error?: string;
       };
+      if (res.status === 409 && data.code === "password_needed") {
+        // The first confirmation removed a password chosen before this inbox
+        // was proven, and none is set yet: the server refuses consent until
+        // one is. The page sends there first whenever it can tell, so this is
+        // rare. A full load, so the choose screen's server checks run; the
+        // button stays busy while we leave.
+        window.location.assign(choosePasswordHref(next));
+        return;
+      }
       if (!res.ok || !data.ok) {
         setError(data.error ?? GENERIC_ERROR);
         setLoading(false);

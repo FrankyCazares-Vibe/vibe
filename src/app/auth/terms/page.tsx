@@ -1,6 +1,8 @@
 import { redirect } from "next/navigation";
 
+import { choosePasswordHref } from "@/lib/auth/choose-password-path";
 import { isSafeRelativePath } from "@/lib/auth/login-next";
+import { passwordMissing, readPasswordFlag } from "@/lib/auth/password-needed";
 import { hasRecordedConsent, CONSENT_COLUMNS } from "@/lib/legal/terms";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
@@ -43,6 +45,16 @@ function resolveNext(raw: string | string[] | undefined): string {
  *
  * Already-accepted users are forwarded straight through so this page can
  * never trap someone, and a bad/missing `next` falls back to `/onboarding`.
+ *
+ * Pre-registration fix (Oct 2026): the first confirmation of an address
+ * clears the Terms tick, so every account confirmed off the sign-up page
+ * lands here. If that confirmation also removed a password chosen before the
+ * inbox was proven (`users.password_needed_at`, see
+ * src/lib/auth/password-needed.ts) and none exists yet, the "Choose your
+ * password" screen comes first: it holds the password AND the Terms box.
+ * Checked only once consent is missing, so no accepted account pays for it;
+ * on any doubt (no column yet, a failed check) this page shows its form as
+ * before, so the two pages can never bounce someone between them.
  */
 export default async function TermsGatePage({
   searchParams,
@@ -63,7 +75,8 @@ export default async function TermsGatePage({
 
   // The consent columns are private (service-role only, like email);
   // self-read scoped to the signed-in user's id.
-  const { data: row } = await createSupabaseServiceClient()
+  const service = createSupabaseServiceClient();
+  const { data: row } = await service
     .from("users")
     .select(CONSENT_COLUMNS)
     .eq("id", user.id)
@@ -71,6 +84,12 @@ export default async function TermsGatePage({
 
   if (hasRecordedConsent(row)) {
     redirect(next);
+  }
+
+  // No password since the first confirmation removed the early one: choose
+  // it first (true only; null = could not tell, and the form shows as before).
+  if ((await readPasswordFlag(service, user.id)) && (await passwordMissing(service, user.id)) === true) {
+    redirect(choosePasswordHref(next));
   }
 
   return <AcceptTermsForm next={next} />;
