@@ -1,7 +1,7 @@
 # Club view, wave 2: "officers run it from the phone" (built Oct 21, 2026)
 
-Branch `claude/cool-jang-f223da` (worktree `cool-jang-f223da`), cut from main `46881b0`. **Not merged, not on
-production.** Plan: `handoffs/2026-10-20-club-view/BUILD-ORDER.md` (wave 2), decisions `DECISIONS.md`, how it's
+Branch `claude/cool-jang-f223da` (worktree `cool-jang-f223da`), cut from main `46881b0`. **SHIPPED Oct 21, 2026**
+(see "Shipped" at the end). Plan: `handoffs/2026-10-20-club-view/BUILD-ORDER.md` (wave 2), decisions `DECISIONS.md`, how it's
 built `WAVE2-DESIGN.md` (same folder). Wave 1's record: `2026-10-20-club-view-wave-1.md`.
 
 ## What's built
@@ -115,3 +115,23 @@ on a computer:
   it that way (one place to edit the page's words and its door).
 - **"Past events and who came" in Club tools has no count** (the drawing shows 4). Recommendation: leave it until
   Insights (week 2), where turnout by event lives.
+
+## Shipped (Oct 21, 2026, about 05:55 to 06:10 Indianapolis time, Franky's yes in chat)
+Shipped from the wave 1 session (`busy-aryabhata-7b6991`); this branch's own session stood down unchanged.
+- **Pre-flight on production (read-only):** not applied [f], 6 clubs, anon SELECT f / UPDATE f, authenticated t / f,
+  service_role t / t. As the file expects.
+- **Database:** `20261023100000_club_meeting_time` applied with the connector (the body between begin and commit,
+  verbatim), its `schema_migrations` row renamed to `20261023100000` / `club_meeting_time`. Post-check:
+  `meeting_time | text | not null | ''::text`, `orgs_meeting_time_len` validated, anon UPDATE f and no SELECT on the
+  column, authenticated UPDATE f and SELECT t, 6 clubs, 0 with a meeting line.
+- **Code:** this branch fast-forwarded onto main with both Privacy Policy copies dated October 21, 2026 (checker
+  PASS against the dev page, tsc clean, 3,721 of 3,721 tests pass): main `4948ce6` (from `46881b0`). Vercel
+  production built it.
+- **Live checks (signed out):** the policy shows "when it meets" and "which of the clubs you run your Profile tab
+  shows"; `/orgs/sae` is the new page at 375px (no sideways scroll, More about us, tabs Posts / Events / Board);
+  `/orgs/sae/tools` sends a signed-out visitor to sign in. The page's two 401s on `/api/events` signed out are
+  old (the page before wave 2 makes the same two; they give "Sign in to see this club's events").
+- **Not checked:** Vercel's runtime-error list (the connector answers 403); the signed-in officer views on
+  production (Franky's phone test below).
+- **Franky's phone test:** open a club you run, hold the Profile tab, switch to the club, open Club tools, write a
+  meeting time in Edit page. On iPhone, check the hold doesn't open a link preview.
