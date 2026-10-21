@@ -456,7 +456,9 @@ export function ClubLinksCard() {
           <Empty>No setup links yet. Make one above when you meet a club&apos;s president.</Empty>
         ) : (
           links.map((l) => {
-            const live = l.state === "live";
+            // Cancel works on any link that hasn't made its club: an ended one
+            // can still be finished by a sign-up it let in before its end.
+            const live = l.state === "live" || l.state === "expired";
             return (
               <div key={l.id} className="adm-card" style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                 <div className="adm-split">

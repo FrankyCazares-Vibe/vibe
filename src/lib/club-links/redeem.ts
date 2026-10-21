@@ -39,6 +39,7 @@ export type RedeemRefusal =
   | "link_expired"
   | "link_off"
   | "link_in_use"
+  | "handle_taken"
   | "campus_required"
   | "audience"
   | "join_unavailable"
@@ -49,6 +50,7 @@ const COPY: Record<RedeemRefusal, string> = {
   link_expired: "That link has ended. Ask whoever shared it for a new one.",
   link_off: "That link has been turned off. Ask the club for a new one.",
   link_in_use: "Someone else is signing up with that setup link right now. Ask Vibe for a new one if it wasn't you.",
+  handle_taken: "That club's name is taken on Vibe. Ask Vibe for a new setup link.",
   campus_required: "Pick your campus in your profile first, then open the link again.",
   audience: "This club is open to students of the other university only.",
   join_unavailable: "You can't join this club through this link. Ask an officer.",
@@ -121,6 +123,8 @@ async function redeemSetup(service: SupabaseClient, link: ClubLinkRow, userId: s
       return refuse(410, "link_off");
     case "in_use":
       return refuse(409, "link_in_use");
+    case "handle_taken":
+      return refuse(409, "handle_taken");
     default:
       return refuse(500, "failed");
   }
