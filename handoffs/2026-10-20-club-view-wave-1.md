@@ -70,6 +70,10 @@ in Admin and open it on a phone.
 - Photo and cover upload can't be tried locally (the storage bucket is off in dev); it reuses the club page's own
   upload, so walk it on the deploy.
 - The four old `scripts/sql/*-check.sql` rehearsal scripts still insert `mod`; they were for shipped migrations.
+- Rare: if a club's handle is taken when its setup link is used, the club gets the handle with a number; that
+  numbering doesn't look at handles other live setup links hold.
+- The local database keeps the walk's test club (Sixty-Four Chess, @sixtyfourchess) and two test accounts
+  (`priya.raman.w1a@iu.edu` owner, `maya.okafor.w1a@purdue.edu` officer; local password as in `scripts/local-seed.mjs`).
 
 ## Next
 **Wave 2 (Fri Oct 23 to Sat Oct 24): the Profile-tab switch, the Instagram-style club page, club tools on the
