@@ -3,10 +3,14 @@
 import { motion } from "motion/react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 
-import { activeMobileTab, type MobileTabHref } from "@/components/mobile/mobile-tab-active";
+import { activeMobileTab, isClubPath, type MobileTabHref } from "@/components/mobile/mobile-tab-active";
+import { ClubSwitcherSheet } from "@/components/orgs/ClubSwitcherSheet";
+import { ClubLogo } from "@/components/profile/ClubFlair";
+import { useLongPress } from "@/lib/hooks/use-long-press";
 import { SPRING_SNAPPY } from "@/lib/motion/springs";
+import { sameHandle, setSwitchedClub, useClubsYouRun, useSwitchedClub } from "@/lib/orgs/club-switch";
 
 /**
  * Bottom tab bar — the only mobile chrome. Renders from any mobile page
@@ -29,6 +33,13 @@ import { SPRING_SNAPPY } from "@/lib/motion/springs";
  * Which tab lights lives in `mobile-tab-active.ts`: the five tabs by
  * exact match or subpath, plus the routes filed under one of them (a
  * club page under Campus, /plus under Profile).
+ *
+ * The club switch (wave 2, WAVE2-DESIGN.md C4): hold Profile and the
+ * switcher sheet opens. Switched to a club, the Profile tab goes to that
+ * club's page, wears its picture (the label stays "Profile") and shows a
+ * dot while one of my clubs has join requests. The switch is read from this
+ * phone's storage (club-switch.ts), so the server and the first render are
+ * always "not switched", and only a switched bar ever asks about my clubs.
  */
 
 type MobileTab = {
@@ -140,16 +151,38 @@ let lastLitHref: MobileTabHref | null | undefined;
 
 export function MobileTabBar() {
   const pathname = usePathname() ?? "";
-  const activeHref = activeMobileTab(pathname);
+  const switched = useSwitchedClub();
+  const activeHref = activeMobileTab(pathname, switched?.handle);
   const settle = lastLitHref !== undefined && activeHref !== lastLitHref;
   useEffect(() => {
     lastLitHref = activeHref;
   }, [activeHref]);
 
+  const [switcherOpen, setSwitcherOpen] = useState(false);
+  const hold = useLongPress(() => setSwitcherOpen(true));
+  // Only a switched tab asks (cached two minutes), for the dot.
+  const runs = useClubsYouRun(switched !== null);
+  const needsYou = runs.status === "ok" && runs.clubs.some((c) => (c.requests ?? 0) > 0);
+  // The club left my list (no longer an officer, renamed, hidden by Vibe):
+  // the tab goes back to me rather than to a page I don't run.
+  const stillRuns = runs.status !== "ok" || runs.clubs.some((c) => sameHandle(c.handle, switched?.handle));
+  useEffect(() => {
+    if (switched && !stillRuns) setSwitchedClub(null);
+  }, [switched, stillRuns]);
+
   return (
+    <>
     <nav className="vibe-mobile-tabbar" aria-label="Primary">
       {MOBILE_TABS.map((item) => {
         const active = item.href === activeHref;
+        const isProfile = item.href === "/profile";
+        const asClub = isProfile ? switched : null;
+        const href = asClub ? `/orgs/${encodeURIComponent(asClub.handle)}` : item.href;
+        // "page" only on the tab's own page (a switched Profile tab: the
+        // club's page itself, not its tools).
+        const onOwnPage = asClub
+          ? isClubPath(pathname, asClub.handle) && pathname.split("/").length === 3
+          : pathname === item.href;
         // The Otto tab is the final spotlight target on the network leg
         // of the Otto tour — anchor it with a stable id so the engine
         // can find it.
@@ -158,16 +191,17 @@ export function MobileTabBar() {
           <Link
             key={item.href}
             id={id}
-            href={item.href}
+            href={href}
+            {...(isProfile ? hold : {})}
             className={
               active
                 ? "vibe-mobile-tab vibe-mobile-tab--active vibe-press"
                 : "vibe-mobile-tab vibe-press"
             }
-            // "page" only on the tab's own page. A club page sits inside
-            // Campus, and /profile/<handle> inside Profile, without being
-            // that page, so there the lit tab is just "true".
-            aria-current={active ? (pathname === item.href ? "page" : "true") : undefined}
+            // A club page sits inside Campus, and /profile/<handle> inside
+            // Profile, without being that page, so there the lit tab is
+            // just "true".
+            aria-current={active ? (onOwnPage ? "page" : "true") : undefined}
           >
             {/* The lit tab's icon settles in from 0.9 (Oct 18, 2026, motion
                 pass). Keyed on the state, so it plays when a tab lights in
@@ -182,13 +216,42 @@ export function MobileTabBar() {
               initial={active && settle ? { scale: 0.9 } : false}
               animate={{ scale: 1 }}
               transition={SPRING_SNAPPY}
+              style={asClub ? { position: "relative" } : undefined}
             >
-              {item.icon}
+              {asClub ? <ClubLogo name={asClub.name} url={asClub.logo_url} size={22} /> : item.icon}
+              {asClub && needsYou ? <span aria-hidden="true" style={dotStyle} /> : null}
             </motion.span>
             {item.label}
+            {asClub && needsYou ? <span style={srOnlyStyle}>, join requests to review</span> : null}
           </Link>
         );
       })}
     </nav>
+    <ClubSwitcherSheet open={switcherOpen} onClose={() => setSwitcherOpen(false)} />
+    </>
   );
 }
+
+/** "One of my clubs has people waiting": the coral dot on the club's picture. */
+const dotStyle: CSSProperties = {
+  position: "absolute",
+  top: -1,
+  right: -3,
+  width: 8,
+  height: 8,
+  borderRadius: "50%",
+  background: "var(--coral)",
+  boxShadow: "0 0 0 2px var(--tabbar-bg)",
+};
+
+const srOnlyStyle: CSSProperties = {
+  position: "absolute",
+  width: 1,
+  height: 1,
+  padding: 0,
+  margin: -1,
+  overflow: "hidden",
+  clip: "rect(0,0,0,0)",
+  whiteSpace: "nowrap",
+  border: 0,
+};

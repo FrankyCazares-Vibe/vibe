@@ -1,10 +1,13 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 
 import { ImageCropperModal } from "@/components/ImageCropperModal";
-import { OrgInviteSheet } from "@/components/orgs/OrgInviteSheet";
+import { useHideTabBar } from "@/lib/chat/use-hide-tabbar";
+import { vibeRequest } from "@/lib/feedback/request";
+import { toast } from "@/lib/feedback/toast";
 import {
   AUDIENCE_HELP,
   OFFICER_FOLLOW_HELP,
@@ -12,14 +15,12 @@ import {
   openToOptions,
 } from "@/lib/orgs/join-copy";
 import type { JoinPolicy, OrgAudience } from "@/lib/orgs/join-state";
+import { MEETING_TIME_MAX, normalizeMeetingTime } from "@/lib/orgs/meeting-time";
 
 type Link = { label: string; url: string };
 
 /** The club's campus, for the "Open to" option that names a shared campus. */
 type OpenToCampus = { name: string; shared: boolean } | null;
-
-/** Same breakpoint as the org page's phone layout (`globals.css` `.vibe-org-header`). */
-const PHONE_QUERY = "(max-width: 720px)";
 
 const MAX_DESC = 400;
 const MAX_PHILANTHROPY = 500;
@@ -61,176 +62,35 @@ const buttonStyle = (variant: "primary" | "ghost" | "danger"): React.CSSProperti
     variant === "primary" ? "inset 0 1px 0 rgba(255,255,255,0.22)" : "none",
 });
 
+// ─── Edit page (photo, cover, description, when you meet, links, …) ──────
+
+/** The fields the word filter can name, as the officer sees them. */
+const BLOCKED_FIELD: Record<string, string> = {
+  description: "The description",
+  meeting_time: "When you meet",
+  links: "A link's name",
+  philanthropy: "Philanthropy",
+  name: "The name",
+};
+
+/** Refusals whose own sentence is the clearest thing to show. */
+const OWN_WORDS = new Set([
+  "invalid_description",
+  "meeting_time_invalid",
+  "invalid_join_policy",
+  "invalid_audience",
+  "audience_excludes_owner",
+  "org_hidden",
+]);
+
 /**
- * The officer bar on the org page. The page renders it for owners and admins
- * only (`isSettingsOfficer`), which is also who may invite (critic C2) and
- * change who can join.
- *
- * A hidden club keeps "Edit details" and nothing else (plan §7 F6): it is out
- * of every list and nobody new can join it, so inviting, new posts and the
- * join fields would all be doors to nowhere (the invite POST, the posts route
- * and the PATCH's join fields refuse `org_hidden` anyway). Banner and Logo go
- * too, by the same plan line, although the PATCH still accepts `banner_url` /
- * `logo_url` on a hidden club — restoring them is a one-line change here if
- * hidden-club officers should keep them.
+ * The club page's Edit page (wave 2; the officer bar's "Edit details",
+ * renamed). "Change photo" and "Change cover" hand over to UploadAssetModal
+ * through `onChangeAsset`; the opener keeps this dialog (concealed) when
+ * something here was typed, so the draft survives the picture.
+ * A hidden club gets neither: the officer bar never offered them there.
  */
-export function OrgProfileAdminBar({
-  orgHandle,
-  orgName,
-  joinPolicy,
-  audience,
-  hidden,
-  openToCampus,
-  initialDescription,
-  initialLinks,
-  initialPhilanthropy,
-  verified,
-}: {
-  orgHandle: string;
-  orgName: string;
-  joinPolicy: JoinPolicy;
-  audience: OrgAudience;
-  hidden: boolean;
-  openToCampus: OpenToCampus;
-  initialDescription: string;
-  initialLinks: Link[];
-  initialPhilanthropy: string;
-  /** A checked club: only it has a members' link (the club's view, wave 1). */
-  verified: boolean;
-}) {
-  const [openModal, setOpenModal] = useState<
-    null | "invite" | "edit" | "banner" | "logo" | "post"
-  >(null);
-  // Picked when the sheet opens, never during render: `window` doesn't exist
-  // on the server, and a rotated phone gets the right shape on the next open.
-  const [invitePresentation, setInvitePresentation] = useState<"sheet" | "modal">("modal");
-
-  const buttons: { key: Exclude<typeof openModal, null>; label: string; icon: React.ReactNode }[] =
-    hidden
-      ? [{ key: "edit", label: "Edit details", icon: <PencilIcon /> }]
-      : [
-          { key: "invite", label: "Invite people", icon: <PersonPlusIcon /> },
-          { key: "banner", label: "Banner", icon: <BannerIcon /> },
-          { key: "logo", label: "Logo", icon: <LogoIcon /> },
-          { key: "edit", label: "Edit details", icon: <PencilIcon /> },
-          { key: "post", label: "New post", icon: <PlusIcon /> },
-        ];
-
-  const open = (key: Exclude<typeof openModal, null>) => {
-    if (key === "invite") {
-      setInvitePresentation(window.matchMedia(PHONE_QUERY).matches ? "sheet" : "modal");
-    }
-    setOpenModal(key);
-  };
-
-  return (
-    <>
-      <div
-        style={{
-          display: "flex",
-          gap: 8,
-          flexWrap: "wrap",
-          padding: "10px 14px",
-          borderRadius: 14,
-          background:
-            "linear-gradient(180deg, rgba(255,180,150,0.18) 0%, rgba(255,180,150,0.04) 100%)",
-          border: "1px solid rgba(255,180,150,0.32)",
-          alignItems: "center",
-          marginBottom: 12,
-        }}
-      >
-        <span
-          style={{
-            fontSize: 11,
-            fontWeight: 700,
-            letterSpacing: "0.16em",
-            textTransform: "uppercase",
-            color: "rgba(255,200,170,0.95)",
-            marginRight: "auto",
-          }}
-        >
-          {hidden ? "Hidden org" : "Officer tools"}
-        </span>
-        {buttons.map((b) => (
-          <button
-            key={b.key}
-            type="button"
-            onClick={() => open(b.key)}
-            style={{
-              ...buttonStyle("ghost"),
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 6,
-            }}
-          >
-            {b.icon}
-            {b.label}
-          </button>
-        ))}
-        {/* The members' link lives on the setup page (wave 1), for checked
-            clubs only; a hidden club can't take anyone new. */}
-        {verified && !hidden ? (
-          <a
-            href={`/orgs/${encodeURIComponent(orgHandle)}/setup#members-link`}
-            style={{
-              ...buttonStyle("ghost"),
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 6,
-              textDecoration: "none",
-            }}
-          >
-            <LinkIcon />
-            Members&rsquo; link
-          </a>
-        ) : null}
-      </div>
-
-      {openModal === "invite" && !hidden ? (
-        <OrgInviteSheet
-          handle={orgHandle}
-          orgName={orgName}
-          audience={audience}
-          presentation={invitePresentation}
-          onClose={() => setOpenModal(null)}
-        />
-      ) : null}
-
-      {openModal === "edit" ? (
-        <EditDetailsModal
-          orgHandle={orgHandle}
-          hidden={hidden}
-          openToCampus={openToCampus}
-          initialJoinPolicy={joinPolicy}
-          initialAudience={audience}
-          initialDescription={initialDescription}
-          initialLinks={initialLinks}
-          initialPhilanthropy={initialPhilanthropy}
-          onClose={() => setOpenModal(null)}
-        />
-      ) : null}
-
-      {openModal === "banner" || openModal === "logo" ? (
-        <UploadAssetModal
-          orgHandle={orgHandle}
-          kind={openModal}
-          onClose={() => setOpenModal(null)}
-        />
-      ) : null}
-
-      {openModal === "post" ? (
-        <NewPostModal
-          orgHandle={orgHandle}
-          onClose={() => setOpenModal(null)}
-        />
-      ) : null}
-    </>
-  );
-}
-
-// ─── Edit details (description, links, philanthropy, who can join) ────────
-
-function EditDetailsModal({
+export function EditPageModal({
   orgHandle,
   hidden,
   openToCampus,
@@ -239,6 +99,10 @@ function EditDetailsModal({
   initialDescription,
   initialLinks,
   initialPhilanthropy,
+  initialMeetingTime,
+  meetingTimeReady,
+  onChangeAsset,
+  concealed = false,
   onClose,
 }: {
   orgHandle: string;
@@ -249,65 +113,161 @@ function EditDetailsModal({
   initialDescription: string;
   initialLinks: Link[];
   initialPhilanthropy: string;
+  initialMeetingTime: string;
+  /** False when the database has no meeting_time yet: the field stays out. */
+  meetingTimeReady: boolean;
+  onChangeAsset?: (kind: "logo" | "banner", dirty: boolean) => void;
+  concealed?: boolean;
   onClose: () => void;
 }) {
   const router = useRouter();
   const [description, setDescription] = useState(initialDescription);
+  const [meetingTime, setMeetingTime] = useState(initialMeetingTime);
   const [links, setLinks] = useState<Link[]>(initialLinks);
   const [philanthropy, setPhilanthropy] = useState(initialPhilanthropy);
   const [joinPolicy, setJoinPolicy] = useState<JoinPolicy>(initialJoinPolicy);
   const [audience, setAudience] = useState<OrgAudience>(initialAudience);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [meetingBad, setMeetingBad] = useState(false);
+  const meetingCountId = useId();
+
+  // Code points, as the database's char_length counts them.
+  const meetingLength = [...meetingTime].length;
+  const meetingOver = meetingLength > MEETING_TIME_MAX;
+
+  const dirty =
+    description !== initialDescription ||
+    meetingTime !== initialMeetingTime ||
+    philanthropy !== initialPhilanthropy ||
+    joinPolicy !== initialJoinPolicy ||
+    audience !== initialAudience ||
+    JSON.stringify(links) !== JSON.stringify(initialLinks);
 
   const save = async () => {
-    setBusy(true);
     setErr(null);
-    try {
-      const body: Record<string, unknown> = {
-        description: description.trim(),
-        philanthropy: philanthropy.trim(),
-        links: links
-          .map((l) => ({ label: l.label.trim(), url: l.url.trim() }))
-          .filter((l) => l.label && l.url),
-      };
-      // Only what the officer changed: narrowing the audience revokes invites
-      // on the server, and a hidden club refuses any join-field change with
-      // 409 `org_hidden`, so an untouched field must never ride along.
-      if (!hidden && joinPolicy !== initialJoinPolicy) body.join_policy = joinPolicy;
-      if (!hidden && audience !== initialAudience) body.audience = audience;
-      const res = await fetch(`/api/orgs/${orgHandle}`, {
-        method: "PATCH",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(body),
-      });
-      const data = await res.json();
-      if (!data?.ok) {
-        setErr(data?.error || "Failed to save");
+    setMeetingBad(false);
+    const body: Record<string, unknown> = {
+      description: description.trim(),
+      philanthropy: philanthropy.trim(),
+      links: links
+        .map((l) => ({ label: l.label.trim(), url: l.url.trim() }))
+        .filter((l) => l.label && l.url),
+    };
+    // Only what the officer changed: narrowing the audience revokes invites
+    // on the server, and a hidden club refuses any join-field change with
+    // 409 `org_hidden`, so an untouched field must never ride along.
+    if (!hidden && joinPolicy !== initialJoinPolicy) body.join_policy = joinPolicy;
+    if (!hidden && audience !== initialAudience) body.audience = audience;
+    // The same for when it meets, so a database without the column never
+    // sees it (the route answers 503 to a body that carries it there).
+    if (meetingTimeReady) {
+      const next = normalizeMeetingTime(meetingTime);
+      if (!next.ok) {
+        setErr(next.message);
+        setMeetingBad(true);
         return;
       }
-      router.refresh();
-      onClose();
-    } catch (e) {
-      console.error("[orgs admin] edit details", e);
-      setErr("Network error");
-    } finally {
-      setBusy(false);
+      if (next.value !== initialMeetingTime) body.meeting_time = next.value;
     }
+
+    setBusy(true);
+    const r = await vibeRequest(`/api/orgs/${encodeURIComponent(orgHandle)}`, {
+      method: "PATCH",
+      json: body,
+      quiet: true,
+      failure: "Couldn't save the page.",
+    });
+    setBusy(false);
+    if (!r.ok) {
+      const blocked = r.code === "content_blocked" && r.field ? BLOCKED_FIELD[r.field] : undefined;
+      if (r.code === "meeting_time_unavailable") {
+        setErr("When you meet can't be saved yet. Try again later.");
+        setMeetingBad(true);
+      } else if (blocked) {
+        setErr(`${blocked} includes words that aren't allowed on Vibe. Edit it and try again.`);
+        if (r.field === "meeting_time") setMeetingBad(true);
+      } else if (r.code && OWN_WORDS.has(r.code) && r.error) {
+        setErr(r.error);
+        if (r.code === "meeting_time_invalid") setMeetingBad(true);
+      } else {
+        setErr(r.message);
+      }
+      // Signed out, Terms, a restriction: the fix is a page, so the toast
+      // carries the button the inline line can't.
+      if (r.action) toast({ message: r.message, tone: "error", action: r.action });
+      return;
+    }
+    router.refresh();
+    onClose();
   };
 
   return (
-    <ModalShell title="Edit details" onClose={onClose}>
+    <ModalShell title="Edit page" onClose={onClose} concealed={concealed}>
+      {!hidden && onChangeAsset ? (
+        <div style={{ display: "flex", gap: 8, marginBottom: 4 }}>
+          <button
+            type="button"
+            className="vibe-press"
+            onClick={() => onChangeAsset("logo", dirty)}
+            style={{ ...buttonStyle("ghost"), ...assetPillStyle }}
+          >
+            Change photo
+          </button>
+          <button
+            type="button"
+            className="vibe-press"
+            onClick={() => onChangeAsset("banner", dirty)}
+            style={{ ...buttonStyle("ghost"), ...assetPillStyle }}
+          >
+            Change cover
+          </button>
+        </div>
+      ) : null}
+
       <FieldLabel>Description</FieldLabel>
       <textarea
         value={description}
         maxLength={MAX_DESC}
         rows={3}
         onChange={(e) => setDescription(e.target.value)}
-        placeholder="What's this org about?"
+        placeholder="What's the club about?"
+        aria-label="Description"
         style={{ ...inputStyle, resize: "vertical", minHeight: 70 }}
       />
       <Hint>{`${description.length} / ${MAX_DESC}`}</Hint>
+
+      {meetingTimeReady ? (
+        <>
+          <FieldLabel>When you meet</FieldLabel>
+          <input
+            type="text"
+            value={meetingTime}
+            // Room for a pasted line to show as over; the save says so.
+            maxLength={MEETING_TIME_MAX * 2}
+            onChange={(e) => {
+              setMeetingTime(e.target.value);
+              setMeetingBad(false);
+            }}
+            placeholder="Thursdays · 7 PM, the Lantern Room"
+            aria-label="When you meet"
+            aria-describedby={meetingCountId}
+            aria-invalid={meetingOver || meetingBad ? true : undefined}
+            enterKeyHint="done"
+            style={{
+              ...inputStyle,
+              ...(meetingOver || meetingBad ? { border: "1px solid #FF8A7A" } : null),
+            }}
+          />
+          <div
+            id={meetingCountId}
+            style={{ fontSize: 11, color: meetingOver ? "#FF8A7A" : "rgba(255,255,255,0.45)" }}
+          >
+            {`${meetingLength} / ${MEETING_TIME_MAX}`}
+            {meetingOver ? " · Keep it to 60 characters." : " · Everyone sees it on the club page."}
+          </div>
+        </>
+      ) : null}
 
       <FieldLabel>Links</FieldLabel>
       <Hint>Up to 10 — Instagram, GroupMe, website, application form, etc.</Hint>
@@ -320,6 +280,7 @@ function EditDetailsModal({
         rows={3}
         onChange={(e) => setPhilanthropy(e.target.value)}
         placeholder="Annual fundraiser supporting Riley Children's Hospital — $40k raised in 2025."
+        aria-label="Philanthropy"
         style={{ ...inputStyle, resize: "vertical", minHeight: 70 }}
       />
       <Hint>{`${philanthropy.length} / ${MAX_PHILANTHROPY}`}</Hint>
@@ -349,14 +310,14 @@ function EditDetailsModal({
       {err ? <ErrorBanner text={err} /> : null}
 
       <ModalFooter>
-        <button type="button" onClick={onClose} style={buttonStyle("ghost")}>
+        <button type="button" onClick={onClose} style={{ ...buttonStyle("ghost"), minHeight: 44 }}>
           Cancel
         </button>
         <button
           type="button"
-          onClick={save}
+          onClick={() => void save()}
           disabled={busy}
-          style={{ ...buttonStyle("primary"), opacity: busy ? 0.6 : 1 }}
+          style={{ ...buttonStyle("primary"), minHeight: 44, opacity: busy ? 0.6 : 1 }}
         >
           {busy ? "Saving…" : "Save"}
         </button>
@@ -364,6 +325,15 @@ function EditDetailsModal({
     </ModalShell>
   );
 }
+
+const assetPillStyle: React.CSSProperties = {
+  flex: 1,
+  minHeight: 44,
+  borderRadius: 999,
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+};
 
 // ─── Banner / Logo upload ────────────────────────────────────────────────
 
@@ -474,11 +444,11 @@ export function UploadAssetModal({
   // ≤1100px so 2x scale needs ≥2200, plus headroom for future wider layouts.
   const cropAspect = isBanner ? 3 : 1;
   const cropOutputMax = isBanner ? 2400 : 1024;
-  const cropTitle = isBanner ? "Adjust banner" : "Adjust logo";
+  const cropTitle = isBanner ? "Adjust cover" : "Adjust photo";
 
   return (
     <ModalShell
-      title={isBanner ? "Change banner" : "Change logo"}
+      title={isBanner ? "Change cover" : "Change photo"}
       onClose={onClose}
     >
       <div
@@ -545,10 +515,10 @@ export function UploadAssetModal({
 // ─── New post ────────────────────────────────────────────────────────────
 //
 // Used to offer a post/clip toggle where "clip" uploaded a vertical video.
-// Clips are backlogged (DOCS/BACKLOG_CLIPS.md), so org posts are now text
-// + image only.
+// Video posts are backlogged (DOCS/BACKLOG_CLIPS.md), so club posts are text
+// + image only. Exported for the club page's + sheet (wave 2, PlusSheet.tsx).
 
-function NewPostModal({
+export function NewPostModal({
   orgHandle,
   onClose,
 }: {
@@ -656,7 +626,7 @@ function NewPostModal({
   };
 
   return (
-    <ModalShell title="Post as the org" onClose={onClose}>
+    <ModalShell title="Post to the page" onClose={onClose}>
       <FieldLabel>Caption</FieldLabel>
       <textarea
         value={content}
@@ -733,27 +703,93 @@ function NewPostModal({
 
 // ─── Shared modal scaffolding ────────────────────────────────────────────
 
+/**
+ * The officer dialogs' frame. A portal on <body> (wave 2): the club page now
+ * opens these from the cover and the header row, and a `position: fixed`
+ * dialog inside a transformed or blurred box would be pinned to that box
+ * instead of the screen. Out there it is outside `.vibe-tabbar-page`, so it
+ * hides the phone's tab bar itself (useHideTabBar), and it carries
+ * `vibe-night-island` so theme tokens inside it read as Night, like the page.
+ *
+ * Escape closes it when it is the top dialog (the cropper over it handles
+ * its own). Focus moves into the panel and goes back where it was on close,
+ * one tick late so a closing vaul sheet's own focus return lands first.
+ * `concealed` keeps it mounted but out of sight (and its draft intact) while
+ * another dialog opens over it.
+ */
 function ModalShell({
   title,
   onClose,
   children,
+  concealed = false,
 }: {
   title: string;
   onClose: () => void;
   children: React.ReactNode;
+  concealed?: boolean;
 }) {
-  return (
+  useHideTabBar();
+  const rootRef = useRef<HTMLDivElement | null>(null);
+  const panelRef = useRef<HTMLDivElement | null>(null);
+  const titleId = useId();
+  const closeRef = useRef(onClose);
+  const concealedRef = useRef(concealed);
+  useEffect(() => {
+    closeRef.current = onClose;
+    concealedRef.current = concealed;
+  });
+
+  useEffect(() => {
+    let previous: HTMLElement | null = null;
+    const t = window.setTimeout(() => {
+      const active = document.activeElement as HTMLElement | null;
+      if (active && active !== document.body && !panelRef.current?.contains(active)) previous = active;
+      if (!concealedRef.current) panelRef.current?.focus({ preventScroll: true });
+    }, 0);
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape" || e.defaultPrevented || concealedRef.current) return;
+      const open = document.querySelectorAll('[aria-modal="true"]');
+      if (open[open.length - 1] !== rootRef.current) return;
+      e.preventDefault();
+      closeRef.current();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => {
+      window.clearTimeout(t);
+      document.removeEventListener("keydown", onKey);
+      if (previous?.isConnected) previous.focus({ preventScroll: true });
+    };
+  }, []);
+
+  // Back from under another dialog: focus comes back to this one.
+  const wasConcealed = useRef(concealed);
+  useEffect(() => {
+    if (wasConcealed.current && !concealed) panelRef.current?.focus({ preventScroll: true });
+    wasConcealed.current = concealed;
+  }, [concealed]);
+
+  // Only ever opened by a tap, so there is no server render to match.
+  if (typeof document === "undefined") return null;
+
+  return createPortal(
     <div
-      onClick={onClose}
+      ref={rootRef}
+      className="vibe-night-island"
+      onClick={(e) => {
+        // A portal still bubbles React events to the page that opened it.
+        e.stopPropagation();
+        onClose();
+      }}
       role="dialog"
-      aria-modal="true"
+      aria-modal={concealed ? undefined : "true"}
+      aria-labelledby={titleId}
       style={{
         position: "fixed",
         inset: 0,
         background: "rgba(8,4,16,0.62)",
         backdropFilter: "blur(8px)",
         WebkitBackdropFilter: "blur(8px)",
-        display: "flex",
+        display: concealed ? "none" : "flex",
         alignItems: "center",
         justifyContent: "center",
         zIndex: 1000,
@@ -761,6 +797,8 @@ function ModalShell({
       }}
     >
       <div
+        ref={panelRef}
+        tabIndex={-1}
         onClick={(e) => e.stopPropagation()}
         style={{
           width: "min(560px, 100%)",
@@ -777,6 +815,7 @@ function ModalShell({
           display: "flex",
           flexDirection: "column",
           gap: 8,
+          outline: "none",
         }}
       >
         <div
@@ -788,6 +827,7 @@ function ModalShell({
           }}
         >
           <h2
+            id={titleId}
             style={{
               margin: 0,
               fontFamily: "Fraunces, serif",
@@ -798,28 +838,48 @@ function ModalShell({
           >
             {title}
           </h2>
+          {/* A 44px target around a 30px circle. */}
           <button
             type="button"
             onClick={onClose}
             aria-label="Close"
             style={{
-              width: 28,
-              height: 28,
+              width: 44,
+              height: 44,
+              marginRight: -8,
+              display: "grid",
+              placeItems: "center",
+              flexShrink: 0,
+              padding: 0,
+              border: "none",
               borderRadius: 999,
-              border: "1px solid rgba(255,255,255,0.14)",
-              background: "rgba(255,255,255,0.06)",
+              background: "transparent",
               color: "#fff",
               cursor: "pointer",
-              fontSize: 14,
-              lineHeight: 1,
             }}
           >
-            ✕
+            <span
+              aria-hidden
+              style={{
+                width: 30,
+                height: 30,
+                display: "grid",
+                placeItems: "center",
+                borderRadius: 999,
+                border: "1px solid rgba(255,255,255,0.14)",
+                background: "rgba(255,255,255,0.06)",
+                fontSize: 14,
+                lineHeight: 1,
+              }}
+            >
+              ✕
+            </span>
           </button>
         </div>
         {children}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 
@@ -1068,114 +1128,5 @@ function LinksEditor({
         </div>
       ) : null}
     </div>
-  );
-}
-
-// ─── Tiny inline icons ───────────────────────────────────────────────────
-
-function PencilIcon() {
-  return (
-    <svg width="13" height="13" viewBox="0 0 16 16" aria-hidden>
-      <path
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.6"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        d="M11.5 1.5l3 3-9 9H2.5v-3l9-9zM10 3l3 3"
-      />
-    </svg>
-  );
-}
-
-function BannerIcon() {
-  return (
-    <svg width="13" height="13" viewBox="0 0 16 16" aria-hidden>
-      <rect
-        x="2"
-        y="3"
-        width="12"
-        height="10"
-        rx="1.5"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.4"
-      />
-      <path
-        d="M2 11l3-3 2 2 3-3 4 4"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.4"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
-
-function LogoIcon() {
-  return (
-    <svg width="13" height="13" viewBox="0 0 16 16" aria-hidden>
-      <circle
-        cx="8"
-        cy="8"
-        r="6"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.4"
-      />
-      <circle cx="8" cy="8" r="2.5" fill="currentColor" />
-    </svg>
-  );
-}
-
-function PersonPlusIcon() {
-  return (
-    <svg width="13" height="13" viewBox="0 0 16 16" aria-hidden>
-      <circle
-        cx="6"
-        cy="5"
-        r="2.75"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.4"
-      />
-      <path
-        d="M1.5 14c0-2.5 2-4.25 4.5-4.25S10.5 11.5 10.5 14M13 5.5v4M11 7.5h4"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.4"
-        strokeLinecap="round"
-      />
-    </svg>
-  );
-}
-
-function LinkIcon() {
-  return (
-    <svg width="13" height="13" viewBox="0 0 16 16" aria-hidden>
-      <path
-        d="M6.5 9.5l3-3M7 4.5l1.2-1.2a2.6 2.6 0 013.7 3.7L10.7 8.2M9 11.5l-1.2 1.2a2.6 2.6 0 01-3.7-3.7L5.3 7.8"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
-
-function PlusIcon() {
-  return (
-    <svg width="13" height="13" viewBox="0 0 16 16" aria-hidden>
-      <path
-        d="M8 3v10M3 8h10"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.6"
-        strokeLinecap="round"
-      />
-    </svg>
   );
 }

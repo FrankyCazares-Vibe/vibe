@@ -41,6 +41,7 @@ import { officerGate } from "@/lib/orgs/hidden-gate";
 import { loadBoardReadable } from "@/lib/orgs/board-facts";
 import { MOD_READONLY } from "@/lib/orgs/join-copy";
 import { loadViewerOrgContext } from "@/lib/orgs/membership";
+import { normalizeMeetingTime } from "@/lib/orgs/meeting-time";
 import {
   purgeDeletedClubMedia,
   type DeletedPostRow,
@@ -77,6 +78,7 @@ type UpdateBody = {
   campus?: unknown;
   campus_id?: unknown;
   followers_read_board?: unknown;
+  meeting_time?: unknown;
 };
 
 type LinkRow = { label: string; url: string };
@@ -94,6 +96,14 @@ const URL_RE = /^https?:\/\/[^\s]{3,}$/i;
  * read by followers, whatever this says (the database's rule).
  */
 const BOARD_SETTING = "followers_read_board";
+
+/**
+ * `orgs.meeting_time` (the club's view, wave 2; migration 20261023100000):
+ * when the club says it meets, one line of its own words, '' for nothing.
+ * PATCH asks for it and, on a database without it, reads again without it,
+ * the way the Board setting is read in GET.
+ */
+const MEETING_TIME = "meeting_time";
 
 /** The setting as the routes send it: true or false, null when this database has no such column. */
 function boardSetting(value: unknown): boolean | null {
@@ -406,8 +416,10 @@ export async function GET(_req: Request, { params }: Params) {
 
 /**
  * PATCH /api/orgs/[slug] — update org metadata, join policy, audience,
- * campus and `followers_read_board` (may followers read the Board; club
- * model, Oct 16). Owner or admin only ("settings officers", spec §3.1).
+ * campus, `followers_read_board` (may followers read the Board; club
+ * model, Oct 16) and `meeting_time` (when the club says it meets, up to 60
+ * characters; the club's view, wave 2). Owner or admin only ("settings
+ * officers", spec §3.1).
  *
  * FOUR THINGS CHANGED HERE (spec §4.2, critic A3 + B4):
  *  0. It is RATE LIMITED (`org-settings:<uid>`, 30 / 10 min), like every other
@@ -472,15 +484,24 @@ export async function PATCH(req: Request, { params }: Params) {
   }
 
   const service = createSupabaseServiceClient();
-  const { data: orgRow, error: orgErr } = await service
-    .from("orgs")
-    // `name`, `description`, `philanthropy` and `links` are read for the word
-    // filter below, which only judges text the officer actually changed.
-    .select(
-      "id, handle, owner_id, name, description, philanthropy, links, join_policy, audience, hidden_at, campus_id",
-    )
-    .eq("handle", slug)
-    .maybeSingle();
+  // `name`, `description`, `philanthropy`, `links` and `meeting_time` are read
+  // for the word filter below, which only judges text the officer actually
+  // changed. A database without `meeting_time` yet (20261023100000) reads
+  // the club as before: saves without it work, saves with it answer 503.
+  const readOrg = (withMeeting: boolean) =>
+    service
+      .from("orgs")
+      .select(
+        `id, handle, owner_id, name, description, philanthropy, links, ${withMeeting ? `${MEETING_TIME}, ` : ""}join_policy, audience, hidden_at, campus_id`,
+      )
+      .eq("handle", slug)
+      .maybeSingle();
+  let meetingColumn = true;
+  let { data: orgRow, error: orgErr } = await readOrg(true);
+  if (orgErr && isMissingColumnError(orgErr, [MEETING_TIME])) {
+    meetingColumn = false;
+    ({ data: orgRow, error: orgErr } = await readOrg(false));
+  }
   if (orgErr) {
     console.error("[orgs/[slug] PATCH load org]", orgErr);
     return fail(500, "load_failed", "Failed to update");
@@ -488,13 +509,14 @@ export async function PATCH(req: Request, { params }: Params) {
   if (!orgRow) {
     return fail(404, "not_found", "Not found");
   }
-  const org = orgRow as {
+  const org = orgRow as unknown as {
     id: string;
     handle: string;
     owner_id: string | null;
     name: string | null;
     description: string | null;
     philanthropy: string | null;
+    meeting_time?: string | null;
     links: unknown;
     join_policy: JoinPolicy;
     audience: OrgAudience;
@@ -720,6 +742,21 @@ export async function PATCH(req: Request, { params }: Params) {
     patch.philanthropy = v;
   }
 
+  // ── When it meets ────────────────────────────────────────────────────────
+  // Wave 2 (C8): one line in the club's own words, shown on its page to
+  // everyone, so the same "only what changed" filter as the description.
+  // A string; "" clears it. Stored on a hidden club too: it is page text,
+  // like the description, and nobody new sees it while the club is hidden.
+  if (body.meeting_time !== undefined) {
+    if (!meetingColumn) {
+      return fail(503, "meeting_time_unavailable", "This isn't ready yet. Try again later.");
+    }
+    const meeting = normalizeMeetingTime(body.meeting_time);
+    if (!meeting.ok) return fail(400, meeting.code, meeting.message);
+    if (!checkChangedText(meeting.value, org.meeting_time).ok) return contentBlockedResponse("meeting_time");
+    patch.meeting_time = meeting.value;
+  }
+
   // ── The Board for followers ──────────────────────────────────────────────
   // Club model (Franky, Oct 16): followers read the club's Board unless its
   // owner or an admin turns that off here (the officer gate above). A
@@ -739,19 +776,32 @@ export async function PATCH(req: Request, { params }: Params) {
     return fail(400, "nothing_to_update", "Nothing to update");
   }
 
-  // The setting comes back only when this save changed it: every other save
-  // reads what it always did, so it works on a database without the column.
+  // The Board setting comes back only when this save changed it: every other
+  // save reads what it always did, so it works on a database without the
+  // column. `meeting_time` comes back whenever the read above found the
+  // column, so the page's copy of the club never loses it on another save.
   const boardChanged = BOARD_SETTING in patch;
-  const updateSelect: string = boardChanged ? `${ORG_SELECT}, ${BOARD_SETTING}` : ORG_SELECT;
-  const { data: updated, error } = await service
-    .from("orgs")
-    .update(patch)
-    .eq("id", org.id)
-    .select(updateSelect)
-    .single();
+  const meetingChanged = MEETING_TIME in patch;
+  const runUpdate = (withMeeting: boolean) =>
+    service
+      .from("orgs")
+      .update(patch)
+      .eq("id", org.id)
+      .select(`${ORG_SELECT}${withMeeting ? `, ${MEETING_TIME}` : ""}${boardChanged ? `, ${BOARD_SETTING}` : ""}`)
+      .single();
+  let { data: updated, error } = await runUpdate(meetingColumn);
+  // The column went between the read and this write (a rollback): a save
+  // that doesn't carry it is sent again without asking for it back. One
+  // statement, so the failed attempt wrote nothing.
+  if (error && meetingColumn && !meetingChanged && isMissingColumnError(error, [MEETING_TIME])) {
+    ({ data: updated, error } = await runUpdate(false));
+  }
   if (error || !updated) {
     if (boardChanged && isMissingColumnError(error, [BOARD_SETTING])) {
       return fail(503, "board_setting_unavailable", "This setting isn't ready yet. Try again later.");
+    }
+    if (meetingChanged && isMissingColumnError(error, [MEETING_TIME])) {
+      return fail(503, "meeting_time_unavailable", "This isn't ready yet. Try again later.");
     }
     console.error("[orgs/[slug] PATCH]", error);
     return fail(500, "update_failed", "Failed to update");

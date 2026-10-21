@@ -240,7 +240,7 @@ export function OrgJoinControl({
     ].filter((s): s is string => !!s);
     if (!showFollow && membership.length === 0) return null;
     return (
-      // ONE element: globals.css makes `.vibe-org-header-join > *` full width on phones.
+      // ONE element: globals.css makes `.vibe-club-join > *` fill its half of the club page's button row.
       <div
         style={{
           display: "flex",

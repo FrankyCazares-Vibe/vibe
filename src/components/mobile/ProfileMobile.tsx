@@ -23,6 +23,7 @@ import {
 } from "@/components/mobile/ResumeViewerMobile";
 import { useMobileTour } from "@/components/mobile/use-mobile-tour";
 import { useTabScrollMemory } from "@/components/mobile/use-tab-scroll-memory";
+import { ClubSwitcherSheet } from "@/components/orgs/ClubSwitcherSheet";
 import { ClubFlairChips } from "@/components/profile/ClubFlair";
 import { ClubsSection, useMyClubs } from "@/components/profile/ClubsSection";
 import { readPublicClubs, type ShownClub } from "@/components/profile/clubs-model";
@@ -32,6 +33,7 @@ import { allowedCampusId, isSchoolSystem, type SchoolSystem } from "@/lib/iu/cam
 import { majorsForCampus } from "@/lib/iu/majors";
 import { Reveal } from "@/lib/motion/Reveal";
 import { SPRING_SNAPPY } from "@/lib/motion/springs";
+import { useClubsYouRun } from "@/lib/orgs/club-switch";
 import {
   CONNECTED_MEANING,
   FOLLOW_LABELS,
@@ -625,6 +627,13 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
   // carries the hidden ones and the Following list only you see.
   const [visitorClubs, setVisitorClubs] = useState<ShownClub[] | null>(null);
   const myClubs = useMyClubs(!isVisitor);
+  // The club switch (wave 2, C6): an owner or officer taps their own name.
+  // Whether I run a club comes from the switcher's own list (cached two
+  // minutes, shared with the sheet), not from /api/me/clubs: that list's
+  // shape is pinned to the static profile's twin, which carries no role.
+  const [switcherOpen, setSwitcherOpen] = useState(false);
+  const clubsIRun = useClubsYouRun(!isVisitor);
+  const runsAClub = clubsIRun.status === "ok" && clubsIRun.clubs.length > 0;
   const [savingEdit, setSavingEdit] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
 
@@ -1991,10 +2000,50 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
                 margin: 0,
               }}
             >
-              {name}
+              {/* Wave 2, C6: on my own profile, when I run a club, my name
+                  opens "Switch to." (the same sheet as holding the Profile
+                  tab). Same look; the 8px padding makes it a 44px target
+                  without moving the line. Nobody else sees a change. */}
+              {!isVisitor && !editMode && runsAClub ? (
+                <button
+                  type="button"
+                  onClick={() => setSwitcherOpen(true)}
+                  aria-haspopup="dialog"
+                  aria-label="Switch to one of your clubs"
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 6,
+                    padding: "8px 0",
+                    margin: "-8px 0",
+                    border: "none",
+                    background: "none",
+                    font: "inherit",
+                    letterSpacing: "inherit",
+                    color: "inherit",
+                    textAlign: "left",
+                    cursor: "pointer",
+                    WebkitTapHighlightColor: "transparent",
+                  }}
+                >
+                  {name}
+                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true" style={{ flexShrink: 0, color: "var(--ink-muted)" }}>
+                    <path d="M3 5.25L7 9.25l4-4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </button>
+              ) : (
+                name
+              )}
             </h1>
           )}
           {verified ? <VerifiedBadge school={school} /> : null}
+          {!isVisitor ? (
+            <ClubSwitcherSheet
+              open={switcherOpen}
+              onClose={() => setSwitcherOpen(false)}
+              me={pick(user.name) ? { name, avatarUrl: avatar } : null}
+            />
+          ) : null}
         </div>
 
         {/* Handle — read-only on mobile for v1 (handle changes have a

@@ -38,8 +38,9 @@ export function Sections5aTo5d() {
           the photo.
         </li>
         <li>
-          <strong>Club pages:</strong> name, description, links, logo, banner,
-          who can join, and the member and follower counts once each reaches 5.
+          <strong>Club pages:</strong> name, description, links, philanthropy,
+          logo, banner, who can join, when it meets, and the member and
+          follower counts once each reaches 5.
           Also the 12 newest posts with each author&apos;s name, handle and
           photo, even for clubs you must ask or be invited to join.
         </li>

@@ -1,217 +1,122 @@
 "use client";
 
 import { useSearchParams } from "next/navigation";
-import { useState, useSyncExternalStore } from "react";
+import { useId, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 
-import { ReportSheet } from "@/components/safety/ReportSheet";
+export type ClubTab = "posts" | "events" | "board";
+
+const TABS: ReadonlyArray<{ id: ClubTab; label: string }> = [
+  { id: "posts", label: "Posts" },
+  { id: "events", label: "Events" },
+  { id: "board", label: "Board" },
+];
 
 /**
- * This page's own phone breakpoint — the width at which globals.css swaps the
- * 2-column grid for the tab strip above (`@media (max-width: 720px)`). The
- * report shell is picked off the same number, so the centered desktop dialog
- * never opens on a screen that is already showing the phone layout. NOT
- * `useIsMobile` (899px): 180px of viewport between the two would give a
- * bottom sheet on a page still in its desktop grid.
+ * The tab the address asks for (the club's view, wave 2, C9):
+ * `?tab=posts|events|board`, and `?event=<id>` (a calendar link; Oct 19,
+ * 2026, critique D13) always means Events, or the card it scrolls to would
+ * be hidden. Anything else opens on Posts.
  */
-const PHONE_QUERY = "(max-width: 720px)";
-
-function subscribePhone(onChange: () => void): () => void {
-  if (typeof window === "undefined" || typeof window.matchMedia !== "function") {
-    return () => {};
-  }
-  const mq = window.matchMedia(PHONE_QUERY);
-  mq.addEventListener("change", onChange);
-  return () => mq.removeEventListener("change", onChange);
-}
-
-function isPhoneNow(): boolean {
-  if (typeof window === "undefined" || typeof window.matchMedia !== "function") {
-    return false;
-  }
-  return window.matchMedia(PHONE_QUERY).matches;
-}
-
-/** Server always renders the desktop shell; the client reads the real
- *  viewport on the first paint after hydration. */
-function serverSnapshot(): boolean {
-  return false;
+export function tabFromAddress(tab: string | null, event: string | null): ClubTab {
+  if (event) return "events";
+  return tab === "events" || tab === "board" ? tab : "posts";
 }
 
 /**
- * Wraps the org profile's main 2-column content grid.
+ * The club page's tabs, Posts | Events | Board, on phone and desktop alike
+ * (underline style; globals.css `.vibe-club-tab`). The panels are handed in
+ * as ReactNodes so the server page renders them with its full data context;
+ * this shell owns only which one shows.
  *
- * Desktop  → renders both columns side-by-side (2fr / 1fr) — same as
- *            the original inline grid.
- * Mobile   → renders a 2-pill tab strip (Posts / About) above the
- *            grid. Active tab drives `data-tab` on the grid;
- *            globals.css hides the inactive column via attribute
- *            selector. Same DOM on both viewports, no remounting
- *            scroll position when switching.
+ * Every panel stays mounted and the others are `hidden`, at every width: the
+ * Events tab's two lists both answer a `?event=` link (linked-event.tsx),
+ * and a switch back keeps a list where the student left it. The address
+ * picks the first tab; a later move to `?tab=…` on the same page (Club
+ * tools' "Past events and who came") switches it too.
  *
- * The two columns are passed in as ReactNode props so the server
- * page can render them with its full data context — this client
- * shell just owns the tab state.
- *
- * `reportable` is the one exception: the club's id and whether the viewer owns
- * it, so the About column can end with a quiet "Report this club". It is
- * OPTIONAL and defaults to nothing, because both live in the server page
- * (src/app/orgs/[handle]/page.tsx) and this shell is handed ReactNodes only.
- * Without it the row is simply absent — no half-wired button that files a
- * report against an id nobody passed.
+ * "Report this club" lived in the old About column; it is in More about us
+ * now (club-page/MoreAboutUs.tsx), with the same rules.
  */
 export function OrgContent({
-  mainColumn,
-  eventsColumn,
-  aboutColumn,
-  reportable,
+  posts,
+  events,
+  board,
 }: {
-  mainColumn: React.ReactNode;
-  eventsColumn: React.ReactNode;
-  aboutColumn: React.ReactNode;
-  /** The club being viewed, and whether this viewer runs it. Omit and no
-   *  Report row shows; `viewerIsOwner` hides it from the club's own officers,
-   *  who would otherwise get the route's 400 "You can't report something of
-   *  your own" — every other surface in the app keeps Report off your own
-   *  things rather than letting the route refuse it. */
-  reportable?: { id: string; viewerIsOwner?: boolean } | null;
+  posts: ReactNode;
+  events: ReactNode;
+  board: ReactNode;
 }) {
-  // Opened at one event (`?event=<id>`, a calendar link; Oct 19, 2026,
-  // critique D13): the phone starts on the Events tab, or the card it
-  // scrolls to would be hidden. The desktop shows every column anyway.
-  const linkedEvent = useSearchParams().get("event");
-  const [tab, setTab] = useState<"posts" | "events" | "about">(linkedEvent ? "events" : "posts");
-  const [reportOpen, setReportOpen] = useState(false);
-  const phone = useSyncExternalStore(subscribePhone, isPhoneNow, serverSnapshot);
-  const canReport = !!reportable && !reportable.viewerIsOwner;
+  const params = useSearchParams();
+  const wanted = tabFromAddress(params.get("tab"), params.get("event"));
+  const [seen, setSeen] = useState<ClubTab>(wanted);
+  const [tab, setTab] = useState<ClubTab>(wanted);
+  if (wanted !== seen) {
+    setSeen(wanted);
+    setTab(wanted);
+  }
+  const baseId = useId();
+  const tabRefs = useRef<Partial<Record<ClubTab, HTMLButtonElement | null>>>({});
 
+  // Arrow keys move along the tabs (WAI-ARIA tabs, automatic activation).
+  const onKeyDown = (e: KeyboardEvent<HTMLButtonElement>) => {
+    const at = TABS.findIndex((t) => t.id === tab);
+    let to = -1;
+    if (e.key === "ArrowRight") to = (at + 1) % TABS.length;
+    else if (e.key === "ArrowLeft") to = (at - 1 + TABS.length) % TABS.length;
+    else if (e.key === "Home") to = 0;
+    else if (e.key === "End") to = TABS.length - 1;
+    if (to < 0) return;
+    e.preventDefault();
+    const next = TABS[to].id;
+    setTab(next);
+    tabRefs.current[next]?.focus();
+  };
+
+  const panels: Record<ClubTab, ReactNode> = { posts, events, board };
   return (
     <div className="vibe-org-content" data-tab={tab}>
-      {/* Tab strip — display:none on desktop via globals.css. */}
-      <div
-        className="vibe-org-tabbar"
-        style={{
-          display: "none",
-          gap: 6,
-          marginTop: 18,
-        }}
-      >
-        <OrgTabPill
-          label="Posts"
-          active={tab === "posts"}
-          onClick={() => setTab("posts")}
-        />
-        <OrgTabPill
-          label="Events"
-          active={tab === "events"}
-          onClick={() => setTab("events")}
-        />
-        <OrgTabPill
-          label="About"
-          active={tab === "about"}
-          onClick={() => setTab("about")}
-        />
+      <div role="tablist" aria-label="Club page" className="vibe-club-tabs">
+        {TABS.map((t) => (
+          <button
+            key={t.id}
+            ref={(el) => {
+              tabRefs.current[t.id] = el;
+            }}
+            type="button"
+            role="tab"
+            id={`${baseId}-${t.id}-tab`}
+            aria-selected={tab === t.id}
+            aria-controls={`${baseId}-${t.id}`}
+            tabIndex={tab === t.id ? 0 : -1}
+            className="vibe-club-tab"
+            onClick={() => setTab(t.id)}
+            onKeyDown={onKeyDown}
+          >
+            {t.label}
+          </button>
+        ))}
       </div>
-
-      {/* Events row — desktop renders it full-width above the 2-col
-          grid. Mobile shows it only when the Events tab is active
-          (via attribute selector on the parent). */}
-      <div
-        className="vibe-org-events-row"
-        style={{ marginTop: 24 }}
-      >
-        {eventsColumn}
-      </div>
-
-      <div
-        className="vibe-org-grid"
-        style={{
-          display: "grid",
-          gridTemplateColumns: "minmax(0, 2fr) minmax(0, 1fr)",
-          gap: 24,
-          marginTop: 24,
-        }}
-      >
+      {TABS.map((t) => (
         <div
-          className="vibe-org-main"
-          style={{ display: "flex", flexDirection: "column", gap: 24, minWidth: 0 }}
+          key={t.id}
+          role="tabpanel"
+          id={`${baseId}-${t.id}`}
+          aria-labelledby={`${baseId}-${t.id}-tab`}
+          hidden={tab !== t.id}
+          className="vibe-club-panel"
+          // `display` follows `hidden` too, so an inline flex never shows a
+          // panel the attribute hides.
+          style={{
+            marginTop: 16,
+            display: tab === t.id ? "flex" : "none",
+            flexDirection: "column",
+            gap: 16,
+            minWidth: 0,
+          }}
         >
-          {mainColumn}
+          {panels[t.id]}
         </div>
-
-        <aside
-          className="vibe-org-about"
-          style={{ display: "flex", flexDirection: "column", gap: 16, minWidth: 0 }}
-        >
-          {aboutColumn}
-          {canReport ? (
-            <button
-              type="button"
-              onClick={() => setReportOpen(true)}
-              style={{
-                alignSelf: "flex-start",
-                padding: "8px 0",
-                background: "transparent",
-                border: "none",
-                color: "rgba(255,255,255,0.55)",
-                fontFamily: "DM Sans, sans-serif",
-                fontSize: 12.5,
-                fontWeight: 600,
-                textDecoration: "underline",
-                cursor: "pointer",
-                WebkitTapHighlightColor: "transparent",
-              }}
-            >
-              Report this club
-            </button>
-          ) : null}
-        </aside>
-      </div>
-
-      {reportOpen && canReport && reportable ? (
-        // A club has no person behind it to block, so the sheet offers none.
-        // Bottom sheet on the phone, centered dialog on the desktop grid —
-        // the same split this component already makes for its own layout.
-        <ReportSheet
-          variant={phone ? "sheet" : "modal"}
-          target={{ type: "org", id: reportable.id, noun: "club" }}
-          onClose={() => setReportOpen(false)}
-        />
-      ) : null}
+      ))}
     </div>
-  );
-}
-
-function OrgTabPill({
-  label,
-  active,
-  onClick,
-}: {
-  label: string;
-  active: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      style={{
-        padding: "8px 18px",
-        borderRadius: 999,
-        border: active
-          ? "1px solid rgba(255,255,255,0.32)"
-          : "1px solid rgba(255,255,255,0.10)",
-        background: active ? "rgba(255,255,255,0.16)" : "transparent",
-        color: active ? "#fff" : "rgba(255,255,255,0.65)",
-        fontFamily: "DM Sans, sans-serif",
-        fontSize: 13,
-        fontWeight: 700,
-        letterSpacing: "0.02em",
-        cursor: "pointer",
-        WebkitTapHighlightColor: "transparent",
-        flexShrink: 0,
-      }}
-    >
-      {label}
-    </button>
   );
 }

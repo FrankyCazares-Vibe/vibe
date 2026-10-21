@@ -61,7 +61,17 @@ const ACCOUNT_KEYS = [
   // device-push (see the top). leave-device-clean.test.ts pins the names.
   "vibe.club-titles-seen.v1",
   "vibe.followed-board-seen.v1",
+  // The club the phone's Profile tab stands for (wave 2, src/lib/orgs/
+  // club-switch.ts): the next person on this phone starts as themselves.
+  "vibe.profile-as-club.v1",
 ] as const;
+
+/**
+ * Per-account sessionStorage, by name: the clubs I run, cached two minutes
+ * for the tab bar and the desktop menu (club-switch.ts). Without this the next
+ * person signing in on the same tab would see my clubs until it ran out.
+ */
+const SESSION_ACCOUNT_KEYS = ["vibe.clubs-you-run.v1"] as const;
 
 /**
  * In order (critic-w3.md item 21): the server DELETE (when `serverDelete`) →
@@ -82,6 +92,13 @@ async function leave(serverDelete: boolean): Promise<void> {
   for (const key of ACCOUNT_KEYS) {
     try {
       window.localStorage.removeItem(key);
+    } catch {
+      // Blocked storage holds nothing to remove.
+    }
+  }
+  for (const key of SESSION_ACCOUNT_KEYS) {
+    try {
+      window.sessionStorage.removeItem(key);
     } catch {
       // Blocked storage holds nothing to remove.
     }

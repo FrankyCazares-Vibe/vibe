@@ -1,44 +1,37 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useState } from "react";
 
-import {
-  type CampusEvent,
-  CreateEventModal,
-  type EligibleOrg,
-  EventCard,
-} from "@/app/campus/campus-home";
-import {
-  asLoadFailure,
-  LoadFailed,
-  type LoadFailure,
-} from "@/components/feedback/LoadFailed";
-import { vibeRequest } from "@/lib/feedback/request";
-import { toast } from "@/lib/feedback/toast";
+import { CreateEventModal, type EligibleOrg, EventCard } from "@/app/campus/campus-home";
+import { LoadFailed } from "@/components/feedback/LoadFailed";
 
-import { LinkedFlash, LinkedFocusStyle, useLinkedEvent, useLinkedEventParam } from "./linked-event";
+import { useClubEvents } from "./club-page/ClubEventsProvider";
+import { LinkedFlash, LinkedFocusStyle, useLinkedEvent } from "./linked-event";
 
 /**
- * Org-scoped events section. Lives on the org profile page (desktop +
- * mobile). Fetches `/api/events?org_id=<id>` so events from this org
- * are shown regardless of viewer's school.
+ * Org-scoped events section: the club page's Events tab. The list itself is
+ * read once for the page by ClubEventsProvider (club-page/), which the
+ * pinned Up next card reads too (the club's view, wave 2): events from this
+ * org whatever the viewer's school, `/api/events?org_id=<id>`.
  *
  * Admins / owners get a "+ Create event" button at the top that opens
  * the same CreateEventModal used on /campus, pre-scoped to this org.
  *
- * `rsvpAtHomeOnly` (S67 wave 4): the club is on a campus that isn't the
- * viewer's home, so every card renders its RSVP off with "RSVP works at
- * home" — the same state the campus Events tab shows while visiting. The
- * RSVP route refuses it anyway (403 `campus_visiting`); the card turns that
- * answer into "RSVP works on your home campus" if the page guessed wrong.
+ * `rsvpAtHomeOnly` (S67 wave 4, now on the provider): the club is on a
+ * campus that isn't the viewer's home, so every card renders its RSVP off
+ * with "RSVP works at home", the same state the campus Events tab shows
+ * while visiting. The RSVP route refuses it anyway (403 `campus_visiting`);
+ * the card turns that answer into "RSVP works on your home campus" if the
+ * page guessed wrong.
  *
  * `?event=<id>` (Oct 19, 2026, critique D13): a calendar event opens here.
  * Once the list has loaded, the linked card scrolls into view and flashes
  * (linked-event.tsx); if neither this list nor the past one has it, a toast
- * says it isn't listed anymore. Every read passes the id as `include`
+ * says it isn't listed anymore. The provider passes the id as `include`
  * (Oct 19, 2026 repair): My Calendar reaches 180 days ahead and this list
  * stops at 60 days and 50 rows, so a January formal would otherwise be
- * "not listed" while it is still on.
+ * "not listed" while it is still on. Only this list answers for the page:
+ * the Up next card carries no anchor, so the scroll lands here.
  */
 export function OrgEventsSection({
   orgId,
@@ -46,76 +39,22 @@ export function OrgEventsSection({
   orgHandle,
   orgVerified,
   viewerRole,
-  rsvpAtHomeOnly = false,
 }: {
   orgId: string;
   orgName: string;
   orgHandle: string;
   orgVerified: boolean;
   viewerRole: string | null;
-  rsvpAtHomeOnly?: boolean;
 }) {
-  const [events, setEvents] = useState<CampusEvent[] | null>(null);
-  // First-load failure only; a failed refresh keeps the events on screen.
-  const [loadErr, setLoadErr] = useState<LoadFailure | null>(null);
-  const [loadKey, setLoadKey] = useState(0);
+  const { events, loadErr, retry, refresh, remove, update, rev, rsvpAtHomeOnly } = useClubEvents();
   const [createOpen, setCreateOpen] = useState(false);
 
   const canManage = viewerRole === "owner" || viewerRole === "admin";
-  const linkedParam = useLinkedEventParam();
-  const listUrl = `/api/events?org_id=${encodeURIComponent(orgId)}&limit=50${
-    linkedParam ? `&include=${encodeURIComponent(linkedParam)}` : ""
-  }`;
   // A failed first read can't say the linked event is gone.
   const linkedId = useLinkedEvent(
     "upcoming",
     events === null ? (loadErr ? "unknown" : null) : events.map((e) => e.id),
   );
-  // Only the newest refresh lands. An officer's cancel / delete / edit bumps
-  // it too: a read already out predates the change and would put the old
-  // card back.
-  const eventsSeqRef = useRef(0);
-
-  // After an RSVP or a new event. The student started it, so a refusal
-  // toasts (vibeRequest's, or ours for a bad body) and the list stays put.
-  const refresh = useCallback(async () => {
-    const seq = ++eventsSeqRef.current;
-    const r = await vibeRequest<{ events?: CampusEvent[] }>(
-      listUrl,
-      { cache: "no-store", failure: "Couldn't refresh events." },
-    );
-    if (seq !== eventsSeqRef.current) return;
-    if (r.ok && Array.isArray(r.data.events)) {
-      setLoadErr(null);
-      setEvents(r.data.events);
-    } else if (r.ok) {
-      toast({ message: "Couldn't refresh events. Try again.", tone: "error" });
-    }
-  }, [listUrl]);
-
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      const r = await vibeRequest<{ events?: CampusEvent[] }>(
-        listUrl,
-        { cache: "no-store", quiet: true, failure: "Couldn't load events." },
-      );
-      if (cancelled) return;
-      if (r.ok && Array.isArray(r.data.events)) {
-        setLoadErr(null);
-        setEvents(r.data.events);
-      } else if (!r.ok && r.status === 401) {
-        // A visitor who was never signed in is asked to sign in, not told
-        // they were signed out (feature report 3, #16).
-        setLoadErr({ ...asLoadFailure(r, "Couldn't load events."), message: "Sign in to see this club's events." });
-      } else {
-        setLoadErr(asLoadFailure(r, "Couldn't load events."));
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [listUrl, loadKey]);
 
   return (
     <section
@@ -178,10 +117,7 @@ export function OrgEventsSection({
         <LoadFailed
           tone="dark"
           failure={loadErr}
-          onRetry={() => {
-            setLoadErr(null);
-            setLoadKey((k) => k + 1);
-          }}
+          onRetry={retry}
         />
       ) : events === null ? (
         <Skeleton />
@@ -203,8 +139,10 @@ export function OrgEventsSection({
           {linkedId ? <LinkedFocusStyle /> : null}
           {events.map((ev) => (
             // The anchor `?event=` scrolls to (EVENT_ANCHOR_ATTR).
+            // Keyed on the Up next card's changes too (`rev.list`), so an
+            // RSVP made there redraws this copy from the fresh list.
             <div
-              key={ev.id}
+              key={`${ev.id}:${rev.list}`}
               data-event-anchor={ev.id}
               tabIndex={ev.id === linkedId ? -1 : undefined}
               // No `outline: none` (Oct 19, 2026 repair): LinkedFocusStyle
@@ -215,19 +153,11 @@ export function OrgEventsSection({
               {ev.id === linkedId ? <LinkedFlash /> : null}
               <EventCard
                 ev={ev}
-                onMutate={refresh}
+                onMutate={() => void refresh("list")}
                 // An officer's Cancel / Delete / Edit (S68): the list changes
                 // at once, no refetch.
-                onRemoved={(id) => {
-                  eventsSeqRef.current += 1;
-                  setEvents((prev) => (prev ? prev.filter((e) => e.id !== id) : prev));
-                }}
-                onUpdated={(next) => {
-                  eventsSeqRef.current += 1;
-                  setEvents((prev) =>
-                    prev ? prev.map((e) => (e.id === next.id ? next : e)) : prev,
-                  );
-                }}
+                onRemoved={remove}
+                onUpdated={(next) => update(next, "list")}
                 visiting={rsvpAtHomeOnly}
               />
             </div>
@@ -251,7 +181,7 @@ export function OrgEventsSection({
           onClose={() => setCreateOpen(false)}
           onCreated={() => {
             setCreateOpen(false);
-            void refresh();
+            void refresh("list");
           }}
         />
       ) : null}

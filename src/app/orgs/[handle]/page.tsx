@@ -11,6 +11,7 @@ import { MobileTabBar } from "@/components/mobile/MobileTabBar";
 import { OrgInviteBanner } from "@/components/orgs/OrgInviteBanner";
 import { OrgMenu } from "@/components/orgs/OrgMenu";
 import { visibleClubPosts } from "@/lib/club-routes/club-posts";
+import { isMissingColumnError } from "@/lib/db/missing-column";
 import {
   loadRestrictedAuthors,
   readClubPostsForViewer,
@@ -22,16 +23,9 @@ import { orgAssetProxyUrl } from "@/lib/org-asset-url";
 import { NO_BOARD, loadBoardFacts } from "@/lib/orgs/board-facts";
 import { loadFollowerCount, loadViewerFollow, publicMemberCount } from "@/lib/orgs/following";
 import {
-  ORG_COPY,
-  audienceChip,
   boardCardView,
-  followerCountText,
   joinPolicyNotice,
   keepFollowingDefault,
-  memberCountText,
-  openToFact,
-  policyChip,
-  whoCanJoinFact,
   type OrgDisplayState,
   type OrgRelation,
 } from "@/lib/orgs/join-copy";
@@ -45,6 +39,8 @@ import {
   type OrgAudience,
 } from "@/lib/orgs/join-state";
 import { loadViewerOrgContext } from "@/lib/orgs/membership";
+import { storedMeetingTime } from "@/lib/orgs/meeting-time";
+import { headerCount, loadOfficerCounts, needsYouText, type OfficerCounts } from "@/lib/orgs/officer-counts";
 import { loadMutedOrgSet } from "@/lib/orgs/org-mutes";
 import { withPostMediaUrls } from "@/lib/post-media-url";
 import { isClubPostDeleteRole } from "@/lib/posts/viewer-can-delete";
@@ -52,8 +48,17 @@ import { loadHiddenUsers } from "@/lib/safety/hidden-users";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 
-import { OrgProfileAdminBar } from "./admin-actions";
 import { BoardSection, ChannelsSection } from "./ChannelsSection";
+import { AboutDetails, fmtDate } from "./club-page/AboutDetails";
+import { ClubCover, ClubHeader, LockGlyph } from "./club-page/ClubHeader";
+import { ClubEventsProvider } from "./club-page/ClubEventsProvider";
+import { ClubSwitchSync } from "./club-page/ClubSwitchSync";
+import { MoreAboutUs } from "./club-page/MoreAboutUs";
+import { CoverOfficerButtons, EditPageButton, SharePageButton } from "./club-page/OfficerActions";
+import { SwitchChevron } from "./club-page/SwitchChevron";
+import { ClubToolsCard, NeedsYouLine } from "./club-page/ToolsCard";
+import type { ClubPageOrg } from "./club-page/types";
+import { UpNext } from "./club-page/UpNext";
 import { OrgContent } from "./OrgContent";
 import { OrgEventsSection } from "./OrgEventsSection";
 import { OrgPastEvents } from "./OrgPastEvents";
@@ -83,35 +88,31 @@ const BACKDROP_PRESETS: Record<string, string> = {
 
 const DORMANT_MS = 60 * 24 * 60 * 60 * 1000;
 
-type OrgProfile = {
+type OrgProfile = ClubPageOrg;
+
+/** The column wave 2 adds (migration 20261023100000); read with a fallback. */
+const MEETING_TIME = "meeting_time";
+const ORG_COLUMNS: string =
+  "id, handle, name, description, logo_url, banner_url, backdrop_preset, verified, links, philanthropy, last_activity_at, created_at, join_policy, audience, hidden_at, campus_id";
+
+/** The club row as the page reads it (`ORG_COLUMNS`, plus `meeting_time`). */
+type OrgRow = {
   id: string;
   handle: string;
   name: string;
-  description: string;
+  description: string | null;
   logo_url: string | null;
   banner_url: string | null;
-  join_policy: JoinPolicy;
-  audience: OrgAudience;
-  hidden: boolean;
-  campus_id: string | null;
-  verified: boolean;
-  backdrop_preset: string;
-  links: Array<{ label: string; url: string }> | null;
-  philanthropy: string;
+  backdrop_preset: string | null;
+  verified: boolean | null;
+  links: unknown;
+  philanthropy: string | null;
   last_activity_at: string | null;
-  /**
-   * Null when the count read failed: omitted, never rendered as 0 (C27).
-   * Also null below 5 for anyone outside the club (`publicMemberCount`,
-   * counts public from 5 up); members see the exact number.
-   */
-  member_count: number | null;
-  /**
-   * The raw count, null when the read failed. Rendered only through
-   * `followerCountText`, which applies the floor of 5 to EVERY viewer here;
-   * officers see the exact number in the desktop Followers tab (CH3).
-   */
-  follower_count: number | null;
-  dormant: boolean;
+  join_policy: string;
+  audience: string;
+  hidden_at: string | null;
+  campus_id: string | null;
+  meeting_time?: unknown;
 };
 
 type PostRow = {
@@ -166,13 +167,20 @@ export default async function OrgProfilePage({ params }: Params) {
   const { handle } = await params;
   const service = createSupabaseServiceClient();
 
-  const { data: orgRaw } = await service
-    .from("orgs")
-    .select(
-      "id, handle, name, description, logo_url, banner_url, backdrop_preset, verified, links, philanthropy, last_activity_at, created_at, join_policy, audience, hidden_at, campus_id"
-    )
-    .eq("handle", handle)
-    .maybeSingle();
+  const readOrg = (withMeetingTime: boolean) =>
+    service
+      .from("orgs")
+      .select(withMeetingTime ? `${ORG_COLUMNS}, ${MEETING_TIME}` : ORG_COLUMNS)
+      .eq("handle", handle)
+      .maybeSingle();
+  let { data: orgData, error: orgErr } = await readOrg(true);
+  // A database without "when it meets" yet reads the club as before; the
+  // line then shows nothing and Edit page leaves its field out (C8).
+  const meetingTimeReady = !(orgErr && isMissingColumnError(orgErr, [MEETING_TIME]));
+  if (!meetingTimeReady) ({ data: orgData, error: orgErr } = await readOrg(false));
+  // A failed read is a 404, as it always was; now it is logged too.
+  if (orgErr) console.error("[orgs/[handle] page org]", orgErr);
+  const orgRaw = orgData as unknown as OrgRow | null;
   if (!orgRaw) notFound();
 
   const orgId = orgRaw.id as string;
@@ -291,7 +299,17 @@ export default async function OrgProfilePage({ params }: Params) {
   // same role rule and restriction check DELETE /api/posts/[id] makes
   // (clubOfficerMayDelete), so the button and the route agree. Only an owner
   // or admin pays for the read; a failed one shows no button.
-  const [memberRes, followerCount, clubPosts, invitedByName, officerMayDeletePosts, boardFacts, mutedRes, setup] = await Promise.all([
+  //
+  // The owner and officers also get their numbers (the club's view, wave 2,
+  // C7): pending requests and this week's new followers, for the needs-you
+  // line and the Club tools card. The request count leaves out anyone in a
+  // block pair with the officer, as their own requests list does; when that
+  // block read fails, the numbers aren't read at all (null: no line, no
+  // count), rather than count a request the list would hide.
+  const officerView = isSettingsOfficer(viewerRole);
+  // Server-rendered per request; intentional Date.now() read.
+  const nowMs = Date.now(); // eslint-disable-line react-hooks/purity
+  const [memberRes, followerCount, clubPosts, invitedByName, officerMayDeletePosts, boardFacts, mutedRes, setup, officerCounts] = await Promise.all([
     service
       .from("org_members")
       .select("user_id", { count: "exact", head: true })
@@ -344,6 +362,7 @@ export default async function OrgProfilePage({ params }: Params) {
           description: (orgRaw.description as string | null) ?? null,
         })
       : Promise.resolve(null),
+    user && officerView ? loadOfficerNumbers(service, supabase, orgId, user.id, nowMs) : Promise.resolve(null),
   ]);
   const { posts: postsRes, blocked: blockedAuthors } = clubPosts;
   if (memberRes.error) {
@@ -351,8 +370,6 @@ export default async function OrgProfilePage({ params }: Params) {
   }
 
   const lastMs = orgRaw.last_activity_at ? Date.parse(orgRaw.last_activity_at) : null;
-  // Server-rendered per request; intentional Date.now() read.
-  const nowMs = Date.now(); // eslint-disable-line react-hooks/purity
   const dormant =
     !orgRaw.verified && lastMs !== null && nowMs - lastMs > DORMANT_MS;
 
@@ -378,9 +395,12 @@ export default async function OrgProfilePage({ params }: Params) {
       ? (orgRaw.links as Array<{ label: string; url: string }>)
       : [],
     philanthropy: (orgRaw.philanthropy as string) ?? "",
+    meeting_time: storedMeetingTime(orgRaw.meeting_time) ?? "",
     last_activity_at: (orgRaw.last_activity_at as string | null) ?? null,
     member_count: memberRes.error ? null : publicMemberCount(memberRes.count, viewerRole),
-    follower_count: followerCount,
+    // Exact for the owner and officers (even under 5), floored for everyone
+    // else; null when the read failed.
+    follower_count: headerCount(followerCount, officerView),
     dormant,
   };
 
@@ -454,131 +474,198 @@ export default async function OrgProfilePage({ params }: Params) {
       />
     ) : null;
 
+  // The owner and officers (C9): Edit page, the cover's + and Club tools,
+  // the switch chevron, their two lines and, on a wide screen, the Club
+  // tools card. Not the cover buttons on a hidden club.
+  const officerRole = officerView && (viewerRole === "owner" || viewerRole === "admin") ? viewerRole : null;
+  const needsYou = officerCounts ? needsYouText(officerCounts) : null;
+  // "Report this club", in More about us. Signed out there is nobody to file
+  // a report as, so the row stays off. `isOfficer` and not the club's
+  // `owner_id`: the route refuses only the owner ("You can't report something
+  // of your own"), but an officer reporting the club they help run is a
+  // conversation with the other officers, not a report to Vibe.
+  //
+  // `ctx.ok` for the same reason the page renders no join button on a failed
+  // membership read: `viewerRole` is null both for a stranger and for a read
+  // that fell over, and on the second the club's own owner would be offered
+  // a Report that can only come back "You can't report something of your
+  // own" — the refusal every other surface is built to avoid. A failed read
+  // already means this page speaks only about the club, so the row goes with
+  // the rest.
+  const reportable = user && ctx?.ok ? { id: org.id, viewerIsOwner: isOfficer(viewerRole) } : null;
+
   return (
     <main
-      className={user ? "vibe-tabbar-page vibe-mobile-safe-top" : "vibe-mobile-safe-top"}
+      // Dark in Light and Night alike (the club's own backdrop), so the
+      // page takes Night's tokens as an island (globals.css).
+      className={`${user ? "vibe-tabbar-page vibe-mobile-safe-top" : "vibe-mobile-safe-top"} vibe-night-island`}
       style={{
         minHeight: "100vh",
         background: backdrop,
         backgroundAttachment: "fixed",
-        color: "#fff",
+        color: "var(--charcoal)",
         fontFamily: "DM Sans, sans-serif",
       }}
     >
       <div
         className="vibe-org-shell"
-        style={{ maxWidth: 1100, margin: "0 auto", padding: "0 24px 64px" }}
+        // One centred column; the owner and officers get room for the
+        // Club tools column on a wide screen.
+        style={{ maxWidth: officerRole ? 1100 : 760, margin: "0 auto", padding: "0 24px 64px" }}
       >
         <TopNav signedIn={!!user} backHref={backHref} />
 
-        {isSettingsOfficer(viewerRole) ? (
-          <OrgProfileAdminBar
-            orgHandle={org.handle}
-            orgName={org.name}
-            joinPolicy={org.join_policy}
-            audience={org.audience}
-            hidden={org.hidden}
-            openToCampus={openToCampus}
-            initialDescription={org.description}
-            initialLinks={org.links ?? []}
-            initialPhilanthropy={org.philanthropy}
-            verified={org.verified}
-          />
-        ) : null}
-        {setup && !setup.complete ? (
-          <FinishSetupLine href={clubSetupPath(org.handle)} done={setup.done} total={setup.total} />
-        ) : null}
-
-        <Banner org={org} />
-        <Header org={org} invited={relation?.state === "invited"} menu={menu}>
-          {relation ? (
-            <OrgProfileJoinButton
-              relation={relation}
-              pendingInviteId={ctx?.pendingInvite?.id ?? null}
-            />
-          ) : (
-            <LoadFailed
-              tone="dark"
-              failure={{ message: "Couldn't load your membership. Try again." }}
-            />
-          )}
-        </Header>
-
-        {/* Membership gates the chats, not the public profile. Description,
-            posts, links, and philanthropy all show so a visitor can decide
-            whether to follow or join. */}
-        {notice ? <JoinPolicyNotice text={notice} /> : null}
-        {invite ? (
-          <div style={{ marginTop: 16 }}>
-            <OrgInviteBanner
+        <ClubCover org={org}>
+          {officerRole && !org.hidden ? (
+            <CoverOfficerButtons
+              orgId={org.id}
+              orgHandle={org.handle}
               orgName={org.name}
-              inviterFirstName={invitedByName}
-              expiresAt={invite.expires_at}
+              verified={org.verified}
+              viewerRole={officerRole}
+              boardId={boardFacts.boardId}
             />
-          </div>
-        ) : null}
-        {org.description ? <Description text={org.description} /> : null}
-        {boardCard && relation ? <BoardSection card={boardCard} relation={relation} /> : null}
+          ) : null}
+        </ClubCover>
 
-        <OrgContent
-          mainColumn={
-            <>
-              {postsErr ? (
-                <PostsFailed />
-              ) : posts.length > 0 ? (
-                <PostsSection
-                  posts={posts}
-                  org={org}
-                  viewerId={user?.id ?? null}
-                  officerMayDelete={officerMayDeletePosts}
+        <div className="vibe-club-layout" data-tools={officerRole ? "true" : undefined}>
+          <div style={{ minWidth: 0 }}>
+            <ClubHeader
+              org={org}
+              invited={relation?.state === "invited"}
+              menu={menu}
+              switcher={officerRole ? <SwitchChevron /> : null}
+              moreAboutUs={
+                <MoreAboutUs reportable={reportable}>
+                  <AboutDetails org={org} />
+                </MoreAboutUs>
+              }
+            />
+
+            {/* One row, two halves: Edit page for the owner and officers,
+                the join control for everyone else, then Share page. A
+                hidden club has no page to share. Mounted once (Edit page
+                reads ?edit=1 itself). */}
+            <div className="vibe-club-actions">
+              {officerRole ? (
+                <EditPageButton
+                  orgHandle={org.handle}
+                  orgName={org.name}
+                  hidden={org.hidden}
+                  openToCampus={openToCampus}
+                  joinPolicy={org.join_policy}
+                  audience={org.audience}
+                  initialDescription={org.description}
+                  initialLinks={org.links ?? []}
+                  initialPhilanthropy={org.philanthropy}
+                  initialMeetingTime={org.meeting_time}
+                  meetingTimeReady={meetingTimeReady}
                 />
               ) : (
-                <EmptyContent />
+                <div className="vibe-club-join">
+                  {relation ? (
+                    <OrgProfileJoinButton
+                      relation={relation}
+                      pendingInviteId={ctx?.pendingInvite?.id ?? null}
+                    />
+                  ) : (
+                    <LoadFailed
+                      tone="dark"
+                      failure={{ message: "Couldn't load your membership. Try again." }}
+                    />
+                  )}
+                </div>
               )}
-            </>
-          }
-          eventsColumn={
-            <>
-              <OrgEventsSection
-                orgId={org.id}
-                orgName={org.name}
-                orgHandle={org.handle}
-                orgVerified={org.verified}
-                viewerRole={viewerRole}
-                rsvpAtHomeOnly={visiting}
+              {org.hidden ? null : <SharePageButton orgHandle={org.handle} orgName={org.name} />}
+            </div>
+
+            {setup && !setup.complete ? (
+              <FinishSetupLine href={clubSetupPath(org.handle)} done={setup.done} total={setup.total} />
+            ) : null}
+            {officerRole && needsYou ? (
+              <NeedsYouLine handle={org.handle} text={needsYou} requests={officerCounts?.pendingRequests ?? 0} />
+            ) : null}
+
+            {/* Membership gates the chats, not the public profile. Description,
+                posts, links, and philanthropy all show so a visitor can decide
+                whether to follow or join. */}
+            {notice ? <JoinPolicyNotice text={notice} /> : null}
+            {invite ? (
+              <div style={{ marginTop: 16 }}>
+                <OrgInviteBanner
+                  orgName={org.name}
+                  inviterFirstName={invitedByName}
+                  expiresAt={invite.expires_at}
+                />
+              </div>
+            ) : null}
+
+            {/* Up next and the Events tab read one list, fetched once. */}
+            <ClubEventsProvider orgId={org.id} rsvpAtHomeOnly={visiting} renderKey={nowMs}>
+              <UpNext officerHint={!!officerRole && !org.hidden} />
+              <OrgContent
+                posts={
+                  postsErr ? (
+                    <PostsFailed />
+                  ) : posts.length > 0 ? (
+                    <PostsSection
+                      posts={posts}
+                      org={org}
+                      viewerId={user?.id ?? null}
+                      officerMayDelete={officerMayDeletePosts}
+                    />
+                  ) : (
+                    <EmptyContent />
+                  )
+                }
+                events={
+                  <>
+                    <OrgEventsSection
+                      orgId={org.id}
+                      orgName={org.name}
+                      orgHandle={org.handle}
+                      orgVerified={org.verified}
+                      viewerRole={viewerRole}
+                    />
+                    {/* Event check-in (Oct 19 2026, contract 4.6): events that
+                        ended in the last 30 days, "N were there" and the
+                        officers' "Who came". Draws nothing when there are none. */}
+                    <OrgPastEvents orgId={org.id} orgHandle={org.handle} />
+                  </>
+                }
+                board={
+                  <>
+                    {boardCard && relation ? <BoardSection card={boardCard} relation={relation} /> : null}
+                    <ChannelsSection orgHandle={org.handle} relation={relation} />
+                  </>
+                }
               />
-              {/* Event check-in (Oct 19 2026, contract 4.6): events that
-                  ended in the last 30 days, "N were there" and the
-                  officers' "Who came". Draws nothing when there are none. */}
-              <OrgPastEvents orgId={org.id} orgHandle={org.handle} />
-            </>
-          }
-          aboutColumn={
-            <>
-              <ChannelsSection orgHandle={org.handle} relation={relation} />
-              {org.links && org.links.length > 0 ? <LinksSection links={org.links} /> : null}
-              {org.philanthropy ? <PhilanthropySection text={org.philanthropy} /> : null}
-              <FactsSection org={org} />
-            </>
-          }
-          // Signed out there is nobody to file a report as, so the row stays
-          // off. `isOfficer` and not the club's `owner_id`: the route refuses
-          // only the owner ("You can't report something of your own"), but an
-          // officer reporting the club they help run is a conversation
-          // with the other officers, not a report to Vibe.
-          //
-          // `ctx.ok` for the same reason the header above renders no join
-          // button on a failed membership read: `viewerRole` is null both for
-          // a stranger and for a read that fell over, and on the second the
-          // club's own owner would be offered a Report that can only come
-          // back "You can't report something of your own" — the refusal every
-          // other surface is built to avoid. A failed read already means this
-          // page speaks only about the club, so the row goes with the rest.
-          reportable={
-            user && ctx?.ok ? { id: org.id, viewerIsOwner: isOfficer(viewerRole) } : null
-          }
-        />
+            </ClubEventsProvider>
+          </div>
+
+          {officerRole ? (
+            <aside className="vibe-club-aside">
+              <ClubToolsCard
+                handle={org.handle}
+                requests={officerCounts?.pendingRequests ?? null}
+                members={org.member_count}
+                followers={org.follower_count}
+              />
+            </aside>
+          ) : null}
+        </div>
       </div>
+
+      {/* This phone's remembered club follows the viewer's standing here. */}
+      {user && ctx?.ok ? (
+        <ClubSwitchSync
+          handle={org.handle}
+          name={org.name}
+          logoUrl={org.logo_url}
+          standingKnown
+          officer={!!officerRole}
+        />
+      ) : null}
 
       {/* The phone tab bar, for signed-in viewers only: every tab is a
           signed-in surface, and a visitor keeps the page's own "Sign in".
@@ -613,8 +700,31 @@ async function loadInviterFirstName(
 }
 
 /**
- * "Finish setting up · 2 of 6", under the officer bar while a new club's
- * setup list has steps left (the club's view, wave 1). Officers only.
+ * The owner's and officers' numbers (C7), with the request count leaving out
+ * everyone in a block pair with this officer (the requests list's BLOCKS
+ * rule). Null when the block read fails: the page then shows no needs-you
+ * line and no request count, rather than count someone the list hides.
+ */
+async function loadOfficerNumbers(
+  service: SupabaseClient,
+  supabase: SupabaseClient,
+  orgId: string,
+  viewerId: string,
+  nowMs: number,
+): Promise<OfficerCounts | null> {
+  const hidden = await loadHiddenUsers(supabase, viewerId).catch((err: unknown) => ({ ok: false as const, error: err }));
+  if (!hidden.ok) {
+    console.error("[orgs/[handle] page officer blocks]", hidden.error);
+    return null;
+  }
+  return loadOfficerCounts(service, orgId, nowMs, hidden.hidden.blocked);
+}
+
+/**
+ * "Finish setting up · 2 of 6", under the buttons while a new club's setup
+ * list has steps left (the club's view, wave 1; the officer bar it sat under
+ * is gone in wave 2). Officers only. Theme tokens since wave 2 (the page is
+ * a night island), the same look as before.
  */
 function FinishSetupLine({ href, done, total }: { href: string; done: number; total: number }) {
   return (
@@ -625,12 +735,12 @@ function FinishSetupLine({ href, done, total }: { href: string; done: number; to
         alignItems: "center",
         gap: 8,
         minHeight: 44,
-        marginBottom: 12,
+        marginTop: 10,
         padding: "0 14px",
         borderRadius: 14,
-        border: "1px solid rgba(255,255,255,0.14)",
-        background: "rgba(255,255,255,0.06)",
-        color: "#fff",
+        border: "1px solid rgba(var(--scrim-rgb),0.14)",
+        background: "rgba(var(--scrim-rgb),0.06)",
+        color: "var(--charcoal)",
         textDecoration: "none",
         fontSize: 14,
         fontWeight: 600,
@@ -638,11 +748,11 @@ function FinishSetupLine({ href, done, total }: { href: string; done: number; to
     >
       <span
         aria-hidden
-        style={{ width: 8, height: 8, borderRadius: 999, background: "#FF5C35", flexShrink: 0 }}
+        style={{ width: 8, height: 8, borderRadius: 999, background: "var(--coral)", flexShrink: 0 }}
       />
       <span style={{ flex: 1, minWidth: 0 }}>
         Finish setting up{" "}
-        <span style={{ color: "rgba(255,255,255,0.65)", fontWeight: 500 }}>
+        <span style={{ color: "var(--ink-muted)", fontWeight: 500 }}>
           · {done} of {total}
         </span>
       </span>
@@ -714,319 +824,6 @@ function TopNav({ signedIn, backHref }: { signedIn: boolean; backHref: string })
         </Link>
       )}
     </nav>
-  );
-}
-
-function Banner({ org }: { org: OrgProfile }) {
-  return (
-    <div
-      style={{
-        position: "relative",
-        // Stays inside the 1100px content container — feels visually
-        // anchored with the rest of the page rather than bleeding wide.
-        width: "100%",
-        // 3:1 aspect — Twitter banner shape. Auto-scales with width so
-        // the rendered aspect always matches what the user cropped at.
-        aspectRatio: "3 / 1",
-        overflow: "hidden",
-        marginTop: 12,
-        borderRadius: 22,
-        background: org.banner_url
-          ? `url(${org.banner_url}) center/cover`
-          : "linear-gradient(135deg, rgba(255,255,255,0.12) 0%, rgba(255,255,255,0.04) 100%)",
-        border: "1px solid rgba(255,255,255,0.1)",
-        boxShadow: "inset 0 1px 0 rgba(255,255,255,0.18), 0 12px 40px rgba(0,0,0,0.4)",
-      }}
-    >
-      <div
-        aria-hidden
-        style={{
-          position: "absolute",
-          inset: 0,
-          background:
-            "linear-gradient(180deg, rgba(0,0,0,0) 40%, rgba(0,0,0,0.55) 100%)",
-        }}
-      />
-    </div>
-  );
-}
-
-function Header({
-  org,
-  invited,
-  menu,
-  children,
-}: {
-  org: OrgProfile;
-  /** The viewer has a live invite: the "Invited you" chip. */
-  invited: boolean;
-  /** The club's ⋯ menu (Mute posts, Leave club), beside the name. */
-  menu?: React.ReactNode;
-  children?: React.ReactNode;
-}) {
-  const policy = policyChip(org.join_policy);
-  const audience = audienceChip(org.audience);
-  // '@handle · 12 followers · 3 members': a count that is unknown (or below
-  // the follower floor) is left out along with its separator.
-  const counts = [followerCountText(org.follower_count), memberCountText(org.member_count)].filter(
-    (text): text is string => !!text,
-  );
-  return (
-    <div
-      className="vibe-org-header"
-      style={{
-        marginTop: 18,
-        padding: "0 16px 16px",
-        display: "grid",
-        gridTemplateColumns: "auto minmax(0, 1fr) auto",
-        columnGap: 16,
-        rowGap: 12,
-        alignItems: "flex-end",
-      }}
-    >
-      {/* Logo */}
-      <div
-        className="vibe-org-header-logo"
-        style={{
-          gridColumn: 1,
-          gridRow: 1,
-          width: "clamp(72px, 22vw, 96px)",
-          height: "clamp(72px, 22vw, 96px)",
-          borderRadius: 20,
-          background: org.logo_url
-            ? `url(${org.logo_url}) center/cover`
-            : "linear-gradient(135deg, #FF5C35 0%, #7B5FE0 100%)",
-          border: "1px solid rgba(255,255,255,0.18)",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          fontFamily: "Fraunces, serif",
-          fontWeight: 900,
-          fontSize: "clamp(24px, 8vw, 32px)",
-          color: "#fff",
-          boxShadow:
-            "inset 0 1px 0 rgba(255,255,255,0.3), 0 12px 32px rgba(0,0,0,0.45)",
-        }}
-      >
-        {!org.logo_url
-          ? org.name
-              .split(/\s+/)
-              .filter(Boolean)
-              .slice(0, 2)
-              .map((s) => s[0])
-              .join("")
-              .toUpperCase()
-          : null}
-      </div>
-
-      {/* Title stack — name on its own line, chips on their own row,
-          @handle + member count on a third row. Each row gates its
-          own wrapping so a long name can't push chips into stacked
-          single-item rows. */}
-      <div
-        className="vibe-org-header-title"
-        style={{
-          gridColumn: 2,
-          gridRow: 1,
-          minWidth: 0,
-          display: "flex",
-          flexDirection: "column",
-          gap: 8,
-        }}
-      >
-        {/* The name, with the ⋯ menu at its end on phone and desktop alike. */}
-        <div style={{ display: "flex", alignItems: "flex-start", gap: 8, minWidth: 0 }}>
-          <h1
-            style={{
-              margin: 0,
-              flex: 1,
-              minWidth: 0,
-              fontFamily: "Fraunces, serif",
-              fontSize: "clamp(20px, 5.2vw, 36px)",
-              fontWeight: 900,
-              letterSpacing: "-0.6px",
-              lineHeight: 1.15,
-              overflowWrap: "break-word",
-            }}
-          >
-            {org.name}
-          </h1>
-          {menu}
-        </div>
-        {/* Chip row: Verified · policy · audience? · Hidden? · Invited you?
-            · Dormant? flex-wrap so the row breaks AFTER chips overflow,
-            not in the middle of a chip. */}
-        <div
-          style={{
-            display: "flex",
-            flexWrap: "wrap",
-            alignItems: "center",
-            gap: 6,
-          }}
-        >
-          {org.verified ? <VerifiedBadge /> : null}
-          {policy ? (
-            <Chip
-              color={org.join_policy === "open" ? "#9DD8FF" : "#9B7BFF"}
-              icon={org.join_policy === "open" ? null : <LockGlyph size={9} />}
-            >
-              {policy}
-            </Chip>
-          ) : null}
-          {audience ? <Chip color="#FFC48A">{audience}</Chip> : null}
-          {org.hidden ? <Chip color="#C9C9D6">{ORG_COPY.meta.hidden}</Chip> : null}
-          {invited ? <Chip color="#FF8A66">{ORG_COPY.chips.invitedYou}</Chip> : null}
-          {org.dormant ? <Chip color="#E84D4D">Dormant</Chip> : null}
-        </div>
-        {/* Handle + counts on their own line so they never get pushed onto
-            a chip's row or under the join button. */}
-        <div
-          style={{
-            fontSize: 13,
-            color: "rgba(255,255,255,0.7)",
-            display: "flex",
-            flexWrap: "wrap",
-            alignItems: "center",
-            gap: 8,
-          }}
-        >
-          <span
-            style={{
-              whiteSpace: "nowrap",
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-              maxWidth: "100%",
-            }}
-          >
-            @{org.handle}
-          </span>
-          {counts.map((text) => (
-            // Each separator travels with its count, so a wrap never strands a '·'.
-            <span
-              key={text}
-              style={{ display: "inline-flex", alignItems: "center", gap: 8 }}
-            >
-              <span style={{ opacity: 0.4 }}>·</span>
-              <span style={{ whiteSpace: "nowrap" }}>{text}</span>
-            </span>
-          ))}
-        </div>
-      </div>
-
-      {/* Join button — desktop lives in the 3rd column flush right,
-          mobile snaps to a full-width row below via the CSS override
-          in globals.css. */}
-      <div
-        className="vibe-org-header-join"
-        style={{
-          gridColumn: 3,
-          gridRow: 1,
-        }}
-      >
-        {children}
-      </div>
-    </div>
-  );
-}
-
-function VerifiedBadge() {
-  return (
-    <span
-      title="Verified by Vibe"
-      style={{
-        display: "inline-flex",
-        alignItems: "center",
-        gap: 4,
-        padding: "3px 8px",
-        borderRadius: 999,
-        fontSize: 10.5,
-        fontWeight: 700,
-        letterSpacing: "0.08em",
-        textTransform: "uppercase",
-        color: "#FFE8A8",
-        background: "rgba(240,200,74,0.18)",
-        border: "1px solid rgba(240,200,74,0.45)",
-        flexShrink: 0,
-      }}
-    >
-      <svg width="11" height="11" viewBox="0 0 16 16" aria-hidden>
-        <path
-          fill="currentColor"
-          d="M8 .5l1.7 1.7L12 1.5l.5 2.3 2.3.5-.7 2.3 1.7 1.7-1.7 1.7.7 2.3-2.3.5-.5 2.3-2.3-.7L8 15.5l-1.7-1.7-2.3.7-.5-2.3-2.3-.5.7-2.3L.2 8l1.7-1.7-.7-2.3 2.3-.5.5-2.3L6.3 2.2 8 .5zm-.6 9.7 4-4-1-1L7.5 8 6 6.5l-1 1L7.5 10z"
-        />
-      </svg>
-      Verified
-    </span>
-  );
-}
-
-function Chip({
-  color,
-  icon,
-  children,
-}: {
-  color: string;
-  icon?: React.ReactNode;
-  children: React.ReactNode;
-}) {
-  const tint = color
-    .replace("#", "")
-    .match(/.{2}/g)
-    ?.map((c) => parseInt(c, 16))
-    .join(",");
-  return (
-    <span
-      style={{
-        display: "inline-flex",
-        alignItems: "center",
-        gap: 4,
-        padding: "3px 8px",
-        borderRadius: 999,
-        fontSize: 10.5,
-        fontWeight: 700,
-        letterSpacing: "0.08em",
-        textTransform: "uppercase",
-        color,
-        background: `rgba(${tint},0.18)`,
-        border: `1px solid rgba(${tint},0.4)`,
-        flexShrink: 0,
-      }}
-    >
-      {icon}
-      {children}
-    </span>
-  );
-}
-
-/** The padlock the join-policy chip and notice share. */
-function LockGlyph({ size }: { size: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 16 16" aria-hidden>
-      <path
-        fill="currentColor"
-        d="M8 1a3 3 0 0 0-3 3v2H4.25A1.25 1.25 0 0 0 3 7.25v6.5C3 14.44 3.56 15 4.25 15h7.5c.69 0 1.25-.56 1.25-1.25v-6.5C13 6.56 12.44 6 11.75 6H11V4a3 3 0 0 0-3-3zm0 1.5A1.5 1.5 0 0 1 9.5 4v2h-3V4A1.5 1.5 0 0 1 8 2.5z"
-      />
-    </svg>
-  );
-}
-
-function Description({ text }: { text: string }) {
-  return (
-    <section
-      style={{
-        marginTop: 16,
-        padding: "16px 18px",
-        borderRadius: 16,
-        background: "rgba(255,255,255,0.05)",
-        border: "1px solid rgba(255,255,255,0.1)",
-        boxShadow: "inset 0 1px 0 rgba(255,255,255,0.16)",
-        fontSize: 15,
-        lineHeight: 1.6,
-        color: "rgba(255,255,255,0.92)",
-      }}
-    >
-      {text}
-    </section>
   );
 }
 
@@ -1145,138 +942,6 @@ function PostsFailed() {
   );
 }
 
-function LinksSection({ links }: { links: Array<{ label: string; url: string }> }) {
-  return (
-    <SectionCard title="Links">
-      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-        {links.map((l) => (
-          <a
-            key={l.url}
-            href={l.url}
-            target="_blank"
-            rel="noopener noreferrer"
-            style={{
-              padding: "10px 12px",
-              borderRadius: 10,
-              background: "rgba(255,255,255,0.04)",
-              border: "1px solid rgba(255,255,255,0.08)",
-              color: "#fff",
-              textDecoration: "none",
-              fontSize: 13,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              gap: 10,
-              minWidth: 0,
-            }}
-          >
-            <span
-              style={{
-                fontWeight: 600,
-                flex: 1,
-                minWidth: 0,
-                whiteSpace: "nowrap",
-                overflow: "hidden",
-                textOverflow: "ellipsis",
-              }}
-            >
-              {l.label}
-            </span>
-            <span
-              style={{
-                color: "rgba(255,255,255,0.5)",
-                fontSize: 12,
-                flexShrink: 0,
-              }}
-            >
-              ↗
-            </span>
-          </a>
-        ))}
-      </div>
-    </SectionCard>
-  );
-}
-
-function PhilanthropySection({ text }: { text: string }) {
-  return (
-    <SectionCard title="Philanthropy">
-      <p
-        style={{
-          margin: 0,
-          fontSize: 13,
-          lineHeight: 1.55,
-          color: "rgba(255,255,255,0.85)",
-          whiteSpace: "pre-wrap",
-        }}
-      >
-        {text}
-      </p>
-    </SectionCard>
-  );
-}
-
-function FactsSection({ org }: { org: OrgProfile }) {
-  // The same floor as the header: no 'Followers' row below 5 (critic C13).
-  const followers =
-    followerCountText(org.follower_count) !== null ? String(org.follower_count) : null;
-  const whoCanJoin = whoCanJoinFact(org.join_policy);
-  const openTo = openToFact(org.audience);
-  return (
-    <SectionCard title="About">
-      {followers !== null ? <Fact label="Followers" value={followers} /> : null}
-      {org.member_count !== null ? (
-        <Fact label="Members" value={String(org.member_count)} />
-      ) : null}
-      {whoCanJoin ? <Fact label="Who can join" value={whoCanJoin} /> : null}
-      {openTo ? <Fact label="Open to" value={openTo} /> : null}
-      <Fact
-        label="Status"
-        value={org.verified ? "Verified" : org.dormant ? "Dormant" : "Community"}
-      />
-      <Fact
-        label="Last activity"
-        value={
-          org.last_activity_at ? fmtDate(org.last_activity_at) : "—"
-        }
-      />
-    </SectionCard>
-  );
-}
-
-function Fact({ label, value }: { label: string; value: string }) {
-  return (
-    <div
-      style={{
-        display: "flex",
-        justifyContent: "space-between",
-        alignItems: "baseline",
-        gap: 12,
-        padding: "8px 0",
-        borderBottom: "1px solid rgba(255,255,255,0.06)",
-        fontSize: 12.5,
-        minWidth: 0,
-      }}
-    >
-      <span style={{ color: "rgba(255,255,255,0.55)", flexShrink: 0 }}>
-        {label}
-      </span>
-      <span
-        style={{
-          color: "#fff",
-          textAlign: "right",
-          minWidth: 0,
-          overflow: "hidden",
-          textOverflow: "ellipsis",
-          whiteSpace: "nowrap",
-        }}
-      >
-        {value}
-      </span>
-    </div>
-  );
-}
-
 function SectionCard({
   title,
   children,
@@ -1309,16 +974,4 @@ function SectionCard({
       {children}
     </section>
   );
-}
-
-function fmtDate(iso: string): string {
-  try {
-    return new Date(iso).toLocaleDateString([], {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-    });
-  } catch {
-    return "";
-  }
 }

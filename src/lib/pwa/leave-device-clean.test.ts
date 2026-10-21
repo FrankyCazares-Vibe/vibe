@@ -1,5 +1,5 @@
 /**
- * The club model's two per-account browser notes are cleared at sign-out and
+ * The club model's per-account browser notes are cleared at sign-out and
  * account deletion with the other copies of your own information (wave-3
  * review, finding 4; Privacy Policy section 7, "Kept in your browser"). Read
  * as text: leave-device-clean.ts imports the push code, which this test does
@@ -33,6 +33,17 @@ test("the club titles I've seen and the Boards I follow are cleared with my acco
   assert.equal(titles, "vibe.club-titles-seen.v1");
   assert.equal(boards, "vibe.followed-board-seen.v1");
   for (const key of [titles, boards]) assert.ok(accountKeys.includes(key), `${key} stays after sign-out`);
+});
+
+test("the club the Profile tab stands for, and the cached clubs I run, are cleared at sign-out", () => {
+  const switched = keyNamed("src/lib/orgs/club-switch.ts", "PROFILE_AS_CLUB_KEY");
+  assert.equal(switched, "vibe.profile-as-club.v1");
+  assert.ok(accountKeys.includes(switched), `${switched} stays after sign-out`);
+  const cache = keyNamed("src/lib/orgs/club-switch.ts", "CLUBS_YOU_RUN_CACHE_KEY");
+  const session = /const SESSION_ACCOUNT_KEYS = \[([\s\S]*?)\] as const;/.exec(clean);
+  assert.ok(session, "SESSION_ACCOUNT_KEYS is missing from leave-device-clean.ts");
+  assert.ok(session[1].includes(`"${cache}"`), `${cache} (sessionStorage) stays after sign-out`);
+  assert.match(clean, /window\.sessionStorage\.removeItem\(key\)/);
 });
 
 test("the static profile writes the same titles key, so the same line clears it", () => {

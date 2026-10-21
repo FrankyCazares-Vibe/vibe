@@ -204,7 +204,15 @@
    brand images. <html data-theme> is the RESOLVED theme (light | dark, never
    "system"), set by the boot script in layout.tsx before first paint. The UI
    kit's former `.dark` block is folded in below, values unchanged, so the
-   shadcn primitives and the `dark:` variant follow this one attribute. */
+   shadcn primitives and the `dark:` variant follow this one attribute.
+   `.vibe-night-island` (the club's view, wave 2) takes the same column on
+   one element and everything inside it: the club page is dark in both looks
+   (its backdrop is the club's own), so its theme-token UI reads right there
+   in Light too. It goes first so the drift tests (theme.test.ts,
+   vibe-bloom.test.ts) still find the Night selector right before its
+   brace. The `dark:` variant doesn't
+   follow it: island UI uses the tokens, not `dark:` classes. */
+.vibe-night-island,
 :root[data-theme="dark"] {
   color-scheme: dark;
   --cream: #0C0B0B;
@@ -2482,55 +2490,147 @@ html {
   display: none;
 }
 
-/* Org profile page — mobile-only overrides. Inline styles on the
-   server-rendered page are tuned for desktop; on mobile we collapse
-   the 2-column content grid to a single stack, trim the outer
-   padding, and show the Posts / Events / About tab strip.
-   !important is needed because the inline style sets
-   gridTemplateColumns explicitly. */
+/* The club page, /orgs/<handle> (the club's view, wave 2, C9). One
+   structure for phone and desktop: the cover, the header (logo and the two
+   counts, name, @handle, bio, one link, chips), the buttons, the officers'
+   lines, Up next, then the Posts | Events | Board tabs. Officers on a wide
+   screen get a right column with the Club tools card; everyone else reads
+   one centred column (the shell's inline max-width). Layout lives here and
+   colours are theme tokens, which `.vibe-night-island` on <main> keeps dark
+   in both looks. The page breakpoint is 720px, as before; the right column
+   and the switch chevron follow the tab bar's 900px. */
+.vibe-club-cover {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 3 / 1;
+  overflow: hidden;
+  margin-top: 12px;
+  border-radius: 22px;
+}
+.vibe-club-id {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  gap: 22px;
+  margin-top: -46px;
+  padding: 0 10px;
+  min-width: 0;
+}
+.vibe-club-logo {
+  width: 104px;
+  height: 104px;
+  border-radius: 24px;
+  flex-shrink: 0;
+}
+.vibe-club-counts {
+  display: flex;
+  gap: 26px;
+  padding-bottom: 6px;
+  min-width: 0;
+}
+.vibe-club-layout {
+  display: block;
+}
+.vibe-club-aside {
+  display: none;
+}
+.vibe-club-switch {
+  display: inline-flex;
+}
+.vibe-club-actions {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-top: 16px;
+}
+.vibe-club-actions > * {
+  flex: 1 1 0;
+  min-width: 0;
+}
+/* The join control (OrgJoinControl, header variant) fills its half
+   instead of hugging the right edge, as it did beside the old header. */
+.vibe-club-join > * {
+  justify-content: stretch !important;
+}
+.vibe-club-tabs {
+  display: flex;
+  margin-top: 22px;
+  border-bottom: 1px solid var(--hairline);
+}
+.vibe-club-tab {
+  flex: 0 0 auto;
+  min-height: 44px;
+  padding: 0 18px;
+  margin-bottom: -1px;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--ink-muted);
+  font-family: var(--font-body);
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.vibe-club-tab[aria-selected="true"] {
+  color: var(--charcoal);
+  border-bottom-color: var(--charcoal);
+}
+.vibe-club-tab:focus-visible {
+  outline: 2px solid var(--coral);
+  outline-offset: -2px;
+}
+/* The tab panel spaces its cards; a card's own top margin from its old
+   spot on the page (the Board card's) would double it. */
+.vibe-club-panel > :first-child {
+  margin-top: 0 !important;
+}
+@media (min-width: 900px) {
+  .vibe-club-layout[data-tools="true"] {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 320px;
+    gap: 28px;
+    align-items: start;
+  }
+  .vibe-club-aside {
+    display: block;
+    position: sticky;
+    top: 24px;
+    margin-top: 16px;
+  }
+  /* The switcher belongs to the phone's Profile tab. */
+  .vibe-club-switch {
+    display: none;
+  }
+}
 @media (max-width: 720px) {
   .vibe-org-shell {
     padding: 0 14px 56px !important;
   }
-  /* Header collapses to 2 columns; the Join cell drops to its own
-     row spanning both columns, full-width on the button inside. */
-  .vibe-org-header {
-    grid-template-columns: auto minmax(0, 1fr) !important;
-    padding: 0 14px 14px !important;
+  /* The cover runs edge to edge under the top bar, as on a profile. */
+  .vibe-club-cover {
+    width: auto;
+    margin: 4px -14px 0;
+    border-radius: 0;
+    border-left: none !important;
+    border-right: none !important;
   }
-  .vibe-org-header-join {
-    grid-column: 1 / -1 !important;
-    grid-row: 2 !important;
+  .vibe-club-id {
+    gap: 16px;
+    margin-top: -38px;
+    padding: 0 2px;
   }
-  /* Make whatever join control is rendered inside fill the row so
-     it can't visually overlap the meta text above it. */
-  .vibe-org-header-join > * {
-    width: 100% !important;
-    justify-content: center !important;
+  .vibe-club-logo {
+    width: 84px;
+    height: 84px;
+    border-radius: 20px;
   }
-  .vibe-org-grid {
-    grid-template-columns: minmax(0, 1fr) !important;
-    gap: 16px !important;
-    margin-top: 12px !important;
+  .vibe-club-counts {
+    gap: 18px;
   }
-  .vibe-org-tabbar {
-    display: flex !important;
-  }
-  /* Events row sits inside the same content wrapper. On mobile each
-     tab only reveals its slice. */
-  .vibe-org-content[data-tab="posts"] .vibe-org-events-row,
-  .vibe-org-content[data-tab="posts"] .vibe-org-about {
-    display: none !important;
-  }
-  .vibe-org-content[data-tab="events"] .vibe-org-grid {
-    display: none !important;
-  }
-  .vibe-org-content[data-tab="events"] .vibe-org-events-row {
-    margin-top: 16px !important;
-  }
-  .vibe-org-content[data-tab="about"] .vibe-org-events-row,
-  .vibe-org-content[data-tab="about"] .vibe-org-main {
-    display: none !important;
+  .vibe-club-tab {
+    flex: 1 1 0;
+    padding: 0 8px;
   }
 }
 

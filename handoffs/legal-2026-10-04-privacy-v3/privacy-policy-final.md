@@ -1,6 +1,6 @@
 # Vibe Privacy Policy
 
-Effective October 21, 2026
+Effective <SHIP DAY>
 
 Vibe is a campus social app for people with an Indiana University or Purdue University email address. It is run by **CONNECTVIBE. LLC**, an Indiana limited liability company. In this policy, "we" means that company. Vibe is independent. It is not run or backed by Indiana University, Purdue University, or any campus, school or club.
 
@@ -224,7 +224,7 @@ No account is needed to see these:
 - **Your profile page:** your name, handle, photos, tagline, location line, website link, interest tags, major and year, campus and the verified badge. It also shows three counts: your followers, the people you follow, and your connections (people you follow who follow you back). Your published posts that were not made as a club show too, including which one you pinned. So do your bio, experience, skills and "Working on", unless you hid them (section 9). It also lists the clubs you are in, each with any title the club gave you and the month you joined it on Vibe, unless you hid that club, the title or your whole Clubs section. Your role in a club is not shown there. Not shown: either email address, résumés, "here for" answers, the clubs you hid or your list of the clubs you follow.
 - **Photos and videos:** anyone who has the exact link can open a profile photo, a cover, a logo, or a photo or video on a post or club page. For most photos that link does not expire.
 - **A post's share link:** you must sign in to open a post from its link, though a post you made as yourself also shows on your public profile. The preview that shows when the link is shared gives the author's name, up to 140 characters of the text, and the photo.
-- **Club pages:** name, description, links, logo, banner, who can join, and the member and follower counts once each reaches 5. Also the 12 newest posts with each author's name, handle and photo, even for clubs you must ask or be invited to join.
+- **Club pages:** name, description, links, philanthropy, logo, banner, who can join, when it meets, and the member and follower counts once each reaches 5. Also the 12 newest posts with each author's name, handle and photo, even for clubs you must ask or be invited to join.
 - **Search engines and link previews:** profile and club pages can appear in search results and in link previews. We cannot pull back those copies.
 
 These need a signed-in account, or more (5b to 5g): your reposts, follower and following lists, chats, RSVP lists, event check-in lists and member lists. A club the Vibe team has hidden, or the profile of a suspended or banned account, looks like a page that does not exist.
