@@ -1,6 +1,8 @@
 # Club view, wave 1: "a club can get on" (built Oct 20, 2026)
 
-Branch `claude/club-wave-1-ae4772` (worktree `busy-aryabhata-7b6991`). **Not on main, not on production.**
+Branch `claude/club-wave-1-ae4772` (worktree `busy-aryabhata-7b6991`). **SHIPPED Oct 21, 2026** with the sign-up
+pre-registration fix (merged to main as `64004a1`; its three database files applied on production that morning,
+Privacy Policy dated October 21, 2026). Ship record: `2026-10-21-signup-preregistration-fix.md`, "Shipped".
 Plan: `handoffs/2026-10-20-club-view/BUILD-ORDER.md` (wave 1), decisions `DECISIONS.md`, how it's built
 `WAVE1-DESIGN.md`.
 
@@ -25,7 +27,7 @@ Plan: `handoffs/2026-10-20-club-view/BUILD-ORDER.md` (wave 1), decisions `DECISI
 - **The sign-up gate** (`auth_hooks.hook_waitlist_gate`) has one new first step for club links; everything it did
   before is unchanged. Club link codes are scrubbed from account data and from Sentry; no IP is stored.
 - **Privacy Policy:** club links and Owner/Officers written into the policy and the delete-account page, dated
-  `<SHIP DAY>` (a production build refuses to deploy until the real date is set). Every club "admin"/"mod" in the
+  October 21, 2026 (a production build refuses to deploy a placeholder date). Every club "admin"/"mod" in the
   policy now says officer. A daily clean-up (the waitlist cron) deletes a sign-up place never tied to an account
   after 30 days, as the policy says.
 
