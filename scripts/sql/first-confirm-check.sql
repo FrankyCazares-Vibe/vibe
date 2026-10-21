@@ -1,9 +1,10 @@
 -- first-confirm-check.sql: the behaviour check of the pre-registration fix
--- (supabase/migrations/20261022100000_password_needed_column.sql and
--- 20261022110000_first_confirm_drops_password.sql; prereg-design.md section
+-- (supabase/migrations/20261022100000_password_needed_column.sql,
+-- 20261022110000_first_confirm_drops_password.sql and
+-- 20261022120000_no_self_service_email_change.sql; prereg-design.md section
 -- 12, "SQL, LOCAL").
 --
--- LOCAL ONLY. Run it AFTER both files are applied to the local stack:
+-- LOCAL ONLY. Run it AFTER the three files are applied to the local stack:
 --   docker exec -i supabase_db_vibe psql -U postgres -d postgres -v ON_ERROR_STOP=1 < scripts/sql/first-confirm-check.sql
 -- Never on production: it writes (and rolls back) auth.users, public.users
 -- and terms_acceptances rows, and for a moment it adds a CHECK to
@@ -37,7 +38,15 @@
 -- role and postgres answered; S11 the 'confirm' Terms source accepted, an
 -- unknown one refused; S12 other writes on a pending account (sign-in time,
 -- metadata as Confirm's own second write, a resent code, a password set
--- while still pending) change nothing the trigger guards.
+-- while still pending) change nothing the trigger guards; S13 the email-change
+-- trigger (20261022120000): sendEmailChange's write (a new address in
+-- email_change) refused P0001 on a confirmed and on a pending account,
+-- nothing kept; ConfirmEmailChange's and ClearAllPendingTokens' clearing
+-- ('' and NULL), the admin email change (SetEmail, `email` only), a soft
+-- delete, a password change and a sign-in time all pass; the same pending
+-- address written again passes (why the file counts pending changes)
+-- and a different one does not. S1 to S12 also run with that trigger on, so
+-- sign-ups (INSERTs) and confirmations pass it.
 -- It raises on the first expectation that fails ("first-confirm-check
 -- FAILED: ...") and prints one NOTICE per case that passes. The two WARNINGs
 -- (S6, S9b) are expected; S7's refusals are caught and counted as passes.
@@ -54,15 +63,16 @@ begin;
 
 set local lock_timeout = '3s';
 
--- Only on the local stack, and only on a database that has both files.
+-- Only on the local stack, and only on a database that has the three files.
 do $$
 begin
   if inet_server_addr() is not null then
     raise exception 'first-confirm-check: local only. Run it through docker exec (the unix socket), never against a remote database';
   end if;
   if to_regprocedure('public.account_password_missing(uuid)') is null
-     or to_regprocedure('auth_hooks.first_confirm_drops_password()') is null then
-    raise exception 'first-confirm-check: apply 20261022100000 and 20261022110000 to the local stack first';
+     or to_regprocedure('auth_hooks.first_confirm_drops_password()') is null
+     or to_regprocedure('auth_hooks.no_self_service_email_change()') is null then
+    raise exception 'first-confirm-check: apply 20261022100000, 20261022110000 and 20261022120000 to the local stack first';
   end if;
 end $$;
 
@@ -116,8 +126,11 @@ end $$;
 -- A test account as a sign-up leaves it: the planted password 'fc-planted-<tag>'
 -- (not a real hash: nothing here signs in), the Terms tick and 18+ in the
 -- metadata, the name 'Planted', made two days ago. p_mailed: 'confirmation',
--- 'recovery', 'both' or 'none' (which *_sent_at is set). Returns its id.
-create function pg_temp.fc_user(p_tag text, p_mailed text, p_confirmed boolean default false)
+-- 'recovery', 'both' or 'none' (which *_sent_at is set). p_email_change: an
+-- email change already pending (set at INSERT, which the 20261022120000
+-- trigger does not see: a change from before that file). Returns its id.
+create function pg_temp.fc_user(p_tag text, p_mailed text, p_confirmed boolean default false,
+                                p_email_change text default null)
 returns uuid
 language plpgsql
 as $$
@@ -126,12 +139,12 @@ declare
 begin
   insert into auth.users (id, instance_id, email, aud, role, encrypted_password,
                           confirmation_token, confirmation_sent_at, recovery_token, recovery_sent_at,
-                          email_confirmed_at, raw_user_meta_data, raw_app_meta_data, created_at, updated_at)
+                          email_confirmed_at, email_change, raw_user_meta_data, raw_app_meta_data, created_at, updated_at)
   values (v, '00000000-0000-0000-0000-000000000000', 'fc-' || p_tag || '@example.test',
           'authenticated', 'authenticated', 'fc-planted-' || p_tag,
           '', case when p_mailed in ('confirmation', 'both') then now() - interval '5 minutes' end,
           '', case when p_mailed in ('recovery', 'both') then now() - interval '5 minutes' end,
-          case when p_confirmed then now() - interval '1 day' end,
+          case when p_confirmed then now() - interval '1 day' end, p_email_change,
           jsonb_build_object('terms_version', '2026-09-06', 'age_attested', true, 'full_name', 'Planted'),
           '{"provider":"email","providers":["email"]}'::jsonb, now() - interval '2 days', now() - interval '2 days');
   return v;
@@ -351,6 +364,79 @@ begin
   update auth.users set encrypted_password = 'fc-new-s12', updated_at = now() where id = u;
   perform pg_temp.fc_ok('S12 a password write on a PENDING account (not arm 2) -> kept',
     pg_temp.fc_state(u), 'new unconfirmed no-flag terms Planted');
+end $$;
+
+-- S13. 20261022120000: no self-service email change ---------------------------------
+do $$
+declare
+  f  regprocedure := 'auth_hooks.no_self_service_email_change()'::regprocedure;
+  u  uuid := pg_temp.fc_user('s13', 'none', true);
+  p  uuid;
+  -- sendEmailChange's write (mail.go:564-572; admin generateLink's email_change types write the same columns).
+  start_change constant text := 'update auth.users set email_change_token_current = ''fc-cur'', email_change_token_new = ''fc-new'', '
+                                'email_change = %L, email_change_sent_at = now(), email_change_confirm_status = 0 where id = %L';
+  -- "<email> <pending address or (none)> <token or (none)> <no sent time>"
+  change_state constant text := 'select concat_ws('' '', a.email, coalesce(nullif(a.email_change, ''''), ''(none)''), '
+                                'coalesce(nullif(a.email_change_token_new, ''''), ''(none)''), a.email_change_sent_at is null) '
+                                'from auth.users a where a.id = %L';
+  got text;
+begin
+  perform pg_temp.fc_ok('S13 the email-change trigger is on auth.users, enabled, BEFORE UPDATE OF email_change',
+    (select t.tgenabled::text || ' ' || (pg_get_triggerdef(t.oid) like '%BEFORE UPDATE OF email_change ON auth.users FOR EACH ROW WHEN%')::text
+       from pg_trigger t where t.tgrelid = 'auth.users'::regclass and t.tgname = 'no_self_service_email_change'),
+    'O true');
+  perform pg_temp.fc_ok('S13 its function: SECURITY DEFINER, search_path '''', supabase_auth_admin may run it, PUBLIC and the API roles not',
+    (select concat_ws(' ', p2.prosecdef and p2.proconfig = array['search_path=""'], has_function_privilege('supabase_auth_admin', f, 'execute'),
+       exists (select 1 from aclexplode(p2.proacl) a where a.grantee in
+         (0::oid, 'anon'::regrole::oid, 'authenticated'::regrole::oid, 'service_role'::regrole::oid)))
+       from pg_proc p2 where p2.oid = f),
+    't t f');
+
+  perform pg_temp.fc_ok('S13 sendEmailChange''s write (a new address, both tokens, the sent time) on a confirmed account -> refused P0001',
+    pg_temp.fc_try(format(start_change, 'fc-s13-target@example.test', u)), 'EP0001');
+  execute format(change_state, u) into got;
+  perform pg_temp.fc_ok('S13 ... nothing kept: the same email, no pending address, no token, no sent time',
+    got, 'fc-s13@example.test (none) (none) t');
+  perform pg_temp.fc_ok('S13 the same write on a pending account -> refused P0001 too (the rule has no exception)',
+    pg_temp.fc_try(format(start_change, 'fc-s13p-target@example.test', pg_temp.fc_user('s13p', 'confirmation'))), 'EP0001');
+
+  -- Changes pending from before the file (planted at INSERT), finished or cancelled the ways GoTrue does.
+  p := pg_temp.fc_user('s13c', 'none', true, 'fc-s13c-new@example.test');
+  perform pg_temp.fc_ok('S13 ConfirmEmailChange''s write (models/user.go:564-592: email_change cleared to '''') -> allowed',
+    pg_temp.fc_try(format('update auth.users set email = email_change, email_change = '''', email_change_token_current = '''', '
+                          'email_change_token_new = '''', email_change_confirm_status = 0 where id = %L', p)), 'ok');
+  execute format(change_state, p) into got;
+  perform pg_temp.fc_ok('S13 ... the email moved, nothing pending', got, 'fc-s13c-new@example.test (none) (none) t');
+  p := pg_temp.fc_user('s13d', 'none', true, 'fc-s13d-new@example.test');
+  perform pg_temp.fc_ok('S13 ClearAllPendingTokens'' write (models/user.go:360-394: every pending token cleared) -> allowed',
+    pg_temp.fc_try(format('update auth.users set confirmation_token = '''', confirmation_sent_at = null, recovery_token = '''', '
+                          'recovery_sent_at = null, email_change = '''', email_change_token_current = '''', email_change_token_new = '''', '
+                          'email_change_sent_at = null, email_change_confirm_status = 0 where id = %L', p)), 'ok');
+  p := pg_temp.fc_user('s13e', 'none', true, 'fc-s13e-new@example.test');
+  perform pg_temp.fc_ok('S13 email_change cleared to NULL -> allowed',
+    pg_temp.fc_try(format('update auth.users set email_change = null where id = %L', p)), 'ok');
+  p := pg_temp.fc_user('s13f', 'none', true, 'fc-s13f-new@example.test');
+  perform pg_temp.fc_ok('S13 the same pending address written again (a resend of a change from before the file) -> passes (why the file counts them)',
+    pg_temp.fc_try(format(start_change, 'fc-s13f-new@example.test', p)), 'ok');
+  perform pg_temp.fc_ok('S13 ... a DIFFERENT address on that pending row -> refused P0001',
+    pg_temp.fc_try(format(start_change, 'fc-s13f-other@example.test', p)), 'EP0001');
+
+  -- The admin API's email change: SetEmail lists `email` only (admin.go:305, models/user.go:398-401).
+  perform pg_temp.fc_ok('S13 the admin email change (SetEmail: email only) -> allowed',
+    pg_temp.fc_try(format('update auth.users set email = %L where id = %L', 'fc-s13-admin@example.test', u)), 'ok');
+  execute format(change_state, u) into got;
+  perform pg_temp.fc_ok('S13 ... the email changed, nothing pending', got, 'fc-s13-admin@example.test (none) (none) t');
+  -- An admin soft delete (models/user.go:1054-1083): a scrambled email_change together with deleted_at.
+  p := pg_temp.fc_user('s13g', 'none', true);
+  perform pg_temp.fc_ok('S13 an admin soft delete (a scrambled email_change with deleted_at) -> allowed',
+    pg_temp.fc_try(format('update auth.users set email = %L, email_change = %L, encrypted_password = null, deleted_at = now() where id = %L',
+      'fc-s13g-scrambled', 'fc-s13g-scrambled-change', p)), 'ok');
+  -- UpdatePassword's shape and a sign-in time: email_change is not in the column list.
+  perform pg_temp.fc_ok('S13 a password change and a sign-in time on that confirmed account -> allowed',
+    pg_temp.fc_try(format('update auth.users set encrypted_password = %L, confirmation_token = '''', confirmation_sent_at = null, '
+                          'recovery_token = '''', recovery_sent_at = null, updated_at = now() where id = %L', 'fc-new-s13', u))
+      || ' ' || pg_temp.fc_try(format('update auth.users set last_sign_in_at = now(), updated_at = now() where id = %L', u)),
+    'ok ok');
 end $$;
 
 -- The end. -----------------------------------------------------------------------

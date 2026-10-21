@@ -14,6 +14,7 @@ import {
   pendingClubLink,
   recordMembersLinkJoin,
   redeemSetupLink,
+  releaseSetupLinkPlace,
   type ClubLinkRow,
 } from "./store";
 
@@ -174,12 +175,24 @@ async function joinThroughLink(
   return { ok: true, kind: "members", handle: org.handle, already: admitted.already };
 }
 
-/** "Not now" on the members' link question after sign-up. */
-export async function declineClubLink(service: SupabaseClient, link: ClubLinkRow, userId: string): Promise<void> {
-  if (link.kind === "members") await dismissMembersLink(service, link.id, userId);
+/**
+ * The no to the question after sign-up. A members' link: "Not now", and it
+ * isn't asked again (best effort). A setup link: "Not me", and this
+ * account's place on the link goes, so the person it was made for can still
+ * use it (whoever signed up with an address first may not be the person
+ * holding it now); a second give-back on the same link turns it off
+ * (SETUP_LINK_MAX_GIVE_BACKS). False only when that place couldn't be given
+ * back: the page says so and the person can tap again.
+ */
+export async function declineClubLink(service: SupabaseClient, link: ClubLinkRow, userId: string): Promise<boolean> {
+  if (link.kind === "members") {
+    await dismissMembersLink(service, link.id, userId);
+    return true;
+  }
+  return (await releaseSetupLinkPlace(service, link.id, userId)) !== "failed";
 }
 
-/** The page that asks about a link waiting for a new account (members) or explains a setup link that failed. */
+/** The page that asks about a link waiting for a new account, "Set up <club>?" or "Join <club>?", and shows a refusal. */
 export const CLUB_LINK_WELCOME_PATH = "/c/welcome";
 
 /** Where an owner's club setup list lives. */

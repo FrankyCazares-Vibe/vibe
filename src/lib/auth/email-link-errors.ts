@@ -160,7 +160,11 @@ export const EMAIL_LINK_COPY: Record<
 > = {
   confirmed_sign_in: {
     title: "Your email is confirmed.",
-    body: "Your email is confirmed, but this page couldn't sign you in. Sign in with your email and password.",
+    // The second sentence: a first confirmation off the sign-up page removes
+    // a password chosen before the inbox was proven (pre-registration fix,
+    // Oct 2026), so the one they remember may be gone. "Forgot?" is the
+    // sign-in page's own label for its reset link.
+    body: "Your email is confirmed, but this page couldn't sign you in. Sign in with your email and password. No password works yet? On the sign-in page, tap Forgot? next to Password: it sends a reset to your inbox.",
     primaryLabel: "Sign in",
     primaryHref: "/auth/login?notice=confirmed",
   },

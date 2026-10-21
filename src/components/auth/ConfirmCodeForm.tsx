@@ -83,12 +83,13 @@ export function ConfirmCodeForm({
   askEmail?: boolean;
   hideEmailField?: boolean;
   /**
-   * Runs once the code has signed this browser in, before the page moves on,
-   * and also when another tab of this browser confirmed first. The sign-up
-   * page and the login code box use it to put back the password typed on
-   * that page: the first confirmation removed the stored one (pre-registration
-   * fix, Oct 2026). It may answer a same-origin path to go to instead of the
-   * usual next step. Its failure never stops the page.
+   * Runs once the code has signed this browser in, before the page moves on.
+   * The sign-up page and the login code box use it to put back the password
+   * typed on that page: the first confirmation removed the stored one
+   * (pre-registration fix, Oct 2026). It may answer a same-origin path to go
+   * to instead of the usual next step. Its failure never stops the page.
+   * It does NOT run when another tab of this browser confirmed first: that
+   * tab may have saved a newer password, and this one must not write over it.
    */
   onConfirmed?: () => Promise<string | void>;
 }): JSX.Element {
@@ -154,9 +155,12 @@ export function ConfirmCodeForm({
         // spent, but this browser is signed in as that same, now-confirmed
         // account, so just carry on. Any other session (a roommate's laptop,
         // a second account) must not turn a wrong code into a success.
-        // `onConfirmed` runs here too: if that tab confirmed somewhere that
-        // holds no password (/auth/confirm), the one typed on this page is
-        // the only one there is.
+        // `onConfirmed` does NOT run here: the other tab may have saved a
+        // password since (the sign-up page, the choose screen), and putting
+        // this page's older one back would silently replace it. If that tab
+        // confirmed somewhere that set none (/auth/confirm), the next step
+        // still gets there: /auth/terms sends an account with no password
+        // to the choose screen.
         if (!networkError) {
           const { data: current } = await supabase.auth.getSession();
           const signedIn = current.session?.user;
@@ -166,7 +170,7 @@ export function ConfirmCodeForm({
           ) {
             leaving = true;
             clearPendingSignup();
-            window.location.assign(await destinationAfterConfirm(onConfirmed));
+            window.location.assign(POST_EMAIL_CONFIRM_PATH);
             return;
           }
         }

@@ -216,6 +216,10 @@ web3 = 30
 enable_signup = true
 # If enabled, a user will be required to confirm any email change on both the old, and new email
 # addresses. If disabled, only the new email is required to confirm.
+# Production's switch is "Secure email change", ON (read Oct 8). Keep it on in
+# both places: with it, the Change email address notice also reaches the
+# account's current sign-in email, and the Privacy Policy says so (section 4).
+# Turning it off changes section 4 the same day.
 double_confirm_changes = true
 # If enabled, users need to confirm their email address before signing in.
 # Production has this set to true. Local stays false, which is why dev never
@@ -272,6 +276,19 @@ content_path = "./supabase/templates/recovery.html"
 [auth.email.template.magic_link]
 subject = "Vibe sign-in request"
 content_path = "./supabase/templates/magic_link.html"
+
+# Change email address is a notice too: no link, no code. Any signed-in
+# account can ask Supabase's /user to move it onto another address (no captcha
+# there), and with a link in this email IU's mail scanner would finish the move
+# onto a student's school address, keeping the asker's password and session.
+# The app never changes a sign-in email this way (the team does it by hand,
+# Privacy Policy section 9). Supabase sends this one file to both addresses, so
+# it names only the address asked for. Dashboard: Emails > Change email
+# address. Local takes it on the next stack restart, like the two above. The
+# Privacy Policy lists it with them (section 4).
+[auth.email.template.email_change]
+subject = "Vibe sign-in email change request"
+content_path = "./supabase/templates/email_change.html"
 
 # Uncomment to customize email template
 # [auth.email.template.invite]

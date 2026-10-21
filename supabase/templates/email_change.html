@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vibe sign-in email change request</title>
+</head>
+<!--
+  A notice, not a change (pre-registration fix, October 2026). Supabase sends
+  this when a signed-in account asks its own /user endpoint for a new sign-in
+  email. Vibe never asks it to: the app has no change-email screen, and the
+  team changes a sign-in email by hand (Privacy Policy section 9). So this
+  email carries no link and no code, on purpose. With one, a stranger could
+  ask to move their own account onto a student's school address, and IU's
+  mail scanner opening the link would finish the move: the stranger keeps
+  their password and session on an account under an inbox they do not hold.
+  - Supabase sends this same file to BOTH addresses: the one asked for, and,
+    with Secure email change on (production, Oct 8), the account's current
+    one too. So it names {{ .NewEmail }} and never says "this address".
+  - No variables except {{ .NewEmail }}. Never the account's current email:
+    that would show someone's sign-in email to whoever owns the typed address.
+    No web fonts, no images, nothing fetched. The same text is the whole
+    message. Keep it this small.
+  - The last two lines speak to the two readers. The current address only
+    gets this after a request made with that account's own live session
+    (PUT /user needs one; /resend needs a change already pending, which
+    20261022120000 never lets exist). So for that reader "did not ask" means
+    someone else is signed in as them, and ignoring it would be the wrong
+    advice: it names Settings' "Sign out of other devices"
+    (src/components/settings/SessionsCard.tsx) and the Log in page's
+    "Forgot?". Renaming either changes this file and the dashboard copy the
+    same day. Whoever owns the typed address can ignore it: nothing changes.
+  The dashboard copy (Supabase > Authentication > Emails > Change email
+  address) must be this file, with the subject:  Vibe sign-in email change request
+-->
+<body style="margin:0;padding:24px;background:#ffffff;font-family:-apple-system,'Segoe UI',Helvetica,Arial,sans-serif;font-size:16px;line-height:24px;color:#1c1c1e;">
+<p style="margin:0 0 16px;">Someone asked to make {{ .NewEmail }} the sign-in email of a Vibe account. Vibe does not change sign-in emails that way.</p>
+<p style="margin:0 0 16px;">To change your own, write to the Vibe team from the email you sign in with now. The Vibe Privacy Policy gives the address.</p>
+<p style="margin:0 0 16px;">Did not ask, and this came to the email you sign in with? Someone may be signed in as you. Open Vibe, go to Settings and tap "Sign out of other devices". Then tap Sign out, and on the Log in page tap "Forgot?" next to Password to choose a new password.</p>
+<p style="margin:0;color:#5a564f;font-size:14px;line-height:21px;">Did not ask, and it came to any other email? Ignore it. Nothing changes.</p>
+</body>
+</html>

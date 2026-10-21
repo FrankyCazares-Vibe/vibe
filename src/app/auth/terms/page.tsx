@@ -52,6 +52,8 @@ function resolveNext(raw: string | string[] | undefined): string {
  * inbox was proven (`users.password_needed_at`, see
  * src/lib/auth/password-needed.ts) and none exists yet, the "Choose your
  * password" screen comes first: it holds the password AND the Terms box.
+ * With a password, this page's form shows, saying the email is confirmed and
+ * the box is for the person who reads it (not the older accounts' wording).
  * Checked only once consent is missing, so no accepted account pays for it;
  * on any doubt (no column yet, a failed check) this page shows its form as
  * before, so the two pages can never bounce someone between them.
@@ -86,11 +88,17 @@ export default async function TermsGatePage({
     redirect(next);
   }
 
-  // No password since the first confirmation removed the early one: choose
-  // it first (true only; null = could not tell, and the form shows as before).
-  if ((await readPasswordFlag(service, user.id)) && (await passwordMissing(service, user.id)) === true) {
+  // The flag means the first confirmation of this address just cleared its
+  // tick (and removed the early password). No password since: choose it
+  // first (true only; null = could not tell, and the form shows as before).
+  const justConfirmed = (await readPasswordFlag(service, user.id)) !== null;
+  if (justConfirmed && (await passwordMissing(service, user.id)) === true) {
     redirect(choosePasswordHref(next));
   }
 
-  return <AcceptTermsForm next={next} />;
+  // A password exists (or we could not tell): the form, worded for an inbox
+  // just proven when the flag is set (they may never have ticked this box:
+  // someone else may have signed up with the address), else for an older
+  // account that never had its agreement recorded.
+  return <AcceptTermsForm next={next} justConfirmed={justConfirmed} />;
 }

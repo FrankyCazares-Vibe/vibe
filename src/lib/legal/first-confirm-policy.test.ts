@@ -9,9 +9,10 @@
  * twice, as the text file and as the page's TSX, and the two must say the
  * same thing: the change ships with its policy lines the same day (any
  * change to what Vibe collects or shows changes the policy the same day).
- * Section 4's list of emails (Supabase's Reset password and Magic link
- * notices) is pinned in src/lib/auth/notice-templates.test.ts instead: those
- * lines go with the dashboard templates, not with the database change.
+ * Section 4's list of emails (Supabase's Reset password, Magic link and
+ * Change email address notices) is pinned in
+ * src/lib/auth/notice-templates.test.ts instead: those lines go with the
+ * dashboard templates, not with the database change.
  *
  * Run with:
  *   node --test src/lib/legal/first-confirm-policy.test.ts

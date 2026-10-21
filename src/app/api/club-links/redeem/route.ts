@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { clubSetupPath, declineClubLink, redeemClubLink } from "@/lib/club-links/redeem";
+import { clubSetupPath, declineClubLink, redeemClubLink, redeemRefusalCopy } from "@/lib/club-links/redeem";
 import { findClubLinkByCode, findClubLinkById, pendingClubLink } from "@/lib/club-links/store";
 import { limitFor } from "@/lib/limits/budgets";
 import { requireCanPublish } from "@/lib/moderation/access";
@@ -20,13 +20,19 @@ function fail(status: number, code: string, error: string) {
  *   { code }          the link page's button: a setup link makes its club with
  *                     this account as owner; a members' link makes it a member.
  *   {}                the link waiting for this account (its sign-up came
- *                     through one): the welcome page's Join button.
- *   { decline: true } "Not now" on the waiting members' link.
+ *                     through one): the welcome page's Make me the owner or
+ *                     Join button.
+ *   { decline: true } the welcome page's no: "Not now" on a members' link (not
+ *                     asked again), "Not me" on a setup link (this account's
+ *                     place on it goes, so the person it was made for can
+ *                     still use it; a second give-back turns the link off).
+ *                     Needs no publish gate: it only gives back.
  *
  * 200 {ok, kind: "setup"|"members", handle, next} | {ok, declined: true}.
  * Refusals: 401; 429; the publish gate's own (Terms, school email,
- * restricted); 404 link_invalid; 404 nothing_waiting; and redeemClubLink's
- * (link_used, link_expired, link_off, link_in_use, campus_required, audience,
+ * restricted); 404 link_invalid; 404 nothing_waiting; 500 failed (a setup
+ * place that couldn't be given back); and redeemClubLink's (link_used,
+ * link_expired, link_off, link_in_use, campus_required, audience,
  * join_unavailable, failed), each with a sentence to show.
  */
 export async function POST(req: Request) {
@@ -61,7 +67,9 @@ export async function POST(req: Request) {
   }
 
   if (body.decline === true) {
-    await declineClubLink(service, link, user.id);
+    if (!(await declineClubLink(service, link, user.id))) {
+      return fail(500, "failed", redeemRefusalCopy("failed"));
+    }
     return NextResponse.json({ ok: true, declined: true });
   }
 

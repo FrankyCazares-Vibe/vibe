@@ -23,27 +23,31 @@ export function Sections4To5() {
       </LegalP>
       <LegalP>
         <strong>Emails.</strong> The automatic emails Vibe sends you are these
-        ten: to confirm your account, reset your password, tell you which email
-        your account signs in with, verify your school email, confirm a
+        eleven: to confirm your account, reset your password, tell you which
+        email your account signs in with, verify your school email, confirm a
         personal email you add, check once a year that you still have your
         school inbox, confirm your waitlist spot, send your access code, and
-        two that tell you someone asked Supabase, the company that runs our
-        sign-in, to reset your password or to send you a sign-in link. The
-        third one can be sent when someone types your school email or your
-        personal email into the Forgot password form and your account signs in
-        with a different email. It goes only to the address that was typed, at
-        most once per calendar day for that address. It shows the first
-        character of your sign-in email and the part after the @ (for example
-        g•••@gmail.com). The screen shows the same sentence whether or not the
-        address belongs to an account. An account that is suspended or banned
-        is not sent it. The last two are sent when someone asks Supabase
-        directly, not through Vibe. Vibe itself never asks for either: the
-        second email above is how Vibe resets a password. A person on
-        the Vibe team may also write to you. They may answer you, write about a
+        three that tell you someone asked Supabase, the company that runs our
+        sign-in, to reset your password, to send you a sign-in link, or to make
+        your email the sign-in email of an account. The third one can be sent
+        when someone types your school email or your personal email into the
+        Forgot password form and your account signs in with a different email.
+        It goes only to the address that was typed, at most once per calendar
+        day for that address. It shows the first character of your sign-in email
+        and the part after the @ (for example g•••@gmail.com). The screen shows
+        the same sentence whether or not the address belongs to an account. An
+        account that is suspended or banned is not sent it. The last three are
+        sent when someone asks Supabase directly, not through Vibe. Vibe itself
+        never asks for any of them: the second email above is how Vibe resets a
+        password, and to change a sign-in email you write to us
+        (<Sec to="9">section 9</Sec>). The one about changing a sign-in email
+        goes to both emails, the one asked for and the sign-in email of the
+        account that asked. It names the email asked for. A person on the
+        Vibe team may also write to you. They may answer you, write about a
         report, your account or a club you run, or tell you something you need
         to know. Examples are a security problem or a change to this policy.
-        Vibe sends no bulk marketing email, and no other email about activity
-        on your account.
+        Vibe sends no bulk marketing email, and no other email about activity on
+        your account.
       </LegalP>
       <LegalP>
         <strong>What we do not do.</strong> We do not:

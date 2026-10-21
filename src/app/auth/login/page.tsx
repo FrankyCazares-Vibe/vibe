@@ -246,9 +246,14 @@ function LoginForm() {
       </div>
     );
   } else if (confirmedNotice) {
+    // A first confirmation off the sign-up page removes a password chosen
+    // before the inbox was proven (pre-registration fix, Oct 2026), so the
+    // one they remember may not work: point at the reset next to Password.
     contextBanner = (
       <div className="vibe-auth-banner vibe-auth-banner--success">
-        Your email is confirmed. Sign in to keep going.
+        Your email is confirmed. Sign in to keep going. No password works yet?
+        Tap <strong>Forgot?</strong> next to Password: it sends a reset to your
+        inbox.
       </div>
     );
   } else if (callbackFailed) {

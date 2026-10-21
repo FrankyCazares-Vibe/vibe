@@ -362,6 +362,13 @@ export function ChoosePasswordForm({
             {signingOut ? "Signing out…" : "Sign out"}
           </button>
         </p>
+        {/* The owner may sign out too, and this account may hold no password
+            yet: say how to get back in, with the sign-in page's own label. */}
+        <p className="vibe-auth-tail" style={{ marginTop: 8, fontSize: 12.5 }}>
+          If it is you and you sign out now, get back in with{" "}
+          <strong>Forgot?</strong> on the sign-in page: it sends a reset to this
+          inbox.
+        </p>
       </div>
     </div>
   );

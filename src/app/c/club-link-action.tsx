@@ -7,9 +7,11 @@ import { vibeRequest } from "@/lib/feedback/request";
 
 /**
  * The one button of a club link for someone signed in: "Make me the owner"
- * (setup) or "Join <club>" (members), and on /c/welcome "Not now". POST
- * /api/club-links/redeem; on success the page goes where the answer says
- * (the setup list, or the club).
+ * (setup) or "Join <club>" (members), and on /c/welcome a no under it ("Not
+ * me" for setup, which gives the account's place on the link back; "Not
+ * now" for members). POST /api/club-links/redeem; on success the page goes
+ * where the answer says (the setup list, or the club), and a no to Campus
+ * with the first-run tour.
  */
 export function ClubLinkAction({
   code,
@@ -19,6 +21,7 @@ export function ClubLinkAction({
   /** The link's code; none on /c/welcome (the link waiting for this account). */
   code: string | null;
   label: string;
+  /** The no (/c/welcome only): sent as {decline: true}. None on the link page. */
   declineLabel?: string;
 }) {
   const router = useRouter();
@@ -43,7 +46,10 @@ export function ClubLinkAction({
       setError(r.status >= 400 && r.status < 500 && r.error ? r.error : r.message);
       return;
     }
-    router.push(decline ? "/campus" : (r.data.next ?? "/campus"));
+    // A no goes where onboarding would have sent them with no link waiting
+    // (ONBOARDING_NEXT_PATH, the welcome page's own redirect), so the
+    // first-run tour still starts; the tour runs once either way.
+    router.push(decline ? "/campus?welcome=1" : (r.data.next ?? "/campus"));
     router.refresh();
   }
 

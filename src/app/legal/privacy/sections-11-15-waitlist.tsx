@@ -225,8 +225,10 @@ export function Section11Waitlist() {
           <strong>A club setup link.</strong> A cofounder makes it in the admin
           tools and hands it, in person, to the person who will run a new club.
           It works once, for up to 7 days. The person who signs up with it, or
-          who opens it signed in and taps &ldquo;Make me the owner&rdquo;,
-          becomes the owner of the new club.
+          who opens it signed in, is asked once whether to set up the club, and
+          taps &ldquo;Make me the owner&rdquo; to become the owner of the new
+          club. &ldquo;Not me&rdquo; frees the link for someone else; a link
+          freed twice is turned off.
         </li>
         <li>
           <strong>A club&apos;s members&apos; link.</strong> A club that Vibe

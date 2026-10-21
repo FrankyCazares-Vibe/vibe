@@ -27,7 +27,8 @@ links already let people in, and sign-up opens to everyone on Oct 31. Reproduced
 - **No sign-in email changes:** Vibe never changes a sign-in email, so the database now refuses Supabase's
   self-service email change (it could have moved someone's own account onto a student's address).
 - **Club links (wave 1):** a setup link no longer makes the club by itself after onboarding; it asks
-  "Set up <club>?" once, with "Not me", which frees the link for the real president.
+  "Set up <club>?" once, with "Not me", which frees the link for the real president (a link freed twice is
+  turned off, so a QR passed around can't keep letting people in: `SETUP_LINK_MAX_GIVE_BACKS` in store.ts).
 - **Privacy Policy:** says confirming removes any earlier password, that we note when an account still needs one,
   that the Terms tick is recorded again at confirmation, and lists the new notice emails. Dated `<SHIP DAY>`.
 
@@ -68,7 +69,10 @@ old code was live.
 - Paste the three notices (`supabase/templates/recovery.html`, `magic_link.html`, `email_change.html`, with their
   subjects from `supabase/config.toml`) into Reset password, Magic link and Change email address.
 - Read the Redirect URLs list and Site URL: no wildcard on a host anyone can deploy to (`*.vercel.app` etc.).
-- Read, change nothing: Confirm email ON (must stay ON), Secure password change, the before-user-created hook ON.
+- Read, change nothing: Confirm email ON (must stay ON), Secure email change ON, Secure password change, the
+  before-user-created hook ON.
+- Before the Change-email paste, production most likely still sends Supabase's default change email with a link;
+  once C is applied that link is dead. Read production's current copy first, then paste.
 - **Keep "Password changed" and "Email changed" notification emails OFF through launch.** His owed list (Oct 11,
   13, 18) says to turn them on: with this fix, every new student would get a "password changed" email right after
   confirming. Revisit in November. Secure password change can go on any time.

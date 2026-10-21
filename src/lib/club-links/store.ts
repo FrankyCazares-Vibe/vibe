@@ -367,3 +367,87 @@ export async function dismissMembersLink(service: SupabaseClient, linkId: string
     .eq("user_id", userId);
   if (error) console.error("[club-links] dismiss", error.message);
 }
+
+/**
+ * A setup link turns off when a place on it is given back for the second
+ * time. Once is the honest case "Not me" is for (a student who scanned a QR
+ * that wasn't theirs, or whose address someone else used first). More means
+ * the link went further than the president (forwarded to a group chat, a
+ * photo of the QR), and each give-back would let one more school address
+ * sign up through it while sign-up is closed. A founder makes a new one.
+ */
+export const SETUP_LINK_MAX_GIVE_BACKS = 2;
+
+/**
+ * "Not me" on a setup link's question after sign-up: this account gives its
+ * place on the link back, so the person the link was made for can still sign
+ * up or tap through it (while an account holds the place, the database
+ * refuses everyone else). Only this account's own place, only on a setup
+ * link that hasn't made its club, and never the row that records making it
+ * (joined_at is set in the same step that makes the club, so a tap on Make
+ * me the owner a moment earlier is never undone here). The link notes each
+ * give-back and turns off at the SETUP_LINK_MAX_GIVE_BACKS-th.
+ *
+ * "released": the place went. "nothing": no place to give back (already
+ * gone, the club is made, or not a setup link). "failed": couldn't ask.
+ */
+export async function releaseSetupLinkPlace(
+  service: SupabaseClient,
+  linkId: string,
+  userId: string,
+): Promise<"released" | "nothing" | "failed"> {
+  const { data: link, error } = await service
+    .from("club_links")
+    .select("id, off_at, setup_marks")
+    .eq("id", linkId)
+    .eq("kind", "setup")
+    .is("used_at", null)
+    .maybeSingle();
+  if (error) {
+    console.error("[club-links] release setup place (link)", error.message);
+    return "failed";
+  }
+  if (!link) return "nothing";
+  // The place goes first, and only the request that removed it notes the
+  // give-back, so two taps at once count once.
+  const { data, error: delErr } = await service
+    .from("club_link_uses")
+    .delete()
+    .eq("link_id", linkId)
+    .eq("user_id", userId)
+    .is("joined_at", null)
+    .select("id");
+  if (delErr) {
+    console.error("[club-links] release setup place", delErr.message);
+    return "failed";
+  }
+  if ((data ?? []).length === 0) return "nothing";
+  await noteSetupLinkGiveBack(service, link as { id: string; off_at: string | null; setup_marks: unknown });
+  return "released";
+}
+
+/**
+ * A give-back on the setup link: when, never who (a list of times under
+ * `given_back` in the link's setup_marks, which the setup list never reads),
+ * and the link turned off at the SETUP_LINK_MAX_GIVE_BACKS-th. Never on a
+ * link that made its club meanwhile. Best effort: the place is already back.
+ */
+async function noteSetupLinkGiveBack(
+  service: SupabaseClient,
+  link: { id: string; off_at: string | null; setup_marks: unknown },
+): Promise<void> {
+  const marks =
+    link.setup_marks && typeof link.setup_marks === "object" && !Array.isArray(link.setup_marks)
+      ? (link.setup_marks as Record<string, unknown>)
+      : {};
+  const now = new Date().toISOString();
+  const before = Array.isArray(marks.given_back) ? marks.given_back.filter((t) => typeof t === "string") : [];
+  const givenBack = [...before, now];
+  const turnOff = givenBack.length >= SETUP_LINK_MAX_GIVE_BACKS && !link.off_at;
+  const { error } = await service
+    .from("club_links")
+    .update({ setup_marks: { ...marks, given_back: givenBack }, ...(turnOff ? { off_at: now } : {}), updated_at: now })
+    .eq("id", link.id)
+    .is("used_at", null);
+  if (error) console.error("[club-links] note setup give-back", error.message);
+}

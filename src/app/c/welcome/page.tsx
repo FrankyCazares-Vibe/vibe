@@ -17,11 +17,14 @@ export const metadata: Metadata = { title: "Your club · Vibe", robots: { index:
 
 /**
  * Where a sign-up a club link let in lands when onboarding finishes (POST
- * /api/me/onboarding-complete): "Set up <club>?" with Make me the owner (a
- * setup link), or "Join <club>?" with Join and Not now (a members' link).
- * Asked, never done for them: the place on the link belongs to the address
- * that signed up, which may not be the person holding it now. A refusal
- * comes back in the route's own words. Nothing waiting: Campus.
+ * /api/me/onboarding-complete): "Set up <club>?" with Make me the owner and
+ * Not me (a setup link), or "Join <club>?" with Join and Not now (a members'
+ * link). Asked, never done for them: the place on the link belongs to the
+ * address that signed up, which may not be the person holding it now. Not me
+ * gives that place back, so the person the link was made for can still use
+ * it (a second give-back turns the link off); both no's go to Campus, with
+ * the first-run tour. A refusal comes back in the route's own words.
+ * Nothing waiting: Campus.
  */
 export default async function ClubLinkWelcomePage() {
   const { userId } = await enforceCampusAccess("/c/welcome");
@@ -56,19 +59,19 @@ export default async function ClubLinkWelcomePage() {
         <div style={{ display: "flex", flexDirection: "column", gap: 12, marginBottom: 20 }}>
           <ClubTile initials={clubInitials(name)} logoUrl={logoUrl} />
           <h1 className="vibe-auth-headline" style={{ overflowWrap: "anywhere" }}>
-            {setup ? `Set up ${name}` : `Join ${name}?`}
+            {setup ? `Set up ${name}?` : `Join ${name}?`}
           </h1>
           {checked ? <CheckedBadge /> : null}
           <p className="vibe-auth-sub">
             {setup
-              ? "You're on Vibe. One more tap and the club's page is yours."
+              ? `You came in through ${name}'s setup link. If you run the club, one tap makes its page yours. If not, Not me keeps the link free for whoever it was made for.`
               : `You came in through ${name}'s link. Join to see its Board and events.`}
           </p>
         </div>
         <ClubLinkAction
           code={null}
           label={setup ? "Make me the owner" : `Join ${name}`}
-          declineLabel={setup ? undefined : "Not now"}
+          declineLabel={setup ? "Not me" : "Not now"}
         />
       </div>
     </div>

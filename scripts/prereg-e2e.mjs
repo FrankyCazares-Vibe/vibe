@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 // The pre-registration fix, end to end through the real LOCAL Supabase Auth
-// (GoTrue) and the two migrations (supabase/migrations/
-// 20261022100000_password_needed_column.sql and
-// 20261022110000_first_confirm_drops_password.sql; prereg-design.md section
+// (GoTrue) and the three migrations (supabase/migrations/
+// 20261022100000_password_needed_column.sql,
+// 20261022110000_first_confirm_drops_password.sql and
+// 20261022120000_no_self_service_email_change.sql; prereg-design.md section
 // 12, "E2E TIER A" and "E2E TIER B"). Modelled on scripts/club-links-e2e.mjs.
 //
 //   node scripts/prereg-e2e.mjs                                    Tier A, the shared stack
@@ -42,6 +43,19 @@
 // source, re-apply"): it applies, and with one of them unflagged it stops.
 // A13 is ONE transaction that ends in ROLLBACK: the live trigger never goes
 // away, other sessions only wait a moment on auth.users.
+// The email-change side door (20261022120000): A14 a confirmed account with a
+// password and a live session (an attacker's own) asks PUT /user to move onto
+// a school address that has not joined -> a 500, and GoTrue's own log
+// (docker logs supabase_auth_<project>) shows its email_change write refused
+// by the trigger (P0001),
+// the account's email unchanged, email_change, its token and sent time empty;
+// GoTrue mailed that address BEFORE it wrote (read from the local Mailpit),
+// and whatever the mail carries is dead (its /verify link opened the way a
+// scanner does, its code typed; with the Change-email notice template it
+// carries neither): still the same email, nothing pending; A15 that session
+// changes its password -> the new one signs in, the old one does not; A16 the
+// admin API's email change (how the team changes one by hand) -> done at
+// once, nothing pending, and it signs in at the new address.
 //
 // TIER B (--rehearsal <proxy>): the second GoTrue with confirmations ON
 // (prereg-testing.md section 2: vibe_auth_prereg on 127.0.0.1:54399 behind
@@ -84,7 +98,7 @@
 // mail today is GoTrue's own default (a link and the code; the copied Vibe
 // subject and template do not take), so the code is read from either shape.
 //
-// Tier A: about 12 sign-ins and 3 code checks; Tier B: about 15 sign-ins, 12
+// Tier A: about 16 sign-ins and 5 code checks; Tier B: about 15 sign-ins, 12
 // sign-ups or sends and 10 code checks. GoTrue allows 30 of each per 5
 // minutes per IP ([auth.rate_limit]; the rehearsal GoTrue counts its own), so
 // wait 5 minutes between runs (or after scripts/club-links-e2e.mjs /
@@ -93,8 +107,10 @@
 // SAFETY: the URL and keys come ONLY from `supabase status -o env` (the local
 // CLI stack), never a .env file, and anything that isn't 127.0.0.1 /
 // localhost is refused, as in scripts/club-links-e2e.mjs. Direct SQL goes
-// through `docker exec` into the local stack's own database container.
-// --rehearsal, --app and Mailpit must be 127.0.0.1 / localhost too. Every
+// through `docker exec` into the local stack's own database container, and
+// A14 reads only the last seconds of the local GoTrue container's own log.
+// --rehearsal, --app and Mailpit (Tier B, and A14 in Tier A) must be
+// 127.0.0.1 / localhost too. Every
 // account it makes (prereg-<run>-*@iu.edu; mail goes only to the local
 // Mailpit, never out) is deleted in `finally` with its allowlist rows, its
 // accept-terms limiter rows and exactly the Mailpit messages sent to it (by
@@ -197,11 +213,13 @@ function psql(sql) {
 }
 const lit = (s) => `'${String(s).replace(/'/g, "''")}'`;
 
-// Both migrations must be in, or every case below would fail for the wrong reason.
+// The three migrations must be in, or the cases below would fail for the wrong reason.
 if (psql(`select (to_regprocedure('public.account_password_missing(uuid)') is not null
     and exists (select 1 from pg_trigger where tgrelid = 'auth.users'::regclass
-                 and tgname = 'first_confirm_drops_password' and tgenabled = 'O'))::text;`) !== "true") {
-  console.error("Refusing: apply 20261022100000 and 20261022110000 to the local stack first.");
+                 and tgname = 'first_confirm_drops_password' and tgenabled = 'O')
+    and exists (select 1 from pg_trigger where tgrelid = 'auth.users'::regclass
+                 and tgname = 'no_self_service_email_change' and tgenabled = 'O'))::text;`) !== "true") {
+  console.error("Refusing: apply 20261022100000, 20261022110000 and 20261022120000 to the local stack first.");
   process.exit(1);
 }
 
@@ -446,7 +464,92 @@ async function laterCases() {
   const a12 = await signIn("a10", PW_R);
   check("A12 ... and that password signs in", a12 === "session", a12);
 
+  await emailChangeCases();
   await rollbackRehearsal();
+}
+
+/** The sign-in email and the email-change columns, as GoTrue left them (local test rows only). */
+const emailRow = (id) => JSON.parse(psql(`select json_build_object('email', email,
+    'pending', coalesce(email_change, ''), 'token', coalesce(email_change_token_new, ''), 'sent', email_change_sent_at is not null)
+  from auth.users where id = ${lit(id)};`));
+const nothingPending = (r) => r.pending === "" && r.token === "" && !r.sent;
+
+/** A14 to A16: the email-change side door (20261022120000), on the shared stack. */
+async function emailChangeCases() {
+  let mailHost = "";
+  try {
+    mailHost = new URL(MAILPIT).hostname;
+  } catch {
+    // refused just below
+  }
+  if (!isLocalHost(mailHost)) throw new Error("A14 reads the local Mailpit, and MAILPIT_URL is not on 127.0.0.1 / localhost");
+  // An attacker's own account: confirmed, a known password, a live session.
+  const id14 = must(await admin.auth.admin.createUser({ email: school("a14"), password: PW_A, email_confirm: true }), "create a14").user.id;
+  made.push(id14);
+  const s14 = publicClient();
+  const in14 = await s14.auth.signInWithPassword({ email: school("a14"), password: PW_A });
+  check("A14 (a confirmed account with a password and a live session)", !in14.error && Boolean(in14.data?.session), describe(in14));
+  const target = school("a14-target");   // a student's school address that has not joined
+  const before = await mailIds(target);
+  mailAddrs.add(school("a14"));   // Secure email change mails the current address too: clean-up deletes it
+  const since = new Date(Date.now() - 2000).toISOString();
+  const e14 = await s14.auth.updateUser({ email: target });
+  // supabase-js gets GoTrue's "Error sending email change email"; GoTrue's own log names the refusal.
+  const log = spawnSync("docker", ["logs", "--since", since, `supabase_auth_${PROJECT_ID}`], { encoding: "utf8" });
+  const refusal = `${log.stdout ?? ""}\n${log.stderr ?? ""}`.split("\n")
+    .find((l) => l.includes("Database error updating user for email change") && l.includes("no_self_service_email_change")) ?? "";
+  check("A14 PUT /user {email: a school address not yet joined} -> 500, and GoTrue's log: its email_change write refused by the trigger (P0001)",
+    e14.error?.status === 500 && refusal.includes("SQLSTATE P0001"),
+    `${describe(e14)}; log: ${refusal.slice(0, 160) || (log.error?.message ?? "no such line")}`);
+  const r14 = emailRow(id14);
+  check("A14 ... the account's email unchanged; email_change, its token and its sent time empty",
+    r14.email === school("a14") && nothingPending(r14), show(r14));
+  // GoTrue sends before it writes (mail.go:549 vs :565): the mail goes out, the write is refused.
+  const mail = await nextMail(target, before, async (m) => m);
+  check("A14 ... GoTrue still mailed that address (it sends before it writes)", Boolean(mail), "no new message in Mailpit");
+  if (mail) {
+    const body = await mailBody(mail);
+    const link = /(https?:\/\/[^"'\s<>]+\/verify\?[^"'\s<>]+)/.exec(body)?.[1] ?? null;
+    const code = /enter the code:\s*(\d{6,10})\b/i.exec(body)?.[1] ?? null;
+    const tried = [];
+    let dead = true;
+    if (link) {
+      let host = "";
+      try {
+        host = new URL(link).hostname;
+      } catch {
+        // not a link: counted as not dead below
+      }
+      const g = isLocalHost(host) ? await fetch(link, { redirect: "manual" }) : null;
+      const to = g?.headers.get("location") ?? "";
+      dead &&= Boolean(g) && g.status >= 300 && g.status < 400 && /error/.test(to);
+      tried.push(`link ${g?.status ?? "not local"} ${to.slice(0, 80)}`);
+    }
+    if (code) {
+      const v = await publicClient().auth.verifyOtp({ email: target, token: code, type: "email_change" });
+      dead &&= Boolean(v.error);
+      tried.push(`code: ${describe(v)}`);
+    }
+    const r = emailRow(id14);
+    check("A14 ... and whatever it carries is dead (a scanner's GET of its link, its code typed, or a notice with neither)",
+      dead && r.email === school("a14") && nothingPending(r), `${tried.join("; ") || "a notice: no link, no code"} ${show(r)}`);
+  }
+
+  // A15: the same session changes its password (the trigger reads only email_change).
+  const PW_N = pw("changed");
+  const p15 = await s14.auth.updateUser({ password: PW_N });
+  check("A15 that session changes its password -> ok", !p15.error, describe(p15));
+  const [a15n, a15o] = [await signIn("a14", PW_N), await signIn("a14", PW_A)];
+  check("A15 ... the new password signs in, the old one does not", a15n === "session" && a15o === "invalid_credentials", `${a15n} / ${a15o}`);
+
+  // A16: the admin API's email change (SetEmail writes `email` only): how the team changes one by hand.
+  const moved = school("a14-moved");
+  const u16 = await admin.auth.admin.updateUserById(id14, { email: moved });
+  const r16 = emailRow(id14);
+  check("A16 the admin API's email change -> done at once, nothing pending", !u16.error && r16.email === moved && nothingPending(r16),
+    `${describe(u16)} ${show(r16)}`);
+  const a16 = await signIn("a14-moved", PW_N);
+  check("A16 ... and it signs in at the new address", a16 === "session", a16);
 }
 
 const B_FILE = join(REPO_ROOT, "supabase/migrations/20261022110000_first_confirm_drops_password.sql");

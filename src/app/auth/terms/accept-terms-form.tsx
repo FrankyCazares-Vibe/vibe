@@ -47,8 +47,22 @@ function openLegalInApp(e: React.MouseEvent<HTMLAnchorElement>) {
  * Client half of the `/auth/terms` interstitial: the same 18+ / Terms /
  * Privacy checkbox as signup, plus a Continue button that records the
  * agreement server-side and then moves on to `next`.
+ *
+ * `justConfirmed`: the account's first confirmation cleared the tick it had
+ * (pre-registration fix, Oct 2026), so the student is told the box is about
+ * the inbox, not the older accounts' "We now record" note. The words never
+ * say "once more" or "again": the person reading may never have ticked it,
+ * when someone else signed up with their address and they took it back with
+ * Forgot password.
  */
-export function AcceptTermsForm({ next }: { next: string }) {
+export function AcceptTermsForm({
+  next,
+  justConfirmed = false,
+}: {
+  next: string;
+  /** The first confirmation of this address just cleared its tick. */
+  justConfirmed?: boolean;
+}) {
   const router = useRouter();
   const [agreed, setAgreed] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -160,13 +174,21 @@ export function AcceptTermsForm({ next }: { next: string }) {
         <h1 className="vibe-auth-headline">
           One quick thing<span className="vibe-auth-dot">.</span>
         </h1>
-        <p className="vibe-auth-sub">
-          We now record your agreement to the{" "}
-          <strong>Terms of Service</strong> and{" "}
-          <strong>Privacy Policy</strong>, and that you&apos;re{" "}
-          <strong>{MIN_AGE} or older</strong> — the age the Terms require.
-          One tap and you won&apos;t see this again.
-        </p>
+        {justConfirmed ? (
+          <p className="vibe-auth-sub">
+            Your email is confirmed. Check the box so we know the person who
+            reads that inbox agreed. One tap and you won&apos;t see this
+            again.
+          </p>
+        ) : (
+          <p className="vibe-auth-sub">
+            We now record your agreement to the{" "}
+            <strong>Terms of Service</strong> and{" "}
+            <strong>Privacy Policy</strong>, and that you&apos;re{" "}
+            <strong>{MIN_AGE} or older</strong> — the age the Terms require.
+            One tap and you won&apos;t see this again.
+          </p>
+        )}
 
         <form onSubmit={onSubmit} className="vibe-auth-form">
           <label

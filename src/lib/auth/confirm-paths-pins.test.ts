@@ -13,8 +13,10 @@
  *    was proven; and a new build's reload never drops that view and its
  *    in-memory password (the club link page draws it too);
  *  - the login code box puts back the password that sign-in matched;
- *  - ConfirmCodeForm runs the parent's step on success AND when another tab
- *    of this browser confirmed first, and goes nowhere it did not vet;
+ *  - ConfirmCodeForm runs the parent's step on success and goes nowhere it
+ *    did not vet; when another tab of this browser confirmed first it goes
+ *    straight on WITHOUT that step, so a stale tab's password never replaces
+ *    one the other tab saved (/auth/terms catches an account left with none);
  *  - `/auth/terms` reads the flag only once consent is missing, and the hot
  *    gates (the proxy, campus access, onboarding) never read it.
  *
@@ -118,7 +120,7 @@ test("login page: the code box puts back the password that sign-in matched", () 
   assert.ok(!body.includes("accept-terms"), "no consent call from the login page");
 });
 
-test("ConfirmCodeForm: the parent's step runs in the shortcut and on success, and its answer is vetted", () => {
+test("ConfirmCodeForm: the parent's step runs on success only, its answer is vetted, and the shortcut skips it", () => {
   const src = read("components/auth/ConfirmCodeForm.tsx");
   const helper = at(src, "async function destinationAfterConfirm(", "ConfirmCodeForm");
   const helperBody = src.slice(helper, at(src, "\n}\n", "ConfirmCodeForm", helper));
@@ -126,13 +128,19 @@ test("ConfirmCodeForm: the parent's step runs in the shortcut and on success, an
   at(helperBody, "catch {", "destinationAfterConfirm");
   const component = src.slice(at(src, "export function ConfirmCodeForm(", "ConfirmCodeForm"));
   const calls = component.split("window.location.assign(await destinationAfterConfirm(onConfirmed));").length - 1;
-  assert.equal(calls, 2, "both the shortcut and the success branch go through the helper");
-  // The shortcut's call sits inside the "already confirmed in this browser" check.
-  const shortcut = at(component, "signedIn?.email_confirmed_at &&", "ConfirmCodeForm");
-  const firstCall = at(component, "await destinationAfterConfirm(onConfirmed)", "ConfirmCodeForm");
-  assert.ok(firstCall > shortcut && firstCall < at(component, "classifyEmailLinkProblem({", "ConfirmCodeForm"));
-  // Nothing goes straight to the next step any more, and onConfirmed is only ever run by the helper.
-  assert.ok(!component.includes("window.location.assign(POST_EMAIL_CONFIRM_PATH)"));
+  assert.equal(calls, 1, "only the success branch goes through the helper");
+  // The "already confirmed in this browser" shortcut, from its check to the
+  // wrong-code copy: it goes straight on and never runs the parent's step,
+  // which would put this tab's older password over one another tab saved.
+  const shortcutAt = at(component, "signedIn?.email_confirmed_at &&", "ConfirmCodeForm");
+  const classify = at(component, "classifyEmailLinkProblem({", "ConfirmCodeForm", shortcutAt);
+  const shortcut = code(component.slice(shortcutAt, classify));
+  assert.ok(shortcut.includes("window.location.assign(POST_EMAIL_CONFIRM_PATH);"), "the shortcut goes straight to the next step");
+  assert.ok(!/onConfirmed|destinationAfterConfirm|updateUser/.test(shortcut), "the shortcut never puts a password back");
+  assert.equal(component.split("window.location.assign(POST_EMAIL_CONFIRM_PATH)").length - 1, 1, "only the shortcut skips the helper");
+  // The helper's one call is the success branch's, after the wrong-code copy.
+  assert.ok(at(component, "await destinationAfterConfirm(onConfirmed)", "ConfirmCodeForm") > classify);
+  // onConfirmed is only ever run by the helper.
   assert.ok(!/await onConfirmed\(\)/.test(component));
 });
 

@@ -91,7 +91,28 @@
 --   delete from supabase_migrations.schema_migrations where version = '20261022110000';
 -- Flags stay as they are: no hot page reads them, /auth/terms and the choose
 -- page double-check with account_password_missing (in 20261022100000), and
--- accounts already emptied finish through the choose page or Forgot password.
+-- accounts already emptied finish through the choose page or Forgot password,
+-- but only while their Terms tick is still missing (next paragraph).
+-- STRANDED ACCOUNTS after any window in which an emptied account met main's
+-- code (the code rolled back while this trigger was live, or the trigger
+-- dropped first and the code rolled back after, as allowed above): main's
+-- /auth/terms and accept-terms record consent with no password check, so an
+-- emptied account that ticks Terms there keeps its session, the flag and no
+-- password. Back on the new code, /auth/terms lets it on as soon as consent
+-- exists, before it reads the flag, so nothing sends it to the choose screen;
+-- it finds out at "That email and password don't match" on a second device
+-- (Forgot password still works). After such a window, count them (counts
+-- only; the design's 2-day canary, password_needed_at < now() - 2 days, also
+-- counts them, mixed with people who stopped half-way):
+--   select count(*) from auth.users a join public.users u on u.id = a.id
+--    where u.password_needed_at is not null and u.terms_accepted_at is not null
+--      and coalesce(a.encrypted_password, '') = '';
+-- If it is not 0, and only with Franky's yes, send exactly those back through
+-- Terms, which then sends them to the choose screen (one statement; their
+-- 'interstitial' history row stays, the history is append-only):
+--   update public.users u set terms_version = null, terms_accepted_at = null, age_attested_at = null
+--     from auth.users a where a.id = u.id and u.password_needed_at is not null
+--      and u.terms_accepted_at is not null and coalesce(a.encrypted_password, '') = '';
 -- RE-APPLY after a rollback (section 10: re-read the source, then this file
 -- unchanged): the accounts emptied while it was live keep their NULL password
 -- and their flag, and the pre-flight lets exactly those through (it prints

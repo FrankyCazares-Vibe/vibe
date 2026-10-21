@@ -1,13 +1,15 @@
 /**
  * Drift tests for the pre-registration fix's database half
  * (`supabase/migrations/20261022100000_password_needed_column.sql` and
- * `20261022110000_first_confirm_drops_password.sql`, written Oct 20 2026), read as
+ * `20261022110000_first_confirm_drops_password.sql`, written Oct 20 2026, and
+ * `20261022120000_no_self_service_email_change.sql`, Oct 21), read as
  * text, the src/lib/usage/migration.test.ts idiom. The files' behaviour is
  * checked on the local stack by scripts/sql/first-confirm-check.sql and
  * scripts/prereg-e2e.mjs; these keep a later edit from quietly undoing it:
  * which writes the trigger sees, what it removes, that it never blocks a
- * confirmation, who may call the password question, and that no API role
- * can ever read the new column.
+ * confirmation, who may call the password question, that no API role
+ * can ever read the new column, which email_change writes C refuses, and
+ * that the app itself never starts an email change (C's premise).
  *
  * Run with:
  *   node --test src/lib/auth/first-confirm-migration.test.ts
@@ -21,8 +23,10 @@ const root = new URL("../../../", import.meta.url);
 const readRoot = (file: string) => readFileSync(new URL(file, root), "utf8");
 const A_FILE = "supabase/migrations/20261022100000_password_needed_column.sql";
 const B_FILE = "supabase/migrations/20261022110000_first_confirm_drops_password.sql";
+const C_FILE = "supabase/migrations/20261022120000_no_self_service_email_change.sql";
 const rawA = readRoot(A_FILE);
 const rawB = readRoot(B_FILE);
+const rawC = readRoot(C_FILE);
 
 /** What Postgres runs: the file without its `--` notes, every run of spaces as one. */
 const code = (sql: string) => sql.replace(/--[^\n]*/g, "").replace(/\s+/g, " ").trim();
@@ -30,6 +34,7 @@ const code = (sql: string) => sql.replace(/--[^\n]*/g, "").replace(/\s+/g, " ").
 const norm = (sql: string) => code(sql).toLowerCase().replace(/\s*([()])\s*/g, "$1");
 const a = norm(rawA);
 const b = norm(rawB);
+const c = norm(rawC);
 const count = (needle: string, text: string) => text.split(norm(needle)).length - 1;
 const between = (text: string, start: string, end: string) => {
   const s = text.indexOf(norm(start));
@@ -109,7 +114,11 @@ test("the name it resets to is the app's TRIGGER_FALLBACK_NAME, and the pre-flig
 });
 
 test("each file makes one function, SECURITY DEFINER with an empty search_path, and nothing is CREATE OR REPLACE", () => {
-  for (const [sql, name] of [[a, "public.account_password_missing"], [b, "auth_hooks.first_confirm_drops_password"]]) {
+  for (const [sql, name] of [
+    [a, "public.account_password_missing"],
+    [b, "auth_hooks.first_confirm_drops_password"],
+    [c, "auth_hooks.no_self_service_email_change"],
+  ]) {
     const heads = [...sql.matchAll(/create function ([\w.]+)\([^)]*\)returns ([^$]+)as \$\$/g)];
     assert.deepEqual(heads.map((h) => h[1]), [name]);
     assert.match(heads[0][2], /security definer set search_path = '' $/, `${name}: security definer, search_path ''`);
@@ -134,7 +143,7 @@ test("account_password_missing refuses anon and authenticated inside (42501); ev
   assert.ok(fn.includes(" stable "), "a read: stable");
   assert.equal(count("grant execute on function public.account_password_missing(uuid) to anon, authenticated, service_role;", a), 1);
   assert.equal(count("revoke all on function public.account_password_missing(uuid) from public;", a), 1);
-  for (const sql of [a, b]) {
+  for (const sql of [a, b, c]) {
     assert.equal(count("revoke execute", sql), 0, "a revoke is a crash button (20260922090000)");
     assert.doesNotMatch(sql, /revoke [^;]* from [^;]*\b(anon|authenticated|service_role)\b/);
   }
@@ -164,7 +173,7 @@ test("password_needed_at: timestamptz, no default, and no migration ever grants 
 });
 
 test("each file is one transaction with a lock timeout and refuses a second apply", () => {
-  for (const [sql, tag] of [[a, "password-needed"], [b, "first-confirm"]]) {
+  for (const [sql, tag] of [[a, "password-needed"], [b, "first-confirm"], [c, "no-email-change"]]) {
     assert.ok(sql.startsWith("begin; set local lock_timeout = '5s';"), `${tag}: begins with the transaction`);
     assert.ok(sql.endsWith("notify pgrst, 'reload schema'; commit;"), `${tag}: ends with the commit`);
     assert.equal(count("commit;", sql), 1);
@@ -192,16 +201,16 @@ test("B's pre-flight: A first, the columns it reads, and no confirmed account wi
   assert.match(rawB, /^-- RE-APPLY after a rollback/m, "the header says how to re-apply");
 });
 
-test("the production migrations write no person's row (no synthetic-row check in either file)", () => {
-  for (const sql of [a, b]) {
+test("the production migrations write no person's row (no synthetic-row check in any of the files)", () => {
+  for (const sql of [a, b, c]) {
     for (const verb of ["insert into auth.users", "update auth.users", "delete from auth.users", "insert into public.users", "delete from public.users"]) {
       assert.equal(count(verb, sql), 0, verb);
     }
   }
 });
 
-test("both headers carry the house sections", () => {
-  for (const raw of [rawA, rawB]) {
+test("every header carries the house sections", () => {
+  for (const raw of [rawA, rawB, rawC]) {
     for (const section of ["PLAIN ENGLISH", "WHAT IT DOES", "PRE-FLIGHT", "POST-CHECK", "HOW TO APPLY", "ROLLBACK"]) {
       assert.match(raw, new RegExp(`^-- ${section}`, "m"), section);
     }
@@ -209,4 +218,100 @@ test("both headers carry the house sections", () => {
     assert.ok(raw.includes("--   (and delete the connector's own auto-timestamped row for this body)"), "the delete-its-row line");
   }
   assert.ok(rawB.includes("drop trigger if exists first_confirm_drops_password on auth.users;"), "B's rollback is in its notes");
+  assert.ok(rawC.includes("--   drop trigger if exists no_self_service_email_change on auth.users;"), "C's rollback is in its notes");
+  assert.ok(rawC.includes("--   values ('20261022120000', 'no_self_service_email_change') on conflict (version) do nothing;"), "C's row");
+});
+
+test("B's header: the accounts a code rollback strands with consent and no password, counted, and re-funnelled only on a yes", () => {
+  assert.match(rawB, /^-- STRANDED ACCOUNTS/m);
+  const where = "u.password_needed_at is not null and u.terms_accepted_at is not null and coalesce(a.encrypted_password, '') = ''";
+  // Header lines: what Postgres would run if the `-- ` were taken off each one.
+  const notes = norm(rawB.split("\n").filter((l) => l.startsWith("--   ")).map((l) => l.slice(5)).join("\n"));
+  assert.ok(notes.includes(norm(`select count(*) from auth.users a join public.users u on u.id = a.id where ${where};`)), "the counts-only read");
+  assert.ok(
+    notes.includes(norm(`update public.users u set terms_version = null, terms_accepted_at = null, age_attested_at = null from auth.users a where a.id = u.id and ${where};`)),
+    "the re-funnel clears exactly the three consent columns of exactly those rows",
+  );
+  assert.match(rawB, /only with Franky's yes, send exactly those back through\n-- Terms/);
+});
+
+// C: the email-change side door (20261022120000). The function's rule, the trigger's WHEN.
+const cBody = between(c, "create function auth_hooks.no_self_service_email_change() returns trigger", "$$;");
+const cRule = between(cBody, "begin if", "then raise exception").trim();
+const cWhen = between(c, "for each row when(", ")execute function auth_hooks.no_self_service_email_change();");
+const C_RULE = [
+  "coalesce(new.email_change, '') <> ''",
+  "new.email_change is distinct from old.email_change",
+  "new.deleted_at is null",
+];
+
+test("C's trigger: BEFORE UPDATE OF email_change only, on auth.users, row by row, one function", () => {
+  assert.equal(count("create trigger no_self_service_email_change before update of email_change on auth.users for each row when (", c), 1);
+  assert.equal(count("create trigger", c), 1);
+  assert.equal(count("execute function auth_hooks.no_self_service_email_change();", c), 1);
+});
+
+test("C's rule: a NEW, non-empty address, not a soft delete; its WHEN is exactly the function's rule", () => {
+  for (const r of C_RULE) assert.ok(cRule.includes(norm(r)), `rule: ${r}`);
+  assert.equal(cRule.split(/\band\b/).length, C_RULE.length, "the rule has no other condition");
+  assert.equal(cWhen, cRule, "clearing or cancelling a change never enters the function");
+  for (const col of [/email_confirmed_at/, /encrypted_password/, /\bnew\.email\b(?!_)/, /\bold\.email\b(?!_)/]) {
+    assert.doesNotMatch(cRule, col, `the rule never reads ${col}`);
+  }
+});
+
+test("C only refuses (P0001), writes and assigns nothing; no EXECUTE for PUBLIC, EXECUTE for supabase_auth_admin only", () => {
+  assert.match(cBody, /raise exception 'no_self_service_email_change: [^']+' using errcode = 'p0001';/);
+  assert.equal(count("raise exception", cBody), 1);
+  assert.equal(count("return new;", cBody), 1);
+  assert.doesNotMatch(cBody, /\b(update|insert|delete)\b|:=|set_config\(/, "no write, no assignment: it only refuses");
+  assert.equal(count("revoke all on function auth_hooks.no_self_service_email_change() from public;", c), 1);
+  assert.equal(count("grant execute on function auth_hooks.no_self_service_email_change() to supabase_auth_admin;", c), 1);
+  assert.equal([...c.matchAll(/\bgrant /g)].length, 1, "no other grant");
+});
+
+test("C's pre-flight: auth_hooks, the three columns; the pending count runs only after CREATE TRIGGER", () => {
+  const preflight = between(c, "begin; set local lock_timeout = '5s'; do $$", "end $$;");
+  assert.ok(preflight.includes(norm("raise exception 'no-email-change: auth_hooks missing'")));
+  assert.ok(preflight.includes(norm("and column_name in ('email', 'email_change', 'deleted_at')) <> 3 then")));
+  // A change from before the file would pass the rule (same value), so the file stops on any. Counted
+  // before CREATE TRIGGER, a write not yet committed would slip past while CREATE TRIGGER waited for it;
+  // after it, the trigger's SHARE ROW EXCLUSIVE lock (held to COMMIT) leaves no gap.
+  const pendingCount =
+    "select count(*) into v_pending from auth.users where coalesce(email_change, '') <> '' and deleted_at is null; " +
+    "if v_pending > 0 then raise exception 'no-email-change: %";
+  assert.equal(count("into v_pending", c), 1, "one pending count");
+  assert.ok(!preflight.includes("v_pending"), "not in the pre-flight");
+  const postcheck = between(c, "execute function auth_hooks.no_self_service_email_change(); do $$", "end $$;");
+  assert.ok(postcheck.includes(norm(pendingCount)), "in the post-check");
+  assert.ok(c.indexOf(norm(pendingCount)) > c.indexOf(norm("create trigger no_self_service_email_change")), "after CREATE TRIGGER");
+  assert.equal(count("commit;", c), 1);
+  assert.ok(c.indexOf(norm(pendingCount)) < c.indexOf(norm("commit;")), "before COMMIT, so a stop keeps nothing");
+});
+
+test("C's header: the GoTrue lines it rests on, the mail that still goes out, the template it pairs with", () => {
+  for (const ref of ["mail.go:524-591", "mail.go:549 vs :565", "mail.go:241-264", "models/user.go:564-592", "models/user.go:398-401", "admin.go:305"]) {
+    assert.ok(rawC.includes(ref), ref);
+  }
+  assert.match(rawC, /THE MAIL STILL GOES OUT/);
+  assert.ok(rawC.includes("supabase/templates/email_change.html"), "the Change-email notice");
+});
+
+/** Every source file under a folder, tests aside. */
+const sources = (dir: string) =>
+  (readdirSync(new URL(dir, root), { recursive: true }) as string[])
+    .filter((f) => /\.(ts|tsx|js|mjs|html)$/.test(f) && !/\.test\./.test(f))
+    .map((f) => [`${dir}${f}`, readRoot(`${dir}${f}`)] as const);
+
+test("C's premise: the app never starts a sign-in email change itself", () => {
+  const files = [...sources("src/"), ...sources("public/html/")];
+  // The scan reaches the pages that do call updateUser (for a password), so it is not reading nothing.
+  for (const f of ["src/app/auth/signup/signup-form.tsx", "src/app/auth/update-password/page.tsx", "public/html/_miniMessenger.js"]) {
+    assert.ok(files.some(([file]) => file === f), `the scan reads ${f}`);
+  }
+  for (const [file, text] of files) {
+    assert.doesNotMatch(text, /\bupdateUser\(\s*\{[^}]*\bemail\b/, `${file} changes a sign-in email (updateUser with email)`);
+    assert.doesNotMatch(text, /type:\s*["'`]email_change/, `${file} asks for an email change (a resend, generateLink or verifyOtp type)`);
+    assert.doesNotMatch(text, /auth\/v1\/user/, `${file} calls GoTrue's /user directly`);
+  }
 });
