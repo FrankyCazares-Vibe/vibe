@@ -1,6 +1,6 @@
 # Vibe Privacy Policy
 
-Effective <SHIP DAY>
+Effective October 21, 2026
 
 Vibe is a campus social app for people with an Indiana University or Purdue University email address. It is run by **CONNECTVIBE. LLC**, an Indiana limited liability company. In this policy, "we" means that company. Vibe is independent. It is not run or backed by Indiana University, Purdue University, or any campus, school or club.
 
