@@ -135,3 +135,10 @@ Shipped from the wave 1 session (`busy-aryabhata-7b6991`); this branch's own ses
   production (Franky's phone test below).
 - **Franky's phone test:** open a club you run, hold the Profile tab, switch to the club, open Club tools, write a
   meeting time in Edit page. On iPhone, check the hold doesn't open a link preview.
+- **Later Oct 21 (Franky: the separate block pushed his profile card out of sight):** "Clubs you run" on a computer
+  moved from its own block above Admin into the left menu's profile card, under the name. The card is now a frame
+  (profile link, then the clubs) in every state, so the clubs come from their cache at once; the card and the
+  menu's divider lines never shrink (a tall menu scrolls instead); the profile link draws its keyboard ring inside
+  the card (`.vibe-identity-me:focus-visible`); the school strip lets clicks through. Reviewed by three lenses with
+  a skeptic per finding (three fixed: clubs waiting on the profile read, the clipped focus ring, the strip's dead
+  click zone); tsc clean, 3,721 tests pass; checked locally at 910px in Night and Light, and in a 520px-tall window.

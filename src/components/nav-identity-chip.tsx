@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
+import { ClubsYouRunNav } from "@/components/orgs/ClubsYouRunNav";
 import { campusRowById } from "@/lib/iu/campuses";
 import { schoolStripBackground } from "@/lib/iu/school-colors";
 import { resolveCoverThemeCss } from "@/lib/profile/cover-themes";
@@ -66,10 +67,21 @@ const cardShell: React.CSSProperties = {
   position: "relative",
   borderRadius: 12,
   overflow: "hidden",
+  // Never squeezed (Oct 21, 2026): LeftNav is a full-height column, and a
+  // flex item that clips its overflow may shrink to nothing. When the menu
+  // is taller than the window, the menu scrolls; the card keeps its size.
+  flexShrink: 0,
   textDecoration: "none",
   background: "var(--paper)",
   border: "1px solid var(--hairline)",
   boxShadow: "0 4px 16px rgba(0, 0, 0, 0.05)",
+};
+
+/** The "you" part of the card: the link to my profile, inside the card's frame. */
+const meLink: React.CSSProperties = {
+  display: "block",
+  textDecoration: "none",
+  color: "inherit",
 };
 
 const bannerFallback = "var(--chip-banner-fallback)";
@@ -92,6 +104,8 @@ function SchoolStrip({ paint }: { paint: string | null }) {
         height: 3,
         background: paint,
         zIndex: 1,
+        // Decoration over the profile link: a click on it is a click on the card.
+        pointerEvents: "none",
       }}
     />
   );
@@ -154,9 +168,16 @@ export function NavIdentityChip() {
     };
   }, []);
 
+  // One frame in every state (Oct 21, 2026): the clubs I run sit inside the
+  // card under my name, and a link can't hold other links, so the card is a
+  // frame holding the profile link, then the clubs. The clubs stay the
+  // frame's last child in every state, so they come from their own cache at
+  // once and never wait for (or depend on) the profile read. The frame keeps
+  // the id the campus tour points at.
+  let me: React.ReactNode;
   if (chip.status === "loading") {
-    return (
-      <Link id="nav-identity-chip" href="/profile" style={{ ...cardShell, opacity: 0.65 }}>
+    me = (
+      <Link href="/profile" className="vibe-identity-me" style={{ ...meLink, opacity: 0.65 }}>
         <div
           style={{
             height: BANNER_PREVIEW_H,
@@ -203,11 +224,9 @@ export function NavIdentityChip() {
         </div>
       </Link>
     );
-  }
-
-  if (chip.status === "idle") {
-    return (
-      <Link id="nav-identity-chip" href="/profile" style={cardShell}>
+  } else if (chip.status === "idle") {
+    me = (
+      <Link href="/profile" className="vibe-identity-me" style={meLink}>
         <div
           style={{
             height: BANNER_PREVIEW_H,
@@ -252,102 +271,108 @@ export function NavIdentityChip() {
         </div>
       </Link>
     );
-  }
-
-  const { name, subtitle, avatarUrl, initials, bannerCss, strip } = chip;
-
-  return (
-    <Link
-      id="nav-identity-chip"
-      href="/profile"
-      style={cardShell}
-      title={`${name} — ${subtitle}`}
-    >
-      <SchoolStrip paint={strip} />
-      <div
-        aria-hidden
-        style={{
-          height: BANNER_PREVIEW_H,
-          width: "100%",
-          background: bannerCss ?? bannerFallback,
-        }}
-      />
-      <div
-        style={{
-          display: "flex",
-          alignItems: "flex-start",
-          gap: 10,
-          padding: "10px 10px 12px",
-          background: "var(--paper)",
-        }}
+  } else {
+    const { name, subtitle, avatarUrl, initials, bannerCss } = chip;
+    me = (
+      <Link
+        href="/profile"
+        className="vibe-identity-me"
+        style={meLink}
+        title={`${name} — ${subtitle}`}
       >
         <div
+          aria-hidden
           style={{
-            width: AVATAR_SZ,
-            height: AVATAR_SZ,
-            borderRadius: 10,
-            background: "#1C1C1E",
+            height: BANNER_PREVIEW_H,
+            width: "100%",
+            background: bannerCss ?? bannerFallback,
+          }}
+        />
+        <div
+          style={{
             display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            fontFamily: "Fraunces, serif",
-            fontSize: "12px",
-            fontWeight: "700",
-            color: "white",
-            flexShrink: 0,
-            overflow: "hidden",
+            alignItems: "flex-start",
+            gap: 10,
+            padding: "10px 10px 12px",
+            background: "var(--paper)",
           }}
         >
-          {avatarUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element -- Supabase + data URLs
-            <img
-              src={avatarUrl}
-              alt=""
-              style={{
-                width: "100%",
-                height: "100%",
-                objectFit: "cover",
-                display: "block",
-              }}
-            />
-          ) : (
-            initials
-          )}
-        </div>
-        <div style={{ minWidth: 0, flex: 1, paddingTop: 1 }}>
           <div
             style={{
-              fontFamily: "'DM Sans', system-ui, sans-serif",
-              fontSize: "12.5px",
-              fontWeight: "600",
-              color: "var(--charcoal)",
-              lineHeight: 1.38,
-              letterSpacing: "-0.01em",
-              overflowWrap: "anywhere",
-              wordBreak: "break-word",
-            }}
-          >
-            {name}
-          </div>
-          <div
-            style={{
-              fontFamily: "'DM Sans', system-ui, sans-serif",
-              fontSize: "11px",
-              color: "var(--ink-muted)",
-              lineHeight: 1.4,
-              marginTop: 4,
-              overflowWrap: "anywhere",
-              wordBreak: "break-word",
-              display: "-webkit-box",
-              WebkitBoxOrient: "vertical",
-              WebkitLineClamp: 2,
+              width: AVATAR_SZ,
+              height: AVATAR_SZ,
+              borderRadius: 10,
+              background: "#1C1C1E",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontFamily: "Fraunces, serif",
+              fontSize: "12px",
+              fontWeight: "700",
+              color: "white",
+              flexShrink: 0,
               overflow: "hidden",
             }}
           >
-            {subtitle}
+            {avatarUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element -- Supabase + data URLs
+              <img
+                src={avatarUrl}
+                alt=""
+                style={{
+                  width: "100%",
+                  height: "100%",
+                  objectFit: "cover",
+                  display: "block",
+                }}
+              />
+            ) : (
+              initials
+            )}
+          </div>
+          <div style={{ minWidth: 0, flex: 1, paddingTop: 1 }}>
+            <div
+              style={{
+                fontFamily: "'DM Sans', system-ui, sans-serif",
+                fontSize: "12.5px",
+                fontWeight: "600",
+                color: "var(--charcoal)",
+                lineHeight: 1.38,
+                letterSpacing: "-0.01em",
+                overflowWrap: "anywhere",
+                wordBreak: "break-word",
+              }}
+            >
+              {name}
+            </div>
+            <div
+              style={{
+                fontFamily: "'DM Sans', system-ui, sans-serif",
+                fontSize: "11px",
+                color: "var(--ink-muted)",
+                lineHeight: 1.4,
+                marginTop: 4,
+                overflowWrap: "anywhere",
+                wordBreak: "break-word",
+                display: "-webkit-box",
+                WebkitBoxOrient: "vertical",
+                WebkitLineClamp: 2,
+                overflow: "hidden",
+              }}
+            >
+              {subtitle}
+            </div>
           </div>
         </div>
-      </div>
-    </Link>
+      </Link>
+    );
+  }
+
+  return (
+    <div id="nav-identity-chip" style={cardShell}>
+      <SchoolStrip paint={chip.status === "ready" ? chip.strip : null} />
+      {me}
+      <ClubsYouRunNav />
+    </div>
   );
 }

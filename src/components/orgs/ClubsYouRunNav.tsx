@@ -9,13 +9,15 @@ import { ClubLogo } from "@/components/profile/ClubFlair";
 import { useClubsYouRun } from "@/lib/orgs/club-switch";
 
 /**
- * "Clubs you run" in the desktop left menu (wave 2, WAVE2-DESIGN.md C5;
- * board R2_Club_Desktop): one line per club I'm the owner or an officer of,
- * above the founders' Admin link (which stays founders-only). A computer has
- * no switch: each line is just the club's page. A coral dot while that club
- * has join requests. Nothing at all until the list has a club, so for most
- * people this draws nothing. Asks once, through the switcher's two-minute
- * cache (club-switch.ts).
+ * "Clubs you run" on a computer (wave 2, WAVE2-DESIGN.md C5; board
+ * R2_Club_Desktop): one line per club I'm the owner or an officer of. Since
+ * Oct 21, 2026 (Franky: the separate menu block pushed the card out of
+ * sight) it sits INSIDE the left menu's profile card, under my name, instead
+ * of as its own block above Admin. A computer has no switch: each line is
+ * just the club's page. A coral dot while that club has join requests.
+ * Nothing at all until the list has a club, so for most people the card is
+ * unchanged. Asks once, through the switcher's two-minute cache
+ * (club-switch.ts).
  */
 /** LeftNav shows from 900px up (CampusAppShell mounts it at every width and hides it below). */
 const DESKTOP_QUERY = "(min-width: 900px)";
@@ -42,7 +44,7 @@ export function ClubsYouRunNav(): JSX.Element | null {
   if (runs.status !== "ok" || runs.clubs.length === 0) return null;
 
   return (
-    <>
+    <div style={sectionStyle}>
       <div style={eyebrowStyle}>Clubs you run</div>
       <nav aria-label="Clubs you run" style={listStyle}>
         {runs.clubs.map((club) => {
@@ -55,7 +57,7 @@ export function ClubsYouRunNav(): JSX.Element | null {
               aria-current={here ? "page" : undefined}
               style={here ? { ...lineStyle, ...lineHereStyle } : lineStyle}
             >
-              <ClubLogo name={club.name} url={club.logo_url} size={22} />
+              <ClubLogo name={club.name} url={club.logo_url} size={20} />
               <span style={nameStyle}>{club.name}</span>
               {waiting ? (
                 <>
@@ -67,44 +69,50 @@ export function ClubsYouRunNav(): JSX.Element | null {
           );
         })}
       </nav>
-    </>
+    </div>
   );
 }
 
-/** LeftNav's "Platform" eyebrow, the same look. */
+/** The card's lower part: a hairline under my name, the card's own paper. */
+const sectionStyle: CSSProperties = {
+  borderTop: "1px solid var(--hairline)",
+  padding: "6px 4px",
+  background: "var(--paper)",
+};
+
+/** LeftNav's "Platform" eyebrow, a size down for the card. */
 const eyebrowStyle: CSSProperties = {
-  fontSize: 10,
+  fontSize: 9.5,
   fontWeight: 700,
   letterSpacing: "0.16em",
   textTransform: "uppercase",
   color: "var(--ink-muted)",
-  padding: "12px 12px 6px",
-  marginTop: 6,
+  padding: "4px 6px 4px",
 };
 
-const listStyle: CSSProperties = { display: "flex", flexDirection: "column", gap: 2 };
+const listStyle: CSSProperties = { display: "flex", flexDirection: "column", gap: 1 };
 
-/** LeftNav's own lines (padding, radius, type), so the menu reads as one list. */
+/** The card's type (12.5px names), so the lines read as part of it. */
 const lineStyle: CSSProperties = {
   display: "flex",
   alignItems: "center",
-  gap: 10,
-  padding: "10px 12px",
-  borderRadius: 12,
-  fontSize: 14,
+  gap: 8,
+  padding: "6px 6px",
+  borderRadius: 8,
+  fontFamily: "'DM Sans', system-ui, sans-serif",
+  fontSize: 12.5,
   fontWeight: 500,
-  color: "var(--ink-muted)",
+  color: "var(--ink-2)",
   textDecoration: "none",
   background: "none",
-  transition: "all 0.15s",
+  transition: "background 0.15s, color 0.15s",
   minWidth: 0,
 };
 
 const lineHereStyle: CSSProperties = {
   fontWeight: 600,
   color: "var(--charcoal)",
-  background: "var(--paper)",
-  boxShadow: "0 4px 24px rgba(0,0,0,0.06)",
+  background: "var(--row-hover)",
 };
 
 const nameStyle: CSSProperties = {

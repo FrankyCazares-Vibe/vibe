@@ -12,7 +12,6 @@ import {
   type LoadFailure,
 } from "@/components/feedback/LoadFailed";
 import { NavIdentityChip } from "@/components/nav-identity-chip";
-import { ClubsYouRunNav } from "@/components/orgs/ClubsYouRunNav";
 import {
   CAL_KIND_WORD,
   calChipStyle,
@@ -340,8 +339,6 @@ export default function LeftNav() {
         })}
       </nav>
 
-      <ClubsYouRunNav />
-
       {isPlatformAdmin ? (
         <>
           <div
@@ -388,6 +385,7 @@ export default function LeftNav() {
       <div
         style={{
           height: "1px",
+          flexShrink: 0,
           background: "var(--hairline)",
           margin: "12px 0",
         }}
@@ -398,6 +396,7 @@ export default function LeftNav() {
       <div
         style={{
           height: "1px",
+          flexShrink: 0,
           background: "var(--hairline)",
           margin: "12px 0",
         }}

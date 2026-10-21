@@ -2602,6 +2602,13 @@ html {
   outline: 2px solid var(--coral);
   outline-offset: -2px;
 }
+/* The left menu's profile card clips its overflow (rounded corners), so the
+   profile link inside it draws its keyboard ring inside, or it is cut off
+   (nav-identity-chip.tsx, Oct 21, 2026). */
+.vibe-identity-me:focus-visible {
+  outline: 2px solid var(--coral);
+  outline-offset: -2px;
+}
 /* The tab panel spaces its cards; a card's own top margin from its old
    spot on the page (the Board card's) would double it. */
 .vibe-club-panel > :first-child {
