@@ -28,3 +28,5 @@ The canvas opens on Round 2 (`R2_*` boards); Round 1 is its own page.
   A "Fetch API cannot load file://" console error and `{{…}}` SVG path warnings are normal.
 
 Nothing here touches the app. Sample club and people are invented (Sixty-Four Chess, the same cast as the app screens).
+
+**Wave 1 built Oct 20 (branch `claude/club-wave-1-ae4772`):** `../2026-10-20-club-view-wave-1.md` (what shipped, what Franky approves, reviews); how it's built: `WAVE1-DESIGN.md`.
