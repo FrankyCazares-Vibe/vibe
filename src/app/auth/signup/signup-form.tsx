@@ -329,6 +329,13 @@ export function SignupForm({
       return;
     }
     const address = email.trim();
+    // A club link lets only a school address in (the gate checks it too):
+    // said here, before a sign-up the gate would refuse, or, with sign-up
+    // open, let in without the club.
+    if (club && !isSchoolEmail(address)) {
+      setError("Use your school email (the one ending in iu.edu or purdue.edu) for this link.");
+      return;
+    }
     submitting.current = true;
     setLoading(true);
     try {
@@ -506,9 +513,9 @@ export function SignupForm({
               autoStartCooldownSec={pending.cooldownSec}
             />
             {club?.kind === "setup" ? (
-              // A setup link works once: this address holds it now.
+              // A setup link works once, so the address matters.
               <p className="vibe-auth-tip" style={{ overflowWrap: "anywhere" }}>
-                This setup link is now tied to <strong>{pending.email}</strong>.
+                Finish with <strong>{pending.email}</strong> to set up the club.
                 Wrong address? Ask whoever gave you the link for a new one.
               </p>
             ) : codeTied ? (
@@ -737,7 +744,7 @@ export function SignupForm({
                 }}
               >
                 <Link
-                  href="/auth/login"
+                  href={signInHref}
                   className="vibe-auth-link vibe-auth-link--tap"
                 >
                   Sign in

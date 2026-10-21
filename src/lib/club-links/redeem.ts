@@ -195,12 +195,13 @@ export function clubSetupPath(handle: string): string {
 export async function clubLinkNextAfterOnboarding(
   service: SupabaseClient,
   userId: string,
-  canPublish: boolean,
+  /** Asked only when a setup link is waiting: may this account make a club? */
+  canPublish: () => Promise<boolean>,
 ): Promise<string | null> {
   try {
     const pending = await pendingClubLink(service, userId);
     if (!pending) return null;
-    if (pending.kind === "members" || !canPublish) return CLUB_LINK_WELCOME_PATH;
+    if (pending.kind === "members" || !(await canPublish())) return CLUB_LINK_WELCOME_PATH;
     const link = await findClubLinkById(service, pending.linkId);
     if (!link) return null;
     const outcome = await redeemClubLink(service, link, userId, { claimed: true });

@@ -488,8 +488,9 @@ begin
      and x.dismissed_at is null
      and k.off_at is null
      and ((k.kind = 'setup' and k.used_at is null)
+          -- A sign-up the link let in before its end still gets the question
+          -- (the 30-day claim window above bounds it).
           or (k.kind = 'members'
-              and k.expires_at > now()
               and not exists (select 1 from public.org_members m
                                where m.org_id = k.org_id and m.user_id = p_user)))
    order by x.claimed_at desc

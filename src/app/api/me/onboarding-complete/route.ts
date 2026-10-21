@@ -192,8 +192,11 @@ async function finishV2(userId: string, body: Body) {
 
   // A sign-up a club link let in (the club's view, wave 1) goes to its club:
   // a setup link's owner to the setup list, a members' link to "Join it?".
-  const canPublish = (await requireCanPublish(userId)) === null;
-  const clubNext = await clubLinkNextAfterOnboarding(service, userId, canPublish);
+  const clubNext = await clubLinkNextAfterOnboarding(
+    service,
+    userId,
+    async () => (await requireCanPublish(userId)) === null,
+  );
 
   return NextResponse.json({ ok: true, next: clubNext ?? ONBOARDING_NEXT_PATH });
 }
