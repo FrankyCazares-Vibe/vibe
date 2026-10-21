@@ -11,7 +11,8 @@ Plan: `handoffs/2026-10-20-club-view/BUILD-ORDER.md` (wave 1), decisions `DECISI
 - **Club links, one mechanism, two kinds.**
   - *Setup link:* Admin › Clubs › "New club setup link": club name, handle, "We met in person: the club is checked",
     Make the link, QR. Works once, for 7 days. The president opens it, signs up with a school email past the closed
-    waitlist, and when onboarding ends the club is made (checked, them as owner) and they land on its setup list.
+    waitlist, and when onboarding ends they are asked once, "Set up <club>?" (Make me the owner / Not me), then land
+    on its setup list. (Changed Oct 21 by the pre-registration fix: it used to make the club by itself.)
     Someone already on Vibe opens it signed in and taps "Make me the owner". Admin lists every setup link (live,
     used with its club, expired, cancelled) with Cancel.
   - *Members' link:* one per checked club, from the setup list or the officer bar's "Members' link". School email
@@ -54,10 +55,14 @@ were read on Oct 20 and match what the files expect (gate checksum `2b258dbf…`
 2. `20261021110000_club_links.sql`: the two new tables and their functions.
 3. `20261021120000_club_links_gate.sql`: the sign-up gate's new club-link step.
 
-**Order on the day:** his yes → apply 1, 2, 3 with the connector (body minus begin/commit; rename each
-auto-timestamp row in `schema_migrations` to the file's version) → set the Privacy Policy date in `page.tsx` and
-line 3 of `privacy-policy-final.md` to that day → merge the branch to main (Vercel deploys) → make one setup link
-in Admin and open it on a phone.
+**Ship wave 1 together with the sign-up pre-registration fix** (branch `claude/signup-inbox-first`, built on top of
+this one; handoff `2026-10-21-signup-preregistration-fix.md`). Club links let people past the closed waitlist, and
+without that fix whoever signs a student's address up first keeps a working password. Its three files join this
+bundle (A, B, C), and its handoff has the full order. In short: his yes → apply 1, 2, 3 and A with the connector
+(body minus begin/commit; rename each auto-timestamp row in `schema_migrations` to the file's version, and delete
+the connector's own row) → set the Privacy Policy date in `page.tsx` and line 3 of `privacy-policy-final.md` to
+that day → merge `claude/signup-inbox-first` to main (it carries wave 1) → the same day, once live, apply B and C →
+the dashboard steps → make one setup link in Admin and open it on a phone. No club link goes out before then.
 
 ## Calls left for Franky (each with a recommendation)
 - **When a members' link ends after 3 weeks, can officers make a fresh one?** Today: no (they can only renew the
