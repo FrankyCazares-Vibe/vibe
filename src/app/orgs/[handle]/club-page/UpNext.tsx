@@ -15,7 +15,7 @@ import { useClubEvents } from "./ClubEventsProvider";
  * officers who can post one with + (`officerHint`). No `data-event-anchor`
  * here: a `?event=` link scrolls to the Events tab's copy.
  */
-export function UpNext({ officerHint }: { officerHint: boolean }) {
+export function UpNext({ officerHint, canPostEvents }: { officerHint: boolean; canPostEvents: boolean }) {
   const { events, refresh, remove, update, rev, rsvpAtHomeOnly } = useClubEvents();
   if (events === null) return null;
   const next = events[0];
@@ -32,7 +32,9 @@ export function UpNext({ officerHint }: { officerHint: boolean }) {
           lineHeight: 1.45,
         }}
       >
-        No event coming up. Post one with +.
+        {/* Only a club Vibe checked can post events (the + sheet's New event
+            is off otherwise): review F6. */}
+        {canPostEvents ? "No event coming up. Post one with +." : "No event coming up. Events need a checked club."}
       </p>
     ) : null;
   }

@@ -2009,7 +2009,9 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
                   type="button"
                   onClick={() => setSwitcherOpen(true)}
                   aria-haspopup="dialog"
-                  aria-label="Switch to one of your clubs"
+                  // The name stays the heading's words; the label says what
+                  // the tap does after it (review F8).
+                  aria-label={`${name}: switch to one of your clubs`}
                   style={{
                     display: "inline-flex",
                     alignItems: "center",

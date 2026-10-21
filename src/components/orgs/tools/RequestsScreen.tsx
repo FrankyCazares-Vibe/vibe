@@ -99,10 +99,18 @@ export function RequestsScreen({ club }: { club: ToolsClub }) {
   if (rows.length === 0) return <EmptyLine>No requests right now.</EmptyLine>;
 
   return (
+    <>
+    {/* The approve route refuses every approve on a hidden club (409
+        org_hidden): Approve isn't offered there, Deny still is (review F1). */}
+    {club.hidden ? (
+      <p style={{ ...quietStyle, margin: "0 0 10px" }}>
+        This club is hidden, so nobody new can join it. You can still deny requests.
+      </p>
+    ) : null}
     <ul style={cardStyle}>
       {rows.map((row) => {
         const isBusy = busy.has(row.id);
-        const canApprove = row.eligible !== false && row.can_approve !== false;
+        const canApprove = !club.hidden && row.eligible !== false && row.can_approve !== false;
         return (
           <li key={row.id} style={{ ...rowItemStyle, padding: "12px 14px" }}>
             <PersonLine
@@ -147,6 +155,7 @@ export function RequestsScreen({ club }: { club: ToolsClub }) {
         );
       })}
     </ul>
+    </>
   );
 }
 

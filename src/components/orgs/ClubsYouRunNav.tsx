@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import type { CSSProperties, JSX } from "react";
+import { useSyncExternalStore, type CSSProperties, type JSX } from "react";
 
 import { isClubPath } from "@/components/mobile/mobile-tab-active";
 import { ClubLogo } from "@/components/profile/ClubFlair";
@@ -17,9 +17,28 @@ import { useClubsYouRun } from "@/lib/orgs/club-switch";
  * people this draws nothing. Asks once, through the switcher's two-minute
  * cache (club-switch.ts).
  */
+/** LeftNav shows from 900px up (CampusAppShell mounts it at every width and hides it below). */
+const DESKTOP_QUERY = "(min-width: 900px)";
+
+function subscribeDesktop(onChange: () => void): () => void {
+  if (typeof window === "undefined" || typeof window.matchMedia !== "function") return () => {};
+  const mq = window.matchMedia(DESKTOP_QUERY);
+  mq.addEventListener("change", onChange);
+  return () => mq.removeEventListener("change", onChange);
+}
+
+function isDesktopNow(): boolean {
+  return typeof window !== "undefined" && typeof window.matchMedia === "function" && window.matchMedia(DESKTOP_QUERY).matches;
+}
+
 export function ClubsYouRunNav(): JSX.Element | null {
   const pathname = usePathname() ?? "";
-  const runs = useClubsYouRun(true);
+  // Asks only where the menu shows (review F3): a phone, where LeftNav is
+  // mounted but hidden, never asks. "Not desktop" on the server and while
+  // hydrating, so the first render and the server agree and nothing is asked
+  // before the width is known.
+  const desktop = useSyncExternalStore(subscribeDesktop, isDesktopNow, () => false);
+  const runs = useClubsYouRun(desktop);
   if (runs.status !== "ok" || runs.clubs.length === 0) return null;
 
   return (

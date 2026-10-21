@@ -17,8 +17,8 @@ thing. Plain English first, the mechanics after.
   Edit page and Share page, everyone else gets Join or Follow and Share page. Officers also get + (post) and Club
   tools on the cover, the "needs you" line ("2 want to join · +6 followers this week") and wave 1's "Finish setting
   up · n of 6". The next event is pinned above the tabs as "Up next". Tabs: Posts (first), Events, Board.
-- **Exact counts for officers.** Officers see the real follower and member numbers even under 5. Everyone else
-  still sees each count only from 5 up.
+- **Exact counts for officers.** Officers see the real follower and member numbers even under 5. Members still
+  see their exact member count, as before; everyone else sees each count only from 5 up.
 - **When it meets.** A new short line a club writes itself ("Thursdays · 7 PM, the Lantern Room"), up to 60
   characters, shown on the club page to everyone. It is the one new thing the page shows, so the Privacy Policy's
   "Club pages" line gains "when it meets".

@@ -43,9 +43,15 @@ export function useLongPress(
     ms?: number;
     /** Asked when the timer ends (`pressedAt` is performance.now() at the press); false skips the hold. */
     shouldFire?: (pressedAt: number) => boolean;
+    /**
+     * Also fire on the browser's own long-press (`contextmenu`). Chrome on
+     * Android can cancel the pointer for its link menu before our timer ends,
+     * and sends `contextmenu` instead; this catches that hold (review F14).
+     */
+    fireOnContextMenu?: boolean;
   } = {},
 ): LongPressHandlers {
-  const { enabled = true, ms = LONG_PRESS_MS } = opts;
+  const { enabled = true, ms = LONG_PRESS_MS, fireOnContextMenu = false } = opts;
   const timer = useRef<number | null>(null);
   const fired = useRef(false);
   const start = useRef<{ x: number; y: number } | null>(null);
@@ -104,6 +110,10 @@ export function useLongPress(
       onContextMenu: (e) => {
         // Mobile Safari and Chrome open their own menu on a long-press; we own the gesture.
         e.preventDefault();
+        if (!fireOnContextMenu || fired.current) return;
+        clear();
+        fired.current = true;
+        latest.current.onLongPress();
       },
       onClickCapture: (e) => {
         if (!fired.current) return;
@@ -112,5 +122,5 @@ export function useLongPress(
         e.stopPropagation();
       },
     };
-  }, [enabled, ms, clear]);
+  }, [enabled, ms, fireOnContextMenu, clear]);
 }

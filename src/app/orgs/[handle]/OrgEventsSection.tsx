@@ -4,6 +4,7 @@ import { useState } from "react";
 
 import { CreateEventModal, type EligibleOrg, EventCard } from "@/app/campus/campus-home";
 import { LoadFailed } from "@/components/feedback/LoadFailed";
+import { useHideTabBar } from "@/lib/chat/use-hide-tabbar";
 
 import { useClubEvents } from "./club-page/ClubEventsProvider";
 import { LinkedFlash, LinkedFocusStyle, useLinkedEvent } from "./linked-event";
@@ -165,6 +166,7 @@ export function OrgEventsSection({
         </div>
       )}
 
+      {createOpen ? <HideTabBar /> : null}
       {createOpen ? (
         <CreateEventModal
           eligibleOrgs={
@@ -187,6 +189,16 @@ export function OrgEventsSection({
       ) : null}
     </section>
   );
+}
+
+/**
+ * The event form portals out of the page, past the `.vibe-tabbar-page
+ * :has([aria-modal])` rule, so the phone tab bar would sit over its footer;
+ * while it's open the bar is hidden by hand, as the + sheet's form does.
+ */
+function HideTabBar(): null {
+  useHideTabBar();
+  return null;
 }
 
 function Skeleton() {

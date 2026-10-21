@@ -496,27 +496,33 @@ export default async function OrgProfilePage({ params }: Params) {
 
   return (
     <main
-      // Dark in Light and Night alike (the club's own backdrop), so the
-      // page takes Night's tokens as an island (globals.css).
-      className={`${user ? "vibe-tabbar-page vibe-mobile-safe-top" : "vibe-mobile-safe-top"} vibe-night-island`}
+      className={user ? "vibe-tabbar-page vibe-mobile-safe-top" : "vibe-mobile-safe-top"}
       style={{
         minHeight: "100vh",
         background: backdrop,
         backgroundAttachment: "fixed",
-        color: "var(--charcoal)",
         fontFamily: "DM Sans, sans-serif",
       }}
     >
       <div
-        className="vibe-org-shell"
-        // One centred column; the owner and officers get room for the
-        // Club tools column on a wide screen.
-        style={{ maxWidth: officerRole ? 1100 : 760, margin: "0 auto", padding: "0 24px 64px" }}
+        // Dark in Light and Night alike (the club's own backdrop), so the
+        // page's content takes Night's tokens as an island (globals.css).
+        // The island stops here, not at <main>, so the phone tab bar below
+        // keeps the app's own theme, cream in Light, as on every other page
+        // (review F4). One centred column; the owner and officers get room
+        // for the Club tools column on a wide screen.
+        className="vibe-org-shell vibe-night-island"
+        style={{
+          maxWidth: officerRole ? 1100 : 760,
+          margin: "0 auto",
+          padding: "0 24px 64px",
+          color: "var(--charcoal)",
+        }}
       >
         <TopNav signedIn={!!user} backHref={backHref} />
 
         <ClubCover org={org}>
-          {officerRole && !org.hidden ? (
+          {officerRole ? (
             <CoverOfficerButtons
               orgId={org.id}
               orgHandle={org.handle}
@@ -524,6 +530,7 @@ export default async function OrgProfilePage({ params }: Params) {
               verified={org.verified}
               viewerRole={officerRole}
               boardId={boardFacts.boardId}
+              hidden={org.hidden}
             />
           ) : null}
         </ClubCover>
@@ -604,7 +611,7 @@ export default async function OrgProfilePage({ params }: Params) {
 
             {/* Up next and the Events tab read one list, fetched once. */}
             <ClubEventsProvider orgId={org.id} rsvpAtHomeOnly={visiting} renderKey={nowMs}>
-              <UpNext officerHint={!!officerRole && !org.hidden} />
+              <UpNext officerHint={!!officerRole && !org.hidden} canPostEvents={org.verified} />
               <OrgContent
                 posts={
                   postsErr ? (

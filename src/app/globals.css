@@ -2547,10 +2547,10 @@ html {
   flex: 1 1 0;
   min-width: 0;
 }
-/* The join control (OrgJoinControl, header variant) fills its half
+/* The join control (OrgJoinControl, header variant) fills its slot
    instead of hugging the right edge, as it did beside the old header. */
 .vibe-club-join > * {
-  justify-content: stretch !important;
+  justify-content: flex-start !important;
 }
 /* It often holds two actions (Following and Joined, Follow and Request to
    join): they sit side by side, sharing the slot, which takes the row but
@@ -2568,6 +2568,8 @@ html {
 .vibe-club-join > * > * {
   flex: 1 1 0;
   min-width: 0;
+  /* Its columns stop at 280px beside the old header; here they share the row. */
+  max-width: none !important;
 }
 .vibe-club-join > * > * button {
   width: 100%;

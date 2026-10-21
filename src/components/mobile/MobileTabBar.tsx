@@ -159,7 +159,7 @@ export function MobileTabBar() {
   }, [activeHref]);
 
   const [switcherOpen, setSwitcherOpen] = useState(false);
-  const hold = useLongPress(() => setSwitcherOpen(true));
+  const hold = useLongPress(() => setSwitcherOpen(true), { fireOnContextMenu: true });
   // Only a switched tab asks (cached two minutes), for the dot.
   const runs = useClubsYouRun(switched !== null);
   const needsYou = runs.status === "ok" && runs.clubs.some((c) => (c.requests ?? 0) > 0);

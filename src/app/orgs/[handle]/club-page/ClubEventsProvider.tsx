@@ -174,7 +174,15 @@ export function ClubEventsProvider({
       },
       update: (next, from) => {
         seqRef.current += 1;
-        setEvents((prev) => (prev ? prev.map((e) => (e.id === next.id ? next : e)) : prev));
+        // An edit can move an event's time, so the list is put back in time
+        // order and Up next is always the soonest one (review F9).
+        setEvents((prev) =>
+          prev
+            ? prev
+                .map((e) => (e.id === next.id ? next : e))
+                .sort((a, b) => Date.parse(a.starts_at) - Date.parse(b.starts_at))
+            : prev,
+        );
         bumpOther(from);
       },
       rev,

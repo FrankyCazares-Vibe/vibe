@@ -163,6 +163,7 @@ export function CoverOfficerButtons({
   verified,
   viewerRole,
   boardId,
+  hidden = false,
 }: {
   orgId: string;
   orgHandle: string;
@@ -170,6 +171,12 @@ export function CoverOfficerButtons({
   verified: boolean;
   viewerRole: "owner" | "admin";
   boardId: string | null;
+  /**
+   * A club Vibe hid: no + (nothing new goes on it, as the officer bar had no
+   * New post there), but Club tools stays, or its officers couldn't reach
+   * the members, the officers or Leave on a phone (review F5).
+   */
+  hidden?: boolean;
 }): JSX.Element {
   const [plusOpen, setPlusOpen] = useState(false);
   const plusRef = useRef<HTMLButtonElement | null>(null);
@@ -182,21 +189,23 @@ export function CoverOfficerButtons({
   return (
     <>
       <div className="vibe-club-cover-actions" style={{ display: "flex", gap: 4 }}>
-        <button
-          type="button"
-          className="vibe-press"
-          ref={plusRef}
-          aria-label="Post"
-          aria-haspopup="dialog"
-          onClick={() => setPlusOpen(true)}
-          style={roundHitStyle}
-        >
-          <span aria-hidden style={roundFaceStyle}>
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
-              <path d="M12 5v14M5 12h14" />
-            </svg>
-          </span>
-        </button>
+        {hidden ? null : (
+          <button
+            type="button"
+            className="vibe-press"
+            ref={plusRef}
+            aria-label="Post"
+            aria-haspopup="dialog"
+            onClick={() => setPlusOpen(true)}
+            style={roundHitStyle}
+          >
+            <span aria-hidden style={roundFaceStyle}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
+                <path d="M12 5v14M5 12h14" />
+              </svg>
+            </span>
+          </button>
+        )}
         <Link
           href={`/orgs/${encodeURIComponent(orgHandle)}/tools`}
           className="vibe-press"
