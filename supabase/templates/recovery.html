@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vibe password reset request</title>
+</head>
+<!--
+  A notice, not a reset (pre-registration fix, October 2026). Supabase sends
+  this when anyone asks its own reset endpoint for an address, confirmed or
+  not. Vibe never asks it to: the app's Forgot password makes its own link
+  and sends it through Resend (src/app/api/auth/password-reset). So this email
+  carries no link and no code, on purpose. With one, a stranger could ask for
+  it, and the student or a mail scanner opening it would confirm an account
+  someone else made (a reset code confirms an unconfirmed email).
+  - No variables except {{ .Email }}. No web fonts, no images, nothing fetched.
+  The same text is the whole message. Keep it this small.
+  The dashboard copy (Supabase > Authentication > Emails > Reset password) must
+  be this file, with the subject:  Vibe password reset request
+-->
+<body style="margin:0;padding:24px;background:#ffffff;font-family:-apple-system,'Segoe UI',Helvetica,Arial,sans-serif;font-size:16px;line-height:24px;color:#1c1c1e;">
+<p style="margin:0 0 16px;">Someone asked to reset the Vibe password for {{ .Email }}. Vibe does not do that from this email.</p>
+<p style="margin:0 0 16px;">To reset yours, open Vibe, tap Log in, then tap "Forgot?" next to Password.</p>
+<p style="margin:0;color:#5a564f;font-size:14px;line-height:21px;">Did not ask? Ignore this email. Nothing changes.</p>
+</body>
+</html>

@@ -84,7 +84,14 @@ export function Sections1To3() {
         (a wave), it also asks for the access code we emailed you. Signing up
         through a club link needs no access code (
         <Sec to="11">section 11</Sec>). We email a code to your school email. Typing it confirms your account and verifies
-        your school email in one step, and you then set up a profile. Some
+        your school email in one step. The password that works is the one
+        chosen by the person who types the code, so confirming removes any
+        password set for your address before then. If you type the code on
+        the page where you just typed your password (the sign-up page or Log
+        in), Vibe sets that password again at once. If you confirm anywhere
+        else, Vibe asks you to choose a password. Unless you confirm on the
+        sign-up page, Vibe also asks you to check the box again. You then set
+        up a profile. Some
         accounts sign in with a different email and verify a school email as a
         separate step: accounts made before sign-up worked this way, and a few
         that we add ourselves.
@@ -129,7 +136,9 @@ export function Sections1To3() {
         <li>
           <strong>Password.</strong> We never store the password itself.
           Supabase, the company that runs our sign-in, stores a scrambled
-          version that cannot be read back.
+          version that cannot be read back. When confirming your email
+          removes a password, we note the time until you have chosen one and
+          accepted the Terms.
         </li>
         <li>
           <strong>Starter name.</strong> If you made your account before

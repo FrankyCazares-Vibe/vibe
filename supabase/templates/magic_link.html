@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vibe sign-in request</title>
+</head>
+<!--
+  A notice, not a sign-in link (pre-registration fix, October 2026). Supabase
+  sends this when anyone asks its own one-time sign-in endpoint for an address
+  whose account is already confirmed (an unconfirmed one gets the code email,
+  confirmation.html, instead). Vibe never signs in that way: it is email and
+  password, and the app never asks for a magic link. So this email carries no
+  link and no code, on purpose. With one, a stranger could ask for it, and a
+  mail scanner opening it would spend it, or a link to a page the stranger
+  runs would hand them a signed-in session.
+  - No variables except {{ .Email }}. No web fonts, no images, nothing fetched.
+  The same text is the whole message. Keep it this small.
+  The dashboard copy (Supabase > Authentication > Emails > Magic link) must be
+  this file, with the subject:  Vibe sign-in request
+-->
+<body style="margin:0;padding:24px;background:#ffffff;font-family:-apple-system,'Segoe UI',Helvetica,Arial,sans-serif;font-size:16px;line-height:24px;color:#1c1c1e;">
+<p style="margin:0 0 16px;">Someone asked for a sign-in link for {{ .Email }}. Vibe does not sign in that way.</p>
+<p style="margin:0 0 16px;">Open Vibe, tap Log in and use your password. If you do not remember it, tap "Forgot?" next to Password.</p>
+<p style="margin:0;color:#5a564f;font-size:14px;line-height:21px;">Did not ask? Ignore this email. Nothing changes.</p>
+</body>
+</html>

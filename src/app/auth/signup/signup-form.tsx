@@ -23,9 +23,11 @@ import {
   isCaptchaError,
   type HumanCheck,
 } from "@/lib/auth/captcha";
+import { choosePasswordHref } from "@/lib/auth/choose-password-path";
 import {
   getAuthEmailCallbackUrl,
   getBrowserSiteOrigin,
+  POST_EMAIL_CONFIRM_PATH,
 } from "@/lib/auth/email-confirm-redirect";
 import { parseRetryAfterSeconds } from "@/lib/auth/email-link-errors";
 import {
@@ -212,13 +214,6 @@ export function SignupForm({
   const [maybeExisting, setMaybeExisting] = useState(false);
   const [pending, setPending] = useState<PendingSignup | null>(null);
   const submitting = useRef(false);
-  // The address already had an unconfirmed account before this sign-up (or
-  // we can't tell). GoTrue keeps that account's password, which whoever
-  // signed up first chose, and only sends the code again; so once the code
-  // proves this person holds the inbox, the password typed here replaces it
-  // (wave 1 security pass F3, Oct 20 2026: a club link let anyone start an
-  // account for a school address while sign-up is closed).
-  const reclaimPassword = useRef(false);
   const [accessCode, setAccessCode] = useState(initialAccessCode);
   // Shown when closed, and also when the gate refused a page that thought
   // sign-up was open (the switch changed since it loaded).
@@ -385,9 +380,6 @@ export function SignupForm({
             // confirmation email in the last minute, so show the pending
             // view for it. GoTrue truncates, so it can say 0; clamp to 1.
             const sec = Math.max(1, retryAfter);
-            // Someone signed this address up in the last minute: maybe not
-            // this person, so their password wins once the code is in.
-            reclaimPassword.current = true;
             rememberPendingSignup(address);
             setPending({
               email: address,
@@ -424,12 +416,6 @@ export function SignupForm({
         setMaybeExisting(true);
         return;
       }
-      // A new account has its confirmation sent the moment it is made; an
-      // older unconfirmed one gets it now, long after it was made.
-      const madeAt = Date.parse(data.user?.created_at ?? "");
-      const sentAt = Date.parse(data.user?.confirmation_sent_at ?? "");
-      reclaimPassword.current =
-        !Number.isFinite(madeAt) || !Number.isFinite(sentAt) || sentAt - madeAt > 60_000;
       rememberPendingSignup(address);
       setPending({
         email: address,
@@ -458,8 +444,12 @@ export function SignupForm({
   }
 
   if (pending) {
+    // `data-holds-reload`: this view and the password typed for it live only
+    // in memory, with the code box often empty while the student is in their
+    // inbox. /auth is a quiet path already; the club link (/c/<code>) draws
+    // this same form and is not, so a new build's reload would drop both.
     return (
-      <div className="vibe-auth-page">
+      <div className="vibe-auth-page" data-holds-reload="">
         <Link href="/" className="vibe-auth-back">
           <Arrow direction="left" /> back
         </Link>
@@ -496,13 +486,39 @@ export function SignupForm({
           <ConfirmCodeForm
             initialEmail={pending.email}
             askEmail={false}
+            // Pre-registration fix (Oct 2026): the first confirmation of an
+            // address removes its stored password, because whoever chose it
+            // had not proven the inbox (anyone can start a sign-up for any
+            // address). The code just proved this person holds it, so the
+            // password typed here goes back on, every time, and only then is
+            // the box ticked here recorded again: consent always means a
+            // password chosen after the inbox was proven. A failed save sends
+            // them to the choose screen, which asks for it once more.
             onConfirmed={async () => {
-              if (!reclaimPassword.current || !password) return;
-              // A fresh session from the code: Vibe asks for no re-check and
-              // sends no "password changed" email (risk report, Oct 8).
+              // Not reachable today (the form needs a password to get here);
+              // kept so a later path into this view still ends with one.
+              if (!password) return choosePasswordHref(POST_EMAIL_CONFIRM_PATH);
+              // A session the code minted a moment ago: GoTrue's "Secure
+              // password change" re-check is only for a session over 24 hours
+              // old. The "password changed" email must stay off through
+              // launch: it has no first-password check, so every new student
+              // would get one right here.
               const { error: pwErr } = await getSupabaseBrowserClient().auth.updateUser({ password });
-              if (pwErr && pwErr.code !== "same_password") {
+              if (pwErr) {
+                // Already the stored password: nothing was removed (the
+                // database change is not live yet) or another tab saved it
+                // first. The tick made at sign-up stands either way.
+                if (pwErr.code === "same_password") return;
                 console.warn("[signup] could not set the password after confirming", pwErr.code ?? pwErr.status);
+                return choosePasswordHref(POST_EMAIL_CONFIRM_PATH, { again: true });
+              }
+              if (agreed) {
+                // A failure here only means /auth/terms asks once.
+                await fetch("/api/me/accept-terms", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ terms_version: TERMS_VERSION }),
+                }).catch(() => undefined);
               }
             }}
           />
@@ -734,7 +750,12 @@ export function SignupForm({
               role="status"
               className="vibe-auth-banner vibe-auth-banner--info"
             >
-              <strong>This email may already have an account.</strong>
+              {/* Also what a person sees when someone else started an account
+                  for their address and it was confirmed without them (a mail
+                  scanner opening a reset link): no password works then, and
+                  a reset sent to the inbox is the way in. */}
+              <strong>This email may already have an account.</strong>{" "}
+              Never made one? Forgot password sends a reset to this inbox.
               <span
                 style={{
                   display: "flex",

@@ -241,14 +241,37 @@ otp_expiry = 3600
 # admin_email = "admin@email.com"
 # sender_name = "Admin"
 
-# "Confirm your Vibe account". Links to the tap-to-confirm /auth/confirm page
-# with {{ .TokenHash }} and prints the 8-digit {{ .Token }}; it must never use
-# {{ .ConfirmationURL }}, which a link scanner's GET burns. Production's copy
-# is pasted into the dashboard from this file; the version it replaced is
-# kept in confirmation.previous.html for rollback.
+# "<code> is your Vibe code" (school email first, Oct 8 2026). It prints the
+# 8-digit {{ .Token }} and nothing to tap: no link, no {{ .TokenHash }}, and
+# never {{ .ConfirmationURL }} (a link scanner's GET burns it, and a link sent
+# with a stranger's redirect_to could hand them a session). Production's copy
+# is pasted into the dashboard from this file (Authentication > Emails >
+# Confirm signup); read it back there after any change. The Sept 15 email it
+# replaced, which had a tap-to-confirm /auth/confirm link, is kept in
+# confirmation.previous.html for rollback.
 [auth.email.template.confirmation]
 subject = "{{ .Token }} is your Vibe code"
 content_path = "./supabase/templates/confirmation.html"
+
+# Reset password and Magic link are notices with no link and no code
+# (pre-registration fix, Oct 2026). The app never asks Supabase to send either:
+# Forgot password is admin generateLink + Resend, and sign-in is email and
+# password. A link or code in them would let a stranger who asks Supabase's
+# public /recover or /otp for an address confirm someone else's pending account,
+# or get a session through a scanner's click. Production's copies are pasted
+# into the dashboard from these files (Reset password, Magic link). Local takes
+# them on the next stack restart; do not restart the shared stack just for this.
+# Once pasted, the dashboard's own "Send password recovery" and "Send magic
+# link" buttons (Authentication > Users) send only these notices: to help a
+# student who cannot log in, send them to Log in > "Forgot?" in the app. The
+# Privacy Policy lists both notices (section 4); change it if they change.
+[auth.email.template.recovery]
+subject = "Vibe password reset request"
+content_path = "./supabase/templates/recovery.html"
+
+[auth.email.template.magic_link]
+subject = "Vibe sign-in request"
+content_path = "./supabase/templates/magic_link.html"
 
 # Uncomment to customize email template
 # [auth.email.template.invite]

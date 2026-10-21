@@ -46,8 +46,11 @@ export function Sections11To15() {
       <LegalP>
         When you check the box at sign-up we record the{" "}
         <PageLink href="/legal/terms">Terms</PageLink> version and the time on
-        our server. We also record that you confirmed you are 18 or older, and
-        which screen you accepted on. The record is deleted with your account.
+        our server, and we record it again once you confirm your email, because
+        only then do we know the box was checked by the person who reads that
+        inbox. We also record that you confirmed you are 18 or older, and
+        whether you accepted at sign-up, after confirming your email or on a
+        later screen. The record is deleted with your account.
       </LegalP>
       <LegalP>
         <strong>One version.</strong> Your checkbox covers the{" "}

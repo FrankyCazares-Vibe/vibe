@@ -19,6 +19,8 @@ import {
   isCaptchaError,
   type HumanCheck,
 } from "@/lib/auth/captcha";
+import { choosePasswordHref } from "@/lib/auth/choose-password-path";
+import { POST_EMAIL_CONFIRM_PATH } from "@/lib/auth/email-confirm-redirect";
 import { getPostLoginDestination } from "@/lib/auth/post-login";
 import { sanitizeLoginNextParam } from "@/lib/auth/login-next";
 import { readPendingSignupEmail } from "@/lib/auth/pending-signup";
@@ -95,6 +97,12 @@ function LoginForm() {
   const [unconfirmedEmail, setUnconfirmedEmail] = useState<string | null>(
     null,
   );
+  // The password that sign-in was typed with. GoTrue answers "email not
+  // confirmed" only when the typed password matched the stored one (it
+  // checks the password first), and the code below proves the inbox; so
+  // once the code is in, this password is put back on: the first
+  // confirmation removed the stored one (pre-registration fix, Oct 2026).
+  const matchedPassword = useRef("");
   const [signedIn, setSignedIn] = useState<{ email: string | null } | null>(
     null,
   );
@@ -172,12 +180,13 @@ function LoginForm() {
           options: captchaOptions(human),
         });
       if (signErr) {
-        setUnconfirmedEmail(
-          signErr.code === "email_not_confirmed" ? address : null,
-        );
+        const unconfirmed = signErr.code === "email_not_confirmed";
+        matchedPassword.current = unconfirmed ? password : "";
+        setUnconfirmedEmail(unconfirmed ? address : null);
         setError(signInErrorMessage(signErr, human));
         return;
       }
+      matchedPassword.current = "";
       if (!signData.session) {
         setUnconfirmedEmail(null);
         setError(SOMETHING_WENT_WRONG);
@@ -377,7 +386,23 @@ function LoginForm() {
           <div key={unconfirmedEmail} className="vibe-auth-recovery">
             {/* Code first, resend under it: a failed code says "send a new
                 email below", same order as signup's pending view. */}
-            <ConfirmCodeForm initialEmail={unconfirmedEmail} askEmail={false} />
+            <ConfirmCodeForm
+              initialEmail={unconfirmedEmail}
+              askEmail={false}
+              // No consent call here: no box was ticked on this page, so
+              // /auth/terms asks once on the way in.
+              onConfirmed={async () => {
+                const pw = matchedPassword.current;
+                if (!pw) return;
+                const { error: pwErr } = await getSupabaseBrowserClient().auth.updateUser({ password: pw });
+                // `same_password`: still stored (the database change is not
+                // live yet, or another tab put it back first).
+                if (pwErr && pwErr.code !== "same_password") {
+                  console.warn("[login] could not set the password after confirming", pwErr.code ?? pwErr.status);
+                  return choosePasswordHref(POST_EMAIL_CONFIRM_PATH, { again: true });
+                }
+              }}
+            />
             <ResendConfirmation initialEmail={unconfirmedEmail} />
           </div>
         ) : null}

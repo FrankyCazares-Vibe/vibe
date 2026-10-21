@@ -23,10 +23,12 @@ export function Sections4To5() {
       </LegalP>
       <LegalP>
         <strong>Emails.</strong> The automatic emails Vibe sends you are these
-        eight: to confirm your account, reset your password, tell you which
-        email your account signs in with, verify your school email, confirm a
+        ten: to confirm your account, reset your password, tell you which email
+        your account signs in with, verify your school email, confirm a
         personal email you add, check once a year that you still have your
-        school inbox, confirm your waitlist spot and send your access code. The
+        school inbox, confirm your waitlist spot, send your access code, and
+        two that tell you someone asked Supabase, the company that runs our
+        sign-in, to reset your password or to send you a sign-in link. The
         third one can be sent when someone types your school email or your
         personal email into the Forgot password form and your account signs in
         with a different email. It goes only to the address that was typed, at
@@ -34,12 +36,14 @@ export function Sections4To5() {
         character of your sign-in email and the part after the @ (for example
         g•••@gmail.com). The screen shows the same sentence whether or not the
         address belongs to an account. An account that is suspended or banned
-        is not sent it. A person on
+        is not sent it. The last two are sent when someone asks Supabase
+        directly, not through Vibe. Vibe itself never asks for either: the
+        second email above is how Vibe resets a password. A person on
         the Vibe team may also write to you. They may answer you, write about a
         report, your account or a club you run, or tell you something you need
         to know. Examples are a security problem or a change to this policy.
-        Vibe sends no bulk marketing email and no email about activity on your
-        account.
+        Vibe sends no bulk marketing email, and no other email about activity
+        on your account.
       </LegalP>
       <LegalP>
         <strong>What we do not do.</strong> We do not:

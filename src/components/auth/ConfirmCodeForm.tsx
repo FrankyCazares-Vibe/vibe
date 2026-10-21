@@ -9,6 +9,7 @@ import {
   classifyEmailLinkProblem,
   type EmailLinkProblem,
 } from "@/lib/auth/email-link-errors";
+import { isSafeRelativePath } from "@/lib/auth/login-next";
 import { clearPendingSignup } from "@/lib/auth/pending-signup";
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser";
 
@@ -33,6 +34,27 @@ function codeErrorMessage(
   }
   if (errorCode === "email_address_invalid") return ENTER_EMAIL;
   return SOMETHING_WRONG;
+}
+
+/**
+ * Where the page goes once the code has signed this browser in. The parent's
+ * `onConfirmed` runs first and may answer a page of its own (the choose
+ * screen, when its password did not save). Only a same-origin path replaces
+ * POST_EMAIL_CONFIRM_PATH; nothing, anything else, or a throw keeps it, so a
+ * parent's failure never stands in the way of a confirmed account.
+ */
+async function destinationAfterConfirm(
+  onConfirmed: (() => Promise<string | void>) | undefined,
+): Promise<string> {
+  if (!onConfirmed) return POST_EMAIL_CONFIRM_PATH;
+  try {
+    const answer = await onConfirmed();
+    return typeof answer === "string" && isSafeRelativePath(answer)
+      ? answer
+      : POST_EMAIL_CONFIRM_PATH;
+  } catch {
+    return POST_EMAIL_CONFIRM_PATH;
+  }
 }
 
 /**
@@ -61,11 +83,14 @@ export function ConfirmCodeForm({
   askEmail?: boolean;
   hideEmailField?: boolean;
   /**
-   * Runs once the code has signed this browser in, before the page moves on
-   * (sign-up's pending view: the password typed there replaces one an
-   * earlier, unconfirmed sign-up set). Its failure never stops the page.
+   * Runs once the code has signed this browser in, before the page moves on,
+   * and also when another tab of this browser confirmed first. The sign-up
+   * page and the login code box use it to put back the password typed on
+   * that page: the first confirmation removed the stored one (pre-registration
+   * fix, Oct 2026). It may answer a same-origin path to go to instead of the
+   * usual next step. Its failure never stops the page.
    */
-  onConfirmed?: () => Promise<void>;
+  onConfirmed?: () => Promise<string | void>;
 }): JSX.Element {
   const seedEmail = initialEmail?.trim() ?? "";
   const askForEmail =
@@ -129,6 +154,9 @@ export function ConfirmCodeForm({
         // spent, but this browser is signed in as that same, now-confirmed
         // account, so just carry on. Any other session (a roommate's laptop,
         // a second account) must not turn a wrong code into a success.
+        // `onConfirmed` runs here too: if that tab confirmed somewhere that
+        // holds no password (/auth/confirm), the one typed on this page is
+        // the only one there is.
         if (!networkError) {
           const { data: current } = await supabase.auth.getSession();
           const signedIn = current.session?.user;
@@ -138,7 +166,7 @@ export function ConfirmCodeForm({
           ) {
             leaving = true;
             clearPendingSignup();
-            window.location.assign(POST_EMAIL_CONFIRM_PATH);
+            window.location.assign(await destinationAfterConfirm(onConfirmed));
             return;
           }
         }
@@ -156,13 +184,6 @@ export function ConfirmCodeForm({
       }
       leaving = true;
       clearPendingSignup();
-      if (data.session && onConfirmed) {
-        try {
-          await onConfirmed();
-        } catch {
-          // Never in the way of a confirmed account.
-        }
-      }
       if (!data.session) {
         // Confirmed, but no session came back: let them sign in.
         window.location.assign(
@@ -171,7 +192,7 @@ export function ConfirmCodeForm({
         return;
       }
       // Full navigation so the proxy sees the new auth cookies.
-      window.location.assign(POST_EMAIL_CONFIRM_PATH);
+      window.location.assign(await destinationAfterConfirm(onConfirmed));
     } catch {
       setError(EMAIL_LINK_COPY.offline.body);
     } finally {

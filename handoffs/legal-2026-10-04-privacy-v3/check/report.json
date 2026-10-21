@@ -3,9 +3,9 @@
   "url": "http://localhost:3100/legal/privacy",
   "md": "handoffs/legal-2026-10-04-privacy-v3/privacy-policy-final.md",
   "counts": {
-    "mdSentences": 1281,
-    "pageSentences": 1281,
-    "same": 1281,
+    "mdSentences": 1289,
+    "pageSentences": 1289,
+    "same": 1289,
     "mentions": 108,
     "dates": {
       "October 5, 2026": 8,
