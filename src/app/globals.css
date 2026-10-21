@@ -2603,11 +2603,22 @@ html {
   outline-offset: -2px;
 }
 /* The left menu's profile card clips its overflow (rounded corners), so the
-   profile link inside it draws its keyboard ring inside, or it is cut off
-   (nav-identity-chip.tsx, Oct 21, 2026). */
-.vibe-identity-me:focus-visible {
+   profile link and the "Your clubs" row inside it draw their keyboard ring
+   inside, or it is cut off (nav-identity-chip.tsx, YourClubsMenu.tsx,
+   Oct 21, 2026). The floating club list's lines do the same. */
+.vibe-identity-me:focus-visible,
+.vibe-clubs-toggle:focus-visible,
+.vibe-clubs-row:focus-visible {
   outline: 2px solid var(--coral);
   outline-offset: -2px;
+}
+.vibe-clubs-toggle {
+  background: none;
+}
+.vibe-clubs-toggle:hover,
+.vibe-clubs-toggle[aria-expanded="true"],
+.vibe-clubs-row:hover {
+  background: var(--row-hover);
 }
 /* The tab panel spaces its cards; a card's own top margin from its old
    spot on the page (the Board card's) would double it. */

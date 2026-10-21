@@ -142,3 +142,16 @@ Shipped from the wave 1 session (`busy-aryabhata-7b6991`); this branch's own ses
   the card (`.vibe-identity-me:focus-visible`); the school strip lets clicks through. Reviewed by three lenses with
   a skeptic per finding (three fixed: clubs waiting on the profile read, the clipped focus ring, the strip's dead
   click zone); tsc clean, 3,721 tests pass; checked locally at 910px in Night and Light, and in a 520px-tall window.
+- **Later still, Oct 21 (Franky: two clubs already pushed the calendar out of view; members want a quick way to
+  their club's page too):** the in-card list became one "Your clubs" row (the label, up to three stacked logos and
+  "+N", a coral badge while a club you run has join requests, a chevron) that opens a list floating over the
+  calendar with a spring (opacity and transform only, reduced motion respected): "Clubs you run", then "Clubs
+  you're in". New light read `GET /api/me/clubs-in` (your plain memberships, hidden clubs left out, 60/min, a
+  two-minute page-memory cache in `src/lib/orgs/clubs-in.ts`, never browser storage). The card is the same height
+  however many clubs (147px with any). Each opening asks both lists fresh; Club settings' leave and delete clear
+  both. `src/components/orgs/ClubsYouRunNav.tsx` is gone (`YourClubsMenu.tsx`). No Privacy Policy change: it shows
+  you only your own memberships, which the app already holds and shows you on your profile. Reviewed by three
+  lenses with a skeptic per finding; nine fixed (Tab from the row into the list, closing on focus elsewhere or an
+  iframe, only the menu or page scrolling closes it, the fading list catches no clicks, labelled groups, the last
+  answer holds the row's place between pages, fresh on open, hover). tsc clean, 3,730 tests pass, walked headless at
+  1280x800 in Night, Light and reduced motion.

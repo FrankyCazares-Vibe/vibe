@@ -28,6 +28,7 @@ import { busyStyle, inputStyle, lineStyle, pillStyle, quietStyle } from "@/compo
 import { vibeRequest } from "@/lib/feedback/request";
 import { toast } from "@/lib/feedback/toast";
 import { clearClubsYouRunCache, readSwitchedClub, sameHandle, setSwitchedClub } from "@/lib/orgs/club-switch";
+import { clearClubsInCache } from "@/lib/orgs/clubs-in";
 import { ORG_COPY, fillCopy, orgErrorCopy } from "@/lib/orgs/join-copy";
 
 import { ConfirmSheet, Group, SheetAction, ToolSheet, cardStyle } from "./tools-ui";
@@ -183,6 +184,7 @@ function LeaveClub({ club }: { club: ToolsClub }) {
     // No longer an officer: the Profile tab goes back to you, and the menus ask again.
     if (sameHandle(readSwitchedClub()?.handle, club.handle)) setSwitchedClub(null);
     clearClubsYouRunCache();
+    clearClubsInCache();
     toast({
       message: fillCopy(r.data.org_follow_state === "following" ? ORG_COPY.menu.leftFollowing : ORG_COPY.menu.left, vars),
       tone: "info",
@@ -235,6 +237,7 @@ function DeleteClub({ club }: { club: ToolsClub }) {
     // (review F2), or they'd open a page that no longer exists.
     if (sameHandle(readSwitchedClub()?.handle, club.handle)) setSwitchedClub(null);
     clearClubsYouRunCache();
+    clearClubsInCache();
     toast({ message: `${club.name} was deleted.`, tone: "info" });
     router.replace("/campus?tab=orgs");
   };

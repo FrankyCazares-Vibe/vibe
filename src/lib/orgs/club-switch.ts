@@ -218,6 +218,15 @@ function writeCache(clubs: ClubYouRun[]): void {
   memo = { at: Date.now(), clubs };
 }
 
+/**
+ * The last answer even past its two minutes, or null once cleared. Only for
+ * showing something while a fresh ask runs (the desktop "Your clubs" row
+ * keeps its place between pages instead of vanishing and coming back).
+ */
+export function readClubsYouRunLast(): ClubYouRun[] | null {
+  return memo ? memo.clubs : null;
+}
+
 /** Forget the cached clubs (a switch, a signed-out answer); the next reader asks the route. */
 export function clearClubsYouRunCache(): void {
   memo = null;

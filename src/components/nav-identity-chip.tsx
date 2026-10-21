@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
-import { ClubsYouRunNav } from "@/components/orgs/ClubsYouRunNav";
+import { YourClubsMenu } from "@/components/orgs/YourClubsMenu";
 import { campusRowById } from "@/lib/iu/campuses";
 import { schoolStripBackground } from "@/lib/iu/school-colors";
 import { resolveCoverThemeCss } from "@/lib/profile/cover-themes";
@@ -168,12 +168,12 @@ export function NavIdentityChip() {
     };
   }, []);
 
-  // One frame in every state (Oct 21, 2026): the clubs I run sit inside the
-  // card under my name, and a link can't hold other links, so the card is a
-  // frame holding the profile link, then the clubs. The clubs stay the
-  // frame's last child in every state, so they come from their own cache at
-  // once and never wait for (or depend on) the profile read. The frame keeps
-  // the id the campus tour points at.
+  // One frame in every state (Oct 21, 2026): "Your clubs" sits inside the
+  // card under my name, and a link can't hold a button, so the card is a
+  // frame holding the profile link, then the clubs row. The row stays the
+  // frame's last child in every state, so it comes from its own caches at
+  // once and never waits for (or depends on) the profile read. The frame
+  // keeps the id the campus tour points at.
   let me: React.ReactNode;
   if (chip.status === "loading") {
     me = (
@@ -372,7 +372,7 @@ export function NavIdentityChip() {
     <div id="nav-identity-chip" style={cardShell}>
       <SchoolStrip paint={chip.status === "ready" ? chip.strip : null} />
       {me}
-      <ClubsYouRunNav />
+      <YourClubsMenu />
     </div>
   );
 }
