@@ -55,10 +55,17 @@ export function ConfirmCodeForm({
   initialEmail,
   askEmail,
   hideEmailField,
+  onConfirmed,
 }: {
   initialEmail?: string | null;
   askEmail?: boolean;
   hideEmailField?: boolean;
+  /**
+   * Runs once the code has signed this browser in, before the page moves on
+   * (sign-up's pending view: the password typed there replaces one an
+   * earlier, unconfirmed sign-up set). Its failure never stops the page.
+   */
+  onConfirmed?: () => Promise<void>;
 }): JSX.Element {
   const seedEmail = initialEmail?.trim() ?? "";
   const askForEmail =
@@ -149,6 +156,13 @@ export function ConfirmCodeForm({
       }
       leaving = true;
       clearPendingSignup();
+      if (data.session && onConfirmed) {
+        try {
+          await onConfirmed();
+        } catch {
+          // Never in the way of a confirmed account.
+        }
+      }
       if (!data.session) {
         // Confirmed, but no session came back: let them sign in.
         window.location.assign(

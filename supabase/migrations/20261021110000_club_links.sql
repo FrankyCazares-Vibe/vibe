@@ -232,9 +232,11 @@ $$;
 -- The row lock on the link makes two sign-ups at once wait for each other,
 -- so the last place goes once. GoTrue runs the gate outside the transaction
 -- that makes the user (20261003110000's header), so a place is taken here,
--- before the account exists; one whose address never got an account within
--- 15 minutes is given back, and so is one never tied to an account within
--- 30 days.
+-- before the account exists. Places given back (wave 1 security pass F1/F2):
+-- one whose address never got an account within 15 minutes; one whose
+-- address has only an account still unconfirmed a day later (a made-up or
+-- someone else's address can't hold a place, or a setup link, for good);
+-- and one never tied to an account within 30 days.
 create function auth_hooks.club_link_claim(p_code text, p_email text)
 returns text
 language plpgsql
@@ -291,13 +293,16 @@ begin
     return 'ok';
   end if;
 
-  -- Places given back.
+  -- Places given back: no account, or only one still unconfirmed after a day.
   delete from public.club_link_uses u
    where u.link_id = l.id
      and u.user_id is null
      and u.claimed_email is not null
      and ((u.claimed_at < now() - interval '15 minutes'
-           and not exists (select 1 from auth.users au where lower(au.email) = u.claimed_email))
+           and not exists (select 1 from auth.users au
+                            where lower(au.email) = u.claimed_email
+                              and (au.email_confirmed_at is not null
+                                   or au.created_at > now() - interval '24 hours')))
           or u.claimed_at < now() - interval '30 days');
 
   select count(*) into n
@@ -307,12 +312,15 @@ begin
     if l.kind = 'members' then
       return 'full';
     end if;
-    -- A setup link: held by another address. Used, if that address has an
-    -- account (or the place is already tied to one); in use, if not yet.
+    -- A setup link: held by another address. Used, if that address has a
+    -- confirmed account (or the place is already tied to one); in use, if
+    -- not yet.
     if exists (select 1 from public.club_link_uses u
                 where u.link_id = l.id
                   and (u.user_id is not null
-                       or exists (select 1 from auth.users au where lower(au.email) = u.claimed_email))) then
+                       or exists (select 1 from auth.users au
+                                   where lower(au.email) = u.claimed_email
+                                     and au.email_confirmed_at is not null))) then
       return 'used';
     end if;
     return 'in_use';
@@ -379,7 +387,8 @@ begin
   end if;
 
   -- Another address's sign-up holds the link: live (under 15 minutes), or
-  -- that address has an account, or the place is tied to another account.
+  -- that address has a confirmed account or one made in the last day, or
+  -- the place is tied to another account (the claim's give-back rules).
   if exists (
        select 1 from public.club_link_uses x
         where x.link_id = l.id
@@ -387,7 +396,10 @@ begin
           and x.claimed_email is distinct from v_email
           and (x.user_id is not null
                or x.claimed_at > now() - interval '15 minutes'
-               or exists (select 1 from auth.users au where lower(au.email) = x.claimed_email))) then
+               or exists (select 1 from auth.users au
+                           where lower(au.email) = x.claimed_email
+                             and (au.email_confirmed_at is not null
+                                  or au.created_at > now() - interval '24 hours')))) then
     return jsonb_build_object('ok', false, 'reason', 'in_use');
   end if;
 

@@ -26,7 +26,8 @@
 // account; C12 the REST API (anon and a signed-in user) can't read the
 // tables, run the two writers, or reach auth_hooks; C13 a stale place (20
 // minutes, no account) is given back; C14 deleting an account drops the
-// places its address still holds; C15 probe, no club code, no access code ->
+// places its address still holds; C16 a place held by an account still
+// unconfirmed a day later is given back; C15 probe, no club code, no access code ->
 // access_code_required, as before.
 //
 // About 20 sign-up / sign-in requests: GoTrue allows 30 per 5 minutes per IP
@@ -413,6 +414,25 @@ async function laterCases(link1, id1, member) {
   const uses14 = await uses(link14.id);
   check("C14 deleting a user drops its address's unbound place (and only that one)",
     uses14.length === 1 && uses14[0].claimed_email === school("c14ghost"), JSON.stringify(uses14));
+
+  // C16 (security pass F1/F2): a place held by an address whose account is
+  // still UNCONFIRMED a day later is given back; one confirmed, or made in
+  // the last day, still holds the link.
+  const link16 = await setupLink("s16");
+  const addr16 = school("c16stale");
+  const r16u = await admin.auth.admin.createUser({ email: addr16, password: PASSWORD, email_confirm: false, user_metadata: SIGNUP_META });
+  const id16 = must(r16u, "create the C16 unconfirmed user").user.id;
+  await holdPlace(link16.id, addr16, fromNow(-25 * 3_600_000));
+  const fresh16 = await signUp(school("c16a"), { club_code: link16.code });
+  check("C16 an unconfirmed account made just now still holds its setup link -> 403 club_link_in_use",
+    refusal(fresh16) === "club_link_in_use", describe(fresh16));
+  psql(`update auth.users set created_at = now() - interval '25 hours' where id = ${lit(id16)};`);
+  const r16 = await signUp(school("c16b"), { club_code: link16.code });
+  check("C16 ... the same account still unconfirmed 25 hours on -> its place is given back, a new address signs up",
+    !r16.error && Boolean(r16.data?.user?.id), describe(r16));
+  const uses16 = await uses(link16.id);
+  check("C16 ... the link's one place is the new address", uses16.length === 1 && uses16[0].claimed_email === school("c16b"),
+    JSON.stringify(uses16));
 
   // C15: the gate's old behaviour is intact.
   const r15 = await signUp(school("c15"));

@@ -212,6 +212,13 @@ export function SignupForm({
   const [maybeExisting, setMaybeExisting] = useState(false);
   const [pending, setPending] = useState<PendingSignup | null>(null);
   const submitting = useRef(false);
+  // The address already had an unconfirmed account before this sign-up (or
+  // we can't tell). GoTrue keeps that account's password, which whoever
+  // signed up first chose, and only sends the code again; so once the code
+  // proves this person holds the inbox, the password typed here replaces it
+  // (wave 1 security pass F3, Oct 20 2026: a club link let anyone start an
+  // account for a school address while sign-up is closed).
+  const reclaimPassword = useRef(false);
   const [accessCode, setAccessCode] = useState(initialAccessCode);
   // Shown when closed, and also when the gate refused a page that thought
   // sign-up was open (the switch changed since it loaded).
@@ -371,6 +378,9 @@ export function SignupForm({
             // confirmation email in the last minute, so show the pending
             // view for it. GoTrue truncates, so it can say 0; clamp to 1.
             const sec = Math.max(1, retryAfter);
+            // Someone signed this address up in the last minute: maybe not
+            // this person, so their password wins once the code is in.
+            reclaimPassword.current = true;
             rememberPendingSignup(address);
             setPending({
               email: address,
@@ -407,6 +417,12 @@ export function SignupForm({
         setMaybeExisting(true);
         return;
       }
+      // A new account has its confirmation sent the moment it is made; an
+      // older unconfirmed one gets it now, long after it was made.
+      const madeAt = Date.parse(data.user?.created_at ?? "");
+      const sentAt = Date.parse(data.user?.confirmation_sent_at ?? "");
+      reclaimPassword.current =
+        !Number.isFinite(madeAt) || !Number.isFinite(sentAt) || sentAt - madeAt > 60_000;
       rememberPendingSignup(address);
       setPending({
         email: address,
@@ -470,7 +486,19 @@ export function SignupForm({
             </div>
           ) : null}
 
-          <ConfirmCodeForm initialEmail={pending.email} askEmail={false} />
+          <ConfirmCodeForm
+            initialEmail={pending.email}
+            askEmail={false}
+            onConfirmed={async () => {
+              if (!reclaimPassword.current || !password) return;
+              // A fresh session from the code: Vibe asks for no re-check and
+              // sends no "password changed" email (risk report, Oct 8).
+              const { error: pwErr } = await getSupabaseBrowserClient().auth.updateUser({ password });
+              if (pwErr && pwErr.code !== "same_password") {
+                console.warn("[signup] could not set the password after confirming", pwErr.code ?? pwErr.status);
+              }
+            }}
+          />
 
           <div className="vibe-auth-recovery">
             <ResendConfirmation
