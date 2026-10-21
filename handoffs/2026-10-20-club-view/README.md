@@ -30,3 +30,6 @@ The canvas opens on Round 2 (`R2_*` boards); Round 1 is its own page.
 Nothing here touches the app. Sample club and people are invented (Sixty-Four Chess, the same cast as the app screens).
 
 **Wave 1 built Oct 20 (branch `claude/club-wave-1-ae4772`):** `../2026-10-20-club-view-wave-1.md` (what shipped, what Franky approves, reviews); how it's built: `WAVE1-DESIGN.md`.
+
+**Wave 2 built Oct 21 (branch `claude/cool-jang-f223da`, not merged):** `../2026-10-21-club-view-wave-2.md` (what's built,
+what Franky approves: one migration, the policy date, the merge); how it's built: `WAVE2-DESIGN.md`.

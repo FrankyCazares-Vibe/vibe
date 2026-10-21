@@ -1,0 +1,117 @@
+# Club view, wave 2: "officers run it from the phone" (built Oct 21, 2026)
+
+Branch `claude/cool-jang-f223da` (worktree `cool-jang-f223da`), cut from main `46881b0`. **Not merged, not on
+production.** Plan: `handoffs/2026-10-20-club-view/BUILD-ORDER.md` (wave 2), decisions `DECISIONS.md`, how it's
+built `WAVE2-DESIGN.md` (same folder). Wave 1's record: `2026-10-20-club-view-wave-1.md`.
+
+## What's built
+- **The switch.** On a phone, hold the Profile tab, or tap your name on your own profile (a small arrow shows
+  after it when you run a club), and a sheet opens: "Switch to." with you, then every club you're the owner or an
+  officer of ("2 to review" when join requests wait). Pick a club and the Profile tab shows the club's picture and
+  opens its page until you switch back; a coral dot on the tab says a club of yours has requests. On the club page
+  itself, the arrow after the club's name opens the same sheet. Only this phone remembers the choice; signing out
+  forgets it, and if you stop being an officer the tab goes back to you. On a computer, "Clubs you run" sits in the
+  left menu above Admin (Admin stays founders-only), one line per club with the same dot.
+- **The club page, Instagram-style** (phone and computer): the cover, the club's picture over it with two big
+  counts (followers, members), name, @handle, bio, the first link, who can join, when it meets, "More about us"
+  (every link, philanthropy, the facts, Report this club). Officers get Edit page and Share page; everyone else gets
+  Join/Follow and a small Share button. Officers also get + (Post to the page, New event, Board post or poll) and
+  Club tools on the cover, "Finish setting up · n of 6" (wave 1's line, unchanged) and the needs-you line ("1 wants
+  to join · +6 followers this week"). The next event is pinned as **Up next**; the tabs are Posts (first), Events,
+  Board. On a computer, officers also get a Club tools card on the right. The page stays dark in Light and Night,
+  as before (its background is the club's own).
+- **Exact counts for officers.** Officers see the real follower and member numbers, even under 5. Members still
+  see their exact member count, as before; everyone else sees each count only from 5 up. "This week" counts people
+  who first followed in the last 7 days.
+- **When it meets.** A new line a club writes in Edit page ("Thursdays · 7 PM, the Lantern Room"), up to 60
+  characters, shown on the page with a small clock. It needs one new database column (below).
+- **Club tools on the phone** (`/orgs/<club>/tools`): Share the club, Invite members, Members' link; Join requests
+  (approve, deny); Members (add a title, make officer or member: owner only, remove); Officers and titles;
+  **Followers** (remove a follower) and **Club settings** (followers read the Board, leave or delete the club).
+  The two that were allowed to slip a week did not slip. The desktop settings window is unchanged.
+- **Nothing was removed.** The old officer bar's buttons moved: Banner and Logo into Edit page ("Change photo",
+  "Change cover"), New post into +, Invite people and Members' link into Club tools.
+
+## What you need to approve (production)
+1. **One database change**, `supabase/migrations/20261023100000_club_meeting_time.sql`: adds `orgs.meeting_time`
+   (empty for every club) with a 60-character limit. No grants change; the club settings route stays the only
+   writer. Rehearsed on the local database only (applied, checked, rolled back, applied again); the file's header
+   has the read-only pre-flight (expected answers in brackets), the post-check and the rollback. **Not applied to
+   production.** Either deploy order is safe (without the column the page shows no meeting line and only a save
+   that sets it is refused), but apply it first so the field works the moment the build is live.
+2. **The Privacy Policy**, both copies, dated `<SHIP DAY>` (a production build refuses to deploy until the real
+   date is in `src/app/legal/privacy/page.tsx` and line 3 of `handoffs/legal-2026-10-04-privacy-v3/
+   privacy-policy-final.md`). Two lines changed: section 5a's "Club pages" now lists philanthropy (it always showed,
+   the policy never said so) and **when it meets**; section 7 now says the browser keeps **which of the clubs you
+   run your Profile tab shows**. Officers' exact counts and "+N this week" add nothing new: officers already see
+   the member list and every follower with the date they first followed (section 5f). The page-against-text
+   checker passes; so do the policy tests.
+3. **The merge** to main, which deploys it.
+
+**Ship order, on your yes:** run the pre-flight (read-only) → apply the migration with the connector (body without
+begin/commit; rename the connector's auto-timestamp row in `schema_migrations` to `20261023100000` /
+`club_meeting_time`) → run the post-check → set the policy date to that day in both places → merge this branch
+→ once live, open a club you run on your phone: hold the Profile tab, switch, open Club tools.
+
+## Checks
+- `npx tsc --noEmit` clean; `npm test` 3,721 of 3,721 pass; eslint clean on the wave's files.
+- Privacy Policy: the page-against-text checker passes (`node handoffs/legal-2026-10-04-privacy-v3/check/check.mjs
+  --url http://localhost:3000/legal/privacy`), and the five policy tests pass (one new: `club-page-policy.test.ts`).
+- The migration, on the local database only: pre-flight, apply, post-check, rollback, apply again. With the column
+  removed, the club page still loads, Edit page hides the field, ordinary saves work, and a meeting-time save gets
+  503 "This isn't ready yet."
+- **Security pass** (notes: side-session folder `wave2-security-pass.md`): nothing Critical, High or Medium. Fixed:
+  the clubs-you-run cache now lives in page memory only (it was per-tab browser storage, so a sign-out in one tab
+  left a copy in another for the next person); the meeting line carries a clock so a club can't make it look like
+  one of the page's own chips; meeting text needs a letter or a number; removing a follower now refuses a suspended
+  officer, as the other officer routes do. Left as is (it predates wave 2, shows presence, never who): an officer's
+  exact follower count includes people in a block pair with them, while the list leaves them out.
+- **Adversarial review** (notes: `wave2-adversarial-review.md` in the same folder): no High; every old club page
+  feature is still reachable. Fixed: Approve was offered on a hidden club, where the server always refuses it (now
+  Deny only, with a line saying why); deleting or leaving a club left the phone switched to it; the desktop menu
+  asked for your clubs on phones too, where it's hidden; the phone tab bar turned dark on club pages in Light mode
+  (it now keeps the app's theme, like every other page); officers of a hidden club lost Club tools on the phone;
+  unchecked clubs were told to post an event with +; Up next didn't re-sort after an event's time was edited; the
+  join buttons didn't fill their share of the row; the Events tab's own event form left the tab bar over it. The
+  hold on the Profile tab now also fires on the phone browser's own long-press (Chrome on Android can cancel the
+  touch before our timer), which still needs a real Android phone to confirm.
+
+## The browser walk (local copy, local database, never production)
+At 375px as a non-admin officer (`maya.okafor.w1a@purdue.edu`, officer of Sixty-Four Chess) and as a plain member
+(`blake@example.test`), Light and Night, plus a follower who isn't a member (`amara@example.test`) and the officer
+on a computer:
+- Officer: the page (exact counts 5 and 3, then 6 and 4), the needs-you line, Up next, the tabs, no sideways
+  scroll; the chevron opens "Switch to."; switching made the Profile tab the club (its picture, lit, the coral dot,
+  "join requests to review" for screen readers); a 0.7 s hold on the tab opened the sheet without navigating; a
+  quick tap still navigates; switching back to "You" goes to the profile; the name on the profile opens the same
+  sheet. Club tools: approved a request (the database shows the member), added the title "Social chair" (an officer
+  is offered Add a title and Remove, never Make officer); Edit page opened from `?edit=1` once and saved "Thursdays ·
+  7 PM, the Lantern Room" and an Instagram link, both shown on the page; + sheet; Share page copied the link with
+  "Link copied."; More about us has no Report row for officers. Desktop: the Club tools card, "Clubs you run" in the
+  left menu with its dot.
+- Member: no officer controls, no needs-you line; Following ✓ · Joined ✓ · a small Share button in one row; More
+  about us with Report this club; the Board tab (Board card and the club's chats).
+- Follower who isn't a member: the member count (4) stays hidden under 5, the follower count (6) shows; Request to
+  join offered.
+- No console errors on any page walked.
+
+## Not done, or not verified
+- **On a real phone:** the hold on iPhone (no link-preview pop-up) and on Android, the phone's own share sheet
+  (headless Chrome has none, so only the copy fallback was seen), and photo and cover uploads from Edit page (the
+  local storage bucket is off; same upload as before, now behind "Change photo" / "Change cover").
+- **Not built (on the board, not in the plan):** "Start a club" at the bottom of the switcher (self-serve clubs are
+  week 3), "Check-in tonight" in the switcher rows, the "shown once" tip under your name. Up next's step rail and
+  the share kit's link picture and QR are wave 3.
+- **Known, left as is:** an officer's exact follower count includes people in a block pair with them (it shows
+  presence, never who; the desktop window has always done the same). Posts stays a list, not a picture grid.
+- **Local test data** added on the local database only: Blake and Casey are members of Sixty-Four Chess (Casey
+  through an approved request), Hana's request is pending, Amara and Noor follow it, a second event (Rapid Night,
+  Oct 30), its meeting line and Instagram link, and Blake's title "Social chair".
+
+## Calls for you (each with my recommendation)
+- **Ship wave 2 with the meeting-time migration as one step on Oct 23?** Recommendation: yes, migration first,
+  then the merge, the same day the policy date is set.
+- **Club settings holds the Board switch, Leave and Delete; who can join stays in Edit page.** Recommendation: keep
+  it that way (one place to edit the page's words and its door).
+- **"Past events and who came" in Club tools has no count** (the drawing shows 4). Recommendation: leave it until
+  Insights (week 2), where turnout by event lives.
