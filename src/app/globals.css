@@ -2819,6 +2819,720 @@ html {
 .vibe-tools-panel [tabindex="-1"]:focus-visible {
   outline: none;
 }
+/* The Edit page's Look section (Oct 22, 2026; LookSection.tsx, and Edit
+   page's own frame, ModalShell layout="edit" in admin-actions.tsx;
+   handoffs/2026-10-22-club-tools-arc/PLAN-4.md K2, the boards LookDesktop
+   and LookPhone). On a computer Edit page is a tall panel on the right and
+   the club page stays in sight on the left, so it can repaint as a
+   background is picked; on a phone (720px, the page's own breakpoint) it is
+   a sheet from the bottom with a preview card instead. The header and the
+   footer stay put while the middle scrolls. Colours are theme tokens (the
+   dialog is a vibe-night-island), but for the panel's own dark glass. The
+   panel arrives on Motion's springs; what is here moves transform and
+   opacity only, on --vibe-spring-snappy, and with reduce motion only the
+   fades are left. */
+.vibe-edit-root {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  /* Light on the left, where the page shows the picked background. */
+  background: linear-gradient(90deg, rgba(6,4,12,0.04) 0%, rgba(6,4,12,0.10) 40%, rgba(6,4,12,0.62) 62%, rgba(6,4,12,0.72) 100%);
+}
+.vibe-edit-panel {
+  position: absolute;
+  top: 24px;
+  right: 24px;
+  bottom: 24px;
+  width: min(560px, calc(100% - 48px));
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: 24px;
+  background: linear-gradient(180deg, rgba(26,20,34,0.96) 0%, rgba(15,12,21,0.97) 100%);
+  border: 1px solid rgba(var(--scrim-rgb),0.12);
+  box-shadow: 0 30px 90px rgba(0,0,0,0.6), inset 0 1px 0 rgba(var(--scrim-rgb),0.12);
+  color: var(--charcoal);
+  font-family: var(--font-body);
+  outline: none;
+}
+/* The picked background washes the top of the panel, fading downwards. */
+.vibe-edit-tint {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 220px;
+  opacity: 0.6;
+  -webkit-mask-image: linear-gradient(180deg, #000 0%, transparent 100%);
+  mask-image: linear-gradient(180deg, #000 0%, transparent 100%);
+  pointer-events: none;
+}
+.vibe-edit-head {
+  position: relative;
+  flex-shrink: 0;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 22px 22px 6px 26px;
+}
+.vibe-edit-eyebrow {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.vibe-edit-title {
+  margin: 4px 0 0;
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 28px;
+  line-height: 1.1;
+  letter-spacing: -0.01em;
+}
+.vibe-edit-close {
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border-radius: 999px;
+  border: 1px solid rgba(var(--scrim-rgb),0.14);
+  background: rgba(var(--scrim-rgb),0.05);
+  color: var(--charcoal);
+  cursor: pointer;
+}
+.vibe-edit-body {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px 26px 28px;
+}
+.vibe-edit-foot {
+  position: relative;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px 22px 18px 26px;
+  border-top: 1px solid var(--hairline);
+  background: rgba(12,9,17,0.9);
+}
+.vibe-edit-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.vibe-edit-status {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  line-height: 1.35;
+  color: var(--ink-muted);
+}
+.vibe-edit-status[data-dirty] {
+  color: var(--charcoal);
+}
+.vibe-edit-cancel,
+.vibe-edit-save {
+  height: 46px;
+  padding: 0 22px;
+  border-radius: 999px;
+  font-family: var(--font-body);
+  font-size: 14.5px;
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.vibe-edit-cancel {
+  border: 1px solid rgba(var(--scrim-rgb),0.14);
+  background: rgba(var(--scrim-rgb),0.06);
+  color: var(--charcoal);
+}
+.vibe-edit-save {
+  padding: 0 28px;
+  border: none;
+  background: var(--coral);
+  color: var(--on-coral);
+  font-weight: 800;
+  box-shadow: 0 8px 24px rgba(255,92,53,0.35);
+}
+.vibe-edit-save:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+.vibe-edit-cancel:hover,
+.vibe-edit-close:hover {
+  background: rgba(var(--scrim-rgb),0.12);
+}
+.vibe-edit-save:hover:not(:disabled) {
+  background: #FF7652;
+}
+.vibe-edit-panel :focus-visible {
+  outline: 2px solid var(--coral);
+  outline-offset: 2px;
+}
+.vibe-edit-panel:focus-visible {
+  outline: none;
+}
+.vibe-look {
+  display: flex;
+  flex-direction: column;
+}
+.vibe-look-title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-style: italic;
+  font-weight: 500;
+  font-size: 32px;
+  line-height: 1.05;
+}
+.vibe-look-lede {
+  margin: 6px 0 0;
+  font-size: 13.5px;
+  line-height: 1.4;
+  color: var(--ink-2);
+}
+.vibe-look-eyebrow {
+  margin: 0 0 10px;
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+}
+/* Photo and Cover on a computer: the picture, what it is, a pill. */
+.vibe-look-assets {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-top: 20px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--hairline);
+}
+.vibe-look-asset {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.vibe-look-asset-logo {
+  flex-shrink: 0;
+  width: 56px;
+  height: 56px;
+  box-sizing: border-box;
+  display: grid;
+  place-items: center;
+  border-radius: 16px;
+  border: 1px solid rgba(var(--scrim-rgb),0.14);
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 19px;
+  color: var(--charcoal);
+}
+.vibe-look-asset-cover {
+  flex-shrink: 0;
+  width: 138px;
+  height: 46px;
+  box-sizing: border-box;
+  border-radius: 10px;
+  border: 1px solid rgba(var(--scrim-rgb),0.12);
+}
+.vibe-look-asset-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.vibe-look-asset-title {
+  font-size: 15px;
+  font-weight: 700;
+}
+.vibe-look-asset-sub {
+  font-size: 13px;
+  color: var(--ink-muted);
+}
+.vibe-look-pill {
+  flex-shrink: 0;
+  height: 44px;
+  padding: 0 18px;
+  border-radius: 999px;
+  border: 1px solid rgba(var(--scrim-rgb),0.14);
+  background: rgba(var(--scrim-rgb),0.06);
+  color: var(--charcoal);
+  font-family: var(--font-body);
+  font-size: 14px;
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.vibe-look-pill:hover {
+  background: rgba(var(--scrim-rgb),0.12);
+}
+/* Photo and Cover on a phone: one grouped list. */
+.vibe-look-list {
+  margin-top: 14px;
+  overflow: hidden;
+  border-radius: 16px;
+  border: 1px solid rgba(var(--scrim-rgb),0.09);
+  background: rgba(var(--scrim-rgb),0.04);
+}
+.vibe-look-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 48px;
+  padding: 0 12px;
+  border: none;
+  background: transparent;
+  color: var(--charcoal);
+  font-family: var(--font-body);
+  text-align: left;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.vibe-look-row:hover,
+.vibe-look-row:active {
+  background: rgba(var(--scrim-rgb),0.05);
+}
+/* Inside the row: the list clips its rounded corners, which would clip a
+   ring drawn outside the row too. */
+.vibe-look-row:focus-visible {
+  outline-offset: -2px;
+}
+.vibe-look-row-thumb {
+  flex-shrink: 0;
+  width: 36px;
+  display: grid;
+  place-items: center;
+}
+.vibe-look-mini-logo {
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 10px;
+  color: var(--charcoal);
+}
+.vibe-look-mini-cover {
+  width: 36px;
+  height: 13px;
+  box-sizing: border-box;
+  border-radius: 4px;
+  border: 1px solid rgba(var(--scrim-rgb),0.18);
+}
+.vibe-look-row-label {
+  flex: 1;
+  min-width: 0;
+  font-size: 15px;
+  font-weight: 600;
+}
+.vibe-look-row-sub {
+  font-size: 12.5px;
+  color: var(--ink-muted);
+}
+.vibe-look-chevron {
+  flex-shrink: 0;
+  color: var(--ink-muted);
+}
+.vibe-look-row-rule {
+  display: block;
+  height: 1px;
+  margin-left: 60px;
+  background: var(--hairline);
+}
+/* Background: the swatches are the gradients themselves, 44px or more. The
+   one that is on gets a ring and a check, never colour alone. */
+.vibe-look-background {
+  margin-top: 18px;
+}
+.vibe-look-label {
+  font-size: 15px;
+  font-weight: 700;
+}
+.vibe-look-help {
+  margin: 3px 0 0;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--ink-muted);
+}
+.vibe-look-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 14px 13px;
+  margin-top: 16px;
+  padding: 0 2px;
+}
+.vibe-look-swatch {
+  position: relative;
+  display: block;
+  height: 66px;
+  min-width: 44px;
+  padding: 0;
+  border: none;
+  border-radius: 16px;
+  background: transparent;
+  color: var(--charcoal);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.vibe-look-swatch:focus-visible {
+  outline: 2px solid var(--coral);
+  outline-offset: 7px;
+}
+.vibe-look-ring {
+  position: absolute;
+  inset: -5px;
+  border-radius: 21px;
+  border: 2px solid var(--charcoal);
+  opacity: 0;
+  transform: scale(0.86);
+  pointer-events: none;
+}
+.vibe-look-face {
+  position: absolute;
+  inset: 0;
+  border-radius: 16px;
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.16), 0 8px 20px rgba(0,0,0,0.35);
+}
+.vibe-look-swatch-name {
+  position: absolute;
+  left: 10px;
+  bottom: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+.vibe-look-check {
+  position: absolute;
+  right: 7px;
+  top: 7px;
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--charcoal);
+  color: var(--cream);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+  opacity: 0;
+  transform: scale(0.4);
+}
+.vibe-look-swatch[aria-checked="true"] .vibe-look-ring,
+.vibe-look-swatch[aria-checked="true"] .vibe-look-check {
+  opacity: 1;
+  transform: none;
+}
+.vibe-look-chosen {
+  display: flex;
+  align-items: baseline;
+  /* A flex row drops a leading space, so the gap is the space. */
+  gap: 0.3em;
+  min-height: 24px;
+  margin-top: 16px;
+  font-size: 15px;
+}
+.vibe-look-chosen-name {
+  font-weight: 700;
+}
+.vibe-look-chosen-tag {
+  color: var(--ink-2);
+}
+.vibe-look-error {
+  margin-top: 8px;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--error-ink);
+}
+/* The phone's preview card: the top of the page on the chosen background. */
+.vibe-look-preview {
+  position: relative;
+  height: 150px;
+  overflow: hidden;
+  isolation: isolate;
+  border-radius: 18px;
+  border: 1px solid rgba(var(--scrim-rgb),0.13);
+  box-shadow: 0 16px 40px rgba(0,0,0,0.45);
+}
+.vibe-look-preview-paint {
+  position: absolute;
+  inset: 0;
+}
+.vibe-look-preview-cover {
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  top: 10px;
+  height: 52px;
+  overflow: hidden;
+  border-radius: 12px;
+  border: 1px solid rgba(var(--scrim-rgb),0.10);
+}
+.vibe-look-preview-tag {
+  position: absolute;
+  right: 8px;
+  top: 8px;
+  height: 22px;
+  box-sizing: border-box;
+  padding: 0 9px;
+  border-radius: 999px;
+  border: 1px solid rgba(var(--scrim-rgb),0.12);
+  background: rgba(8,6,12,0.66);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  line-height: 20px;
+}
+.vibe-look-preview-logo {
+  position: absolute;
+  left: 20px;
+  top: 40px;
+  width: 50px;
+  height: 50px;
+  box-sizing: border-box;
+  display: grid;
+  place-items: center;
+  border-radius: 14px;
+  border: 2px solid rgba(8,6,12,0.8);
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 17px;
+}
+.vibe-look-preview-id {
+  position: absolute;
+  left: 82px;
+  right: 14px;
+  top: 66px;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.vibe-look-preview-name,
+.vibe-look-preview-handle,
+.vibe-look-preview-blurb {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.vibe-look-preview-name {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 19px;
+  line-height: 1.15;
+}
+.vibe-look-preview-handle {
+  margin-top: 1px;
+  font-size: 13px;
+  color: var(--ink-muted);
+}
+.vibe-look-preview-blurb {
+  position: absolute;
+  left: 20px;
+  right: 14px;
+  top: 116px;
+  font-size: 13px;
+  color: var(--ink-2);
+}
+/* About, with the club's name first. The label reads like the fields under
+   it; the count sits beside it, as on the board. */
+.vibe-look-about {
+  margin-top: 12px;
+}
+.vibe-look-rule {
+  display: block;
+  height: 1px;
+  margin: 4px 0 18px;
+  background: var(--hairline);
+}
+.vibe-look-about[data-phone] .vibe-look-rule {
+  margin-bottom: 14px;
+}
+.vibe-look-about-title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 20px;
+}
+.vibe-look-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 6px;
+}
+.vibe-look-field-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+.vibe-look-field-label,
+.vibe-look-count {
+  font-size: 11px;
+  color: var(--ink-muted);
+}
+.vibe-look-field-label {
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.vibe-look-count {
+  font-variant-numeric: tabular-nums;
+}
+.vibe-look-input {
+  width: 100%;
+  min-height: 44px;
+  box-sizing: border-box;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(var(--scrim-rgb),0.14);
+  background: rgba(var(--scrim-rgb),0.04);
+  color: var(--charcoal);
+  font-family: var(--font-body);
+  font-size: 14px;
+}
+.vibe-look-input[aria-invalid="true"] {
+  border-color: var(--error-ink);
+}
+.vibe-look-field .vibe-look-error {
+  margin-top: 0;
+}
+@media (max-width: 720px) {
+  .vibe-edit-root {
+    background: linear-gradient(180deg, rgba(6,4,12,0.46) 0%, rgba(6,4,12,0.72) 40%);
+  }
+  .vibe-edit-panel {
+    top: calc(env(safe-area-inset-top, 0px) + 44px);
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: auto;
+    border-radius: 24px 24px 0 0;
+    border-bottom: none;
+    background: linear-gradient(180deg, rgba(30,24,41,0.97) 0%, rgba(18,14,25,0.985) 30%, rgba(13,10,19,0.99) 100%);
+    box-shadow: 0 -24px 60px rgba(0,0,0,0.55);
+  }
+  .vibe-edit-tint {
+    height: 320px;
+    opacity: 0.35;
+  }
+  .vibe-edit-head {
+    align-items: center;
+    padding: 20px 16px 4px;
+  }
+  /* The sheet covers the page, so the club's name is on the card instead. */
+  .vibe-edit-eyebrow,
+  .vibe-edit-status {
+    display: none;
+  }
+  .vibe-edit-title {
+    margin: 0;
+    font-size: 24px;
+  }
+  .vibe-edit-body {
+    padding: 8px 16px 28px;
+  }
+  .vibe-edit-foot {
+    padding: 12px 16px calc(14px + env(safe-area-inset-bottom, 0px));
+    background: #0D0A13;
+  }
+  .vibe-edit-cancel {
+    flex: 1;
+    height: 50px;
+  }
+  .vibe-edit-save {
+    flex: 1.45;
+    height: 50px;
+  }
+  /* 16px, so a phone doesn't zoom the page in when the field takes focus. */
+  .vibe-look-input {
+    font-size: 16px;
+  }
+}
+/* The phone's swatches are squares with no name inside (it is under the
+   group and in each one's label), the check in the middle. */
+.vibe-look[data-phone] .vibe-look-background {
+  margin-top: 20px;
+}
+.vibe-look[data-phone] .vibe-look-grid {
+  gap: 12px;
+  margin-top: 9px;
+  padding: 5px 0;
+}
+.vibe-look[data-phone] .vibe-look-swatch {
+  height: auto;
+  aspect-ratio: 1 / 1;
+}
+.vibe-look[data-phone] .vibe-look-check {
+  left: 50%;
+  top: 50%;
+  right: auto;
+  width: 26px;
+  height: 26px;
+  margin: -13px 0 0 -13px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.45);
+}
+.vibe-look[data-phone] .vibe-look-chosen {
+  margin-top: 14px;
+}
+.vibe-look[data-phone] .vibe-look-chosen-name {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 20px;
+}
+@keyframes vibe-look-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes vibe-look-rise {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .vibe-look-ring,
+  .vibe-look-check {
+    transition: opacity 200ms ease, transform 320ms var(--vibe-spring-snappy);
+  }
+  .vibe-look-face {
+    transition: transform 320ms var(--vibe-spring-snappy);
+  }
+  /* A mouse only: on a phone a hover sticks after the tap. */
+  @media (hover: hover) {
+    .vibe-look-swatch:hover .vibe-look-face {
+      transform: scale(1.04);
+    }
+  }
+  .vibe-look-fade {
+    animation: vibe-look-fade 360ms ease both;
+  }
+  .vibe-look-chosen {
+    animation: vibe-look-rise 320ms var(--vibe-spring-snappy) both;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  /* The ring and the check still come and go, as a fade with no grow. */
+  .vibe-look-ring,
+  .vibe-look-check {
+    transform: none;
+    transition: opacity 200ms ease;
+  }
+  .vibe-look-fade {
+    animation: vibe-look-fade 200ms ease both;
+  }
+}
 @media (max-width: 720px) {
   .vibe-org-shell {
     padding: 0 14px 56px !important;

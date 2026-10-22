@@ -149,6 +149,13 @@ import { Reveal } from "@/lib/motion/Reveal";
 import { SPRING_SNAPPY, SPRING_SOFT } from "@/lib/motion/springs";
 import { orgAssetProxyUrl } from "@/lib/org-asset-url";
 import {
+  backdropFor,
+  type BackdropKey,
+  DEFAULT_BACKDROP,
+  legacyChatWallpaper,
+  pickerBackdrops,
+} from "@/lib/orgs/backdrops";
+import {
   AUDIENCE_HELP,
   audienceChip,
   fillCopy,
@@ -304,8 +311,6 @@ type Org = {
   campus_id?: string | null;
 };
 
-export type BackdropKey = "cream" | "sand-purple" | "ember" | "deep-violet" | "forest" | "midnight";
-
 type Channel = {
   id: string;
   name: string;
@@ -395,59 +400,33 @@ const GLASS_SURFACE = {
   ].join(", "),
 } as const;
 
-// Backdrop presets — admins/owners pick one in org settings.
-// Each composes 3 radial color washes over a dark base.
-export const BACKDROP_PRESETS: Record<BackdropKey, { label: string; css: string }> = {
-  cream: {
-    label: "Cream paper",
-    css:
-      "radial-gradient(120% 80% at 0% 0%, rgba(255,222,180,0.45) 0%, rgba(255,222,180,0) 60%), " +
-      "radial-gradient(110% 80% at 100% 100%, rgba(255,200,170,0.35) 0%, rgba(255,200,170,0) 60%), " +
-      "linear-gradient(180deg, #FAF7F2 0%, #F4EDE2 100%)",
-  },
-  "sand-purple": {
-    label: "Sand purple",
-    css:
-      "radial-gradient(120% 80% at 0% 0%, rgba(123,95,224,0.55) 0%, rgba(123,95,224,0) 55%), " +
-      "radial-gradient(110% 90% at 100% 100%, rgba(255,92,53,0.5) 0%, rgba(255,92,53,0) 55%), " +
-      "radial-gradient(140% 100% at 70% 20%, rgba(255,140,90,0.18) 0%, rgba(255,140,90,0) 60%), " +
-      "linear-gradient(180deg, #1B1530 0%, #241B40 50%, #2E1F35 100%)",
-  },
-  ember: {
-    label: "Ember",
-    css:
-      "radial-gradient(120% 90% at 10% 0%, rgba(255,92,53,0.55) 0%, rgba(255,92,53,0) 55%), " +
-      "radial-gradient(110% 90% at 100% 100%, rgba(255,200,90,0.35) 0%, rgba(255,200,90,0) 55%), " +
-      "radial-gradient(140% 100% at 70% 30%, rgba(180,40,40,0.35) 0%, rgba(180,40,40,0) 60%), " +
-      "linear-gradient(180deg, #1A0F12 0%, #2A1418 55%, #1F0E12 100%)",
-  },
-  "deep-violet": {
-    label: "Deep violet",
-    css:
-      "radial-gradient(120% 90% at 0% 0%, rgba(138,90,255,0.55) 0%, rgba(138,90,255,0) 55%), " +
-      "radial-gradient(110% 90% at 100% 100%, rgba(80,40,200,0.45) 0%, rgba(80,40,200,0) 55%), " +
-      "radial-gradient(140% 100% at 50% 50%, rgba(200,140,255,0.18) 0%, rgba(200,140,255,0) 60%), " +
-      "linear-gradient(180deg, #110826 0%, #1B0F38 50%, #0E0820 100%)",
-  },
-  forest: {
-    label: "Forest",
-    css:
-      "radial-gradient(120% 90% at 0% 0%, rgba(70,160,110,0.5) 0%, rgba(70,160,110,0) 55%), " +
-      "radial-gradient(110% 90% at 100% 100%, rgba(40,100,140,0.45) 0%, rgba(40,100,140,0) 55%), " +
-      "radial-gradient(140% 100% at 60% 30%, rgba(180,220,140,0.18) 0%, rgba(180,220,140,0) 60%), " +
-      "linear-gradient(180deg, #0E1A18 0%, #122620 55%, #0B1614 100%)",
-  },
-  midnight: {
-    label: "Midnight",
-    css:
-      "radial-gradient(120% 90% at 0% 0%, rgba(60,90,200,0.4) 0%, rgba(60,90,200,0) 55%), " +
-      "radial-gradient(110% 90% at 100% 100%, rgba(180,120,255,0.28) 0%, rgba(180,120,255,0) 55%), " +
-      "radial-gradient(140% 100% at 50% 50%, rgba(120,180,255,0.12) 0%, rgba(120,180,255,0) 60%), " +
-      "linear-gradient(180deg, #07091A 0%, #0E1230 55%, #050614 100%)",
-  },
-};
+// The club backgrounds live in src/lib/orgs/backdrops.ts (Oct 22, 2026,
+// the one list): the create dialog and the settings window below offer
+// `pickerBackdrops()`, the chat pane paints `legacyChatWallpaper()`, and a
+// new club, or an invite card built without its club's row, starts on
+// `DEFAULT_BACKDROP` (the database's own default, not the old "cream").
 
-const DEFAULT_BACKDROP: BackdropKey = "cream";
+/**
+ * The "Backdrop" caption and hint around a row of swatches (Oct 22, 2026).
+ * Not `Field`: that is a `<label>`, and a click anywhere on a label (its
+ * caption, its hint, the gap between two swatches) clicks the first button
+ * inside it, so a stray click picked Dusk and Save sent it, a "cream" club's
+ * included. The same reason `ChoiceField` isn't one.
+ */
+function BackdropField({ hint, children }: { hint?: string; children: React.ReactNode }) {
+  return (
+    <div role="group" aria-label="Backdrop" style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+      <span
+        aria-hidden
+        style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: COLORS.glassMuted }}
+      >
+        Backdrop
+      </span>
+      {children}
+      {hint ? <span style={{ fontSize: 11, color: "rgba(255,255,255,0.4)" }}>{hint}</span> : null}
+    </div>
+  );
+}
 
 // Cream paper backdrop for the Feed tab — warm, cozy, "community noticeboard".
 // The gradient itself is the `--feed-backdrop` token in globals.css (light and
@@ -903,9 +882,12 @@ export function CampusHome({
   const isEmpty = orgs !== null && orgs.length === 0;
 
   // Backdrop is read-only at the campus level — admins change it from
-  // the org Settings modal, which has its own save handler.
-  const activeBackdropKey: BackdropKey = activeOrg?.backdrop_preset ?? DEFAULT_BACKDROP;
-  const activeBackdrop = BACKDROP_PRESETS[activeBackdropKey].css;
+  // the org Settings modal, which has its own save handler. The old chat
+  // wallpaper (Oct 22, 2026): a club on "cream" keeps the light paper this
+  // pane was drawn for (ChannelMain's `isCream`); any other key, a new one
+  // or one this bundle doesn't know, paints from the shared list, and no
+  // club at all paints the default.
+  const activeBackdrop = legacyChatWallpaper(activeOrg?.backdrop_preset);
 
   const handleOrgCreated = useCallback((org: Org) => {
     setOrgs((prev) => [org, ...(prev ?? [])]);
@@ -1296,7 +1278,7 @@ function CreateOrgModal({
   const [description, setDescription] = useState("");
   const [joinPolicy, setJoinPolicy] = useState<JoinPolicy>("open");
   const [audience, setAudience] = useState<OrgAudience>("both");
-  const [backdrop, setBackdrop] = useState<BackdropKey>("sand-purple");
+  const [backdrop, setBackdrop] = useState<BackdropKey>(DEFAULT_BACKDROP);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -1476,16 +1458,19 @@ function CreateOrgModal({
           {OFFICER_FOLLOW_HELP}
         </div>
 
-        <Field label="Backdrop" hint="Officers can change it later.">
+        <BackdropField hint="Officers can change it later.">
           <div style={{ display: "flex", gap: 6 }}>
-            {(Object.keys(BACKDROP_PRESETS) as BackdropKey[]).map((key) => {
-              const preset = BACKDROP_PRESETS[key];
+            {/* The shared list (Oct 22, 2026): only what the database takes today. */}
+            {pickerBackdrops().map((preset) => {
+              const key = preset.key;
               const on = key === backdrop;
               return (
                 <button
                   key={key}
                   type="button"
                   title={preset.label}
+                  aria-label={preset.label}
+                  aria-pressed={on}
                   onClick={() => setBackdrop(key)}
                   style={{
                     flex: 1,
@@ -1505,7 +1490,7 @@ function CreateOrgModal({
               );
             })}
           </div>
-        </Field>
+        </BackdropField>
 
         {error ? (
           <div
@@ -1979,12 +1964,15 @@ function SettingsOverview({
     const json: Record<string, unknown> = {
       name: name.trim(),
       description: description.trim(),
-      backdrop_preset: backdrop,
       philanthropy: philanthropy.trim(),
       links: links
         .map((l) => ({ label: l.label.trim(), url: l.url.trim() }))
         .filter((l) => l.label && l.url),
     };
+    // The background only when it changed (Oct 22, 2026): the PATCH refuses
+    // a key the pickers don't offer, and a club still on "cream" must save
+    // the rest without picking a new one.
+    if (backdrop !== org.backdrop_preset) json.backdrop_preset = backdrop;
     // Only what changed, and never on a hidden club (the PATCH refuses it).
     // Never the legacy public flag: the PATCH maps a stray one into a join policy.
     if (!org.hidden) {
@@ -2036,7 +2024,9 @@ function SettingsOverview({
         {followerCountText(readOnlyFollowers) ? (
           <ReadOnlyRow label="Followers" value={String(readOnlyFollowers)} />
         ) : null}
-        <ReadOnlyRow label="Backdrop" value={BACKDROP_PRESETS[org.backdrop_preset].label} />
+        {/* The club page's name for it: "cream" and a key this bundle
+            doesn't know read as the default, as the club page paints them. */}
+        <ReadOnlyRow label="Backdrop" value={backdropFor(org.backdrop_preset).label} />
       </div>
     );
   }
@@ -2102,16 +2092,21 @@ function SettingsOverview({
           </div>
         </>
       )}
-      <Field label="Backdrop">
+      <BackdropField>
         <div style={{ display: "flex", gap: 6 }}>
-          {(Object.keys(BACKDROP_PRESETS) as BackdropKey[]).map((key) => {
-            const p = BACKDROP_PRESETS[key];
+          {/* The shared list (Oct 22, 2026). A club on "cream" sees none of
+              these marked: that light paper is never offered again, and it
+              stays until an officer picks one. */}
+          {pickerBackdrops().map((p) => {
+            const key = p.key;
             const active = key === backdrop;
             return (
               <button
                 key={key}
                 type="button"
                 title={p.label}
+                aria-label={p.label}
+                aria-pressed={active}
                 onClick={() => setBackdrop(key)}
                 style={{
                   flex: 1,
@@ -2126,7 +2121,7 @@ function SettingsOverview({
             );
           })}
         </div>
-      </Field>
+      </BackdropField>
 
       <Field
         label="Links"

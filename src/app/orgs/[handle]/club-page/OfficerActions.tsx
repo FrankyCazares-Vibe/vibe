@@ -6,9 +6,11 @@
  * into Edit page, New post into +, Invite people and the members' link into
  * Club tools.
  *
- * - EditPageButton: the half-width "Edit page" pill and its dialog. The
- *   address `?edit=1` (Club tools' "Edit the page") opens it once, then comes
- *   off the address so a reload or Back doesn't open it again. The computer's
+ * - EditPageButton: the half-width "Edit page" pill and its dialog (since
+ *   Oct 22, 2026 it opens on Look: photo, cover and background, then the
+ *   club's name; LookSection.tsx). The address `?edit=1` (Club tools' "Edit
+ *   the page") opens it once, then comes off the address so a reload or
+ *   Back doesn't open it again. The computer's
  *   tools panel opens it directly (`openEditPage`, club-tools-launcher.ts;
  *   Oct 22, 2026), as many times as it likes.
  * - SharePageButton: the half-width "Share page" pill (share-page.ts).
@@ -34,6 +36,13 @@ type EditProps = {
   orgName: string;
   hidden: boolean;
   openToCampus: { name: string; shared: boolean } | null;
+  /** The club's name as stored: Edit page's Name field starts here (Oct 22, 2026). */
+  initialName: string;
+  /** The stored `orgs.backdrop_preset`: Look's picker starts here ("cream" shows as the default). */
+  initialBackdrop: string;
+  /** The page's own picture addresses, for Look's thumbnails and the phone's preview card. */
+  logoUrl: string | null;
+  bannerUrl: string | null;
   joinPolicy: JoinPolicy;
   audience: OrgAudience;
   initialDescription: string;
@@ -99,6 +108,10 @@ export function EditPageButton(props: EditProps): JSX.Element {
           orgHandle={orgHandle}
           hidden={hidden}
           openToCampus={props.openToCampus}
+          initialName={props.initialName}
+          initialBackdrop={props.initialBackdrop}
+          logoUrl={props.logoUrl}
+          bannerUrl={props.bannerUrl}
           initialJoinPolicy={props.joinPolicy}
           initialAudience={props.audience}
           initialDescription={props.initialDescription}

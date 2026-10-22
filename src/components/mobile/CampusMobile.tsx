@@ -7,8 +7,6 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { Drawer } from "vaul";
 
 import {
-  BACKDROP_PRESETS,
-  type BackdropKey,
   type CampusEvent,
   CampusBanner,
   EventCard,
@@ -69,6 +67,7 @@ import { LikeBurst } from "@/lib/motion/LikeBurst";
 import { Reveal } from "@/lib/motion/Reveal";
 import { SPRING_SNAPPY } from "@/lib/motion/springs";
 import { orgAssetProxyUrl } from "@/lib/org-asset-url";
+import { type BackdropKey, legacyChatWallpaper } from "@/lib/orgs/backdrops";
 import {
   audienceChip,
   inviteSubText,
@@ -1324,9 +1323,9 @@ export function CampusMobile() {
           thread={synthesizeChannelThread(openChannel)}
           onClose={() => setOpenChannel(null)}
           backdropCss={
-            openChannel.orgBackdrop
-              ? BACKDROP_PRESETS[openChannel.orgBackdrop]?.css ?? null
-              : null
+            // The shared list (Oct 22, 2026): "cream" keeps its light
+            // paper here, any other key paints from the list.
+            openChannel.orgBackdrop ? legacyChatWallpaper(openChannel.orgBackdrop) : null
           }
         />
       ) : null}
@@ -3022,15 +3021,13 @@ function OrgChannelsDrawer({
             right: 0,
             bottom: 0,
             width: "100%",
-            // Mirror the desktop chat backdrop: each org picks a preset
-            // (cream / sand-purple / ember / deep-violet / forest / midnight)
-            // in org settings, and that gradient now flows through the
-            // mobile channel rail + the conversation below it. Falls back
-            // to neutral dark when the org hasn't picked one yet.
-            background:
-              BACKDROP_PRESETS[
-                (org.backdrop_preset ?? "cream") as BackdropKey
-              ]?.css ?? "linear-gradient(180deg, #1A1B1F 0%, #16171B 100%)",
+            // Mirror the desktop chat backdrop: each org picks a background
+            // (src/lib/orgs/backdrops.ts, the one list, Oct 22, 2026), and
+            // that gradient flows through the mobile channel rail + the
+            // conversation below it. A row without one reads as "cream",
+            // the light paper these panes were drawn for (the `tone` below
+            // agrees); a key this bundle doesn't know paints the default.
+            background: legacyChatWallpaper(org.backdrop_preset ?? "cream"),
             color: "#E7E7EA",
             zIndex: 1081,
             outline: "none",

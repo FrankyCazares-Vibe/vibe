@@ -8,7 +8,10 @@
  *   - GET /api/campus-map/zone?org=: only members who show the club, read
  *     with the SERVICE client (so the zone survives 20261017120000, which
  *     makes `org_members` members-only); a hidden club is 404; outside a
- *     club only a public club anyone can join lists anyone.
+ *     club only a public club anyone can join lists anyone;
+ *   - and (the Look section, Oct 22, 2026) POST /api/orgs: a new club's
+ *     background is the shared default or a picker's key, anything else 400,
+ *     and the database's CHECK refusing it a 409, never a 500.
  *
  * Run with:
  *   node --test src/lib/orgs/club-counts-map-routes.test.ts
@@ -66,7 +69,8 @@ registerHooks({
 type Call = [string, ...unknown[]];
 type Query = { client: "cookie" | "service"; table: string; calls: Call[] };
 type Answer = { data?: unknown; error?: { code?: string; message?: string } | null };
-const METHODS = ["select", "eq", "in", "is", "or", "order", "limit", "neq", "not"];
+// insert / gt / delete: POST /api/orgs (creating a club) reads and writes with them.
+const METHODS = ["select", "eq", "in", "is", "or", "order", "limit", "neq", "not", "insert", "gt", "delete"];
 type World = { queries: Query[]; cookie: unknown; service: unknown };
 
 function fakeClient(kind: Query["client"], world: World, answer: (q: Query) => Answer) {
@@ -165,6 +169,66 @@ test("orgs discover: an unreadable membership list floors every count, never sho
   const res = await quietly(async () => json(await orgsList.GET(get("/api/orgs?filter=discover"))));
   assert.equal(res.status, 200);
   assert.deepEqual(countsById(res.body.orgs), { [MINE]: null, [SMALL]: null, [BIG]: 7 });
+});
+
+// ── POST /api/orgs: a new club's background (the Look section, Oct 22, 2026) ─
+
+const BACKDROPS_FILE = "./backdrops.ts";
+const looks = (await import(BACKDROPS_FILE)) as typeof import("./backdrops");
+const post = (body: unknown) =>
+  new Request("https://vibe.test/api/orgs", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+const NEW_CLUB = { name: "Lantern Society", handle: "lantern-society", join_policy: "open", audience: "both" };
+
+/** A verified creator on a campus, a free handle; `insertError` is the database refusing the row. */
+function createWorld(insertError?: Answer["error"]) {
+  return install((q) => {
+    if (q.table === "users") return { data: { school_verified: true, school: "", school_system: "iu", campus_id: CAMPUS } };
+    const row = q.calls.find((c) => c[0] === "insert")?.[1] as Record<string, unknown> | undefined;
+    if (q.table === "orgs" && row) return insertError ? { error: insertError } : { data: { id: MINE, ...row } };
+    if (q.table === "orgs") return { data: null };
+    return { data: [] };
+  });
+}
+const inserted = (w: World) => reads(w, "service", "orgs").find((q) => q.calls.some((c) => c[0] === "insert"))?.calls.find((c) => c[0] === "insert")?.[1] as
+  | Record<string, unknown>
+  | undefined;
+
+test("orgs create: no background sent is the shared default; a picker's key is kept", async () => {
+  const plain = createWorld();
+  const res = await json(await orgsList.POST(post(NEW_CLUB)));
+  assert.equal(res.status, 201, JSON.stringify(res.body));
+  assert.equal(inserted(plain)!.backdrop_preset, looks.DEFAULT_BACKDROP);
+  assert.equal(looks.DEFAULT_BACKDROP, "sand-purple");
+  for (const { key } of looks.pickerBackdrops()) {
+    const w = createWorld();
+    assert.equal((await orgsList.POST(post({ ...NEW_CLUB, backdrop_preset: key }))).status, 201, key);
+    assert.equal(inserted(w)!.backdrop_preset, key);
+  }
+});
+
+test("orgs create: \"cream\", an unknown key, a new key before it is live, or not a string is 400 invalid_backdrop, nothing read or written", async () => {
+  const fresh = looks.BACKDROPS.filter((b) => b.isNew && !looks.NEW_BACKDROPS_LIVE).map((b) => b.key);
+  for (const value of ["cream", "sunset", "", null, 7, ...fresh]) {
+    const w = createWorld();
+    const res = await json(await orgsList.POST(post({ ...NEW_CLUB, backdrop_preset: value })));
+    assert.deepEqual([res.status, res.body.code, res.body.error], [400, "invalid_backdrop", "Pick one of the backgrounds."], JSON.stringify(value));
+    assert.equal(w.queries.length, 0, JSON.stringify(value));
+  }
+});
+
+test("orgs create: the database's CHECK refusing the key (23514) is 409 backdrop_not_ready; any other insert failure is the 500", async () => {
+  const quietWarn = console.warn;
+  console.warn = () => {};
+  try {
+    createWorld({ code: "23514", message: 'new row for relation "orgs" violates check constraint "orgs_backdrop_preset_check"' });
+    const res = await json(await orgsList.POST(post({ ...NEW_CLUB, backdrop_preset: "forest" })));
+    assert.deepEqual([res.status, res.body.code], [409, "backdrop_not_ready"]);
+  } finally {
+    console.warn = quietWarn;
+  }
+  createWorld({ code: "23505", message: "duplicate key value violates unique constraint" });
+  const res = await quietly(async () => json(await orgsList.POST(post(NEW_CLUB))));
+  assert.deepEqual([res.status, res.body.code], [500, "create_failed"]);
 });
 
 // ── GET /api/search?kinds=orgs ───────────────────────────────────────────────

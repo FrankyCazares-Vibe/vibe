@@ -41,6 +41,7 @@ import { officerGate } from "@/lib/orgs/hidden-gate";
 import { loadBoardReadable } from "@/lib/orgs/board-facts";
 import { MOD_READONLY } from "@/lib/orgs/join-copy";
 import { loadViewerOrgContext } from "@/lib/orgs/membership";
+import { isPickableBackdrop } from "@/lib/orgs/backdrops";
 import { normalizeMeetingTime } from "@/lib/orgs/meeting-time";
 import {
   purgeDeletedClubMedia,
@@ -53,14 +54,21 @@ import { createSupabaseServiceClient } from "@/lib/supabase/service";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-const VALID_BACKDROPS = [
-  "cream",
-  "sand-purple",
-  "ember",
-  "deep-violet",
-  "forest",
-  "midnight",
-] as const;
+/**
+ * The database's rule on `orgs.backdrop_preset` (Oct 22, 2026). Before
+ * migration 20261026100000 it refuses the five new backgrounds; should the
+ * code offer them first, the save is a 409 that says so, never a 500.
+ */
+const BACKDROP_CHECK = "orgs_backdrop_preset_check";
+
+/** A save the backdrop CHECK refused: Postgres's 23514, naming that rule. */
+function isBackdropCheckError(error: unknown): boolean {
+  const e = (error ?? {}) as { code?: unknown; message?: unknown; details?: unknown };
+  return (
+    e.code === "23514" &&
+    [e.message, e.details].some((text) => typeof text === "string" && text.includes(BACKDROP_CHECK))
+  );
+}
 
 type Params = { params: Promise<{ slug: string }> };
 
@@ -494,11 +502,13 @@ export async function PATCH(req: Request, { params }: Params) {
   // for the word filter below, which only judges text the officer actually
   // changed. A database without `meeting_time` yet (20261023100000) reads
   // the club as before: saves without it work, saves with it answer 503.
+  // `backdrop_preset` is read so a form re-sending the club's own background
+  // is never refused for it (the background block below).
   const readOrg = (withMeeting: boolean) =>
     service
       .from("orgs")
       .select(
-        `id, handle, owner_id, name, description, philanthropy, links, ${withMeeting ? `${MEETING_TIME}, ` : ""}join_policy, audience, hidden_at, campus_id`,
+        `id, handle, owner_id, name, description, philanthropy, links, backdrop_preset, ${withMeeting ? `${MEETING_TIME}, ` : ""}join_policy, audience, hidden_at, campus_id`,
       )
       .eq("handle", slug)
       .maybeSingle();
@@ -522,6 +532,7 @@ export async function PATCH(req: Request, { params }: Params) {
     name: string | null;
     description: string | null;
     philanthropy: string | null;
+    backdrop_preset?: string | null;
     meeting_time?: string | null;
     links: unknown;
     join_policy: JoinPolicy;
@@ -572,6 +583,11 @@ export async function PATCH(req: Request, { params }: Params) {
   // join policy or audience again, refused every time over text it never
   // touched and cannot see is the problem. `checkChangedText` waves through a
   // value that is already stored, so the filter only ever judges new writing.
+  //
+  // Who may rename (the Edit page's Name field, Oct 22, 2026): whoever passed
+  // the gate above, the owner and the club's officers (`SETTINGS_ROLES`,
+  // owner and admin), the same as every other field here. The 2-50 count is
+  // JavaScript's `length` after trimming, so the field counts the same way.
   const patch: Record<string, unknown> = {};
   if (typeof body.name === "string") {
     const v = body.name.trim();
@@ -591,11 +607,20 @@ export async function PATCH(req: Request, { params }: Params) {
     }
     patch.description = v;
   }
-  if (
-    typeof body.backdrop_preset === "string" &&
-    (VALID_BACKDROPS as readonly string[]).includes(body.backdrop_preset)
-  ) {
-    patch.backdrop_preset = body.backdrop_preset;
+  // ── The club's background ────────────────────────────────────────────────
+  // The Look section (Oct 22, 2026): only a background the pickers offer
+  // (src/lib/orgs/backdrops.ts, the one list). Anything else is a 400; it
+  // used to be dropped without a word, so a save said "Saved" over a
+  // background that never changed. The club's own key sent back unchanged
+  // is left as it is, the way `checkChangedText` waves through stored text:
+  // a club still on "cream" (never offered again) can save everything else
+  // from a form that re-sends it.
+  if (body.backdrop_preset !== undefined) {
+    if (isPickableBackdrop(body.backdrop_preset)) {
+      patch.backdrop_preset = body.backdrop_preset;
+    } else if (body.backdrop_preset !== org.backdrop_preset) {
+      return fail(400, "invalid_backdrop", "Pick one of the backgrounds.");
+    }
   }
   if (body.logo_url !== undefined) {
     const v = normalizeOrgAssetInput(body.logo_url, org.id);
@@ -808,6 +833,13 @@ export async function PATCH(req: Request, { params }: Params) {
     }
     if (meetingChanged && isMissingColumnError(error, [MEETING_TIME])) {
       return fail(503, "meeting_time_unavailable", "This isn't ready yet. Try again later.");
+    }
+    // A new background offered before the database takes it (the five new
+    // keys with `NEW_BACKDROPS_LIVE` flipped before 20261026100000). One
+    // statement, so nothing else in this save was written either.
+    if ("backdrop_preset" in patch && isBackdropCheckError(error)) {
+      console.warn("[orgs/[slug] PATCH] the database refused a background; is 20261026100000 applied?");
+      return fail(409, "backdrop_not_ready", "That background isn't ready yet. Pick another one for now.");
     }
     console.error("[orgs/[slug] PATCH]", error);
     return fail(500, "update_failed", "Failed to update");

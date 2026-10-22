@@ -10,6 +10,7 @@ import { loadClubSetup } from "@/lib/club-links/setup";
 import { MobileTabBar } from "@/components/mobile/MobileTabBar";
 import { OrgMenu } from "@/components/orgs/OrgMenu";
 import { visibleClubPosts } from "@/lib/club-routes/club-posts";
+import { backdropCss, DEFAULT_BACKDROP } from "@/lib/orgs/backdrops";
 import { isMissingColumnError } from "@/lib/db/missing-column";
 import {
   loadRestrictedAuthors,
@@ -68,25 +69,6 @@ import { type OrgPostItem, OrgPostsList } from "./OrgPostsList";
 import { OrgProfileJoinButton } from "./join-button";
 
 type Params = { params: Promise<{ handle: string }> };
-
-const BACKDROP_PRESETS: Record<string, string> = {
-  "sand-purple":
-    "radial-gradient(120% 80% at 0% 0%, rgba(123,95,224,0.55) 0%, rgba(123,95,224,0) 55%), " +
-    "radial-gradient(110% 90% at 100% 100%, rgba(255,92,53,0.5) 0%, rgba(255,92,53,0) 55%), " +
-    "linear-gradient(180deg, #1B1530 0%, #241B40 50%, #2E1F35 100%)",
-  ember:
-    "radial-gradient(120% 90% at 10% 0%, rgba(255,92,53,0.55) 0%, rgba(255,92,53,0) 55%), " +
-    "linear-gradient(180deg, #1A0F12 0%, #2A1418 55%, #1F0E12 100%)",
-  "deep-violet":
-    "radial-gradient(120% 80% at 0% 0%, rgba(120,90,220,0.6) 0%, rgba(120,90,220,0) 55%), " +
-    "linear-gradient(180deg, #15102A 0%, #1F1640 60%, #15102A 100%)",
-  forest:
-    "radial-gradient(120% 90% at 10% 0%, rgba(70,160,110,0.5) 0%, rgba(70,160,110,0) 55%), " +
-    "linear-gradient(180deg, #0D1A14 0%, #14241B 60%, #0D1A14 100%)",
-  midnight:
-    "radial-gradient(120% 80% at 30% 10%, rgba(40,80,180,0.4) 0%, rgba(40,80,180,0) 60%), " +
-    "linear-gradient(180deg, #0A0E1A 0%, #14182A 60%, #0A0E1A 100%)",
-};
 
 const DORMANT_MS = 60 * 24 * 60 * 60 * 1000;
 
@@ -398,7 +380,7 @@ export default async function OrgProfilePage({ params }: Params) {
     hidden: !!hiddenAt,
     campus_id: campusId,
     verified: !!orgRaw.verified,
-    backdrop_preset: (orgRaw.backdrop_preset as string) ?? "sand-purple",
+    backdrop_preset: (orgRaw.backdrop_preset as string) ?? DEFAULT_BACKDROP,
     links: Array.isArray(orgRaw.links)
       ? (orgRaw.links as Array<{ label: string; url: string }>)
       : [],
@@ -450,8 +432,9 @@ export default async function OrgProfilePage({ params }: Params) {
         })
       : [];
 
-  const backdrop =
-    BACKDROP_PRESETS[org.backdrop_preset] ?? BACKDROP_PRESETS["sand-purple"];
+  // The one list of backgrounds (src/lib/orgs/backdrops.ts, Oct 22, 2026):
+  // "cream" and any unknown key paint the default.
+  const backdrop = backdropCss(org.backdrop_preset);
 
   // The Announcement Board card: Open, Read the Board, Follow to read the
   // Board, Verify school email, or nothing (club model; `boardCardView`).
@@ -515,9 +498,14 @@ export default async function OrgProfilePage({ params }: Params) {
   const page = (
     <main
       className={user ? "vibe-tabbar-page vibe-mobile-safe-top" : "vibe-mobile-safe-top"}
+      // Painted through `--club-backdrop` so Edit page's Look section can
+      // repaint the page live while an officer picks (and put it back on
+      // Cancel). `data-club-backdrop` is how it finds this element.
+      data-club-backdrop=""
       style={{
         minHeight: "100vh",
-        background: backdrop,
+        ["--club-backdrop" as string]: backdrop,
+        background: "var(--club-backdrop)",
         backgroundAttachment: "fixed",
         fontFamily: "DM Sans, sans-serif",
       }}
@@ -581,6 +569,11 @@ export default async function OrgProfilePage({ params }: Params) {
                 <EditPageButton
                   orgHandle={org.handle}
                   orgName={org.name}
+                  // The Look section and the Name field (Oct 22, 2026).
+                  initialName={org.name}
+                  initialBackdrop={org.backdrop_preset}
+                  logoUrl={org.logo_url}
+                  bannerUrl={org.banner_url}
                   hidden={org.hidden}
                   openToCampus={openToCampus}
                   joinPolicy={org.join_policy}

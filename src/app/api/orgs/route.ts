@@ -19,6 +19,7 @@ import { campusScopeError, homeCampusIdFor } from "@/lib/iu/community-scope";
 import { contentBlockedResponse, requireCanPublish } from "@/lib/moderation/access";
 import { checkText } from "@/lib/moderation/text-filter";
 import { normalizeOrgAssetInput, orgAssetProxyUrl } from "@/lib/org-asset-url";
+import { DEFAULT_BACKDROP, isPickableBackdrop, type Backdrop } from "@/lib/orgs/backdrops";
 import {
   flattenCountEmbed,
   loadViewerFollowedOrgIds,
@@ -46,15 +47,6 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 
 const HANDLE_RE = /^[a-z0-9][a-z0-9_-]{2,30}$/;
-const VALID_BACKDROPS = [
-  "cream",
-  "sand-purple",
-  "ember",
-  "deep-violet",
-  "forest",
-  "midnight",
-] as const;
-type BackdropKey = (typeof VALID_BACKDROPS)[number];
 
 /**
  * The most follow rows `filter=following` reads (one more is read to set
@@ -737,11 +729,17 @@ export async function POST(req: Request) {
   const handle = typeof body.handle === "string" ? body.handle.trim().toLowerCase() : "";
   const name = typeof body.name === "string" ? body.name.trim() : "";
   const description = typeof body.description === "string" ? body.description.trim() : "";
-  const backdrop: BackdropKey =
-    typeof body.backdrop_preset === "string" &&
-    (VALID_BACKDROPS as readonly string[]).includes(body.backdrop_preset)
-      ? (body.backdrop_preset as BackdropKey)
-      : "sand-purple";
+  // The club's background (Oct 22, 2026): one of the pickers' backgrounds
+  // (src/lib/orgs/backdrops.ts, the one list), the default when none is
+  // sent. A key the pickers don't offer is a 400 (it used to become the
+  // default without a word), "cream" included: it is never offered again.
+  let backdrop: Backdrop["key"] = DEFAULT_BACKDROP;
+  if (body.backdrop_preset !== undefined) {
+    if (!isPickableBackdrop(body.backdrop_preset)) {
+      return fail(400, "invalid_backdrop", "Pick one of the backgrounds.");
+    }
+    backdrop = body.backdrop_preset;
+  }
   // Asset values must be our own R2 keys or Supabase-hosted URLs — never an
   // arbitrary third-party URL that the asset proxy would then redirect to.
   const logoUrl = normalizeOrgAssetInput(body.logo_url ?? null);
@@ -927,6 +925,13 @@ export async function POST(req: Request) {
       "id, handle, name, description, logo_url, banner_url, is_public, backdrop_preset, verified, last_activity_at, links, philanthropy, school, campus_id, join_policy, audience"
     )
     .single();
+  // A new background offered before the database takes it (its CHECK, until
+  // 20261026100000): a 409 that says so, as PATCH /api/orgs/[slug] answers.
+  const refused = (orgErr ?? {}) as { code?: unknown; message?: unknown };
+  if (refused.code === "23514" && String(refused.message ?? "").includes("orgs_backdrop_preset_check")) {
+    console.warn("[orgs POST] the database refused a background; is 20261026100000 applied?");
+    return fail(409, "backdrop_not_ready", "That background isn't ready yet. Pick another one for now.");
+  }
   if (orgErr || !org) {
     console.error("[orgs POST insert org]", orgErr);
     return fail(500, "create_failed", "Failed to create org");

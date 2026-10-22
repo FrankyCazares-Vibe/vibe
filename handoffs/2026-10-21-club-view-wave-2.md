@@ -302,3 +302,24 @@ Shipped from the wave 1 session (`busy-aryabhata-7b6991`); this branch's own ses
     disagree). Canvas row "Club settings and the background picker": Look on a computer (click a background, the
     page repaints), Look on a phone, and the settings map. Phone answer: yes for settings and the picker (same
     Edit page), no for the Arc.
+- **Oct 22, later (Franky: build the Look section, one shared list of the 10 tuned backgrounds, the picker in
+  Edit page on phone and computer, and the Name field; write up the database change for the 5 new presets):**
+  - **One list of club backgrounds:** `src/lib/orgs/backdrops.ts`. The club page, Edit page's picker, the old
+    desktop settings window and create dialog, the old chat wallpapers and both org routes now read it (a test
+    fails if a second list appears). The five existing backgrounds are retuned so the quiet grey text on the club
+    page is readable (4.6:1 or better at the brightest spot, from 2.3-3.0:1): "Sand purple" now shows as **Dusk**,
+    "Deep violet" as **Violet**; the keys are unchanged, so no club's row changes. "Cream" is never offered again
+    and shows as Dusk on the club page.
+  - **Edit page opens on "Look":** photo, cover and the background swatches (radio group, keyboard arrows, ring +
+    check, the name under it). On a computer the club page behind repaints as you pick, and Cancel / × / Escape put
+    it back; on a phone a preview card at the top shows the choice. **Name** is the first field under About (2-50
+    characters, counter, the word filter's refusal shown at the field). The server now refuses an unknown
+    background (400) instead of silently ignoring it, and answers 409 if a not-yet-allowed one is sent.
+  - Walked locally as Maya at 1440px and 390px: Forest repainted the page, Escape restored Dusk, Save renamed the
+    club and set Midnight (both restored afterwards); no sideways scroll on the phone.
+  - **Waiting for Franky's yes:** `supabase/migrations/20261026100000_club_backdrop_presets.sql` lets five more
+    names be saved (Rose, Cardinal, Lantern, Canal, Onyx); plain-English write-up in
+    `handoffs/2026-10-22-club-tools-arc/BACKDROP-MIGRATION.md`. Rehearsed locally; production untouched. After it:
+    flip `NEW_BACKDROPS_LIVE` to true in backdrops.ts (+ its test line) and deploy; the picker then shows ten.
+  - Found in passing: `npm test` silently skips test files under `src/app/orgs/[handle]/` (the brackets read as a
+    glob); the 35 there pass when run from their folder. Worth fixing in package.json.

@@ -9,7 +9,10 @@
  *   - the club setting `followers_read_board`: officers only, a boolean, and
  *     GET reads it (null on a database without the column);
  *   - GET /api/me/club-boards: the Boards I read as a follower, decided by
- *     the database (the channels read on MY client), never a member's name.
+ *     the database (the channels read on MY client), never a member's name;
+ *   - and (the Look section, Oct 22, 2026) PATCH /api/orgs/[slug]'s answers
+ *     on the club's background (the shared list in ./backdrops.ts) and its
+ *     name, here because this file already stands up that route.
  *
  * Run with:
  *   node --test src/lib/orgs/follower-board-routes.test.ts
@@ -25,6 +28,7 @@
  */
 
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import * as nodeModule from "node:module";
 import { test } from "node:test";
 
@@ -470,7 +474,8 @@ const getOrg = () => orgRoute.GET(req("GET"), { params: Promise.resolve({ slug: 
 const OWNER = uuid(9, "a");
 const STORED = { id: ORG, handle: "sae", owner_id: OWNER, name: "SAE", description: "", philanthropy: "", links: [], join_policy: "invite", audience: "both", campus_id: null };
 
-type PatchSetup = { role?: string; hidden?: boolean; updateError?: Answer["error"] };
+/** `stored`: columns the club already has (its background, its name), over STORED. */
+type PatchSetup = { role?: string; hidden?: boolean; updateError?: Answer["error"]; stored?: Record<string, unknown> };
 function patchWorld(s: PatchSetup = {}) {
   return install(
     (q) => {
@@ -479,7 +484,7 @@ function patchWorld(s: PatchSetup = {}) {
         const sent = q.calls.find((c) => c[0] === "update")![1] as Record<string, unknown>;
         return { data: { id: ORG, handle: "sae", logo_url: null, banner_url: null, ...sent } };
       }
-      if (q.table === "orgs") return { data: { ...STORED, hidden_at: s.hidden ? "2026-10-10T00:00:00Z" : null } };
+      if (q.table === "orgs") return { data: { ...STORED, ...s.stored, hidden_at: s.hidden ? "2026-10-10T00:00:00Z" : null } };
       if (q.table === "org_members") return { data: { role: s.role ?? "admin" } };
       throw new Error(`unexpected read of ${q.table}`);
     },
@@ -529,6 +534,135 @@ test("PATCH: every other save reads what it always did (no setting column), and 
     assert.deepEqual((await json(await patchOrg({ followers_read_board: false }))).body.code, "board_setting_unavailable");
   } finally {
     console.error = quiet;
+  }
+});
+
+// ── /api/orgs/[slug]: the club's background and name (the Look section, Oct 22, 2026) ──
+
+const BACKDROPS_FILE = "./backdrops.ts";
+const looks = (await import(BACKDROPS_FILE)) as typeof import("./backdrops");
+const FILTER_LIST = "@/lib/moderation/text-filter-list";
+const { filterTerms } = (await import(FILTER_LIST)) as typeof import("../moderation/text-filter-list");
+const sentOf = (w: World) => updateOf(w)?.calls.find((c) => c[0] === "update")?.[1] as Record<string, unknown> | undefined;
+const CHECK_REFUSAL = { code: "23514", message: 'new row for relation "orgs" violates check constraint "orgs_backdrop_preset_check"' };
+const silenced = async <T>(fn: () => Promise<T>): Promise<T> => {
+  const [error, warn] = [console.error, console.warn];
+  console.error = console.warn = () => {};
+  try {
+    return await fn();
+  } finally {
+    [console.error, console.warn] = [error, warn];
+  }
+};
+
+test("PATCH background: every key the pickers offer is saved, by an owner or an officer", async () => {
+  for (const { key } of looks.pickerBackdrops()) {
+    for (const role of ["admin", "owner"]) {
+      const w = patchWorld({ role });
+      const res = await json(await patchOrg({ backdrop_preset: key }));
+      assert.equal(res.status, 200, `${key} ${role}`);
+      assert.deepEqual(Object.keys(sentOf(w)!).sort(), ["backdrop_preset", "updated_at"]);
+      assert.equal(sentOf(w)!.backdrop_preset, key);
+    }
+  }
+  const hidden = patchWorld({ hidden: true });
+  assert.equal((await patchOrg({ backdrop_preset: "midnight" })).status, 200, "a hidden club paints only its own page");
+  assert.equal(sentOf(hidden)!.backdrop_preset, "midnight");
+  const member = patchWorld({ role: "member" });
+  assert.equal((await json(await patchOrg({ backdrop_preset: "forest" }))).body.code, "settings_officers_only");
+  assert.equal(updateOf(member), undefined);
+});
+
+test("PATCH background: \"cream\", an unknown key or not a string is 400 invalid_backdrop (no longer dropped), nothing written", async () => {
+  for (const value of ["cream", "sunset", "Forest", "", null, 7, { key: "forest" }]) {
+    const w = patchWorld();
+    const res = await json(await patchOrg({ backdrop_preset: value, description: "New words" }));
+    assert.deepEqual([res.status, res.body.code, res.body.error], [400, "invalid_backdrop", "Pick one of the backgrounds."], JSON.stringify(value));
+    assert.equal(updateOf(w), undefined, JSON.stringify(value));
+  }
+});
+
+test("PATCH background: the five new keys wait for NEW_BACKDROPS_LIVE (400 before it, saved after)", async () => {
+  const fresh = looks.BACKDROPS.filter((b) => b.isNew).map((b) => b.key);
+  assert.deepEqual(fresh, ["rose", "cardinal", "lantern", "canal", "onyx"]);
+  for (const key of fresh) {
+    const w = patchWorld();
+    const res = await json(await patchOrg({ backdrop_preset: key }));
+    if (looks.NEW_BACKDROPS_LIVE) {
+      assert.equal(res.status, 200, key);
+    } else {
+      assert.deepEqual([res.status, res.body.code], [400, "invalid_backdrop"], key);
+      assert.equal(updateOf(w), undefined, key);
+    }
+  }
+});
+
+test("PATCH background: the club's own key sent back unchanged is never refused, and not rewritten", async () => {
+  // A club still on "cream" (never offered again) saves the rest from a form that re-sends it.
+  const cream = patchWorld({ stored: { backdrop_preset: "cream" } });
+  assert.equal((await patchOrg({ backdrop_preset: "cream", description: "New words" })).status, 200);
+  assert.deepEqual(Object.keys(sentOf(cream)!).sort(), ["description", "updated_at"]);
+  // It can still move to an offered one, and never to another legacy or unknown key.
+  const moved = patchWorld({ stored: { backdrop_preset: "cream" } });
+  assert.equal((await patchOrg({ backdrop_preset: "ember" })).status, 200);
+  assert.equal(sentOf(moved)!.backdrop_preset, "ember");
+  patchWorld({ stored: { backdrop_preset: "cream" } });
+  assert.equal((await json(await patchOrg({ backdrop_preset: "sunset" }))).body.code, "invalid_backdrop");
+});
+
+test("PATCH background: the database's CHECK refusing a key (23514) is 409 backdrop_not_ready, never a 500", async () => {
+  patchWorld({ updateError: CHECK_REFUSAL });
+  const res = await silenced(async () => json(await patchOrg({ backdrop_preset: "forest", description: "New words" })));
+  assert.deepEqual(
+    [res.status, res.body.code, res.body.error],
+    [409, "backdrop_not_ready", "That background isn't ready yet. Pick another one for now."],
+  );
+  // Only for a save that carries a background, and only that rule: anything else is still the 500.
+  patchWorld({ updateError: CHECK_REFUSAL });
+  assert.equal((await silenced(async () => json(await patchOrg({ description: "New words" })))).status, 500);
+  patchWorld({ updateError: { code: "23514", message: 'violates check constraint "orgs_meeting_time_len"' } });
+  assert.equal((await silenced(async () => json(await patchOrg({ backdrop_preset: "forest" })))).status, 500);
+});
+
+test("PATCH name: owner and officers rename, trimmed, 2-50 characters; 1 or 51 is 400 invalid_name; a member is 403", async () => {
+  for (const role of ["admin", "owner"]) {
+    const w = patchWorld({ role });
+    assert.equal((await patchOrg({ name: "  Lantern Society  " })).status, 200, role);
+    assert.deepEqual(Object.keys(sentOf(w)!).sort(), ["name", "updated_at"]);
+    assert.equal(sentOf(w)!.name, "Lantern Society");
+  }
+  for (const name of ["ab", "a".repeat(50), `  ${"a".repeat(50)}  `]) {
+    patchWorld();
+    assert.equal((await patchOrg({ name })).status, 200, name);
+  }
+  for (const name of ["a", "  a  ", "", "a".repeat(51)]) {
+    const w = patchWorld();
+    const res = await json(await patchOrg({ name }));
+    assert.deepEqual([res.status, res.body.code, res.body.error], [400, "invalid_name", "Name must be 2–50 chars"], name);
+    assert.equal(updateOf(w), undefined);
+  }
+  const member = patchWorld({ role: "member" });
+  assert.equal((await json(await patchOrg({ name: "Lantern Society" }))).body.code, "settings_officers_only");
+  assert.equal(updateOf(member), undefined);
+});
+
+test("PATCH name: a blocked word is 422 on a new name only; the stored name sent back is not judged again", async () => {
+  const blocked = `${filterTerms()[0].term} club`;
+  const w = patchWorld();
+  assert.equal((await patchOrg({ name: blocked })).status, 422);
+  assert.equal(updateOf(w), undefined);
+  patchWorld({ stored: { name: blocked } });
+  assert.equal((await patchOrg({ name: blocked, backdrop_preset: "forest" })).status, 200);
+});
+
+test("the one list: the org routes and the old pickers carry no second list of backgrounds", () => {
+  const files = ["app/api/orgs/[slug]/route.ts", "app/api/orgs/route.ts", "app/campus/campus-home.tsx", "components/mobile/CampusMobile.tsx"];
+  // Each background's first wash, the old cream paper's too: that CSS lives in ./backdrops.ts only.
+  const washes = [...looks.BACKDROPS.map((b) => b.css), looks.LEGACY_CREAM_WALLPAPER].map((css) => css.slice(0, css.indexOf(")") + 1));
+  for (const file of files) {
+    const text = readFileSync(new URL(file, SRC_ROOT), "utf8");
+    assert.doesNotMatch(text, /VALID_BACKDROPS|BACKDROP_PRESETS|label: "(Cream paper|Sand purple|Deep violet)"/, file);
+    for (const wash of washes) assert.ok(!text.includes(wash), `${file} copies ${wash}`);
   }
 });
 

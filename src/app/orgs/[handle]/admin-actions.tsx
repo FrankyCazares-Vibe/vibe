@@ -1,5 +1,6 @@
 "use client";
 
+import { motion } from "motion/react";
 import { useRouter } from "next/navigation";
 import { useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -8,6 +9,8 @@ import { ImageCropperModal } from "@/components/ImageCropperModal";
 import { useHideTabBar } from "@/lib/chat/use-hide-tabbar";
 import { vibeRequest } from "@/lib/feedback/request";
 import { toast } from "@/lib/feedback/toast";
+import { SPRING_SNAPPY, SPRING_SOFT } from "@/lib/motion/springs";
+import { backdropFor, pickerBackdrops } from "@/lib/orgs/backdrops";
 import {
   AUDIENCE_HELP,
   OFFICER_FOLLOW_HELP,
@@ -16,6 +19,10 @@ import {
 } from "@/lib/orgs/join-copy";
 import type { JoinPolicy, OrgAudience } from "@/lib/orgs/join-state";
 import { MEETING_TIME_MAX, normalizeMeetingTime } from "@/lib/orgs/meeting-time";
+
+import { AboutHeading, LookSection, NameField, useBackdropPreview } from "./club-page/LookSection";
+import { editPageBody, lookStatus, nameProblem, openingBackdrop } from "./club-page/look-section";
+import { usePhone } from "./club-page/use-phone";
 
 type Link = { label: string; url: string };
 
@@ -83,17 +90,32 @@ const OWN_WORDS = new Set([
   "org_hidden",
 ]);
 
+/** The background refusals (PATCH /api/orgs/[slug]), shown under the picker. */
+const BACKDROP_REFUSED: Record<string, string> = {
+  // A key the database can't hold yet (before migration 20261026100000).
+  backdrop_not_ready: "That background can't be saved yet. Pick another one for now.",
+  invalid_backdrop: "That background can't be saved. Pick another one.",
+};
+
 /**
  * The club page's Edit page (wave 2; the officer bar's "Edit details",
- * renamed). "Change photo" and "Change cover" hand over to UploadAssetModal
- * through `onChangeAsset`; the opener keeps this dialog (concealed) when
- * something here was typed, so the draft survives the picture.
- * A hidden club gets neither: the officer bar never offered them there.
+ * renamed). Since Oct 22, 2026 it opens on Look (LookSection.tsx: photo,
+ * cover, the background picker), then About, with the club's name first.
+ * "Change photo" and "Change cover" hand over to UploadAssetModal through
+ * `onChangeAsset`; the opener keeps this dialog (concealed) when something
+ * here was typed or picked, so the draft survives the picture. A hidden
+ * club gets neither: the officer bar never offered them there. The page
+ * behind shows the picked background until Edit page closes; only Save
+ * keeps it.
  */
 export function EditPageModal({
   orgHandle,
   hidden,
   openToCampus,
+  initialName,
+  initialBackdrop,
+  logoUrl,
+  bannerUrl,
   initialJoinPolicy,
   initialAudience,
   initialDescription,
@@ -108,6 +130,12 @@ export function EditPageModal({
   orgHandle: string;
   hidden: boolean;
   openToCampus: OpenToCampus;
+  initialName: string;
+  /** The stored `orgs.backdrop_preset` ("cream" and unknown keys open on the default). */
+  initialBackdrop: string;
+  /** The page's own picture addresses, for Look's thumbnails and the phone's preview. */
+  logoUrl: string | null;
+  bannerUrl: string | null;
   initialJoinPolicy: JoinPolicy;
   initialAudience: OrgAudience;
   initialDescription: string;
@@ -121,6 +149,18 @@ export function EditPageModal({
   onClose: () => void;
 }) {
   const router = useRouter();
+  const phone = usePhone();
+  const offered = pickerBackdrops();
+  // Fixed for this opening: Save sends a background only when another was picked.
+  const [opening] = useState(() =>
+    openingBackdrop(initialBackdrop, offered, backdropFor(initialBackdrop).key),
+  );
+  const [backdrop, setBackdrop] = useState<string>(opening);
+  const [backdropErr, setBackdropErr] = useState<string | null>(null);
+  const keepPreview = useBackdropPreview(backdropFor(backdrop).css);
+  const [name, setName] = useState(initialName);
+  const [nameErr, setNameErr] = useState<string | null>(null);
+  const nameRef = useRef<HTMLInputElement | null>(null);
   const [description, setDescription] = useState(initialDescription);
   const [meetingTime, setMeetingTime] = useState(initialMeetingTime);
   const [links, setLinks] = useState<Link[]>(initialLinks);
@@ -136,31 +176,40 @@ export function EditPageModal({
   const meetingLength = [...meetingTime].length;
   const meetingOver = meetingLength > MEETING_TIME_MAX;
 
-  const dirty =
+  const backdropChanged = backdrop !== opening;
+  // Trimmed, as Save sends it: a stray space is no change to keep.
+  const otherChanges =
+    name.trim() !== initialName.trim() ||
     description !== initialDescription ||
     meetingTime !== initialMeetingTime ||
     philanthropy !== initialPhilanthropy ||
     joinPolicy !== initialJoinPolicy ||
     audience !== initialAudience ||
     JSON.stringify(links) !== JSON.stringify(initialLinks);
+  const dirty = backdropChanged || otherChanges;
+  const status = lookStatus({
+    from: backdropChanged ? backdropFor(opening).label : null,
+    to: backdropChanged ? backdropFor(backdrop).label : null,
+    otherChanges,
+  });
 
   const save = async () => {
     setErr(null);
     setMeetingBad(false);
-    const body: Record<string, unknown> = {
-      description: description.trim(),
-      philanthropy: philanthropy.trim(),
-      links: links
-        .map((l) => ({ label: l.label.trim(), url: l.url.trim() }))
-        .filter((l) => l.label && l.url),
-    };
-    // Only what the officer changed: narrowing the audience revokes invites
-    // on the server, and a hidden club refuses any join-field change with
-    // 409 `org_hidden`, so an untouched field must never ride along.
-    if (!hidden && joinPolicy !== initialJoinPolicy) body.join_policy = joinPolicy;
-    if (!hidden && audience !== initialAudience) body.audience = audience;
-    // The same for when it meets, so a database without the column never
-    // sees it (the route answers 503 to a body that carries it there).
+    setNameErr(null);
+    setBackdropErr(null);
+    // Judged only when changed, as the route judges it: an old name never
+    // stands in the way of saving the rest.
+    const badName = name.trim() !== initialName.trim() ? nameProblem(name) : null;
+    if (badName) {
+      setNameErr(badName);
+      nameRef.current?.focus();
+      return;
+    }
+    // When it meets goes only when changed, so a database without the
+    // column never sees it (the route answers 503 to a body that carries
+    // it there). What else goes, and why, is look-section.ts `editPageBody`.
+    let meeting: { value: string; initial: string } | null = null;
     if (meetingTimeReady) {
       const next = normalizeMeetingTime(meetingTime);
       if (!next.ok) {
@@ -168,8 +217,23 @@ export function EditPageModal({
         setMeetingBad(true);
         return;
       }
-      if (next.value !== initialMeetingTime) body.meeting_time = next.value;
+      meeting = { value: next.value, initial: initialMeetingTime };
     }
+    const body = editPageBody({
+      hidden,
+      name,
+      initialName,
+      backdrop,
+      openingBackdrop: opening,
+      description,
+      philanthropy,
+      links,
+      joinPolicy,
+      initialJoinPolicy,
+      audience,
+      initialAudience,
+      meetingTime: meeting,
+    });
 
     setBusy(true);
     const r = await vibeRequest(`/api/orgs/${encodeURIComponent(orgHandle)}`, {
@@ -181,7 +245,17 @@ export function EditPageModal({
     setBusy(false);
     if (!r.ok) {
       const blocked = r.code === "content_blocked" && r.field ? BLOCKED_FIELD[r.field] : undefined;
-      if (r.code === "meeting_time_unavailable") {
+      // The name and the background answer beside their own field.
+      if ((r.code === "content_blocked" && r.field === "name") || r.code === "invalid_name") {
+        setNameErr(
+          r.code === "invalid_name"
+            ? "A club's name is 2 to 50 characters."
+            : "The name includes words that aren't allowed on Vibe. Edit it and try again.",
+        );
+        nameRef.current?.focus();
+      } else if (r.code && BACKDROP_REFUSED[r.code]) {
+        setBackdropErr(BACKDROP_REFUSED[r.code]);
+      } else if (r.code === "meeting_time_unavailable") {
         setErr("When you meet can't be saved yet. Try again later.");
         setMeetingBad(true);
       } else if (blocked) {
@@ -198,32 +272,71 @@ export function EditPageModal({
       if (r.action) toast({ message: r.message, tone: "error", action: r.action });
       return;
     }
+    // The page keeps the new background; the refreshed page paints it too.
+    keepPreview();
     router.refresh();
     onClose();
   };
 
+  const footer = (
+    <>
+      {err ? <ErrorBanner text={err} /> : null}
+      <div className="vibe-edit-actions">
+        <span className="vibe-edit-status" data-dirty={dirty ? "" : undefined}>
+          {status}
+        </span>
+        <button type="button" className="vibe-edit-cancel vibe-press" onClick={onClose}>
+          Cancel
+        </button>
+        <button
+          type="button"
+          className="vibe-edit-save vibe-press"
+          onClick={() => void save()}
+          disabled={busy}
+        >
+          {busy ? "Saving…" : "Save"}
+        </button>
+      </div>
+    </>
+  );
+
   return (
-    <ModalShell title="Edit page" onClose={onClose} concealed={concealed}>
-      {!hidden && onChangeAsset ? (
-        <div style={{ display: "flex", gap: 8, marginBottom: 4 }}>
-          <button
-            type="button"
-            className="vibe-press"
-            onClick={() => onChangeAsset("logo", dirty)}
-            style={{ ...buttonStyle("ghost"), ...assetPillStyle }}
-          >
-            Change photo
-          </button>
-          <button
-            type="button"
-            className="vibe-press"
-            onClick={() => onChangeAsset("banner", dirty)}
-            style={{ ...buttonStyle("ghost"), ...assetPillStyle }}
-          >
-            Change cover
-          </button>
-        </div>
-      ) : null}
+    <ModalShell
+      title="Edit page"
+      onClose={onClose}
+      concealed={concealed}
+      layout="edit"
+      eyebrow={initialName}
+      tint={backdropFor(backdrop).css}
+      footer={footer}
+    >
+      <LookSection
+        phone={phone}
+        name={name}
+        handle={orgHandle}
+        description={description}
+        logoUrl={logoUrl}
+        bannerUrl={bannerUrl}
+        offered={offered}
+        value={backdrop}
+        onChange={(key) => {
+          setBackdrop(key);
+          setBackdropErr(null);
+        }}
+        onChangeAsset={!hidden && onChangeAsset ? (kind) => onChangeAsset(kind, dirty) : undefined}
+        error={backdropErr}
+      />
+
+      <AboutHeading phone={phone} />
+      <NameField
+        value={name}
+        onChange={(next) => {
+          setName(next);
+          setNameErr(null);
+        }}
+        error={nameErr}
+        inputRef={nameRef}
+      />
 
       <FieldLabel>Description</FieldLabel>
       <textarea
@@ -306,34 +419,9 @@ export function EditPageModal({
           <Hint>{OFFICER_FOLLOW_HELP}</Hint>
         </>
       ) : null}
-
-      {err ? <ErrorBanner text={err} /> : null}
-
-      <ModalFooter>
-        <button type="button" onClick={onClose} style={{ ...buttonStyle("ghost"), minHeight: 44 }}>
-          Cancel
-        </button>
-        <button
-          type="button"
-          onClick={() => void save()}
-          disabled={busy}
-          style={{ ...buttonStyle("primary"), minHeight: 44, opacity: busy ? 0.6 : 1 }}
-        >
-          {busy ? "Saving…" : "Save"}
-        </button>
-      </ModalFooter>
     </ModalShell>
   );
 }
-
-const assetPillStyle: React.CSSProperties = {
-  flex: 1,
-  minHeight: 44,
-  borderRadius: 999,
-  display: "inline-flex",
-  alignItems: "center",
-  justifyContent: "center",
-};
 
 // ─── Banner / Logo upload ────────────────────────────────────────────────
 
@@ -716,19 +804,39 @@ export function NewPostModal({
  * one tick late so a closing vaul sheet's own focus return lands first.
  * `concealed` keeps it mounted but out of sight (and its draft intact) while
  * another dialog opens over it.
+ *
+ * `layout="edit"` is Edit page's own frame (Oct 22, 2026, the Look boards):
+ * on a computer a tall panel on the right with the page left in sight, so
+ * the page can repaint as a background is picked; on a phone a sheet from
+ * the bottom. Its header and `footer` stay put while the middle scrolls,
+ * and `tint` washes the top of the panel in the picked background. It
+ * arrives on springs.ts's springs (transform and opacity; with reduce motion
+ * only the fade). Its classes are globals.css "The Edit page's Look section".
  */
 function ModalShell({
   title,
   onClose,
   children,
   concealed = false,
+  layout = "dialog",
+  eyebrow,
+  footer,
+  tint,
 }: {
   title: string;
   onClose: () => void;
   children: React.ReactNode;
   concealed?: boolean;
+  layout?: "dialog" | "edit";
+  /** Edit layout only: the small line over the title (the club's name). */
+  eyebrow?: string;
+  /** Edit layout only: the row under the scrolling middle. */
+  footer?: React.ReactNode;
+  /** Edit layout only: the background (CSS) that washes the panel's top. */
+  tint?: string;
 }) {
   useHideTabBar();
+  const phone = usePhone();
   const rootRef = useRef<HTMLDivElement | null>(null);
   const panelRef = useRef<HTMLDivElement | null>(null);
   const titleId = useId();
@@ -770,6 +878,55 @@ function ModalShell({
 
   // Only ever opened by a tap, so there is no server render to match.
   if (typeof document === "undefined") return null;
+
+  if (layout === "edit") {
+    return createPortal(
+      <div
+        ref={rootRef}
+        className="vibe-night-island vibe-edit-root"
+        onClick={(e) => {
+          // A portal still bubbles React events to the page that opened it.
+          e.stopPropagation();
+          onClose();
+        }}
+        role="dialog"
+        aria-modal={concealed ? undefined : "true"}
+        aria-labelledby={titleId}
+        style={concealed ? { display: "none" } : undefined}
+      >
+        <motion.div
+          ref={panelRef}
+          tabIndex={-1}
+          className="vibe-edit-panel"
+          onClick={(e) => e.stopPropagation()}
+          // A phone's sheet rises from the bottom edge; a computer's panel
+          // comes in a little from the right. Opacity quickly, so it is solid
+          // early; with reduce motion on, the fade is what's left.
+          initial={phone ? { y: "100%", opacity: 0 } : { x: 32, opacity: 0 }}
+          animate={phone ? { y: "0%", opacity: 1 } : { x: 0, opacity: 1 }}
+          transition={{ x: SPRING_SOFT, y: SPRING_SOFT, opacity: SPRING_SNAPPY }}
+        >
+          {tint ? <span aria-hidden className="vibe-edit-tint" style={{ background: tint }} /> : null}
+          <div className="vibe-edit-head">
+            <div style={{ flex: 1, minWidth: 0 }}>
+              {eyebrow ? <div className="vibe-edit-eyebrow">{eyebrow}</div> : null}
+              <h2 id={titleId} className="vibe-edit-title">
+                {title}
+              </h2>
+            </div>
+            <button type="button" className="vibe-edit-close vibe-press" onClick={onClose} aria-label="Close">
+              <svg aria-hidden width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
+                <path d="M6 6l12 12M18 6L6 18" />
+              </svg>
+            </button>
+          </div>
+          <div className="vibe-edit-body">{children}</div>
+          {footer ? <div className="vibe-edit-foot">{footer}</div> : null}
+        </motion.div>
+      </div>,
+      document.body,
+    );
+  }
 
   return createPortal(
     <div
