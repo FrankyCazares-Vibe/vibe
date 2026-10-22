@@ -238,3 +238,14 @@ Shipped from the wave 1 session (`busy-aryabhata-7b6991`); this branch's own ses
     (900 to 1440) and a phone, Night. Plan and details: `handoffs/2026-10-22-club-tools-arc/PLAN.md`.
     **Not checked:** the "Not this time" state live (no local data for it; unit-tested), Approve/Decline/Invite
     clicks against real data (viewed only, to leave the local test club as it was), a real phone.
+- **Oct 22, later (Franky's yes in chat): officer notifications for new join requests are ON in production.**
+  Migration `20261024100000_org_join_request_notification` rehearsed on the local stack (apply, apply again,
+  rollback, apply; then a real request as Avery notified both Sixty-Four Chess officers and not Avery, showed in
+  Maya's list as "Avery Owner asked to join Sixty-Four Chess", and Cancel removed the request and its follow and
+  marked the notices read; the test rows were then deleted). Production pre-flight (catalog and counts only): the
+  type rule was exactly the old 8-type list, only known types in use, browser roles can't insert or update
+  notifications. Applied with the connector (the body between begin and commit); its auto-dated
+  `schema_migrations` row renamed to `20261024100000` / `org_join_request_notification`. Post-check: the rule now
+  ends with `org_join_request` and is validated, the per-type counts are unchanged, grants unchanged. No code
+  change was needed (main `44b0923` already writes the notices). Not checked on production: a real request (it
+  needs a real student); the first one will show it.
