@@ -198,3 +198,43 @@ Shipped from the wave 1 session (`busy-aryabhata-7b6991`); this branch's own ses
   Otto orb popping back over the closing panel). tsc clean, 3,731 tests pass; walked headless at 900 to 1440,
   Night, Light and reduce motion; phones unchanged pixel for pixel. **Not checked:** on Franky's own officer
   account on production (open a club you run on a computer, use the handle and the cover's button).
+- **Oct 22 (Franky: likes the Arc mockup best; doesn't want people to confuse following with asking to join;
+  "fix everything else"; "why is the banner small"):**
+  - **Club tools on a computer are the Arc now.** The owner and officers get the little planet on the window's
+    right edge (from 1024px; the cover's Club tools button opens it from 900px). Press it and seven tools float
+    out of it in an arc: Invite and share, Members, Followers, Join requests (bigger, coral, in the middle),
+    Officers and titles, Past events, Club settings. Hovering (or tabbing to) one names it; clicking opens a card
+    with what it needs, with real data and real buttons: Join requests lists who's waiting with Approve and
+    Decline; Followers lists followers who aren't members with "Invite to join"; Members and Officers list
+    people; Invite and share has Share the club page, Invite members and the members' link; each card links to
+    the full Club tools page. Escape closes the card, then the arc. The slide-out panel is gone.
+  - **Following and joining are now two separate things on the club page.** The button row has Follow (or
+    Following ✓; members see "Member ✓") and Share. Joining lives in its own small "Membership" box under it, for
+    anyone who isn't a member: one plain line and one button ("Officers approve new members. Asking also follows
+    the club." [Request to join]; "Request sent. An officer will look at it." [Cancel request]; "Invite only.
+    Officers invite members."; an invite's Accept and Decline; "Sign in to follow or join."). The old invite
+    banner and the "Officers approve members" notice are folded into the box.
+  - **Fixed:** a student turned down waits 14 days before asking again (the box says "Not this time. You can ask
+    again on <day>", the day after the wait ends), unless the officers invite them in after all; a student can
+    cancel a pending request (which also undoes the follow the request made); followers can be invited from the
+    Followers card and from the phone's Followers screen ("Invite followers" and Invite on each row).
+  - **Officers will be told when someone asks to join** (Otto and push: "<name> asked to join <club>", opening
+    Join requests; it uses the "Club invites" push switch). **This needs one database change, which is NOT
+    applied:** `supabase/migrations/20261024100000_org_join_request_notification.sql` adds the new kind to the
+    notifications list. Until Franky says yes and it's applied, requests work as before and officers just aren't
+    told (the app logs it and carries on). No Privacy Policy change: the policy already says officers see
+    requests to join.
+  - **The banner:** the cover was small because the page's text column is capped at 760px for readable lines
+    and the cover followed it at 3:1. On a computer it now runs the middle column's width (up to 1100px), the
+    text staying at 760; officers' covers stop short of the planet.
+  - **Not built, Franky's call: events for fraternities.** Today every club event is visible to anyone who can
+    see the club; chats are members-only and the Board is members plus followers (with its switch).
+    Recommendation: one choice per event, "Everyone" (default) or "Members only" (chapter meetings, private
+    socials); no "followers only" tier, since anyone can follow (it would be public in all but name). It needs a
+    database column and touches the events lists, Tonight, the calendar and check-in.
+  - Checks: built in three file-owned batches, each reviewed and repaired, then a whole-change review (3 lenses,
+    a skeptic per finding; 4 held, all fixed). tsc clean, 3,773 tests pass, eslint clean (4 old-pattern warnings).
+    Walked headless as an officer, a member, a non-member, a pending requester and signed out, on a computer
+    (900 to 1440) and a phone, Night. Plan and details: `handoffs/2026-10-22-club-tools-arc/PLAN.md`.
+    **Not checked:** the "Not this time" state live (no local data for it; unit-tested), Approve/Decline/Invite
+    clicks against real data (viewed only, to leave the local test club as it was), a real phone.

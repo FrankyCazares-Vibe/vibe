@@ -51,9 +51,11 @@ import type { FcmMessage } from "./types";
 /**
  * Every kind that can push. The dead `connection` kind never does.
  * `event_cancelled` (a club's cancelled-event notice, S68) always pushes: it
- * has no Settings switch (ALWAYS_ON_PUSH_KINDS).
+ * has no Settings switch (ALWAYS_ON_PUSH_KINDS). `org_join_request` (to an
+ * owner or officer: "<name> asked to join <club>", Oct 22, 2026) has no
+ * switch of its own either: it rides the "Club invites" one (SHARED_SWITCH).
  */
-export type PushKind = SwitchablePushKind | "event_cancelled";
+export type PushKind = SwitchablePushKind | "event_cancelled" | "org_join_request";
 
 /** The kinds a student can switch off in Settings → Notifications. */
 export type SwitchablePushKind =
@@ -92,6 +94,29 @@ export const PUSH_KINDS: readonly SwitchablePushKind[] = [
  * would only mean walking to an event that isn't happening.
  */
 export const ALWAYS_ON_PUSH_KINDS: readonly PushKind[] = ["event_cancelled"];
+
+/**
+ * Kinds that obey ANOTHER kind's Settings switch instead of having their own.
+ *
+ * `org_join_request` follows `org_invite` ("Club invites"; the card's hint
+ * says "Also when someone asks to join a club you run"). Why that switch and
+ * not a new one, or `org_request_approved`: both invites and join requests
+ * are the same conversation, "who's coming into a club", seen from the two
+ * ends, and a student who turned club pushes off meant club pushes. A new
+ * switch would also sit in every student's Settings although only officers
+ * ever get one of these. `org_request_approved` is the answer to the
+ * student's OWN request, which is a different thing to silence.
+ *
+ * Changing this moves the push only: the Otto row always lands.
+ */
+export const SHARED_SWITCH: Readonly<Partial<Record<PushKind, SwitchablePushKind>>> = Object.freeze({
+  org_join_request: "org_invite",
+});
+
+/** The Settings switch that decides `kind`: its own, or the one it shares. */
+export function switchFor(kind: PushKind): PushKind {
+  return SHARED_SWITCH[kind] ?? kind;
+}
 
 export type PushMessage = {
   kind: PushKind;
@@ -215,7 +240,9 @@ export type PushEvent =
       content: PushChatContent;
     }
   | {
-      kind: "org_invite" | "org_request_approved";
+      // org_join_request: the actor is the student who asked, and the push
+      // goes to each owner and officer of the club.
+      kind: "org_invite" | "org_request_approved" | "org_join_request";
       actor: PushActor;
       orgId: string;
       club: PushClub;
@@ -302,7 +329,7 @@ export function parsePushPrefs(ottoSettings: unknown): PushPrefs {
 
 export function pushKindOn(prefs: PushPrefs, kind: PushKind): boolean {
   if (ALWAYS_ON_PUSH_KINDS.includes(kind)) return true;
-  return !prefs.off.has(kind);
+  return !prefs.off.has(switchFor(kind));
 }
 
 function isObject(v: unknown): v is Record<string, unknown> {
@@ -323,6 +350,9 @@ const threadPath = (channelId: string) => `/messages?channel=${encodeURIComponen
 // Club rows open the club; without its handle the Orgs tab is the closest place.
 const clubPath = (handle: string | null) =>
   handle ? `/orgs/${encodeURIComponent(handle)}` : "/campus?tab=orgs";
+// A join request opens where it's answered: Club tools > Join requests.
+const joinRequestsPath = (handle: string | null) =>
+  handle ? `/orgs/${encodeURIComponent(handle)}/tools/requests` : "/campus?tab=orgs";
 
 /**
  * A chat message in a few words. The sender's own text when previews allow
@@ -423,6 +453,22 @@ export function buildPushMessage(event: PushEvent, ctx: PushBuildContext): PushM
           : club ? `Approved your request to join ${club}` : "Approved your club request",
         url: url(clubPath(event.club.handle)),
         tag: `${event.kind}:${event.orgId}`,
+      };
+      break;
+    }
+    case "org_join_request": {
+      // The same naming rule as an invite (critic item 6): the officer's own
+      // phone can out them as much as a member's, so a club only anyone
+      // could find is named, and only with previews on.
+      const club = ctx.previews && clubMayBeNamed(event.club) ? previewText(event.club.name, 50) : null;
+      m = {
+        ...base,
+        title: name,
+        body: club ? `Asked to join ${club}` : "Asked to join your club",
+        url: url(joinRequestsPath(event.club.handle)),
+        // One per club: a busy night is one line that updates, not a stack.
+        // The requests list is where they're answered, all of them at once.
+        tag: `org_join_request:${event.orgId}`,
       };
       break;
     }

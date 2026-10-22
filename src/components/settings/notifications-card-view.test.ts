@@ -86,6 +86,23 @@ test("the groups list every kind once, in the card's order", () => {
   assert.equal(mention?.hint, "In posts and club chats");
 });
 
+test("Club invites says it also covers join requests, the kind that shares its switch (Oct 22, 2026)", () => {
+  const rows = V.KIND_GROUPS.flatMap((g) => g.rows);
+  const invites = rows.find((r) => r.kind === "org_invite");
+  assert.equal(invites?.hint, "Also when someone asks to join a club you run");
+  // Every kind that shares a switch shares one the card shows, and has no row of its own.
+  for (const [kind, shared] of Object.entries(P.SHARED_SWITCH)) {
+    assert.ok(V.CARD_KINDS.includes(shared as never), `${kind} shares ${shared}, which the card lists`);
+    assert.ok(!rows.some((r) => r.kind === kind), `${kind} has no switch of its own`);
+  }
+  // Turning Club invites off turns the join-request push off, through the
+  // same saved list the card writes.
+  const off = V.flipPrefs(ALL_ON, { kind: "org_invite", on: false });
+  const patch = V.patchForFlip(off, { kind: "org_invite", on: false });
+  assert.equal(P.pushKindOn(P.parsePushPrefs(patch), "org_join_request"), false);
+  assert.equal(P.pushKindOn(P.parsePushPrefs({}), "org_join_request"), true);
+});
+
 test("the previews hint never promises to hide who sent it", () => {
   assert.match(V.COPY.previewsHint, /^Names always show\./);
   assert.doesNotMatch(V.COPY.previewsHint, /hide (the )?(name|sender|who)/i);

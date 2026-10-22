@@ -570,3 +570,59 @@ test("a cancelled event's wire shapes carry the club's tap target", () => {
   assert.deepEqual(fcm.data, { url: `${ORIGIN}/orgs/chess`, tag: `event_cancelled:${NOTICE}`, kind: "event_cancelled" });
   assert.equal(fcm.android?.notification?.channel_id, "activity");
 });
+
+// ── A join request, to an owner or officer (Oct 22, 2026) ───────────────────
+
+const joinRequest = (club: PushClub = PUBLIC_CLUB): PushEvent => ({
+  kind: "org_join_request",
+  actor: MAYA,
+  orgId: ORG,
+  club,
+});
+
+test("a join request: the asker's name, the club only when it may be named, the requests page", () => {
+  const m = build(joinRequest());
+  assert.equal(m.kind, "org_join_request");
+  assert.equal(m.title, "Maya Lopez");
+  assert.equal(m.body, "Asked to join Chess Club");
+  assert.equal(m.url, `${ORIGIN}/orgs/chess/tools/requests`);
+  assert.equal(m.tag, `org_join_request:${ORG}`, "one line per club, updated in place");
+  assert.equal(m.chat, false);
+  const secret: PushClub[] = [
+    { ...PUBLIC_CLUB, join_policy: "invite" },
+    { ...PUBLIC_CLUB, audience: "iu" },
+    { ...PUBLIC_CLUB, is_public: false },
+    { ...PUBLIC_CLUB, hidden_at: "2026-09-01T00:00:00Z" },
+  ];
+  for (const club of secret) {
+    assert.equal(build(joinRequest(club)).body, "Asked to join your club", JSON.stringify(club));
+  }
+  assert.equal(build(joinRequest(), { previews: false }).body, "Asked to join your club");
+  assert.equal(build(joinRequest({ ...PUBLIC_CLUB, handle: null })).url, `${ORIGIN}/campus?tab=orgs`);
+  assert.equal(build(joinRequest({ ...PUBLIC_CLUB, name: BLOCKED })).body, "Asked to join your club");
+  assert.equal(build({ ...joinRequest(), actor: { name: null, handle: null } } as PushEvent).title, "Someone");
+});
+
+test("a join request rides the Club invites switch: no switch of its own, never always-on", () => {
+  assert.ok(!(P.PUSH_KINDS as readonly string[]).includes("org_join_request"), "not a Settings switch");
+  assert.ok(!P.ALWAYS_ON_PUSH_KINDS.includes("org_join_request"));
+  assert.equal(P.switchFor("org_join_request"), "org_invite");
+  assert.equal(P.switchFor("like"), "like", "every other kind is its own switch");
+  assert.equal(P.pushKindOn(P.parsePushPrefs({}), "org_join_request"), true, "on by default");
+  assert.equal(P.pushKindOn(P.parsePushPrefs({ push: { off: ["org_invite"] } }), "org_join_request"), false);
+  assert.equal(P.pushKindOn(P.parsePushPrefs({ push: { off: ["org_request_approved"] } }), "org_join_request"), true);
+  // A hand-saved "org_join_request" in `off` is an unknown kind: ignored.
+  const saved = P.parsePushPrefs({ push: { off: ["org_join_request"] } });
+  assert.equal(saved.off.has("org_join_request" as never), false);
+  assert.equal(P.pushKindOn(saved, "org_join_request"), true);
+  assert.deepEqual(P.deliveryFor("org_join_request"), { ttlSec: 86_400, urgency: "normal" });
+});
+
+test("a join request's wire shapes carry the requests page and the activity channel", () => {
+  const m = build(joinRequest());
+  const web = JSON.parse(P.toWebPush(m)).notification;
+  assert.deepEqual([web.title, web.body, web.navigate], ["Maya Lopez", "Asked to join Chess Club", `${ORIGIN}/orgs/chess/tools/requests`]);
+  const fcm = P.toFcm(m, "token");
+  assert.deepEqual(fcm.data, { url: `${ORIGIN}/orgs/chess/tools/requests`, tag: `org_join_request:${ORG}`, kind: "org_join_request" });
+  assert.equal(fcm.android?.notification?.channel_id, "activity");
+});

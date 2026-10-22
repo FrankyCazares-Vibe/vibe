@@ -70,6 +70,9 @@ const JOIN_STATES: readonly JoinState[] = [
   "audience_blocked",
   "unverified",
   "hidden",
+  // An officer said no in the last two weeks (Oct 22, 2026): the row still
+  // shows, with the follow toggle and no Request (`orgRowView`).
+  "declined",
 ];
 const ORG_ROLES: readonly OrgRole[] = ["owner", "admin", "member"];
 
@@ -94,7 +97,7 @@ function oneOf<T extends string>(value: unknown, allowed: readonly T[]): T | nul
 
 /**
  * Discover rows, typed. Drops a row missing `id`, `handle` or `name`, a row
- * whose `join_state` isn't one of the nine states (there'd be no control to
+ * whose `join_state` isn't one of the ten states (there'd be no control to
  * render), and a repeated `id` (first wins). A non-array is `[]`.
  *
  * Defaults for a malformed field: an unknown `join_policy` reads as "request"

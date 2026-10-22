@@ -56,16 +56,20 @@ type Body = { action?: unknown };
  * approval was silent: the officer tapped Approve and the student found out
  * only by revisiting the org page.
  *
- * DENIAL IS A RECORD, AND B23 READS IT (critic A8). A denial writes
- * `status = 'denied'` with `resolved_at` and `resolved_by`, and that row is
- * the only memory the system has that an officer said no. The invite route
- * checks it before letting anybody be re-invited:
+ * DENIAL IS A RECORD, AND THE STUDENT'S SIDE READS IT (critic A8; Oct 22,
+ * 2026). A denial writes `status = 'denied'` with `resolved_at` and
+ * `resolved_by`, and that row is the only memory the system has that an
+ * officer said no. `loadViewerOrgContext` reads the newest one as
+ * `declinedAt`, and for `REQUEST_COOLDOWN_DAYS` (14) after it `orgJoinState`
+ * answers `declined`: the club page says "Not this time. You can ask again
+ * on <day>." and POST /join refuses a new request with 409
+ * `recently_declined`. The invite route deliberately does NOT read it (an
+ * officer may still invite somebody they turned down; an earlier version of
+ * this comment said it checked 30 days, which it never did).
  *
- *   select 1 from org_join_requests
- *    where org_id = $1 and user_id = $2 and status = 'denied'
- *      and resolved_at > now() - interval '30 days'
- *
- * Do not "clean up" denied rows, and do not null `resolved_at` on them.
+ * Do not "clean up" denied rows, and do not null `resolved_at` on them. A
+ * student who CANCELS deletes their pending row instead (DELETE /join), so a
+ * cancel never starts the wait.
  *
  * S67 SECURITY WAVE 2 (#15 and the hidden-club Low):
  *   - a non-member asking about a HIDDEN club gets 404, never 403;

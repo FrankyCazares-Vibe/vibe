@@ -40,7 +40,8 @@ const STUBS: Record<string, string> = {
   "@/lib/legal/require-terms": stub("export async function requireTermsAccepted() { return null; }"),
   "@/lib/orgs/membership": stub(
     "export async function loadViewerOrgContext() { return null; }\nexport async function expireStaleInvites() {}\n" +
-      "export async function admitMember() { return { ok: true }; }",
+      "export async function admitMember() { return { ok: true }; }\n" +
+      "export async function notifyOfficersOfJoinRequest() {}\nexport async function settleJoinRequestNotifications() {}",
   ),
   "@/lib/orgs/org-blocks": stub("export async function loadOrgBlocks() { return { ok: true, blockedByOfficer: false }; }"),
 };

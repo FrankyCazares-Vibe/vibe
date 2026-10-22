@@ -91,7 +91,11 @@ export const KIND_GROUPS: readonly KindGroup[] = [
   {
     title: "Clubs",
     rows: [
-      { kind: "org_invite", label: "Club invites" },
+      // One switch for both ends of "who's coming into a club" (Oct 22,
+      // 2026): a join request to an officer rides this one
+      // (SHARED_SWITCH in payload.ts), so the hint says so instead of a
+      // switch only officers would ever use.
+      { kind: "org_invite", label: "Club invites", hint: "Also when someone asks to join a club you run" },
       { kind: "org_request_approved", label: "Club requests approved" },
     ],
   },

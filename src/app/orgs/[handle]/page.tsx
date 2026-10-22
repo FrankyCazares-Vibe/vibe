@@ -8,7 +8,6 @@ import { LoadFailed } from "@/components/feedback/LoadFailed";
 import { clubSetupPath } from "@/lib/club-links/redeem";
 import { loadClubSetup } from "@/lib/club-links/setup";
 import { MobileTabBar } from "@/components/mobile/MobileTabBar";
-import { OrgInviteBanner } from "@/components/orgs/OrgInviteBanner";
 import { OrgMenu } from "@/components/orgs/OrgMenu";
 import { visibleClubPosts } from "@/lib/club-routes/club-posts";
 import { isMissingColumnError } from "@/lib/db/missing-column";
@@ -53,12 +52,13 @@ import { ClubAppFrame, showsAppFrame } from "./club-frame";
 import { AboutDetails, fmtDate } from "./club-page/AboutDetails";
 import { ClubCover, ClubHeader, LockGlyph } from "./club-page/ClubHeader";
 import { ClubEventsProvider } from "./club-page/ClubEventsProvider";
-import { ClubToolsDrawer } from "./club-page/ClubToolsDrawer";
+import { ClubToolsLauncher } from "./club-page/ClubToolsLauncher";
+import { MembershipBox } from "./club-page/MembershipBox";
 import { ClubSwitchSync } from "./club-page/ClubSwitchSync";
 import { MoreAboutUs } from "./club-page/MoreAboutUs";
 import { CoverOfficerButtons, EditPageButton, SharePageButton } from "./club-page/OfficerActions";
 import { SwitchChevron } from "./club-page/SwitchChevron";
-import { ClubToolsCard, NeedsYouLine, clubToolsRows } from "./club-page/ToolsCard";
+import { ClubToolsCard, NeedsYouLine } from "./club-page/ToolsCard";
 import type { ClubPageOrg } from "./club-page/types";
 import { UpNext } from "./club-page/UpNext";
 import { OrgContent } from "./OrgContent";
@@ -221,6 +221,8 @@ export default async function OrgProfilePage({ params }: Params) {
         pendingRequest: ctx.pendingRequest,
         // Removed members see "Request to join", not "Join" (S67 sec wave 2).
         removed: ctx.removed,
+        // Turned down in the last two weeks: "Not this time" (Oct 22, 2026).
+        declinedAt: ctx.ok ? ctx.declinedAt : null,
       })
     : null;
 
@@ -252,6 +254,7 @@ export default async function OrgProfilePage({ params }: Params) {
           reason: decision?.reason ?? null,
           audience,
           joinPolicy,
+          askAgainAt: decision?.askAgainAt ?? null,
         };
   const invite =
     relation?.state === "invited" && ctx?.pendingInvite ? ctx.pendingInvite : null;
@@ -485,7 +488,7 @@ export default async function OrgProfilePage({ params }: Params) {
   const officerRole = officerView && (viewerRole === "owner" || viewerRole === "admin") ? viewerRole : null;
   // Out of the app frame the Club tools card is the page's own, beside the
   // club on a wide screen, as before; in it, Club tools come out of the right
-  // edge when asked (ClubToolsDrawer).
+  // edge when asked (ClubToolsLauncher, the Arc).
   const toolsInPage = !!officerRole && !framed;
   const needsYou = officerCounts ? needsYouText(officerCounts) : null;
   // "Report this club", in More about us. Signed out there is nobody to file
@@ -530,6 +533,8 @@ export default async function OrgProfilePage({ params }: Params) {
         // tools column on a wide screen (in it, globals.css keeps theirs at
         // 760 from 900px up: their tools come out of the right edge).
         className="vibe-org-shell vibe-night-island"
+        // The Club tools planet is on the right edge: the cover keeps clear.
+        data-club-tools={framed && officerRole ? "" : undefined}
         style={{
           maxWidth: officerRole ? 1100 : 760,
           margin: "0 auto",
@@ -589,10 +594,7 @@ export default async function OrgProfilePage({ params }: Params) {
               ) : (
                 <div className="vibe-club-join">
                   {relation ? (
-                    <OrgProfileJoinButton
-                      relation={relation}
-                      pendingInviteId={ctx?.pendingInvite?.id ?? null}
-                    />
+                    <OrgProfileJoinButton relation={relation} />
                   ) : (
                     <LoadFailed
                       tone="dark"
@@ -613,19 +615,22 @@ export default async function OrgProfilePage({ params }: Params) {
               <NeedsYouLine handle={org.handle} text={needsYou} requests={officerCounts?.pendingRequests ?? 0} />
             ) : null}
 
-            {/* Membership gates the chats, not the public profile. Description,
-                posts, links, and philanthropy all show so a visitor can decide
-                whether to follow or join. */}
-            {notice ? <JoinPolicyNotice text={notice} /> : null}
-            {invite ? (
-              <div style={{ marginTop: 16 }}>
-                <OrgInviteBanner
-                  orgName={org.name}
-                  inviterFirstName={invitedByName}
-                  expiresAt={invite.expires_at}
-                />
-              </div>
-            ) : null}
+            {/* Following and joining are two things (Franky, Oct 22, 2026):
+                the row above follows; this box is how to become a member,
+                in one line and one action, the invite included. Members and
+                officers see none. The hidden-club line still shows below;
+                the "Officers approve members" notice is the box's now. */}
+            {officerRole ? null : (
+              <MembershipBox
+                relation={relation}
+                invite={
+                  invite
+                    ? { id: invite.id, expiresAt: invite.expires_at, inviterFirstName: invitedByName }
+                    : null
+                }
+              />
+            )}
+            {notice && org.hidden ? <JoinPolicyNotice text={notice} /> : null}
 
             {/* Up next and the Events tab read one list, fetched once. */}
             <ClubEventsProvider orgId={org.id} rsvpAtHomeOnly={visiting} renderKey={nowMs}>
@@ -678,14 +683,19 @@ export default async function OrgProfilePage({ params }: Params) {
         </div>
       </div>
 
-      {/* Club tools on a computer, for the owner and officers: a handle on
-          the right edge that brings the panel out. */}
+      {/* Club tools on a computer, for the owner and officers: the little
+          planet on the right edge; the tools float out of it (the Arc). */}
       {framed && officerRole ? (
-        <ClubToolsDrawer
-          clubName={org.name}
-          toolsHref={`/orgs/${encodeURIComponent(org.handle)}/tools`}
-          rows={clubToolsRows(org.handle, toolsCounts)}
-          requests={toolsCounts.requests}
+        <ClubToolsLauncher
+          handle={org.handle}
+          orgId={org.id}
+          orgName={org.name}
+          verified={org.verified}
+          hidden={org.hidden}
+          joinPolicy={org.join_policy}
+          audience={org.audience}
+          counts={toolsCounts}
+          viewerId={user?.id ?? null}
         />
       ) : null}
 

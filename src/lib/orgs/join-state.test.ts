@@ -25,12 +25,16 @@ const {
   INVITE_ROLES,
   INVITE_TTL_DAYS,
   OFFICER_ROLES,
+  REQUEST_COOLDOWN_DAYS,
+  REQUEST_COOLDOWN_MS,
   SETTINGS_ROLES,
   SIGNED_OUT,
+  askAgainAt,
   audienceAllows,
   canApproveRequest,
   canInvite,
   checkConstraintName,
+  declinedAtUnlessAdmitted,
   firstNameOf,
   inviteIsLive,
   isJoinPolicy,
@@ -58,6 +62,7 @@ function decide(over: {
   pendingInvite?: Input["pendingInvite"];
   pendingRequest?: Input["pendingRequest"];
   removed?: Input["removed"];
+  declinedAt?: Input["declinedAt"];
   now?: Date;
 }) {
   return orgJoinState({
@@ -78,6 +83,7 @@ function decide(over: {
     pendingInvite: over.pendingInvite ?? null,
     pendingRequest: over.pendingRequest ?? null,
     ...(over.removed === undefined ? {} : { removed: over.removed }),
+    ...(over.declinedAt === undefined ? {} : { declinedAt: over.declinedAt }),
     now: over.now ?? NOW,
   });
 }
@@ -617,4 +623,82 @@ test("canApproveRequest: any officer, and a removed person needs the invite role
   assert.equal(canApproveRequest("admin", true), true);
   assert.equal(canApproveRequest("member", true), false);
   assert.equal(canApproveRequest(undefined, true), false);
+});
+
+// ── A recent "no" (Oct 22, 2026): `declined` for 14 days, then ask again ───
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+/** An officer's Deny `days` days before NOW. */
+const deniedAgo = (days: number) => new Date(NOW.getTime() - days * DAY_MS).toISOString();
+
+test("declined: a no inside 14 days takes the Request away and says when to ask again", () => {
+  const d = decide({ org: { join_policy: "request" }, declinedAt: deniedAgo(3) });
+  assert.equal(d.state, "declined");
+  assert.equal(d.askAgainAt, new Date(NOW.getTime() + 11 * DAY_MS).toISOString());
+  assert.equal(d.reason, undefined, "no reason: there is nothing to ask for yet");
+});
+
+test("declined: the window closes at exactly 14 days, the same boundary as inviteIsLive", () => {
+  assert.equal(REQUEST_COOLDOWN_DAYS, 14);
+  assert.equal(REQUEST_COOLDOWN_MS, 14 * DAY_MS);
+  const justIn = new Date(NOW.getTime() - REQUEST_COOLDOWN_MS + 1).toISOString();
+  assert.equal(decide({ org: { join_policy: "request" }, declinedAt: justIn }).state, "declined");
+  assert.equal(decide({ org: { join_policy: "request" }, declinedAt: deniedAgo(14) }).state, "can_request");
+  assert.equal(decide({ org: { join_policy: "request" }, declinedAt: deniedAgo(30) }).state, "can_request");
+});
+
+test("declined: leaving it out, null, or an unreadable date keeps today's answer", () => {
+  for (const declinedAt of [undefined, null, "", "not a date"]) {
+    const d = decide({ org: { join_policy: "request" }, declinedAt });
+    assert.deepEqual(d, { state: "can_request", reason: "policy" }, String(declinedAt));
+  }
+});
+
+test("declined: only ever takes the Request button; everything above it still wins", () => {
+  const recent = deniedAgo(1);
+  // Member, hidden, unverified and audience come first, as they always did.
+  assert.equal(decide({ role: "member", declinedAt: recent }).state, "member");
+  assert.equal(decide({ org: { hidden_at: "2026-09-16T00:00:00.000Z" }, declinedAt: recent }).state, "not_found");
+  assert.equal(decide({ viewer: { school_system: null }, declinedAt: recent }).state, "unverified");
+  assert.equal(
+    decide({ org: { audience: "purdue" }, viewer: { school_system: "iu" }, declinedAt: recent }).state,
+    "audience_blocked",
+  );
+  // An officer changed their mind: the invite admits them.
+  assert.equal(decide({ org: { join_policy: "request" }, pendingInvite: LIVE_INVITE, declinedAt: recent }).state, "invited");
+  // The club opened up: one tap, like any leftover (open beats leftovers).
+  assert.equal(decide({ org: { join_policy: "open" }, declinedAt: recent }).state, "can_join");
+  // A request still waiting (filed before this rule) reads as waiting.
+  assert.equal(decide({ org: { join_policy: "request" }, pendingRequest: { id: "r" }, declinedAt: recent }).state, "requested");
+  // Invite-only says invite-only: the truer sentence.
+  assert.equal(decide({ org: { join_policy: "invite" }, declinedAt: recent }).state, "invite_only");
+});
+
+test("declined: a removed student on an open club, and a visitor, wait like anyone asked", () => {
+  const recent = deniedAgo(2);
+  assert.equal(decide({ org: { join_policy: "open" }, removed: true, declinedAt: recent }).state, "declined");
+  assert.equal(
+    decide({ org: { join_policy: "open", campus_id: "bloomington" }, declinedAt: recent }).state,
+    "declined",
+  );
+});
+
+test("askAgainAt: the end of the window, or null when they may ask now", () => {
+  assert.equal(askAgainAt(null, NOW), null);
+  assert.equal(askAgainAt(undefined, NOW), null);
+  assert.equal(askAgainAt("garbage", NOW), null);
+  assert.equal(askAgainAt(deniedAgo(20), NOW), null);
+  assert.equal(askAgainAt(deniedAgo(0), NOW)?.toISOString(), new Date(NOW.getTime() + REQUEST_COOLDOWN_MS).toISOString());
+  // Clock skew: a stamp from the future waits from itself, never forever.
+  const future = new Date(NOW.getTime() + DAY_MS).toISOString();
+  assert.equal(askAgainAt(future, NOW)?.toISOString(), new Date(NOW.getTime() + DAY_MS + REQUEST_COOLDOWN_MS).toISOString());
+});
+
+test("declinedAtUnlessAdmitted: an invite accepted after the no lifts it", () => {
+  const no = deniedAgo(5);
+  assert.equal(declinedAtUnlessAdmitted(no, null), no);
+  assert.equal(declinedAtUnlessAdmitted(no, deniedAgo(8)), no, "an older admission doesn't lift a newer no");
+  assert.equal(declinedAtUnlessAdmitted(no, deniedAgo(2)), null, "let in after the no: no wait");
+  assert.equal(declinedAtUnlessAdmitted(no, "garbage"), no, "an unreadable admission leaves the no");
+  assert.equal(declinedAtUnlessAdmitted(null, deniedAgo(2)), null);
 });

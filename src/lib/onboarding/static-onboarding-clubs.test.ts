@@ -151,13 +151,16 @@ const STATES: OrgRelation["state"][] = [
   "audience_blocked",
   "unverified",
   "hidden",
+  // An officer said no in the last two weeks (Oct 22, 2026): the row keeps
+  // the follow toggle and offers no Request, in the page as in the app.
+  "declined",
   "signed_out",
 ];
 const POLICIES: OrgRelation["joinPolicy"][] = ["open", "request", "invite", null];
 const REASONS: OrgRelation["reason"][] = ["policy", "visiting", null];
 const AUDIENCES: OrgRelation["audience"][] = ["both", "iu", "purdue"];
 
-/** Every relation the grid walks: 10 standings × follow × policy × reason × audience. */
+/** Every relation the grid walks: 11 standings × follow × policy × reason × audience. */
 function* relations(): Generator<OrgRelation> {
   for (const state of STATES)
     for (const following of [false, true])
@@ -182,7 +185,7 @@ test("orgRowViewOnboarding answers what orgRowView(rel, 'onboarding') answers, e
     assert.deepEqual(call("orgRowViewOnboarding", rel), ts.orgRowView(rel, "onboarding"), JSON.stringify(rel));
     n++;
   }
-  assert.equal(n, 10 * 2 * 4 * 3 * 3);
+  assert.equal(n, 11 * 2 * 4 * 3 * 3);
 });
 
 test("a by-request club offers Follow and Request on one line, and asking follows", () => {
@@ -270,6 +273,8 @@ test("joinOutcome reads every Join, Request and Accept answer the same way", () 
     { ok: false, code: "audience_mismatch", error: "Chess Club is open to IU students only" },
     { ok: false, code: "audience_mismatch", error: null },
     { ok: false, code: "join_unavailable", error: "You can't join this club right now." },
+    { ok: false, code: "recently_declined", error: "Not this time. You can ask again on Nov 6." },
+    { ok: false, code: "recently_declined", error: null },
     { ok: false, code: null },
   ];
   for (const following of [false, true]) {

@@ -5,10 +5,10 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { orgAssetProxyUrl } from "@/lib/org-asset-url";
 
 /**
- * The club an `org_invite` / `org_request_approved` / `event_cancelled`
- * notification is about, resolved for the two notification readers
- * (`/api/me/notifications`, which feeds both Otto panels, and `/api/me/otto`,
- * the phone Otto tab).
+ * The club an `org_invite` / `org_request_approved` / `event_cancelled` /
+ * `org_join_request` notification is about, resolved for the two
+ * notification readers (`/api/me/notifications`, which feeds both Otto
+ * panels, and `/api/me/otto`, the phone Otto tab).
  *
  * SERVICE ROLE, ON PURPOSE. M1c (`20260916103000_org_join_policy_invites.sql`,
  * the A4 contract paragraph) kept `orgs_select` narrow, so a student invited to
@@ -28,6 +28,12 @@ import { orgAssetProxyUrl } from "@/lib/org-asset-url";
  * is admin-hidden or gone drops the notice. A club the student can't see
  * because of its audience or join policy still resolves (service role), so
  * the student who RSVP'd still reads its name.
+ *
+ * A join-request notice (`org_join_request`, Oct 22, 2026: "<name> asked to
+ * join <club>", sent to each owner and officer, migration 20261024100000)
+ * needs its club for the name and for the tap, which opens Club tools > Join
+ * requests. Same rule again: a club that's hidden or gone drops it (a hidden
+ * club takes no new members, and the join route refuses it anyway).
  *
  * Only the club types are looked at. Any signed-in user can insert a
  * `mention` row for someone else, `org_id` included, so a drop keyed on
@@ -50,7 +56,7 @@ type OrgRow = {
   hidden_at: string | null;
 };
 
-const CLUB_TYPES = new Set(["org_invite", "org_request_approved", "event_cancelled"]);
+const CLUB_TYPES = new Set(["org_invite", "org_request_approved", "event_cancelled", "org_join_request"]);
 
 function isClubRow(r: { type?: string }): boolean {
   return typeof r.type === "string" && CLUB_TYPES.has(r.type);

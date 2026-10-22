@@ -12,8 +12,9 @@
  * - SharePageButton: the half-width "Share page" pill (share-page.ts).
  * - CoverOfficerButtons: + and Club tools, two round buttons for the cover's
  *   top-right corner. They draw no position of their own: the page places
- *   the row. In the app frame on a computer, Club tools brings out the
- *   Club tools panel (club-tools-drawer.ts); elsewhere it is the page.
+ *   the row. In the app frame on a computer, Club tools brings the Arc
+ *   out of the right edge (club-tools-launcher.ts; Oct 22, 2026); elsewhere
+ *   it is the page.
  */
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
@@ -22,7 +23,7 @@ import { type CSSProperties, type JSX, useEffect, useRef, useState } from "react
 import type { JoinPolicy, OrgAudience } from "@/lib/orgs/join-state";
 
 import { EditPageModal, UploadAssetModal } from "../admin-actions";
-import { openClubToolsDrawer } from "./club-tools-drawer";
+import { openClubToolsLauncher } from "./club-tools-launcher";
 import { PlusSheet } from "./PlusSheet";
 import { shareClubPage } from "./share-page";
 
@@ -215,7 +216,7 @@ export function CoverOfficerButtons({
           onClick={(e) => {
             // A new tab or window still gets the page.
             if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
-            if (openClubToolsDrawer(e.currentTarget)) e.preventDefault();
+            if (openClubToolsLauncher(e.currentTarget)) e.preventDefault();
           }}
           style={roundHitStyle}
         >

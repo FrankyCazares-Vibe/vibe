@@ -25,7 +25,8 @@
  *   6. open, not visiting, not removed → `can_join`
  *   7. pending request              → `requested`
  *   8. invite-only                  → `invite_only`
- *   9. otherwise                    → `can_request` (`policy` | `visiting`)
+ *   9. a request turned down in the last 14 days → `declined` (+ `askAgainAt`)
+ *  10. otherwise                    → `can_request` (`policy` | `visiting`)
  *
  * Why it is in that order:
  *   - Audience beats an invite: an invite sent before the officers narrowed
@@ -36,6 +37,11 @@
  *     shows "Approve request", and the invite POST never admits anyone
  *     silently.
  *   - The visiting rule never applies to an invite: the officer picked them.
+ *   - A recent "no" sits just above `can_request` and nowhere higher (Oct 22,
+ *     2026): it only ever takes away the Request button. An invite still
+ *     admits them (an officer changed their mind and picked them), a club
+ *     that opened up still lets them join (open beats leftovers, as above),
+ *     and an invite-only club says invite-only, which is the truer sentence.
  *
  * TWO THINGS THIS FUNCTION DELIBERATELY DOES NOT ANSWER:
  *   - SIGNED OUT. Every input describes a signed-in viewer. `/orgs/[handle]`
@@ -90,7 +96,11 @@ export type JoinState =
   | "invite_only"
   | "audience_blocked"
   | "unverified"
-  | "hidden";
+  | "hidden"
+  // An officer turned their request down less than
+  // {@link REQUEST_COOLDOWN_DAYS} ago (Oct 22, 2026). No Request button
+  // until `askAgainAt`; an invite still works.
+  | "declined";
 
 /**
  * The state of a viewer who is not signed in. {@link orgJoinState} can never
@@ -101,7 +111,7 @@ export type JoinState =
 export const SIGNED_OUT = "signed_out";
 
 /**
- * Every state a join button can render: the nine {@link JoinState} values plus
+ * Every state a join button can render: the ten {@link JoinState} values plus
  * {@link SIGNED_OUT}. Type `joinCopy`'s first parameter with THIS and the
  * compiler refuses a copy table that forgets the signed-out row (spec §5.1).
  */
@@ -114,6 +124,12 @@ export type OrgJoinDecision = {
   reason?: "policy" | "visiting";
   /** Only on `audience_blocked`: which university the org is open to. */
   audience?: "iu" | "purdue";
+  /**
+   * Only on `declined`: when they may ask again (ISO), the moment the
+   * {@link REQUEST_COOLDOWN_DAYS} window ends. The join route sends it as
+   * `available_at`; the club page's Membership box prints its day.
+   */
+  askAgainAt?: string;
 };
 
 export type OrgJoinStateInput = {
@@ -143,6 +159,15 @@ export type OrgJoinStateInput = {
    * (an owner or admin chose to let them back).
    */
   removed?: boolean;
+  /**
+   * When an officer last turned down their request to join this club: the
+   * `resolved_at` of their newest `denied` `org_join_requests` row
+   * (`loadViewerOrgContext` reads it as `declinedAt`), or null. OPTIONAL and
+   * additive like `removed`: a caller that leaves it out gets the answer it
+   * got before Oct 22, 2026. The invite route leaves it out on purpose, so
+   * officers can still invite somebody they said no to.
+   */
+  declinedAt?: string | null;
   /** Injected in tests; defaults to `new Date()`. */
   now?: Date;
 };
@@ -208,6 +233,17 @@ export const INVITE_TTL_DAYS = 30;
 /** How long after a decline before the same org may invite again (spec §3.5). */
 export const DECLINE_COOLDOWN_DAYS = 14;
 
+/**
+ * How long after an officer turns a request down before the student may ask
+ * again (Franky, Oct 22, 2026: "same as a declined invite"). The same number
+ * as {@link DECLINE_COOLDOWN_DAYS} on purpose, and its own line for the same
+ * reason `INVITE_ROLES` is its own array: a student's "no thanks" and a
+ * club's "not this time" are two different things that happen to wait the
+ * same two weeks today. Without it, a Request button that reappears the
+ * moment an officer taps Deny turns the queue into a nag.
+ */
+export const REQUEST_COOLDOWN_DAYS = 14;
+
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 /** `INVITE_TTL_DAYS` in milliseconds, for date arithmetic. */
@@ -215,6 +251,9 @@ export const INVITE_TTL_MS = INVITE_TTL_DAYS * DAY_MS;
 
 /** `DECLINE_COOLDOWN_DAYS` in milliseconds. */
 export const DECLINE_COOLDOWN_MS = DECLINE_COOLDOWN_DAYS * DAY_MS;
+
+/** `REQUEST_COOLDOWN_DAYS` in milliseconds. */
+export const REQUEST_COOLDOWN_MS = REQUEST_COOLDOWN_DAYS * DAY_MS;
 
 // ── Guards ──────────────────────────────────────────────────────────────────
 
@@ -304,6 +343,50 @@ export function inviteIsLive(
   const expires = new Date(invite.expires_at).getTime();
   if (Number.isNaN(expires)) return false;
   return expires > now.getTime();
+}
+
+/**
+ * When a student whose request was turned down at `declinedAt` may ask
+ * again, or null when they may ask now (no "no" on record, the window is
+ * over, or the timestamp is unreadable). The window is
+ * {@link REQUEST_COOLDOWN_MS} from the moment the officer tapped Deny, and
+ * it is open while `now` is before its end: the same `>` as
+ * {@link inviteIsLive}, so the route that refuses a request and the page
+ * that hides the button can never disagree about the boundary instant.
+ *
+ * An unparseable timestamp reads as "no decline" rather than "declined
+ * forever": the cost of being wrong is one Request an officer can deny
+ * again, while the other mistake would lock a student out of a club with no
+ * date to wait for. A timestamp in the future (clock skew) counts from
+ * itself, so it can only make the wait longer by the skew, never forever.
+ */
+/**
+ * The "no" that still counts: `declinedAt`, unless the officers let the
+ * student in after it (`admittedAt`, the newest accepted invite to that
+ * club). An officer who turned someone down and then invited them changed
+ * their mind; if that student later leaves, the old "no" must not hold them
+ * at "Not this time" for the rest of the two weeks (review, Oct 22, 2026).
+ * An unreadable admission time leaves the "no" standing.
+ */
+export function declinedAtUnlessAdmitted(
+  declinedAt: string | null | undefined,
+  admittedAt: string | null | undefined,
+): string | null {
+  if (!declinedAt) return null;
+  const no = Date.parse(declinedAt);
+  const yes = admittedAt ? Date.parse(admittedAt) : Number.NaN;
+  return Number.isFinite(no) && Number.isFinite(yes) && yes > no ? null : declinedAt;
+}
+
+export function askAgainAt(
+  declinedAt: string | null | undefined,
+  now: Date = new Date(),
+): Date | null {
+  if (!declinedAt) return null;
+  const at = new Date(declinedAt).getTime();
+  if (Number.isNaN(at)) return null;
+  const ends = at + REQUEST_COOLDOWN_MS;
+  return ends > now.getTime() ? new Date(ends) : null;
 }
 
 /** First word of a display name, or null when there is no usable name. */
@@ -451,7 +534,14 @@ export function orgJoinState(input: OrgJoinStateInput): OrgJoinDecision {
   //    of the policy, and a silent queue of hopefuls is not a feature.
   if (org.join_policy === "invite") return { state: "invite_only" };
 
-  // 9. Request policy, or open-while-visiting (plan §2.6). An open club only
+  // 9. An officer said no less than two weeks ago (Oct 22, 2026). Only the
+  //    Request button goes: everything above still wins (see the header).
+  //    The route refuses a new request with 409 `recently_declined` until
+  //    `askAgainAt`, and the page says the date instead of offering a tap.
+  const waitUntil = askAgainAt(input.declinedAt, now);
+  if (waitUntil) return { state: "declined", askAgainAt: waitUntil.toISOString() };
+
+  // 10. Request policy, or open-while-visiting (plan §2.6). An open club only
   //    gets here at home when the viewer was removed (6), and that is not
   //    "visiting": officers approve them the way a request club's are.
   return {

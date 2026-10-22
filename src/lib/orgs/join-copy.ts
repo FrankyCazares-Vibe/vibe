@@ -26,6 +26,15 @@
  * request club offers Follow and Request side by side on every surface,
  * onboarding included, the same shape as Follow and Join on an open club.
  * Clubs never follow people: no line here says a club follows anyone.
+ *
+ * THE CLUB PAGE SPLITS THEM (Franky, Oct 22, 2026: "I don't want people to
+ * confuse following for request to join"). Its button row keeps only the
+ * follow slot ({@link orgFollowSlot}: Follow / Following ✓, or one
+ * "Member ✓"), and joining moves into its own Membership box under the row
+ * ({@link membershipBoxView}): one plain line for where they stand, one
+ * action. Rows, cards and onboarding keep their two-pill shape; they have no
+ * room for a box. `orgHeaderView` stays for the Board card and the
+ * follower's Board tile.
  */
 
 import type { JoinState, JoinPolicy, OrgAudience, OrgRole } from "./join-state";
@@ -33,11 +42,44 @@ import type { JoinState, JoinPolicy, OrgAudience, OrgRole } from "./join-state";
 // ── Types ───────────────────────────────────────────────────────────────────
 
 /**
- * Every state a club control renders: the nine signed-in {@link JoinState}
+ * Every state a club control renders: the ten signed-in {@link JoinState}
  * values plus signed out. The literal is re-declared rather than imported
  * (`SIGNED_OUT` is a runtime value, and this module takes types only).
  */
 export type OrgDisplayState = JoinState | "signed_out";
+
+/**
+ * The eleven, as a runtime list, for reading a state out of a server answer
+ * ({@link isOrgDisplayState}). Spelled out here because this module imports
+ * nothing at runtime; `join-copy.test.ts` checks it against every state the
+ * views switch on.
+ */
+export const ORG_DISPLAY_STATES: readonly OrgDisplayState[] = Object.freeze([
+  "member",
+  "invited",
+  "requested",
+  "can_join",
+  "can_request",
+  "invite_only",
+  "audience_blocked",
+  "unverified",
+  "hidden",
+  "declined",
+  "signed_out",
+]);
+
+/** Is this one of the {@link ORG_DISPLAY_STATES}? */
+export function isOrgDisplayState(value: unknown): value is OrgDisplayState {
+  return typeof value === "string" && (ORG_DISPLAY_STATES as readonly string[]).includes(value);
+}
+
+/**
+ * The calendar the club pages print days in: a server render runs in UTC on
+ * Vercel, which would move an evening date to the next day, and the client's
+ * own zone would then disagree with the server's HTML (the same pin as
+ * `OrgInviteBanner`).
+ */
+export const CAMPUS_TIME_ZONE = "America/Indiana/Indianapolis";
 
 /** Where a follow came from. Mirrors the sources the follow route accepts. */
 export type FollowSource = "profile" | "discover" | "onboarding";
@@ -51,7 +93,10 @@ export type OrgActionKind =
   | "decline"
   | "sign_in"
   | "verify_email"
-  | "status";
+  | "status"
+  // Take back a pending request (DELETE /join with `{cancel_request: true}`;
+  // Oct 22, 2026). Only the club page's Membership box offers it.
+  | "cancel";
 
 export type OrgAction = {
   kind: OrgActionKind;
@@ -78,6 +123,13 @@ export type OrgRelation = {
   reason: "policy" | "visiting" | null;
   audience: OrgAudience;
   joinPolicy: JoinPolicy | null;
+  /**
+   * Only on `declined`: when they may ask again (the decision's
+   * `askAgainAt`, ISO). Optional, so every surface that builds a relation
+   * without it still type-checks; the copy then says "later" instead of a
+   * day (Oct 22, 2026).
+   */
+  askAgainAt?: string | null;
 };
 
 export type OrgRowSurface = "phone_row" | "card" | "onboarding";
@@ -322,6 +374,47 @@ export const ORG_COPY = freezeDeep({
   banner: {
     title: "You're invited to join {org}",
   },
+  // The club page's Membership box (Franky, Oct 22, 2026: following and
+  // joining are two different things, so joining gets its own box under the
+  // Follow / Share row). One line for where they stand, one action. Its own
+  // section, so the static onboarding's whole-section copies (buttons, subs,
+  // control…) don't change: onboarding has no box.
+  membership: {
+    title: "Membership",
+    canJoinBoth: "Anyone at IU or Purdue can join.",
+    canJoinIu: "Anyone at IU can join.",
+    canJoinPurdue: "Anyone at Purdue can join.",
+    join: "Join",
+    // Asking follows the club (club model, Oct 16): said before the tap.
+    requestPolicy: "Officers approve new members. Asking also follows the club.",
+    requestVisiting: "You're visiting from another campus, so officers approve. Asking also follows the club.",
+    requestToJoin: "Request to join",
+    requested: "Request sent. An officer will look at it.",
+    cancel: "Cancel request",
+    cancelled: "Request cancelled.",
+    // Cancelling drops the follow that asking made, never one they tapped.
+    cancelledUnfollowed: "Request cancelled. You don't follow {org} anymore.",
+    cancelFailed: "Couldn't cancel your request.",
+    // A 14-day wait after an officer says no (REQUEST_COOLDOWN_DAYS).
+    declined: "Not this time. You can ask again on {date}.",
+    declinedLater: "Not this time. You can ask again later.",
+    notThisTime: "Not this time",
+    askAgainOn: "You can ask again on {date}.",
+    askAgainLater: "You can ask again later.",
+    inviteOnly: "Invite only. Officers invite members.",
+    invitedByName: "{name} invited you to join.",
+    invitedByOfficer: "An officer invited you to join.",
+    inviteExpires: "Expires {date}",
+    accept: "Accept",
+    decline: "Decline",
+    audienceIu: "Only IU students can join.",
+    audiencePurdue: "Only Purdue students can join.",
+    unverified: "Verify your school email to join.",
+    verify: "Verify",
+    signedOut: "Sign in to follow or join.",
+    signIn: "Sign in",
+    member: "Member ✓",
+  },
   inviteSheet: {
     title: "Invite people",
     close: "Close",
@@ -556,6 +649,15 @@ export function orgHeaderView(rel: OrgRelation): OrgHeaderView {
       ]);
     case "requested":
       return view([action("status", ORG_COPY.buttons.requested, "quiet", { disabled: true })]);
+    // A recent "no" (Oct 22, 2026): a label and the day, never a Request the
+    // join route would answer 409.
+    case "declined":
+      return view([
+        action("status", ORG_COPY.membership.notThisTime, "quiet", {
+          disabled: true,
+          sub: askAgainText(rel.askAgainAt),
+        }),
+      ]);
     case "invite_only":
       return view([
         action("status", ORG_COPY.buttons.inviteOnly, "quiet", {
@@ -572,6 +674,142 @@ export function orgHeaderView(rel: OrgRelation): OrgHeaderView {
         }),
       ]);
   }
+}
+
+// ── The club page: the follow slot and the Membership box ───────────────────
+
+/**
+ * The day a turned-down student may ask again, as "Nov 6": the day AFTER the
+ * two weeks run out, so the promise holds all day (the window ends at the
+ * hour the officer said no; "on Nov 5" would be refused on Nov 5's morning).
+ * Null when the moment is unknown.
+ */
+export function askAgainDayText(iso: string | null | undefined, timeZone: string = CAMPUS_TIME_ZONE): string | null {
+  const at = iso ? Date.parse(iso) : Number.NaN;
+  if (!Number.isFinite(at)) return null;
+  return shortDateText(new Date(at + 24 * 60 * 60 * 1000).toISOString(), timeZone);
+}
+
+/** 'You can ask again on Nov 6.', or '… later.' when the day is unknown. */
+function askAgainText(iso: string | null | undefined, timeZone: string = CAMPUS_TIME_ZONE): string {
+  const date = askAgainDayText(iso, timeZone);
+  return date ? fillCopy(ORG_COPY.membership.askAgainOn, { date }) : ORG_COPY.membership.askAgainLater;
+}
+
+/** The invite on screen, for the Membership box's invited line. */
+export type MembershipInvite = {
+  /** `visibleInviterFirstName`'s answer: null reads "An officer". */
+  inviterFirstName: string | null;
+  expiresAt: string | null;
+};
+
+export type MembershipBoxView = {
+  line: string;
+  /** A second, smaller line (the invite's expiry), or null. */
+  sub: string | null;
+  /** Zero to two; at most one `filled`. */
+  actions: OrgAction[];
+};
+
+/**
+ * The club page's Membership box (Franky, Oct 22, 2026), or null for no box:
+ * members and officers (they are in), and a hidden club seen by a platform
+ * admin (nobody new can join it, and the notice above already says why).
+ * Everyone else gets one plain line for where they stand and at most one
+ * thing to do, so "Follow" in the row above can never be mistaken for the
+ * way in.
+ *
+ * Pass `timeZone` only to override {@link CAMPUS_TIME_ZONE}: the box renders
+ * on the server and again on the client, and both must print the same day.
+ */
+export function membershipBoxView(
+  rel: OrgRelation,
+  invite: MembershipInvite | null = null,
+  timeZone: string = CAMPUS_TIME_ZONE,
+): MembershipBoxView | null {
+  const copy = ORG_COPY.membership;
+  const box = (line: string, actions: OrgAction[] = [], sub: string | null = null): MembershipBoxView => ({
+    line,
+    sub,
+    actions,
+  });
+  switch (rel.state) {
+    case "member":
+    case "hidden":
+      return null;
+    case "signed_out":
+      return box(copy.signedOut, [
+        action("sign_in", copy.signIn, "filled", {
+          href: "/auth/login?next=" + encodeURIComponent("/orgs/" + rel.handle),
+        }),
+      ]);
+    case "can_join":
+      return box(
+        rel.audience === "iu" ? copy.canJoinIu : rel.audience === "purdue" ? copy.canJoinPurdue : copy.canJoinBoth,
+        [action("join", copy.join, "filled")],
+      );
+    case "can_request":
+      return box(rel.reason === "visiting" ? copy.requestVisiting : copy.requestPolicy, [
+        action("request", copy.requestToJoin, "filled"),
+      ]);
+    case "requested":
+      return box(copy.requested, [action("cancel", copy.cancel, "outline")]);
+    case "declined": {
+      const date = askAgainDayText(rel.askAgainAt, timeZone);
+      return box(date ? fillCopy(copy.declined, { date }) : copy.declinedLater);
+    }
+    case "invite_only":
+      return box(copy.inviteOnly);
+    case "invited": {
+      const name = (invite?.inviterFirstName ?? "").trim();
+      const expires = shortDateText(invite?.expiresAt, timeZone);
+      return box(
+        name ? fillCopy(copy.invitedByName, { name }) : copy.invitedByOfficer,
+        [action("accept", copy.accept, "filled"), action("decline", copy.decline, "outline")],
+        expires ? fillCopy(copy.inviteExpires, { date: expires }) : null,
+      );
+    }
+    case "audience_blocked":
+      return box(rel.audience === "purdue" ? copy.audiencePurdue : copy.audienceIu);
+    case "unverified":
+      return box(copy.unverified, [action("verify_email", copy.verify, "filled", { href: "/auth/school-email" })]);
+  }
+}
+
+/**
+ * The club page's button-row slot (Oct 22, 2026): following only. A member
+ * gets one locked "Member ✓" (they follow automatically; leaving stays in
+ * the ⋯ menu), a hidden club its "Hidden" label, and everyone else Follow or
+ * Following ✓. Signed out it is a Follow that goes to sign in, next to the
+ * box's "Sign in to follow or join.".
+ *
+ * Follow is the filled control only when the Membership box below has no
+ * filled action of its own, so the page shows one coral button at a time
+ * (the header's old rule for an invite, now for every door in). `sub` is
+ * the follow disclosure on a club not known to be open.
+ */
+export function orgFollowSlot(rel: OrgRelation): { action: OrgAction | null; sub: string | null } {
+  if (rel.state === "member") {
+    return { action: action("status", ORG_COPY.membership.member, "quiet", { disabled: true }), sub: null };
+  }
+  if (rel.state === "hidden") {
+    return {
+      action: action("status", ORG_COPY.buttons.hidden, "quiet", { disabled: true }),
+      sub: ORG_COPY.subs.hidden,
+    };
+  }
+  const boxLeads = membershipBoxView(rel)?.actions.some((a) => a.tone === "filled") ?? false;
+  const tone: OrgAction["tone"] = boxLeads ? "outline" : "filled";
+  if (rel.state === "signed_out") {
+    return {
+      action: action("sign_in", ORG_COPY.buttons.follow, tone, {
+        href: "/auth/login?next=" + encodeURIComponent("/orgs/" + rel.handle),
+      }),
+      sub: null,
+    };
+  }
+  const F = followToggle(rel.following, tone);
+  return { action: F, sub: wantsDisclosure(rel, [F]) ? FOLLOW_DISCLOSURE : null };
 }
 
 // ── Rows, cards and onboarding ──────────────────────────────────────────────
@@ -642,10 +880,13 @@ export function orgRowView(rel: OrgRelation, surface: OrgRowSurface): OrgRowView
       if (surface !== "card") layout = "line";
       break;
     }
+    // `declined` (Oct 22, 2026) has no door for two weeks, so a row offers
+    // what it offers a club they already asked: the follow toggle only.
     case "requested":
     case "invite_only":
     case "audience_blocked":
     case "unverified":
+    case "declined":
       actions = [followToggle(rel.following)];
       break;
   }
@@ -825,6 +1066,7 @@ export function channelsGateCopy(
         inline: action("request", ORG_COPY.buttons.requestToJoin, "outline"),
       };
     case "requested":
+    case "declined":
       return { line: ORG_COPY.channels.approve, inline: null };
     case "invite_only":
       return { line: ORG_COPY.channels.inviteOnly, inline: null };
@@ -1169,9 +1411,56 @@ export function changeAfter(
         role: rel.role,
         declined: true,
       };
+    // Taking a request back (Oct 22, 2026). The server's answer replaces
+    // this ({@link cancelOutcome}); it is only the replay's guess: what the
+    // policy offers anyone, with the follow left as it was.
+    case "cancel":
+      return {
+        state: rel.joinPolicy === "invite" ? "invite_only" : "can_request",
+        following: rel.following,
+        role: rel.role,
+      };
     default:
       return null;
   }
+}
+
+/** What `DELETE /api/orgs/<handle>/join` with `{cancel_request: true}` answered. */
+export type CancelAnswer =
+  | { ok: true; data: { cancelled?: unknown; join_state?: unknown; org_follow_state?: unknown } }
+  | { ok: false; code?: string | null; error?: string | null };
+
+/**
+ * What a Cancel request tap's answer means for the control (Oct 22, 2026):
+ *   - `change`: the standing the server read back after the cancel, and the
+ *     toast to show (null for none). The server's `join_state` wins; an
+ *     answer without one falls back to {@link changeAfter}'s guess. A
+ *     cancel that found they were let in meanwhile reads `member` and
+ *     welcomes them; one that found the request already answered just
+ *     shows the new state.
+ *   - `refused`: any failure, which the caller toasts its own way.
+ */
+export function cancelOutcome(
+  rel: Pick<OrgRelation, "state" | "following" | "role" | "joinPolicy" | "orgName">,
+  r: CancelAnswer,
+): { kind: "change"; next: OrgControlChange; message: string | null } | { kind: "refused" } {
+  if (!r.ok) return { kind: "refused" };
+  const guess = changeAfter(rel, "cancel") as OrgControlChange;
+  const state = isOrgDisplayState(r.data.join_state) && r.data.join_state !== "signed_out" ? r.data.join_state : guess.state;
+  const f = r.data.org_follow_state;
+  const following = state === "member" || (f === "following" ? true : f === "not_following" ? false : rel.following);
+  const org = orgLabel(rel.orgName);
+  const next: OrgControlChange = { state, following, role: state === "member" ? (rel.role ?? "member") : rel.role };
+  if (state === "member") return { kind: "change", next, message: fillCopy(ORG_COPY.control.welcome, { org }) };
+  if (r.data.cancelled !== true) return { kind: "change", next, message: null };
+  return {
+    kind: "change",
+    next,
+    message:
+      rel.following && !following
+        ? fillCopy(ORG_COPY.membership.cancelledUnfollowed, { org })
+        : ORG_COPY.membership.cancelled,
+  };
 }
 
 // ── What a Join, Request or Accept answered ─────────────────────────────────
@@ -1206,7 +1495,7 @@ export function joinOutcome(
   kind: JoinPressKind,
   r: JoinAnswer,
 ):
-  | { kind: "change"; next: OrgControlChange; audience: OrgAudience; welcome: boolean }
+  | { kind: "change"; next: OrgControlChange; audience: OrgAudience; welcome: boolean; notice?: string }
   | { kind: "unclear"; message: string }
   | { kind: "refused" } {
   const keep = (state: OrgDisplayState, audience: OrgAudience = rel.audience) =>
@@ -1225,6 +1514,13 @@ export function joinOutcome(
   }
   if (r.code === "invite_only") return keep("invite_only");
   if (r.code === "school_unverified") return keep("unverified");
+  // An officer said no less than two weeks ago (Oct 22, 2026): the control
+  // stops offering Request, and `notice` is the route's own sentence with
+  // the day ("Not this time. You can ask again on Nov 5."), for a toast.
+  if (r.code === "recently_declined") {
+    const said = typeof r.error === "string" ? r.error.trim() : "";
+    return { ...keep("declined"), notice: said || ORG_COPY.membership.declinedLater };
+  }
   if (r.code === "audience_mismatch") {
     const error = r.error ?? "";
     const audience = /open to Purdue students only\.?$/.test(error) ? "purdue" : /open to IU students only\.?$/.test(error) ? "iu" : rel.audience;
@@ -1248,7 +1544,7 @@ export type ControlMemory = { seen: string; kept: KeptAnswer | null };
 
 /** One key per relation a parent can pass: any field that differs is a new relation. */
 export function relationKey(r: OrgRelation): string {
-  return [r.handle, r.state, r.following, r.role, r.reason, r.audience, r.joinPolicy].join("|");
+  return [r.handle, r.state, r.following, r.role, r.reason, r.audience, r.joinPolicy, r.askAgainAt ?? ""].join("|");
 }
 
 /**

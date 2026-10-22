@@ -21,7 +21,8 @@ type NotifType =
   | "mention"
   | "org_invite"
   | "org_request_approved"
-  | "event_cancelled";
+  | "event_cancelled"
+  | "org_join_request";
 
 type NotifActor = {
   id: string;
@@ -57,9 +58,9 @@ type NotifRow = {
   actor: NotifActor;
   post: NotifPost;
   comment: NotifComment;
-  // The club behind an invite, an approval or a cancelled event. The
-  // notifications GET reads it with the service client; null when it
-  // couldn't, so the copy says "a club".
+  // The club behind an invite, an approval, a join request or a cancelled
+  // event. The notifications GET reads it with the service client; null when
+  // it couldn't, so the copy says "a club" ("your club" on a join request).
   org_id?: string | null;
   org?: { handle: string; name: string; logo_url: string | null } | null;
   // A cancelled-event notice's copy of the event; null on other types. That
@@ -996,6 +997,10 @@ function verbFor(n: NotifRow): string {
       return `invited you to join ${n.org?.name ?? "a club"}`;
     case "org_request_approved":
       return `approved your request to join ${n.org?.name ?? "a club"}`;
+    // To an owner or officer (Oct 22, 2026): the requester is the actor.
+    // Without the club (it couldn't be read) it's still one of theirs.
+    case "org_join_request":
+      return `asked to join ${n.org?.name ?? "your club"}`;
     default:
       // event_cancelled renders its own line (NotifRowView, fromClub).
       return "";
@@ -1070,6 +1075,15 @@ function NotifRowView({ n, onClose }: { n: NotifRow; onClose: () => void }) {
     onClose();
   };
   const openRow = () => {
+    // A join request opens where it's answered: Club tools > Join requests
+    // (the requests page itself sends a non-officer back to the club).
+    if (n.type === "org_join_request") {
+      window.location.href = n.org
+        ? `/orgs/${encodeURIComponent(n.org.handle)}/tools/requests`
+        : "/campus?tab=orgs";
+      onClose();
+      return;
+    }
     // Club rows open the club, not the officer who sent them. Without the
     // club (it couldn't be read) the Orgs tab is the closest place.
     if (n.type === "org_invite" || n.type === "org_request_approved" || fromClub) {

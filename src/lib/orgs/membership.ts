@@ -6,11 +6,13 @@ import { isMissingColumnError } from "@/lib/db/missing-column";
 import { isSchoolSystem } from "@/lib/iu/campuses";
 import {
   checkConstraintName,
+  declinedAtUnlessAdmitted,
   isOrgRole,
   isUniqueViolation,
   type OrgRole,
   type ViewerSystem,
 } from "@/lib/orgs/join-state";
+import { loadOrgSideIds } from "@/lib/orgs/org-blocks";
 import { ORG_REMOVALS_TABLE, isMissingRemovalsTable, removedIdSet } from "@/lib/orgs/removals";
 import { kickPushDrain } from "@/lib/push/dispatch";
 
@@ -81,6 +83,15 @@ export type ViewerOrgContext = {
    */
   removed: boolean;
   /**
+   * When an officer last turned down their request to this club (the
+   * `resolved_at` of their newest `denied` request), or null when nobody
+   * ever has (Oct 22, 2026). Pass it to `orgJoinState` as `declinedAt`: the
+   * decision answers `declined` for {@link import("./join-state").REQUEST_COOLDOWN_DAYS}
+   * days after it, and the Request button waits. Every row is read, however
+   * old; the window is the decision's to judge, on its clock.
+   */
+  declinedAt: string | null;
+  /**
    * False when any of the reads failed. The other four fields are then
    * the least-privileged answer (no role, no invite, no request, unverified),
    * which is safe to act on but WRONG to render: a real member would be told
@@ -101,7 +112,7 @@ const NO_VIEWER: ViewerRow = Object.freeze({
 
 /**
  * Everything {@link import("./join-state").orgJoinState} needs about one
- * viewer and one org, in a single round trip (four queries in parallel).
+ * viewer and one org, in a single round trip (six queries in parallel).
  *
  * Returns the spec's four fields plus `ok`/`error`, so
  * `const { role, pendingInvite, pendingRequest, viewer } = await
@@ -117,7 +128,7 @@ export async function loadViewerOrgContext(
   orgId: string,
   userId: string,
 ): Promise<ViewerOrgContext> {
-  const [memberRes, inviteRes, requestRes, viewerRes, removalRes] = await Promise.all([
+  const [memberRes, inviteRes, requestRes, viewerRes, removalRes, declinedRes, admittedRes] = await Promise.all([
     service
       .from("org_members")
       .select("role")
@@ -151,6 +162,32 @@ export async function loadViewerOrgContext(
       .eq("org_id", orgId)
       .eq("user_id", userId)
       .maybeSingle(),
+    // The newest "no" (Oct 22, 2026). Denied rows stack (they are the audit
+    // trail, see requests/[id]/route.ts), so newest first, one row. A deny
+    // always stamps `resolved_at`; a row without one can't be dated, so it
+    // is left out rather than read as "declined just now".
+    service
+      .from("org_join_requests")
+      .select("resolved_at")
+      .eq("org_id", orgId)
+      .eq("user_id", userId)
+      .eq("status", "denied")
+      .not("resolved_at", "is", null)
+      .order("resolved_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    // The newest invite they accepted to this club: one after the "no"
+    // means the officers let them in after all (`declinedAtUnlessAdmitted`).
+    service
+      .from("org_invites")
+      .select("resolved_at")
+      .eq("org_id", orgId)
+      .eq("invitee_id", userId)
+      .eq("status", "accepted")
+      .not("resolved_at", "is", null)
+      .order("resolved_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
   ]);
 
   // A build that finds no org_removals table reads "not removed" (see
@@ -165,6 +202,10 @@ export async function loadViewerOrgContext(
     requestRes.error ??
     viewerRes.error ??
     (removalMissing ? null : removalRes.error) ??
+    // Fails closed with the rest: an unknown "no" would offer a Request the
+    // route then refuses, and the routes 500 on `ok: false` anyway.
+    declinedRes.error ??
+    admittedRes.error ??
     null;
   if (failure) console.error("[orgs/membership loadViewerOrgContext]", failure);
 
@@ -193,9 +234,16 @@ export async function loadViewerOrgContext(
         }
       : NO_VIEWER,
     removed: !failure && !removalMissing && removalRes.data != null,
+    declinedAt: declinedAtUnlessAdmitted(declinedAtOf(declinedRes.data), declinedAtOf(admittedRes.data)),
     ok: !failure,
     error: failure,
   };
+}
+
+/** `resolved_at` off the newest denied row, when it is a usable string. */
+function declinedAtOf(row: unknown): string | null {
+  const at = (row as { resolved_at?: unknown } | null)?.resolved_at;
+  return typeof at === "string" && at ? at : null;
 }
 
 // ── Writes ──────────────────────────────────────────────────────────────────
@@ -459,6 +507,141 @@ export async function notifyOrg(
     console.error("[orgs/membership notifyOrg]", { type: row.type, error });
   } catch (e) {
     console.error("[orgs/membership notifyOrg]", e);
+  }
+}
+
+/** The officers' "<name> asked to join <club>" (Oct 22, 2026). */
+export const JOIN_REQUEST_NOTIFICATION = "org_join_request";
+
+/**
+ * One "asked to join" per student per club per day, however many times they
+ * ask and cancel: the request and its cancel share one rate limit (30 per 10
+ * minutes), which is plenty for a person and far too many buzzes for an
+ * officer's phone. The officers' Requests list always has the live queue.
+ */
+const JOIN_REQUEST_NOTIFY_WINDOW_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * Logged the first time production refuses the type, then quiet: until
+ * Franky applies `20261024100000_org_join_request_notification.sql`, every
+ * request would otherwise log the same line.
+ */
+let joinRequestTypeMissingLogged = false;
+
+/**
+ * Tell a club's owner and officers that somebody asked to join (Oct 22,
+ * 2026): one `notifications` row each, `type: 'org_join_request'`,
+ * `actor_id` = the student, `org_id` = the club. The insert's trigger queues
+ * the push the way an invite's does; `kickPushDrain` sends it after the
+ * response (B3 renders the row and the push).
+ *
+ * WHO IS TOLD. The club's side (`loadOrgSideIds`: the owner plus every
+ * officer), minus the student, minus `excludeIds`: the join route passes the
+ * officers the student has blocked (`loadOrgBlocks(...).personBlocked`), so
+ * a person who blocked somebody never lands in that person's Otto, the same
+ * rule that hides their request from that officer's list. The other
+ * direction (an officer blocked the student) never gets here: the join
+ * route refuses that request before it is written.
+ *
+ * NEVER FAILS THE REQUEST. Called after the request row landed, so every
+ * failure is logged and swallowed. A database that doesn't know the type
+ * yet (23514 on `notifications_type_check`: the migration is written, not
+ * applied) is logged once per server process and skipped; so is one without
+ * `notifications.org_id`. Never throws.
+ */
+export async function notifyOfficersOfJoinRequest(
+  service: SupabaseClient,
+  args: { orgId: string; requesterId: string; excludeIds?: readonly string[] },
+): Promise<void> {
+  try {
+    const side = await loadOrgSideIds(service, args.orgId, args.requesterId);
+    if (!side.ok) {
+      console.error("[orgs/membership notifyOfficersOfJoinRequest side]", side.error);
+      return;
+    }
+    const skip = new Set(
+      [args.requesterId, ...(args.excludeIds ?? [])].map((id) => id.toLowerCase()),
+    );
+    const recipients = side.ids.filter((id) => !skip.has(id.toLowerCase()));
+    if (recipients.length === 0) return;
+
+    // Asked, cancelled and asked again today: the officers already heard.
+    const since = new Date(Date.now() - JOIN_REQUEST_NOTIFY_WINDOW_MS).toISOString();
+    const { data: recent, error: recentErr } = await service
+      .from("notifications")
+      .select("id")
+      .eq("type", JOIN_REQUEST_NOTIFICATION)
+      .eq("actor_id", args.requesterId)
+      .eq("org_id", args.orgId)
+      .gte("created_at", since)
+      .limit(1);
+    if (recentErr) {
+      // Unknown means "maybe they were told": skip rather than buzz twice.
+      if (!isMissingColumnError(recentErr, ["org_id"])) {
+        console.error("[orgs/membership notifyOfficersOfJoinRequest recent]", recentErr);
+      }
+      return;
+    }
+    if ((recent ?? []).length > 0) return;
+
+    const { error } = await service.from("notifications").insert(
+      recipients.map((userId) => ({
+        user_id: userId,
+        actor_id: args.requesterId,
+        type: JOIN_REQUEST_NOTIFICATION,
+        org_id: args.orgId,
+      })),
+    );
+    if (!error) {
+      // Same as notifyOrg: after() needs the route's request scope, which
+      // the join route's POST provides. Returns at once, never throws.
+      kickPushDrain();
+      return;
+    }
+    if (checkConstraintName(error) === "notifications_type_check") {
+      if (!joinRequestTypeMissingLogged) {
+        joinRequestTypeMissingLogged = true;
+        console.error(
+          "[orgs/membership notifyOfficersOfJoinRequest] skipped: notifications_type_check has no 'org_join_request' yet (migration 20261024100000 not applied)",
+        );
+      }
+      return;
+    }
+    if (isMissingColumnError(error, ["org_id"])) {
+      console.error("[orgs/membership notifyOfficersOfJoinRequest] skipped, notifications.org_id is not deployed");
+      return;
+    }
+    console.error("[orgs/membership notifyOfficersOfJoinRequest]", error);
+  } catch (e) {
+    console.error("[orgs/membership notifyOfficersOfJoinRequest]", e);
+  }
+}
+
+/**
+ * A cancelled request's "asked to join" rows, marked read for every officer
+ * (Oct 22, 2026): the student took it back, so nobody's Otto should still
+ * count it as news. Marked, not deleted: the row is also the day's "already
+ * told" memory above, so ask-cancel-ask can't buzz anyone again until
+ * tomorrow. Best-effort and logged; never throws.
+ */
+export async function settleJoinRequestNotifications(
+  service: SupabaseClient,
+  orgId: string,
+  requesterId: string,
+): Promise<void> {
+  try {
+    const { error } = await service
+      .from("notifications")
+      .update({ read_at: new Date().toISOString() })
+      .eq("type", JOIN_REQUEST_NOTIFICATION)
+      .eq("actor_id", requesterId)
+      .eq("org_id", orgId)
+      .is("read_at", null);
+    if (error && !isMissingColumnError(error, ["org_id"])) {
+      console.error("[orgs/membership settleJoinRequestNotifications]", error);
+    }
+  } catch (e) {
+    console.error("[orgs/membership settleJoinRequestNotifications]", e);
   }
 }
 

@@ -2,7 +2,13 @@ import { NextResponse } from "next/server";
 
 import { requireTermsAccepted } from "@/lib/legal/require-terms";
 import { loadOrgRole, type OrgFollowState } from "@/lib/orgs/following";
-import { LEAVE_DROPS_FOLLOW_SOURCES, ORG_COPY } from "@/lib/orgs/join-copy";
+import {
+  CAMPUS_TIME_ZONE,
+  LEAVE_DROPS_FOLLOW_SOURCES,
+  ORG_COPY,
+  fillCopy,
+  askAgainDayText,
+} from "@/lib/orgs/join-copy";
 import {
   checkConstraintName,
   isUniqueViolation,
@@ -10,7 +16,13 @@ import {
   type JoinPolicy,
   type OrgAudience,
 } from "@/lib/orgs/join-state";
-import { admitMember, expireStaleInvites, loadViewerOrgContext } from "@/lib/orgs/membership";
+import {
+  admitMember,
+  expireStaleInvites,
+  loadViewerOrgContext,
+  notifyOfficersOfJoinRequest,
+  settleJoinRequestNotifications,
+} from "@/lib/orgs/membership";
 import { loadOrgBlocks } from "@/lib/orgs/org-blocks";
 import { rateLimit, tooManyRequests } from "@/lib/rate-limit";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -20,7 +32,7 @@ type Params = { params: Promise<{ slug: string }> };
 
 type Body = { message?: unknown };
 
-type LeaveBody = { keep_following?: unknown };
+type LeaveBody = { keep_following?: unknown; cancel_request?: unknown };
 
 type ServiceClient = ReturnType<typeof createSupabaseServiceClient>;
 
@@ -129,16 +141,21 @@ async function relabelFollow(
   return !error;
 }
 
-/** `{keep_following}` from a leave's body: true, false, or null when absent. */
-async function readKeepFollowing(req: Request): Promise<boolean | null> {
+/**
+ * A DELETE's body, read once: `keep_following` (true, false, or null when
+ * absent) for a leave, and `cancel_request` (only an explicit `true`) for
+ * taking a request back.
+ */
+async function readDeleteBody(req: Request): Promise<{ keep: boolean | null; cancelRequest: boolean }> {
   try {
     const parsed: unknown = await req.json();
-    const keep = parsed && typeof parsed === "object"
-      ? (parsed as LeaveBody).keep_following
-      : undefined;
-    return typeof keep === "boolean" ? keep : null;
+    const body = parsed && typeof parsed === "object" ? (parsed as LeaveBody) : {};
+    return {
+      keep: typeof body.keep_following === "boolean" ? body.keep_following : null,
+      cancelRequest: body.cancel_request === true,
+    };
   } catch {
-    return null;
+    return { keep: null, cancelRequest: false };
   }
 }
 
@@ -169,6 +186,16 @@ async function readKeepFollowing(req: Request): Promise<boolean | null> {
  * `request`; see {@link followOnRequest}. `org_follow_state` says how that
  * went, so a client never has to guess.
  *
+ * OFFICERS HEAR ABOUT IT (Oct 22, 2026). A NEW request (not a repeat tap,
+ * not the race's loser) puts "<name> asked to join <club>" in the owner's
+ * and every officer's Otto ({@link notifyOfficersOfJoinRequest}), minus any
+ * officer the student blocked. Best-effort: the request is the record.
+ *
+ * NOT THIS TIME (Oct 22, 2026). For two weeks after an officer turns a
+ * request down, asking again is refused with 409 `recently_declined` and the
+ * day they can ask (`available_at`). An invite still admits them, and a club
+ * that switched to open still lets them join (`orgJoinState` step 9).
+ *
  * RESPONSES
  *   200 {ok, joined:true, role, via:"join"|"invite"}   admitted
  *   200 {ok, joined:true, role, already:true}          already a member
@@ -179,6 +206,7 @@ async function readKeepFollowing(req: Request): Promise<boolean | null> {
  *                          #15). The copy never names a block.
  *   404 not_found          the handle, or a hidden org to anybody but an admin
  *   409 org_hidden         a platform admin (or an officer) on a hidden org
+ *   409 recently_declined (+available_at)  an officer said no in the last 14 days
  *   429                    30 attempts per 10 minutes, per user
  */
 export async function POST(req: Request, { params }: Params) {
@@ -250,7 +278,14 @@ export async function POST(req: Request, { params }: Params) {
     pendingRequest: ctx.pendingRequest,
     // A removed member must ask to come back, even to an open club (#15).
     removed: ctx.removed,
+    // Two weeks after an officer's "no", asking waits (Oct 22, 2026).
+    declinedAt: ctx.declinedAt,
   });
+
+  // The officers this student blocked, from the block read below: they are
+  // left out of the "asked to join" notification (the requests list already
+  // hides the request from them).
+  let blockedOfficers: readonly string[] = [];
 
   // BLOCKS KEEP PEOPLE OUT, ONE WAY (S67 sec wave 2 #15, product call 9).
   // Before anything is written — an admission (join, accepted invite) or a
@@ -275,6 +310,7 @@ export async function POST(req: Request, { params }: Params) {
     if (blocks.blockedByOfficer) {
       return fail(403, "join_unavailable", ORG_COPY.errors.joinUnavailable);
     }
+    blockedOfficers = Array.isArray(blocks.personBlocked) ? blocks.personBlocked : [];
   }
 
   switch (decision.state) {
@@ -316,6 +352,19 @@ export async function POST(req: Request, { params }: Params) {
     // point of the policy (spec §3.2 row 8).
     case "invite_only":
       return fail(403, "invite_only", "This org is invite only. Officers invite members.");
+
+    // An officer said no less than two weeks ago (Oct 22, 2026). Writes
+    // nothing, so like `requested` it skips the block read. The sentence is
+    // the Membership box's own, with the day in campus time.
+    case "declined": {
+      const date = askAgainDayText(decision.askAgainAt, CAMPUS_TIME_ZONE);
+      return fail(
+        409,
+        "recently_declined",
+        date ? fillCopy(ORG_COPY.membership.declined, { date }) : ORG_COPY.membership.declinedLater,
+        { available_at: decision.askAgainAt ?? null },
+      );
+    }
 
     // Asking again follows too, so a request filed before asking followed
     // (or one whose follow was dropped since) catches up.
@@ -380,12 +429,23 @@ export async function POST(req: Request, { params }: Params) {
         console.error("[orgs/[slug]/join request insert]", reqErr);
         return fail(500, "request_failed", "Failed to request join");
       }
+      // Only a request this tap created tells the officers (the race's loser
+      // above and a repeat tap don't), alongside the follow so the tap waits
+      // for one round of writes, not two. Logs and never throws.
+      const [orgFollowState] = await Promise.all([
+        followOnRequest(service, org.id, user.id),
+        notifyOfficersOfJoinRequest(service, {
+          orgId: org.id,
+          requesterId: user.id,
+          excludeIds: blockedOfficers,
+        }),
+      ]);
       return NextResponse.json({
         ok: true,
         pending: true,
         request: created,
         reason: decision.reason,
-        org_follow_state: await followOnRequest(service, org.id, user.id),
+        org_follow_state: orgFollowState,
       });
     }
   }
@@ -423,12 +483,20 @@ export async function POST(req: Request, { params }: Params) {
  * Only a member's follow is ever touched here: a non-member's DELETE changes
  * nothing, so this route can't be used as a second Unfollow.
  *
+ * CANCEL REQUEST (Oct 22, 2026): `{cancel_request: true}` takes back the
+ * viewer's pending request instead, and NEVER leaves. The flag is what keeps
+ * the two apart: a Cancel tapped in a tab opened before an officer approved
+ * them would otherwise land on a member and walk them out of the club. See
+ * {@link cancelRequest}. Same `org-join:<uid>` budget, so asking and
+ * cancelling in a loop spend one.
+ *
  * RESPONSES
  *   200 {ok, left:true, org_follow_state?}  `org_follow_state` is read back
  *       after the change; it is missing only if that read failed
  *   200 {ok, left:false}                    they weren't a member
+ *   200 {ok, cancelled, join_state?, join_reason?, org_follow_state?}  a cancel
  *   400 owner_cannot_leave · 401 · 404 not_found (also a hidden club to a
- *   non-member) · 429 · 500 load_failed | leave_failed
+ *   non-member) · 429 · 500 load_failed | leave_failed | cancel_failed
  */
 export async function DELETE(req: Request, { params }: Params) {
   const { slug } = await params;
@@ -441,21 +509,24 @@ export async function DELETE(req: Request, { params }: Params) {
   const rl = await rateLimit(`org-join:${user.id}`, JOIN_LIMIT);
   if (!rl.allowed) return tooManyRequests(rl, JOIN_TOO_FAST);
 
-  const keep = await readKeepFollowing(req);
+  const { keep, cancelRequest: cancelling } = await readDeleteBody(req);
 
   const service = createSupabaseServiceClient();
   const { data: org, error: orgErr } = await service
     .from("orgs")
-    .select("id, owner_id, hidden_at")
+    .select("id, owner_id, hidden_at, join_policy, audience, campus_id")
     .eq("handle", slug)
     .maybeSingle();
   if (orgErr) {
     console.error("[orgs/[slug]/join DELETE load org]", orgErr);
-    return fail(500, "load_failed", "Failed to leave");
+    return fail(500, "load_failed", cancelling ? "Failed to cancel" : "Failed to leave");
   }
   if (!org) {
     return fail(404, "not_found", "Not found");
   }
+  // Before the owner check: an owner has no request to take back, and a
+  // cancel never leaves, so it answers "member" rather than a leave refusal.
+  if (cancelling) return cancelRequest(service, org as CancelOrg, user.id);
   if (org.owner_id === user.id) {
     return fail(
       400,
@@ -525,5 +596,97 @@ export async function DELETE(req: Request, { params }: Params) {
     ok: true,
     left: true,
     ...(after.ok ? { org_follow_state: after.source ? "following" : "not_following" } : {}),
+  });
+}
+
+/** The club row a cancel reads (DELETE's select). */
+type CancelOrg = {
+  id: string;
+  hidden_at: string | null;
+  join_policy: JoinPolicy;
+  audience: OrgAudience;
+  campus_id: string | null;
+};
+
+/**
+ * Take back the viewer's pending request (Franky, Oct 22, 2026: "a student
+ * can cancel a pending request"). Called only for `{cancel_request: true}`,
+ * after the rate limit and the club load.
+ *
+ *   - A MEMBER (an officer let them in after the page loaded) gets
+ *     `{cancelled:false, join_state:"member"}` and nothing changes. A cancel
+ *     never leaves.
+ *   - A hidden club is 404 to a non-member, as the leave is.
+ *   - Otherwise the pending row is DELETED, not marked: the table's three
+ *     statuses are all an officer's word, and a "no" from nobody would start
+ *     the two-week wait. With it goes the follow the request made (source
+ *     `request`), never one they tapped, got from onboarding or kept from
+ *     before; and the officers' "asked to join" rows are marked read
+ *     ({@link settleJoinRequestNotifications}).
+ *
+ * The answer reads their standing back through the one decision, so the
+ * Membership box shows what is true now (Request to join, or "Not this
+ * time" if an officer answered first). `join_state` and `org_follow_state`
+ * are left out only when that read fails; the client then keeps its guess.
+ */
+async function cancelRequest(service: ServiceClient, org: CancelOrg, userId: string) {
+  const roleRes = await loadOrgRole(service, org.id, userId);
+  if (!roleRes.ok) return fail(500, "load_failed", "Failed to cancel");
+  if (roleRes.role) {
+    return NextResponse.json({ ok: true, cancelled: false, join_state: "member", org_follow_state: "following" });
+  }
+  // A hidden club confirms nothing to a non-member (`follow/route.ts`).
+  if (org.hidden_at) return fail(404, "not_found", "Not found");
+
+  const { data: gone, error: deleteErr } = await service
+    .from("org_join_requests")
+    .delete()
+    .eq("org_id", org.id)
+    .eq("user_id", userId)
+    .eq("status", "pending")
+    .select("id");
+  if (deleteErr) {
+    console.error("[orgs/[slug]/join DELETE cancel request]", deleteErr);
+    return fail(500, "cancel_failed", "Failed to cancel");
+  }
+  const cancelled = Array.isArray(gone) && gone.length > 0;
+
+  if (cancelled) {
+    // One statement that can only match a follow asking made. Logged, not
+    // fatal: the request is gone, which is what they asked for.
+    const [unfollow] = await Promise.all([
+      service
+        .from("org_followers")
+        .delete()
+        .eq("org_id", org.id)
+        .eq("user_id", userId)
+        .eq("source", REQUEST_FOLLOW_SOURCE),
+      settleJoinRequestNotifications(service, org.id, userId),
+    ]);
+    if (unfollow.error) console.error("[orgs/[slug]/join DELETE cancel unfollow]", unfollow.error);
+  }
+
+  const [ctx, follow] = await Promise.all([
+    loadViewerOrgContext(service, org.id, userId),
+    readFollowSource(service, org.id, userId),
+  ]);
+  const decision = ctx.ok
+    ? orgJoinState({
+        org,
+        viewer: ctx.viewer,
+        role: ctx.role,
+        pendingInvite: ctx.pendingInvite,
+        pendingRequest: ctx.pendingRequest,
+        removed: ctx.removed,
+        declinedAt: ctx.declinedAt,
+      })
+    : null;
+  return NextResponse.json({
+    ok: true,
+    cancelled,
+    ...(decision && decision.state !== "not_found"
+      ? { join_state: decision.state, join_reason: decision.reason ?? null }
+      : {}),
+    ...(follow.ok ? { org_follow_state: follow.source ? "following" : "not_following" } : {}),
   });
 }

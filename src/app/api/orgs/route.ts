@@ -28,6 +28,7 @@ import {
 } from "@/lib/orgs/following";
 import {
   INVITE_ONLY_ORGS_IN_DISCOVERY,
+  declinedAtUnlessAdmitted,
   isJoinPolicy,
   isOrgAudience,
   isOrgRole,
@@ -324,7 +325,7 @@ export async function GET(req: Request) {
     if (followingIds.length === 0) return followingResponse([], followingHasMore);
   }
 
-  const [myMembershipsRes, myPendingRes, myInvitesRes, discoverFollowsRes, myRemovalsRes] = await Promise.all([
+  const [myMembershipsRes, myPendingRes, myInvitesRes, discoverFollowsRes, myRemovalsRes, myDeclinedRes, myAcceptedRes] = await Promise.all([
     supabase.from("org_members").select("org_id, role").eq("user_id", user.id),
     // Pending join requests block re-requesting; they render as "Requested".
     supabase
@@ -349,6 +350,25 @@ export async function GET(req: Request) {
     // removed from a handful at most). Service role: the table has no
     // policies for anyone else.
     service.from(ORG_REMOVALS_TABLE).select("org_id").eq("user_id", user.id),
+    // Requests an officer turned down (Oct 22, 2026): for two weeks those
+    // clubs show no Request (`declined`). The viewer's own rows, on their
+    // own client (org_join_requests_select). Every dated one is read and
+    // `orgJoinState` judges the window on its clock, the same as the club
+    // page's read: a student has a handful of these at most.
+    supabase
+      .from("org_join_requests")
+      .select("org_id, resolved_at")
+      .eq("user_id", user.id)
+      .eq("status", "denied")
+      .not("resolved_at", "is", null),
+    // Invites they accepted: one after a "no" lifts it (the club page's
+    // `loadViewerOrgContext` reads the same; `declinedAtUnlessAdmitted`).
+    service
+      .from("org_invites")
+      .select("org_id, resolved_at")
+      .eq("invitee_id", user.id)
+      .eq("status", "accepted")
+      .not("resolved_at", "is", null),
   ]);
 
   // A failed read here doesn't empty the page, it mislabels buttons: a joined
@@ -394,6 +414,27 @@ export async function GET(req: Request) {
   for (const r of myPendingRes.data || []) {
     const row = r as { id: string; org_id: string };
     requestByOrg.set(row.org_id, { id: row.id });
+  }
+
+  // The newest "no" per club. A failed read is logged like its neighbours:
+  // the club then offers Request, and the join route answers 409
+  // `recently_declined`, which the card turns into the same `declined`.
+  if (myDeclinedRes.error) console.error(`[orgs GET ${filter} declined]`, myDeclinedRes.error);
+  const declinedAtByOrg = new Map<string, string>();
+  for (const r of myDeclinedRes.data || []) {
+    const row = r as { org_id?: unknown; resolved_at?: unknown };
+    if (typeof row.org_id !== "string" || typeof row.resolved_at !== "string") continue;
+    const seen = declinedAtByOrg.get(row.org_id);
+    if (!seen || Date.parse(row.resolved_at) > Date.parse(seen)) declinedAtByOrg.set(row.org_id, row.resolved_at);
+  }
+  // A failed read leaves every "no" standing (the route decides the same way).
+  if (myAcceptedRes.error) console.error(`[orgs GET ${filter} accepted invites]`, myAcceptedRes.error);
+  const admittedAtByOrg = new Map<string, string>();
+  for (const r of myAcceptedRes.data || []) {
+    const row = r as { org_id?: unknown; resolved_at?: unknown };
+    if (typeof row.org_id !== "string" || typeof row.resolved_at !== "string") continue;
+    const seen = admittedAtByOrg.get(row.org_id);
+    if (!seen || Date.parse(row.resolved_at) > Date.parse(seen)) admittedAtByOrg.set(row.org_id, row.resolved_at);
   }
 
   type InviteRow = {
@@ -547,6 +588,7 @@ export async function GET(req: Request) {
       pendingInvite: invite,
       pendingRequest: request,
       removed: removedOrgIds.has(o.id),
+      declinedAt: declinedAtUnlessAdmitted(declinedAtByOrg.get(o.id), admittedAtByOrg.get(o.id)),
     });
     // Following's rows are all in the set by construction.
     const orgFollowState: OrgFollowState = followedOrgIds.has(o.id)

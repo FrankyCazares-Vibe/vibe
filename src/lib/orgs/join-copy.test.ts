@@ -1,7 +1,9 @@
 /**
  * Tests for `join-copy.ts` — the club buttons, chips and copy every surface
  * shares (wave plan `handoffs/2026-09-16-wave-plan-follow-onboarding-edit.md`
- * §6 F5a B). Walks all 10 display states × following × join policy × surface.
+ * §6 F5a B). Walks all 11 display states × following × join policy × surface
+ * (`declined` since Oct 22, 2026), plus the club page's follow slot and
+ * Membership box.
  *
  * Run with:
  *   node --test --experimental-strip-types src/lib/orgs/join-copy.test.ts
@@ -19,6 +21,7 @@ import { test } from "node:test";
 const specifier = "./join-copy.ts";
 const {
   AUDIENCE_HELP,
+  CAMPUS_TIME_ZONE,
   FOLLOWER_COUNT_FLOOR,
   FOLLOW_DISCLOSURE,
   LEAVE_DROPS_FOLLOW_SOURCES,
@@ -26,9 +29,11 @@ const {
   MOD_READONLY,
   OFFICER_FOLLOW_HELP,
   ORG_COPY,
+  ORG_DISPLAY_STATES,
   WHO_CAN_JOIN_OPTIONS,
   audienceChip,
   boardCardView,
+  cancelOutcome,
   changeAfter,
   channelsGateCopy,
   fillCopy,
@@ -36,15 +41,18 @@ const {
   followsSinceText,
   inviteRowButton,
   inviteSubText,
+  isOrgDisplayState,
   joinOutcome,
   joinPolicyNotice,
   joinPressFailure,
   keepFollowingDefault,
   memberCountText,
+  membershipBoxView,
   memoryFor,
   openToFact,
   openToOptions,
   orgErrorCopy,
+  orgFollowSlot,
   orgHeaderView,
   orgMenuItems,
   orgRowView,
@@ -71,6 +79,7 @@ const STATES: DisplayState[] = [
   "audience_blocked",
   "unverified",
   "hidden",
+  "declined",
   "signed_out",
 ];
 const POLICIES = ["open", "request", "invite", null] as const;
@@ -860,4 +869,174 @@ test("both club-page Follow controls read the kept answer through memoryFor and 
   assert.match(read("../../app/orgs/[handle]/join-button.tsx"), /onChange=\{\(\) => router\.refresh\(\)\}/);
   const board = read("../../app/orgs/[handle]/ChannelsSection.tsx").split("export function BoardSection")[1] ?? "";
   assert.match(board, /axis="follow"[\s\S]*?onChange=\{\(\) => router\.refresh\(\)\}/);
+});
+
+// ── Joining made clear: the club page's slot and Membership box (Oct 22, 2026) ─
+
+test("display states: the runtime list is exactly the walk's, and the guard reads it", () => {
+  assert.deepEqual([...ORG_DISPLAY_STATES].sort(), [...STATES].sort());
+  for (const state of STATES) assert.equal(isOrgDisplayState(state), true, state);
+  for (const junk of ["owner", "not_found", "", null, 7]) assert.equal(isOrgDisplayState(junk), false, String(junk));
+});
+
+test("Membership box: no box for members and hidden clubs; elsewhere one line and at most one way in", () => {
+  for (const r of combos()) {
+    const view = membershipBoxView(r);
+    const where = label(r);
+    if (r.state === "member" || r.state === "hidden") {
+      assert.equal(view, null, where);
+      continue;
+    }
+    assert.ok(view && view.line.trim().length > 0, where);
+    assert.ok(view.actions.length <= 2, where);
+    assert.ok(view.actions.filter((a) => a.tone === "filled").length <= 1, where);
+    // Following never lives in the box: that is the whole point.
+    assert.ok(!view.actions.some(isFollowKind), where);
+    const kinds = view.actions.map((a) => a.kind);
+    assert.equal(kinds.includes("join"), r.state === "can_join", where);
+    assert.equal(kinds.includes("request"), r.state === "can_request", where);
+    assert.equal(kinds.includes("cancel"), r.state === "requested", where);
+    assert.equal(kinds.includes("accept") && kinds.includes("decline"), r.state === "invited", where);
+  }
+});
+
+test("Membership box: the plain lines, state by state", () => {
+  const line = (over: Partial<Relation>) => membershipBoxView(rel(over))?.line;
+  assert.equal(line({ state: "can_join", audience: "both" }), "Anyone at IU or Purdue can join.");
+  assert.equal(line({ state: "can_join", audience: "iu" }), "Anyone at IU can join.");
+  assert.equal(line({ state: "can_join", audience: "purdue" }), "Anyone at Purdue can join.");
+  assert.equal(line({ state: "can_request", reason: "policy" }), "Officers approve new members. Asking also follows the club.");
+  assert.match(line({ state: "can_request", reason: "visiting" }) ?? "", /^You're visiting from another campus, so officers approve\./);
+  assert.equal(line({ state: "requested" }), "Request sent. An officer will look at it.");
+  assert.equal(line({ state: "invite_only" }), "Invite only. Officers invite members.");
+  assert.equal(line({ state: "audience_blocked", audience: "iu" }), "Only IU students can join.");
+  assert.equal(line({ state: "audience_blocked", audience: "purdue" }), "Only Purdue students can join.");
+  assert.equal(line({ state: "unverified" }), "Verify your school email to join.");
+  assert.equal(line({ state: "signed_out" }), "Sign in to follow or join.");
+  const signIn = membershipBoxView(rel({ state: "signed_out", handle: "sae" }))?.actions[0];
+  assert.equal(signIn?.href, "/auth/login?next=%2Forgs%2Fsae");
+  assert.equal(membershipBoxView(rel({ state: "unverified" }))?.actions[0]?.href, "/auth/school-email");
+  assert.deepEqual(labels(membershipBoxView(rel({ state: "requested" }))?.actions ?? []), ["cancel:Cancel request:outline"]);
+});
+
+test("Membership box: 'Not this time' prints the campus's day, or 'later' without one", () => {
+  // 03:00 UTC on Nov 5 is still Nov 4 in Indianapolis: the day is pinned to
+  // campus time, so the server's HTML and the client's render agree.
+  const late = rel({ state: "declined", askAgainAt: "2026-11-05T03:00:00.000Z" });
+  assert.equal(CAMPUS_TIME_ZONE, "America/Indiana/Indianapolis");
+  // The day after the window ends, so the promise holds all day.
+  assert.equal(membershipBoxView(late)?.line, "Not this time. You can ask again on Nov 5.");
+  assert.equal(membershipBoxView(late, null, "UTC")?.line, "Not this time. You can ask again on Nov 6.");
+  assert.deepEqual(membershipBoxView(late)?.actions, [], "nothing to tap for two weeks");
+  for (const askAgainAt of [undefined, null, "nonsense"]) {
+    assert.equal(membershipBoxView(rel({ state: "declined", askAgainAt }))?.line, "Not this time. You can ask again later.");
+  }
+  const header = orgHeaderView(late);
+  assert.deepEqual(labels(header.membership), ["status:Not this time:quiet"]);
+  assert.equal(header.membership[0]!.sub, "You can ask again on Nov 5.");
+  assert.equal(header.membership[0]!.disabled, true);
+  assert.deepEqual(channelsGateCopy(late), { line: ORG_COPY.channels.approve, inline: null });
+  assert.notEqual(relationKey(late), relationKey({ ...late, askAgainAt: null }), "a new day is a new relation");
+});
+
+test("Membership box: the invite folds in, named or not, with its expiry and no second set of buttons elsewhere", () => {
+  const invited = rel({ state: "invited", joinPolicy: "invite" });
+  const named = membershipBoxView(invited, { inviterFirstName: "Sam", expiresAt: "2026-10-30T15:00:00.000Z" });
+  assert.equal(named?.line, "Sam invited you to join.");
+  assert.equal(named?.sub, "Expires Oct 30");
+  assert.deepEqual(labels(named?.actions ?? []), ["accept:Accept:filled", "decline:Decline:outline"]);
+  const anon = membershipBoxView(invited, { inviterFirstName: "  ", expiresAt: "bad" });
+  assert.equal(anon?.line, "An officer invited you to join.");
+  assert.equal(anon?.sub, null);
+  assert.equal(membershipBoxView(invited)?.line, "An officer invited you to join.");
+  // The row above only follows: no Accept there.
+  assert.ok(!orgFollowSlot(invited).action || isFollowKind(orgFollowSlot(invited).action!));
+});
+
+test("follow slot: following only; one 'Member ✓' for members; one coral button across the slot and the box", () => {
+  for (const r of combos()) {
+    const slot = orgFollowSlot(r);
+    const where = label(r);
+    const a = slot.action;
+    assert.ok(a, where);
+    assert.ok(!["join", "request", "accept", "decline", "cancel"].includes(a.kind), `${where}: no door in the row`);
+    if (r.state === "member") {
+      assert.deepEqual([a.kind, a.label, a.disabled, slot.sub], ["status", "Member ✓", true, null], where);
+      continue;
+    }
+    if (r.state === "hidden") {
+      assert.equal(a.label, "Hidden", where);
+      continue;
+    }
+    if (r.state === "signed_out") {
+      assert.deepEqual([a.kind, a.label, a.href], ["sign_in", "Follow", "/auth/login?next=%2Forgs%2Fsae"], where);
+    } else {
+      assert.ok(isFollowKind(a), where);
+      assert.equal(a.kind === "unfollow", r.following, where);
+      assert.equal(slot.sub, expectsDisclosure(r, [a]) ? FOLLOW_DISCLOSURE : null, where);
+    }
+    const box = membershipBoxView(r)?.actions ?? [];
+    const filled = [a, ...box].filter((x) => x.tone === "filled").length;
+    assert.ok(filled <= 1, `${where}: ${filled} filled`);
+    // Follow leads only when the box has no way in to offer.
+    if (!r.following) assert.equal(a.tone === "filled", !box.some((x) => x.tone === "filled"), where);
+  }
+});
+
+test("joinOutcome: 'recently_declined' flips to declined and carries the route's sentence for a toast", () => {
+  const base = { state: "can_request" as const, following: true, role: null, audience: "both" as const };
+  const said = joinOutcome(base, "request", { ok: false, code: "recently_declined", error: "Not this time. You can ask again on Nov 4." });
+  assert.deepEqual(said, {
+    kind: "change",
+    next: { state: "declined", following: true, role: null },
+    audience: "both",
+    welcome: false,
+    notice: "Not this time. You can ask again on Nov 4.",
+  });
+  const bare = joinOutcome(base, "request", { ok: false, code: "recently_declined", error: null });
+  assert.equal(bare.kind === "change" && bare.notice, "Not this time. You can ask again later.");
+  // Every other answer carries no notice (the static onboarding mirror deep-compares them).
+  const joined = joinOutcome(base, "join", { ok: true, data: { joined: true } });
+  assert.ok(joined.kind === "change" && !("notice" in joined));
+});
+
+test("cancel: the replay's guess, then the server's standing, and the toast says what changed", () => {
+  const asked = rel({ state: "requested", following: true, joinPolicy: "request", orgName: "Chess" });
+  assert.deepEqual(changeAfter(asked, "cancel"), { state: "can_request", following: true, role: null });
+  assert.equal(changeAfter({ ...asked, joinPolicy: "invite" }, "cancel")?.state, "invite_only");
+  // The follow asking made went with it.
+  const dropped = cancelOutcome(asked, { ok: true, data: { cancelled: true, join_state: "can_request", org_follow_state: "not_following" } });
+  assert.deepEqual(dropped, {
+    kind: "change",
+    next: { state: "can_request", following: false, role: null },
+    message: "Request cancelled. You don't follow Chess anymore.",
+  });
+  // A follow they tapped stays, and so does the plain toast.
+  const kept = cancelOutcome(asked, { ok: true, data: { cancelled: true, join_state: "can_request", org_follow_state: "following" } });
+  assert.equal(kept.kind === "change" && kept.message, "Request cancelled.");
+  // Let in meanwhile: a member, welcomed, never walked out.
+  const inNow = cancelOutcome(asked, { ok: true, data: { cancelled: false, join_state: "member", org_follow_state: "following" } });
+  assert.deepEqual(inNow, { kind: "change", next: { state: "member", following: true, role: "member" }, message: "You're in. Welcome to Chess." });
+  // An officer answered first: show where they stand, no toast.
+  const answered = cancelOutcome(asked, { ok: true, data: { cancelled: false, join_state: "declined" } });
+  assert.deepEqual(answered, { kind: "change", next: { state: "declined", following: true, role: null }, message: null });
+  // An answer without a readable state keeps the guess; a failure is refused.
+  const vague = cancelOutcome(asked, { ok: true, data: { cancelled: true, join_state: "signed_out" } });
+  assert.equal(vague.kind === "change" && vague.next.state, "can_request");
+  assert.deepEqual(cancelOutcome(asked, { ok: false, code: "cancel_failed" }), { kind: "refused" });
+});
+
+test("the club page: the row is the slot, the box uses the shared taps, and Cancel never leaves", () => {
+  const read = (file: string) => readFileSync(new URL(file, import.meta.url), "utf8");
+  const row = read("../../app/orgs/[handle]/join-button.tsx");
+  assert.match(row, /variant="slot"/);
+  assert.ok(!/pendingInviteId/.test(row), "the row has no invite buttons to need it");
+  const box = read("../../app/orgs/[handle]/club-page/MembershipBox.tsx");
+  assert.match(box, /useOrgControl\(/);
+  assert.match(box, /membershipBoxView\(/);
+  assert.match(box, /onChange: \(\) => router\.refresh\(\)/);
+  const control = read("../../components/orgs/OrgJoinControl.tsx");
+  assert.match(control, /json: \{ cancel_request: true \}/, "the flag that keeps a cancel from ever being a leave");
+  assert.match(control, /cancelOutcome\(rel, r\)/);
+  assert.match(read("../../app/api/orgs/[slug]/join/route.ts"), /if \(cancelling\) return cancelRequest\(/);
 });

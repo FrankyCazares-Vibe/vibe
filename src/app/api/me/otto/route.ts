@@ -65,9 +65,10 @@ export type ActivityRow = {
   comment_excerpt: string | null;
   /**
    * The club behind an `org_invite` / `org_request_approved` /
-   * `event_cancelled` row, resolved with the service client; null for every
-   * other type, and for a club row whose club couldn't be read (it renders
-   * "a club").
+   * `event_cancelled` / `org_join_request` row, resolved with the service
+   * client; null for every other type, and for a club row whose club
+   * couldn't be read (it renders "a club", or "your club" on a join request).
+   * A join request's `actor` is the student who asked (Oct 22, 2026).
    */
   org: NotificationOrg | null;
   /**

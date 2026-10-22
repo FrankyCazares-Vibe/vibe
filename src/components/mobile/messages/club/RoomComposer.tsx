@@ -455,6 +455,9 @@ function FollowerTile({ orgHandle, clubName, night, onJoined }: { orgHandle: str
     if (out.kind === "change") {
       setRel({ ...rel, ...out.next, audience: out.audience });
       if (out.welcome) toast({ message: fillCopy(ORG_COPY.control.welcome, { org: rel.orgName.trim() || clubName || "the club" }), tone: "info" });
+      // A 409 `recently_declined` (Oct 22, 2026): Request just turned into
+      // "Not this time", so say the day, as the club page does.
+      if (out.notice) toast({ message: out.notice, tone: "info" });
       if (out.next.state === "member") onJoined?.();
       return;
     }

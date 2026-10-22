@@ -7,12 +7,14 @@ import { vibeRequest, type VibeFailure } from "@/lib/feedback/request";
 import { toast } from "@/lib/feedback/toast";
 import {
   ORG_COPY,
+  cancelOutcome,
   changeAfter,
   fillCopy,
   joinOutcome,
   joinPressFailure,
   memoryFor,
   orgErrorCopy,
+  orgFollowSlot,
   orgHeaderView,
   orgRowView,
   relationKey,
@@ -53,11 +55,21 @@ import type { OrgAudience } from "@/lib/orgs/join-state";
  * `onChange` still shows what the server said. A new relation forgets it for
  * good (`memoryFor`): the club page's header and Board card both follow, and
  * an old answer must not outlive the other control's tap.
+ *
+ * THE CLUB PAGE, SINCE OCT 22, 2026. Its button row renders the `slot`
+ * variant (follow only), and its Membership box renders the membership
+ * actions through {@link useOrgControl}, the same taps this component makes,
+ * plus Cancel request. Two controls, one relation: each tap refreshes the
+ * page, so the other catches up.
  */
 
 export type OrgJoinControlProps = {
   relation: OrgRelation;
-  variant: "header" | "phone_row" | "card" | "onboarding";
+  /**
+   * `slot` (Oct 22, 2026) is the club page's button row: following only
+   * (`orgFollowSlot`), because joining lives in the Membership box under it.
+   */
+  variant: "header" | "slot" | "phone_row" | "card" | "onboarding";
   /**
    * Header only: "membership" drops the follow column (the channels card),
    * "follow" drops the membership column (the Board card).
@@ -72,19 +84,41 @@ export type OrgJoinControlProps = {
   onChange?: (next: OrgControlChange) => void;
 };
 
+/** What {@link useOrgControl} needs: the control's props, minus how it looks. */
+export type OrgControlOptions = Pick<
+  OrgJoinControlProps,
+  "relation" | "source" | "pendingInviteId" | "replay" | "onChange"
+>;
+
+/** One club's controls, wired: what to render, and what a tap does. */
+export type OrgControl = {
+  /** The parent's relation with this control's own kept answer laid over it. */
+  rel: OrgRelation;
+  /** The server said the club is gone: every control disables. */
+  gone: boolean;
+  /** Which control is waiting on the server, by the key it was pressed with. */
+  busyKey: string | null;
+  press: (a: OrgAction, key: string) => Promise<void>;
+  /** Decline needs the invite id; without one it isn't offered (replay excepted). */
+  offered: (actions: OrgAction[]) => OrgAction[];
+};
+
 /** `equal`: the line layout's two same-width pills. `grow`: fill a header column. */
 type Fill = "none" | "equal" | "grow";
 
-export function OrgJoinControl({
+/**
+ * The taps, shared by {@link OrgJoinControl} and the club page's Membership
+ * box (`club-page/MembershipBox.tsx`, Oct 22, 2026), so the box's Join,
+ * Request, Cancel, Accept and Decline go through exactly the doors, refusals
+ * and kept answers the old header's did. Rendering stays with the caller.
+ */
+export function useOrgControl({
   relation,
-  variant,
-  axis = "both",
-  followLabel,
   source,
   pendingInviteId = null,
   replay = false,
   onChange,
-}: OrgJoinControlProps): JSX.Element | null {
+}: OrgControlOptions): OrgControl {
   const basis = relationKey(relation);
   const [memory, setMemory] = useState<ControlMemory>(() => ({ seen: basis, kept: null }));
   /** Which control is waiting on the server, by its position key. */
@@ -96,7 +130,6 @@ export function OrgJoinControl({
   const current = memoryFor(memory, relation);
   if (current !== memory) setMemory(current);
   const { rel, gone } = shownRelation(relation, current);
-  const palette = PALETTES[variant];
 
   /** Keep the server's answer for the relation this tap was made on. */
   const keep = (next: OrgControlChange, audience: OrgAudience, isGone: boolean) =>
@@ -134,6 +167,26 @@ export function OrgJoinControl({
 
     const handle = encodeURIComponent(rel.handle);
     const orgName = rel.orgName.trim() || "this org";
+
+    // Take back a pending request (Oct 22, 2026). The flag makes the route
+    // cancel and never leave, even if an officer let them in meanwhile;
+    // `cancelOutcome` reads the standing it sends back.
+    if (a.kind === "cancel") {
+      setBusyKey(key);
+      const r = await vibeRequest<{ cancelled?: unknown; join_state?: unknown; org_follow_state?: unknown }>(
+        `/api/orgs/${handle}/join`,
+        { method: "DELETE", json: { cancel_request: true }, quiet: true, failure: ORG_COPY.membership.cancelFailed },
+      );
+      setBusyKey(null);
+      const out = cancelOutcome(rel, r);
+      if (out.kind === "change") {
+        apply(out.next);
+        if (out.message) toast({ message: out.message, tone: "info" });
+      } else if (!r.ok) {
+        refuse(r);
+      }
+      return;
+    }
 
     if (a.kind === "decline") {
       if (!pendingInviteId) return;
@@ -200,6 +253,9 @@ export function OrgJoinControl({
     if (out.kind === "change") {
       apply(out.next, out.audience);
       if (out.welcome) toast({ message: fillCopy(ORG_COPY.control.welcome, { org: orgName }), tone: "info" });
+      // "Not this time. You can ask again on Nov 5." (Oct 22, 2026): the
+      // Request button just went away, so say why.
+      if (out.notice) toast({ message: out.notice, tone: "info" });
     } else if (out.kind === "unclear") {
       toast({ message: out.message, tone: "error" });
     } else if (!r.ok) {
@@ -207,8 +263,33 @@ export function OrgJoinControl({
     }
   };
 
+  const offered = (actions: OrgAction[]) =>
+    actions.filter((a) => a.kind !== "decline" || replay || !!pendingInviteId);
+
+  return { rel, gone, busyKey, press, offered };
+}
+
+export function OrgJoinControl({
+  relation,
+  variant,
+  axis = "both",
+  followLabel,
+  source,
+  pendingInviteId = null,
+  replay = false,
+  onChange,
+}: OrgJoinControlProps): JSX.Element | null {
+  const { rel, gone, busyKey, press, offered } = useOrgControl({
+    relation,
+    source,
+    pendingInviteId,
+    replay,
+    onChange,
+  });
+  const palette = PALETTES[variant];
+
   const button = (a: OrgAction, key: string, extra?: { pressed?: boolean; fill?: Fill }) => (
-    <ControlButton
+    <OrgControlButton
       key={key}
       action={a}
       palette={palette}
@@ -220,9 +301,24 @@ export function OrgJoinControl({
     />
   );
 
-  /** Decline needs the invite id; without one it isn't offered (replay excepted). */
-  const offered = (actions: OrgAction[]) =>
-    actions.filter((a) => a.kind !== "decline" || replay || !!pendingInviteId);
+  // The club page's button row (Oct 22, 2026): one column, the follow slot
+  // and its fine print. Same one-element shape as the header, so
+  // globals.css's `.vibe-club-join > *` rules still fit it to the row.
+  if (variant === "slot") {
+    const slot = orgFollowSlot(rel);
+    if (!slot.action) return null;
+    const a = slot.action;
+    return (
+      <div style={{ display: "flex", alignItems: "flex-start", gap: "10px 12px", minWidth: 0 }}>
+        <div style={headerColumnStyle}>
+          {button(a, "follow", {
+            pressed: a.kind === "follow" || a.kind === "unfollow" ? rel.following : undefined,
+          })}
+          {slot.sub ? <span style={palette.sub}>{slot.sub}</span> : null}
+        </div>
+      </div>
+    );
+  }
 
   if (variant === "header") {
     const view = orgHeaderView(rel);
@@ -299,7 +395,12 @@ export function OrgJoinControl({
   );
 }
 
-function ControlButton({
+/**
+ * One club control: a link for Sign in and Verify, a button for everything
+ * else, '…' while its tap waits. Exported for the Membership box (Oct 22,
+ * 2026), which passes its own palette.
+ */
+export function OrgControlButton({
   action: a,
   palette,
   busy,
@@ -371,7 +472,7 @@ function ControlButton({
 // desktop cards sit on dark glass, onboarding on charcoal, phone Orgs rows on
 // cream. Every control is at least 44px tall.
 
-type Palette = {
+export type Palette = {
   base: CSSProperties;
   filled: CSSProperties;
   outline: CSSProperties;
@@ -379,7 +480,7 @@ type Palette = {
   sub: CSSProperties;
 };
 
-const PILL: CSSProperties = {
+export const PILL: CSSProperties = {
   display: "inline-flex",
   alignItems: "center",
   justifyContent: "center",
@@ -466,6 +567,7 @@ const CREAM: Palette = {
 
 const PALETTES: Record<OrgJoinControlProps["variant"], Palette> = {
   header: GLASS,
+  slot: GLASS,
   card: GLASS,
   onboarding: CHARCOAL,
   phone_row: CREAM,

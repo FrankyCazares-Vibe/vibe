@@ -1328,6 +1328,7 @@ function orgRowViewOnboarding(rel) {
     case "invite_only":
     case "audience_blocked":
     case "unverified":
+    case "declined":
       actions = [orgFollowToggle(rel.following)];
       break;
   }
@@ -1461,6 +1462,12 @@ function joinOutcome(rel, kind, r) {
   }
   if (r.code === "invite_only") return keep("invite_only");
   if (r.code === "school_unverified") return keep("unverified");
+  // An officer said no less than two weeks ago (Oct 22, 2026): the row stops
+  // offering Request, and `notice` is the route's sentence with the day.
+  if (r.code === "recently_declined") {
+    const said = typeof r.error === "string" ? r.error.trim() : "";
+    return { ...keep("declined"), notice: said || "Not this time. You can ask again later." };
+  }
   if (r.code === "audience_mismatch") return keep("audience_blocked", audienceFromRefusal(r.error, rel.audience));
   return { kind: "refused" };
 }
@@ -1469,7 +1476,7 @@ function joinOutcome(rel, kind, r) {
 
 const CLUB_JOIN_STATES = Object.freeze([
   "member", "invited", "requested", "can_join", "can_request",
-  "invite_only", "audience_blocked", "unverified", "hidden",
+  "invite_only", "audience_blocked", "unverified", "hidden", "declined",
 ]);
 const CLUB_ORG_ROLES = Object.freeze(["owner", "admin", "member"]);
 
@@ -3609,6 +3616,7 @@ async function pressClub(row, a, index) {
   if (out.kind === 'change') {
     applyClub(row, out.next, out.audience);
     if (out.welcome) window.vibeToast(fillCopy(ORG_COPY.control.welcome, { org: orgName }));
+    if (out.notice) window.vibeToast(out.notice);
   } else if (out.kind === 'unclear') {
     // A 2xx that says neither: nothing is known to have changed.
     window.vibeToast(out.message, { tone: 'error' });

@@ -123,7 +123,9 @@ export function boardsMatching<T extends Pick<FollowedBoard, "org">>(boards: rea
   return boards.filter((b) => b.org.name.toLowerCase().includes(q) || b.org.handle.toLowerCase().includes(q));
 }
 
-const JOIN_STATES = ["member", "invited", "requested", "can_join", "can_request", "invite_only", "audience_blocked", "unverified", "hidden"] as const;
+// `declined` (Oct 22, 2026): an officer said no in the last two weeks, so the
+// tile offers no Request (`orgHeaderView` shows the day they can ask again).
+const JOIN_STATES = ["member", "invited", "requested", "can_join", "can_request", "invite_only", "audience_blocked", "unverified", "hidden", "declined"] as const;
 const ROLES = ["owner", "admin", "member"] as const;
 
 function oneOf<T extends string>(value: unknown, list: readonly T[]): T | null {
@@ -152,6 +154,8 @@ export function followerRelation(org: unknown): OrgRelation | null {
     reason: oneOf(o.join_reason, ["policy", "visiting"] as const),
     audience: oneOf(o.audience, ["both", "iu", "purdue"] as const) ?? "both",
     joinPolicy: oneOf(o.join_policy, ["open", "request", "invite"] as const),
+    // Only when the club GET sent the day (a `declined` standing).
+    ...(typeof o.join_ask_again_at === "string" && o.join_ask_again_at ? { askAgainAt: o.join_ask_again_at } : {}),
   };
 }
 

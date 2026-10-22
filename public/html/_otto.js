@@ -841,6 +841,11 @@
       case 'org_request_approved':
         verb = 'approved your request to join ' + _ottoEsc((n.org && n.org.name) || 'a club');
         break;
+      // To an owner or officer (Oct 22, 2026): the requester is the actor.
+      // OttoSidePanel.tsx's twin; without the club it's still one of theirs.
+      case 'org_join_request':
+        verb = 'asked to join ' + _ottoEsc((n.org && n.org.name) || 'your club');
+        break;
       default:           verb = '';
     }
     // Snippet content varies by type — for comments we want to show
@@ -877,6 +882,14 @@
     const n = (_ottoLastList || []).find(x => x.id === notifId);
     if (!n) return;
     closeOttoPanel();
+    // A join request opens where it's answered: Club tools > Join requests
+    // (OttoSidePanel.tsx's twin).
+    if (n.type === 'org_join_request') {
+      window.location.href = (n.org && n.org.handle)
+        ? '/orgs/' + encodeURIComponent(n.org.handle) + '/tools/requests'
+        : '/campus?tab=orgs';
+      return;
+    }
     // Club rows open the club, not the officer who sent them. Without the
     // club (it couldn't be read) the Orgs tab is the closest place.
     if (n.type === 'org_invite' || n.type === 'org_request_approved' || n.type === 'event_cancelled') {

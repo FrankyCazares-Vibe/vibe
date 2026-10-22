@@ -46,7 +46,7 @@ export type ClubToolsCounts = { requests: number | null; members: number | null;
 
 export type ClubToolsRow = { label: string; href: string; count?: number | null };
 
-/** The tools index's rows, as links: the card below and the computer's Club tools panel (ClubToolsDrawer). */
+/** The tools index's rows, as links, for the card below. */
 export function clubToolsRows(handle: string, { requests, members, followers }: ClubToolsCounts): ClubToolsRow[] {
   const h = encodeURIComponent(handle);
   const base = `/orgs/${h}/tools`;
@@ -62,8 +62,8 @@ export function clubToolsRows(handle: string, { requests, members, followers }: 
 
 /**
  * The card beside the club page on a wide screen outside the app frame (a
- * phone held sideways). In the frame, the same rows come out of the right
- * edge instead (ClubToolsDrawer).
+ * phone held sideways). In the frame, the tools float out of the little
+ * planet on the right edge instead (ClubToolsLauncher, the Arc).
  */
 export function ClubToolsCard({
   handle,

@@ -52,7 +52,10 @@ const STUBS: Record<string, string> = {
   "@/lib/legal/require-terms": stub("export async function requireTermsAccepted() { return null; }"),
   "@/lib/orgs/membership": stub(
     `export async function loadViewerOrgContext() { return ${W}.ctx; }\nexport async function expireStaleInvites() {}\n` +
-      "export async function admitMember() { return { ok: true }; }\nexport async function recordOrgRemoval() {}\nexport async function forgetOrgRemoval() {}",
+      "export async function admitMember() { return { ok: true }; }\nexport async function recordOrgRemoval() {}\nexport async function forgetOrgRemoval() {}\n" +
+      // The officers' "asked to join" and a cancel's mark-read (Oct 22, 2026), recorded.
+      `export async function notifyOfficersOfJoinRequest(_s, args) { (${W}.notified ??= []).push(args); }\n` +
+      `export async function settleJoinRequestNotifications(_s, orgId, userId) { (${W}.settled ??= []).push([orgId, userId]); }`,
   ),
   "@/lib/orgs/org-blocks": stub("export async function loadOrgBlocks() { return { ok: true, blockedByOfficer: false }; }"),
   "@/lib/moderation/access": stub(
@@ -189,6 +192,83 @@ test("join POST: a follow they already had is 'following'; a database without th
   assert.equal(res.body.org_follow_state, "following");
   assert.deepEqual(sources, ["request", "join"]);
   assert.equal(writes(old, "org_followers", "insert").length, 2);
+});
+
+// ── Joining made clear (Oct 22, 2026): officers told, "not this time", cancel ─
+
+type Told = { orgId: string; requesterId: string; excludeIds?: readonly string[] };
+const told = (w: World) => ((w as unknown as { notified?: Told[] }).notified ?? []);
+const DAY = 24 * 60 * 60 * 1000;
+
+test("join POST: a NEW request tells the officers once; a repeat tap or a request already waiting doesn't", async () => {
+  const fresh = requestWorld({ data: null });
+  await json(await join.POST(req("POST", {}), params({ slug: "chess" })));
+  assert.deepEqual(told(fresh), [{ orgId: ORG, requesterId: ME, excludeIds: [] }]);
+  const waiting = requestWorld({ data: null });
+  waiting.ctx = { ...OUTSIDER, pendingRequest: { id: "r1", status: "pending", requested_at: "x" } };
+  const again = await json(await join.POST(req("POST", {}), params({ slug: "chess" })));
+  assert.equal(again.body.pending, true);
+  assert.deepEqual(told(waiting), [], "asking again while it waits tells nobody twice");
+});
+
+test("join POST: for two weeks after a no, asking is refused with the day; after that it files", async () => {
+  const recent = new Date(Date.now() - 3 * DAY).toISOString();
+  const w = requestWorld({ data: null });
+  w.ctx = { ...OUTSIDER, declinedAt: recent };
+  const res = await json(await join.POST(req("POST", {}), params({ slug: "chess" })));
+  assert.equal(res.status, 409);
+  assert.equal(res.body.code, "recently_declined");
+  assert.equal(res.body.available_at, new Date(Date.parse(recent) + 14 * DAY).toISOString());
+  assert.match(String(res.body.error), /^Not this time\. You can ask again on [A-Z][a-z]{2} \d{1,2}\.$/);
+  assert.equal(writes(w, "org_join_requests", "insert").length, 0, "nothing filed");
+  assert.equal(writes(w, "org_followers", "insert").length, 0, "and nothing followed");
+  assert.deepEqual(told(w), []);
+  const old = requestWorld({ data: null });
+  old.ctx = { ...OUTSIDER, declinedAt: new Date(Date.now() - 15 * DAY).toISOString() };
+  assert.equal((await json(await join.POST(req("POST", {}), params({ slug: "chess" })))).body.pending, true);
+});
+
+/** A non-member (or `role`) with a pending request on the request club. */
+function cancelWorld(role: string | null, pending = true) {
+  return install((q) => {
+    if (q.table === "orgs") return { data: [REQUEST_CLUB] };
+    if (q.table === "org_members") return { data: role ? [{ role }] : [] };
+    if (q.table === "org_join_requests") return { data: pending ? [{ id: "r1" }] : [] };
+    if (q.table === "org_followers") return { data: [] };
+    throw new Error(`unexpected read of ${q.table}`);
+  }, { ctx: OUTSIDER });
+}
+const cancel = () => join.DELETE(req("DELETE", { cancel_request: true }), params({ slug: "chess" }));
+
+test("cancel: deletes the pending request and only a follow asking made, then reads the standing back", async () => {
+  const w = cancelWorld(null);
+  const res = await json(await cancel());
+  assert.equal(res.status, 200, JSON.stringify(res.body));
+  assert.deepEqual(res.body, { ok: true, cancelled: true, join_state: "can_request", join_reason: "policy", org_follow_state: "not_following" });
+  const [gone] = writes(w, "org_join_requests", "delete");
+  assert.equal(gone.client, "service");
+  assert.ok(gone.calls.some((c) => c[0] === "eq" && c[1] === "status" && c[2] === "pending"), "only the pending row");
+  assert.ok(gone.calls.some((c) => c[0] === "eq" && c[1] === "user_id" && c[2] === ME), "only my own");
+  const [unfollow] = writes(w, "org_followers", "delete");
+  assert.ok(unfollow.calls.some((c) => c[0] === "eq" && c[1] === "source" && c[2] === "request"), "never a follow they tapped");
+  assert.deepEqual((w as unknown as { settled?: unknown[] }).settled, [[ORG, ME]]);
+  assert.equal(writes(w, "org_members", "delete").length, 0, "a cancel never leaves");
+});
+
+test("cancel: a member (let in meanwhile) stays in, and nothing is written; no request, no unfollow", async () => {
+  const member = cancelWorld("member");
+  const res = await json(await cancel());
+  assert.deepEqual(res.body, { ok: true, cancelled: false, join_state: "member", org_follow_state: "following" });
+  for (const table of ["org_members", "org_join_requests", "org_followers"]) {
+    assert.equal(writes(member, table, "delete").length, 0, table);
+  }
+  const nothing = cancelWorld(null, false);
+  assert.equal((await json(await cancel())).body.cancelled, false);
+  assert.equal(writes(nothing, "org_followers", "delete").length, 0, "no request taken back, no follow dropped");
+  // Without the flag a non-member's DELETE is still the leave's no-op.
+  const plain = cancelWorld(null);
+  assert.deepEqual((await json(await join.DELETE(req("DELETE"), params({ slug: "chess" })))).body, { ok: true, left: false });
+  assert.equal(writes(plain, "org_join_requests", "delete").length, 0);
 });
 
 // ── DELETE /api/orgs/[slug]/join: Leave, with "Keep following" (E1) ─────────

@@ -68,6 +68,9 @@ function describe(n: ActivityRow): string {
       return `${actor} invited you to join ${n.org?.name ?? "a club"}`;
     case "org_request_approved":
       return `${actor} approved your request to join ${n.org?.name ?? "a club"}`;
+    // To an owner or officer (Oct 22, 2026): the requester is the actor.
+    case "org_join_request":
+      return `${actor} asked to join ${n.org?.name ?? "your club"}`;
     default:
       return `${actor} did something`;
   }
@@ -75,10 +78,15 @@ function describe(n: ActivityRow): string {
 
 /**
  * Where tapping a row goes. A club row opens the club, or the Orgs tab when
- * the club couldn't be read. A post row opens the post page, the same place
- * the desktop Otto panel sends it. Every other row stays a plain line.
+ * the club couldn't be read; a join request opens where it's answered, Club
+ * tools > Join requests (the desktop Otto panel's openRow does the same). A
+ * post row opens the post page, the same place the desktop Otto panel sends
+ * it. Every other row stays a plain line.
  */
 function hrefFor(n: ActivityRow): string | null {
+  if (n.type === "org_join_request") {
+    return n.org ? `/orgs/${encodeURIComponent(n.org.handle)}/tools/requests` : "/campus?tab=orgs";
+  }
   if (n.type === "org_invite" || n.type === "org_request_approved" || n.type === "event_cancelled") {
     return n.org ? `/orgs/${encodeURIComponent(n.org.handle)}` : "/campus?tab=orgs";
   }

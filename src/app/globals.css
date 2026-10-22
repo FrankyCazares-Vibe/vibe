@@ -2669,9 +2669,16 @@ html {
   /* Inside the app frame (signed in, on a computer: Oct 21, 2026) the left
      menu does the top bar's job (its Campus goes back to Campus → Orgs), so
      the bar goes and the cover starts below a little air. The officers'
-     Club tools come out of the right edge then (ClubToolsDrawer.tsx), not
-     beside the page, so their page is one column too. Under 900px nothing
-     here applies: the frame steps aside and the page is as it was. */
+     Club tools float out of the right edge then (ClubToolsLauncher.tsx, the
+     Arc), not beside the page, so their page is one column too. Under 900px
+     nothing here applies: the frame steps aside and the page is as it was.
+     The cover runs wider than the text (Franky, Oct 22: "why is the banner
+     small"): the middle column's width, up to 1100px, centred on the 760px
+     column it sits in. The column is the window less the 200px menu; 264px
+     comes off the window so it stays inside that column whatever scroll bar
+     the system draws (up to 64px), and it never gets narrower than the text.
+     No container query on <main>: its containment would hold the page's
+     fixed layers (dialogs, the Club tools planet) to <main>. */
   .vibe-app-shell .vibe-club-topnav {
     display: none !important;
   }
@@ -2679,59 +2686,126 @@ html {
     max-width: 760px !important;
     padding-top: 16px !important;
   }
-}
-/* Club tools on a computer (ClubToolsDrawer.tsx, ClubToolsPanel.tsx,
-   GalaxyBackdrop.tsx; Oct 21, 2026): the handle on the right edge shows
-   from 1024px, where the club column leaves it a margin (narrower, it
-   would sit on the page's edge; the cover's Club tools button opens the
-   panel from 900px). The sky's loops, a few twinkling stars and the orbits
-   turning, run only without reduce motion, on opacity and transform. */
-.vibe-club-tools-handle {
-  display: none;
-}
-@media (min-width: 1024px) {
-  .vibe-club-tools-handle {
-    display: grid;
+  .vibe-app-shell .vibe-club-cover {
+    width: max(100%, min(1100px, calc(100vw - 264px)));
+    margin-left: calc((100% - max(100%, min(1100px, calc(100vw - 264px)))) / 2);
+    max-height: 340px;
+  }
+  /* The owner and officers have the Club tools planet half out of the right
+     edge (46px): their cover keeps clear of it, another 92px narrower. */
+  .vibe-app-shell .vibe-org-shell[data-club-tools] .vibe-club-cover {
+    width: max(100%, min(1100px, calc(100vw - 356px)));
+    margin-left: calc((100% - max(100%, min(1100px, calc(100vw - 356px)))) / 2);
   }
 }
-.vibe-club-tools-handle:focus-visible {
+/* Club tools on a computer, the Arc (ClubToolsLauncher.tsx and its cards;
+   Oct 22, 2026, replacing the slide-out panel): a little planet half tucked
+   into the window's right edge, the tools floating out of it in an arc.
+   The planet shows from 1024px, where the club column leaves it a margin
+   (narrower, it would sit on the page's edge; the cover's Club tools button
+   brings the arc out from 900px, and the planet with it, as the arc's
+   centre). Motion springs the planet, the bubbles
+   and the cards; what is here is the CSS half, on transform and opacity
+   only: a bubble's name sliding in on hover and keyboard focus, its press,
+   and three slow loops (each bubble's bob, the planet's turning colours,
+   the glow while someone waits) that run only without reduce motion. The
+   CSS timing is SPRING_SNAPPY's twin, `--vibe-spring-snappy`. */
+.vibe-arc-planet {
+  display: none;
+}
+.vibe-arc-planet[data-open] {
+  display: block;
+}
+@media (min-width: 1024px) {
+  .vibe-arc-planet {
+    display: block;
+  }
+}
+.vibe-arc-planet-hit:focus-visible,
+.vibe-arc-close:focus-visible,
+.vibe-arc-bubble:focus-visible {
+  outline: 2px solid var(--coral);
+  outline-offset: 4px;
+}
+.vibe-arc-bubble:hover,
+.vibe-arc-bubble:focus-visible {
+  transform: scale(1.09);
+}
+.vibe-arc-bubble:active {
+  transform: scale(0.96);
+}
+.vibe-arc-label {
+  opacity: 0;
+  transform: translateX(8px);
+  pointer-events: none;
+}
+.vibe-arc-spot:hover .vibe-arc-label,
+.vibe-arc-spot:focus-within .vibe-arc-label {
+  opacity: 1;
+  transform: none;
+}
+/* A card open beside the arc: the names would sit on it, so they stay away. */
+.vibe-arc-nav[data-carding] .vibe-arc-label {
+  opacity: 0 !important;
+}
+.vibe-arc-row:hover {
+  background: rgba(255,255,255,0.06);
+}
+.vibe-arc-primary:hover:not(:disabled) {
+  background: #FF7652 !important;
+}
+.vibe-arc-ghost:hover:not(:disabled) {
+  background: rgba(255,255,255,0.12) !important;
+}
+.vibe-arc-card :focus-visible {
   outline: 2px solid var(--coral);
   outline-offset: 2px;
 }
-.vibe-star {
-  display: block;
-  width: 100%;
-  height: 100%;
-  border-radius: 50%;
-  background: #fff;
-  box-shadow: 0 0 4px rgba(255,255,255,0.55);
+.vibe-arc-card:focus-visible {
+  outline: none;
 }
-.vibe-galaxy-row:hover {
-  background: rgba(255,255,255,0.08) !important;
+@keyframes vibe-arc-bob {
+  from { transform: translateY(-3px); }
+  to { transform: translateY(3px); }
 }
-.vibe-galaxy-row--cta:hover {
-  background: rgba(255,92,53,0.24) !important;
+@keyframes vibe-arc-sway {
+  from { transform: rotate(-6deg); }
+  to { transform: rotate(6deg); }
 }
-.vibe-galaxy-row:focus-visible {
-  outline: 2px solid var(--coral);
-  outline-offset: -2px;
-}
-@keyframes vibe-star-twinkle {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.2; }
-}
-@keyframes vibe-orbit-spin {
-  to { transform: rotate(360deg); }
+@keyframes vibe-arc-pulse {
+  0%, 100% { opacity: 0.25; transform: scale(1); }
+  50% { opacity: 0.75; transform: scale(1.18); }
 }
 @media (prefers-reduced-motion: no-preference) {
-  .vibe-star--twinkle {
-    animation: vibe-star-twinkle 3.6s ease-in-out infinite;
+  .vibe-arc-bubble {
+    transition: transform 320ms var(--vibe-spring-snappy);
   }
-  .vibe-orbit-spin {
-    animation: vibe-orbit-spin 9s linear infinite;
+  .vibe-arc-bubble:active {
+    transition-duration: 90ms;
   }
-  .vibe-orbit-spin--slow {
-    animation-duration: 90s;
+  .vibe-arc-label {
+    transition: opacity 200ms ease, transform 320ms var(--vibe-spring-snappy);
+  }
+  .vibe-arc-bob {
+    animation: vibe-arc-bob 4.2s ease-in-out infinite alternate;
+  }
+  .vibe-arc-sway {
+    animation: vibe-arc-sway 7s ease-in-out infinite alternate;
+  }
+  .vibe-arc-glow--hot {
+    animation: vibe-arc-pulse 2.6s ease-in-out infinite;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  /* The names still come and go, as a fade with no slide. */
+  .vibe-arc-label {
+    transform: none;
+    transition: opacity 200ms ease;
+  }
+  .vibe-arc-bubble:hover,
+  .vibe-arc-bubble:focus-visible,
+  .vibe-arc-bubble:active {
+    transform: none;
   }
 }
 @media (max-width: 720px) {

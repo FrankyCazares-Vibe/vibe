@@ -346,6 +346,10 @@ export async function GET(_req: Request, { params }: Params) {
     // A removed member of an open club asks, never one-tap rejoins
     // (S67 sec wave 2 #15; the join route decides the same way).
     removed: ctx.removed,
+    // Two weeks after an officer's "no", `declined` (Oct 22, 2026), as the
+    // join route and the club page decide it. Undefined from an older
+    // stand-in reads as no decline.
+    declinedAt: ctx.declinedAt,
   });
   if (decision.state === "not_found") {
     return fail(404, "not_found", "Not found");
@@ -402,6 +406,8 @@ export async function GET(_req: Request, { params }: Params) {
       hidden: !!hidden_at,
       join_state: decision.state,
       join_reason: decision.reason ?? null,
+      // Only on `declined`: when they may ask again (ISO), else null.
+      join_ask_again_at: decision.askAgainAt ?? null,
       pending_invite:
         decision.state === "invited" && ctx.pendingInvite
           ? {

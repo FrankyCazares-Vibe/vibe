@@ -4,6 +4,7 @@ import { after } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { hasRecordedConsent, CONSENT_COLUMNS } from "@/lib/legal/terms";
+import { OFFICER_ROLES } from "@/lib/orgs/join-state";
 import { isUuid } from "@/lib/pgrest";
 import { rateLimit } from "@/lib/rate-limit";
 import { loadHiddenUsers, type HiddenUsers } from "@/lib/safety/hidden-users";
@@ -402,7 +403,17 @@ type Batch = {
   follows: Set<string>;
   /** A cancelled-event notice's event_title / event_starts_at, by notification id. */
   eventNotices: Map<string, EventNoticeFields>;
+  /**
+   * For join-request notices only (Oct 22, 2026): `${org}:${user}` for each
+   * recipient who is STILL an owner or officer of that club, and
+   * `${org}:${user}` for each requester whose request is STILL pending.
+   */
+  clubOfficers: Set<string>;
+  pendingRequests: Set<string>;
 };
+
+/** The notification type an officer gets when someone asks to join (migration 20261024100000). */
+const ORG_JOIN_REQUEST = "org_join_request";
 
 const byId = <T extends { id: string }>(rows: T[]) => new Map(rows.map((r) => [r.id, r]));
 
@@ -459,7 +470,15 @@ async function loadBatch(service: SupabaseClient, rows: OutboxRow[]): Promise<Ba
   const nowIso = new Date().toISOString();
   const none = <T>() => Promise.resolve([] as T[]);
 
-  const [mentionMsgs, posts, comments, users, restrictions, follows, members, chatMutes, eventNotices] = await Promise.all([
+  // Join-request notices: which clubs, which requesters (their actors).
+  const joinNotifs = notifs.filter((n) => n.type === ORG_JOIN_REQUEST && n.org_id);
+  const joinOrgs = unique(joinNotifs.map((n) => n.org_id));
+  const joinActors = unique(joinNotifs.map((n) => n.actor_id));
+
+  const [
+    mentionMsgs, posts, comments, users, restrictions, follows, members, chatMutes, eventNotices,
+    clubOfficers, pendingRequests,
+  ] = await Promise.all([
     readIn<MessageRow>(
       service,
       "messages",
@@ -521,6 +540,30 @@ async function loadBatch(service: SupabaseClient, rows: OutboxRow[]): Promise<Ba
       "id",
       unique(notifs.filter((n) => isClubNotice(n.type)).map((n) => n.id)),
     ),
+    // A join request names a student to an officer, so it is asked again at
+    // send time: is the recipient still an owner or officer (demoted or gone
+    // since the row was written: no push), and is the request still open
+    // (answered by another officer, or cancelled: no push).
+    joinOrgs.length === 0 || recipients.length === 0
+      ? none<{ org_id: string; user_id: string }>()
+      : rowsOf<{ org_id: string; user_id: string }>(
+          service
+            .from("org_members")
+            .select("org_id, user_id")
+            .in("org_id", joinOrgs)
+            .in("user_id", recipients)
+            .in("role", [...OFFICER_ROLES]),
+        ),
+    joinOrgs.length === 0 || joinActors.length === 0
+      ? none<{ org_id: string; user_id: string }>()
+      : rowsOf<{ org_id: string; user_id: string }>(
+          service
+            .from("org_join_requests")
+            .select("org_id, user_id")
+            .in("org_id", joinOrgs)
+            .in("user_id", joinActors)
+            .eq("status", "pending"),
+        ),
   ]);
 
   const messages = [...sourceMsgs, ...mentionMsgs];
@@ -555,6 +598,8 @@ async function loadBatch(service: SupabaseClient, rows: OutboxRow[]): Promise<Ba
     chatMutes,
     follows: new Set(follows.map((f) => `${f.follower_id}:${f.following_id}`)),
     eventNotices: new Map(eventNotices.map((e) => [e.id, e])),
+    clubOfficers: new Set(clubOfficers.map((m) => `${m.org_id}:${m.user_id}`)),
+    pendingRequests: new Set(pendingRequests.map((r) => `${r.org_id}:${r.user_id}`)),
   };
 }
 
@@ -579,6 +624,7 @@ const unsure = (row: OutboxRow): Stop =>
 
 const NOTIFICATION_KINDS: ReadonlySet<string> = new Set([
   "follow", "like", "comment", "mention", "org_invite", "org_request_approved", EVENT_CANCELLED,
+  ORG_JOIN_REQUEST,
 ]);
 
 type Memo = {
@@ -677,6 +723,17 @@ async function decide(
         eventTitle: ev?.event_title ?? null,
         eventStartsAt: ev?.event_starts_at ?? null,
       });
+    }
+    case ORG_JOIN_REQUEST: {
+      // To an owner or officer: "<name> asked to join <club>". The org_invite
+      // rule first, then the two send-time questions loadBatch read. The
+      // push obeys the "Club invites" switch (SHARED_SWITCH in payload.ts).
+      const org = n.org_id ? b.orgs.get(n.org_id) : undefined;
+      if (!org) return skip("source_gone");
+      if (org.hidden_at) return skip("hidden_club");
+      if (!b.clubOfficers.has(`${org.id}:${recipientId}`)) return skip("not_officer");
+      if (!b.pendingRequests.has(`${org.id}:${actorId}`)) return skip("request_closed");
+      return ready("org_join_request", { kind: "org_join_request", actor: who, orgId: org.id, club: org });
     }
     default: {
       // org_invite / org_request_approved
