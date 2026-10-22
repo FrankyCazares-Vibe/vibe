@@ -23,6 +23,7 @@ import {
   notifyOfficersOfJoinRequest,
   settleJoinRequestNotifications,
 } from "@/lib/orgs/membership";
+import { dropMembersOnlyRsvpsOnLeave, membersOnlyRsvpsOnLeave } from "@/lib/orgs/leave-rsvps";
 import { loadOrgBlocks } from "@/lib/orgs/org-blocks";
 import { rateLimit, tooManyRequests } from "@/lib/rate-limit";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -157,6 +158,66 @@ async function readDeleteBody(req: Request): Promise<{ keep: boolean | null; can
   } catch {
     return { keep: null, cancelRequest: false };
   }
+}
+
+/**
+ * GET /api/orgs/[slug]/join?leave_preview=1 — what leaving would take away
+ * (Franky, Oct 22, 2026; PLAN-3.md): the viewer's Going and Interested RSVPs
+ * to this club's Members only events that haven't ended, soonest first. The
+ * three leave confirms (the club page's ⋯, Club tools › Club settings,
+ * desktop Settings › Danger) read it when they open and warn before the tap;
+ * the DELETE below then drops those RSVPs. Nothing is written here.
+ *
+ * Same `org-join:<uid>` budget as joining and leaving, before the first
+ * read: one count per confirm opened, far inside 30 per 10 minutes, and a
+ * script can't use the read to dodge the join's limit. SERVICE ROLE for the
+ * club and the RSVPs, like DELETE: a private or hidden club must not 404 on
+ * the lookup, and the answer must not lean on `event_visible`.
+ *
+ * RESPONSES
+ *   200 {ok, events: [{id, title, starts_at, viewer_status}]}  a member
+ *   200 {ok, events: []}   not a member (nothing to lose by leaving)
+ *   400 bad_request (no `leave_preview=1`) · 401 · 404 not_found (also a
+ *   hidden club to a non-member) · 429 · 500 load_failed
+ */
+export async function GET(req: Request, { params }: Params) {
+  const { slug } = await params;
+  const supabase = await createSupabaseServerClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) {
+    return fail(401, "unauthorized", "Unauthorized");
+  }
+
+  const rl = await rateLimit(`org-join:${user.id}`, JOIN_LIMIT);
+  if (!rl.allowed) return tooManyRequests(rl, JOIN_TOO_FAST);
+
+  if (new URL(req.url).searchParams.get("leave_preview") !== "1") {
+    return fail(400, "bad_request", "Nothing to read here");
+  }
+
+  const service = createSupabaseServiceClient();
+  const { data: org, error: orgErr } = await service
+    .from("orgs")
+    .select("id, hidden_at")
+    .eq("handle", slug)
+    .maybeSingle();
+  if (orgErr) {
+    console.error("[orgs/[slug]/join GET load org]", orgErr);
+    return fail(500, "load_failed", "Failed to load");
+  }
+  if (!org) return fail(404, "not_found", "Not found");
+
+  const roleRes = await loadOrgRole(service, org.id, user.id);
+  if (!roleRes.ok) return fail(500, "load_failed", "Failed to load");
+  if (!roleRes.role) {
+    // A hidden club confirms nothing to a non-member (as DELETE).
+    if (org.hidden_at) return fail(404, "not_found", "Not found");
+    return NextResponse.json({ ok: true, events: [] });
+  }
+
+  const preview = await membersOnlyRsvpsOnLeave(service, org.id, user.id);
+  if (!preview.ok) return fail(500, "load_failed", "Failed to load");
+  return NextResponse.json({ ok: true, events: preview.events });
 }
 
 /**
@@ -462,8 +523,15 @@ export async function POST(req: Request, { params }: Params) {
  *
  * Leaving also drops the club's chat rows (channel_members and
  * org_channel_members), in the database: the SECURITY DEFINER AFTER DELETE
- * trigger `org_members_drop_club_access` (20260928100000). A voluntary leave
- * keeps RSVPs; only a removal (members/[userId] DELETE) drops those.
+ * trigger `org_members_drop_club_access` (20260928100000). A removal
+ * (members/[userId] DELETE) drops every upcoming RSVP to the club's events
+ * there too. A voluntary leave keeps RSVPs to Everyone events, but since
+ * Oct 22, 2026 not to Members only ones: only members can go, so once the
+ * membership is gone this route deletes the leaver's RSVPs to the club's
+ * members-only events that haven't ended (`dropMembersOnlyRsvpsOnLeave`,
+ * service role, best-effort: a failure is logged and the leave stands). The
+ * confirms warned first (GET above), and `rsvps_dropped` says how many Going
+ * or Interested ones came off, for the toast.
  *
  * Leaving counts against the same `org-join:<uid>` budget as joining
  * (limits wave 3), before the first read: joining and leaving in a loop
@@ -491,8 +559,8 @@ export async function POST(req: Request, { params }: Params) {
  * cancelling in a loop spend one.
  *
  * RESPONSES
- *   200 {ok, left:true, org_follow_state?}  `org_follow_state` is read back
- *       after the change; it is missing only if that read failed
+ *   200 {ok, left:true, rsvps_dropped, org_follow_state?}  `org_follow_state`
+ *       is read back after the change; it is missing only if that read failed
  *   200 {ok, left:false}                    they weren't a member
  *   200 {ok, cancelled, join_state?, join_reason?, org_follow_state?}  a cancel
  *   400 owner_cannot_leave · 401 · 404 not_found (also a hidden club to a
@@ -574,7 +642,10 @@ export async function DELETE(req: Request, { params }: Params) {
   }
 
   // The membership is gone, so from here a failed follow change is logged and
-  // shows in `org_follow_state`, never as a failed leave.
+  // shows in `org_follow_state`, never as a failed leave. The members-only
+  // RSVPs go first (Oct 22, 2026): logged, never thrown, never a failed leave.
+  const rsvps = await dropMembersOnlyRsvpsOnLeave(service, org.id, user.id);
+
   if (keep === true && !hadFollow && !org.hidden_at) {
     const { error: followErr } = await service
       .from("org_followers")
@@ -595,6 +666,7 @@ export async function DELETE(req: Request, { params }: Params) {
   return NextResponse.json({
     ok: true,
     left: true,
+    rsvps_dropped: rsvps.dropped,
     ...(after.ok ? { org_follow_state: after.source ? "following" : "not_following" } : {}),
   });
 }

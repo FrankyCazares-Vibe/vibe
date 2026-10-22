@@ -116,8 +116,11 @@ export function NotDeletedYet() {
           &ldquo;Delete conversation&rdquo; only clear your view.
         </li>
         <li>
-          A request to join a club. You cannot take it back. Asking also follows
-          the club. If the club says no, you keep following until you unfollow.
+          A request to join a club once its owner or officers have answered it.
+          While it is still waiting you can cancel it, which also takes back the
+          follow it made. Asking also follows the club. If the club says no, you
+          keep following until you unfollow, and you can ask again after 14
+          days.
         </li>
         <li>
           The date you first followed a club. It stays after you unfollow,

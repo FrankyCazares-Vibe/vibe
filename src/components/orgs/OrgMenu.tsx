@@ -5,8 +5,10 @@ import { useEffect, useId, useRef, useState, type CSSProperties, type JSX } from
 
 import { vibeRequest, type VibeFailure } from "@/lib/feedback/request";
 import { toast } from "@/lib/feedback/toast";
-import { ORG_COPY, fillCopy, orgErrorCopy, orgMenuItems } from "@/lib/orgs/join-copy";
+import { ORG_COPY, fillCopy, leaveToastText, orgErrorCopy, orgMenuItems } from "@/lib/orgs/join-copy";
 import type { OrgRole } from "@/lib/orgs/join-state";
+
+import { LeaveWarning, useLeavePreview } from "./LeaveWarning";
 
 /**
  * The club page's ⋯ menu (club model gaps 1 and 2, Franky's calls of Oct 16),
@@ -22,7 +24,9 @@ import type { OrgRole } from "@/lib/orgs/join-state";
  *   - Leave club, for members except the owner, who hands the club on first.
  *     The confirm asks whether to keep following (`DELETE /join` with
  *     `{keep_following}`); the box starts checked only for a follow they
- *     tapped themselves (`keepFollowingDefault`).
+ *     tapped themselves (`keepFollowingDefault`). It also warns about the
+ *     club's Members only events they're going to, which a leave takes them
+ *     off (`LeaveWarning`, Oct 22, 2026), and the toast says how many.
  *
  * The rows and every word come from `join-copy.ts` (`orgMenuItems`,
  * `ORG_COPY.menu`). No optimistic flips: a tap waits for the server, and the
@@ -136,7 +140,7 @@ export function OrgMenu(p: OrgMenuProps): JSX.Element | null {
 
   const leave = async (keepFollowing: boolean) => {
     setBusy(true);
-    const r = await vibeRequest<{ left?: unknown; org_follow_state?: unknown }>(
+    const r = await vibeRequest<{ left?: unknown; org_follow_state?: unknown; rsvps_dropped?: unknown }>(
       `/api/orgs/${encodeURIComponent(p.orgHandle)}/join`,
       {
         method: "DELETE",
@@ -148,10 +152,7 @@ export function OrgMenu(p: OrgMenuProps): JSX.Element | null {
     setBusy(false);
     if (!r.ok) return refuse(r);
     setLeaving(false);
-    if (r.data.left === true) {
-      const still = r.data.org_follow_state === "following";
-      toast({ message: fillCopy(still ? ORG_COPY.menu.leftFollowing : ORG_COPY.menu.left, { org }), tone: "info" });
-    }
+    if (r.data.left === true) toast({ message: leaveToastText(org, r.data), tone: "info" });
     // Left, or already out: either way the page's standing is stale.
     router.refresh();
   };
@@ -195,6 +196,7 @@ export function OrgMenu(p: OrgMenuProps): JSX.Element | null {
       ) : null}
       {leaving ? (
         <LeaveDialog
+          handle={p.orgHandle}
           org={org}
           busy={busy}
           initialKeep={p.keepFollowing}
@@ -214,9 +216,12 @@ export function OrgMenu(p: OrgMenuProps): JSX.Element | null {
  * "Leave SAE?" with the keep-following choice. Inline (not portaled) at the
  * org page's own dialog layer, so `.vibe-tabbar-page:has([aria-modal])` hides
  * the phone tab bar while it is open. Escape and the scrim cancel, except
- * while the leave is on its way.
+ * while the leave is on its way. The members-only warning, when there is
+ * one, sits right above the buttons; it scrolls with the dialog on a short
+ * phone (`maxHeight` below), so Leave and Cancel are never pushed off.
  */
 function LeaveDialog({
+  handle,
   org,
   busy,
   initialKeep,
@@ -224,6 +229,7 @@ function LeaveDialog({
   onCancel,
   onLeave,
 }: {
+  handle: string;
   org: string;
   busy: boolean;
   initialKeep: boolean;
@@ -234,6 +240,7 @@ function LeaveDialog({
 }): JSX.Element {
   const titleId = useId();
   const [keep, setKeep] = useState(initialKeep);
+  const membersOnly = useLeavePreview(handle);
   const cancelRef = useRef<HTMLButtonElement | null>(null);
   // The latest busy flag and cancel handler, for the one Escape listener
   // below: re-subscribing each render would also steal focus on every tick.
@@ -283,6 +290,7 @@ function LeaveDialog({
             <span style={{ fontSize: 12.5, color: "var(--ink-muted)" }}>{boardOn ? ORG_COPY.menu.keepFollowingSubBoard : ORG_COPY.menu.keepFollowingSub}</span>
           </span>
         </label>
+        <LeaveWarning events={membersOnly} />
         <div style={{ display: "flex", gap: 10, marginTop: 4 }}>
           <button ref={cancelRef} type="button" disabled={busy} onClick={onCancel} style={cancelStyle}>
             {ORG_COPY.menu.cancel}
@@ -374,6 +382,8 @@ const scrimStyle: CSSProperties = {
 
 const dialogStyle: CSSProperties = {
   width: "min(400px, 100%)",
+  maxHeight: "100%",
+  overflowY: "auto",
   boxSizing: "border-box",
   padding: 20,
   borderRadius: 18,

@@ -403,7 +403,7 @@ Vibe does not delete things just because they are old. They stay until you, a cl
 | Messages | The sender deletes the message (a "Message deleted" note stays in its place) or their account. In club rooms, also when the room, the event or the club is deleted, or the account that wrote the Board post above it |
 | A pin on a message | Someone in the chat unpins it, the message is deleted, or the Vibe team removes the message |
 | An event's chat | Deleted with the event. It closes to new messages 7 days after the event ends |
-| RSVPs | You take yours back, or the event, the club or your account is deleted. For an upcoming event, also when the club takes you out, or marks that event "Members only" while you are not a member |
+| RSVPs | You take yours back, or the event, the club or your account is deleted. For an upcoming event, also when the club takes you out, when you leave the club and the event is marked "Members only", or when the club marks it "Members only" while you are not a member |
 | Event check-ins | You remove yours, the club's owner or an officer takes it off or clears the event's check-ins, or the event, the club or your account is deleted. Leaving the club, or being taken out of it, does not remove them |
 | Events | An owner or officer cancels the event, or the club or the account that made it is deleted |
 | Join requests and invites | The club or your account is deleted |
@@ -438,7 +438,7 @@ Vibe does not delete things just because they are old. They stay until you, a cl
 
   For a comment, or for your messages in a chat or club you have left, you need not delete your account. Write to help@connectvibe.app from your sign-in email. We reply to that address, and once you answer that reply we aim to delete the comment or the messages by hand.
 - A direct or group chat itself. "Clear chat history" and "Delete conversation" only clear your view.
-- A request to join a club. You cannot take it back. Asking also follows the club. If the club says no, you keep following until you unfollow.
+- A request to join a club once its owner or officers have answered it. While it is still waiting you can cancel it, which also takes back the follow it made. Asking also follows the club. If the club says no, you keep following until you unfollow, and you can ask again after 14 days.
 - The date you first followed a club. It stays after you unfollow, until the club or your account is deleted. While you are not following, no other user is shown it. If you follow again, the club's owner and officers see that first date (section 5f).
 - An account that never confirmed its email or never finished setting up. If you cannot sign in to delete it, write to help@connectvibe.app.
 - Our email log, the abuse counts, the sign-in log and emails you send us (section 9).

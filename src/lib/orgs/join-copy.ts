@@ -360,6 +360,20 @@ export const ORG_COPY = freezeDeep({
     leftFollowing: "You left {org}. You still follow it.",
     leaveFailed: "Couldn't leave {org}.",
     ownerCantLeave: "Owners can't leave. Hand the club to another officer first.",
+    // Leaving takes you off the club's Members only events (Franky, Oct 22,
+    // 2026): the confirm warns first, the toast says how many came off.
+    // `leaveWarningView` and `leaveToastText` pick one and fill {n}.
+    leaveRsvpsTitleOne: "You're going to {n} members-only event",
+    leaveRsvpsTitleMany: "You're going to {n} members-only events",
+    leaveRsvpsBodyOne: "Leaving takes you off it: only members can go.",
+    leaveRsvpsBodyMany: "Leaving takes you off them: only members can go.",
+    leaveRsvpsMore: "and {n} more",
+    leaveRsvpsUntitled: "Untitled event",
+    leaveRsvpsLoadFailed: "Couldn't load your events.",
+    leftRsvpsOne: "You left {org}. You're off {n} members-only event.",
+    leftRsvpsMany: "You left {org}. You're off {n} members-only events.",
+    leftFollowingRsvpsOne: "You left {org}. You still follow it, but you're off {n} members-only event.",
+    leftFollowingRsvpsMany: "You left {org}. You still follow it, but you're off {n} members-only events.",
   },
   control: {
     followFailed: "Couldn't follow this club.",
@@ -1175,6 +1189,93 @@ export const LEAVE_DROPS_FOLLOW_SOURCES: readonly string[] = Object.freeze(["joi
  */
 export function keepFollowingDefault(source: string | null | undefined): boolean {
   return typeof source === "string" && !LEAVE_DROPS_FOLLOW_SOURCES.includes(source);
+}
+
+/**
+ * One of the student's RSVPs a leave would take away: a Going or Interested
+ * RSVP to one of the club's Members only events that hasn't ended (Oct 22,
+ * 2026; `GET /api/orgs/[slug]/join?leave_preview=1`, leave-rsvps.ts).
+ */
+export type LeaveRsvpEvent = {
+  id: string;
+  title: string;
+  starts_at: string;
+  viewer_status: "going" | "maybe";
+};
+
+/** The preview's `events`, read safely: anything malformed is left out. */
+export function leaveRsvpEventsOf(value: unknown): LeaveRsvpEvent[] {
+  if (!Array.isArray(value)) return [];
+  const out: LeaveRsvpEvent[] = [];
+  for (const row of value) {
+    const r = row as Partial<Record<keyof LeaveRsvpEvent, unknown>> | null;
+    if (!r || typeof r.id !== "string" || typeof r.starts_at !== "string") continue;
+    out.push({
+      id: r.id,
+      title: typeof r.title === "string" ? r.title : "",
+      starts_at: r.starts_at,
+      viewer_status: r.viewer_status === "maybe" ? "maybe" : "going",
+    });
+  }
+  return out;
+}
+
+/** How many of the warning's events are named; the rest are "and N more". */
+export const LEAVE_WARNING_SHOWN = 3;
+
+export type LeaveWarningView = {
+  title: string;
+  body: string;
+  /** Soonest first, at most {@link LEAVE_WARNING_SHOWN}; `date` is null when the start can't be read. */
+  items: { key: string; title: string; date: string | null }[];
+  more: string | null;
+};
+
+/**
+ * The leave confirms' warning block, on every surface (the club page's ⋯,
+ * Club tools › Club settings, desktop Settings › Danger), or null when the
+ * student holds no such RSVP: then the confirm reads as it always has. Each
+ * event is its title and its day in `timeZone` (pass CAMPUS_TIME_ZONE, so a
+ * phone abroad and the server agree). An untitled event reads
+ * `leaveRsvpsUntitled`, never a blank line.
+ */
+export function leaveWarningView(
+  events: readonly LeaveRsvpEvent[] | null | undefined,
+  timeZone: string = CAMPUS_TIME_ZONE,
+): LeaveWarningView | null {
+  const list = Array.isArray(events) ? events : [];
+  const n = list.length;
+  if (n === 0) return null;
+  const one = n === 1;
+  const menu = ORG_COPY.menu;
+  return {
+    title: fillCopy(one ? menu.leaveRsvpsTitleOne : menu.leaveRsvpsTitleMany, { n }),
+    body: one ? menu.leaveRsvpsBodyOne : menu.leaveRsvpsBodyMany,
+    items: list.slice(0, LEAVE_WARNING_SHOWN).map((ev) => ({
+      key: ev.id,
+      title: ev.title.trim() || menu.leaveRsvpsUntitled,
+      date: shortDateText(ev.starts_at, timeZone),
+    })),
+    more: n > LEAVE_WARNING_SHOWN ? fillCopy(menu.leaveRsvpsMore, { n: n - LEAVE_WARNING_SHOWN }) : null,
+  };
+}
+
+/**
+ * The toast after a leave went through, from the route's answer: whether
+ * they still follow (`org_follow_state`) and how many members-only RSVPs came
+ * off (`rsvps_dropped`; missing, zero or junk means none, which is what an
+ * older server says).
+ */
+export function leaveToastText(org: string, answer: { org_follow_state?: unknown; rsvps_dropped?: unknown } | null | undefined): string {
+  const following = answer?.org_follow_state === "following";
+  const raw = answer?.rsvps_dropped;
+  const n = typeof raw === "number" && Number.isInteger(raw) && raw > 0 ? raw : 0;
+  const menu = ORG_COPY.menu;
+  if (n === 0) return fillCopy(following ? menu.leftFollowing : menu.left, { org });
+  const line = following
+    ? n === 1 ? menu.leftFollowingRsvpsOne : menu.leftFollowingRsvpsMany
+    : n === 1 ? menu.leftRsvpsOne : menu.leftRsvpsMany;
+  return fillCopy(line, { org, n });
 }
 
 /**

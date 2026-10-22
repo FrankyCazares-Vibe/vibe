@@ -651,8 +651,10 @@ export async function settleJoinRequestNotifications(
  * Record that an officer removed `userId` from the org. Call it BEFORE the
  * org_members delete: the AFTER DELETE trigger reads this row to tell a
  * removal (drop their RSVPs to the club's events that haven't ended) from a
- * voluntary leave (keep them), and a crash between the two steps then leaves
- * a member with a stale removal (member state wins; the next removal simply
+ * voluntary leave (keep them, except Members only ones, which the join
+ * route's DELETE drops itself since Oct 22, 2026: leave-rsvps.ts), and a
+ * crash between the two steps then leaves a member with a stale removal
+ * (member state wins; the next removal simply
  * re-stamps it), never a removed person with no record (a one-tap rejoin).
  *
  * `missing: true` when the table isn't deployed yet: the caller removes the

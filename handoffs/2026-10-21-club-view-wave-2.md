@@ -281,3 +281,24 @@ Shipped from the wave 1 session (`busy-aryabhata-7b6991`); this branch's own ses
     and then cancelled shows its "Event cancelled" line to followers. Both small; say if either should change.
   - Checks: 4 batches with a reviewer each, tsc clean, 3,827 tests pass. Walked headless on the computer (the
     panel from Join requests and Members, the chip, the form); not on a real phone.
+- **Oct 22, later (Franky: warn before leaving when it takes you off Members only events; removals should remove
+  RSVPs; map the officers' settings and the background; a phone version?):**
+  - **Leaving a club now takes you off its upcoming Members only events, with a warning first.** All three leave
+    dialogs (the club page's ⋯ menu on phone and computer, Club tools > Club settings, the desktop org settings
+    window) show "You're going to N members-only events · Leaving takes you off them: only members can go." with
+    the events listed, before Leave. After leaving: "You left <club>. You're off N members-only events." RSVPs to
+    Everyone events stay. Server: `GET /api/orgs/<h>/join?leave_preview=1` and the leave itself use one helper
+    (`src/lib/orgs/leave-rsvps.ts`), so the warning lists exactly what comes off. No database change. Walked
+    locally as Casey with two members-only RSVPs: the warning showed (375px and 1280px), leaving removed both and
+    kept his Everyone RSVP; Casey and the test events were restored afterwards.
+  - **Removals already removed RSVPs** (to every upcoming event of the club) since September; now tested (the
+    removal is recorded before the membership is deleted, which is what triggers it).
+  - **Privacy Policy** (still effective October 22): the RSVPs row says leaving takes you off a club's Members
+    only events, and the "What Vibe does not delete yet" line about join requests now says a waiting request can
+    be cancelled (it had said "You cannot take it back" since before Cancel request shipped).
+  - **Settings map + background picker: mockups only, nothing built.** `handoffs/2026-10-22-club-tools-arc/
+    SETTINGS-MAP.md` (what officers can set today, what's missing, when; 10 tuned background presets with exact
+    CSS that keep text readable; today's backgrounds fail on quiet text and the club page and the old picker
+    disagree). Canvas row "Club settings and the background picker": Look on a computer (click a background, the
+    page repaints), Look on a phone, and the settings map. Phone answer: yes for settings and the picker (same
+    Edit page), no for the Arc.

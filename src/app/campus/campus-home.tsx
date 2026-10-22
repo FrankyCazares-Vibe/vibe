@@ -79,6 +79,7 @@ import {
 import { useClubMute, type ClubMuteFn } from "@/components/mobile/PostViewerMobile";
 import { SharePostSheet } from "@/components/mobile/SharePostSheet";
 import { UserCard, type UserCardProps } from "@/components/network/UserCard";
+import { LeaveWarning, useLeavePreview } from "@/components/orgs/LeaveWarning";
 import { OrgInviteSheet } from "@/components/orgs/OrgInviteSheet";
 import { OrgJoinControl } from "@/components/orgs/OrgJoinControl";
 import {
@@ -155,6 +156,7 @@ import {
   followsSinceText,
   inviteSubText,
   keepFollowingDefault,
+  leaveToastText,
   memberCountText,
   MOD_READONLY,
   OFFICER_FOLLOW_HELP,
@@ -3618,7 +3620,10 @@ function DangerCard({
  * if it fails, and the student's own tick always wins. A hidden club asks
  * nothing about following (nobody new may follow one) and sends no body,
  * today's leave. A refusal toasts why (the owner can't leave) and the
- * question stays.
+ * question stays. The club's Members only events they're going to are
+ * named above the button (`LeaveWarning`, Oct 22, 2026: leaving takes them
+ * off those), in the Night column like the rest of this dark glass card,
+ * and the toast says how many came off.
  */
 function LeaveClubConfirm({
   org,
@@ -3633,6 +3638,7 @@ function LeaveClubConfirm({
   const [boardOn, setBoardOn] = useState(false);
   const [busy, setBusy] = useState(false);
   const touchedRef = useRef(false);
+  const membersOnly = useLeavePreview(org.handle);
 
   useEffect(() => {
     if (org.hidden) return;
@@ -3655,7 +3661,7 @@ function LeaveClubConfirm({
   const leave = async () => {
     if (busy) return;
     setBusy(true);
-    const r = await vibeRequest<{ org_follow_state?: unknown }>(
+    const r = await vibeRequest<{ org_follow_state?: unknown; rsvps_dropped?: unknown }>(
       `/api/orgs/${encodeURIComponent(org.handle)}/join`,
       {
         method: "DELETE",
@@ -3665,10 +3671,7 @@ function LeaveClubConfirm({
     );
     setBusy(false);
     if (!r.ok) return;
-    toast({
-      message: fillCopy(r.data.org_follow_state === "following" ? ORG_COPY.menu.leftFollowing : ORG_COPY.menu.left, { org: org.name }),
-      tone: "info",
-    });
+    toast({ message: leaveToastText(org.name, r.data), tone: "info" });
     onLeft();
   };
 
@@ -3712,6 +3715,7 @@ function LeaveClubConfirm({
           </span>
         </label>
       )}
+      <LeaveWarning events={membersOnly} night style={{ margin: "0 0 12px" }} />
     </DangerCard>
   );
 }

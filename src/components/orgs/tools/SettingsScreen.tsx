@@ -34,9 +34,10 @@ import { vibeRequest } from "@/lib/feedback/request";
 import { toast } from "@/lib/feedback/toast";
 import { clearClubsYouRunCache, readSwitchedClub, sameHandle, setSwitchedClub } from "@/lib/orgs/club-switch";
 import { clearClubsInCache } from "@/lib/orgs/clubs-in";
-import { ORG_COPY, fillCopy, orgErrorCopy } from "@/lib/orgs/join-copy";
+import { ORG_COPY, fillCopy, leaveToastText, orgErrorCopy } from "@/lib/orgs/join-copy";
 
-import { ConfirmSheet, Group, SheetAction, ToolSheet, cardStyle } from "./tools-ui";
+import { LeaveWarning, useLeavePreview } from "../LeaveWarning";
+import { ConfirmRows, Group, SheetAction, ToolSheet, cardStyle } from "./tools-ui";
 import type { ToolsClub } from "./types";
 
 export function SettingsScreen({
@@ -173,7 +174,12 @@ function knobStyle(on: boolean): CSSProperties {
   };
 }
 
-/** An officer's way out. They keep following (the members' feed stays theirs); the owner can't leave. */
+/**
+ * An officer's way out. They keep following (the members' feed stays theirs);
+ * the owner can't leave. The confirm warns about the club's Members only
+ * events they're going to, which leaving takes them off (Oct 22, 2026), and
+ * the toast says how many came off.
+ */
 function LeaveClub({ club, onLeft }: { club: ToolsClub; onLeft?: () => void }) {
   const router = useRouter();
   const [asking, setAsking] = useState(false);
@@ -183,7 +189,7 @@ function LeaveClub({ club, onLeft }: { club: ToolsClub; onLeft?: () => void }) {
   const leave = async () => {
     if (busy) return;
     setBusy(true);
-    const r = await vibeRequest<{ org_follow_state?: unknown }>(`/api/orgs/${encodeURIComponent(club.handle)}/join`, {
+    const r = await vibeRequest<{ org_follow_state?: unknown; rsvps_dropped?: unknown }>(`/api/orgs/${encodeURIComponent(club.handle)}/join`, {
       method: "DELETE",
       // A hidden club has nothing to keep following (the desktop sends no body either).
       ...(club.hidden ? {} : { json: { keep_following: true } }),
@@ -200,10 +206,7 @@ function LeaveClub({ club, onLeft }: { club: ToolsClub; onLeft?: () => void }) {
     if (sameHandle(readSwitchedClub()?.handle, club.handle)) setSwitchedClub(null);
     clearClubsYouRunCache();
     clearClubsInCache();
-    toast({
-      message: fillCopy(r.data.org_follow_state === "following" ? ORG_COPY.menu.leftFollowing : ORG_COPY.menu.left, vars),
-      tone: "info",
-    });
+    toast({ message: leaveToastText(club.name, r.data), tone: "info" });
     if (onLeft) onLeft();
     else router.replace(`/orgs/${encodeURIComponent(club.handle)}`);
   };
@@ -219,16 +222,24 @@ function LeaveClub({ club, onLeft }: { club: ToolsClub; onLeft?: () => void }) {
         />
       </Group>
       {asking ? (
-        <ConfirmSheet
-          title={fillCopy(ORG_COPY.menu.leaveTitle, vars)}
-          note={ORG_COPY.menu.leaveBody}
-          confirmLabel={ORG_COPY.menu.leaveConfirm}
-          busy={busy}
-          onConfirm={() => void leave()}
-          onClose={() => setAsking(false)}
-        />
+        <LeaveConfirm club={club} busy={busy} onConfirm={() => void leave()} onClose={() => setAsking(false)} />
       ) : null}
     </>
+  );
+}
+
+/**
+ * "Leave SAE?": ConfirmSheet's sheet with the members-only warning between
+ * the note and the two rows. Its own component so the preview is read when
+ * the sheet opens, not when Club settings does.
+ */
+function LeaveConfirm({ club, busy, onConfirm, onClose }: { club: ToolsClub; busy: boolean; onConfirm: () => void; onClose: () => void }) {
+  const membersOnly = useLeavePreview(club.handle);
+  return (
+    <ToolSheet title={fillCopy(ORG_COPY.menu.leaveTitle, { org: club.name })} note={ORG_COPY.menu.leaveBody} onClose={onClose}>
+      <LeaveWarning events={membersOnly} style={{ margin: "4px 18px 10px" }} />
+      <ConfirmRows confirmLabel={ORG_COPY.menu.leaveConfirm} busy={busy} onConfirm={onConfirm} onClose={onClose} />
+    </ToolSheet>
   );
 }
 

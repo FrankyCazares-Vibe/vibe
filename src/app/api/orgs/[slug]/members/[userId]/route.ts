@@ -318,7 +318,8 @@ export async function PATCH(req: Request, { params }: Params) {
  * row BEFORE the membership is deleted, so:
  *   - the AFTER DELETE trigger sees it and, besides the club's chat rows
  *     (dropped on every leave), also drops their RSVPs to the club's events
- *     that haven't ended;
+ *     that haven't ended, Everyone and Members only alike (a voluntary leave
+ *     drops only the Members only ones, in the join route: Oct 22, 2026);
  *   - the join route makes them ask to come back instead of one tap, and the
  *     officers see "Removed before" on that request;
  *   - a crash between the two steps leaves a member with a stale record

@@ -8,7 +8,14 @@
  *   - DELETE /api/orgs/[slug]/join: `keep_following` true relabels a join
  *     or request follow to `profile` BEFORE the membership goes, and puts it
  *     back when the delete fails; false deletes the follow; no body leaves
- *     the follows to the database's trigger;
+ *     the follows to the database's trigger; once the membership is gone the
+ *     leaver's RSVPs to the club's Members only upcoming events come off
+ *     (Oct 22, 2026), never when the leave failed or for a non-member;
+ *   - GET /api/orgs/[slug]/join?leave_preview=1: the RSVPs a leave would
+ *     take away, for a member only;
+ *   - DELETE /api/orgs/[slug]/members/[userId]: the removal is recorded
+ *     BEFORE the membership goes, so the database's trigger drops their
+ *     RSVPs (removals already did; Oct 22, 2026 pins the order);
  *   - POST /api/orgs/[slug]/mute: a hidden club is 404 to a non-member;
  *   - PATCH /api/orgs/[slug]/members/[userId] {title}: the reach (an admin
  *     never titles the owner), one of role or title at a time;
@@ -52,7 +59,10 @@ const STUBS: Record<string, string> = {
   "@/lib/legal/require-terms": stub("export async function requireTermsAccepted() { return null; }"),
   "@/lib/orgs/membership": stub(
     `export async function loadViewerOrgContext() { return ${W}.ctx; }\nexport async function expireStaleInvites() {}\n` +
-      "export async function admitMember() { return { ok: true }; }\nexport async function recordOrgRemoval() {}\nexport async function forgetOrgRemoval() {}\n" +
+      "export async function admitMember() { return { ok: true }; }\n" +
+      // A removal's record lands in the query log, so its order against the delete shows (Oct 22, 2026).
+      `export async function recordOrgRemoval(_s, args) { ${W}.queries.push({ client: "service", table: "org_removals", calls: [["upsert", args]] }); return ${W}.removal ?? { ok: true, missing: false }; }\n` +
+      `export async function forgetOrgRemoval(_s, orgId, userId) { ${W}.queries.push({ client: "service", table: "org_removals", calls: [["delete", orgId, userId]] }); }\n` +
       // The officers' "asked to join" and a cancel's mark-read (Oct 22, 2026), recorded.
       `export async function notifyOfficersOfJoinRequest(_s, args) { (${W}.notified ??= []).push(args); }\n` +
       `export async function settleJoinRequestNotifications(_s, orgId, userId) { (${W}.settled ??= []).push([orgId, userId]); }`,
@@ -84,8 +94,8 @@ registerHooks({
 type Call = [string, ...unknown[]];
 type Query = { client: "cookie" | "service"; table: string; calls: Call[] };
 type Answer = { data?: unknown; error?: { code?: string; message?: string } | null; count?: number | null };
-const METHODS = ["select", "eq", "in", "is", "or", "order", "limit", "neq", "not", "update", "insert", "upsert", "delete"];
-type World = { user: { id: string } | null; queries: Query[]; ctx: unknown; cookie: unknown; service: unknown };
+const METHODS = ["select", "eq", "in", "is", "or", "order", "limit", "neq", "not", "gt", "gte", "lte", "update", "insert", "upsert", "delete"];
+type World = { user: { id: string } | null; queries: Query[]; ctx: unknown; cookie: unknown; service: unknown; removal?: unknown };
 
 function fakeClient(kind: Query["client"], world: World, answer: (q: Query) => Answer) {
   const settle = (q: Query, single: boolean) => {
@@ -269,11 +279,16 @@ test("cancel: a member (let in meanwhile) stays in, and nothing is written; no r
   const plain = cancelWorld(null);
   assert.deepEqual((await json(await join.DELETE(req("DELETE"), params({ slug: "chess" })))).body, { ok: true, left: false });
   assert.equal(writes(plain, "org_join_requests", "delete").length, 0);
+  assert.equal(plain.queries.filter((q) => q.table === "rsvps").length, 0, "a non-member's DELETE touches no RSVP");
 });
 
 // ── DELETE /api/orgs/[slug]/join: Leave, with "Keep following" (E1) ─────────
 
-type LeaveSetup = { source: string | null; deleteFails?: boolean };
+/**
+ * `rsvps`: what the members-only read answers (leave-rsvps.ts); `dropped`:
+ * the rows its delete says it took. Both default to none.
+ */
+type LeaveSetup = { source: string | null; deleteFails?: boolean; rsvps?: unknown[]; dropped?: unknown[]; rsvpError?: boolean };
 function leaveWorld(s: LeaveSetup) {
   return install((q) => {
     if (q.table === "orgs") return { data: [{ id: ORG, owner_id: OWNER, hidden_at: null }] };
@@ -282,9 +297,16 @@ function leaveWorld(s: LeaveSetup) {
     }
     if (q.table === "org_members") return { data: [{ role: "member" }] };
     if (q.table === "org_followers") return q.calls.some((c) => c[0] === "update") ? { data: [{ source: "profile" }] } : { data: s.source ? [{ source: s.source }] : [] };
+    if (q.table === "rsvps" && s.rsvpError) return { error: { code: "42703", message: "column events.visibility does not exist" } };
+    if (q.table === "rsvps") return q.calls.some((c) => c[0] === "delete") ? { data: s.dropped ?? [] } : { data: s.rsvps ?? [] };
     throw new Error(`unexpected read of ${q.table}`);
   });
 }
+/** The query log as `table[:write]`, for order checks. */
+const order = (w: World) =>
+  w.queries.map((q) => q.table + (["update", "delete", "insert", "upsert"].map((m) => (q.calls.some((c) => c[0] === m) ? `:${m}` : "")).join("")));
+const rsvpQueries = (w: World) => w.queries.filter((q) => q.table === "rsvps");
+const hasCall = (q: Query, ...call: unknown[]) => q.calls.some((c) => JSON.stringify(c) === JSON.stringify(call));
 const leave = (body?: unknown) => join.DELETE(req("DELETE", body), params({ slug: "chess" }));
 const updates = (w: World) => writes(w, "org_followers", "update").map((q) => argOf(q, "update"));
 
@@ -294,8 +316,8 @@ test("leave: keep_following true relabels a join or request follow to profile BE
     const res = await json(await leave({ keep_following: true }));
     assert.equal(res.body.left, true, source);
     assert.deepEqual(updates(w), [{ source: "profile" }], source);
-    const order = w.queries.map((q) => q.table + (q.calls.some((c) => c[0] === "update") ? ":update" : q.calls.some((c) => c[0] === "delete") ? ":delete" : ""));
-    assert.ok(order.indexOf("org_followers:update") < order.indexOf("org_members:delete"), `relabel first (${source})`);
+    const log = order(w);
+    assert.ok(log.indexOf("org_followers:update") < log.indexOf("org_members:delete"), `relabel first (${source})`);
     assert.equal(writes(w, "org_followers", "delete").length, 0);
   }
   const tapped = leaveWorld({ source: "profile" });
@@ -304,15 +326,115 @@ test("leave: keep_following true relabels a join or request follow to profile BE
 });
 
 test("leave: a failed delete puts the relabel back; false deletes the follow; no body leaves follows to the trigger", async () => {
-  const failed = leaveWorld({ source: "request", deleteFails: true });
+  const failed = leaveWorld({ source: "request", deleteFails: true, rsvps: [{ status: "going", event: { id: "e1" } }] });
   assert.equal((await quietly(async () => leave({ keep_following: true }))).status, 500);
   assert.deepEqual(updates(failed), [{ source: "profile" }, { source: "request" }]);
+  assert.equal(rsvpQueries(failed).length, 0, "a leave that failed keeps every RSVP");
   const drop = leaveWorld({ source: "profile" });
   assert.equal((await json(await leave({ keep_following: false }))).body.left, true);
   assert.equal(writes(drop, "org_followers", "delete").length, 1);
   const none = leaveWorld({ source: "join" });
   await leave();
   assert.equal(writes(none, "org_followers", "delete").length + writes(none, "org_followers", "update").length + writes(none, "org_followers", "insert").length, 0);
+});
+
+// ── Leaving takes you off Members only events (Oct 22, 2026, PLAN-3.md) ─────
+
+const UPCOMING = [
+  { status: "going", event: { id: "e1", title: "Chapter dinner", starts_at: "2026-10-30T23:00:00Z" } },
+  { status: "no", event: { id: "e2", title: "Formal", starts_at: "2026-11-03T23:00:00Z" } },
+];
+
+test("leave: after the membership goes, my RSVPs to the club's members-only upcoming events come off (service role)", async () => {
+  for (const body of [undefined, { keep_following: true }, { keep_following: false }]) {
+    const w = leaveWorld({ source: "join", rsvps: UPCOMING, dropped: [{ status: "going" }, { status: "no" }] });
+    const res = await json(await leave(body));
+    assert.equal(res.status, 200, JSON.stringify(res.body));
+    assert.equal(res.body.left, true);
+    assert.equal(res.body.rsvps_dropped, 1, "a Can't go isn't one they were on");
+    const log = order(w);
+    assert.ok(log.indexOf("org_members:delete") < log.indexOf("rsvps"), `the membership goes first (${JSON.stringify(body)})`);
+    const [read, del] = rsvpQueries(w);
+    assert.equal(read.client, "service");
+    assert.ok(hasCall(read, "eq", "user_id", ME) && hasCall(read, "eq", "event.org_id", ORG) && hasCall(read, "eq", "event.visibility", "members"));
+    assert.ok(read.calls.some((c) => c[0] === "gt" && c[1] === "event.ends_at"), "events that haven't ended");
+    assert.equal(del.client, "service");
+    assert.ok(del.calls.some((c) => c[0] === "delete"));
+    assert.ok(hasCall(del, "eq", "user_id", ME), "only mine");
+    assert.ok(hasCall(del, "in", "event_id", ["e1", "e2"]), "only those events");
+  }
+});
+
+test("leave: nothing members-only is rsvps_dropped 0; a failed RSVP read never fails the leave", async () => {
+  const none = leaveWorld({ source: "profile" });
+  assert.equal((await json(await leave())).body.rsvps_dropped, 0);
+  assert.equal(writes(none, "rsvps", "delete").length, 0, "no delete with nothing to drop");
+  const broken = leaveWorld({ source: "profile", rsvpError: true });
+  const res = await quietly(async () => json(await leave({ keep_following: true })));
+  assert.equal(res.status, 200);
+  assert.equal(res.body.left, true);
+  assert.equal(res.body.rsvps_dropped, 0);
+  assert.equal(writes(broken, "rsvps", "delete").length, 0);
+});
+
+const preview = (slug = "chess", query = "?leave_preview=1") => join.GET(new Request(`https://vibe.test/api/orgs/${slug}/join${query}`), params({ slug }));
+
+const COMING = [
+  { status: "going", event: { id: "e1", title: "Chapter dinner", starts_at: "2026-10-30T23:00:00Z" } },
+  { status: "maybe", event: { id: "e2", title: "Formal", starts_at: "2026-11-03T23:00:00Z" } },
+];
+
+function previewWorld(role: string | null, hidden = false, rsvps: unknown[] = COMING) {
+  return install((q) => {
+    if (q.table === "orgs") return { data: [{ id: ORG, hidden_at: hidden ? "2026-10-01T00:00:00Z" : null }] };
+    if (q.table === "org_members") return { data: role ? [{ role }] : [] };
+    if (q.table === "rsvps") return { data: rsvps };
+    throw new Error(`unexpected read of ${q.table}`);
+  });
+}
+
+test("leave preview: a member gets their members-only RSVPs, read on the service role; nothing is written", async () => {
+  const w = previewWorld("member");
+  const res = await json(await preview());
+  assert.equal(res.status, 200, JSON.stringify(res.body));
+  assert.deepEqual(res.body, {
+    ok: true,
+    events: [
+      { id: "e1", title: "Chapter dinner", starts_at: "2026-10-30T23:00:00Z", viewer_status: "going" },
+      { id: "e2", title: "Formal", starts_at: "2026-11-03T23:00:00Z", viewer_status: "maybe" },
+    ],
+  });
+  const [read] = rsvpQueries(w);
+  assert.equal(read.client, "service");
+  assert.ok(hasCall(read, "in", "status", ["going", "maybe"]));
+  assert.ok(hasCall(read, "eq", "event.visibility", "members"));
+  for (const method of ["insert", "upsert", "update", "delete"]) {
+    assert.equal(w.queries.filter((q) => q.calls.some((c) => c[0] === method)).length, 0, method);
+  }
+});
+
+test("leave preview: a non-member gets none; a hidden club is 404 to them; signed out 401; no flag 400; a failed read 500", async () => {
+  const outsider = previewWorld(null);
+  assert.deepEqual((await json(await preview())).body, { ok: true, events: [] });
+  assert.equal(rsvpQueries(outsider).length, 0, "nobody else's RSVPs are read for a non-member");
+  previewWorld(null, true);
+  assert.equal((await preview()).status, 404);
+  previewWorld("member", true);
+  assert.equal((await preview()).status, 200, "a member of a hidden club still sees what they'd lose");
+  const out = previewWorld("member");
+  out.user = null;
+  assert.equal((await preview()).status, 401);
+  const bare = previewWorld("member");
+  assert.equal((await preview("chess", "")).status, 400);
+  assert.equal(bare.queries.length, 0, "no flag, no read");
+  install((q) => {
+    if (q.table === "orgs") return { data: [{ id: ORG, hidden_at: null }] };
+    if (q.table === "org_members") return { data: [{ role: "member" }] };
+    return { error: { code: "42703", message: "no visibility" } };
+  });
+  const failed = await quietly(async () => json(await preview()));
+  assert.equal(failed.status, 500);
+  assert.equal(failed.body.code, "load_failed");
 });
 
 // ── Mute a club's posts (gap 2): two routes, one writer ─────────────────────
@@ -418,6 +540,32 @@ test("role: the owner makes a member an officer and back; the write never reache
   const owner = titleWorld("owner", "owner");
   assert.equal((await setRole(OWNER, "member")).status, 400, "the owner's row is never changed here");
   assert.equal(writes(owner, "org_members", "update").length, 0);
+});
+
+// ── Removals drop RSVPs: the record goes in first (Oct 22, 2026, PLAN-3.md) ──
+
+const remove = (target: string) => member.DELETE(req("DELETE"), params({ slug: "chess", userId: target }));
+
+test("remove: the removal is recorded BEFORE the membership goes, so the trigger drops every upcoming RSVP", async () => {
+  const w = titleWorld("owner", "member");
+  assert.deepEqual(await json(await remove(PEER)), { status: 200, body: { ok: true } });
+  const log = order(w);
+  assert.ok(log.includes("org_removals:upsert") && log.includes("org_members:delete"), log.join(", "));
+  assert.ok(log.indexOf("org_removals:upsert") < log.indexOf("org_members:delete"), "record first, then delete");
+  const [recorded] = w.queries.filter((q) => q.table === "org_removals");
+  assert.deepEqual(recorded.calls[0][1], { orgId: ORG, userId: PEER, removedBy: ME });
+  const [gone] = writes(w, "org_members", "delete");
+  assert.equal(gone.client, "service");
+  assert.ok(hasCall(gone, "eq", "user_id", PEER));
+  // The route never deletes RSVPs itself: the trigger does, from the record.
+  assert.equal(rsvpQueries(w).length, 0);
+});
+
+test("remove: a removal that can't be recorded deletes nothing (no removal the trigger can't tell from a leave)", async () => {
+  const w = titleWorld("owner", "member");
+  w.removal = { ok: false };
+  assert.equal((await remove(PEER)).status, 500);
+  assert.equal(writes(w, "org_members", "delete").length, 0);
 });
 
 test("title: role and title together are refused (400) before anything is read about the member", async () => {

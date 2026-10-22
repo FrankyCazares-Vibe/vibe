@@ -67,7 +67,9 @@ const PHRASES = [
   "and who marked Going but did not check in. At an event marked",
   "only members can check themselves in",
   // Section 8: marking an upcoming event Members only drops outsiders' RSVPs.
-  "For an upcoming event, also when the club takes you out, or marks that event",
+  "For an upcoming event, also when the club takes you out,",
+  // Leaving takes you off a club's Members only events (Oct 22, 2026).
+  "when you leave the club and the event is marked",
   "while you are not a member",
 ];
 

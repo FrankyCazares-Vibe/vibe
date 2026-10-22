@@ -25,6 +25,7 @@ const {
   FOLLOWER_COUNT_FLOOR,
   FOLLOW_DISCLOSURE,
   LEAVE_DROPS_FOLLOW_SOURCES,
+  LEAVE_WARNING_SHOWN,
   REQUEST_DISCLOSURE,
   MOD_READONLY,
   OFFICER_FOLLOW_HELP,
@@ -46,6 +47,9 @@ const {
   joinPolicyNotice,
   joinPressFailure,
   keepFollowingDefault,
+  leaveRsvpEventsOf,
+  leaveToastText,
+  leaveWarningView,
   memberCountText,
   membershipBoxView,
   memoryFor,
@@ -803,6 +807,93 @@ test("the Announcement Board has one name: no 'announcements' label, and 'admin'
     const src = read(file).split("\n").filter((l) => !/^\s*(\*|\/\/|\/\*)/.test(l)).join("\n");
     assert.ok(!/["`][^"`]*\b[Aa]nnouncements?\b[^"`]*["`]/.test(src), `${file}: a string says "announcements"`);
   }
+});
+
+// ── Leaving takes you off Members only events (Oct 22, 2026, PLAN-3.md) ─────
+
+const MEMBERS_ONLY = [
+  { id: "e1", title: "Chapter dinner", starts_at: "2026-10-31T03:30:00Z", viewer_status: "going" as const },
+  { id: "e2", title: "  ", starts_at: "2026-11-03T23:00:00Z", viewer_status: "maybe" as const },
+  { id: "e3", title: "Formal", starts_at: "not a date", viewer_status: "going" as const },
+  { id: "e4", title: "Retreat", starts_at: "2026-11-14T15:00:00Z", viewer_status: "going" as const },
+  { id: "e5", title: "Rush review", starts_at: "2026-11-20T23:00:00Z", viewer_status: "going" as const },
+];
+
+test("leave warning: none without members-only RSVPs; one or many in the plan's words", () => {
+  assert.equal(leaveWarningView([], CAMPUS_TIME_ZONE), null);
+  assert.equal(leaveWarningView(null), null);
+  assert.equal(leaveWarningView(undefined), null);
+  const one = leaveWarningView(MEMBERS_ONLY.slice(0, 1), CAMPUS_TIME_ZONE);
+  assert.deepEqual(one, {
+    title: "You're going to 1 members-only event",
+    body: "Leaving takes you off it: only members can go.",
+    // 03:30 UTC on Oct 31 is still Oct 30 on campus: the day is campus time.
+    items: [{ key: "e1", title: "Chapter dinner", date: "Oct 30" }],
+    more: null,
+  });
+  const many = leaveWarningView(MEMBERS_ONLY, CAMPUS_TIME_ZONE);
+  assert.equal(many?.title, "You're going to 5 members-only events");
+  assert.equal(many?.body, "Leaving takes you off them: only members can go.");
+  assert.equal(many?.items.length, LEAVE_WARNING_SHOWN);
+  assert.deepEqual(many?.items.map((i) => [i.title, i.date]), [["Chapter dinner", "Oct 30"], ["Untitled event", "Nov 3"], ["Formal", null]]);
+  assert.equal(many?.more, "and 2 more");
+  assert.equal(leaveWarningView(MEMBERS_ONLY.slice(0, 3))?.more, null, "exactly three: no 'and 0 more'");
+});
+
+test("leave warning: the preview's events are read safely; junk rows are left out", () => {
+  assert.deepEqual(leaveRsvpEventsOf(null), []);
+  assert.deepEqual(leaveRsvpEventsOf({ id: "e1" }), []);
+  assert.deepEqual(
+    leaveRsvpEventsOf([null, { id: 1, starts_at: "x" }, { id: "e9" }, { id: "e1", starts_at: "2026-11-01T00:00:00Z", title: 7, viewer_status: "no" }]),
+    [{ id: "e1", title: "", starts_at: "2026-11-01T00:00:00Z", viewer_status: "going" }],
+  );
+});
+
+test("leave toast: the RSVPs that came off join the line; none (or an older server) reads as before", () => {
+  assert.equal(leaveToastText("SAE", { org_follow_state: "not_following", rsvps_dropped: 0 }), "You left SAE.");
+  assert.equal(leaveToastText("SAE", { org_follow_state: "following" }), "You left SAE. You still follow it.");
+  assert.equal(leaveToastText("SAE", null), "You left SAE.");
+  for (const junk of [-1, 1.5, "2", null, Number.NaN]) {
+    assert.equal(leaveToastText("SAE", { rsvps_dropped: junk }), "You left SAE.", String(junk));
+  }
+  assert.equal(leaveToastText("SAE", { rsvps_dropped: 1 }), "You left SAE. You're off 1 members-only event.");
+  assert.equal(leaveToastText("SAE", { rsvps_dropped: 3 }), "You left SAE. You're off 3 members-only events.");
+  assert.equal(leaveToastText("SAE", { org_follow_state: "following", rsvps_dropped: 1 }), "You left SAE. You still follow it, but you're off 1 members-only event.");
+  assert.equal(leaveToastText("SAE", { org_follow_state: "following", rsvps_dropped: 2 }), "You left SAE. You still follow it, but you're off 2 members-only events.");
+  // A club named like a placeholder stays itself.
+  assert.equal(leaveToastText("{n}", { rsvps_dropped: 2 }), "You left {n}. You're off 2 members-only events.");
+});
+
+test("leave warning words: plain, no officer jargon, and every placeholder is one the helpers fill", () => {
+  const keys = [
+    "leaveRsvpsTitleOne", "leaveRsvpsTitleMany", "leaveRsvpsBodyOne", "leaveRsvpsBodyMany", "leaveRsvpsMore", "leaveRsvpsUntitled",
+    "leaveRsvpsLoadFailed", "leftRsvpsOne", "leftRsvpsMany", "leftFollowingRsvpsOne", "leftFollowingRsvpsMany",
+  ] as const;
+  for (const key of keys) {
+    const line = ORG_COPY.menu[key];
+    assert.ok(line.length > 0, key);
+    assert.ok(!/\badmins?\b|\bmods?\b|cancel(l)?ed/i.test(line), `${key}: ${line}`);
+    for (const ph of line.match(/\{\w+\}/g) ?? []) assert.ok(["{n}", "{org}"].includes(ph), `${key}: ${ph}`);
+  }
+  for (const key of ["leftRsvpsOne", "leftRsvpsMany", "leftFollowingRsvpsOne", "leftFollowingRsvpsMany"] as const) {
+    assert.ok(ORG_COPY.menu[key].startsWith("You left {org}."), key);
+  }
+});
+
+test("all three leave confirms warn and toast through the shared block and leaveToastText", () => {
+  const read = (file: string) => readFileSync(new URL(file, import.meta.url), "utf8");
+  for (const file of ["../../components/orgs/OrgMenu.tsx", "../../components/orgs/tools/SettingsScreen.tsx", "../../app/campus/campus-home.tsx"]) {
+    const src = read(file);
+    assert.match(src, /useLeavePreview\(/, `${file} reads the preview`);
+    assert.match(src, /<LeaveWarning events=\{membersOnly\}/, `${file} draws the warning`);
+    assert.match(src, /leaveToastText\(/, `${file} words the toast through leaveToastText`);
+    assert.ok(!/ORG_COPY\.menu\.leftFollowing\b|ORG_COPY\.menu\.left\b/.test(src), `${file}: the left toast is leaveToastText's`);
+    for (const literal of ["You're going to", "You're off", "Leaving takes you off"]) {
+      assert.ok(!src.includes(literal), `${file} spells out the warning's words: ${literal}`);
+    }
+  }
+  const home = read("../../app/campus/campus-home.tsx");
+  assert.match(home, /<LeaveWarning events=\{membersOnly\} night /, "desktop Settings' card is dark in both looks");
 });
 
 // ── Two controls, one page ──────────────────────────────────────────────────
