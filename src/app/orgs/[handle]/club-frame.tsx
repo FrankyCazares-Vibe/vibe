@@ -1,8 +1,10 @@
 import { headers } from "next/headers";
 import type { ReactNode } from "react";
 
+import { chatDesktopFor } from "@/lib/chat/flag-desktop-server";
 import { isPhoneRequest } from "@/lib/device-hint";
 
+import { ClubCampusBar } from "./club-page/ClubCampusBar";
 import { ClubShell } from "./ClubShell";
 
 /**
@@ -43,4 +45,18 @@ export async function ClubAppFrame({
 }) {
   if (!(await showsAppFrame())) return <>{children}</>;
   return <ClubShell campusHref={campusHref}>{children}</ClubShell>;
+}
+
+/**
+ * Campus's top bar for the setup list and the Club tools pages (Oct 22,
+ * 2026, Franky: they get the club page's bar too). The first thing in the
+ * page's <main>: the frame is a grid whose middle column is <main> itself,
+ * so anything beside it would take a cell of its own. The officers' own
+ * pages, so always their home campus; the Chat pill follows their
+ * `chat_desktop` switch, as on Campus. Nothing on a phone; globals.css shows
+ * it in the frame from 900px. The club page draws its own (it may be visiting).
+ */
+export async function ClubFrameBar({ viewerId }: { viewerId: string }) {
+  if (!(await showsAppFrame())) return null;
+  return <ClubCampusBar visitedCampusId={null} hideChat={await chatDesktopFor(viewerId)} />;
 }

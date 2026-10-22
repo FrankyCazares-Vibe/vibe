@@ -11,7 +11,7 @@ import { officerGate } from "@/lib/orgs/hidden-gate";
 import { SETTINGS_ROLES, isJoinPolicy, isOrgAudience, isOrgRole } from "@/lib/orgs/join-state";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 
-import { ClubAppFrame } from "../club-frame";
+import { ClubAppFrame, ClubFrameBar } from "../club-frame";
 import { SetupScreen, type SetupClub } from "./SetupScreen";
 
 /**
@@ -106,6 +106,7 @@ export default async function ClubSetupPage({ params }: Props) {
   return (
     <ClubAppFrame>
       <main className="vibe-tabbar-page" style={pageStyle}>
+        <ClubFrameBar viewerId={userId} />
         <SetupScreen
           club={club}
           role={role}

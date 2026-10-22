@@ -25,7 +25,7 @@ export default async function ClubFollowersPage({ params }: Props) {
   const { club } = loaded;
 
   return (
-    <ToolsPage>
+    <ToolsPage viewerId={loaded.userId}>
       <ToolsHeader backHref={toolsPath(club.handle)} backLabel="Club tools" title="Followers." club={club} />
       <FollowersScreen club={club} />
     </ToolsPage>

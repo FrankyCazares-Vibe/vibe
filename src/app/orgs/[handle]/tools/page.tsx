@@ -70,7 +70,7 @@ export default async function ClubToolsPage({ params }: Props) {
   const clubUrl = `${getSiteUrl()}/orgs/${encodeURIComponent(loaded.club.handle)}`;
 
   return (
-    <ToolsPage>
+    <ToolsPage viewerId={loaded.userId}>
       <ToolsIndex club={loaded.club} counts={counts} clubUrl={clubUrl} />
     </ToolsPage>
   );

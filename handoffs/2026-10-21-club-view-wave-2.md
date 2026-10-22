@@ -348,3 +348,8 @@ Shipped from the wave 1 session (`busy-aryabhata-7b6991`); this branch's own ses
   - Walked locally (Maya as officer, Blake as member) at 1440, 960, 860 and 390, Night and Light: all of the above,
     search found Blake, Campuses opened, Feed went to `/campus?tab=feed`, no page errors, no sideways scroll.
   - Not changed: the setup list and the Club tools page keep their own tops.
+- **Oct 22, later (Franky: "put the Campus bar on the setup list and Club tools pages too"):** `ClubFrameBar`
+  (club-frame.tsx) draws the same bar as the first thing in the setup list's and every Club tools page's <main>
+  (the frame is a grid whose middle column is <main>, so the bar can't sit beside it). Home campus always (they
+  are the officers' own pages); Chat pill per their `chat_desktop` switch. Walked at 1440, 1100, 960, 860 and 390:
+  bar from 900px, none on a phone, Orgs from Club tools goes to Campus › Orgs, no errors.

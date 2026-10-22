@@ -26,7 +26,7 @@ export default async function ClubOfficersPage({ params }: Props) {
   const { club } = loaded;
 
   return (
-    <ToolsPage>
+    <ToolsPage viewerId={loaded.userId}>
       <ToolsHeader backHref={toolsPath(club.handle)} backLabel="Club tools" title="Officers and titles." club={club} />
       <MembersScreen club={club} mode="officers" />
     </ToolsPage>

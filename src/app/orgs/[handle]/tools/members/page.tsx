@@ -25,7 +25,7 @@ export default async function ClubMembersPage({ params }: Props) {
   const { club } = loaded;
 
   return (
-    <ToolsPage>
+    <ToolsPage viewerId={loaded.userId}>
       <ToolsHeader backHref={toolsPath(club.handle)} backLabel="Club tools" title="Members." club={club} sub="Tap someone for their title and more" />
       <MembersScreen club={club} mode="members" />
     </ToolsPage>
