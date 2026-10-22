@@ -353,3 +353,11 @@ Shipped from the wave 1 session (`busy-aryabhata-7b6991`); this branch's own ses
   (the frame is a grid whose middle column is <main>, so the bar can't sit beside it). Home campus always (they
   are the officers' own pages); Chat pill per their `chat_desktop` switch. Walked at 1440, 1100, 960, 860 and 390:
   bar from 900px, none on a phone, Orgs from Club tools goes to Campus › Orgs, no errors.
+- **Oct 22, later (Franky: "on phones take + and ≡ off the cover, make the row + Post · Club tools · share, and put
+  Edit page in Club tools / Club settings. No Campus bar on phones."):** the cover's corner is empty on every screen
+  (`CoverOfficerButtons` is gone; ClubCover has no slot). The officers' row: phone `+ Post · Club tools · share
+  square`; computer `+ Post · Share page`, with `Club tools` from 900 to 1023px (and in a computer window under
+  900px). Edit page's button is hidden on every screen (still mounted for `?edit=1` and the Arc's opener); on a
+  phone it is Club tools › Edit the page or Club settings › Edit page. Walked at 390 (Night and Light), 860, 960,
+  1440: + Post opened the sheet, Club tools → Club settings → Edit page opened the dialog on the club page, focus
+  came back to Club tools; members unchanged; no errors.

@@ -13,7 +13,7 @@
  *   list (CLUB_EVENTS_CHANGED) so Up next and the Events tab read it again.
  * - Board post or poll: the club's Board in Messages; left out with no Board.
  *
- * Mounted by CoverOfficerButtons when + is tapped, and it stays mounted
+ * Mounted by RowPostButton (+ Post) when it is tapped, and it stays mounted
  * through whichever dialog a row opens, calling `onClose` when that is done.
  * The sheet and the dialog are portals on <body>, outside the page's
  * `vibe-night-island`, so each carries the class itself and its theme tokens

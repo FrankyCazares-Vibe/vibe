@@ -2598,16 +2598,16 @@ html {
 .vibe-club-join > * > * button {
   width: 100%;
 }
-/* The Campus bar and the officers' + Post and Club tools pills (PLAN-5,
-   Oct 22, 2026) belong to the app frame on a computer: hidden everywhere
-   else, phones and windows under 900px included, and shown by the 900px
-   block below. The pills draw their own `display` inline, hence the
-   !important. */
+/* The Campus bar (PLAN-5, Oct 22, 2026) belongs to the app frame on a
+   computer: hidden everywhere else, phones and windows under 900px
+   included, and shown by the 900px block below. Edit page's button is out
+   of sight on every screen (Club settings and Club tools open its dialog;
+   it stays mounted for them, OfficerActions.tsx); it draws its own
+   `display` inline, hence the !important. */
 .vibe-club-campusbar {
   display: none;
 }
-.vibe-club-row-post,
-.vibe-club-row-tools {
+.vibe-club-edit-page {
   display: none !important;
 }
 .vibe-club-tabs {
@@ -2702,20 +2702,11 @@ html {
      the club's column keeps its 16px of air under it, and the cover's
      widths below measure the column, not the bar. The planet sits halfway
      down the window, well under the bar's 64px. The cover's corner is
-     empty here: + and Club tools are pills in the row under the bio (+ Post
-     first, in coral; Club tools only until the planet shows, below), and
-     Edit page is in Club settings. Its button stays mounted, out of sight,
-     so Club settings and ?edit=1 still open the dialog. */
+     empty (on every screen): + Post and Club tools are pills in the row
+     under the bio (Club tools only until the planet shows, below), and Edit
+     page is in Club settings. */
   .vibe-app-shell .vibe-club-campusbar {
     display: block;
-  }
-  .vibe-app-shell .vibe-club-cover-actions,
-  .vibe-app-shell .vibe-club-edit-page {
-    display: none !important;
-  }
-  .vibe-app-shell .vibe-club-row-post,
-  .vibe-app-shell .vibe-club-row-tools {
-    display: inline-flex !important;
   }
   .vibe-app-shell .vibe-org-shell {
     max-width: 760px !important;

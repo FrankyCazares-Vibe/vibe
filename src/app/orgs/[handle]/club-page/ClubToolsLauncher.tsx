@@ -163,9 +163,10 @@ export function ClubToolsLauncher({
       }
       if (!giveFocusBack) return;
       window.requestAnimationFrame(() => {
-        // The opener, else the planet, else the cover's button: whichever is
-        // still on the page and showing (the planet hides under 1024px).
-        const back = [returnTo.current, planetRef.current, document.querySelector<HTMLElement>('a[aria-label="Club tools"]')].find(
+        // The opener, else the planet, else the row's Club tools pill:
+        // whichever is still on the page and showing (the planet hides under
+        // 1024px, the pill from there).
+        const back = [returnTo.current, planetRef.current, document.querySelector<HTMLElement>(".vibe-club-row-tools")].find(
           (el) => !!el && el.isConnected && el.getClientRects().length > 0,
         );
         back?.focus({ preventScroll: true });

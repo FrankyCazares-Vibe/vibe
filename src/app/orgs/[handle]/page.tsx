@@ -60,7 +60,6 @@ import { MembershipBox } from "./club-page/MembershipBox";
 import { ClubSwitchSync } from "./club-page/ClubSwitchSync";
 import { MoreAboutUs } from "./club-page/MoreAboutUs";
 import {
-  CoverOfficerButtons,
   EditPageButton,
   RowClubToolsButton,
   RowPostButton,
@@ -477,12 +476,11 @@ export default async function OrgProfilePage({ params }: Params) {
       />
     ) : null;
 
-  // The owner and officers (C9): Edit page, the cover's + and Club tools,
-  // the switch chevron, their two lines and, on a wide screen, the Club
-  // tools card. Not the cover's + on a hidden club. In the app frame
-  // from 900px (PLAN-5, Oct 22, 2026) the cover's corner is empty: + and
-  // Club tools are pills in the row under the bio, and Edit page lives in
-  // Club settings (globals.css decides what shows where).
+  // The owner and officers (C9): + Post and Club tools in the row under the
+  // bio, the switch chevron, their two lines and, on a wide screen outside
+  // the app frame, the Club tools card. Not + Post on a hidden club. The
+  // cover's corner is empty on every screen and Edit page lives in Club
+  // settings and Club tools (PLAN-5, Oct 22, 2026; phones the same day).
   const officerRole = officerView && (viewerRole === "owner" || viewerRole === "admin") ? viewerRole : null;
   // Out of the app frame the Club tools card is the page's own, beside the
   // club on a wide screen, as before; in it, Club tools come out of the right
@@ -555,19 +553,7 @@ export default async function OrgProfilePage({ params }: Params) {
       >
         <TopNav signedIn={!!user} backHref={backHref} />
 
-        <ClubCover org={org}>
-          {officerRole ? (
-            <CoverOfficerButtons
-              orgId={org.id}
-              orgHandle={org.handle}
-              orgName={org.name}
-              verified={org.verified}
-              viewerRole={officerRole}
-              boardId={boardFacts.boardId}
-              hidden={org.hidden}
-            />
-          ) : null}
-        </ClubCover>
+        <ClubCover org={org} />
 
         <div className="vibe-club-layout" data-tools={toolsInPage ? "true" : undefined}>
           <div style={{ minWidth: 0 }}>
@@ -583,18 +569,16 @@ export default async function OrgProfilePage({ params }: Params) {
               }
             />
 
-            {/* One row, two halves: Edit page for the owner and officers,
-                the join control for everyone else, then Share page. A
-                hidden club has no page to share. Mounted once (Edit page
-                reads ?edit=1 itself).
-                In the app frame from 900px (PLAN-5, Oct 22, 2026) the
-                officers' row is + Post (coral, first; not on a hidden club,
-                as the cover's +) and Share page, plus Club tools from 900 to
-                1023px, where the Arc's planet doesn't show. Edit page stays
-                mounted but the CSS hides it there: Club settings opens it
-                (openEditPage), and ?edit=1 still does. */}
+            {/* One row. Everyone else: the join control, then Share page.
+                The owner and officers (PLAN-5, Oct 22, 2026; phones the same
+                day): + Post (coral, first; not on a hidden club), then on a
+                phone Club tools and the share square, on a computer Share
+                page and Club tools (the CSS hides that from 1024px, where the
+                Arc's planet shows). A hidden club has no page to share.
+                Edit page is mounted once, out of sight (globals.css): Club
+                settings and Club tools open it, by the opener or ?edit=1. */}
             <div className="vibe-club-actions">
-              {framed && officerRole && !org.hidden ? (
+              {officerRole && !org.hidden ? (
                 <RowPostButton
                   orgId={org.id}
                   orgHandle={org.handle}
@@ -606,7 +590,6 @@ export default async function OrgProfilePage({ params }: Params) {
               ) : null}
               {officerRole ? (
                 <EditPageButton
-                  inSettingsOnComputer={framed}
                   orgHandle={org.handle}
                   orgName={org.name}
                   // The Look section and the Name field (Oct 22, 2026).
@@ -636,10 +619,11 @@ export default async function OrgProfilePage({ params }: Params) {
                   )}
                 </div>
               )}
+              {officerRole && !framed ? <RowClubToolsButton orgHandle={org.handle} /> : null}
               {org.hidden ? null : (
-                <SharePageButton orgHandle={org.handle} orgName={org.name} compact={!officerRole} />
+                <SharePageButton orgHandle={org.handle} orgName={org.name} compact={!officerRole || !framed} />
               )}
-              {framed && officerRole ? <RowClubToolsButton orgHandle={org.handle} /> : null}
+              {officerRole && framed ? <RowClubToolsButton orgHandle={org.handle} /> : null}
             </div>
 
             {setup && !setup.complete ? (

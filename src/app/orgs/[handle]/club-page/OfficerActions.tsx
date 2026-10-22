@@ -3,28 +3,24 @@
 /**
  * The officer's buttons on the club page (wave 2, C9; the page mounts them).
  * They replace the officer bar (`OrgProfileAdminBar`): Banner and Logo moved
- * into Edit page, New post into +, Invite people and the members' link into
- * Club tools.
+ * into Edit page, New post into + Post, Invite people and the members' link
+ * into Club tools.
  *
- * - EditPageButton: the half-width "Edit page" pill and its dialog (since
- *   Oct 22, 2026 it opens on Look: photo, cover and background, then the
- *   club's name; LookSection.tsx). The address `?edit=1` (Club tools' "Edit
- *   the page") opens it once, then comes off the address so a reload or
- *   Back doesn't open it again. The computer's
- *   tools panel opens it directly (`openEditPage`, club-tools-launcher.ts;
- *   Oct 22, 2026), as many times as it likes. In the app frame from 900px
- *   Edit page lives in Club settings (PLAN-5, Oct 22, 2026): the page passes
- *   `inSettingsOnComputer` and the CSS hides the button there, but it stays
- *   mounted so both doors still open the dialog.
- * - SharePageButton: the half-width "Share page" pill (share-page.ts).
- * - CoverOfficerButtons: + and Club tools, two round buttons for the cover's
- *   top-right corner. They draw no position of their own: the page places
- *   the row. In the app frame on a computer, Club tools brings the Arc
- *   out of the right edge (club-tools-launcher.ts; Oct 22, 2026); elsewhere
- *   it is the page.
- * - RowPostButton and RowClubToolsButton (PLAN-5, Oct 22, 2026): the cover's
- *   two, as pills in the row under the bio, for the app frame from 900px,
- *   where the cover's corner is empty. The CSS decides when each shows.
+ * - EditPageButton: the Edit page dialog (since Oct 22, 2026 it opens on
+ *   Look: photo, cover and background, then the club's name;
+ *   LookSection.tsx). Since Oct 22, 2026 (PLAN-5; phones the same day) Edit
+ *   page lives in Club settings and Club tools, not the row: its button
+ *   carries `vibe-club-edit-page`, which the CSS hides, but it stays mounted
+ *   so every door still opens the dialog. The address `?edit=1` (Club
+ *   tools' "Edit the page", Club settings' Edit page on a phone) opens it
+ *   once, then comes off the address so a reload or Back doesn't open it
+ *   again; the computer's Arc and tools panel open it directly
+ *   (`openEditPage`, club-tools-launcher.ts), as many times as they like.
+ * - SharePageButton: the half-width "Share page" pill, or the 44px square
+ *   (share-page.ts).
+ * - RowPostButton and RowClubToolsButton: the cover's old + and ≡ as pills
+ *   in the row under the bio (Franky, Oct 22, 2026: they made no sense in
+ *   the cover's corner, which is empty now on every screen).
  */
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
@@ -57,11 +53,6 @@ type EditProps = {
   initialMeetingTime: string;
   /** False: the database has no meeting_time column yet, so the field stays out. */
   meetingTimeReady: boolean;
-  /**
-   * In the app frame on a computer, where Edit page is in Club settings: the
-   * button carries `vibe-club-edit-page`, which the CSS hides from 900px.
-   */
-  inSettingsOnComputer?: boolean;
 };
 
 /** On the page and drawn: not removed, not under `display: none`. */
@@ -154,7 +145,7 @@ export function EditPageButton(props: EditProps): JSX.Element {
       <button
         ref={buttonRef}
         type="button"
-        className={props.inSettingsOnComputer ? "vibe-press vibe-club-edit-page" : "vibe-press"}
+        className="vibe-press vibe-club-edit-page"
         aria-haspopup="dialog"
         onClick={() => {
           returnTo.current = null;
@@ -255,89 +246,10 @@ export function SharePageButton({
   );
 }
 
-export function CoverOfficerButtons({
-  orgId,
-  orgHandle,
-  orgName,
-  verified,
-  viewerRole,
-  boardId,
-  hidden = false,
-}: {
-  orgId: string;
-  orgHandle: string;
-  orgName: string;
-  verified: boolean;
-  viewerRole: "owner" | "admin";
-  boardId: string | null;
-  /**
-   * A club Vibe hid: no + (nothing new goes on it, as the officer bar had no
-   * New post there), but Club tools stays, or its officers couldn't reach
-   * the members, the officers or Leave on a phone (review F5).
-   */
-  hidden?: boolean;
-}): JSX.Element {
-  const [plusOpen, setPlusOpen] = useState(false);
-  const plusRef = useRef<HTMLButtonElement | null>(null);
-  // Back to + when whatever it opened is done (the event form doesn't hand
-  // focus back on its own); a frame late, after the sheet's own return.
-  const closePlus = () => {
-    setPlusOpen(false);
-    window.requestAnimationFrame(() => plusRef.current?.focus({ preventScroll: true }));
-  };
-  return (
-    <>
-      <div className="vibe-club-cover-actions" style={{ display: "flex", gap: 4 }}>
-        {hidden ? null : (
-          <button
-            type="button"
-            className="vibe-press"
-            ref={plusRef}
-            aria-label="Post"
-            aria-haspopup="dialog"
-            onClick={() => setPlusOpen(true)}
-            style={roundHitStyle}
-          >
-            <span aria-hidden style={roundFaceStyle}>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
-                <path d="M12 5v14M5 12h14" />
-              </svg>
-            </span>
-          </button>
-        )}
-        <Link
-          href={`/orgs/${encodeURIComponent(orgHandle)}/tools`}
-          className="vibe-press"
-          aria-label="Club tools"
-          onClick={(e) => {
-            // A new tab or window still gets the page.
-            if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
-            if (openClubToolsLauncher(e.currentTarget)) e.preventDefault();
-          }}
-          style={roundHitStyle}
-        >
-          <span aria-hidden style={roundFaceStyle}>
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-              <path d="M5 7h14M5 12h14M5 17h14" />
-            </svg>
-          </span>
-        </Link>
-      </div>
-      {plusOpen ? (
-        <PlusSheet
-          club={{ orgId, orgHandle, orgName, verified, viewerRole, boardId }}
-          onClose={closePlus}
-        />
-      ) : null}
-    </>
-  );
-}
-
 /**
- * The cover's + as the row's first pill, "+ Post" in coral (PLAN-5, Oct 22,
- * 2026): the same PlusSheet. The page leaves it out on a hidden club, as
- * the cover leaves out its +. `vibe-club-row-post`: the CSS shows it only in
- * the app frame from 900px.
+ * "+ Post", the row's first pill, in coral (PLAN-5, Oct 22, 2026; on phones
+ * too the same day): the PlusSheet the cover's + used to open. The page
+ * leaves it out on a hidden club (nothing new goes on one).
  */
 export function RowPostButton({
   orgId,
@@ -356,7 +268,8 @@ export function RowPostButton({
 }): JSX.Element {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLButtonElement | null>(null);
-  // Back to the pill when the sheet is done, a frame late, as the cover's +.
+  // Back to the pill when the sheet is done (the event form doesn't hand
+  // focus back on its own), a frame late, after the sheet's own return.
   const close = () => {
     setOpen(false);
     window.requestAnimationFrame(() => ref.current?.focus({ preventScroll: true }));
@@ -384,10 +297,11 @@ export function RowPostButton({
 }
 
 /**
- * The cover's Club tools as a pill beside Share page (PLAN-5, Oct 22, 2026),
- * for windows 900 to 1023px wide, where the Arc's planet doesn't show
- * (`vibe-club-row-tools`: the CSS shows it only there). It brings the Arc
- * out like the cover's; with no launcher up it is the Club tools page.
+ * Club tools as a pill in the row (PLAN-5, Oct 22, 2026): on a phone it is
+ * the Club tools page; on a computer it brings the Arc out, and from 1024px,
+ * where the Arc's planet shows, the CSS hides it (`vibe-club-row-tools`).
+ * A hidden club keeps it, or its officers couldn't reach the members, the
+ * officers or Leave on a phone (review F5).
  */
 export function RowClubToolsButton({ orgHandle }: { orgHandle: string }): JSX.Element {
   return (
@@ -453,37 +367,3 @@ function ShareGlyph() {
     </svg>
   );
 }
-
-/** A 44px target around the drawn 40px circle. */
-const roundHitStyle: CSSProperties = {
-  width: 44,
-  height: 44,
-  display: "grid",
-  placeItems: "center",
-  padding: 0,
-  border: "none",
-  borderRadius: 999,
-  background: "transparent",
-  color: "var(--charcoal)",
-  textDecoration: "none",
-  cursor: "pointer",
-  WebkitTapHighlightColor: "transparent",
-};
-
-/**
- * Dark glass that reads on any cover, a white one included: the Night glass
- * token under a blur, a light rim, and a soft shadow off the picture.
- */
-const roundFaceStyle: CSSProperties = {
-  width: 40,
-  height: 40,
-  display: "grid",
-  placeItems: "center",
-  borderRadius: 999,
-  background: "var(--glass-65)",
-  border: "1px solid rgba(var(--scrim-rgb),0.16)",
-  boxShadow: "0 2px 10px rgba(0,0,0,0.35)",
-  backdropFilter: "blur(10px) saturate(140%)",
-  WebkitBackdropFilter: "blur(10px) saturate(140%)",
-  color: "var(--charcoal)",
-};

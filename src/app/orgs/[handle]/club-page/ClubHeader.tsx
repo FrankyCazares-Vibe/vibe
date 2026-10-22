@@ -10,12 +10,16 @@ import type { ClubPageOrg } from "./types";
  * Instagram-style: the cover, the logo over its lower edge with the two
  * counts beside it, the name, @handle and chips, the bio, the first link,
  * and a chip row (who can join, when it meets, More about us). Server
- * rendered; the interactive bits (⋯ menu, switch chevron, More about us,
- * the cover's officer buttons) are handed in as nodes.
+ * rendered; the interactive bits (⋯ menu, switch chevron, More about us)
+ * are handed in as nodes.
  */
 
-/** The cover (Banner as before: the club's 3:1 crop, or a soft gradient). */
-export function ClubCover({ org, children }: { org: ClubPageOrg; children?: ReactNode }) {
+/**
+ * The cover (Banner as before: the club's 3:1 crop, or a soft gradient).
+ * Nothing sits on it since Oct 22, 2026: its old + and Club tools are pills
+ * in the row under the bio (Franky: they made no sense in the corner).
+ */
+export function ClubCover({ org }: { org: ClubPageOrg }) {
   return (
     <div
       className="vibe-club-cover"
@@ -35,11 +39,6 @@ export function ClubCover({ org, children }: { org: ClubPageOrg; children?: Reac
           background: "linear-gradient(180deg, rgba(0,0,0,0) 40%, rgba(0,0,0,0.55) 100%)",
         }}
       />
-      {children ? (
-        <div style={{ position: "absolute", top: 10, right: 10, display: "flex", gap: 8, zIndex: 1 }}>
-          {children}
-        </div>
-      ) : null}
     </div>
   );
 }
