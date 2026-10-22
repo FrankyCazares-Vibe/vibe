@@ -10,7 +10,7 @@ import { toast } from "@/lib/feedback/toast";
 import { ORG_COPY, shortDateText } from "@/lib/orgs/join-copy";
 
 import { arcTool, displayName, requestsSub } from "./club-tools-arc";
-import type { ArcCardProps } from "./ClubToolsLauncherCards";
+import { panelOpener, type ArcCardProps } from "./ClubToolsLauncherCards";
 import { ArcCardFrame, ArcNote, ArcPageLink, ArcPersonRow, ArcRise, ArcSkeleton, ghostStyle, pillStyle, primaryStyle } from "./ClubToolsLauncherParts";
 
 /**
@@ -34,6 +34,7 @@ export function RequestsCard({
   club,
   onClose,
   onLeave,
+  onPanel,
   onCount,
   onChanged,
 }: ArcCardProps & { onCount: (n: number) => void; onChanged: () => void }): JSX.Element {
@@ -163,6 +164,7 @@ export function RequestsCard({
           href={`/orgs/${encodeURIComponent(club.handle)}/tools/requests`}
           label={more ? `See all ${more.toLocaleString("en-US")} requests` : "Open Join requests"}
           onLeave={onLeave}
+          onOpen={panelOpener(onPanel, { screen: "requests" })}
         />
       }
     >

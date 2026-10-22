@@ -129,6 +129,13 @@ function fail(status: number, code: string, error: string) {
  * failed read there leaves them "nothing known" instead of failing the list:
  * no check-in shown is honest, a broken list isn't.
  *
+ * MEMBERS ONLY (Oct 22, 2026). Every event row here is read on the VIEWER's
+ * client, so `event_visible` (20261025100000) leaves a members-only event
+ * out for everyone but its club's members and platform admins: members see
+ * theirs in the campus list and Tonight too. Each item carries
+ * `visibility` ("everyone" | "members", its last key) for the chip. The
+ * service-role reads above only resolve ids and names, never rows.
+ *
  * CACHING. Every answer, refusals included, says Cache-Control: no-store
  * (contract 3.0): each one is per viewer (their RSVPs, whether they checked
  * in, and an officer's exact check-in counts), so nothing between may keep it.
@@ -544,6 +551,11 @@ export async function POST(req: Request) {
   //    (5 minutes' grace), at most 14 days long (the database's
   //    events_max_duration CHECK). An event ending in 2099 used to sit at the
   //    top of the campus list forever.
+  //  - Who can see it (Oct 22, 2026): `visibility` "everyone" (the default
+  //    when left out) or "members", the club's members only; anything else
+  //    is 400 invalid_visibility. The database decides who sees a
+  //    members-only event (event_visible, 20261025100000), so the officer
+  //    check below is all this route adds.
   const checked = checkEventFields(readEventFields(body), Date.now());
   if (!checked.ok) {
     const p = checked.problem;
@@ -605,6 +617,7 @@ export async function POST(req: Request) {
       location: fields.location,
       starts_at: fields.starts_at,
       ends_at: fields.ends_at,
+      visibility: fields.visibility,
     })
     .select(EVENT_ROW_COLUMNS)
     .single();

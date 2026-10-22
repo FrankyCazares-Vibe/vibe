@@ -26,7 +26,11 @@
  * `voters: []`, `voters_more: 0`, as if anonymous, without a single voter
  * being read. Members voted and signed up thinking only members would see
  * their names; a follower never does. `mine` stays the follower's own pick
- * (a past one, from before they left the club).
+ * (a past one, from before they left the club). An Event card of a
+ * MEMBERS-ONLY event (Oct 22, 2026; 20261025100000) goes out to a follower
+ * with `event: null`, as if cancelled, and its event is never read for them:
+ * the Board page drops such a card before it gets here
+ * (`readFollowerPage`), and this is the second wall.
  *
  * `null` = a read failed (logged); the caller answers 503 `try_again`,
  * never a page with a card-less poll. On a database without migration B
@@ -40,7 +44,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseServiceClient, isSupabaseServiceConfigured } from "@/lib/supabase/service";
 
-import { eventRefsFor, type EventRow } from "../event-refs";
+import { EVENT_REF_COLUMNS, eventRefsFor, type EventRow } from "../event-refs";
 import { roomState } from "../room-state";
 import { isMissingChatSchema, warnMissingChatSchemaOnce } from "../schema";
 import type { Card, MessageKind, Person, PollCard, PollCardOption, Room } from "../types";
@@ -260,7 +264,7 @@ export async function hydrateCards(
       service.from("chat_event_cards").select("message_id, note").in("message_id", chunk),
     ),
     readAll<EventRow>("events", eventIds, (chunk) =>
-      service.from("events").select("id, title, starts_at, ends_at, location, org_id").in("id", chunk),
+      service.from("events").select(EVENT_REF_COLUMNS).in("id", chunk),
     ),
   ]);
   const sideTables = [polls, options, votes, notes];
@@ -281,12 +285,18 @@ export async function hydrateCards(
   const voterIds = opts.countsOnly === true
     ? []
     : Array.from(new Set(votes.filter((vote) => !anonymousPolls.has(vote.poll_id)).map((vote) => vote.user_id)));
+  // A follower is never handed a members-only event (see the header): its
+  // ref is not even built for them.
+  const shownEvents = opts.countsOnly === true ? events.filter((event) => event.visibility !== "members") : events;
   const [people, refs] = await Promise.all([
     readAll<unknown>("voters", voterIds, (chunk) =>
       client.from("users").select("id, handle, name, avatar_url").in("id", chunk),
     ),
-    eventIds.length > 0 ? eventRefsFor(events, viewerId, { now }) : Promise.resolve(new Map()),
+    shownEvents.length > 0 ? eventRefsFor(shownEvents, viewerId, { now }) : Promise.resolve(new Map()),
   ]);
+  const membersOnly = new Set(
+    opts.countsOnly === true ? events.filter((event) => event.visibility === "members").map((event) => event.id) : [],
+  );
   if (typeof people === "string" || refs === null) return null;
   const personById = new Map<string, Person>();
   for (const row of people) {
@@ -316,8 +326,9 @@ export async function hydrateCards(
     // No side row (never after B: the RPC writes both in one transaction): no card.
     if (!noteOf.has(row.id)) continue;
     const note = noteOf.get(row.id) ?? null;
-    if (row.card_event_id === null) {
-      // The event was cancelled: the FK set the column null.
+    if (row.card_event_id === null || membersOnly.has(row.card_event_id)) {
+      // The event was cancelled (the FK set the column null), or it is
+      // members-only and the viewer a follower: the same card, no event.
       cards.set(row.id, { type: "event", note, event: null });
       continue;
     }

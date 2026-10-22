@@ -14,7 +14,7 @@ import {
 } from "@/lib/orgs/join-copy";
 
 import { arcTool, displayName, followersSub } from "./club-tools-arc";
-import type { ArcCardProps } from "./ClubToolsLauncherCards";
+import { panelOpener, type ArcCardProps } from "./ClubToolsLauncherCards";
 import {
   ArcCardFrame,
   ArcNote,
@@ -108,6 +108,7 @@ export function FollowersCard({
   counts,
   onClose,
   onLeave,
+  onPanel,
   onChanged,
 }: ArcCardProps & { onChanged: () => void }): JSX.Element {
   const base = `/api/orgs/${encodeURIComponent(club.handle)}`;
@@ -296,7 +297,14 @@ export function FollowersCard({
       title="Followers"
       sub={followersSub(counts.followers)}
       onClose={onClose}
-      footer={<ArcPageLink href={`/orgs/${encodeURIComponent(club.handle)}/tools/followers`} label="See all followers" onLeave={onLeave} />}
+      footer={
+        <ArcPageLink
+          href={`/orgs/${encodeURIComponent(club.handle)}/tools/followers`}
+          label="See all followers"
+          onLeave={onLeave}
+          onOpen={panelOpener(onPanel, { screen: "followers" })}
+        />
+      }
     >
       {blocked ? (
         <ArcRise index={0}>

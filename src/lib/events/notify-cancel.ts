@@ -37,15 +37,27 @@ const INSERT_CHUNK = 1000;
 
 export type CollectResult = { ok: true; ids: string[] } | { ok: false };
 
+/** Ids per `in (...)` filter when the recipients are checked against a club's members. */
+const IDS_PER_MEMBER_READ = 100;
+
 /**
  * Everyone with a going/maybe RSVP to the event, minus `actorId`. A read
  * error is `{ ok: false }`: the caller must NOT delete then, because once the
  * event is gone its RSVPs are too and nobody could be told.
+ *
+ * `membersOf` (Oct 22, 2026, "Members only" events): the club of a
+ * members-only event. The notice carries the event's title, so only the
+ * club's CURRENT members are kept: someone who RSVP'd and then left the club
+ * no longer sees the event (event_visible, 20261025100000) and isn't told
+ * about it either. A flip to Members only already took non-members' RSVPs
+ * off; this covers people who left after. A failed members read is
+ * `{ ok: false }` too, for the same reason as above.
  */
 export async function collectCancelRecipients(
   service: SupabaseClient,
   eventId: string,
   actorId: string,
+  opts?: { membersOf?: string | null },
 ): Promise<CollectResult> {
   const rows: { user_id?: unknown; status?: unknown }[] = [];
   for (let from = 0; from < MAX_RECIPIENTS; from += PAGE) {
@@ -67,7 +79,25 @@ export async function collectCancelRecipients(
   if (rows.length >= MAX_RECIPIENTS) {
     console.warn("[events notify-cancel collect] recipient cap reached", { eventId, cap: MAX_RECIPIENTS });
   }
-  return { ok: true, ids: cancelRecipientIds(rows, actorId) };
+  const ids = cancelRecipientIds(rows, actorId);
+  const orgId = opts?.membersOf ?? null;
+  if (!orgId || ids.length === 0) return { ok: true, ids };
+  const members = new Set<string>();
+  for (let i = 0; i < ids.length; i += IDS_PER_MEMBER_READ) {
+    const { data, error } = await service
+      .from("org_members")
+      .select("user_id")
+      .eq("org_id", orgId)
+      .in("user_id", ids.slice(i, i + IDS_PER_MEMBER_READ));
+    if (error) {
+      console.error("[events notify-cancel members]", { eventId, code: error.code, message: error.message });
+      return { ok: false };
+    }
+    for (const row of (data ?? []) as { user_id?: unknown }[]) {
+      if (typeof row.user_id === "string") members.add(row.user_id);
+    }
+  }
+  return { ok: true, ids: ids.filter((id) => members.has(id)) };
 }
 
 export type SendResult = { notified: number; failed: boolean };

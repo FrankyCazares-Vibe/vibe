@@ -29,7 +29,8 @@ export function Sections5fTo5g() {
             <li>
               who checked in at the club&apos;s events, including people who are
               not members or did not RSVP, and who marked Going but did not
-              check in;
+              check in. At an event marked &ldquo;Members only&rdquo;, only
+              members can check themselves in;
             </li>
             <li>the people added to a room, with the date each was added.</li>
           </LegalUL>

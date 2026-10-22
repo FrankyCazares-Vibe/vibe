@@ -249,3 +249,35 @@ Shipped from the wave 1 session (`busy-aryabhata-7b6991`); this branch's own ses
   ends with `org_join_request` and is validated, the per-type counts are unchanged, grants unchanged. No code
   change was needed (main `44b0923` already writes the notices). Not checked on production: a real request (it
   needs a real student); the first one will show it.
+- **Oct 22, later still (Franky: tools from the Arc shouldn't send him to other pages; "yes, apply that switch
+  for Everyone or Members only"):**
+  - **Club tools open in place on a computer.** From the Arc, "Open Join requests", "See all members", "See all
+    followers", "Change roles and titles", "Open Club settings", "All Club tools" and "Members' link" no longer
+    leave the club page: the planet's circle grows out and a panel slides in from the right (about 560px, like
+    Otto's) with the full tool (approve and deny, members and roles, followers and invites, settings, the setup
+    list). ‹ goes back a step and finally to the arc; ×, Escape or a click outside closes it. "Edit the page"
+    opens Edit page directly; "Past events" goes to the Events tab. Phones keep the Club tools pages as they are.
+  - **"Members only" events are live.** Officers pick "Who can see it: Everyone / Members only" when they create
+    or edit an event (Everyone stays the default). A members-only event is seen only by the club's members (and
+    the Vibe team): not followers, not people who left, not signed-out visitors; only members can RSVP or check
+    themselves in; it can't be put on the Board, and the follower views (club space, Board, Board previews)
+    leave it out. It shows a small "Members only" chip with a lock. Switching an upcoming event to members-only
+    takes non-members' RSVPs off it. Checked locally: a member sees it with the chip and can RSVP; a follower and
+    a pending requester don't see it anywhere (club list, campus list, club space, the .ics link) and get 404 on
+    RSVP.
+  - **Database, production (Franky's yes):** migration `20261025100000_event_visibility` (the `visibility`
+    column with its rule, `event_visible` restated with the members arm, new `event_audience_ok`, the two RSVP
+    rules, `event_checkin_self_as`, `chat_create_event_card`). Rehearsed locally (apply, again, rollback, apply,
+    probes as each role). The production pre-flight found one difference: production's `event_checkin_self_as`
+    was the Oct 19 body with four comment lines missing (same code); the guard now accepts that copy too (a test
+    proves it's the repo body less its comments), and the apply tool was checked to keep comments. Applied before
+    the code went out, row renamed to `20261025100000`, post-check: column and rule in, all 20 events "everyone",
+    the four functions exactly as written, grants unchanged.
+  - **Privacy Policy effective October 22, 2026** (5b, the section 5 table, 5e, 5f, section 8's RSVPs row,
+    section 1's team access, 3c): both copies word for word; the policy checker passed on a rendered copy (1300
+    of 1300 sentences); the live checker run on port 3105 is still to do.
+  - Left for Franky: someone who leaves a club on their own keeps their RSVP to its members-only events (it still
+    counts in Going and shows on the officers' list); a Board card of an event later switched to members-only
+    and then cancelled shows its "Event cancelled" line to followers. Both small; say if either should change.
+  - Checks: 4 batches with a reviewer each, tsc clean, 3,827 tests pass. Walked headless on the computer (the
+    panel from Join requests and Members, the chip, the form); not on a real phone.

@@ -16,6 +16,7 @@ import {
   type ArcCounts,
   type ArcMember,
 } from "./club-tools-arc";
+import type { PanelEntry } from "./club-tools-panel";
 import { ARC_ICON, ArcCardFrame, ArcGlyph, ArcNote, ArcPageLink, ArcPersonRow, ArcRise, ArcSkeleton, metaStyle, nameStyle } from "./ClubToolsLauncherParts";
 import { shareClubPage } from "./share-page";
 
@@ -25,6 +26,11 @@ import { shareClubPage } from "./share-page";
  * shows what the tool is about from real reads or the club's own settings,
  * and ends with the way to the tool's whole page. Join requests and
  * Followers, which act on people, have their own files.
+ *
+ * Since Oct 22, 2026 that way opens the tool in place when the launcher can
+ * (`onPanel`): the planet grows into the tools panel (ClubToolsPanel.tsx)
+ * and the whole page stays a cmd-click away. Past events still goes to the
+ * club page's Events tab, which is the page under the arc.
  */
 
 /** The club and who is looking, as the page passes them in. */
@@ -48,7 +54,14 @@ export type ArcCardProps = {
   onClose: () => void;
   /** A link out of the launcher was followed: it closes. */
   onLeave: (href: string) => void;
+  /** Opens a tool in the panel, in place; absent, the links go to the tool's page. */
+  onPanel?: (entry: PanelEntry) => void;
 };
+
+/** The footer link's in-place opener for a screen, when the launcher has a panel. */
+export function panelOpener(onPanel: ArcCardProps["onPanel"], entry: PanelEntry): (() => void) | undefined {
+  return onPanel ? () => onPanel(entry) : undefined;
+}
 
 /** One read of the roster per opening, shared by Members and Officers (cleared when the arc opens again). */
 export type RosterRead = Promise<VibeResult<{ members?: ArcMember[] }>>;
@@ -56,7 +69,8 @@ export type RosterCache = RefObject<RosterRead | null>;
 
 const ROSTER_LINE = "Couldn't load members.";
 
-function useRoster(handle: string, cacheRef: RosterCache): { rows: ArcMember[] | null; failure: LoadFailure | null; retry: () => void } {
+/** The roster, read once per opening (`cacheRef`), for the Members and Officers cards and the panel's All Club tools. */
+export function useRoster(handle: string, cacheRef: RosterCache): { rows: ArcMember[] | null; failure: LoadFailure | null; retry: () => void } {
   const [state, setState] = useState<{ rows: ArcMember[] | null; failure: LoadFailure | null }>({ rows: null, failure: null });
   const [tick, setTick] = useState(0);
   useEffect(() => {
@@ -96,7 +110,7 @@ function useRoster(handle: string, cacheRef: RosterCache): { rows: ArcMember[] |
 
 const toolsPath = (handle: string, page = "") => `/orgs/${encodeURIComponent(handle)}/tools${page ? `/${page}` : ""}`;
 
-export function MembersCard({ club, counts, onClose, onLeave, rosterRef }: ArcCardProps & { rosterRef: RosterCache }): JSX.Element {
+export function MembersCard({ club, counts, onClose, onLeave, onPanel, rosterRef }: ArcCardProps & { rosterRef: RosterCache }): JSX.Element {
   const { rows, failure, retry } = useRoster(club.handle, rosterRef);
   let body: ReactNode;
   if (failure) body = <LoadFailed failure={failure} tone="dark" compact onRetry={retry} />;
@@ -109,14 +123,21 @@ export function MembersCard({ club, counts, onClose, onLeave, rosterRef }: ArcCa
       title="Members"
       sub={membersSub(counts.members ?? rows?.length ?? null)}
       onClose={onClose}
-      footer={<ArcPageLink href={toolsPath(club.handle, "members")} label="See all members" onLeave={onLeave} />}
+      footer={
+        <ArcPageLink
+          href={toolsPath(club.handle, "members")}
+          label="See all members"
+          onLeave={onLeave}
+          onOpen={panelOpener(onPanel, { screen: "members" })}
+        />
+      }
     >
       {body}
     </ArcCardFrame>
   );
 }
 
-export function OfficersCard({ club, onClose, onLeave, rosterRef }: ArcCardProps & { rosterRef: RosterCache }): JSX.Element {
+export function OfficersCard({ club, onClose, onLeave, onPanel, rosterRef }: ArcCardProps & { rosterRef: RosterCache }): JSX.Element {
   const { rows, failure, retry } = useRoster(club.handle, rosterRef);
   let body: ReactNode;
   if (failure) body = <LoadFailed failure={failure} tone="dark" compact onRetry={retry} />;
@@ -128,7 +149,14 @@ export function OfficersCard({ club, onClose, onLeave, rosterRef }: ArcCardProps
       title="Officers and titles"
       sub="Who runs the club"
       onClose={onClose}
-      footer={<ArcPageLink href={toolsPath(club.handle, "officers")} label="Change roles and titles" onLeave={onLeave} />}
+      footer={
+        <ArcPageLink
+          href={toolsPath(club.handle, "officers")}
+          label="Change roles and titles"
+          onLeave={onLeave}
+          onOpen={panelOpener(onPanel, { screen: "officers" })}
+        />
+      }
     >
       {body}
     </ArcCardFrame>
@@ -155,7 +183,7 @@ export function EventsCard({ club, onClose, onLeave }: ArcCardProps): JSX.Elemen
 }
 
 /** Who can join and who it's open to, in Edit page's own words (join-copy.ts). */
-export function SettingsCard({ club, onClose, onLeave }: ArcCardProps): JSX.Element {
+export function SettingsCard({ club, onClose, onLeave, onPanel }: ArcCardProps): JSX.Element {
   const policy = WHO_CAN_JOIN_OPTIONS.find((o) => o.value === club.joinPolicy);
   const openTo = openToOptions(null).find((o) => o.value === club.audience);
   const rows: { icon: string; name: string; meta: string }[] = [
@@ -170,7 +198,14 @@ export function SettingsCard({ club, onClose, onLeave }: ArcCardProps): JSX.Elem
       title="Club settings"
       sub="Only officers can change these"
       onClose={onClose}
-      footer={<ArcPageLink href={toolsPath(club.handle, "settings")} label="Open Club settings" onLeave={onLeave} />}
+      footer={
+        <ArcPageLink
+          href={toolsPath(club.handle, "settings")}
+          label="Open Club settings"
+          onLeave={onLeave}
+          onOpen={panelOpener(onPanel, { screen: "settings" })}
+        />
+      }
     >
       {rows.map((r, i) => (
         <ArcRise key={r.name} index={i + 1}>
@@ -186,7 +221,7 @@ export function SettingsCard({ club, onClose, onLeave }: ArcCardProps): JSX.Elem
  * over the arc: `onInvite`), and the members' link for a verified club. A
  * hidden club takes nobody new, so it says that instead (ToolsIndex.tsx).
  */
-export function InviteCard({ club, onClose, onLeave, onInvite }: ArcCardProps & { onInvite: () => void }): JSX.Element {
+export function InviteCard({ club, onClose, onLeave, onPanel, onInvite }: ArcCardProps & { onInvite: () => void }): JSX.Element {
   const h = encodeURIComponent(club.handle);
   return (
     <ArcCardFrame
@@ -194,7 +229,9 @@ export function InviteCard({ club, onClose, onLeave, onInvite }: ArcCardProps & 
       title="Invite and share"
       sub="Bring people in"
       onClose={onClose}
-      footer={<ArcPageLink href={toolsPath(club.handle)} label="All Club tools" onLeave={onLeave} />}
+      footer={
+        <ArcPageLink href={toolsPath(club.handle)} label="All Club tools" onLeave={onLeave} onOpen={panelOpener(onPanel, { screen: "index" })} />
+      }
     >
       {club.hidden ? (
         <ArcRise index={1}>
@@ -222,7 +259,12 @@ export function InviteCard({ club, onClose, onLeave, onInvite }: ArcCardProps & 
               <Link
                 href={`/orgs/${h}/setup#members-link`}
                 className="vibe-arc-row"
-                onNavigate={() => onLeave(`/orgs/${h}/setup`)}
+                onNavigate={(e) => {
+                  if (onPanel) {
+                    e.preventDefault();
+                    onPanel({ screen: "setup", step: "members_link" });
+                  } else onLeave(`/orgs/${h}/setup`);
+                }}
                 style={thingButtonStyle}
               >
                 <ThingLine icon={ARC_ICON.link} name="Members' link" meta="A link that lets people join" />

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { newestLivePerRoom, readLatestPerRoomWithDeleted } from "@/lib/chat/latest-per-room";
+import { eventVisibilityOf, type EventVisibility } from "@/lib/events/validate";
 import { attachNotificationOrgs, type NotificationOrg } from "@/lib/orgs/notification-orgs";
 import { visibleActorFilter, withEventNotices } from "@/lib/push/event-notice";
 import { loadHiddenUsers } from "@/lib/safety/hidden-users";
@@ -87,6 +88,8 @@ export type UpcomingEvent = {
   starts_at: string;
   location: string | null;
   viewer_status: "going" | "maybe";
+  /** Who can see it (Oct 22, 2026): "members" = the club's members only. */
+  visibility: EventVisibility;
 };
 
 export type UpcomingReminder = {
@@ -275,7 +278,7 @@ export async function GET() {
     supabase
       .from("rsvps")
       .select(
-        "status,event:events!inner(id,title,starts_at,ends_at,location)",
+        "status,event:events!inner(id,title,starts_at,ends_at,location,visibility)",
       )
       .eq("user_id", user.id)
       .in("status", ["going", "maybe"])
@@ -303,7 +306,7 @@ export async function GET() {
 
   type RawRsvp = {
     status: "going" | "maybe";
-    event: { id: string; title: string; starts_at: string; ends_at: string; location: string | null } | null;
+    event: { id: string; title: string; starts_at: string; ends_at: string; location: string | null; visibility?: string | null } | null;
   };
   const upcomingEvents: UpcomingEvent[] = ((rsvpsRes.data ?? []) as unknown as RawRsvp[])
     .filter((r) => r.event)
@@ -314,6 +317,7 @@ export async function GET() {
       starts_at: r.event!.starts_at,
       location: r.event!.location,
       viewer_status: r.status,
+      visibility: eventVisibilityOf(r.event!.visibility),
     }));
 
   type RawDatedRem = { id: string; title: string; body: string | null; remind_at: string };

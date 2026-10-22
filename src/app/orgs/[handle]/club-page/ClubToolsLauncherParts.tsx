@@ -204,10 +204,35 @@ export function ArcPersonRow({
   );
 }
 
-/** The way to the tool's whole page: a ghost pill. Following it closes the launcher (`onLeave`). */
-export function ArcPageLink({ href, label, onLeave }: { href: string; label: string; onLeave: (href: string) => void }): JSX.Element {
+/**
+ * The way to the tool's whole page: a ghost pill. Following it closes the
+ * launcher (`onLeave`). With `onOpen` (Oct 22, 2026) a plain click opens the
+ * tool in place, in the panel, instead; a cmd- or middle-click still gets the
+ * page in a new tab, since Link only asks `onNavigate` about a plain click.
+ */
+export function ArcPageLink({
+  href,
+  label,
+  onLeave,
+  onOpen,
+}: {
+  href: string;
+  label: string;
+  onLeave: (href: string) => void;
+  onOpen?: () => void;
+}): JSX.Element {
   return (
-    <Link href={href} className="vibe-arc-ghost" onNavigate={() => onLeave(href)} style={{ ...pillStyle, ...ghostStyle, width: "100%" }}>
+    <Link
+      href={href}
+      className="vibe-arc-ghost"
+      onNavigate={(e) => {
+        if (onOpen) {
+          e.preventDefault();
+          onOpen();
+        } else onLeave(href);
+      }}
+      style={{ ...pillStyle, ...ghostStyle, width: "100%" }}
+    >
       {label}
     </Link>
   );

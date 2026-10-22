@@ -10,7 +10,10 @@
  * `roomState`; `room_id` = the room's id when the viewer holds a row on it
  * OR is an owner / admin of the club (the rule of `can_view_org_channel`'s
  * event arm, DM:3.6), else null; `viewer_status` from the viewer's own RSVP;
- * `going_count` / `maybe_count` from all RSVPs; `location` "" when null.
+ * `going_count` / `maybe_count` from all RSVPs; `location` "" when null;
+ * `visibility` from the row given (Oct 22, 2026: "Members only" events), so
+ * every caller's event select names `visibility` (EVENT_REF_COLUMNS); a row
+ * without it reads as "everyone", the column's default.
  * `null` on any failed read (logged). Not `event_rsvp_counts()`: it applies
  * `event_visible` to the caller and the service role has no `auth.uid()`.
  *
@@ -22,6 +25,7 @@ import "server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { eventVisibilityOf } from "@/lib/events/validate";
 import { createSupabaseServiceClient, isSupabaseServiceConfigured } from "@/lib/supabase/service";
 
 import { BOARD_POSTER_ROLES, isClubRole } from "./room-rules";
@@ -36,7 +40,12 @@ export type EventRow = {
   ends_at: string;
   location: string | null;
   org_id: string | null;
+  /** "everyone" | "members" (20261025100000); left out = "everyone". */
+  visibility?: string | null;
 };
+
+/** What `eventRefsFor` needs of an event, for every caller's `events` select. */
+export const EVENT_REF_COLUMNS = "id, title, starts_at, ends_at, location, org_id, visibility";
 
 const TAG = "chat/event-refs";
 
@@ -224,6 +233,7 @@ export async function eventRefsFor(
       viewer_status: withCounts ? (tally.mine.get(row.id) ?? null) : null,
       going_count: withCounts ? (tally.going.get(row.id) ?? 0) : 0,
       maybe_count: withCounts ? (tally.maybe.get(row.id) ?? 0) : 0,
+      visibility: eventVisibilityOf(row.visibility),
     });
   }
   return refs;

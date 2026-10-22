@@ -29,3 +29,26 @@ export function openClubToolsLauncher(from: HTMLElement | null): boolean {
   opener(from);
   return true;
 }
+
+/**
+ * Edit page, opened from the tools panel's "Edit the page" (Oct 22, 2026;
+ * ClubToolsPanel.tsx): the panel closes and the cover's Edit page dialog
+ * opens straight away. Not through `?edit=1`: EditPageButton (OfficerActions
+ * .tsx) takes that from the address once per page, so a second one would
+ * open nothing. The button registers itself; one per page.
+ */
+let editOpener: (() => void) | null = null;
+
+export function registerEditPageOpener(open: () => void): () => void {
+  editOpener = open;
+  return () => {
+    if (editOpener === open) editOpener = null;
+  };
+}
+
+/** Opens Edit page and answers true, or answers false when there is none on this page. */
+export function openEditPage(): boolean {
+  if (!editOpener) return false;
+  editOpener();
+  return true;
+}

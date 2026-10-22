@@ -4,7 +4,7 @@ import { readCreateCardBody, type CleanCardBody } from "@/lib/chat/cards/body";
 import { cardFallbackContent } from "@/lib/chat/cards/fallback";
 import { chatV2For } from "@/lib/chat/flag-server";
 import { readChatMessage, roomOf } from "@/lib/chat/message-read";
-import { clubRole } from "@/lib/chat/rooms";
+import { clubRole, clubRoleAnswer } from "@/lib/chat/rooms";
 import {
   refusalBody,
   type ClubRole,
@@ -12,6 +12,7 @@ import {
   type InvalidCardRefusal,
   type RefusalCode,
 } from "@/lib/chat/types";
+import { eventVisibilityOf } from "@/lib/events/validate";
 import { ensureMember } from "@/lib/messages/channel-access";
 import { contentBlockedResponse, requireCanPublish } from "@/lib/moderation/access";
 import { checkText } from "@/lib/moderation/text-filter";
@@ -132,22 +133,34 @@ export async function POST(req: Request, ctx: RouteCtx) {
 
   // 11. the fallback text (5.1); an Event card's title and time come from
   // the event itself, which must be this club's and not over (the RPC's
-  // `P0C23` is the second wall).
+  // `P0C23` is the second wall). A members-only event (Oct 22, 2026) never
+  // goes on the Board, which followers read: 400 `event_members_only` (the
+  // RPC's `P0C27` is the second wall). Any other club room is members-only,
+  // so it may go there.
   let content: string;
   if (card.type === "event") {
     const { data, error } = await service
       .from("events")
-      .select("id, title, starts_at, org_id, ends_at")
+      .select("id, title, starts_at, org_id, ends_at, visibility")
       .eq("id", card.event_id)
       .maybeSingle();
     if (error) {
       console.error(`[${LOG} event]`, error.code, error.message);
       return refuse("try_again", 503);
     }
-    const event = data as { title?: unknown; starts_at?: unknown; org_id?: unknown; ends_at?: unknown } | null;
+    const event = data as { title?: unknown; starts_at?: unknown; org_id?: unknown; ends_at?: unknown; visibility?: unknown } | null;
     const endsAt = typeof event?.ends_at === "string" ? Date.parse(event.ends_at) : Number.NaN;
     if (!event || event.org_id !== member.orgId || !(endsAt > now.getTime()) || typeof event.starts_at !== "string") {
       return refuse("event_not_found", 404);
+    }
+    if (eventVisibilityOf(event.visibility) === "members") {
+      // Someone outside the club (a follower on the Board) can't see this
+      // event at all: the answer for an event they can't see, never a hint
+      // that it exists. Asked only for a members-only event.
+      const role = await clubRoleAnswer(member.orgId, user.id);
+      if (role === "failed") return refuse("try_again", 503);
+      if (role === null) return refuse("event_not_found", 404);
+      if (room.kind === "board") return refuse("event_members_only", 400);
     }
     content = cardFallbackContent({
       type: "event",
@@ -191,6 +204,8 @@ export async function POST(req: Request, ctx: RouteCtx) {
     // database said no.
     const code = typeof rpcError.code === "string" ? rpcError.code.trim().toUpperCase() : "";
     if (code === "P0C21" && (await roleOf()) === null) return membersOnly();
+    // The event turned members-only between the check above and the RPC.
+    if (code === "P0C27") return refuse("event_members_only", 400);
     const refused = await rpcRefusal(rpcError, {
       room,
       roleOf,

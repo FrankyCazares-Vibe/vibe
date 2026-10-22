@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { eventVisibilityOf } from "@/lib/events/validate";
 import { RSVP_CAMPUS_VISITING_COPY, rsvpCampusDecision } from "@/lib/iu/campus-request";
 import { requireTermsAccepted } from "@/lib/legal/require-terms";
 import { isUuid } from "@/lib/pgrest";
@@ -15,12 +16,17 @@ function fail(status: number, code: string, error: string) {
 }
 
 /**
- * May the viewer RSVP to this event? Two refusals, in this order:
+ * May the viewer RSVP to this event? Three refusals, in this order:
  *
  * 1. The event's org is hidden. A hidden org is out of every list, and
  *    nothing new attaches to it (spec §3.4), so RSVPing to its events answers
  *    the same 404 as an event id that doesn't exist.
- * 2. The event is on another campus (S67 E3): 403 `campus_visiting`. Any
+ * 2. The event is Members only (Oct 22, 2026) and the viewer is not a member
+ *    of its club: the same 404, so it says nothing about the event. Platform
+ *    admins see these events but don't take part. The database refuses the
+ *    same RSVP (rsvps_insert_own's event_audience_ok, 20261025100000); this
+ *    answers first so the refusal is a clean 404, not a 500.
+ * 3. The event is on another campus (S67 E3): 403 `campus_visiting`. Any
  *    verified student may LOOK AROUND another campus, but RSVP works at home.
  *    The event's campus is its club's, else its creator's home campus; the
  *    rule itself is `rsvpCampusDecision` (pure, unit-tested), which refuses
@@ -38,7 +44,7 @@ function fail(status: number, code: string, error: string) {
 async function rsvpBlocked(eventId: string, viewerId: string) {
   const service = createSupabaseServiceClient();
   const [eventRes, viewerRes] = await Promise.all([
-    service.from("events").select("id, org_id, creator_id").eq("id", eventId).maybeSingle(),
+    service.from("events").select("id, org_id, creator_id, visibility").eq("id", eventId).maybeSingle(),
     service.from("users").select("campus_id").eq("id", viewerId).maybeSingle(),
   ]);
   const { data: event, error } = eventRes;
@@ -49,9 +55,29 @@ async function rsvpBlocked(eventId: string, viewerId: string) {
   if (!event) {
     return fail(404, "not_found", "Event not found");
   }
-  const { org_id: orgId, creator_id: creatorId } = event as {
+  const { org_id: orgId, creator_id: creatorId, visibility } = event as {
     org_id: string | null;
     creator_id: string | null;
+    visibility?: unknown;
+  };
+
+  // Is the viewer a member of the event's club? Read at most once, and only
+  // when a rule needs it (a members-only event, or the campus refusal below).
+  let membership: boolean | undefined;
+  const isMember = async (): Promise<boolean | "failed"> => {
+    if (membership !== undefined) return membership;
+    if (!orgId) return (membership = false);
+    const { data, error: memberErr } = await service
+      .from("org_members")
+      .select("user_id")
+      .eq("org_id", orgId)
+      .eq("user_id", viewerId)
+      .maybeSingle();
+    if (memberErr) {
+      console.error("[events/:id/rsvp membership load]", memberErr);
+      return "failed";
+    }
+    return (membership = !!data);
   };
 
   let orgCampusId: string | null = null;
@@ -69,6 +95,12 @@ async function rsvpBlocked(eventId: string, viewerId: string) {
       return fail(404, "not_found", "Event not found");
     }
     orgCampusId = (org?.campus_id as string | null | undefined) ?? null;
+  }
+
+  if (eventVisibilityOf(visibility) === "members") {
+    const member = await isMember();
+    if (member === "failed") return fail(500, "request_failed", "Request failed");
+    if (!member) return fail(404, "not_found", "Event not found");
   }
 
   if (viewerRes.error) {
@@ -100,17 +132,9 @@ async function rsvpBlocked(eventId: string, viewerId: string) {
   // clubs wherever home is. Read only on the refusal path, so a home-campus
   // RSVP costs nothing extra.
   if (orgId) {
-    const { data: membership, error: memberErr } = await service
-      .from("org_members")
-      .select("user_id")
-      .eq("org_id", orgId)
-      .eq("user_id", viewerId)
-      .maybeSingle();
-    if (memberErr) {
-      console.error("[events/:id/rsvp membership load]", memberErr);
-      return fail(500, "request_failed", "Request failed");
-    }
-    if (membership) return null;
+    const member = await isMember();
+    if (member === "failed") return fail(500, "request_failed", "Request failed");
+    if (member) return null;
   }
   return fail(403, "campus_visiting", RSVP_CAMPUS_VISITING_COPY);
 }
@@ -124,7 +148,8 @@ async function rsvpBlocked(eventId: string, viewerId: string) {
  *
  * Plan §2.6 (B8): this route had neither a rate limit nor a Terms gate, the
  * only write on the campus tab without them. Both are here now. An event
- * whose org is hidden answers 404 (spec §3.4); an event on a campus that
+ * whose org is hidden answers 404 (spec §3.4), and so does a members-only
+ * event to anyone outside its club (Oct 22, 2026); an event on a campus that
  * isn't the viewer's home answers 403 `campus_visiting` (S67 E3).
  */
 export async function PUT(req: Request, ctx: RouteContext) {

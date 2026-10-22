@@ -58,7 +58,11 @@ const STUBS: Record<string, string> = {
   "@/lib/chat/message-read": stub(
     `export async function roomOf() { return ${W}.roomOf; }\nexport async function readChatMessage() { return null; }`,
   ),
-  "@/lib/chat/rooms": stub(`export async function clubRole(orgId, userId) { ${W}.log.push(['clubRole', userId]); return ${W}.roles[userId] ?? null; }`),
+  "@/lib/chat/rooms": stub(
+    `export async function clubRole(orgId, userId) { ${W}.log.push(['clubRole', userId]); return ${W}.roles[userId] ?? null; }\n` +
+      // The cards route asks it only for a members-only event (Oct 22, 2026).
+      `export async function clubRoleAnswer(orgId, userId) { ${W}.log.push(['clubRoleAnswer', userId]); return ${W}.roles[userId] ?? null; }`,
+  ),
   "@/lib/chat/cards/hydrate": stub("export async function hydrateCards() { return new Map(); }"),
   "@/lib/orgs/membership": stub(`export async function loadViewerOrgContext() { return ${W}.orgCtx; }`),
   "@/lib/posts/delete-media-store": stub("export async function purgeDeletedClubMedia() {}"),
@@ -614,7 +618,7 @@ const ref = (id: string, name: string) => ({ id, handle: name.toLowerCase(), nam
 const row = (id: number, channel: string, user: string, at: string) =>
   ({ id: uuid(id, "e"), channel_id: channel, content: `post ${id}`, created_at: at, user_id: user, kind: "text", thread_root_id: null });
 
-type BoardsSetup = { follows?: string[]; rows?: unknown[]; fail?: string; schemaMissing?: boolean };
+type BoardsSetup = { follows?: string[]; rows?: unknown[]; fail?: string; schemaMissing?: boolean; membersOnly?: string[] };
 const MEMBERS = [
   { org_id: ORG, user_id: OFFICER, role: "admin" },
   { org_id: ORG_B, user_id: AUTHOR, role: "member" },
@@ -638,6 +642,12 @@ function boardsWorld(s: BoardsSetup = {}) {
         return { data: MEMBERS.filter((m) => roles.includes(m.role)) };
       }
       if (q.table === "rpc:chat_latest_per_channel") return { data: s.rows ?? [] };
+      // The previews' Event cards' events (Oct 22, 2026): the members-only ones among those asked.
+      if (q.table === "events") {
+        assert.ok(has(q, "eq", "visibility", "members"));
+        const asked = (q.calls.find((c) => c[0] === "in" && c[1] === "id")?.[2] ?? []) as string[];
+        return { data: (s.membersOnly ?? []).filter((id) => asked.includes(id)).map((id) => ({ id })) };
+      }
       // The shared window a refused function falls back to (latest-per-room.ts).
       if (q.table === "messages") return { data: [] };
     }
@@ -742,4 +752,34 @@ test("club-boards: nobody's id or name in the answer, only the clubs'", async ()
   const text = JSON.stringify(await listBoards().then((r) => r.json()));
   for (const id of [ME, OFFICER, AUTHOR]) assert.ok(!text.includes(id), id);
   assert.ok(!text.includes("user_id") && !text.includes("users"));
+});
+
+// Oct 22, 2026 ("Members only" events): the Event card of a members-only
+// event never previews to a follower (their Board leaves it out too); the
+// post before it does. An Everyone event's card previews as before. The
+// events unreadable: every Event card is left out, the list still stands.
+test("club-boards: a members-only event's card never previews; an Everyone one does; its events unreadable → no card previews", async () => {
+  const EV_MEMBERS = uuid(30, "e");
+  const EV_EVERYONE = uuid(31, "e");
+  const card = (id: number, eventId: string, at: string) => ({ ...row(id, BOARD_ID, OFFICER, at), kind: "event_card", content: "Event: Chapter", card_event_id: eventId });
+  const rows = [card(1, EV_MEMBERS, "2026-10-14T00:00:00Z"), row(2, BOARD_ID, OFFICER, "2026-10-13T00:00:00Z")];
+  const w = boardsWorld({ rows, membersOnly: [EV_MEMBERS] });
+  const sae = (await boardsOf()).find((b) => b.org.name === "SAE")!;
+  assert.equal(sae.latest?.id, uuid(2, "e"), "the post before the card");
+  const rpc = w.queries.find((q) => q.table === "rpc:chat_latest_per_channel")!;
+  assert.ok(String(rpc.calls[1][1]).includes("card_event_id"), "the select names the card's event");
+  const events = w.queries.find((q) => q.table === "events")!;
+  assert.equal(events.client, "service");
+
+  boardsWorld({ rows: [card(1, EV_EVERYONE, "2026-10-14T00:00:00Z")], membersOnly: [EV_MEMBERS] });
+  assert.equal((await boardsOf()).find((b) => b.org.name === "SAE")!.latest?.id, uuid(1, "e"), "an Everyone event's card previews");
+
+  const quiet = console.error;
+  console.error = () => {};
+  try {
+    boardsWorld({ rows: [card(1, EV_EVERYONE, "2026-10-14T00:00:00Z"), row(2, BOARD_ID, OFFICER, "2026-10-13T00:00:00Z")], fail: "service:events" });
+    assert.equal((await boardsOf()).find((b) => b.org.name === "SAE")!.latest?.id, uuid(2, "e"), "never a card on a guess");
+  } finally {
+    console.error = quiet;
+  }
 });

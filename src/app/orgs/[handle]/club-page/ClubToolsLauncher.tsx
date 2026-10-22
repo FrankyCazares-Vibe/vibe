@@ -6,13 +6,16 @@ import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore
 import { createPortal } from "react-dom";
 
 import { OrgInviteSheet } from "@/components/orgs/OrgInviteSheet";
+import type { ToolsClub } from "@/components/orgs/tools/types";
 import type { JoinPolicy, OrgAudience } from "@/lib/orgs/join-state";
 
 import { ARC, FRAME_MENU_WIDTH, arcLayout, planetCount, planetLabel, type ArcToolId } from "./club-tools-arc";
-import { LAUNCHER_QUERY, registerClubToolsLauncher } from "./club-tools-launcher";
+import { LAUNCHER_QUERY, openEditPage, registerClubToolsLauncher } from "./club-tools-launcher";
+import { openPanelAt, panelBack, panelBloom, type PanelEntry, type PanelState } from "./club-tools-panel";
 import { ClubToolsArc } from "./ClubToolsLauncherArc";
 import type { ArcClub, RosterRead } from "./ClubToolsLauncherCards";
 import { ClubToolsPlanet } from "./ClubToolsLauncherPlanet";
+import type { ClubToolsSetup, PanelHost } from "./ClubToolsPanel";
 
 /**
  * Club tools on a computer, in the app frame: the Arc (Oct 22, 2026,
@@ -35,6 +38,15 @@ import { ClubToolsPlanet } from "./ClubToolsLauncherPlanet";
  * focus goes back to whatever opened it, unless a link is leaving the page.
  * After something changed the club (a request approved or declined), the
  * page is read again as the arc closes, so its counts catch up.
+ *
+ * Tools open in place (Oct 22, 2026; PLAN-2.md T1): with the officer's
+ * `role`, a card's "Open Join requests", "See all members" and the rest no
+ * longer leave the page. The planet grows into the tools panel
+ * (ClubToolsPanel.tsx), the phone's Club tools screens in it, and the arc
+ * folds into the planet while it is out; ‹ goes back a screen and then to
+ * the arc, with the card that opened it; × or Escape closes everything.
+ * Opening a screen counts as a change (they act on the club), so the page is
+ * read again on the way back to the arc and when it all closes.
  */
 export type ClubToolsLauncherProps = {
   handle: string;
@@ -48,6 +60,13 @@ export type ClubToolsLauncherProps = {
   counts: { requests: number | null; members: number | null; followers: number | null };
   /** The viewer, so the Members and Officers cards can say "you". Optional. */
   viewerId?: string | null;
+  /**
+   * The viewer's role in the club. With it, the cards' links open the tools
+   * in place, in the panel; without it, they go to the Club tools pages.
+   */
+  role?: "owner" | "admin";
+  /** The setup list, for the panel's setup screen and members' link; absent, it shows the members' link alone. */
+  setup?: ClubToolsSetup | null;
 };
 
 const noSubscribe = () => () => {};
@@ -73,6 +92,8 @@ export function ClubToolsLauncher({
   audience,
   counts,
   viewerId = null,
+  role,
+  setup = null,
 }: ClubToolsLauncherProps): JSX.Element | null {
   const router = useRouter();
   const pathname = usePathname();
@@ -91,6 +112,10 @@ export function ClubToolsLauncher({
   // 1024px the planet shows only while this is true, so it doesn't vanish
   // before the bubbles reach it (review, Oct 22, 2026).
   const [arcShown, setArcShown] = useState(false);
+  // A tool open in place, and the bloom on its way back into the planet
+  // after ‹ (the planet stays hidden until it is back).
+  const [panel, setPanel] = useState<PanelState | null>(null);
+  const [returning, setReturning] = useState(false);
 
   // The planet's count follows the Join requests card once it has read the
   // list, until the page sends a new number.
@@ -116,6 +141,8 @@ export function ClubToolsLauncher({
       rosterRef.current = null;
       setTool(null);
       setInviteOpen(false);
+      setPanel(null);
+      setReturning(false);
       setArcShown(true);
       setOpenOn(pathname);
     },
@@ -128,6 +155,8 @@ export function ClubToolsLauncher({
     (giveFocusBack: boolean) => {
       setOpenOn(null);
       setInviteOpen(false);
+      setPanel(null);
+      setReturning(false);
       if (changed.current) {
         changed.current = false;
         router.refresh();
@@ -171,9 +200,13 @@ export function ClubToolsLauncher({
     return () => mq.removeEventListener("change", onChange);
   }, [open]);
 
-  const layout = useMemo(() => {
+  // The arc, and the panel's bloom round the open planet, in this window.
+  const { layout, bloom } = useMemo(() => {
     const [w, h] = size.split("x").map(Number);
-    return arcLayout(w || 1280, h || 800, FRAME_MENU_WIDTH + ARC.margin);
+    const width = w || 1280;
+    const height = h || 800;
+    const arc = arcLayout(width, height, FRAME_MENU_WIDTH + ARC.margin);
+    return { layout: arc, bloom: panelBloom(width, height, arc.hub, arc.closeSpot.size) };
   }, [size]);
 
   const club: ArcClub = useMemo(
@@ -191,12 +224,104 @@ export function ClubToolsLauncher({
     window.requestAnimationFrame(() => document.querySelector<HTMLElement>("[data-arc-invite]")?.focus({ preventScroll: true }));
   }, []);
 
+  // ── Tools in place ──────────────────────────────────────────────────────
+
+  // The phone's screens' club, from the page's own props (only the fields
+  // they read: no logo, no owner). No role, no panel.
+  const toolsClub: ToolsClub | null = useMemo(
+    () =>
+      role
+        ? { id: orgId, handle, name: orgName, logoUrl: null, verified, hidden, joinPolicy, audience, ownerId: null, role, viewerId: viewerId ?? "" }
+        : null,
+    [role, orgId, handle, orgName, verified, hidden, joinPolicy, audience, viewerId],
+  );
+
+  /** A card's link, or a row of All Club tools: that screen, in place, the card it came from remembered. */
+  const openPanel = useCallback(
+    (entry: PanelEntry) => {
+      // Every screen can change the club; whatever shows next reads the roster afresh.
+      changed.current = true;
+      rosterRef.current = null;
+      setReturning(false);
+      setPanel((p) => openPanelAt(p, entry, tool));
+      setTool(null);
+    },
+    [tool],
+  );
+
+  /** ‹ : a screen back; from the first, back to the arc, with the card that opened it. */
+  const backPanel = useCallback(() => {
+    if (!panel) return;
+    rosterRef.current = null;
+    // What changed in there shows on the numbers now: the arc's and the
+    // page's, and All Club tools' too when ‹ comes back to it (its counts
+    // are the page's; review, Oct 22, 2026: a request approved on Join
+    // requests still showed on its row until the arc).
+    if (changed.current) {
+      changed.current = false;
+      router.refresh();
+    }
+    const next = panelBack(panel);
+    if (next) {
+      setPanel(next);
+      return;
+    }
+    setPanel(null);
+    setReturning(true);
+    setTool(panel.from);
+  }, [panel, router]);
+
+  const onReturned = useCallback(() => setReturning(false), []);
+  // The planet never stays hidden if the bloom's way back is cut short.
+  useEffect(() => {
+    if (!returning) return;
+    const t = window.setTimeout(() => setReturning(false), 1200);
+    return () => window.clearTimeout(t);
+  }, [returning]);
+
+  const clubPath = `/orgs/${encodeURIComponent(handle)}`;
+  const panelHost: PanelHost | null = useMemo(() => {
+    if (!toolsClub) return null;
+    return {
+      club: toolsClub,
+      setup,
+      counts: live,
+      rosterRef,
+      onBack: backPanel,
+      onClose: () => close(true),
+      onOpen: openPanel,
+      onEditPage: () => {
+        // Edit page takes focus from its own button (OfficerActions.tsx) and
+        // gives it back there, so there is none to hand back here.
+        close(false);
+        if (!openEditPage()) router.push(`${clubPath}?edit=1`, { scroll: false });
+      },
+      onPastEvents: () => {
+        // As the Past events card's link: the Events tab, on this page.
+        close(true);
+        router.push(`${clubPath}?tab=events`);
+      },
+      onLeft: () => {
+        // No longer an officer: the page, read again, draws no Club tools.
+        changed.current = true;
+        close(false);
+      },
+      onDeleted: () => {
+        // The club is gone: nothing to read again, off to Campus › Orgs.
+        changed.current = false;
+        close(false);
+        router.replace("/campus?tab=orgs");
+      },
+    };
+  }, [toolsClub, setup, live, backPanel, close, openPanel, router, clubPath]);
+
   if (!mounted) return null;
   return createPortal(
     <>
       <ClubToolsPlanet
         open={open}
         shown={open || arcShown}
+        merged={!!panel || returning}
         count={planetCount(live.requests)}
         label={planetLabel(live.requests)}
         buttonRef={planetRef}
@@ -219,6 +344,11 @@ export function ClubToolsLauncher({
             onInvite={() => setInviteOpen(true)}
             onCount={setLiveRequests}
             onChanged={markChanged}
+            panel={panel}
+            returning={returning}
+            panelGeo={bloom}
+            panelHost={panelHost}
+            onReturned={onReturned}
           />
         ) : null}
       </AnimatePresence>

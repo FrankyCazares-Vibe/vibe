@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { isMissingColumnError } from "@/lib/db/missing-column";
+import { eventVisibilityOf, type EventVisibility } from "@/lib/events/validate";
 import { resolveCampusRequest, scopeViewerFromRow } from "@/lib/iu/campus-request";
 import { scopeCampusIds, type CampusScopeForbidden } from "@/lib/iu/campus-scope";
 import {
@@ -184,7 +185,7 @@ export async function GET(req: Request) {
     let eventsQuery = supabase
       .from("events")
       .select(
-        "id,title,description,starts_at,ends_at,location," +
+        "id,title,description,starts_at,ends_at,location,visibility," +
           "org:orgs(id,handle,name,logo_url,verified)",
       )
       .gte("ends_at", new Date().toISOString())
@@ -391,6 +392,7 @@ export async function GET(req: Request) {
     starts_at: string;
     ends_at: string;
     location: string;
+    visibility?: string | null;
     org: {
       id: string;
       handle: string;
@@ -413,12 +415,16 @@ export async function GET(req: Request) {
       logo_url: string | null;
       verified: boolean;
     } | null;
+    /** Who can see it (Oct 22, 2026): "members" = the club's members only, for the chip. */
+    visibility: EventVisibility;
   }> = [];
   if (wantEvents) {
     const rows = (eventsRes.data ?? []) as unknown as EventRow[];
     for (const r of rows) {
       // The campus filter ran in the query (`org_id in (campus org ids)`), so
-      // every row here is already on a campus in scope.
+      // every row here is already on a campus in scope. The rows are the
+      // viewer's own read, so a members-only event is here only for its
+      // club's members (event_visible, Oct 22, 2026).
       eventsOut.push({
         id: r.id,
         title: r.title,
@@ -435,6 +441,7 @@ export async function GET(req: Request) {
               verified: r.org.verified,
             }
           : null,
+        visibility: eventVisibilityOf(r.visibility),
       });
       if (eventsOut.length >= limit) break;
     }

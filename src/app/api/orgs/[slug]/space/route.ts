@@ -39,8 +39,8 @@ type Params = { params: Promise<{ slug: string }> };
 
 const TAG = "orgs/[slug]/space GET";
 
-/** What `eventRefsFor` needs of an event (5.5). */
-const EVENT_COLUMNS = "id, title, starts_at, ends_at, location, org_id";
+/** What `eventRefsFor` needs of an event (5.5), `visibility` included (Oct 22, 2026). */
+const EVENT_COLUMNS = "id, title, starts_at, ends_at, location, org_id, visibility";
 
 /**
  * The rooms select (wave-3 contract 4.2), and the one from before
@@ -71,13 +71,27 @@ const loadFailed = () =>
   NextResponse.json({ ok: false, error: "Couldn't load this club.", code: "load_failed" }, { status: 500 });
 const requestFailed = () => NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
 
-/** The club's events that have not ended (service role), soonest first; `[]` and one log line on a failure. */
-async function readUpcoming(service: SupabaseClient, orgId: string, limit: number, what: string): Promise<EventRow[]> {
-  const { data, error } = await service
+/**
+ * The club's events that have not ended (service role), soonest first; `[]`
+ * and one log line on a failure. `everyoneOnly` is the FOLLOWER's read (Oct
+ * 22, 2026): the service role sees every row, so a members-only event is
+ * left out here, in the query, and the follower's Up next and the
+ * Share-an-event list never hold one. A member's read has them all.
+ */
+async function readUpcoming(
+  service: SupabaseClient,
+  orgId: string,
+  limit: number,
+  what: string,
+  opts?: { everyoneOnly?: boolean },
+): Promise<EventRow[]> {
+  let query = service
     .from("events")
     .select(EVENT_COLUMNS)
     .eq("org_id", orgId)
-    .gt("ends_at", new Date().toISOString())
+    .gt("ends_at", new Date().toISOString());
+  if (opts?.everyoneOnly) query = query.eq("visibility", "everyone");
+  const { data, error } = await query
     .order("starts_at", { ascending: true })
     .limit(limit);
   if (error) {
@@ -149,7 +163,9 @@ const membersOnly = () => NextResponse.json(refusalBody("members_only"), { statu
  * nothing else. So: the Board alone in `rooms`, its latest posts as a
  * follower reads them, the club's event listings, and the member count from
  * 5 up. No Lounge, Officers, extra rooms or event chats, and no member's
- * face or name.
+ * face or name. No members-only event either (Oct 22, 2026): not in
+ * `up_next` or `upcoming` (`readUpcoming`'s `everyoneOnly`), and not as a
+ * Board card (`readFollowerPage` leaves those out).
  *
  * WHO MAY: the database, never TypeScript. The club's Board is found with
  * the service role (a fact about the club), then `can_view_org_channel` is
@@ -198,8 +214,8 @@ async function followerSpace(
   const [memberCountRes, boardRoom, upNextRows, upcomingRows] = await Promise.all([
     service.from("org_members").select("user_id", { count: "exact", head: true }).eq("org_id", orgId),
     loadRoom(board.id),
-    readUpcoming(service, orgId, 3, "up_next"),
-    wantsUpcoming ? readUpcoming(service, orgId, 50, "upcoming") : Promise.resolve([] as EventRow[]),
+    readUpcoming(service, orgId, 3, "up_next", { everyoneOnly: true }),
+    wantsUpcoming ? readUpcoming(service, orgId, 50, "upcoming", { everyoneOnly: true }) : Promise.resolve([] as EventRow[]),
   ]);
   if (memberCountRes.error) {
     console.error(`[${TAG} follower member count]`, memberCountRes.error.code, memberCountRes.error.message);

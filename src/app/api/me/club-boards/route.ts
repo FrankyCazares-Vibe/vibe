@@ -33,7 +33,10 @@ const FOLLOWS_MAX = 50;
  * Board speaks for the club, so `latest.author_name` is always "" and the
  * screens print the club's name. No member's name leaves this route.
  */
-const PREVIEW_SELECT = "id, channel_id, content, created_at, user_id, kind, thread_root_id, attachment_kind";
+const PREVIEW_SELECT = "id, channel_id, content, created_at, user_id, kind, thread_root_id, attachment_kind, card_event_id";
+
+/** Event ids per `in (...)` filter when the previews' Event cards are checked (Oct 22, 2026). */
+const EVENTS_PER_READ = 100;
 
 const requestFailed = () => NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
 
@@ -156,6 +159,32 @@ export async function GET() {
   return boards ? answer(boards) : requestFailed();
 }
 
+/**
+ * Which of the previews' Event cards point at a MEMBERS-ONLY event (Oct 22,
+ * 2026; 20261025100000), read with the service role by the cards' event ids.
+ * Null when the read fails: the caller then leaves every Event card out.
+ */
+async function membersOnlyEventsOf(
+  service: ReturnType<typeof createSupabaseServiceClient>,
+  rows: { card_event_id?: string | null }[],
+): Promise<Set<string> | null> {
+  const ids = Array.from(new Set(rows.map((row) => row.card_event_id).filter((id): id is string => typeof id === "string")));
+  const found = new Set<string>();
+  for (let i = 0; i < ids.length; i += EVENTS_PER_READ) {
+    const { data, error } = await service
+      .from("events")
+      .select("id")
+      .in("id", ids.slice(i, i + EVENTS_PER_READ))
+      .eq("visibility", "members");
+    if (error) {
+      console.error(`[${TAG} members-only events]`, error.code, error.message);
+      return null;
+    }
+    for (const row of (data ?? []) as { id?: unknown }[]) if (typeof row.id === "string") found.add(row.id);
+  }
+  return found;
+}
+
 type Listed = {
   service: ReturnType<typeof createSupabaseServiceClient>;
   /** The clubs to list, each with a ref and a Board. */
@@ -175,7 +204,8 @@ type Listed = {
  * no test: a top-level Board post by an owner or admin is shown through
  * blocks (the officer exception), and nothing else is shown at all. Null
  * when the posters can't be read (fails closed); a preview read that fails
- * leaves every `latest` null, logged, and the list still stands.
+ * leaves every `latest` null, logged, and the list still stands. The Event
+ * card of a members-only event never previews (Oct 22, 2026).
  */
 async function withPreviews(l: Listed): Promise<FollowedBoard[] | null> {
   const posters = await boardPostersOf(l.service, l.listed, TAG);
@@ -199,11 +229,18 @@ async function withPreviews(l: Listed): Promise<FollowedBoard[] | null> {
     sharedWindow,
   );
   if (error) console.error(`[${TAG} previews]`, error.code, error.message);
-  const rows = (error ? [] : (data ?? [])) as unknown as PreviewRow[];
+  const rows = (error ? [] : (data ?? [])) as unknown as (PreviewRow & { card_event_id?: string | null })[];
+  const membersOnly = await membersOnlyEventsOf(l.service, rows);
   // A deleted post (Oct 19, 2026) is not shown to a follower: their Board
   // leaves it out, so its preview does too (the post before it previews).
+  // Nor is the Event card of a members-only event (Oct 22, 2026): the
+  // follower's Board leaves it out too (message-read.ts `readFollowerPage`).
+  // Its events unreadable: every Event card is left out, never one on a guess.
   const hidden = (row: PreviewRow): boolean => {
     const orgId = orgOfRoom.get(row.channel_id);
+    const cardEventId = (row as PreviewRow & { card_event_id?: unknown }).card_event_id;
+    const card = typeof cardEventId === "string" ? cardEventId : null;
+    if (card && (membersOnly === null || membersOnly.has(card))) return true;
     return hasDeletedShape(row) || !isFollowerBoardPost(row, orgId ? posters.get(orgId) : undefined);
   };
   const latest = latestShownPerRoom(rows, hidden);

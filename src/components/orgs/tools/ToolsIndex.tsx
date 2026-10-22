@@ -6,8 +6,14 @@
  * the members' link), People (join requests, members, followers, officers,
  * each with its exact count) and The club (Edit the page, past events,
  * Club settings). Each row opens its own page; Share and Invite act here.
+ *
+ * On a computer, in the club page's tools panel (ClubToolsPanel.tsx; Oct 22,
+ * 2026), the host passes `onOpen`: there is no header of its own (the
+ * panel's says where you are), and every row opens in place instead of
+ * going to a page. Edit the page and Past events close the panel and act on
+ * the club page under it.
  */
-import { useState } from "react";
+import { useRef, useState } from "react";
 
 import { OrgInviteSheet } from "@/components/orgs/OrgInviteSheet";
 import { quietStyle } from "@/components/orgs/club-tool-styles";
@@ -38,13 +44,39 @@ export type ToolsCounts = {
   officers: number | null;
 };
 
+/** A row that opens in the computer's tools panel, rather than going to its page. */
+export type ToolsIndexTarget =
+  | "members_link"
+  | "requests"
+  | "members"
+  | "followers"
+  | "officers"
+  | "edit"
+  | "events"
+  | "settings";
+
 /** The club page's phone breakpoint (`admin-actions.tsx`): a sheet below it, a window above. */
 const PHONE_QUERY = "(max-width: 720px)";
 
-export function ToolsIndex({ club, counts, clubUrl }: { club: ToolsClub; counts: ToolsCounts; clubUrl: string }) {
+export function ToolsIndex({
+  club,
+  counts,
+  clubUrl,
+  onOpen,
+}: {
+  club: ToolsClub;
+  counts: ToolsCounts;
+  clubUrl: string;
+  onOpen?: (target: ToolsIndexTarget) => void;
+}) {
   const [invite, setInvite] = useState<"sheet" | "modal" | null>(null);
+  // In the panel, focus goes back to Invite members when the window closes
+  // (it hands none back itself, and the arc's dialog would lose it).
+  const inviteFrom = useRef<HTMLElement | null>(null);
   const clubPath = `/orgs/${encodeURIComponent(club.handle)}`;
   const tools = `${clubPath}/tools`;
+  // A row's way in: its page, or (in the panel) the host opening it in place.
+  const go = (target: ToolsIndexTarget, href: string) => (onOpen ? { onClick: () => onOpen(target) } : { href });
 
   const share = async () => {
     const title = `${club.name} on Vibe`;
@@ -65,7 +97,9 @@ export function ToolsIndex({ club, counts, clubUrl }: { club: ToolsClub; counts:
 
   return (
     <>
-      <ToolsHeader backHref={clubPath} backLabel={club.name} title="Club tools." sub={`${club.name} · only officers see this`} />
+      {onOpen ? null : (
+        <ToolsHeader backHref={clubPath} backLabel={club.name} title="Club tools." sub={`${club.name} · only officers see this`} />
+      )}
 
       {club.hidden ? (
         // A hidden club takes nobody new (the invite and join routes refuse it).
@@ -78,10 +112,13 @@ export function ToolsIndex({ club, counts, clubUrl }: { club: ToolsClub; counts:
           <NavRow
             icon={<PersonPlusIcon />}
             label="Invite members"
-            onClick={() => setInvite(window.matchMedia(PHONE_QUERY).matches ? "sheet" : "modal")}
+            onClick={() => {
+              inviteFrom.current = onOpen && document.activeElement instanceof HTMLElement ? document.activeElement : null;
+              setInvite(window.matchMedia(PHONE_QUERY).matches ? "sheet" : "modal");
+            }}
           />
           {club.verified ? (
-            <NavRow icon={<LinkIcon />} label="Members' link" href={`${clubPath}/setup#members-link`} />
+            <NavRow icon={<LinkIcon />} label="Members' link" {...go("members_link", `${clubPath}/setup#members-link`)} />
           ) : null}
         </Group>
       )}
@@ -90,22 +127,22 @@ export function ToolsIndex({ club, counts, clubUrl }: { club: ToolsClub; counts:
         <NavRow
           icon={<InboxIcon />}
           label="Join requests"
-          href={`${tools}/requests`}
+          {...go("requests", `${tools}/requests`)}
           count={counts.requests}
           dot={(counts.requests ?? 0) > 0}
         />
-        <NavRow icon={<PeopleIcon />} label="Members" href={`${tools}/members`} count={counts.members} />
-        <NavRow icon={<EyeIcon />} label="Followers" href={`${tools}/followers`} count={counts.followers} />
-        <NavRow icon={<CrownIcon />} label="Officers and titles" href={`${tools}/officers`} count={counts.officers} />
+        <NavRow icon={<PeopleIcon />} label="Members" {...go("members", `${tools}/members`)} count={counts.members} />
+        <NavRow icon={<EyeIcon />} label="Followers" {...go("followers", `${tools}/followers`)} count={counts.followers} />
+        <NavRow icon={<CrownIcon />} label="Officers and titles" {...go("officers", `${tools}/officers`)} count={counts.officers} />
       </Group>
 
       <Group label="The club">
-        <NavRow icon={<PencilIcon />} label="Edit the page" href={`${clubPath}?edit=1`} />
-        <NavRow icon={<CalendarCheckIcon />} label="Past events and who came" href={`${clubPath}?tab=events`} />
+        <NavRow icon={<PencilIcon />} label="Edit the page" {...go("edit", `${clubPath}?edit=1`)} />
+        <NavRow icon={<CalendarCheckIcon />} label="Past events and who came" {...go("events", `${clubPath}?tab=events`)} />
         <NavRow
           icon={<SlidersIcon />}
           label="Club settings"
-          href={`${tools}/settings`}
+          {...go("settings", `${tools}/settings`)}
           note={club.role === "owner" ? "Board, delete" : "Board, leave"}
         />
       </Group>
@@ -120,7 +157,12 @@ export function ToolsIndex({ club, counts, clubUrl }: { club: ToolsClub; counts:
           orgName={club.name}
           audience={club.audience}
           presentation={invite}
-          onClose={() => setInvite(null)}
+          onClose={() => {
+            setInvite(null);
+            const back = inviteFrom.current;
+            inviteFrom.current = null;
+            if (back) window.requestAnimationFrame(() => back.isConnected && back.focus({ preventScroll: true }));
+          }}
         />
       ) : null}
     </>

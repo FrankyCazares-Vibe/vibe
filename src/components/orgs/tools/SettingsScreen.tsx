@@ -7,6 +7,11 @@
  * leaving (an officer) or deleting the club (the owner, after typing its
  * handle, as the desktop's Danger tab asks). Leaving lands on the club
  * page; deleting on Campus › Orgs.
+ *
+ * In the club page's tools panel on a computer (ClubToolsPanel.tsx; Oct 22,
+ * 2026) the host passes `onLeft` / `onDeleted`, so it can close the panel
+ * first and then read the page again or go; without them, the page goes
+ * where it always has.
  */
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, type CSSProperties } from "react";
@@ -34,11 +39,21 @@ import { ORG_COPY, fillCopy, orgErrorCopy } from "@/lib/orgs/join-copy";
 import { ConfirmSheet, Group, SheetAction, ToolSheet, cardStyle } from "./tools-ui";
 import type { ToolsClub } from "./types";
 
-export function SettingsScreen({ club }: { club: ToolsClub }) {
+export function SettingsScreen({
+  club,
+  onLeft,
+  onDeleted,
+}: {
+  club: ToolsClub;
+  /** After leaving (the toast is said): instead of going to the club page. */
+  onLeft?: () => void;
+  /** After deleting (the toast is said): instead of going to Campus › Orgs. */
+  onDeleted?: () => void;
+}) {
   return (
     <>
       <BoardSetting club={club} />
-      {club.role === "owner" ? <DeleteClub club={club} /> : <LeaveClub club={club} />}
+      {club.role === "owner" ? <DeleteClub club={club} onDeleted={onDeleted} /> : <LeaveClub club={club} onLeft={onLeft} />}
     </>
   );
 }
@@ -159,7 +174,7 @@ function knobStyle(on: boolean): CSSProperties {
 }
 
 /** An officer's way out. They keep following (the members' feed stays theirs); the owner can't leave. */
-function LeaveClub({ club }: { club: ToolsClub }) {
+function LeaveClub({ club, onLeft }: { club: ToolsClub; onLeft?: () => void }) {
   const router = useRouter();
   const [asking, setAsking] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -189,7 +204,8 @@ function LeaveClub({ club }: { club: ToolsClub }) {
       message: fillCopy(r.data.org_follow_state === "following" ? ORG_COPY.menu.leftFollowing : ORG_COPY.menu.left, vars),
       tone: "info",
     });
-    router.replace(`/orgs/${encodeURIComponent(club.handle)}`);
+    if (onLeft) onLeft();
+    else router.replace(`/orgs/${encodeURIComponent(club.handle)}`);
   };
 
   return (
@@ -217,7 +233,7 @@ function LeaveClub({ club }: { club: ToolsClub }) {
 }
 
 /** The owner's delete: the club, its chats, posts and events, after typing its handle. A hidden club can't be. */
-function DeleteClub({ club }: { club: ToolsClub }) {
+function DeleteClub({ club, onDeleted }: { club: ToolsClub; onDeleted?: () => void }) {
   const router = useRouter();
   const [asking, setAsking] = useState(false);
   const [typed, setTyped] = useState("");
@@ -239,7 +255,8 @@ function DeleteClub({ club }: { club: ToolsClub }) {
     clearClubsYouRunCache();
     clearClubsInCache();
     toast({ message: `${club.name} was deleted.`, tone: "info" });
-    router.replace("/campus?tab=orgs");
+    if (onDeleted) onDeleted();
+    else router.replace("/campus?tab=orgs");
   };
 
   return (

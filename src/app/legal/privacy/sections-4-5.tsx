@@ -129,6 +129,10 @@ export function Sections4To5() {
             "The club's owner and officers. The people in an event's chat also see who is in it, and the first few who marked Going (up to 8)",
           ],
           [
+            "Club events, with Going and Interested totals",
+            "Any signed-in account, except an event its club marks \u201cMembers only\u201d, which only the club's members see",
+          ],
+          [
             "How many people checked in at an event",
             "Any signed-in account that can see the event, once at least 5 have checked in. The club's owner and officers see the exact number. So does anyone who can see the check-in screen at the door",
           ],

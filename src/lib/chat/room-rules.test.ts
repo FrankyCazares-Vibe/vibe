@@ -383,6 +383,8 @@ test("the refusal sentences are the contract's, word for word", () => {
       poll_closed: "This one is closed.",
       slot_full: "That spot just filled.",
       cards_club_rooms_only: "Polls, sign-ups and events only work in club chats.",
+      // Members only events (Oct 22, 2026): one never goes on the Board as a card.
+      event_members_only: "Members only events can't go on the Board: followers read it.",
       members_only: "Members only.",
       create_failed: "Couldn't create the club. Try again.",
       invalid_after: "Reload to catch up.",

@@ -407,3 +407,65 @@ test("a follower never sees a deleted post's note, even when the read could not 
   assert.equal(service.log.filter((l) => l.table === "messages").length, 2, "asked with the filter, then again without it");
   assert.ok(!cookie.log.some((l) => l.table === "messages" && has(l.calls, "in", "id")), "no deleted_at read for a follower");
 });
+
+// ── Members-only events on a follower's Board (Oct 22, 2026) ────────────────
+// The Event card of a members-only event never reaches a follower, and the
+// page stays full: it asks for `limit` + the number of such cards in the room
+// and keeps the first `limit` after dropping them (a page cut short reads as
+// the oldest one; review of Oct 19, 2026).
+const EV_MEMBERS = uuid(20, "e");
+const MEMBERS_CARD = row(6, OFFICER, { kind: "event_card", card_event_id: EV_MEMBERS });
+
+function membersOnlyService(over?: { eventsError?: boolean; cardsError?: boolean }) {
+  const asked: number[] = [];
+  const service = installService((table, calls) => {
+    if (table === "events" && arg(calls, "eq", "visibility") === "members") {
+      assert.equal(arg(calls, "eq", "org_id"), ORG);
+      return over?.eventsError ? { error: { code: "57014", message: "canceling" } } : { data: [{ id: EV_MEMBERS }] };
+    }
+    if (table === "messages" && has(calls, "in", "card_event_id")) {
+      assert.equal(arg(calls, "eq", "channel_id"), CHANNEL);
+      assert.deepEqual(arg(calls, "in", "card_event_id"), [EV_MEMBERS]);
+      return over?.cardsError ? { error: { code: "57014", message: "canceling" } } : { data: [{ id: MEMBERS_CARD.id }] };
+    }
+    if (table === "messages") {
+      // The page read, newest first, cut at the limit asked.
+      const limit = calls.find((c) => c[0] === "limit")?.[1];
+      asked.push(Number(limit));
+      const newestFirst = [MEMBERS_CARD, POLL, POST].map((r) => ({ ...r }));
+      return { data: newestFirst.slice(0, Number(limit)) };
+    }
+    return serviceAnswers(table, calls);
+  });
+  return { service, asked };
+}
+
+test("a follower's Board: a members-only event's card is left out, and a full page is still full", async () => {
+  const { asked, service } = membersOnlyService();
+  const read = await readChatMessages(cookieClient(PAGE).client as unknown as Client, CHANNEL, { limit: 2 }, known());
+  assert.ok(read.ok, JSON.stringify(read));
+  assert.deepEqual(asked, [3], "limit + the one members-only card");
+  assert.deepEqual(read.messages.map((m) => m.id), [POST.id, POLL.id], "two posts, oldest first; the card gone");
+  assert.equal(JSON.stringify(read).includes(EV_MEMBERS), false, "the event is never named");
+  assert.equal(service.log.some((l) => l.table === "chat_event_cards"), false, "its card is never hydrated");
+});
+
+test("a follower's Board: the members-only lookups failing is 503, never a page with the card on a guess", async () => {
+  for (const over of [{ eventsError: true }, { cardsError: true }]) {
+    membersOnlyService(over);
+    const read = await readChatMessages(cookieClient(PAGE).client as unknown as Client, CHANNEL, { limit: 2 }, known());
+    assert.deepEqual(read, { ok: false, status: 503, body: { ok: false, error: "Try again in a moment.", code: "try_again" } }, JSON.stringify(over));
+  }
+});
+
+test("a club with no members-only event: one small read, the page asked at its own limit", async () => {
+  const asked: number[] = [];
+  installService((table, calls) => {
+    if (table === "events" && arg(calls, "eq", "visibility") === "members") return { data: [] };
+    if (table === "messages") asked.push(Number(calls.find((c) => c[0] === "limit")?.[1]));
+    return serviceAnswers(table, calls);
+  });
+  const read = await readChatMessages(cookieClient(PAGE).client as unknown as Client, CHANNEL, { limit: 50 }, known());
+  assert.ok(read.ok);
+  assert.deepEqual(asked, [50]);
+});

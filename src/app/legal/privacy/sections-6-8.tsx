@@ -112,7 +112,7 @@ export function Sections6To8() {
           ],
           [
             "RSVPs",
-            "You take yours back, the club takes you out (upcoming events only), or the event, the club or your account is deleted",
+            "You take yours back, or the event, the club or your account is deleted. For an upcoming event, also when the club takes you out, or marks that event \u201cMembers only\u201d while you are not a member",
           ],
           [
             "Event check-ins",

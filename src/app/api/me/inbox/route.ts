@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { blockedIdsFor } from "@/lib/chat/blocks";
-import { eventRefsFor, type EventRow } from "@/lib/chat/event-refs";
+import { EVENT_REF_COLUMNS, eventRefsFor, type EventRow } from "@/lib/chat/event-refs";
 import { chatV2For } from "@/lib/chat/flag-server";
 import { readLatestPerRoom } from "@/lib/chat/latest-per-room";
 import {
@@ -265,7 +265,8 @@ export async function GET() {
     if (!service) return [];
     const { data, error } = await service
       .from("events")
-      .select("id, title, starts_at, ends_at, location, org_id")
+      // With `visibility` (Oct 22, 2026): a members-only next event carries its chip.
+      .select(EVENT_REF_COLUMNS)
       .in("org_id", orgIds)
       .gt("ends_at", new Date().toISOString())
       .order("starts_at", { ascending: true })

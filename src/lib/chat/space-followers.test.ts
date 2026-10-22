@@ -290,3 +290,31 @@ test("follower space: below 5 or a failed count is null; no Board, a no, a missi
   followerWorld({ service: (t, c, n) => (t === "orgs" ? { data: [org(T(1))] } : followerService(42)(t, c, n)) });
   assert.equal((await space.GET(req(), ctx())).status, 404, "a hidden club is not there, follower or not");
 });
+
+// Oct 22, 2026 ("Members only" events): the service role sees every event,
+// so the follower's two event reads ask for Everyone events only, in the
+// query; a member's reads (reads-routes.test.ts) ask for them all.
+test("follower space: up_next and upcoming read Everyone events only, and the select names visibility", async () => {
+  const { serviceLog } = followerWorld({
+    service: (table, calls, nth) => {
+      if (table === "events") {
+        // The fake honours the filter: a members-only row is dropped only when asked.
+        const rows = [ev("ev-a", 9), { ...ev("ev-m", 9), visibility: "members" }, { ...ev("ev-b", 10), visibility: "everyone" }];
+        const only = arg(calls, "eq", "visibility");
+        return { data: only ? rows.filter((r) => ("visibility" in r ? r.visibility : "everyone") === only) : rows };
+      }
+      return followerService(42)(table, calls, nth);
+    },
+  });
+  const res = await space.GET(req("http://localhost/api/orgs/salsa/space?events=1"), ctx());
+  assert.equal(res.status, 200, JSON.stringify(res.body));
+  const body = res.body as SpaceBody;
+  assert.deepEqual(body.up_next.map((e) => e.id), ["ev-a", "ev-b"]);
+  assert.deepEqual(body.upcoming.map((e) => e.id), ["ev-a", "ev-b"]);
+  const eventReads = reads(serviceLog, "events");
+  assert.equal(eventReads.length, 2, "up_next and upcoming");
+  for (const read of eventReads) {
+    assert.equal(arg(read.calls, "eq", "visibility"), "everyone");
+    assert.match(String(arg(read.calls, "select")), /\bvisibility\b/);
+  }
+});

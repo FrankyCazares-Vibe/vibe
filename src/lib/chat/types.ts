@@ -62,6 +62,13 @@ export type EventRef = {
   viewer_status: "going" | "maybe" | null;
   going_count: number;
   maybe_count: number;
+  /**
+   * Who can see it (Oct 22, 2026, "Members only" events; 20261025100000):
+   * "members" = the club's members only, and the screens show the chip.
+   * Every server read sets it; optional so a cached answer or an older
+   * fixture still types, and anything but "members" reads as "everyone".
+   */
+  visibility?: "everyone" | "members";
 };
 
 /** What `loadRoom` (rooms.ts) returns. */
@@ -134,6 +141,7 @@ export type RefusalCode =
   | "poll_closed" // 409: a vote past closes_at, or in a closed event chat
   | "slot_full" // 409: a sign-up slot at capacity
   | "cards_club_rooms_only" // 400: a card sent to a dm or a group
+  | "event_members_only" // 400: a members-only event as a card on the Board, which followers read (Oct 22, 2026)
   // 403: GET /api/orgs/[slug]/space by a non-member who may not read the
   // club's Board (not following, barred, blocked, or the club turned it off:
   // one answer, so nobody is told which); and, club model (Oct 16), anything
@@ -189,6 +197,7 @@ export const REFUSAL_SENTENCES: Readonly<Record<RefusalCode, string>> = Object.f
   poll_closed: "This one is closed.",
   slot_full: "That spot just filled.",
   cards_club_rooms_only: "Polls, sign-ups and events only work in club chats.",
+  event_members_only: "Members only events can't go on the Board: followers read it.",
   members_only: "Members only.",
   create_failed: "Couldn't create the club. Try again.",
   invalid_after: "Reload to catch up.",

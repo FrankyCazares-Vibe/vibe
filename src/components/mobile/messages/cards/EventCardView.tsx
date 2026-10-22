@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 
+import { MembersOnlyChip } from "@/components/events/MembersOnlyChip";
+import { isMembersOnly, MEMBERS_ONLY_COPY } from "@/components/events/members-only";
 import { emitCalendarChanged } from "@/lib/calendar/calendar-sync";
 import type { EventCard, ThreadRoom } from "@/lib/chat/types";
 import { eventWhen, eventWhenSpoken } from "@/lib/chat/when";
@@ -41,6 +43,11 @@ import { Chevron, ClubDisc, CoralDisc, PillSpinner, Ring } from "./card-parts";
  * the refusal toast goes through `toastSendFailure`. `event === null` → the
  * title from the fallback text, `This event was cancelled.`, no buttons.
  * `state === "closed"` → the pills are hidden, `Open event chat` stays.
+ *
+ * Members only (Oct 22, 2026, PLAN-2.md): a members-only event gets the
+ * "Members only" chip under its title, and the card's label says it. Such a
+ * card is never on the Board (followers read it; the server refuses it and
+ * leaves it out of followers' reads), so it only shows in members' rooms.
  */
 export type EventCardViewProps = {
   card: EventCard;
@@ -116,7 +123,9 @@ export function EventCardView({ card, content, room, createdAt, author, isMine, 
   const when = eventWhen(event.starts_at, zone);
   const whenSpoken = eventWhenSpoken(event.starts_at, zone);
   const closed = event.state === "closed";
-  const label = eventCardLabel({ title: event.title, location: event.location, whenSpoken, going: event.going_count, status: event.viewer_status }, author, isMine);
+  const membersOnly = isMembersOnly(event);
+  const baseLabel = eventCardLabel({ title: event.title, location: event.location, whenSpoken, going: event.going_count, status: event.viewer_status }, author, isMine);
+  const label = membersOnly ? `${baseLabel}. ${MEMBERS_ONLY_COPY.spoken}` : baseLabel;
 
   const pill = (status: Status, text: string) => {
     const pressed = event.viewer_status === status;
@@ -159,6 +168,7 @@ export function EventCardView({ card, content, room, createdAt, author, isMine, 
       <div style={{ boxSizing: "border-box", padding: "9px 12px 2px", display: "flex", flexDirection: "column" }}>
         {header}
         {title(event.title)}
+        {membersOnly ? <MembersOnlyChip style={{ alignSelf: "flex-start", marginTop: 5 }} /> : null}
         <div style={{ marginTop: 3, fontSize: 13, fontWeight: 500, lineHeight: 1.35, color: t.secondary, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{eventPlaceLine(event.location, when)}</div>
         {card.note !== null ? <div style={{ marginTop: 4, fontSize: 13.5, fontWeight: 500, lineHeight: 1.35, color: t.secondary, overflowWrap: "anywhere" }}>{card.note}</div> : null}
         {!closed ? (

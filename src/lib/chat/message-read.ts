@@ -40,6 +40,7 @@
  * answers today's data with every new field at its default.
  */
 
+import { eventVisibilityOf } from "@/lib/events/validate";
 import {
   ensureMember,
   isChannelMessageMediaKey,
@@ -1091,12 +1092,74 @@ export async function readChatMessages(
   };
 }
 
+/** The most rows one follower page may ask for once members-only cards are counted in (PostgREST's max rows). */
+const FOLLOWER_READ_MAX = 1000;
+
+/** Event ids read per page, and a runaway guard far above any club's members-only events. */
+const MEMBERS_ONLY_PAGE = 1000;
+const MEMBERS_ONLY_MAX = 20_000;
+
+/**
+ * The Event cards on this Board whose event is MEMBERS ONLY (Oct 22, 2026;
+ * 20261025100000), by message id, with the service role: the club's
+ * members-only events first (none, the usual case: one small read and done),
+ * then the cards of those events in this room. Null when a read fails (the
+ * caller answers 503): a follower must never be shown one on a guess. An
+ * event made members-only after it was carded is covered the same way.
+ */
+async function membersOnlyCardsOn(
+  service: ServiceClient,
+  orgId: string,
+  channelId: string,
+  tag: string,
+): Promise<Set<string> | null> {
+  const eventIds: string[] = [];
+  for (let from = 0; from < MEMBERS_ONLY_MAX; from += MEMBERS_ONLY_PAGE) {
+    const { data, error } = await service
+      .from("events")
+      .select("id")
+      .eq("org_id", orgId)
+      .eq("visibility", "members")
+      .order("id", { ascending: true })
+      .range(from, from + MEMBERS_ONLY_PAGE - 1);
+    if (error) {
+      console.error(`[${tag} members-only events]`, error.code, error.message);
+      return null;
+    }
+    const page = (data ?? []) as { id?: unknown }[];
+    for (const row of page) if (typeof row.id === "string") eventIds.push(row.id);
+    if (page.length < MEMBERS_ONLY_PAGE) break;
+  }
+  const cards = new Set<string>();
+  for (const chunk of inChunks(eventIds, 100)) {
+    const { data, error } = await service
+      .from("messages")
+      .select("id")
+      .eq("channel_id", channelId)
+      .in("card_event_id", chunk);
+    if (error) {
+      console.error(`[${tag} members-only cards]`, error.code, error.message);
+      return null;
+    }
+    for (const row of (data ?? []) as { id?: unknown }[]) if (typeof row.id === "string") cards.add(row.id);
+  }
+  return cards;
+}
+
 /**
  * A follower's page of a Board (repair of review finding 1): the rows with
  * the service role (`readFollowerBoardPage`: top-level, live, by a current
  * owner or admin), then built exactly as a member's page and stripped of
  * every name by `buildChatMessages` (standing "follower"). Any read that
  * fails is 503 `try_again`, never an empty Board passed off as the truth.
+ *
+ * MEMBERS-ONLY EVENTS (Oct 22, 2026): a card of one is left out
+ * (`membersOnlyCardsOn`). Not by cutting a page after the read, which comes
+ * back short and reads as the oldest page (the review of Oct 19, 2026): the
+ * page asks for `limit` + the number of such cards in the room, drops them,
+ * and keeps the first `limit`, so a full page is still full. Past
+ * FOLLOWER_READ_MAX rows (hundreds of such cards in one Board) a page can
+ * come back short; no club is near that.
  */
 async function readFollowerPage(
   client: ServerClient,
@@ -1107,16 +1170,20 @@ async function readFollowerPage(
   const tag = "chat/message-read follower";
   const service = serviceOrNull(tag);
   if (!service) return tryAgain();
+  const hidden = await membersOnlyCardsOn(service, room.org_id, channelId, tag);
+  if (hidden === null) return tryAgain();
+  const asked = Math.min(o.limit + hidden.size, FOLLOWER_READ_MAX);
   const page = await readFollowerBoardPage(
     service,
-    { channelId, orgId: room.org_id, select: MESSAGE_SELECT_FOLLOWER, limit: o.limit, before: o.before, after: o.after, oldestFirst: o.oldestFirst },
+    { channelId, orgId: room.org_id, select: MESSAGE_SELECT_FOLLOWER, limit: asked, before: o.before, after: o.after, oldestFirst: o.oldestFirst },
     tag,
   );
   if (page.error || page.data === null) {
     if (page.error) console.error(`[${tag}]`, page.error.code, page.error.message);
     return tryAgain();
   }
-  const rows = page.data as unknown as MessageRow[];
+  // In the order asked, so the first `limit` kept are the page a member's read gives.
+  const rows = (page.data as unknown as MessageRow[]).filter((r) => !hidden.has(r.id)).slice(0, o.limit);
   // A shared post only as the follower's own login shows it (a draft, a post
   // Vibe took down, a restricted author or a block reads as no post).
   const seen = await attachmentsSeenBy(client, rows, tag);
@@ -1339,7 +1406,7 @@ async function readRoomEvent(
   // total: the two counts, the viewer's own answer and the order of the
   // people going all come from it.
   const [place, rsvps] = await Promise.all([
-    service.from("events").select("location").eq("id", event.id).maybeSingle(),
+    service.from("events").select("location, visibility").eq("id", event.id).maybeSingle(),
     service
       .from("rsvps")
       .select("user_id, status", { count: "exact" })
@@ -1385,7 +1452,8 @@ async function readRoomEvent(
 
   const people = await readGoing(client, service, room, goingIds, blocked);
   if (!people) return "failed";
-  const location = (place.data as { location?: unknown } | null)?.location;
+  const placeRow = place.data as { location?: unknown; visibility?: unknown } | null;
+  const location = placeRow?.location;
   return {
     id: event.id,
     title: event.title,
@@ -1399,6 +1467,8 @@ async function readRoomEvent(
     viewer_status: status === "going" || status === "maybe" ? status : null,
     going_count: goingCount,
     maybe_count: maybeCount,
+    // The event panels' "Members only" chip (Oct 22, 2026).
+    visibility: eventVisibilityOf(placeRow?.visibility),
     going: people,
   };
 }

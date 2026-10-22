@@ -54,7 +54,7 @@ const STUBS: Record<string, string> = {
     "export async function chatV2For(id) { globalThis.__vibeFlagAskedFor = id; return globalThis.__vibeFlag === true; }",
   ),
   "@/lib/chat/event-refs": dataModule(
-    "export async function eventRefsFor(events, viewerId, opts) { return globalThis.__vibeEventRefsFor(events, viewerId, opts); }",
+    'export const EVENT_REF_COLUMNS = "id, title, starts_at, ends_at, location, org_id, visibility"; export async function eventRefsFor(events, viewerId, opts) { return globalThis.__vibeEventRefsFor(events, viewerId, opts); }',
   ),
   "@/lib/chat/rooms": dataModule(
     "export async function loadRoom(id) { return globalThis.__vibeLoadRoom(id); }\n" +
@@ -389,7 +389,7 @@ test("inbox: the happy path, field by field (7.1.2-7.1.9)", async () => {
 
   const events = reads(serviceLog, "events");
   assert.equal(events.length, 1);
-  assert.equal(selectOf(events[0].calls), "id, title, starts_at, ends_at, location, org_id");
+  assert.equal(selectOf(events[0].calls), "id, title, starts_at, ends_at, location, org_id, visibility");
   assert.deepEqual(arg(events[0].calls, "in", "org_id"), [ORG1, ORG2]);
   assert.equal(typeof arg(events[0].calls, "gt", "ends_at"), "string");
   assert.deepEqual(events[0].calls.find((c) => c[0] === "order"), ["order", "starts_at", { ascending: true }]);
@@ -973,7 +973,7 @@ test("calendar: flag off → the three fields null on every rsvp entry, eventRef
   assert.deepEqual(entries.map((e) => e.id), ["pe", "ev-club", "ev-solo"]);
   assert.deepEqual(entries[1], {
     kind: "rsvp", id: "ev-club", title: "ev-club", starts_at: T(8), ends_at: T(8, 12), location: "Hall", viewer_status: "going",
-    org: { handle: "salsa", name: "Salsa", verified: true }, org_id: null, room_id: null, room_state: null,
+    org: { handle: "salsa", name: "Salsa", verified: true }, visibility: "everyone", org_id: null, room_id: null, room_state: null,
   });
   // Oct 19, 2026 (critique D13): an RSVP carries its status and no fixed
   // colour; the client paints it by `viewer_status`.
@@ -982,7 +982,7 @@ test("calendar: flag off → the three fields null on every rsvp entry, eventRef
   assert.equal("color" in entries[2], false, "no amber for Interested");
   assert.deepEqual(entries[0], { kind: "personal", id: "pe", title: "Dentist", starts_at: T(3), ends_at: null, location: "", notes: "", color: "#fff" });
   assert.equal(asked, 0);
-  assert.match(selectOf(reads(cookieLog, "rsvps")[0].calls), /event:events!inner\(id,title,starts_at,ends_at,location,org_id,org:orgs\(handle,name,verified\)\)/);
+  assert.match(selectOf(reads(cookieLog, "rsvps")[0].calls), /event:events!inner\(id,title,starts_at,ends_at,location,org_id,visibility,org:orgs\(handle,name,verified\)\)/);
   assert.equal(g.__vibeFlagAskedFor, VIEWER);
 });
 
@@ -1002,8 +1002,8 @@ test("calendar: flag on → eventRefsFor with counts: false; org_id, room_id, ro
   assert.deepEqual([entries[2].org_id, entries[2].room_id, entries[2].room_state], [null, null, null], "no club: no room, no state");
   assert.deepEqual(asked, [[
     [
-      { id: "ev-club", title: "ev-club", starts_at: T(8), ends_at: T(8, 12), location: "Hall", org_id: ORG1 },
-      { id: "ev-solo", title: "ev-solo", starts_at: T(8), ends_at: T(8, 12), location: "Hall", org_id: null },
+      { id: "ev-club", title: "ev-club", starts_at: T(8), ends_at: T(8, 12), location: "Hall", org_id: ORG1, visibility: null },
+      { id: "ev-solo", title: "ev-solo", starts_at: T(8), ends_at: T(8, 12), location: "Hall", org_id: null, visibility: null },
     ],
     VIEWER,
     { counts: false },
@@ -1019,6 +1019,33 @@ test("calendar: flag on → eventRefsFor with counts: false; org_id, room_id, ro
 
   install({ user: null });
   assert.deepEqual(await calendar.GET(req("http://localhost/api/me/calendar"), ctx()), { status: 401, body: { ok: false, error: "Unauthorized" } });
+});
+
+// Oct 22, 2026 ("Members only" events): an RSVP'd members-only event says so
+// in its entry and hands its visibility to eventRefsFor; junk reads "everyone".
+test("calendar: each rsvp entry carries visibility, members-only included, and eventRefsFor gets it", async () => {
+  const membersCookie: Answerer = (table) => {
+    if (table === "rsvps") {
+      return {
+        data: [
+          { status: "going", event: { ...rsvpRow("ev-chapter", ORG1).event, visibility: "members" } },
+          { status: "maybe", event: { ...rsvpRow("ev-odd", ORG1).event, visibility: "friends" } },
+        ],
+      };
+    }
+    return { data: [] };
+  };
+  install({ cookie: membersCookie, flag: true });
+  const asked: EventRow[][] = [];
+  g.__vibeEventRefsFor = async (events: EventRow[]) => {
+    asked.push(events);
+    return plainRefs(events);
+  };
+  const res = await calendar.GET(req("http://localhost/api/me/calendar"), ctx());
+  assert.equal(res.status, 200);
+  const entries = res.body.entries as Record<string, unknown>[];
+  assert.deepEqual(entries.map((e) => [e.id, e.visibility]), [["ev-chapter", "members"], ["ev-odd", "everyone"]]);
+  assert.deepEqual(asked[0].map((e) => e.visibility), ["members", "friends"], "the row as read; eventRefsFor reads it safely");
 });
 
 // Oct 19, 2026 (critique B8 repair): the club behind an RSVP is named with the

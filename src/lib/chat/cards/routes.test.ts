@@ -79,7 +79,9 @@ const STUBS: Record<string, string> = {
       "s.log.push(['readChatMessage', client === s.cookie, id, known]); return s.readBack.length ? s.readBack.shift() : null; }",
   ),
   "@/lib/chat/rooms": stub(
-    "export async function clubRole(orgId, userId) { globalThis.__b2.log.push(['clubRole', orgId, userId]); return globalThis.__b2.roles[userId] ?? null; }",
+    "export async function clubRole(orgId, userId) { globalThis.__b2.log.push(['clubRole', orgId, userId]); return globalThis.__b2.roles[userId] ?? null; }\n" +
+      "export async function clubRoleAnswer(orgId, userId) { const s = globalThis.__b2; s.log.push(['clubRoleAnswer', orgId, userId]); " +
+      "return s.rolesFailed ? 'failed' : (s.roles[userId] ?? null); }",
   ),
   "@/lib/chat/cards/hydrate": stub(
     "export async function hydrateCards(client, rows, viewerId, opts) { const s = globalThis.__b2; " +
@@ -384,7 +386,7 @@ test("POST 11: an Event card reads the event with the service role: five columns
   const { queries } = setup({});
   assert.equal((await post(EVENT_CARD)).status, 201);
   assert.equal(queries[0].table, "events");
-  assert.deepEqual(queries[0].calls, [["select", "id, title, starts_at, org_id, ends_at"], ["eq", "id", EVENT], ["maybeSingle"]]);
+  assert.deepEqual(queries[0].calls, [["select", "id, title, starts_at, org_id, ends_at, visibility"], ["eq", "id", EVENT], ["maybeSingle"]]);
   const poll = setup({});
   assert.equal((await post(POLL)).status, 201);
   assert.deepEqual(poll.queries.map((q) => q.table), ["rpc:chat_create_poll"]);
@@ -403,6 +405,39 @@ test("POST 11: a missing, another club's, or an ended event → 404 event_not_fo
     assert.deepEqual(await post(EVENT_CARD), want, JSON.stringify(s));
     assert.equal(rpcs(queries).length, 0);
   }
+});
+
+// Oct 22, 2026 ("Members only" events): never on the Board, which followers
+// read (400 event_members_only, before the RPC); fine in any other club room;
+// someone outside the club hears the "can't see it" 404, never a hint.
+test("POST 11: a members-only event: 400 event_members_only on the Board, a card elsewhere, 404 for a non-member", async () => {
+  const MEMBERS_EVENT = { ...LIVE_EVENT, visibility: "members" };
+  const onBoard = setup({ event: MEMBERS_EVENT, roomOf: { room: BOARD, failed: false }, roles: { [ME]: "owner" } });
+  assert.deepEqual(await post(EVENT_CARD), refused("event_members_only", 400));
+  assert.equal(rpcs(onBoard.queries).length, 0, "no RPC");
+  assert.deepEqual(refused("event_members_only", 400).body.error, "Members only events can't go on the Board: followers read it.");
+
+  const inLounge = setup({ event: MEMBERS_EVENT, roles: { [ME]: "member" } });
+  assert.equal((await post(EVENT_CARD)).status, 201);
+  assert.equal(rpcs(inLounge.queries)[0].table, "rpc:chat_create_event_card");
+
+  const stranger = setup({ event: MEMBERS_EVENT, roomOf: { room: BOARD, failed: false }, roles: {} });
+  assert.deepEqual(await post(EVENT_CARD), refused("event_not_found", 404));
+  assert.equal(rpcs(stranger.queries).length, 0);
+
+  const unreadable = setup({ event: MEMBERS_EVENT, roomOf: { room: BOARD, failed: false } });
+  (unreadable.state as unknown as { rolesFailed: boolean }).rolesFailed = true;
+  assert.deepEqual(await post(EVENT_CARD), refused("try_again", 503));
+
+  // An Everyone event never asks for the role, Board or not.
+  const everyone = setup({ event: { ...LIVE_EVENT, visibility: "everyone" }, roomOf: { room: BOARD, failed: false } });
+  await post(EVENT_CARD);
+  assert.equal(everyone.state.log.some((entry) => entry[0] === "clubRoleAnswer"), false);
+});
+
+test("POST 12: P0C27 (the event turned members-only before the RPC) → 400 event_members_only", async () => {
+  setup({ rpcError: { code: "P0C27", message: "members-only event on the Board" }, roomOf: { room: BOARD, failed: false } });
+  assert.deepEqual(await post(EVENT_CARD), refused("event_members_only", 400));
 });
 
 // ── POST, 4.1: gate 12, the RPC and its SQLSTATEs ───────────────────────────

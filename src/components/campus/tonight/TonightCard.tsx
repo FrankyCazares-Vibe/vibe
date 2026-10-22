@@ -13,6 +13,8 @@
  */
 import { useId } from "react";
 
+import { MembersOnlyChip } from "@/components/events/MembersOnlyChip";
+import { isMembersOnly, MEMBERS_ONLY_COPY } from "@/components/events/members-only";
 import { Reveal } from "@/lib/motion/Reveal";
 
 import { ClubSwatch, IconChevron, ItemTitle, ReasonLabel, SchoolTag } from "./TonightBits";
@@ -41,6 +43,11 @@ export function TonightCard({ school, clubs, onOpen }: TonightCardProps) {
   const view = useTonightView(school, clubs);
   if (!view || !view.lead) return null;
   const lead = view.lead;
+  // Members only (Oct 22, 2026): a club #1 its club keeps to members. Only
+  // members get it in the list at all; the chip says it isn't public, and
+  // the button's label says it too, since the lines below are hidden.
+  const membersOnly = lead.kind === "club" && isMembersOnly(lead.ev);
+  const spoken = membersOnly ? `${cardSpoken(view)} ${MEMBERS_ONLY_COPY.spoken}` : cardSpoken(view);
 
   return (
     <Reveal>
@@ -49,7 +56,7 @@ export function TonightCard({ school, clubs, onOpen }: TonightCardProps) {
           type="button"
           className="tonight-card-hit tonight-focus vibe-press"
           aria-haspopup="dialog"
-          aria-label={cardSpoken(view)}
+          aria-label={spoken}
           onClick={onOpen}
         />
         {/* (1) the question and the day, with why #1 leads at the right.
@@ -73,6 +80,9 @@ export function TonightCard({ school, clubs, onOpen }: TonightCardProps) {
           <span className="tonight-card-by">
             {lead.kind === "school" ? <SchoolTag size="hero" /> : <ClubSwatch orgId={lead.ev.org?.id ?? null} />}
             <span className="tonight-ellipsis">{lead.text.byline}</span>
+            {/* One line, 16px tall: the card keeps its fixed height. The
+                club's name gives way (ellipsis) before the chip does. */}
+            {membersOnly ? <MembersOnlyChip size="row" /> : null}
           </span>
           {/* (4) when and where. */}
           <span className="tonight-card-when">

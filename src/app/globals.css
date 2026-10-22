@@ -2808,6 +2808,17 @@ html {
     transform: none;
   }
 }
+/* A tool open in place, in the panel the planet grows into
+   (ClubToolsPanel.tsx; Oct 22, 2026): the arc's coral focus ring on what is
+   in it, none on a screen that only took focus to bring the keyboard in.
+   Its motion is all Motion; nothing loops here. */
+.vibe-tools-panel :focus-visible {
+  outline: 2px solid var(--coral);
+  outline-offset: 2px;
+}
+.vibe-tools-panel [tabindex="-1"]:focus-visible {
+  outline: none;
+}
 @media (max-width: 720px) {
   .vibe-org-shell {
     padding: 0 14px 56px !important;

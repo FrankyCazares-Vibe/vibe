@@ -51,7 +51,7 @@ const STUBS: Record<string, string> = {
     "export async function loadOrgRole() { return { ok: true, role: globalThis.__ev.role }; }",
   ),
   "@/lib/events/notify-cancel": stub(
-    "export async function collectCancelRecipients(service, eventId, actorId) { globalThis.__ev.log.push('notices:collect'); return globalThis.__ev.collect; }\n" +
+    "export async function collectCancelRecipients(service, eventId, actorId, opts) { globalThis.__ev.log.push('notices:collect'); globalThis.__ev.collectOpts.push(opts); return globalThis.__ev.collect; }\n" +
       "export async function sendCancelNotices(service, args) { globalThis.__ev.log.push('notices:send'); return globalThis.__ev.send; }",
   ),
 };
@@ -115,6 +115,10 @@ type World = {
   /** What `event_checkin_state` answers (event check-in, Oct 19 2026). Unset: the RSVP rows, as before. */
   checkinState?: unknown[];
   checkinStateError?: Err;
+  /** "Members only" flips (Oct 22, 2026): who RSVP'd, who of them is a member, a failing delete. */
+  rsvpUserIds?: string[];
+  memberIds?: string[];
+  rsvpDeleteError?: Err;
 };
 
 type Call = [string, ...unknown[]];
@@ -123,12 +127,34 @@ type Write = { content: string; ids: string[]; kind: unknown };
 function setup(w: World) {
   const log: string[] = [];
   const writes: Write[] = [];
+  const updates: Record<string, unknown>[] = [];
+  const dropped: string[][] = [];
+  const collectOpts: unknown[] = [];
   const answerService = (table: string, calls: Call[]): { data: unknown; error: unknown } => {
     const first = calls[0]?.[0];
     if (table === "events" && first === "select") return { data: w.event, error: null };
     if (table === "events" && first === "update") {
       log.push("event:update");
+      updates.push(calls[0][1] as Record<string, unknown>);
       return { data: w.updatedEvent === undefined ? null : w.updatedEvent, error: w.updateError ?? null };
+    }
+    if (table === "rsvps" && first === "select") {
+      log.push("rsvps:read");
+      assert.equal(calls.find((c) => c[0] === "eq" && c[1] === "event_id")?.[2], EVENT);
+      return { data: (w.rsvpUserIds ?? []).map((user_id) => ({ user_id })), error: null };
+    }
+    if (table === "org_members") {
+      log.push("members:read");
+      assert.equal(calls.find((c) => c[0] === "eq" && c[1] === "org_id")?.[2], ORG);
+      const asked = (calls.find((c) => c[0] === "in" && c[1] === "user_id")?.[2] as string[]) ?? [];
+      return { data: asked.filter((id) => (w.memberIds ?? []).includes(id)).map((user_id) => ({ user_id })), error: null };
+    }
+    if (table === "rsvps" && first === "delete") {
+      log.push("rsvps:delete");
+      assert.equal(calls.find((c) => c[0] === "eq" && c[1] === "event_id")?.[2], EVENT);
+      const ids = (calls.find((c) => c[0] === "in" && c[1] === "user_id")?.[2] as string[]) ?? [];
+      dropped.push(ids);
+      return { data: w.rsvpDeleteError ? null : ids.map((user_id) => ({ user_id })), error: w.rsvpDeleteError ?? null };
     }
     if (table === "orgs") return { data: ORG_ROW, error: null };
     if (table === "messages" && first === "select") {
@@ -162,7 +188,7 @@ function setup(w: World) {
   const chain = (table: string, answer: (t: string, c: Call[]) => { data: unknown; error: unknown }) => {
     const calls: Call[] = [];
     const builder: Record<string, unknown> = {};
-    for (const m of ["select", "eq", "in", "is", "order", "limit", "update", "delete", "gt"]) {
+    for (const m of ["select", "eq", "in", "is", "order", "limit", "range", "update", "delete", "gt"]) {
       builder[m] = (...args: unknown[]) => {
         calls.push([m, ...args]);
         return builder;
@@ -198,8 +224,9 @@ function setup(w: World) {
     role: w.role === undefined ? "admin" : w.role,
     collect: w.collect ?? { ok: true, ids: ["u1", "u2"] },
     send: w.send ?? { notified: 2, failed: false },
+    collectOpts,
   };
-  return { log, writes };
+  return { log, writes, updates, dropped, collectOpts };
 }
 
 const CTX = { params: Promise.resolve({ id: EVENT }) };
@@ -430,7 +457,7 @@ test("PATCH: the refusals touch no card (ended 409, not an officer 403, invalid 
 
 type PatchAnswer = { ok: boolean; event: Record<string, unknown> | null };
 
-test("PATCH: the answer's event carries the check-in state, the three keys last", async (t) => {
+test("PATCH: the answer's event carries the check-in state, the three keys, then visibility, last", async (t) => {
   quiet(t);
   setup({
     event: UPCOMING,
@@ -441,7 +468,7 @@ test("PATCH: the answer's event carries the check-in state, the three keys last"
   assert.equal(res.status, 200);
   const { event } = (await res.json()) as PatchAnswer;
   assert.ok(event);
-  assert.deepEqual(Object.keys(event).slice(-4), ["org", "checkin_open", "checked_in_count", "viewer_checked_in"]);
+  assert.deepEqual(Object.keys(event).slice(-5), ["org", "checkin_open", "checked_in_count", "viewer_checked_in", "visibility"]);
   assert.deepEqual([event.checkin_open, event.checked_in_count, event.viewer_checked_in], [true, 7, true]);
   assert.deepEqual([event.going_count, event.interested_count], [3, 1]);
 });
@@ -466,4 +493,84 @@ test("PATCH: a failed check-in state read still saves and answers, the fields 'n
   assert.deepEqual([event.going_count, event.interested_count], [3, 1], "the RSVP counts are untouched");
   const lines = seen.filter((a) => String(a[0]).includes("checkin state"));
   assert.deepEqual(lines, [["[events/:id PATCH checkin state]", { code: "PGRST202" }]]);
+});
+
+// ── "Members only" events (Oct 22, 2026; PLAN-2.md E1) ──────────────────────
+
+const MEMBERS_ONLY = { ...UPCOMING, visibility: "members" };
+const EVERYONE = { ...UPCOMING, visibility: "everyone" };
+const MEMBER_A = mid(11);
+const MEMBER_B = mid(12);
+const STRANGER = mid(13);
+const LEFT_CLUB = mid(14);
+
+test("PATCH to Members only: saved, then the non-members' RSVPs come off (service role), before the answer", async (t) => {
+  quiet(t);
+  const { log, updates, dropped } = setup({
+    event: EVERYONE,
+    updatedEvent: MEMBERS_ONLY,
+    rsvpUserIds: [MEMBER_A, STRANGER, MEMBER_B, LEFT_CLUB],
+    memberIds: [MEMBER_A, MEMBER_B],
+  });
+  const res = await patch({ visibility: "members" });
+  assert.equal(res.status, 200);
+  const { event } = (await res.json()) as PatchAnswer;
+  assert.equal(event?.visibility, "members");
+  assert.equal(updates[0].visibility, "members", "the column is written");
+  assert.deepEqual(log, ["event:update", "rsvps:read", "members:read", "rsvps:delete"], "after the save; no card touched");
+  assert.deepEqual(dropped, [[STRANGER, LEFT_CLUB]], "members keep theirs");
+});
+
+test("PATCH that keeps Members only, or stays Everyone, or goes back to Everyone: no RSVP is touched", async (t) => {
+  quiet(t);
+  for (const [stored, body, saved] of [
+    [MEMBERS_ONLY, { location: "Room 2" }, { ...MEMBERS_ONLY, location: "Room 2" }],
+    [EVERYONE, { location: "Room 2" }, { ...EVERYONE, location: "Room 2" }],
+    [MEMBERS_ONLY, { visibility: "everyone" }, EVERYONE],
+    [UPCOMING, { description: "x" }, { ...UPCOMING, description: "x" }],
+  ] as const) {
+    const { log, updates } = setup({ event: stored, updatedEvent: saved, rsvpUserIds: [STRANGER] });
+    assert.equal((await patch(body)).status, 200, JSON.stringify(body));
+    assert.deepEqual(log, ["event:update"], JSON.stringify(body));
+    assert.equal(updates[0].visibility, (saved as { visibility?: string }).visibility ?? "everyone", "a field left out keeps its stored value");
+  }
+});
+
+test("PATCH with a visibility that isn't one of the two: 400 invalid_visibility, nothing written", async (t) => {
+  quiet(t);
+  const { log } = setup({ event: EVERYONE, updatedEvent: MEMBERS_ONLY });
+  const res = await patch({ visibility: "secret" });
+  assert.equal(res.status, 400);
+  const body = (await res.json()) as { code: string; error: string };
+  assert.equal(body.code, "invalid_visibility");
+  assert.deepEqual(log, []);
+});
+
+test("PATCH to Members only whose RSVP delete fails: still saved and answered (200), logged without names", async (t) => {
+  quiet(t);
+  const errors: unknown[][] = [];
+  t.mock.method(console, "error", (...args: unknown[]) => errors.push(args));
+  setup({
+    event: EVERYONE,
+    updatedEvent: MEMBERS_ONLY,
+    rsvpUserIds: [STRANGER],
+    memberIds: [],
+    rsvpDeleteError: { code: "57014", message: "canceling statement" },
+  });
+  assert.equal((await patch({ visibility: "members" })).status, 200);
+  assert.ok(errors.some((args) => String(args[0]).includes("members-only")), "said in the log");
+  assert.equal(JSON.stringify(errors).includes(STRANGER), false, "never a person's id");
+});
+
+test("DELETE of a members-only event: the notices go to the club's current members only; an Everyone event asks nothing more", async (t) => {
+  quiet(t);
+  const members = setup({ event: MEMBERS_ONLY });
+  assert.equal((await del()).status, 200);
+  assert.deepEqual(members.collectOpts, [{ membersOf: ORG }]);
+  const everyone = setup({ event: EVERYONE });
+  assert.equal((await del()).status, 200);
+  assert.deepEqual(everyone.collectOpts, [{ membersOf: null }]);
+  const legacy = setup({ event: UPCOMING });
+  assert.equal((await del()).status, 200);
+  assert.deepEqual(legacy.collectOpts, [{ membersOf: null }], "a row read without the column is Everyone");
 });

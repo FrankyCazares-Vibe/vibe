@@ -368,10 +368,34 @@ test("Event cards: the note, the event through eventRefsFor, and event null when
   assert.deepEqual(card.event, {
     id: EVENT, title: "Fall Formal", starts_at: "2026-10-08T23:30:00+00:00", ends_at: "2026-10-09T03:00:00+00:00",
     location: "", state: "soon", room_id: uuid(5, "f"), viewer_status: "going", going_count: 1, maybe_count: 0,
+    visibility: "everyone",
   });
   assert.deepEqual(cards!.get(CARD_CANCELLED), { type: "event", note: null, event: null });
   const eventsRead = service.log.find((l) => l.table === "events")!.calls;
   assert.deepEqual(arg(eventsRead, "in", "id"), [EVENT], "the cancelled card's null id is not asked");
+  assert.match(String(eventsRead.find((c) => c[0] === "select")?.[1]), /\bvisibility\b/, "the event's visibility is read (Oct 22, 2026)");
+});
+
+// Oct 22, 2026 ("Members only" events): a member sees a members-only event's
+// card in full; a follower (countsOnly) gets the card with `event: null`, and
+// eventRefsFor is never asked about that event for them.
+test("a members-only event's card: the event for a member, event null for a follower", async () => {
+  const membersOnly = (table: string, calls: Call[]): Answer => {
+    if (table === "events") {
+      return {
+        data: [{ id: EVENT, title: "Chapter", starts_at: "2026-10-08T23:30:00+00:00", ends_at: "2026-10-09T03:00:00+00:00", location: null, org_id: ORG, visibility: "members" }],
+      };
+    }
+    return sideTables(table, calls);
+  };
+  installService(membersOnly);
+  const asMember = await hydrateCards(viewerClient().client as unknown as Client, [rows[3]], VIEWER, { room: LOUNGE, blocked: new Set(), now: NOW });
+  assert.equal(((asMember!.get(CARD) as EventCard).event as { visibility?: string }).visibility, "members");
+
+  const service = installService(membersOnly);
+  const asFollower = await hydrateCards(viewerClient().client as unknown as Client, [rows[3]], VIEWER, { room: LOUNGE, blocked: new Set(), now: NOW, countsOnly: true });
+  assert.deepEqual(asFollower!.get(CARD), { type: "event", note: "Bring a friend", event: null });
+  assert.equal(service.log.some((l) => l.table === "rsvps" || l.table === "channels"), false, "no ref is built for a follower");
 });
 
 test("an event the events read did not return: event null, the card kept", async () => {

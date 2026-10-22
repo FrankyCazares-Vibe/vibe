@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { eventVisibilityOf } from "@/lib/events/validate";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 const DEFAULT_LIMIT = 5;
@@ -15,6 +16,7 @@ type RsvpRow = {
     starts_at: string;
     ends_at: string;
     location: string;
+    visibility?: string | null;
     org: {
       handle: string;
       name: string;
@@ -32,6 +34,9 @@ type RsvpRow = {
  * n days; the strip passes 14 so a far-off RSVP doesn't take one of its three
  * slots. Absent, junk or non-positive means no horizon, which is what Otto's
  * panel and every deployed caller get today.
+ *
+ * Read on the viewer's client, so a members-only event of a club they left
+ * is not here (`event_visible`, Oct 22, 2026); each row carries `visibility`.
  */
 export async function GET(req: Request) {
   const supabase = await createSupabaseServerClient();
@@ -60,7 +65,7 @@ export async function GET(req: Request) {
     .from("rsvps")
     .select(
       "status," +
-        "event:events!inner(id,title,starts_at,ends_at,location," +
+        "event:events!inner(id,title,starts_at,ends_at,location,visibility," +
         "org:orgs(handle,name,verified)" +
         ")",
     )
@@ -90,6 +95,8 @@ export async function GET(req: Request) {
       location: (r.event as NonNullable<RsvpRow["event"]>).location,
       org: (r.event as NonNullable<RsvpRow["event"]>).org,
       viewer_status: r.status as "going" | "maybe",
+      // Last (Oct 22, 2026): "members" = the club's members only, for the chip.
+      visibility: eventVisibilityOf((r.event as NonNullable<RsvpRow["event"]>).visibility),
     }));
 
   return NextResponse.json({ ok: true, upcoming });

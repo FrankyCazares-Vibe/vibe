@@ -8,7 +8,9 @@
  *
  * - EditPageButton: the half-width "Edit page" pill and its dialog. The
  *   address `?edit=1` (Club tools' "Edit the page") opens it once, then comes
- *   off the address so a reload or Back doesn't open it again.
+ *   off the address so a reload or Back doesn't open it again. The computer's
+ *   tools panel opens it directly (`openEditPage`, club-tools-launcher.ts;
+ *   Oct 22, 2026), as many times as it likes.
  * - SharePageButton: the half-width "Share page" pill (share-page.ts).
  * - CoverOfficerButtons: + and Club tools, two round buttons for the cover's
  *   top-right corner. They draw no position of their own: the page places
@@ -23,7 +25,7 @@ import { type CSSProperties, type JSX, useEffect, useRef, useState } from "react
 import type { JoinPolicy, OrgAudience } from "@/lib/orgs/join-state";
 
 import { EditPageModal, UploadAssetModal } from "../admin-actions";
-import { openClubToolsLauncher } from "./club-tools-launcher";
+import { openClubToolsLauncher, registerEditPageOpener } from "./club-tools-launcher";
 import { PlusSheet } from "./PlusSheet";
 import { shareClubPage } from "./share-page";
 
@@ -56,6 +58,18 @@ export function EditPageButton(props: EditProps): JSX.Element {
   const [edit, setEdit] = useState<EditState>("closed");
   const [asset, setAsset] = useState<"logo" | "banner" | null>(null);
   const tookEditParam = useRef(false);
+  const buttonRef = useRef<HTMLButtonElement | null>(null);
+
+  // The tools panel's "Edit the page". Focus comes here first, so closing
+  // the dialog brings it back to this button, as if it had been pressed.
+  useEffect(
+    () =>
+      registerEditPageOpener(() => {
+        buttonRef.current?.focus({ preventScroll: true });
+        setEdit("open");
+      }),
+    [],
+  );
 
   useEffect(() => {
     if (tookEditParam.current || searchParams.get("edit") !== "1") return;
@@ -70,6 +84,7 @@ export function EditPageButton(props: EditProps): JSX.Element {
   return (
     <>
       <button
+        ref={buttonRef}
         type="button"
         className="vibe-press"
         aria-haspopup="dialog"

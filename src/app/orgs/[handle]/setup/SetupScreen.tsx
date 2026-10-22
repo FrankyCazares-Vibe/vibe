@@ -11,6 +11,13 @@
  *
  * A club no setup link made has no list (`setup` null): the page is then
  * its members' link alone.
+ *
+ * `embedded` (Oct 22, 2026): the club page's tools panel on a computer holds
+ * this screen (ClubToolsPanel.tsx). The panel has the title and the way
+ * back, so there is no column, eyebrow or heading here; `initialStep` opens
+ * a step (the members' link) where the address's #members-link would, since
+ * the address is the club page's; "Open <club>" closes the panel instead
+ * (`onClose`), and "Open the club page" isn't needed, the page is under it.
  */
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -57,34 +64,49 @@ export function SetupScreen({
   club,
   role,
   setup,
+  embedded = false,
+  initialStep,
+  onClose,
 }: {
   club: SetupClub;
   role: "owner" | "admin";
   setup: SetupView | null;
+  embedded?: boolean;
+  /** Embedded: the step to open first, instead of the address's hash. */
+  initialStep?: SetupStepId;
+  /** Embedded: "Open <club>" once it's all done closes the panel. */
+  onClose?: () => void;
 }) {
   const router = useRouter();
   const refresh = useCallback(() => router.refresh(), [router]);
   // The address's #members-link, read after hydration (the server has no
-  // hash): it opens the members' link row and scrolls to it.
+  // hash): it opens the members' link row and scrolls to it. Embedded, the
+  // address is the club page's, so the host says which step instead.
   const hash = useSyncExternalStore(subscribeHash, () => window.location.hash, () => "");
-  const wantsLink = hash === LINK_HASH;
+  const wantsLink = embedded ? initialStep === "members_link" : hash === LINK_HASH;
   // `undefined` until a row is tapped: the hash decides; after that, the tap.
   const [open, setOpen] = useState<SetupStepId | null | undefined>(undefined);
   const openStep: SetupStepId | null = open === undefined ? (wantsLink ? "members_link" : null) : open;
 
   useEffect(() => {
     if (!wantsLink) return;
-    document.getElementById("members-link")?.scrollIntoView({ block: "start" });
-  }, [wantsLink]);
+    const link = document.getElementById("members-link");
+    if (!link) return;
+    // In the panel, only the panel's own list moves: scrollIntoView could
+    // also scroll the club page behind it.
+    const list = embedded ? link.closest<HTMLElement>("[data-tools-panel-scroll]") : null;
+    if (list) list.scrollTop += link.getBoundingClientRect().top - list.getBoundingClientRect().top - 12;
+    else if (!embedded) link.scrollIntoView({ block: "start" });
+  }, [wantsLink, embedded]);
 
   const clubPath = `/orgs/${encodeURIComponent(club.handle)}`;
 
   return (
-    <div style={columnStyle}>
-      <div style={eyebrowStyle}>{setup ? "Club setup" : "Club tools"}</div>
+    <div style={embedded ? undefined : columnStyle}>
+      {embedded ? null : <div style={eyebrowStyle}>{setup ? "Club setup" : "Club tools"}</div>}
       {setup ? (
         <>
-          <h1 style={titleStyle}>Get {club.name} ready.</h1>
+          {embedded ? null : <h1 style={titleStyle}>Get {club.name} ready.</h1>}
           <Progress done={setup.done} total={setup.total} />
           <SetupList
             club={club}
@@ -97,9 +119,15 @@ export function SetupScreen({
           {setup.complete ? (
             <div style={{ display: "flex", flexDirection: "column", gap: 14, marginTop: 20 }}>
               <p style={{ ...lineStyle, color: "var(--charcoal)", fontWeight: 700, fontSize: 15 }}>All set.</p>
-              <Link href={clubPath} className="vibe-press" style={primaryButtonStyle}>
-                Open {club.name}
-              </Link>
+              {embedded && onClose ? (
+                <button type="button" className="vibe-press" onClick={onClose} style={primaryButtonStyle}>
+                  Open {club.name}
+                </button>
+              ) : (
+                <Link href={clubPath} className="vibe-press" style={primaryButtonStyle}>
+                  Open {club.name}
+                </Link>
+              )}
             </div>
           ) : (
             <p style={{ ...lineStyle, marginTop: 16, fontSize: 13, color: "var(--ink-muted)" }}>
@@ -109,17 +137,19 @@ export function SetupScreen({
         </>
       ) : (
         <>
-          <h1 style={titleStyle}>{club.name}&rsquo;s members&rsquo; link</h1>
-          <div style={{ marginTop: 20 }}>
+          {embedded ? null : <h1 style={titleStyle}>{club.name}&rsquo;s members&rsquo; link</h1>}
+          <div style={{ marginTop: embedded ? 0 : 20 }}>
             <MembersLinkPanel handle={club.handle} clubName={club.name} />
           </div>
         </>
       )}
-      <div style={{ marginTop: 16, textAlign: "center" }}>
-        <Link href={clubPath} style={textActionStyle}>
-          Open the club page
-        </Link>
-      </div>
+      {embedded ? null : (
+        <div style={{ marginTop: 16, textAlign: "center" }}>
+          <Link href={clubPath} style={textActionStyle}>
+            Open the club page
+          </Link>
+        </div>
+      )}
     </div>
   );
 }

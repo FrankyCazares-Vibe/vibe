@@ -1,6 +1,6 @@
 # Vibe Privacy Policy
 
-Effective October 21, 2026
+Effective October 22, 2026
 
 Vibe is a campus social app for people with an Indiana University or Purdue University email address. It is run by **CONNECTVIBE. LLC**, an Indiana limited liability company. In this policy, "we" means that company. Vibe is independent. It is not run or backed by Indiana University, Purdue University, or any campus, school or club.
 
@@ -52,6 +52,8 @@ Vibe is built and run by the three cofounders of CONNECTVIBE. LLC. This policy c
 - totals of how Vibe is used, such as sign-ups, posts and chat messages per day. The totals do not say who did what, but on a quiet day a daily total can come from one person;
 - the waitlist (section 11).
 
+In the app itself, they can also see the events a club marks "Members only" (section 5b).
+
 They can look an account up by its exact email address, and the result does not show the address. The admin tools do not show email addresses (except on the waitlist), passwords, résumés or billing details. They do not show messages that were not reported, who viewed what, or IP addresses. An IP address is the number that identifies your internet connection.
 
 **One cofounder also has direct access** to the systems that store Vibe's information and to our accounts at the companies in section 6. This policy calls that person "the cofounder with direct access". With that access, the person can read everything Vibe stores, including both your email addresses, every message and the sign-in records in section 3d. The other two cofounders do not have it. The same cofounder's personal Gmail inbox receives the mail you send us (section 3g).
@@ -100,7 +102,7 @@ Your profile holds:
 - Posts, drafts, comments, likes, reposts and saves.
 - Who you follow and who follows you.
 - Clubs: memberships and roles, the title a club's owner or an officer gave you, clubs you follow, requests to join with your message, and invites. Asking to join a club also follows it. If a club's owner or an officer takes you out of the club, adds you to a room, gives you a title or removes you as a follower, we store who did it and when.
-- Club events, your RSVPs (Going or Interested) and personal calendar entries.
+- Club events and whether each is marked "Members only", your RSVPs (Going or Interested) and personal calendar entries.
 - Event check-ins: the club events you checked in at. You check in yourself, with the 4-digit code or the QR code on the club's check-in screen, or the club's owner or an officer marks you as here. Our database does not store the time you checked in or which way you did it, but Vercel's visit logs can show both (section 6).
 - Messages and everything in them.
 - Which messages are pinned in a chat, who pinned each one, and when.
@@ -211,6 +213,7 @@ One paid feature lets a person see who looked at them. With Vibe+, they see the 
 | The posts on a club's Board | The club's members. Also its followers with a verified school email, unless the club turned that off. Followers do not see the replies (section 5e) |
 | A club's member list | The club's members. For a club that anyone can join, any signed-in account also sees on the Map the members who show that club on their profile |
 | A club's follower list, who RSVP'd to its events and who checked in at them | The club's owner and officers. The people in an event's chat also see who is in it, and the first few who marked Going (up to 8) |
+| Club events, with Going and Interested totals | Any signed-in account, except an event its club marks "Members only", which only the club's members see |
 | How many people checked in at an event | Any signed-in account that can see the event, once at least 5 have checked in. The club's owner and officers see the exact number. So does anyone who can see the check-in screen at the door |
 | Drafts, saved posts, your mute list, your personal calendar, the clubs you hid from your profile and your list of the clubs you follow | Only you. A club's owner and officers still see that you follow it |
 | Your sign-in email, school email and personal email | Only you, except your starter name (section 3a). A short form of your sign-in email can be emailed to your own school or personal inbox (section 4) |
@@ -237,7 +240,7 @@ This means every account, verified or not, at every campus.
 
 - Everything above, plus your comments and reposts, and the lists of the people you follow and who follows you.
 - Totals of likes, views and saves on each post. The author gets a notification naming each liker. Vibe shows nobody else who liked, and shows nobody who saved.
-- Club events, with Going and Interested totals and, once at least 5 people have checked in at one, how many did.
+- Club events, with Going and Interested totals and, once at least 5 people have checked in at one, how many did. One exception: an event its club marks "Members only", which only its members see. Only they can RSVP to it or check themselves in.
 - Search finds verified accounts that finished setting up, across both universities. The Map lists people by campus and major. For a club that anyone can join, it also lists the members who show that club on their profile.
 - For any account: when it was made, when its handle last changed and its total profile views. No screen shows the department or school an account typed at set-up, but a signed-in account could still read it.
 
@@ -278,7 +281,7 @@ Vibe has direct chats, group chats and club rooms.
 
 In the app, the "only the owner and officers" choice reads "Only officers post".
 
-New members can read a room's whole history. A follower who can read the Board also sees its earlier posts by the club's current owner and officers. In a room where the club chose who can post, you can still read, vote in polls and take a sign-up spot. The room tells you the rule, for example "Only officers post here." It does not list the people who were picked.
+New members can read a room's whole history. A follower who can read the Board also sees its earlier posts by the club's current owner and officers. An event marked "Members only" cannot be shared on the Board, and a follower never sees one there. In a room where the club chose who can post, you can still read, vote in polls and take a sign-up spot. The room tells you the rule, for example "Only officers post here." It does not list the people who were picked.
 
 - **Polls and sign-ups.** With names on, the members who can open the room see who picked what, and sign-ups always show them the names. A follower reading the Board sees only the totals. In an "Anonymous" poll nobody in the club can see who voted. Your vote is still stored with your account, so the cofounder with direct access (section 1) could see how you voted.
 - **Blocks in club rooms.** You each see a blank in place of the other's messages. One exception: a post on the Board by the club's owner or an officer shows to every member, and to every follower who can read the Board, block or not. If the club's owner or an officer blocks a follower, that follower can no longer read the Board. The blank only hides messages on screen, so treat what you write in a club room as readable by every member, including someone you blocked.
@@ -294,7 +297,7 @@ A club is run by its owner and its officers. Only the owner makes a member an of
   - followers, with the date each first followed. You are on it from the moment you ask to join, unless one of you blocked the other;
   - invites and their outcome;
   - who RSVP'd to the club's events;
-  - who checked in at the club's events, including people who are not members or did not RSVP, and who marked Going but did not check in;
+  - who checked in at the club's events, including people who are not members or did not RSVP, and who marked Going but did not check in. At an event marked "Members only", only members can check themselves in;
   - the people added to a room, with the date each was added.
 
   They can give a member a title, which shows on that member's profile unless the member hides the club or the title. They can stop followers reading the Board. They can remove a follower without that person being told: that person can follow again, but cannot read the Board until they join. They can mark a person who marked Going or Interested as here, take one person's check-in off, and clear all of an event's check-ins. And they can delete any post made as the club.
@@ -400,7 +403,7 @@ Vibe does not delete things just because they are old. They stay until you, a cl
 | Messages | The sender deletes the message (a "Message deleted" note stays in its place) or their account. In club rooms, also when the room, the event or the club is deleted, or the account that wrote the Board post above it |
 | A pin on a message | Someone in the chat unpins it, the message is deleted, or the Vibe team removes the message |
 | An event's chat | Deleted with the event. It closes to new messages 7 days after the event ends |
-| RSVPs | You take yours back, the club takes you out (upcoming events only), or the event, the club or your account is deleted |
+| RSVPs | You take yours back, or the event, the club or your account is deleted. For an upcoming event, also when the club takes you out, or marks that event "Members only" while you are not a member |
 | Event check-ins | You remove yours, the club's owner or an officer takes it off or clears the event's check-ins, or the event, the club or your account is deleted. Leaving the club, or being taken out of it, does not remove them |
 | Events | An owner or officer cancels the event, or the club or the account that made it is deleted |
 | Join requests and invites | The club or your account is deleted |

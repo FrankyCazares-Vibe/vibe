@@ -83,12 +83,33 @@ const OLD_KEYS = [
   "org",
 ];
 const CHECKIN_KEYS = ["checkin_open", "checked_in_count", "viewer_checked_in"];
+/** Oct 22, 2026 ("Members only" events): the very last key. */
+const VISIBILITY_KEYS = ["visibility"];
 
-test("the old keys keep their order, and the three check-in keys come last", () => {
+test("the old keys keep their order, the three check-in keys come next, visibility last", () => {
   const item = toEventListItem(ROW, CTX);
-  assert.deepEqual(Object.keys(item), [...OLD_KEYS, ...CHECKIN_KEYS]);
+  assert.deepEqual(Object.keys(item), [...OLD_KEYS, ...CHECKIN_KEYS, ...VISIBILITY_KEYS]);
   const withRow = toEventListItem(ROW, { ...CTX, checkin: { open: true, count: 7, viewerCheckedIn: true } });
-  assert.deepEqual(Object.keys(withRow), [...OLD_KEYS, ...CHECKIN_KEYS]);
+  assert.deepEqual(Object.keys(withRow), [...OLD_KEYS, ...CHECKIN_KEYS, ...VISIBILITY_KEYS]);
+  // The row read with EVENT_ROW_COLUMNS carries `visibility` after created_at;
+  // it leaves its select-order place and lands last.
+  const read = { id: ROW.id, org_id: ORG, creator_id: ME, title: ROW.title, description: ROW.description,
+    starts_at: ROW.starts_at, ends_at: ROW.ends_at, location: ROW.location, created_at: ROW.created_at,
+    visibility: "members", creator: ROW.creator };
+  assert.deepEqual(Object.keys(toEventListItem(read, CTX)), [...OLD_KEYS, ...CHECKIN_KEYS, ...VISIBILITY_KEYS]);
+});
+
+test("visibility: \"members\" stays; missing, null or junk reads \"everyone\"", () => {
+  assert.equal(toEventListItem({ ...ROW, visibility: "members" }, CTX).visibility, "members");
+  assert.equal(toEventListItem({ ...ROW, visibility: "everyone" }, CTX).visibility, "everyone");
+  assert.equal(toEventListItem(ROW, CTX).visibility, "everyone", "a row without the column");
+  assert.equal(toEventListItem({ ...ROW, visibility: null }, CTX).visibility, "everyone");
+  assert.equal(toEventListItem({ ...ROW, visibility: "Members" }, CTX).visibility, "everyone");
+});
+
+test("EVENT_ROW_COLUMNS names visibility last", async () => {
+  const { EVENT_ROW_COLUMNS } = (await import(spec)) as typeof import("./event-item");
+  assert.equal(EVENT_ROW_COLUMNS.split(",").at(-1), "visibility");
 });
 
 test("without a check-in row: not open, no count, not checked in", () => {

@@ -696,6 +696,17 @@ export default async function OrgProfilePage({ params }: Params) {
           audience={org.audience}
           counts={toolsCounts}
           viewerId={user?.id ?? null}
+          // Tools open in place (Oct 22, 2026): the role decides the
+          // owner-only controls; the setup list's fields one by one, so the
+          // setup link's id never reaches the browser.
+          role={officerRole}
+          setup={{
+            view: setup
+              ? { steps: setup.steps, done: setup.done, total: setup.total, complete: setup.complete }
+              : null,
+            hasLogo: !!org.logo_url,
+            hasBanner: !!org.banner_url,
+          }}
         />
       ) : null}
 

@@ -126,7 +126,7 @@ const ROOM_B = "cccccccc-0000-4000-8000-00000000000b";
 const NOW = new Date("2026-10-08T20:00:00Z");
 
 const events: EventRow[] = [
-  { id: EV_A, title: "Fall Formal", starts_at: "2026-10-08T23:30:00+00:00", ends_at: "2026-10-09T03:00:00+00:00", location: "Alumni Hall", org_id: ORG1 },
+  { id: EV_A, title: "Fall Formal", starts_at: "2026-10-08T23:30:00+00:00", ends_at: "2026-10-09T03:00:00+00:00", location: "Alumni Hall", org_id: ORG1, visibility: "members" },
   { id: EV_B, title: "Bake Sale", starts_at: "2026-10-01T15:00:00+00:00", ends_at: "2026-10-01T18:00:00+00:00", location: null, org_id: ORG2 },
   { id: EV_C, title: "No room yet", starts_at: "2026-10-20T15:00:00+00:00", ends_at: "2026-10-20T18:00:00+00:00", location: "", org_id: ORG1 },
 ];
@@ -192,8 +192,10 @@ test("the four reads, and every EventRef field per the rules of 5.5", async () =
     viewer_status: "going",
     going_count: 2,
     maybe_count: 1,
+    visibility: "members",
   });
-  // B: no row, but an admin of its club; ended a week ago → closed; location "" when null.
+  // B: no row, but an admin of its club; ended a week ago → closed; location "" when null;
+  // no `visibility` on the row → "everyone" (Oct 22, 2026: the column's default).
   assert.deepEqual(refs.get(EV_B), {
     id: EV_B,
     title: "Bake Sale",
@@ -205,6 +207,7 @@ test("the four reads, and every EventRef field per the rules of 5.5", async () =
     viewer_status: null,
     going_count: 0,
     maybe_count: 0,
+    visibility: "everyone",
   });
   // C: no room at all → room_id null even though the viewer is a member of its club.
   assert.equal(refs.get(EV_C)?.room_id, null);
@@ -296,4 +299,18 @@ test("a database without migration A (channels.event_id missing, 42703) answers 
 test("no service role configured answers null", async () => {
   (globalThis as unknown as { __vibeFakeServiceClient: unknown }).__vibeFakeServiceClient = undefined;
   assert.equal(await eventRefsFor(events, VIEWER, { now: NOW }), null);
+});
+
+// Oct 22, 2026 ("Members only" events): `visibility` comes from the row
+// given, read safely: only an exact "members" is members-only.
+test("visibility: \"members\" stays, anything else reads \"everyone\"", async () => {
+  install(happy);
+  const odd = [
+    { ...events[0], visibility: "members" },
+    { ...events[1], visibility: "MEMBERS" },
+    { ...events[2], visibility: null },
+  ];
+  const refs = await eventRefsFor(odd, VIEWER, { now: NOW, counts: false });
+  assert.ok(refs);
+  assert.deepEqual([EV_A, EV_B, EV_C].map((id) => refs.get(id)?.visibility), ["members", "everyone", "everyone"]);
 });

@@ -8,7 +8,7 @@
  * button is at least 44px tall.
  */
 import Link from "next/link";
-import type { CSSProperties, JSX, ReactNode } from "react";
+import { createContext, useContext, type CSSProperties, type JSX, type ReactNode } from "react";
 import { Drawer } from "vaul";
 
 import { eyebrowStyle, lineStyle, quietStyle, titleStyle } from "@/components/orgs/club-tool-styles";
@@ -19,32 +19,75 @@ const SANS = "DM Sans, sans-serif";
  * "‹ <club>" (or "‹ Club tools") at the top, then the page's title and its
  * grey line. A sub-page passes `club`: its grey line then starts with the
  * club's name as a link to the club page, so both ways back are one tap.
+ *
+ * In the computer's tools panel on the club page (ClubToolsPanel.tsx; Oct
+ * 22, 2026) the screen never leaves the page: `onBack` makes ‹ a button
+ * (back to the screen under it, or the arc), `onClose` puts the panel's ×
+ * at the other end of that row, the title is the panel's heading (an h2,
+ * `titleId` names the panel by it) and the club's name is plain words, since
+ * the club page is already right there.
  */
+type HeaderBack = { backHref: string; onBack?: never } | { onBack: () => void; backHref?: never };
+
 export function ToolsHeader({
   backHref,
+  onBack,
   backLabel,
   title,
   sub,
   club,
-}: {
-  backHref: string;
+  onClose,
+  closeLabel = "Close",
+  titleId,
+}: HeaderBack & {
   backLabel: string;
   title: string;
   sub?: string;
   club?: { name: string; handle: string };
+  onClose?: () => void;
+  closeLabel?: string;
+  titleId?: string;
 }): JSX.Element {
+  const backInner = (
+    <>
+      <svg aria-hidden width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M15 18l-6-6 6-6" />
+      </svg>
+      <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{backLabel}</span>
+    </>
+  );
+  const Heading = onBack ? "h2" : "h1";
+  const back = onBack ? (
+    <button type="button" className="vibe-press" aria-label={`Back to ${backLabel}`} onClick={onBack} style={backButtonStyle}>
+      {backInner}
+    </button>
+  ) : (
+    <Link href={backHref} className="vibe-press" style={backLinkStyle}>
+      {backInner}
+    </Link>
+  );
   return (
     <header style={{ marginBottom: 18 }}>
-      <Link href={backHref} className="vibe-press" style={backLinkStyle}>
-        <svg aria-hidden width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M15 18l-6-6 6-6" />
-        </svg>
-        <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{backLabel}</span>
-      </Link>
-      <h1 style={{ ...titleStyle, marginTop: 6 }}>{title}</h1>
+      {/* The phone pages keep the bare link, as before; the row is the panel's. */}
+      {onClose ? (
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+          {back}
+          <button type="button" className="vibe-press" aria-label={closeLabel} onClick={onClose} style={closeButtonStyle}>
+            <svg aria-hidden width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
+              <path d="M6 6l12 12M18 6L6 18" />
+            </svg>
+          </button>
+        </div>
+      ) : (
+        back
+      )}
+      <Heading id={titleId} style={{ ...titleStyle, marginTop: 6 }}>
+        {title}
+      </Heading>
       {sub || club ? (
         <p style={{ ...quietStyle, marginTop: 4, fontSize: 13 }}>
-          {club ? (
+          {club && onBack ? <span style={{ fontWeight: 600 }}>{club.name}</span> : null}
+          {club && !onBack ? (
             <Link href={`/orgs/${encodeURIComponent(club.handle)}`} style={clubLinkStyle}>
               {club.name}
             </Link>
@@ -226,6 +269,15 @@ export function FilterBox({ value, onChange, label }: { value: string; onChange:
 }
 
 /**
+ * Where the sheets of a screen in the computer's tools panel go (Oct 22,
+ * 2026; ClubToolsPanel.tsx provides it): along the bottom of the panel's
+ * column, `width` wide, rather than the middle of the window, and dark like
+ * the panel (`vibe-night-island`), in Light too. No provider (every phone
+ * page), no change.
+ */
+export const ToolSheetPlacement = createContext<{ width: number } | null>(null);
+
+/**
  * A bottom sheet (vaul), above the phone's tab bar (9988) and under the
  * toasts (12000), the layers ClubOptionsSheet uses. Swipe down, the
  * backdrop or a Cancel row closes it.
@@ -241,11 +293,16 @@ export function ToolSheet({
   onClose: () => void;
   children: ReactNode;
 }): JSX.Element {
+  const inPanel = useContext(ToolSheetPlacement);
   return (
     <Drawer.Root open onOpenChange={(o) => { if (!o) onClose(); }}>
       <Drawer.Portal>
         <Drawer.Overlay style={sheetOverlayStyle} />
-        <Drawer.Content style={sheetContentStyle} aria-describedby={undefined}>
+        <Drawer.Content
+          className={inPanel ? "vibe-night-island" : undefined}
+          style={inPanel ? { ...sheetContentStyle, left: "auto", width: inPanel.width, maxWidth: inPanel.width, margin: 0 } : sheetContentStyle}
+          aria-describedby={undefined}
+        >
           <Drawer.Handle style={sheetHandleStyle} />
           <Drawer.Title style={sheetHeadingStyle}>{title}</Drawer.Title>
           {note ? <div style={sheetNoteStyle}>{note}</div> : null}
@@ -405,6 +462,34 @@ const backLinkStyle: CSSProperties = {
   fontSize: 14,
   fontWeight: 600,
   textDecoration: "none",
+};
+
+/** The panel's ‹: the link's look, as a button. */
+const backButtonStyle: CSSProperties = {
+  ...backLinkStyle,
+  minWidth: 0,
+  border: "none",
+  borderRadius: 999,
+  background: "transparent",
+  cursor: "pointer",
+  WebkitTapHighlightColor: "transparent",
+};
+
+/** The panel's ×: a 44px round, quiet. */
+const closeButtonStyle: CSSProperties = {
+  width: 44,
+  height: 44,
+  flexShrink: 0,
+  display: "grid",
+  placeItems: "center",
+  marginRight: -6,
+  padding: 0,
+  borderRadius: 999,
+  border: "1px solid var(--hairline)",
+  background: "rgba(var(--scrim-rgb),0.05)",
+  color: "var(--charcoal)",
+  cursor: "pointer",
+  WebkitTapHighlightColor: "transparent",
 };
 
 const personNameStyle: CSSProperties = {

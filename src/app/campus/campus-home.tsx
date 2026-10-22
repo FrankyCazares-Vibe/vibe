@@ -67,6 +67,15 @@ import {
 import { CheckinSlot } from "@/components/events/checkin/CheckinSlot";
 import { HereToggle, hereRequestsOut, type ConfirmOff } from "@/components/events/checkin/HereToggle";
 import { StartCheckinAction } from "@/components/events/checkin/StartCheckinAction";
+import { LockGlyph, MembersOnlyChip } from "@/components/events/MembersOnlyChip";
+import {
+  EVENT_VISIBILITIES,
+  eventVisibility,
+  isMembersOnly,
+  MEMBERS_ONLY_COPY,
+  visibilityHint,
+  type EventVisibility,
+} from "@/components/events/members-only";
 import { useClubMute, type ClubMuteFn } from "@/components/mobile/PostViewerMobile";
 import { SharePostSheet } from "@/components/mobile/SharePostSheet";
 import { UserCard, type UserCardProps } from "@/components/network/UserCard";
@@ -10225,6 +10234,10 @@ export type CampusEvent = {
   checkin_open?: boolean;
   checked_in_count?: number | null;
   viewer_checked_in?: boolean;
+  // Members only events (Oct 22, 2026, PLAN-2.md): who can see it. GET
+  // /api/events and PATCH send it from this deploy on; optional, and read
+  // through members-only.ts, so a payload without it is "everyone".
+  visibility?: EventVisibility;
   org: {
     id: string;
     handle: string;
@@ -10650,6 +10663,19 @@ export function EventCard({
   const [status, setStatus] = useState<"going" | "maybe" | null>(ev.viewer_status);
   const [going, setGoing] = useState(ev.going_count);
   const [interested, setInterested] = useState(ev.interested_count);
+  // Members only (Oct 22, 2026): a flip to Members only takes non-members'
+  // RSVPs off on the server, and the list swaps in (or refetches) the saved
+  // event. The totals follow the server's new numbers instead of the ones
+  // this card started with, or "12 going" (and Cancel's "tell 12 people")
+  // would outlive the flip. Adjusted while rendering, React's "a prop
+  // changed" pattern, and only when the server's numbers move, so an
+  // optimistic tap stands until its own refetch lands.
+  const [served, setServed] = useState({ going: ev.going_count, interested: ev.interested_count });
+  if (served.going !== ev.going_count || served.interested !== ev.interested_count) {
+    setServed({ going: ev.going_count, interested: ev.interested_count });
+    setGoing(ev.going_count);
+    setInterested(ev.interested_count);
+  }
   const [busy, setBusy] = useState(false);
   // The route answered 403 `campus_visiting` (the page guessed "home"
   // wrong): the card switches to its RSVP-at-home state for good.
@@ -10788,6 +10814,13 @@ export function EventCard({
               }}
             >
               by @{ev.creator.handle}
+            </div>
+          ) : null}
+          {/* Members only (Oct 22, 2026): only the club's members can see
+              this card at all, so the chip tells them it isn't public. */}
+          {isMembersOnly(ev) ? (
+            <div style={{ marginTop: 6 }}>
+              <MembersOnlyChip tone="glass" />
             </div>
           ) : null}
         </div>
@@ -12288,6 +12321,9 @@ export function CreateEventModal(props: CreateEventModalProps) {
     location: editing?.location ?? "",
     startsAt: editing ? toLocalDateTimeInputValue(new Date(editing.starts_at)) : defaultStartIsoLocal(),
     endsAt: editing ? toLocalDateTimeInputValue(new Date(editing.ends_at)) : defaultEndIsoLocal(),
+    // Members only (Oct 22, 2026): an edit keeps the event's own choice; a
+    // new event starts at Everyone, the column's default.
+    visibility: eventVisibility(editing),
   }));
   const [title, setTitle] = useState(initial.title);
   const [description, setDescription] = useState(initial.description);
@@ -12295,10 +12331,13 @@ export function CreateEventModal(props: CreateEventModalProps) {
   const [startsAt, setStartsAt] = useState(initial.startsAt);
   const [endsAt, setEndsAt] = useState(initial.endsAt);
   const [orgId, setOrgId] = useState<string>(editing?.org_id ?? eligibleOrgs[0]?.id ?? "");
+  const [visibility, setVisibility] = useState<EventVisibility>(initial.visibility);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [badField, setBadField] = useState<EventFormField | null>(null);
   const errorId = useId();
+  // The club the hint names: the event's own on an edit, else the picked one.
+  const clubName = editing ? editing.org?.name : eligibleOrgs.find((o) => o.id === orgId)?.name;
 
   // What an edit would send: only the fields that changed. A picker compares
   // as the string it shows, so an untouched start (which may be in the past
@@ -12315,6 +12354,7 @@ export function CreateEventModal(props: CreateEventModalProps) {
   if (endsAt !== initial.endsAt && Number.isFinite(endMs)) {
     changes.ends_at = new Date(endMs).toISOString();
   }
+  if (visibility !== initial.visibility) changes.visibility = visibility;
   const dirty = !editing || Object.keys(changes).length > 0;
   const canSubmit = !busy && !!title.trim() && !!startsAt && !!endsAt && !!orgId && dirty;
 
@@ -12354,6 +12394,7 @@ export function CreateEventModal(props: CreateEventModalProps) {
             starts_at: new Date(startMs).toISOString(),
             ends_at: new Date(endMs).toISOString(),
             org_id: orgId,
+            visibility,
           },
           quiet: true,
           failure: "Couldn't create the event.",
@@ -12538,6 +12579,16 @@ export function CreateEventModal(props: CreateEventModalProps) {
             </select>
           </label>
         ) : null}
+        {/* After the club, because its line names the club (Oct 22, 2026).
+            Not on an old event with no club: "members" needs a club. */}
+        {!editing || editing.org_id ? (
+          <EventVisibilityField
+            value={visibility}
+            onChange={setVisibility}
+            disabled={busy}
+            hint={visibilityHint(clubName, !!editing && initial.visibility === "everyone" && visibility === "members")}
+          />
+        ) : null}
         {error ? (
           <div
             id={errorId}
@@ -12604,6 +12655,110 @@ export function CreateEventModal(props: CreateEventModalProps) {
       </motion.div>
     </div>,
     document.body,
+  );
+}
+
+/**
+ * "Who can see it: Everyone / Members only" (Oct 22, 2026, PLAN-2.md): the
+ * create/edit form's two-option choice, with one quiet line under it that
+ * says what Members only means for this club. Fraternities keep some events
+ * private; the database keeps a members-only event from followers and
+ * signed-out visitors (batch E1), this only sets it.
+ *
+ * Not a `<label>` (as ChoiceField explains: clicking a label would pick the
+ * first option), and it keeps the radio group's keyboard contract: one tab
+ * stop, the arrows and Home / End move the choice and the focus. Each option
+ * is 44px tall. Drawn in the modal's own dark glass, like its other fields.
+ */
+function EventVisibilityField({
+  value,
+  onChange,
+  disabled,
+  hint,
+}: {
+  value: EventVisibility;
+  onChange: (next: EventVisibility) => void;
+  disabled: boolean;
+  hint: string;
+}) {
+  const labelId = useId();
+  const hintId = useId();
+  const buttonsRef = useRef(new Map<EventVisibility, HTMLButtonElement | null>());
+
+  const pick = (next: EventVisibility) => {
+    onChange(next);
+    buttonsRef.current.get(next)?.focus();
+  };
+
+  const onKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (disabled) return;
+    const at = EVENT_VISIBILITIES.indexOf(value);
+    const last = EVENT_VISIBILITIES.length - 1;
+    let to: number;
+    if (e.key === "ArrowRight" || e.key === "ArrowDown") to = at >= last ? 0 : at + 1;
+    else if (e.key === "ArrowLeft" || e.key === "ArrowUp") to = at <= 0 ? last : at - 1;
+    else if (e.key === "Home") to = 0;
+    else if (e.key === "End") to = last;
+    else return;
+    e.preventDefault();
+    pick(EVENT_VISIBILITIES[to]);
+  };
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+      <span id={labelId} style={eventModalLabel}>
+        {MEMBERS_ONLY_COPY.question}
+      </span>
+      <div
+        role="radiogroup"
+        aria-labelledby={labelId}
+        aria-describedby={hintId}
+        onKeyDown={onKeyDown}
+        style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 8 }}
+      >
+        {EVENT_VISIBILITIES.map((v) => {
+          const on = value === v;
+          return (
+            <button
+              key={v}
+              type="button"
+              role="radio"
+              aria-checked={on}
+              disabled={disabled}
+              tabIndex={on ? 0 : -1}
+              className="vibe-press"
+              ref={(el) => {
+                buttonsRef.current.set(v, el);
+              }}
+              onClick={() => onChange(v)}
+              style={{
+                ...modalSegmentStyle(on),
+                minHeight: 44,
+                padding: "0 12px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 6,
+                textAlign: "center",
+                fontFamily: "DM Sans, sans-serif",
+                fontSize: 13,
+                fontWeight: 700,
+                cursor: disabled ? "default" : "pointer",
+              }}
+            >
+              {v === "members" ? <LockGlyph size={12} /> : null}
+              {v === "members" ? MEMBERS_ONLY_COPY.members : MEMBERS_ONLY_COPY.everyone}
+            </button>
+          );
+        })}
+      </div>
+      <span
+        id={hintId}
+        style={{ fontFamily: "DM Sans, sans-serif", fontSize: 12, lineHeight: 1.4, color: "rgba(255,255,255,0.55)" }}
+      >
+        {hint}
+      </span>
+    </div>
   );
 }
 

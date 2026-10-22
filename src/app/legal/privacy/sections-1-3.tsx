@@ -42,6 +42,10 @@ export function Sections1To3() {
         </li>
       </LegalUL>
       <LegalP>
+        In the app itself, they can also see the events a club marks
+        &ldquo;Members only&rdquo; (<Sec to="5b">section 5b</Sec>).
+      </LegalP>
+      <LegalP>
         They can look an account up by its exact email address, and the result
         does not show the address. The admin tools do not show email addresses
         (except on the waitlist), passwords, résumés or billing details. They
@@ -207,8 +211,8 @@ export function Sections1To3() {
           title or removes you as a follower, we store who did it and when.
         </li>
         <li>
-          Club events, your RSVPs (Going or Interested) and personal calendar
-          entries.
+          Club events and whether each is marked &ldquo;Members only&rdquo;,
+          your RSVPs (Going or Interested) and personal calendar entries.
         </li>
         <li>
           Event check-ins: the club events you checked in at. You check in

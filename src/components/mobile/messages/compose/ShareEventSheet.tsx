@@ -4,6 +4,8 @@ import { useEffect, useId, useState } from "react";
 
 import type { ChatMessage, EventRef, RoomKind, SpaceResponse } from "@/lib/chat/types";
 import { eventWhen, eventWhenSpoken } from "@/lib/chat/when";
+import { MembersOnlyChip } from "@/components/events/MembersOnlyChip";
+import { isMembersOnly, MEMBERS_ONLY_COPY, shareRefused } from "@/components/events/members-only";
 import { asLoadFailure, LoadFailed, type LoadFailure } from "@/components/feedback/LoadFailed";
 import { vibeRequest } from "@/lib/feedback/request";
 
@@ -27,6 +29,12 @@ import { charCount, eventValid, NOTE_MAX, shareCta, sheetRoomLine } from "./shee
  * event chat.`, the CTA `Share to <room>` → `POST …/cards { type: "event",
  * event_id, note? }`. The `New event · Officers only` link is not built
  * (open point 14.19).
+ *
+ * Members only (Oct 22, 2026, PLAN-2.md): a members-only event's row carries
+ * the "Members only" chip. On the Board, which followers read, those rows
+ * can't be picked (`aria-disabled`, dimmed) and one line under the list says
+ * why; the cards route refuses them there too. Every other room is
+ * members-only already, so there they can be picked as usual.
  */
 export type ShareEventSheetProps = {
   roomId: string;
@@ -51,6 +59,7 @@ export function ShareEventSheet({ roomId, roomKind, roomName, clubName, orgHandl
   const t = palette(night);
   const ids = useId();
   const eventsLabelId = `${ids}-events`;
+  const boardOffId = `${ids}-board-off`;
   const [events, setEvents] = useState<Events>({ status: "loading" });
   const [retryToken, setRetryToken] = useState(0);
   const [selected, setSelected] = useState<string | null>(null);
@@ -81,7 +90,12 @@ export function ShareEventSheet({ roomId, roomKind, roomName, clubName, orgHandl
     };
   }, [orgHandle, retryToken]);
 
-  const valid = events.status === "ok" && eventValid(selected, note);
+  // A refused row can't be picked, and a pick a Retry turned members-only
+  // can't be sent either.
+  const refused = (ev: EventRef) => shareRefused(roomKind, ev);
+  const selectedRefused = events.status === "ok" && events.rows.some((ev) => ev.id === selected && refused(ev));
+  const anyRefused = events.status === "ok" && events.rows.some(refused);
+  const valid = events.status === "ok" && eventValid(selected, note) && !selectedRefused;
 
   const submit = () => {
     if (!valid || selected === null) return;
@@ -114,17 +128,23 @@ export function ShareEventSheet({ roomId, roomKind, roomName, clubName, orgHandl
     list = <div style={{ minHeight: 44, display: "flex", alignItems: "center", fontSize: 13, fontWeight: 500, color: t.secondary }}>No upcoming events.</div>;
   } else {
     list = events.rows.map((ev) => {
-      const on = selected === ev.id;
+      const off = refused(ev);
+      const on = selected === ev.id && !off;
+      const membersOnly = isMembersOnly(ev);
       const when = eventWhen(ev.starts_at, zone);
       const parts = whenParts(when);
+      const spoken = shareEventLabel(ev.title, eventWhenSpoken(ev.starts_at, zone), ev.location, on);
       return (
         <button
           key={ev.id}
           type="button"
           role="radio"
           aria-checked={on}
-          aria-label={shareEventLabel(ev.title, eventWhenSpoken(ev.starts_at, zone), ev.location, on)}
+          aria-disabled={off || undefined}
+          aria-describedby={off ? boardOffId : undefined}
+          aria-label={off ? `${spoken}, ${MEMBERS_ONLY_COPY.boardOffSpoken}` : membersOnly ? `${spoken}, ${MEMBERS_ONLY_COPY.chip.toLowerCase()}` : spoken}
           onClick={() => {
+            if (off) return;
             clearField();
             setSelected(ev.id);
           }}
@@ -142,7 +162,10 @@ export function ShareEventSheet({ roomId, roomKind, roomName, clubName, orgHandl
             display: "flex",
             alignItems: "center",
             gap: 12,
-            cursor: "pointer",
+            cursor: off ? "default" : "pointer",
+            // Dimmed, not hidden: the officer sees the event is there and
+            // reads, just below, why the Board can't take it.
+            opacity: off ? 0.55 : 1,
             WebkitTapHighlightColor: "transparent",
           }}
         >
@@ -152,7 +175,10 @@ export function ShareEventSheet({ roomId, roomKind, roomName, clubName, orgHandl
           </span>
           <span style={{ flexGrow: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 2 }}>
             <span style={{ fontFamily: SERIF, fontWeight: 700, fontSize: 16.5, lineHeight: 1.2, letterSpacing: -0.2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{ev.title}</span>
-            <span style={{ fontSize: 12.5, fontWeight: 500, lineHeight: 1.3, color: t.secondary, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{shareEventLine(when, ev.location)}</span>
+            <span style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
+              {membersOnly ? <MembersOnlyChip size="row" /> : null}
+              <span style={{ minWidth: 0, fontSize: 12.5, fontWeight: 500, lineHeight: 1.3, color: t.secondary, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{shareEventLine(when, ev.location)}</span>
+            </span>
           </span>
           {on ? <CoralDisc size={22} /> : <Ring size={22} color={t.ringGrey} />}
         </button>
@@ -167,6 +193,11 @@ export function ShareEventSheet({ roomId, roomKind, roomName, clubName, orgHandl
           Upcoming events
         </FieldLabel>
         {list}
+        {anyRefused ? (
+          <p id={boardOffId} style={{ margin: 0, fontSize: 12.5, lineHeight: 1.35, fontWeight: 500, color: t.secondary }}>
+            {MEMBERS_ONLY_COPY.boardOff}
+          </p>
+        ) : null}
       </div>
 
       <div style={{ marginTop: 12, boxSizing: "border-box", paddingTop: 12, borderTop: "1px solid rgba(var(--scrim-rgb),0.07)", display: "flex", flexDirection: "column", gap: 8 }}>

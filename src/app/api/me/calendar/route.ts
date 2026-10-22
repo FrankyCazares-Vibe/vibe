@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { eventRefsFor, type EventRow } from "@/lib/chat/event-refs";
 import { chatV2For } from "@/lib/chat/flag-server";
 import type { CalendarRoomFields } from "@/lib/chat/types";
+import { eventVisibilityOf, type EventVisibility } from "@/lib/events/validate";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 
@@ -15,6 +16,7 @@ type RsvpRow = {
     ends_at: string;
     location: string;
     org_id: string | null;
+    visibility?: string | null;
     org: { handle: string; name: string; verified: boolean } | null;
   } | null;
 };
@@ -88,6 +90,8 @@ export type CalendarEntry =
       // so the old green and amber can't be mistaken for a personal colour.
       viewer_status: "going" | "maybe";
       org: { handle: string; name: string; verified: boolean } | null;
+      /** Who can see it (Oct 22, 2026): "members" = the club's members only, the chip. */
+      visibility: EventVisibility;
     } & CalendarRoomFields
   | {
       kind: "personal";
@@ -110,6 +114,10 @@ export type CalendarEntry =
  * `rsvp` entry carries `org_id`, `room_id` and `room_state`. With
  * `chat_v2` off for the caller, or when the refs could not be built, all
  * three are null; the calendar never answers 500 for them. Not gated.
+ *
+ * Members only (Oct 22, 2026): the RSVPs are read on the viewer's client, so
+ * `event_visible` drops a members-only event of a club they left (the inner
+ * join leaves the row out); each `rsvp` entry carries `visibility`.
  */
 export async function GET(req: Request) {
   const supabase = await createSupabaseServerClient();
@@ -134,7 +142,7 @@ export async function GET(req: Request) {
       .from("rsvps")
       .select(
         "status," +
-          "event:events!inner(id,title,starts_at,ends_at,location,org_id," +
+          "event:events!inner(id,title,starts_at,ends_at,location,org_id,visibility," +
           "org:orgs(handle,name,verified)" +
           ")",
       )
@@ -167,7 +175,7 @@ export async function GET(req: Request) {
   if (flagOn && rsvpRows.length > 0) {
     const events: EventRow[] = rsvpRows.map((row) => {
       const ev = row.event as NonNullable<RsvpRow["event"]>;
-      return { id: ev.id, title: ev.title, starts_at: ev.starts_at, ends_at: ev.ends_at, location: ev.location, org_id: ev.org_id ?? null };
+      return { id: ev.id, title: ev.title, starts_at: ev.starts_at, ends_at: ev.ends_at, location: ev.location, org_id: ev.org_id ?? null, visibility: ev.visibility ?? null };
     });
     try {
       refs = await eventRefsFor(events, user.id, { counts: false });
@@ -195,6 +203,7 @@ export async function GET(req: Request) {
       location: ev.location,
       viewer_status: row.status as "going" | "maybe",
       org: ev.org ?? (ev.org_id ? orgById.get(ev.org_id) ?? null : null),
+      visibility: eventVisibilityOf(ev.visibility),
       ...rooms,
     });
   }

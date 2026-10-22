@@ -78,6 +78,7 @@ test("create: a normal event passes, trimmed, with ISO times", () => {
     location: "Union 201",
     starts_at: iso(NOW + DAY),
     ends_at: iso(NOW + DAY + 2 * HOUR),
+    visibility: "everyone",
   });
 });
 
@@ -134,6 +135,7 @@ test("edit: a field left out keeps its stored value; one sent replaces it", () =
     location: "Union 305",
     startsAt: stored.starts_at,
     endsAt: stored.ends_at,
+    visibility: "everyone",
   });
   // Sent but not a string: "" (so `null` clears a description, as POST reads it).
   assert.equal(readEventFields({ description: null }, stored).description, "");
@@ -181,4 +183,57 @@ test("edit: the word filter checks only what changed", () => {
   // The same word is refused on a create (no stored value to compare with).
   const create = checkEventFields(readEventFields({ ...good, description: legacy.description }), NOW);
   assert.deepEqual(problemOf(create), { kind: "content_blocked", status: 422, field: "description" });
+});
+
+// ── Who can see it (Oct 22, 2026, "Members only" events) ────────────────────
+
+test("visibility: left out of a create is everyone; everyone and members pass; anything else is 400 invalid_visibility", () => {
+  const check = (patch: Record<string, unknown>) => checkEventFields(readEventFields({ ...good, ...patch }), NOW);
+  const omitted = check({});
+  assert.ok(omitted.ok);
+  assert.equal(omitted.value.visibility, "everyone");
+  for (const value of ["everyone", "members", " members "]) {
+    const r = check({ visibility: value });
+    assert.ok(r.ok, value);
+    assert.equal(r.value.visibility, value.trim());
+  }
+  for (const value of ["Members", "friends", "", 1, null, true, ["members"]]) {
+    assert.deepEqual(problemOf(check({ visibility: value })), {
+      kind: "invalid", status: 400, code: "invalid_visibility",
+      error: "Choose who can see it: Everyone or Members only",
+    }, JSON.stringify(value));
+  }
+});
+
+test("visibility is checked last and never word-filtered: an older refusal still wins", () => {
+  const r = checkEventFields(readEventFields({ ...good, title: "", visibility: "friends" }), NOW);
+  assert.equal((problemOf(r) as { code: string }).code, "title_required");
+  const times = checkEventFields(readEventFields({ ...good, starts_at: "nope", visibility: "friends" }), NOW);
+  assert.equal((problemOf(times) as { code: string }).code, "invalid_times");
+  const blockedWord = checkEventFields(readEventFields({ ...good, visibility: BLOCKED }), NOW);
+  assert.equal((problemOf(blockedWord) as { code: string }).code, "invalid_visibility", "an enum, not text");
+});
+
+test("visibility on an edit: left out keeps the stored value (junk stored reads everyone); sent replaces it", () => {
+  const membersOnly = { ...stored, visibility: "members" };
+  const kept = checkEventFields(readEventFields({ location: "Union 305" }, membersOnly), NOW, membersOnly);
+  assert.ok(kept.ok);
+  assert.equal(kept.value.visibility, "members");
+  const flipped = checkEventFields(readEventFields({ visibility: "everyone" }, membersOnly), NOW, membersOnly);
+  assert.ok(flipped.ok);
+  assert.equal(flipped.value.visibility, "everyone");
+  const legacy = checkEventFields(readEventFields({}, { ...stored, visibility: null }), NOW, stored);
+  assert.ok(legacy.ok);
+  assert.equal(legacy.value.visibility, "everyone");
+  const junk = checkEventFields(readEventFields({ visibility: "secret" }, membersOnly), NOW, membersOnly);
+  assert.equal((problemOf(junk) as { code: string }).code, "invalid_visibility");
+});
+
+test("eventVisibilityOf: only an exact \"members\" is members-only", async () => {
+  const { eventVisibilityOf, EVENT_VISIBILITIES } = await import("./validate");
+  assert.deepEqual([...EVENT_VISIBILITIES], ["everyone", "members"]);
+  assert.deepEqual(
+    ["members", "everyone", "MEMBERS", " members", null, undefined, 3].map((v) => eventVisibilityOf(v)),
+    ["members", "everyone", "everyone", "everyone", "everyone", "everyone", "everyone"],
+  );
 });

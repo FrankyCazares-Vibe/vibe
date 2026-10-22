@@ -1,5 +1,7 @@
 "use client";
 
+import { MembersOnlyChip } from "@/components/events/MembersOnlyChip";
+import { isMembersOnly } from "@/components/events/members-only";
 import type { EventRef, Person } from "@/lib/chat/types";
 import { eventTime } from "@/lib/chat/when";
 
@@ -24,6 +26,11 @@ import { pillState, rsvpPill, statePillText, whoIsGoingLabel } from "./helpers";
  * Drawn INSIDE the event chat's scroller, above the rows (`EventChat` hands it
  * to `RoomThread` as `header`; S71 amendment 3, E): it scrolls away with the
  * messages.
+ *
+ * Members only (Oct 22, 2026, PLAN-2.md): a members-only event carries the
+ * "Members only" chip in the hero's top right corner, away from the state
+ * pill (a long "Ended · chat open N more days" pill fills the bottom row).
+ * Desktop's `EventPanel` draws this same block, so both get it from here.
  */
 export type EventAboutProps = {
   event: EventRef & { going: Person[] };
@@ -118,6 +125,7 @@ export function EventAbout({ event, night, now, onRsvp }: EventAboutProps) {
         {live ? <div aria-hidden="true" style={{ position: "absolute", zIndex: -1, left: -66, top: 34, width: 340, height: 132, pointerEvents: "none", background: t.bloom }} /> : null}
         <div style={{ position: "relative", height: 96, boxSizing: "border-box", padding: 10, borderRadius: 18, overflow: "hidden", border: `1px solid ${t.hairline}`, display: "flex", alignItems: "flex-end", background: HERO_BG }}>
           <StatePill event={event} now={now} />
+          {isMembersOnly(event) ? <MembersOnlyChip tone="hero" style={{ position: "absolute", top: 10, right: 10 }} /> : null}
         </div>
         <div role="group" aria-label="Plans" style={{ marginTop: 8, display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 8 }}>
           <div style={tile}>

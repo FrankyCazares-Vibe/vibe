@@ -76,9 +76,12 @@ export function Section5e() {
       <LegalP>
         New members can read a room&apos;s whole history. A follower who can
         read the Board also sees its earlier posts by the club&apos;s current
-        owner and officers. In a room where the club chose who can post, you can still read, vote in polls and take a
-        sign-up spot. The room tells you the rule, for example &ldquo;Only
-        officers post here.&rdquo; It does not list the people who were picked.
+        owner and officers. An event marked &ldquo;Members only&rdquo; cannot
+        be shared on the Board, and a follower never sees one there. In a room
+        where the club chose who can post, you can still read, vote in polls
+        and take a sign-up spot. The room tells you the rule, for example
+        &ldquo;Only officers post here.&rdquo; It does not list the people who
+        were picked.
       </LegalP>
       <LegalUL bullets>
         <li>

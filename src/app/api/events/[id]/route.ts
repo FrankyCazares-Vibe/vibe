@@ -15,7 +15,7 @@ import {
   type EventOrgCard,
 } from "@/lib/events/event-item";
 import { collectCancelRecipients, sendCancelNotices } from "@/lib/events/notify-cancel";
-import { checkEventFields, readEventFields } from "@/lib/events/validate";
+import { checkEventFields, eventVisibilityOf, readEventFields } from "@/lib/events/validate";
 import {
   contentBlockedResponse,
   requireCanPublish,
@@ -60,6 +60,12 @@ function fail(status: number, code: string, error: string) {
 const GONE = "That event is no longer available.";
 const NOT_OFFICER = "Only the club's owner and admins can change its events.";
 const FAILED = "Request failed";
+
+/** Ids per `in (...)` filter, as the chat reads do: the request line stays short. */
+const IDS_PER_REQUEST = 100;
+/** RSVPs read per page (PostgREST's max rows), and a runaway guard far above any club's list. */
+const RSVP_PAGE = 1000;
+const RSVP_MAX = 20_000;
 
 /** The event as both handlers read it (service role: `org_id` must be trusted). */
 type EventRecord = Omit<EventListRow, "creator">;
@@ -180,7 +186,11 @@ export async function DELETE(_req: Request, ctx: RouteContext) {
 
   let recipientIds: string[] = [];
   if (notify) {
-    const collected = await collectCancelRecipients(service, event.id, user.id);
+    // A members-only event's notice names it, so only its club's current
+    // members hear (Oct 22, 2026): someone who left keeps no window on it.
+    const collected = await collectCancelRecipients(service, event.id, user.id, {
+      membersOf: eventVisibilityOf(event.visibility) === "members" ? event.org_id : null,
+    });
     if (!collected.ok) return fail(500, "request_failed", FAILED);
     recipientIds = collected.ids;
   }
@@ -229,6 +239,83 @@ export async function DELETE(_req: Request, ctx: RouteContext) {
     return NextResponse.json({ ok: true, notified: sent.notified, notify_failed: true });
   }
   return NextResponse.json({ ok: true, notified: sent.notified });
+}
+
+/**
+ * A flip to Members only (Oct 22, 2026; PLAN-2.md E1): the event's RSVPs by
+ * people who are not members of its club come off, so its Going count and
+ * its officers' list hold members only. From the moment the edit saved,
+ * `rsvps_insert_own` / `rsvps_update_own` refuse a non-member's new RSVP
+ * (event_audience_ok, 20261025100000), so what this reads is everything
+ * there will be; it runs after the save for that reason. The event hasn't
+ * ended (PATCH refuses that), so these are all upcoming RSVPs. Check-ins
+ * already made stay: they are a record of who was at the door.
+ *
+ * SERVICE ROLE: `rsvps` shows an officer only the rows of events they
+ * manage, which is right today but a policy detail this must not lean on,
+ * and `org_members` hides a roster from non-members. NEVER THROWS: a failed
+ * read or delete is logged (counts and the event id, never a person) and
+ * `ok: false`; the edit stays saved, and event_visible already keeps the
+ * event from those people whatever happens here.
+ */
+async function dropNonMemberRsvps(
+  service: ReturnType<typeof createSupabaseServiceClient>,
+  eventId: string,
+  orgId: string,
+): Promise<{ ok: boolean; dropped: number }> {
+  const tag = "[events/:id PATCH members-only rsvps]";
+  try {
+    const userIds: string[] = [];
+    for (let from = 0; from < RSVP_MAX; from += RSVP_PAGE) {
+      const { data, error } = await service
+        .from("rsvps")
+        .select("user_id")
+        .eq("event_id", eventId)
+        .order("user_id", { ascending: true })
+        .range(from, from + RSVP_PAGE - 1);
+      if (error) {
+        console.error(tag, "read", { eventId, code: error.code });
+        return { ok: false, dropped: 0 };
+      }
+      const page = (data ?? []) as { user_id?: unknown }[];
+      for (const row of page) if (typeof row.user_id === "string") userIds.push(row.user_id);
+      if (page.length < RSVP_PAGE) break;
+    }
+    const members = new Set<string>();
+    for (let i = 0; i < userIds.length; i += IDS_PER_REQUEST) {
+      const { data, error } = await service
+        .from("org_members")
+        .select("user_id")
+        .eq("org_id", orgId)
+        .in("user_id", userIds.slice(i, i + IDS_PER_REQUEST));
+      if (error) {
+        console.error(tag, "members", { eventId, code: error.code });
+        return { ok: false, dropped: 0 };
+      }
+      for (const row of (data ?? []) as { user_id?: unknown }[]) {
+        if (typeof row.user_id === "string") members.add(row.user_id);
+      }
+    }
+    const strangers = userIds.filter((id) => !members.has(id));
+    let dropped = 0;
+    for (let i = 0; i < strangers.length; i += IDS_PER_REQUEST) {
+      const { data, error } = await service
+        .from("rsvps")
+        .delete()
+        .eq("event_id", eventId)
+        .in("user_id", strangers.slice(i, i + IDS_PER_REQUEST))
+        .select("user_id");
+      if (error) {
+        console.error(tag, "delete", { eventId, code: error.code, dropped });
+        return { ok: false, dropped };
+      }
+      dropped += (data ?? []).length;
+    }
+    return { ok: true, dropped };
+  } catch (err) {
+    console.error(tag, { eventId, error: err instanceof Error ? err.message : "unknown" });
+    return { ok: false, dropped: 0 };
+  }
 }
 
 /**
@@ -288,8 +375,9 @@ async function itemFor(
 /**
  * PATCH /api/events/[id] -> { ok: true, event: <one GET /api/events item> }
  *
- * Edits title, description, location, starts_at, ends_at (POST's names); a
- * field left out keeps its stored value. Only while the event hasn't ended.
+ * Edits title, description, location, starts_at, ends_at and visibility
+ * (POST's names; visibility "everyone" | "members", Oct 22, 2026); a field
+ * left out keeps its stored value. Only while the event hasn't ended.
  * Validation is POST's own (src/lib/events/validate.ts), checking only what
  * changed: an unchanged title isn't re-run through a word list that grew
  * since, and an event already under way keeps its past start (a moved start
@@ -304,6 +392,11 @@ async function itemFor(
  * logged; a failure there never changes this answer). The refresh is bounded
  * (at most 50 update statements, 10 at a time, none started after 5 s: S71
  * repair R2), so a room full of Event cards cannot hold this request.
+ * A flip to Members only takes the RSVPs of non-members off
+ * (`dropNonMemberRsvps`, awaited, its result only logged), before the
+ * answer's counts are read. The event's Board cards stay where they are:
+ * every follower read leaves a members-only event's card out (the space,
+ * the Board page and its previews), and members still see them.
  *
  * Gate: requireCanPublish, like POST (editing is publishing: Terms, a
  * verified school email, no restriction), then a current owner / admin.
@@ -311,8 +404,8 @@ async function itemFor(
  * school_email_required · 400 invalid_json · 404 not_found ·
  * 403 org_role_required / org_hidden · 403 org_unverified · 409 event_ended ·
  * 400 org_cannot_change · 400 title_required / title_too_long /
- * description_too_long / location_too_long / invalid_times ·
- * 422 content_blocked (+ field) · 500 request_failed.
+ * description_too_long / location_too_long / invalid_times /
+ * invalid_visibility · 422 content_blocked (+ field) · 500 request_failed.
  * Rate limited: 30 per 10 minutes per officer, like post edits.
  */
 export async function PATCH(req: Request, ctx: RouteContext) {
@@ -394,6 +487,17 @@ export async function PATCH(req: Request, ctx: RouteContext) {
       console.error("[events/:id PATCH cards] some event cards kept their old text", {
         eventId: event.id,
         updated: refreshed.updated,
+      });
+    }
+  }
+
+  // Members only now, and not before: non-members' RSVPs come off.
+  if (eventVisibilityOf(saved.visibility) === "members" && eventVisibilityOf(event.visibility) !== "members") {
+    const dropped = await dropNonMemberRsvps(service, event.id, event.org_id);
+    if (!dropped.ok) {
+      console.error("[events/:id PATCH members-only] some non-member RSVPs stayed", {
+        eventId: event.id,
+        dropped: dropped.dropped,
       });
     }
   }

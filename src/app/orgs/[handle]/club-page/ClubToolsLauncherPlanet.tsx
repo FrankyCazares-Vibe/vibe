@@ -19,16 +19,24 @@ import { ARC } from "./club-tools-arc";
  * `.vibe-arc-planet`), and at any width while the arc is out (the cover's
  * button opens it from 900px, and the arc turns round it); the loops are
  * CSS, behind reduce motion.
+ *
+ * `merged` (Oct 22, 2026): a tool is open in place, in the panel the planet
+ * grew into (ClubToolsPanel.tsx). The planet swells a touch and fades as its
+ * bloom, the same colours, takes over, and comes back when the bloom has
+ * shrunk back into it.
  */
 export function ClubToolsPlanet({
   open,
   shown,
+  merged = false,
   count,
   label,
   buttonRef,
   onOpen,
 }: {
   open: boolean;
+  /** The panel is out (or its bloom still on its way back): the planet is the panel now. */
+  merged?: boolean;
   /** Open, or the arc still closing: keeps the planet drawn under 1024px (globals.css). */
   shown: boolean;
   /** The coral count ("3", "9+"), or null when no one is waiting. */
@@ -43,9 +51,13 @@ export function ClubToolsPlanet({
       className="vibe-arc-planet vibe-night-island"
       data-open={shown ? "" : undefined}
       initial={false}
-      animate={{ x: open ? -ARC.openShift : 0, scale: open ? ARC.openScale : 1 }}
+      animate={{
+        x: open ? -ARC.openShift : 0,
+        scale: open ? (merged ? ARC.openScale * 1.2 : ARC.openScale) : 1,
+        opacity: open && merged ? 0 : 1,
+      }}
       whileHover={open ? undefined : { x: -5, transition: SPRING_SNAPPY }}
-      transition={SPRING_SOFT}
+      transition={{ default: SPRING_SOFT, opacity: SPRING_SNAPPY }}
       style={{ ...wrapStyle, zIndex: open ? 1001 : 900, pointerEvents: open ? "none" : undefined }}
     >
       <span
@@ -125,13 +137,15 @@ const bodyStyle: CSSProperties = {
   boxShadow: "0 0 0 1px rgba(255,196,160,0.30), -8px 0 26px rgba(0,0,0,0.45)",
 };
 
-/** The planet's colours, an illustration: the same in Light and Night. */
+/** The planet's colours, an illustration: the same in Light and Night. Its bloom wears them too. */
+export const PLANET_SURFACE =
+  "radial-gradient(circle at 68% 70%, #040820 0%, #0A1B4E 28%, #17527E 45%, #2F8F7A 57%, #C8A04A 69%, #FF7A3F 78%, #FF5C35 86%, #FFB894 100%)";
+
 const surfaceStyle: CSSProperties = {
   position: "absolute",
   inset: 0,
   borderRadius: "50%",
-  background:
-    "radial-gradient(circle at 68% 70%, #040820 0%, #0A1B4E 28%, #17527E 45%, #2F8F7A 57%, #C8A04A 69%, #FF7A3F 78%, #FF5C35 86%, #FFB894 100%)",
+  background: PLANET_SURFACE,
   transformOrigin: "50% 50%",
 };
 
