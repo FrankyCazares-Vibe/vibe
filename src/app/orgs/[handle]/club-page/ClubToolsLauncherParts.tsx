@@ -20,7 +20,7 @@ import { avatarTint, initials, type ArcPersonLine, type ArcTool, type ArcToolId 
  */
 
 /** The board's line glyphs (24-unit boxes, drawn at 1.8 stroke). */
-export const ARC_ICON: Record<ArcToolId | "lock" | "campus" | "exit" | "link" | "share" | "eye", string> = {
+export const ARC_ICON: Record<ArcToolId | "lock" | "campus" | "exit" | "link" | "share" | "eye" | "pencil", string> = {
   invite: "M12 3v12M7 8l5-5 5 5M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6",
   share: "M12 3v12M7 8l5-5 5 5M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6",
   members: "M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M13 7a4 4 0 1 1-8 0 4 4 0 0 1 8 0ZM22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75",
@@ -34,6 +34,7 @@ export const ARC_ICON: Record<ArcToolId | "lock" | "campus" | "exit" | "link" | 
   exit: "M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4M10 17l5-5-5-5M15 12H3",
   link: "M10 13a5 5 0 0 0 7.07 0l3-3a5 5 0 0 0-7.07-7.07l-1.5 1.5M14 11a5 5 0 0 0-7.07 0l-3 3a5 5 0 0 0 7.07 7.07l1.5-1.5",
   eye: "M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12ZM15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z",
+  pencil: "M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z",
 };
 
 export function ArcGlyph({ d, size = 20 }: { d: string; size?: number }): JSX.Element {

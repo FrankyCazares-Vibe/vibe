@@ -54,6 +54,7 @@ export function ClubToolsArc({
   onClose,
   onLeave,
   onInvite,
+  onEditPage,
   onCount,
   onChanged,
   panel,
@@ -74,6 +75,8 @@ export function ClubToolsArc({
   onClose: (giveFocusBack: boolean) => void;
   onLeave: (href: string) => void;
   onInvite: () => void;
+  /** Club settings' Edit page: the arc closes and the Edit page dialog opens. */
+  onEditPage: () => void;
   onCount: (n: number) => void;
   onChanged: () => void;
   /** The tools panel's screens, while a tool is open in place. */
@@ -254,7 +257,7 @@ export function ClubToolsArc({
           ) : tool === "events" ? (
             <EventsCard key="events" {...common} />
           ) : tool === "settings" ? (
-            <SettingsCard key="settings" {...common} />
+            <SettingsCard key="settings" {...common} onEditPage={onEditPage} />
           ) : tool === "invite" ? (
             <InviteCard key="invite" {...common} onInvite={onInvite} />
           ) : null}

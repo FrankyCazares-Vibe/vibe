@@ -182,8 +182,12 @@ export function EventsCard({ club, onClose, onLeave }: ArcCardProps): JSX.Elemen
   );
 }
 
-/** Who can join and who it's open to, in Edit page's own words (join-copy.ts). */
-export function SettingsCard({ club, onClose, onLeave, onPanel }: ArcCardProps): JSX.Element {
+/**
+ * Edit page first (Oct 22, 2026, Franky: "put the edit page button in
+ * settings"; on a computer it is no longer beside Share page), then who can
+ * join and who it's open to, in Edit page's own words (join-copy.ts).
+ */
+export function SettingsCard({ club, onClose, onLeave, onPanel, onEditPage }: ArcCardProps & { onEditPage: () => void }): JSX.Element {
   const policy = WHO_CAN_JOIN_OPTIONS.find((o) => o.value === club.joinPolicy);
   const openTo = openToOptions(null).find((o) => o.value === club.audience);
   const rows: { icon: string; name: string; meta: string }[] = [
@@ -207,8 +211,13 @@ export function SettingsCard({ club, onClose, onLeave, onPanel }: ArcCardProps):
         />
       }
     >
+      <ArcRise index={1}>
+        <button type="button" className="vibe-arc-row" aria-haspopup="dialog" onClick={onEditPage} style={thingButtonStyle}>
+          <ThingLine icon={ARC_ICON.pencil} name="Edit page" meta="Name, background, about and links" />
+        </button>
+      </ArcRise>
       {rows.map((r, i) => (
-        <ArcRise key={r.name} index={i + 1}>
+        <ArcRise key={r.name} index={i + 2}>
           <ThingLine icon={r.icon} name={r.name} meta={r.meta} />
         </ArcRise>
       ))}

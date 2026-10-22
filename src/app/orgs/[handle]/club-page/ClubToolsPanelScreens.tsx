@@ -22,6 +22,8 @@ import { clubPageUrl } from "./share-page";
  * the ways out: All Club tools' rows open their screen on top, Edit the page
  * and Past events close everything and act on the club page, and Club
  * settings' Leave and Delete close it before the page is read again or left.
+ * Club settings' Edit page (PLAN-5, Oct 22, 2026) is the same way out as
+ * Edit the page: the panel closes and the dialog opens.
  */
 export function PanelScreenBody({ entry, host }: { entry: PanelEntry; host: PanelHost }): JSX.Element {
   const { club } = host;
@@ -37,7 +39,7 @@ export function PanelScreenBody({ entry, host }: { entry: PanelEntry; host: Pane
     case "followers":
       return <FollowersScreen club={club} />;
     case "settings":
-      return <SettingsScreen club={club} onLeft={host.onLeft} onDeleted={host.onDeleted} />;
+      return <SettingsScreen club={club} onEditPage={host.onEditPage} onLeft={host.onLeft} onDeleted={host.onDeleted} />;
     case "setup":
       return (
         <SetupScreen

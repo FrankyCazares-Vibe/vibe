@@ -280,6 +280,13 @@ export function ClubToolsLauncher({
   }, [returning]);
 
   const clubPath = `/orgs/${encodeURIComponent(handle)}`;
+  // Edit page lives in Club settings on a computer (Oct 22, 2026): the
+  // arc's card and the panel's screen both open it here. Edit page gives
+  // focus back itself (OfficerActions.tsx), so there is none to hand back.
+  const editPage = useCallback(() => {
+    close(false);
+    if (!openEditPage()) router.push(`${clubPath}?edit=1`, { scroll: false });
+  }, [close, router, clubPath]);
   const panelHost: PanelHost | null = useMemo(() => {
     if (!toolsClub) return null;
     return {
@@ -290,12 +297,7 @@ export function ClubToolsLauncher({
       onBack: backPanel,
       onClose: () => close(true),
       onOpen: openPanel,
-      onEditPage: () => {
-        // Edit page takes focus from its own button (OfficerActions.tsx) and
-        // gives it back there, so there is none to hand back here.
-        close(false);
-        if (!openEditPage()) router.push(`${clubPath}?edit=1`, { scroll: false });
-      },
+      onEditPage: editPage,
       onPastEvents: () => {
         // As the Past events card's link: the Events tab, on this page.
         close(true);
@@ -313,7 +315,7 @@ export function ClubToolsLauncher({
         router.replace("/campus?tab=orgs");
       },
     };
-  }, [toolsClub, setup, live, backPanel, close, openPanel, router, clubPath]);
+  }, [toolsClub, setup, live, backPanel, close, openPanel, editPage, router, clubPath]);
 
   if (!mounted) return null;
   return createPortal(
@@ -342,6 +344,7 @@ export function ClubToolsLauncher({
             onClose={close}
             onLeave={leave}
             onInvite={() => setInviteOpen(true)}
+            onEditPage={editPage}
             onCount={setLiveRequests}
             onChanged={markChanged}
             panel={panel}

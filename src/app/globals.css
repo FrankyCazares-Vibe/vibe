@@ -2598,6 +2598,18 @@ html {
 .vibe-club-join > * > * button {
   width: 100%;
 }
+/* The Campus bar and the officers' + Post and Club tools pills (PLAN-5,
+   Oct 22, 2026) belong to the app frame on a computer: hidden everywhere
+   else, phones and windows under 900px included, and shown by the 900px
+   block below. The pills draw their own `display` inline, hence the
+   !important. */
+.vibe-club-campusbar {
+  display: none;
+}
+.vibe-club-row-post,
+.vibe-club-row-tools {
+  display: none !important;
+}
 .vibe-club-tabs {
   display: flex;
   margin-top: 22px;
@@ -2668,7 +2680,8 @@ html {
   }
   /* Inside the app frame (signed in, on a computer: Oct 21, 2026) the left
      menu does the top bar's job (its Campus goes back to Campus → Orgs), so
-     the bar goes and the cover starts below a little air. The officers'
+     the bar goes and the cover starts below a little air (since Oct 22,
+     under the Campus bar, below). The officers'
      Club tools float out of the right edge then (ClubToolsLauncher.tsx, the
      Arc), not beside the page, so their page is one column too. Under 900px
      nothing here applies: the frame steps aside and the page is as it was.
@@ -2681,6 +2694,28 @@ html {
      fixed layers (dialogs, the Club tools planet) to <main>. */
   .vibe-app-shell .vibe-club-topnav {
     display: none !important;
+  }
+  /* The Campus bar (ClubCampusBar.tsx; Franky's pick A, Oct 22, 2026):
+     Campus's own top bar, Orgs lit, the first thing in <main>. <main> is
+     the middle column and pads nothing on a computer, so the bar spans it
+     edge to edge at the very top and scrolls with the page, as on Campus;
+     the club's column keeps its 16px of air under it, and the cover's
+     widths below measure the column, not the bar. The planet sits halfway
+     down the window, well under the bar's 64px. The cover's corner is
+     empty here: + and Club tools are pills in the row under the bio (+ Post
+     first, in coral; Club tools only until the planet shows, below), and
+     Edit page is in Club settings. Its button stays mounted, out of sight,
+     so Club settings and ?edit=1 still open the dialog. */
+  .vibe-app-shell .vibe-club-campusbar {
+    display: block;
+  }
+  .vibe-app-shell .vibe-club-cover-actions,
+  .vibe-app-shell .vibe-club-edit-page {
+    display: none !important;
+  }
+  .vibe-app-shell .vibe-club-row-post,
+  .vibe-app-shell .vibe-club-row-tools {
+    display: inline-flex !important;
   }
   .vibe-app-shell .vibe-org-shell {
     max-width: 760px !important;
@@ -2719,6 +2754,18 @@ html {
 @media (min-width: 1024px) {
   .vibe-arc-planet {
     display: block;
+  }
+  /* The planet is the way to Club tools from here: the row's Club tools
+     pill (shown in the frame from 900px, above) goes (PLAN-5, Oct 22). */
+  .vibe-app-shell .vibe-club-row-tools {
+    display: none !important;
+  }
+  /* A hidden club's officers have nothing left in that row here: no + Post
+     or Share page, Edit page in Club settings, Club tools on the planet.
+     The empty row gives back its 16px (Oct 22, 2026). Only the margin, so
+     nothing the row holds (Edit page's dialog) is ever hidden by it. */
+  .vibe-app-shell .vibe-club-actions:not(:has(> button:not(.vibe-club-edit-page), > .vibe-club-join)) {
+    margin-top: 0;
   }
 }
 .vibe-arc-planet-hit:focus-visible,

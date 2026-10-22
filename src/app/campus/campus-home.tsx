@@ -484,9 +484,11 @@ function campusEyebrow(tab: string, label: string | null): string {
  *
  * CampusHome provides it. The default is "home, not provided", so the pieces
  * the phone and the org page share (CampusBanner, EventCard) behave as they
- * did unless something tells them otherwise.
+ * did unless something tells them otherwise. A club page's Campus bar
+ * (CampusTopBar, in ClubCampusBar.tsx; Oct 22, 2026) provides it too, hence
+ * the exports.
  */
-type CampusView = {
+export type CampusView = {
   provided: boolean;
   viewingId: string | null;
   homeId: string | null;
@@ -505,7 +507,7 @@ const HOME_CAMPUS_VIEW: CampusView = {
   url: (path) => path,
 };
 
-const CampusViewContext = createContext<CampusView>(HOME_CAMPUS_VIEW);
+export const CampusViewContext = createContext<CampusView>(HOME_CAMPUS_VIEW);
 
 function useCampusView(): CampusView {
   return useContext(CampusViewContext);
@@ -5663,8 +5665,10 @@ const TOPBAR_ELLIPSIS: React.CSSProperties = {
  * - IU: all crimson; Purdue: all black with a gold bottom hairline;
  * - none (before the first campus answer, or no campus): neutral ink.
  * The phone keeps CampusBanner; each page mounts exactly one of the two.
+ * A club page on a computer mounts it too, Orgs lit (ClubCampusBar.tsx,
+ * Oct 22, 2026): its tabs go to Campus instead of switching in place.
  */
-function CampusTopBar({
+export function CampusTopBar({
   active,
   onTabChange,
   hideMap,

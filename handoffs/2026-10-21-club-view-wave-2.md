@@ -329,3 +329,22 @@ Shipped from the wave 1 session (`busy-aryabhata-7b6991`); this branch's own ses
   clubs), applied with the connector, row renamed, post-check: the eleven-name rule, validated, still the only one,
   clubs unchanged, grants unchanged. Then `NEW_BACKDROPS_LIVE = true` (backdrops.ts + its test). Checked locally:
   the picker offers all ten in order and saving Cardinal stores `cardinal` (put back afterwards).
+- **Oct 22, later (Franky, looking at a club page on his computer: "include a way to go back to campus, move the
+  top right buttons"; three options on the canvas, he picked A, then "put the edit page button in settings ...
+  settings arc"):** plan `handoffs/2026-10-22-club-tools-arc/PLAN-5.md`.
+  - **Campus's own top bar on the club page** (computer, app frame, from 900px): `club-page/ClubCampusBar.tsx`
+    mounts `CampusTopBar` (now exported from campus-home.tsx, with `CampusViewContext`) with **Orgs lit**. Tabs go
+    to that Campus tab, the search is Campus's, Campuses opens the same picker (a pick goes to that campus's Orgs).
+    Reached while visiting another campus, the bar shows that campus and keeps `campus=` (hrefs in
+    `club-campus-bar.ts`, 11 tests).
+  - **The cover's corner is empty there.** The row under the bio is **+ Post** (coral, opens the same Post sheet)
+    and **Share page**; from 900 to 1023px, where the planet doesn't show, a **Club tools** pill too.
+  - **Edit page lives in Club settings:** the Arc's Club settings card opens with an Edit page row, and so does the
+    Club settings screen (panel and `/tools/settings`, which links to `?edit=1`). The page's Edit page button stays
+    mounted out of sight so `?edit=1` and the opener work; focus comes back to the planet (or the row's Club tools
+    pill), never to a hidden button.
+  - Phones, windows under 900px and signed-out visitors: unchanged (walked: phone shows Return to Organizations,
+    the cover's + and ≡, Edit page | Share page).
+  - Walked locally (Maya as officer, Blake as member) at 1440, 960, 860 and 390, Night and Light: all of the above,
+    search found Blake, Campuses opened, Feed went to `/campus?tab=feed`, no page errors, no sideways scroll.
+  - Not changed: the setup list and the Club tools page keep their own tops.

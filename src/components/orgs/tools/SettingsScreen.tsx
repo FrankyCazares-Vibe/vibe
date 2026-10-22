@@ -12,9 +12,16 @@
  * 2026) the host passes `onLeft` / `onDeleted`, so it can close the panel
  * first and then read the page again or go; without them, the page goes
  * where it always has.
+ *
+ * First, since Oct 22, 2026 (Franky: "put the edit page button in settings"),
+ * the Your page group: Edit page, the way in on a computer, where the club
+ * page's own Edit page button is out of sight (PLAN-5 item 4). The panel
+ * passes `onEditPage`; the settings page has none, so the row goes to the
+ * club page's `?edit=1`, which opens the same dialog there.
  */
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState, type CSSProperties } from "react";
+import { useEffect, useId, useRef, useState, type CSSProperties, type ReactNode } from "react";
 
 import { LoadFailed, asLoadFailure, type LoadFailure } from "@/components/feedback/LoadFailed";
 import {
@@ -37,15 +44,19 @@ import { clearClubsInCache } from "@/lib/orgs/clubs-in";
 import { ORG_COPY, fillCopy, leaveToastText, orgErrorCopy } from "@/lib/orgs/join-copy";
 
 import { LeaveWarning, useLeavePreview } from "../LeaveWarning";
-import { ConfirmRows, Group, SheetAction, ToolSheet, cardStyle } from "./tools-ui";
+import { PencilIcon } from "./icons";
+import { Chevron, ConfirmRows, Group, SheetAction, ToolSheet, cardStyle, rowItemStyle } from "./tools-ui";
 import type { ToolsClub } from "./types";
 
 export function SettingsScreen({
   club,
+  onEditPage,
   onLeft,
   onDeleted,
 }: {
   club: ToolsClub;
+  /** Edit page in the tools panel: the host closes the panel and opens the dialog, instead of going to `?edit=1`. */
+  onEditPage?: () => void;
   /** After leaving (the toast is said): instead of going to the club page. */
   onLeft?: () => void;
   /** After deleting (the toast is said): instead of going to Campus › Orgs. */
@@ -53,11 +64,94 @@ export function SettingsScreen({
 }) {
   return (
     <>
+      <YourPage club={club} onEditPage={onEditPage} />
       <BoardSetting club={club} />
       {club.role === "owner" ? <DeleteClub club={club} onDeleted={onDeleted} /> : <LeaveClub club={club} onLeft={onLeft} />}
     </>
   );
 }
+
+/**
+ * Your page: one row, Edit page, with what it covers under it. NavRow's look
+ * (the pencil, the words, the chevron), with a second line NavRow has no room
+ * for. Every officer who reaches Club settings may edit the page, a hidden
+ * club's too, so it always shows.
+ */
+function YourPage({ club, onEditPage }: { club: ToolsClub; onEditPage?: () => void }) {
+  const subId = useId();
+  const inner: ReactNode = (
+    <>
+      <span aria-hidden style={rowIconStyle}>
+        <PencilIcon />
+      </span>
+      <span style={{ flex: 1, minWidth: 0 }}>
+        <span style={{ display: "block", fontWeight: 600 }}>Edit page</span>
+        <span id={subId} style={{ ...quietStyle, display: "block", marginTop: 2 }}>
+          Name, background, about and links
+        </span>
+      </span>
+      <Chevron />
+    </>
+  );
+  return (
+    <Group label="Your page">
+      <li style={rowItemStyle}>
+        {onEditPage ? (
+          // It opens the Edit page dialog in place, as the page's own button does.
+          <button
+            type="button"
+            aria-label="Edit page"
+            aria-describedby={subId}
+            aria-haspopup="dialog"
+            onClick={onEditPage}
+            className="vibe-press"
+            style={rowStyle}
+          >
+            {inner}
+          </button>
+        ) : (
+          <Link
+            href={`/orgs/${encodeURIComponent(club.handle)}?edit=1`}
+            aria-label="Edit page"
+            aria-describedby={subId}
+            className="vibe-press"
+            style={rowStyle}
+          >
+            {inner}
+          </Link>
+        )}
+      </li>
+    </Group>
+  );
+}
+
+/** tools-ui's row and icon looks (they aren't exported), padded for the second line. */
+const rowStyle: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: 12,
+  width: "100%",
+  minHeight: 52,
+  boxSizing: "border-box",
+  padding: "10px 14px",
+  border: "none",
+  background: "transparent",
+  color: "var(--charcoal)",
+  fontFamily: "DM Sans, sans-serif",
+  fontSize: 15,
+  textAlign: "left",
+  textDecoration: "none",
+  cursor: "pointer",
+  WebkitTapHighlightColor: "transparent",
+};
+
+const rowIconStyle: CSSProperties = {
+  display: "inline-flex",
+  width: 22,
+  justifyContent: "center",
+  color: "var(--ink-2)",
+  flexShrink: 0,
+};
 
 /** The Board switch: read from the club, saved at once; a refusal toasts and leaves it as it was. */
 function BoardSetting({ club }: { club: ToolsClub }) {

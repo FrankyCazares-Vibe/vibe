@@ -12,13 +12,19 @@
  *   the page") opens it once, then comes off the address so a reload or
  *   Back doesn't open it again. The computer's
  *   tools panel opens it directly (`openEditPage`, club-tools-launcher.ts;
- *   Oct 22, 2026), as many times as it likes.
+ *   Oct 22, 2026), as many times as it likes. In the app frame from 900px
+ *   Edit page lives in Club settings (PLAN-5, Oct 22, 2026): the page passes
+ *   `inSettingsOnComputer` and the CSS hides the button there, but it stays
+ *   mounted so both doors still open the dialog.
  * - SharePageButton: the half-width "Share page" pill (share-page.ts).
  * - CoverOfficerButtons: + and Club tools, two round buttons for the cover's
  *   top-right corner. They draw no position of their own: the page places
  *   the row. In the app frame on a computer, Club tools brings the Arc
  *   out of the right edge (club-tools-launcher.ts; Oct 22, 2026); elsewhere
  *   it is the page.
+ * - RowPostButton and RowClubToolsButton (PLAN-5, Oct 22, 2026): the cover's
+ *   two, as pills in the row under the bio, for the app frame from 900px,
+ *   where the cover's corner is empty. The CSS decides when each shows.
  */
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
@@ -51,7 +57,27 @@ type EditProps = {
   initialMeetingTime: string;
   /** False: the database has no meeting_time column yet, so the field stays out. */
   meetingTimeReady: boolean;
+  /**
+   * In the app frame on a computer, where Edit page is in Club settings: the
+   * button carries `vibe-club-edit-page`, which the CSS hides from 900px.
+   */
+  inSettingsOnComputer?: boolean;
 };
+
+/** On the page and drawn: not removed, not under `display: none`. */
+function showing(el: HTMLElement | null): el is HTMLElement {
+  return !!el && el.isConnected && el.getClientRects().length > 0;
+}
+
+/**
+ * What had focus as Edit page opens, kept when `button` is out of sight
+ * (`el` null when nothing did); null when the button is in sight.
+ */
+function focusToKeep(button: HTMLElement | null): { el: HTMLElement | null } | null {
+  if (showing(button)) return null;
+  const active = document.activeElement;
+  return { el: active instanceof HTMLElement && active !== document.body ? active : null };
+}
 
 /**
  * "kept" = Edit page is mounted but out of sight under a picture upload,
@@ -68,13 +94,45 @@ export function EditPageButton(props: EditProps): JSX.Element {
   const [asset, setAsset] = useState<"logo" | "banner" | null>(null);
   const tookEditParam = useRef(false);
   const buttonRef = useRef<HTMLButtonElement | null>(null);
+  const editRef = useRef<EditState>("closed");
+  useEffect(() => {
+    editRef.current = edit;
+  });
 
-  // The tools panel's "Edit the page". Focus comes here first, so closing
-  // the dialog brings it back to this button, as if it had been pressed.
+  // Opened while this button is out of sight (Club settings in the app
+  // frame, Oct 22, 2026): the dialog can't hand focus back to a hidden
+  // button, so we keep what had it and hand it back ourselves on close.
+  // Null when the button is in sight: the dialog's own return (ModalShell,
+  // admin-actions.tsx) brings focus back to it.
+  const returnTo = useRef<{ el: HTMLElement | null } | null>(null);
+  // A frame late, after the dialog's own return: where focus was if it is
+  // still there and drawn (the Arc's row is gone by then), else the Arc's
+  // door (the planet from 1024px, the row's Club tools pill from 900 to
+  // 1023px), else this button if a narrower window shows it again, else
+  // left be. Opened from the button in sight but closing with it hidden (the
+  // window grew past 900px meanwhile): the dialog's return can't land on
+  // it, so the same doors are tried.
+  const giveFocusBack = () => {
+    const back = returnTo.current ?? (showing(buttonRef.current) ? null : { el: null });
+    if (!back) return;
+    returnTo.current = null;
+    window.requestAnimationFrame(() => {
+      const planet = document.querySelector<HTMLElement>(".vibe-arc-planet-hit");
+      const rowTools = document.querySelector<HTMLElement>(".vibe-club-row-tools");
+      [back.el, planet, rowTools, buttonRef.current].find(showing)?.focus({ preventScroll: true });
+    });
+  };
+
+  // The tools panel's "Edit the page". A button in sight takes focus first,
+  // so closing the dialog brings it back here, as if it had been pressed.
+  // Already open: nothing moves.
   useEffect(
     () =>
       registerEditPageOpener(() => {
-        buttonRef.current?.focus({ preventScroll: true });
+        if (editRef.current === "closed") {
+          returnTo.current = focusToKeep(buttonRef.current);
+          if (!returnTo.current) buttonRef.current?.focus({ preventScroll: true });
+        }
         setEdit("open");
       }),
     [],
@@ -83,6 +141,7 @@ export function EditPageButton(props: EditProps): JSX.Element {
   useEffect(() => {
     if (tookEditParam.current || searchParams.get("edit") !== "1") return;
     tookEditParam.current = true;
+    returnTo.current = focusToKeep(buttonRef.current);
     setEdit("open");
     const rest = new URLSearchParams(searchParams.toString());
     rest.delete("edit");
@@ -95,9 +154,12 @@ export function EditPageButton(props: EditProps): JSX.Element {
       <button
         ref={buttonRef}
         type="button"
-        className="vibe-press"
+        className={props.inSettingsOnComputer ? "vibe-press vibe-club-edit-page" : "vibe-press"}
         aria-haspopup="dialog"
-        onClick={() => setEdit("open")}
+        onClick={() => {
+          returnTo.current = null;
+          setEdit("open");
+        }}
         style={halfPillStyle}
       >
         Edit page
@@ -130,7 +192,10 @@ export function EditPageButton(props: EditProps): JSX.Element {
                   setEdit(dirty ? "kept" : "closed");
                 }
           }
-          onClose={() => setEdit("closed")}
+          onClose={() => {
+            setEdit("closed");
+            giveFocusBack();
+          }}
         />
       ) : null}
 
@@ -139,6 +204,9 @@ export function EditPageButton(props: EditProps): JSX.Element {
           orgHandle={orgHandle}
           kind={asset}
           onClose={() => {
+            // Kept: Edit page comes back and takes focus. Otherwise the
+            // picture was the last dialog up.
+            if (editRef.current !== "kept") giveFocusBack();
             setAsset(null);
             setEdit((e) => (e === "kept" ? "open" : e));
           }}
@@ -265,6 +333,79 @@ export function CoverOfficerButtons({
   );
 }
 
+/**
+ * The cover's + as the row's first pill, "+ Post" in coral (PLAN-5, Oct 22,
+ * 2026): the same PlusSheet. The page leaves it out on a hidden club, as
+ * the cover leaves out its +. `vibe-club-row-post`: the CSS shows it only in
+ * the app frame from 900px.
+ */
+export function RowPostButton({
+  orgId,
+  orgHandle,
+  orgName,
+  verified,
+  viewerRole,
+  boardId,
+}: {
+  orgId: string;
+  orgHandle: string;
+  orgName: string;
+  verified: boolean;
+  viewerRole: "owner" | "admin";
+  boardId: string | null;
+}): JSX.Element {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLButtonElement | null>(null);
+  // Back to the pill when the sheet is done, a frame late, as the cover's +.
+  const close = () => {
+    setOpen(false);
+    window.requestAnimationFrame(() => ref.current?.focus({ preventScroll: true }));
+  };
+  return (
+    <>
+      <button
+        ref={ref}
+        type="button"
+        className="vibe-press vibe-club-row-post"
+        aria-haspopup="dialog"
+        onClick={() => setOpen(true)}
+        style={postPillStyle}
+      >
+        <svg aria-hidden width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round">
+          <path d="M12 5v14M5 12h14" />
+        </svg>
+        Post
+      </button>
+      {open ? (
+        <PlusSheet club={{ orgId, orgHandle, orgName, verified, viewerRole, boardId }} onClose={close} />
+      ) : null}
+    </>
+  );
+}
+
+/**
+ * The cover's Club tools as a pill beside Share page (PLAN-5, Oct 22, 2026),
+ * for windows 900 to 1023px wide, where the Arc's planet doesn't show
+ * (`vibe-club-row-tools`: the CSS shows it only there). It brings the Arc
+ * out like the cover's; with no launcher up it is the Club tools page.
+ */
+export function RowClubToolsButton({ orgHandle }: { orgHandle: string }): JSX.Element {
+  return (
+    <Link
+      href={`/orgs/${encodeURIComponent(orgHandle)}/tools`}
+      className="vibe-press vibe-club-row-tools"
+      onClick={(e) => {
+        // A new tab or window still gets the page.
+        if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+        if (openClubToolsLauncher(e.currentTarget)) e.preventDefault();
+      }}
+      style={{ ...halfPillStyle, textDecoration: "none" }}
+    >
+      Club tools
+    </Link>
+  );
+}
+
 // ─── Looks ────────────────────────────────────────────────────────────────
 
 /** Half of the button row (C9 item 4): the page's dark glass, 44px. */
@@ -294,6 +435,15 @@ const squarePillStyle: CSSProperties = {
   flex: "0 0 44px",
   width: 44,
   padding: 0,
+};
+
+/** The row's + Post: the half pill in the brand coral, dark ink on it. */
+const postPillStyle: CSSProperties = {
+  ...halfPillStyle,
+  gap: 6,
+  border: "1px solid var(--coral)",
+  background: "var(--coral)",
+  color: "var(--on-coral)",
 };
 
 function ShareGlyph() {

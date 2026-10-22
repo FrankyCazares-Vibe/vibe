@@ -5,6 +5,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { Arrow } from "@/components/brand/Arrow";
 import { LoadFailed } from "@/components/feedback/LoadFailed";
+import { chatDesktopFor } from "@/lib/chat/flag-desktop-server";
 import { clubSetupPath } from "@/lib/club-links/redeem";
 import { loadClubSetup } from "@/lib/club-links/setup";
 import { MobileTabBar } from "@/components/mobile/MobileTabBar";
@@ -51,13 +52,20 @@ import { createSupabaseServiceClient } from "@/lib/supabase/service";
 import { BoardSection, ChannelsSection } from "./ChannelsSection";
 import { ClubAppFrame, showsAppFrame } from "./club-frame";
 import { AboutDetails, fmtDate } from "./club-page/AboutDetails";
+import { ClubCampusBar } from "./club-page/ClubCampusBar";
 import { ClubCover, ClubHeader, LockGlyph } from "./club-page/ClubHeader";
 import { ClubEventsProvider } from "./club-page/ClubEventsProvider";
 import { ClubToolsLauncher } from "./club-page/ClubToolsLauncher";
 import { MembershipBox } from "./club-page/MembershipBox";
 import { ClubSwitchSync } from "./club-page/ClubSwitchSync";
 import { MoreAboutUs } from "./club-page/MoreAboutUs";
-import { CoverOfficerButtons, EditPageButton, SharePageButton } from "./club-page/OfficerActions";
+import {
+  CoverOfficerButtons,
+  EditPageButton,
+  RowClubToolsButton,
+  RowPostButton,
+  SharePageButton,
+} from "./club-page/OfficerActions";
 import { SwitchChevron } from "./club-page/SwitchChevron";
 import { ClubToolsCard, NeedsYouLine } from "./club-page/ToolsCard";
 import type { ClubPageOrg } from "./club-page/types";
@@ -299,7 +307,7 @@ export default async function OrgProfilePage({ params }: Params) {
   const officerView = isSettingsOfficer(viewerRole);
   // Server-rendered per request; intentional Date.now() read.
   const nowMs = Date.now(); // eslint-disable-line react-hooks/purity
-  const [memberRes, followerCount, clubPosts, invitedByName, officerMayDeletePosts, boardFacts, mutedRes, setup, officerCounts] = await Promise.all([
+  const [memberRes, followerCount, clubPosts, invitedByName, officerMayDeletePosts, boardFacts, mutedRes, setup, officerCounts, desktopChat] = await Promise.all([
     service
       .from("org_members")
       .select("user_id", { count: "exact", head: true })
@@ -353,6 +361,10 @@ export default async function OrgProfilePage({ params }: Params) {
         })
       : Promise.resolve(null),
     user && officerView ? loadOfficerNumbers(service, supabase, orgId, user.id, nowMs) : Promise.resolve(null),
+    // The Campus bar's Chat pill hides when the `chat_desktop` switch is on
+    // for this student, as on Campus (campus/page.tsx). Asked only in the
+    // app frame, the one place the bar is mounted (PLAN-5, Oct 22, 2026).
+    user && framed ? chatDesktopFor(user.id) : Promise.resolve(false),
   ]);
   const { posts: postsRes, blocked: blockedAuthors } = clubPosts;
   if (memberRes.error) {
@@ -467,7 +479,10 @@ export default async function OrgProfilePage({ params }: Params) {
 
   // The owner and officers (C9): Edit page, the cover's + and Club tools,
   // the switch chevron, their two lines and, on a wide screen, the Club
-  // tools card. Not the cover buttons on a hidden club.
+  // tools card. Not the cover's + on a hidden club. In the app frame
+  // from 900px (PLAN-5, Oct 22, 2026) the cover's corner is empty: + and
+  // Club tools are pills in the row under the bio, and Edit page lives in
+  // Club settings (globals.css decides what shows where).
   const officerRole = officerView && (viewerRole === "owner" || viewerRole === "admin") ? viewerRole : null;
   // Out of the app frame the Club tools card is the page's own, beside the
   // club on a wide screen, as before; in it, Club tools come out of the right
@@ -510,6 +525,14 @@ export default async function OrgProfilePage({ params }: Params) {
         fontFamily: "DM Sans, sans-serif",
       }}
     >
+      {/* Campus's own top bar, Orgs lit (Franky's pick A, Oct 22, 2026):
+          the way back to Campus on a computer. <main> is the middle column,
+          so the bar spans it edge to edge, above the club's column, and
+          scrolls with the page as on Campus. Outside the night island: it
+          wears the school's colours and the app's own theme, as on Campus.
+          Only in the frame, and the CSS shows it only from 900px; under
+          that the page keeps its own top, "Return to Organizations". */}
+      {framed ? <ClubCampusBar visitedCampusId={visitedCampusId} hideChat={desktopChat} /> : null}
       <div
         // Dark in Light and Night alike (the club's own backdrop), so the
         // page's content takes Night's tokens as an island (globals.css).
@@ -563,10 +586,27 @@ export default async function OrgProfilePage({ params }: Params) {
             {/* One row, two halves: Edit page for the owner and officers,
                 the join control for everyone else, then Share page. A
                 hidden club has no page to share. Mounted once (Edit page
-                reads ?edit=1 itself). */}
+                reads ?edit=1 itself).
+                In the app frame from 900px (PLAN-5, Oct 22, 2026) the
+                officers' row is + Post (coral, first; not on a hidden club,
+                as the cover's +) and Share page, plus Club tools from 900 to
+                1023px, where the Arc's planet doesn't show. Edit page stays
+                mounted but the CSS hides it there: Club settings opens it
+                (openEditPage), and ?edit=1 still does. */}
             <div className="vibe-club-actions">
+              {framed && officerRole && !org.hidden ? (
+                <RowPostButton
+                  orgId={org.id}
+                  orgHandle={org.handle}
+                  orgName={org.name}
+                  verified={org.verified}
+                  viewerRole={officerRole}
+                  boardId={boardFacts.boardId}
+                />
+              ) : null}
               {officerRole ? (
                 <EditPageButton
+                  inSettingsOnComputer={framed}
                   orgHandle={org.handle}
                   orgName={org.name}
                   // The Look section and the Name field (Oct 22, 2026).
@@ -599,6 +639,7 @@ export default async function OrgProfilePage({ params }: Params) {
               {org.hidden ? null : (
                 <SharePageButton orgHandle={org.handle} orgName={org.name} compact={!officerRole} />
               )}
+              {framed && officerRole ? <RowClubToolsButton orgHandle={org.handle} /> : null}
             </div>
 
             {setup && !setup.complete ? (
