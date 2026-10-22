@@ -323,3 +323,9 @@ Shipped from the wave 1 session (`busy-aryabhata-7b6991`); this branch's own ses
     flip `NEW_BACKDROPS_LIVE` to true in backdrops.ts (+ its test line) and deploy; the picker then shows ten.
   - Found in passing: `npm test` silently skips test files under `src/app/orgs/[handle]/` (the brackets read as a
     glob); the 35 there pass when run from their folder. Worth fixing in package.json.
+- **Oct 22, later (Franky's yes): the five new backgrounds are live.** Migration
+  `20261026100000_club_backdrop_presets` on production: pre-flight matched (the six-name rule, the only one on the
+  column; 6 clubs: sand-purple 3, deep-violet 1, ember 1, cream 1; none outside the new list; browsers can't edit
+  clubs), applied with the connector, row renamed, post-check: the eleven-name rule, validated, still the only one,
+  clubs unchanged, grants unchanged. Then `NEW_BACKDROPS_LIVE = true` (backdrops.ts + its test). Checked locally:
+  the picker offers all ten in order and saving Cardinal stores `cardinal` (put back afterwards).

@@ -18,10 +18,10 @@
  * stored key, never offered, and it shows as the default (Dusk) on the club
  * page.
  *
- * The five new ones (Rose, Cardinal, Lantern, Canal, Onyx) need the database
- * CHECK widened (migration 20261026100000_club_backdrop_presets, Franky's yes
- * first). Until it is applied they are not offered: flip
- * {@link NEW_BACKDROPS_LIVE} in the same deploy that follows the migration.
+ * The five new ones (Rose, Cardinal, Lantern, Canal, Onyx) needed the
+ * database CHECK widened: migration 20261026100000_club_backdrop_presets,
+ * applied to production Oct 22, 2026 with Franky's yes, and then
+ * {@link NEW_BACKDROPS_LIVE} turned on in the next deploy.
  *
  * Pure: no React, no `@/` imports, so `node --test` loads it directly.
  */
@@ -49,10 +49,11 @@ export type Backdrop = {
 };
 
 /**
- * Off until migration 20261026100000 is on production: the database refuses
- * the five new keys before it. Flip to true in the deploy right after it.
+ * On since Oct 22, 2026: migration 20261026100000 is on production, so the
+ * database takes the five new keys. Turning it off hides them again (clubs
+ * already on one keep painting it); the database rule stays as it is.
  */
-export const NEW_BACKDROPS_LIVE = false;
+export const NEW_BACKDROPS_LIVE = true;
 
 /** The default for a new club and for any key the page can't paint. */
 export const DEFAULT_BACKDROP = "sand-purple" as const;

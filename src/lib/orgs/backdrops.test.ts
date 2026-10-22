@@ -45,8 +45,8 @@ test("the ten are the measured ones, word for word, in picker order", () => {
   );
 });
 
-test("the database keys today are the CHECK's six; the five new ones wait for their migration", () => {
-  assert.equal(NEW_BACKDROPS_LIVE, false, "flip only in the deploy after 20261026100000 is on production");
+test("the database keys: the CHECK's six before 20261026100000, eleven after; the five new ones are live", () => {
+  assert.equal(NEW_BACKDROPS_LIVE, true, "on since 20261026100000 reached production (Oct 22, 2026)");
   assert.deepEqual([...storableBackdropKeys(false)].sort(), ["cream", "deep-violet", "ember", "forest", "midnight", "sand-purple"]);
   assert.deepEqual(
     BACKDROPS.filter((b) => b.isNew).map((b) => b.key),
