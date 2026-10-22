@@ -15,17 +15,9 @@ const CampusAppShell = dynamic(() =>
 );
 
 /** The app frame around a club page on a computer. `ClubAppFrame` decides when. */
-export function ClubShell({
-  children,
-  sidebar,
-  campusHref,
-}: {
-  children: ReactNode;
-  sidebar?: ReactNode;
-  campusHref: string;
-}) {
+export function ClubShell({ children, campusHref }: { children: ReactNode; campusHref: string }) {
   return (
-    <CampusAppShell pageTabBar sidebar={sidebar} campusHref={campusHref}>
+    <CampusAppShell pageTabBar campusHref={campusHref}>
       {children}
     </CampusAppShell>
   );

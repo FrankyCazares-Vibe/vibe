@@ -4,9 +4,9 @@ import { Arrow } from "@/components/brand/Arrow";
 
 /**
  * The officers' two lines under the buttons and the desktop Club tools card
- * (the club's view, wave 2, C9 items 5 and 9). Server rendered, theme
- * tokens, owner and officers only (the page decides). Every row is a link
- * to the club's tools pages (C10).
+ * (the club's view, wave 2, C9 items 5 and 9), and the rows both Club tools
+ * surfaces list. Server rendered, theme tokens, owner and officers only (the
+ * page decides). Every row is a link to the club's tools pages (C10).
  */
 
 /**
@@ -41,22 +41,16 @@ export function NeedsYouLine({ handle, text, requests }: { handle: string; text:
   );
 }
 
-/** The desktop right column's card: the tools index's rows, as links. */
-export function ClubToolsCard({
-  handle,
-  requests,
-  members,
-  followers,
-}: {
-  handle: string;
-  /** Null when unknown (a failed read): the row shows no number. */
-  requests: number | null;
-  members: number | null;
-  followers: number | null;
-}) {
+/** The officers' numbers on the Club tools rows. Null when unknown (a failed read): the row shows no number. */
+export type ClubToolsCounts = { requests: number | null; members: number | null; followers: number | null };
+
+export type ClubToolsRow = { label: string; href: string; count?: number | null };
+
+/** The tools index's rows, as links: the card below and the computer's Club tools panel (ClubToolsDrawer). */
+export function clubToolsRows(handle: string, { requests, members, followers }: ClubToolsCounts): ClubToolsRow[] {
   const h = encodeURIComponent(handle);
   const base = `/orgs/${h}/tools`;
-  const rows: Array<{ label: string; href: string; count?: number | null }> = [
+  return [
     { label: "Join requests", href: `${base}/requests`, count: requests },
     { label: "Members", href: `${base}/members`, count: members },
     { label: "Followers", href: `${base}/followers`, count: followers },
@@ -64,6 +58,23 @@ export function ClubToolsCard({
     { label: "Past events and who came", href: `/orgs/${h}?tab=events` },
     { label: "Club settings", href: `${base}/settings` },
   ];
+}
+
+/**
+ * The card beside the club page on a wide screen outside the app frame (a
+ * phone held sideways). In the frame, the same rows come out of the right
+ * edge instead (ClubToolsDrawer).
+ */
+export function ClubToolsCard({
+  handle,
+  requests,
+  members,
+  followers,
+}: {
+  handle: string;
+} & ClubToolsCounts) {
+  const base = `/orgs/${encodeURIComponent(handle)}/tools`;
+  const rows = clubToolsRows(handle, { requests, members, followers });
   return (
     <section
       aria-labelledby="club-tools-card-title"

@@ -31,11 +31,9 @@ export const CLUB_CAMPUS_HREF = "/campus?tab=orgs";
 
 export async function ClubAppFrame({
   children,
-  sidebar,
   campusHref = CLUB_CAMPUS_HREF,
 }: {
   children: ReactNode;
-  sidebar?: ReactNode;
   /**
    * The left menu's Campus link. It does the old top bar's "Return to
    * Organizations" job: the club page passes its own, which keeps the campus
@@ -44,9 +42,5 @@ export async function ClubAppFrame({
   campusHref?: string;
 }) {
   if (!(await showsAppFrame())) return <>{children}</>;
-  return (
-    <ClubShell sidebar={sidebar} campusHref={campusHref}>
-      {children}
-    </ClubShell>
-  );
+  return <ClubShell campusHref={campusHref}>{children}</ClubShell>;
 }

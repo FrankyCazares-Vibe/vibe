@@ -9,10 +9,7 @@ import { OttoCorner } from "@/components/network/OttoCorner";
 
 type Props = {
   children: ReactNode;
-  /**
-   * Optional right column (e.g. feed widgets). Omit for simple two-column
-   * layouts. It shows from 1100px wide (globals.css `--with-rail`).
-   */
+  /** Optional right column (e.g. feed widgets). Omit for simple two-column layouts. */
   sidebar?: ReactNode;
   /**
    * The page draws its own <MobileTabBar /> inside its <main> and pads

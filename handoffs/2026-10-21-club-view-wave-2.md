@@ -179,3 +179,22 @@ Shipped from the wave 1 session (`busy-aryabhata-7b6991`); this branch's own ses
   (nothing new is collected or shown). **Not checked:** a real iPad held upright (it reads as a computer, so it
   gets the frame, which steps aside under 900px), and the signed-in views on production (Franky: open a club you
   run on a computer and on your phone).
+- **Later that night, Oct 21 (Franky: "make the club tools come out instead of always being out", a nice
+  animation, after Otto or something space based):** on a computer the always-open right column is gone; nobody
+  has one now. The owner and officers get a small handle on the window's right edge instead, from 1024px wide
+  (Otto's orbit on it, a coral count while someone wants to join). The handle, or the cover's Club tools button
+  (from 900px), brings Club tools out: a deep-space panel springs out of the right edge, a coral nebula blooms in
+  where it came from with a violet one in the far corner, the stars come on one by one, Otto's orbit turns slowly
+  behind the title, and the rows rise in one after another. Same rows as before, plus "Invite, share and more" to
+  the full Club tools page. It goes back on Escape, the ×, a click outside, a pick, a page change or a window under
+  900px; focus comes back to what opened it. Springs and transform/opacity only; with reduce motion on it only
+  fades and nothing loops. Under 900px, on a phone, and outside the frame, nothing changed (the cover's button
+  still goes to the Club tools page; outside the frame a wide screen still has the side card). Files:
+  `club-page/ClubToolsDrawer.tsx`, `ClubToolsPanel.tsx`, `GalaxyBackdrop.tsx`, `club-tools-drawer.ts`; the
+  `--with-rail` and shell changes from earlier tonight are undone (no page uses the rail). Reviewed by three lenses
+  with a skeptic per finding: 11 held, all fixed (a fast reopen left focus behind the panel, a double-click on the
+  handle hit a row still sliding in, the handle sat on the ⋯ button between 900 and 1020px, focus lost after
+  "Past events" or narrowing the window, counts too faint on the nebula, the coral button greying on hover, the
+  Otto orb popping back over the closing panel). tsc clean, 3,731 tests pass; walked headless at 900 to 1440,
+  Night, Light and reduce motion; phones unchanged pixel for pixel. **Not checked:** on Franky's own officer
+  account on production (open a club you run on a computer, use the handle and the cover's button).
