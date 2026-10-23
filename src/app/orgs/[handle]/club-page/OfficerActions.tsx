@@ -16,8 +16,8 @@
  *   once, then comes off the address so a reload or Back doesn't open it
  *   again; the computer's Arc and tools panel open it directly
  *   (`openEditPage`, club-tools-launcher.ts), as many times as they like.
- * - SharePageButton: the half-width "Share page" pill, or the 44px square
- *   (share-page.ts).
+ * - SharePageButton: the half-width "Share page" pill, or the 44px square;
+ *   since Oct 23, 2026 either opens the Share sheet (ShareSheet.tsx).
  * - RowPostButton and RowClubToolsButton: the cover's old + and ≡ as pills
  *   in the row under the bio (Franky, Oct 22, 2026: they made no sense in
  *   the cover's corner, which is empty now on every screen).
@@ -31,7 +31,7 @@ import type { JoinPolicy, OrgAudience } from "@/lib/orgs/join-state";
 import { EditPageModal, UploadAssetModal } from "../admin-actions";
 import { openClubToolsLauncher, registerEditPageOpener } from "./club-tools-launcher";
 import { PlusSheet } from "./PlusSheet";
-import { shareClubPage } from "./share-page";
+import { ShareSheet, type ShareViewer } from "./ShareSheet";
 
 type EditProps = {
   orgHandle: string;
@@ -211,38 +211,48 @@ export function EditPageButton(props: EditProps): JSX.Element {
  * `compact`: a 44px square with the share glyph, for the row a visitor or a
  * member sees, where the join control often holds two actions with a line
  * under each and needs the room; officers keep the two halves.
+ *
+ * Since Oct 23, 2026 (wave 3, B2) both open the Share sheet (ShareSheet.tsx):
+ * the club's link picture, Send it, Copy link and, for `viewer` "officer",
+ * the table card. The Arc and the tools rows keep sharing straight away
+ * (shareClubPage).
  */
 export function SharePageButton({
   orgHandle,
   orgName,
   compact = false,
+  viewer = "visitor",
 }: {
   orgHandle: string;
   orgName: string;
   compact?: boolean;
+  viewer?: ShareViewer;
 }): JSX.Element {
-  // One sheet at a time: a second tap while one is up would be refused and
-  // fall through to a copy.
-  const sharing = useRef(false);
-  const share = async () => {
-    if (sharing.current) return;
-    sharing.current = true;
-    try {
-      await shareClubPage({ handle: orgHandle, name: orgName });
-    } finally {
-      sharing.current = false;
-    }
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLButtonElement | null>(null);
+  // Back to the button when the sheet is done (the phone sheet doesn't hand
+  // focus back on its own), a frame late, after the dialog's own return.
+  const close = () => {
+    setOpen(false);
+    window.requestAnimationFrame(() => {
+      if (ref.current?.isConnected) ref.current.focus({ preventScroll: true });
+    });
   };
   return (
-    <button
-      type="button"
-      className="vibe-press"
-      onClick={() => void share()}
-      aria-label={compact ? "Share page" : undefined}
-      style={compact ? squarePillStyle : halfPillStyle}
-    >
-      {compact ? <ShareGlyph /> : "Share page"}
-    </button>
+    <>
+      <button
+        ref={ref}
+        type="button"
+        className="vibe-press"
+        aria-haspopup="dialog"
+        onClick={() => setOpen(true)}
+        aria-label={compact ? "Share page" : undefined}
+        style={compact ? squarePillStyle : halfPillStyle}
+      >
+        {compact ? <ShareGlyph /> : "Share page"}
+      </button>
+      {open ? <ShareSheet handle={orgHandle} name={orgName} viewer={viewer} onClose={close} /> : null}
+    </>
   );
 }
 

@@ -20,6 +20,7 @@ import {
 import { rsvpCampusDecision } from "@/lib/iu/campus-request";
 import { campusRowById, isSharedCampus } from "@/lib/iu/campuses";
 import { requireNotRestricted } from "@/lib/moderation/access";
+import { clubPageMetadata } from "@/lib/og/club-card-content";
 import { orgAssetProxyUrl } from "@/lib/org-asset-url";
 import { NO_BOARD, loadBoardFacts } from "@/lib/orgs/board-facts";
 import { loadFollowerCount, loadViewerFollow, publicMemberCount } from "@/lib/orgs/following";
@@ -130,30 +131,12 @@ export async function generateMetadata({ params }: Params) {
     .maybeSingle();
   // The preview tags are set here too, so a shared club link unfurls as the
   // club's own card (feature report 3, #15) and a missing or hidden club as
-  // the plain one below, never as its tab title.
-  const generic = { title: "Vibe", description: "Vibe is the social app for students at IU and Purdue." };
-  if (!org) return { title: "Not found · Vibe", openGraph: generic, twitter: generic };
-  // A hidden club's name must not reach the tab title or a link preview.
-  if (org.hidden_at) return { title: "Vibe", openGraph: generic, twitter: generic };
-  const title = `${org.name} · Vibe`;
-  const description =
-    org.description?.slice(0, 200) ||
-    (org.is_public ? "An org on Vibe." : "A private org on Vibe.");
-  // The site picture: this openGraph replaces the root layout's whole, and
-  // the card doesn't use the club's own logo. Next copies it to the X card.
-  // Add `?v=2` to the address if the card art is ever redrawn.
-  const sharePicture = {
-    url: "/opengraph-image",
-    width: 1200,
-    height: 630,
-    alt: "vibe. Your campus. Your people. Yourself.",
-  };
-  return {
-    title,
-    description,
-    openGraph: { title: org.name, description, type: "profile", images: [sharePicture] },
-    twitter: { card: "summary_large_image", title: org.name, description },
-  };
+  // the plain one, never as its tab title. Since Oct 23, 2026 (wave 3, B2)
+  // a visible club's link carries the club's own picture: this names none
+  // for it, so Next uses the segment's opengraph-image.tsx and
+  // twitter-image.tsx; a hidden or missing club names the site's picture on
+  // both cards, so the club's never reaches it (club-card-content.ts, tested).
+  return clubPageMetadata(org);
 }
 
 export default async function OrgProfilePage({ params }: Params) {
@@ -444,6 +427,18 @@ export default async function OrgProfilePage({ params }: Params) {
           hiddenAuthors: blockedAuthors.ids,
         })
       : [];
+  // When the club last posted to its page, for Up next's Thank-you step
+  // (wave 3, Oct 23, 2026): a thank-you counts as done once the club has
+  // posted after the event ended. The newest of the posts read above (the
+  // read is newest first; the max is taken anyway); null when the club has
+  // none, or when the read failed, so the step then still asks for one.
+  const latestPostAt = postsErr
+    ? null
+    : allPostRows.reduce<string | null>(
+        (newest, p) =>
+          p.created_at && (!newest || Date.parse(p.created_at) > Date.parse(newest)) ? p.created_at : newest,
+        null,
+      );
 
   // The one list of backgrounds (src/lib/orgs/backdrops.ts, Oct 22, 2026):
   // "cream" and any unknown key paint the default.
@@ -559,8 +554,16 @@ export default async function OrgProfilePage({ params }: Params) {
       meetingTimeReady={meetingTimeReady}
     />
   ) : null;
+  // Share page opens the Share sheet (wave 3, B2, Oct 23, 2026): the club's
+  // link picture, Send it, Copy link and, for the owner and officers, the
+  // table card. `viewer` picks the sheet's words and that last row.
   const shareButton = org.hidden ? null : (
-    <SharePageButton orgHandle={org.handle} orgName={org.name} compact={!officerRole || !framed} />
+    <SharePageButton
+      orgHandle={org.handle}
+      orgName={org.name}
+      compact={!officerRole || !framed}
+      viewer={officerRole ? "officer" : viewerRole ? "member" : "visitor"}
+    />
   );
 
   const page = (
@@ -697,7 +700,17 @@ export default async function OrgProfilePage({ params }: Params) {
 
             {/* Up next and the Events tab read one list, fetched once. */}
             <ClubEventsProvider orgId={org.id} rsvpAtHomeOnly={visiting} renderKey={nowMs}>
-              <UpNext officerHint={!!officerRole && !org.hidden} canPostEvents={org.verified} />
+              {/* The club's id and handle, so the officers' past read runs
+                  even with nothing coming up: a thank-you is still owed the
+                  morning after the club's only event (integration, Oct 23,
+                  2026). */}
+              <UpNext
+                officerHint={!!officerRole && !org.hidden}
+                canPostEvents={org.verified}
+                latestPostAt={latestPostAt}
+                orgId={org.id}
+                orgHandle={org.handle}
+              />
               <OrgContent
                 posts={
                   postsErr ? (

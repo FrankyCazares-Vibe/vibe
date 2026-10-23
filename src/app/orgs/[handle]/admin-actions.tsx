@@ -605,16 +605,20 @@ export function UploadAssetModal({
 // Used to offer a post/clip toggle where "clip" uploaded a vertical video.
 // Video posts are backlogged (DOCS/BACKLOG_CLIPS.md), so club posts are text
 // + image only. Exported for the club page's + sheet (wave 2, PlusSheet.tsx).
+// `initialContent` (Oct 23, 2026, wave 3 B1): the officers' Up next opens it
+// with a thank-you starter the officer edits; it only prefills the caption.
 
 export function NewPostModal({
   orgHandle,
   onClose,
+  initialContent,
 }: {
   orgHandle: string;
   onClose: () => void;
+  initialContent?: string;
 }) {
   const router = useRouter();
-  const [content, setContent] = useState("");
+  const [content, setContent] = useState(initialContent ?? "");
   const [file, setFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [pendingImage, setPendingImage] = useState<File | null>(null);

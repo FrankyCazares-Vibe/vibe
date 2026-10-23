@@ -255,9 +255,16 @@ export const anonReadLimit = createAnonReadLimiter({
  * prefetch spends a count. The caller checks that nobody is signed in.
  */
 const READ_PAGE = /^\/(?:profile|orgs|posts)\/[^/]+$/;
+/**
+ * A club's link pictures (Oct 23, 2026: `src/app/orgs/[handle]/opengraph-image`
+ * and `twitter-image`) count the same: each is a database read and a drawn
+ * picture for anyone signed out, and its answer says whether a handle is a
+ * visible club. Link-preview fetchers ask once per pasted link.
+ */
+const CLUB_PICTURE = /^\/orgs\/[^/]+\/(?:opengraph|twitter)-image$/;
 
 export function isSignedOutReadPage(pathname: string, method: string): boolean {
-  return method !== "OPTIONS" && READ_PAGE.test(pathname);
+  return method !== "OPTIONS" && (READ_PAGE.test(pathname) || CLUB_PICTURE.test(pathname));
 }
 
 /** What the data routes' 429 says; failure-copy.ts shows the same line, with Sign in, for this code. */

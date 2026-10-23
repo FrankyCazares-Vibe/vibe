@@ -134,6 +134,13 @@ test("the proxy counts any signed-out read of one profile, club or post page (ev
     ["/profile/sae_frank/", "GET", false],
     ["/profile/sae_frank/extra", "GET", false],
     ["/orgs", "GET", false],
+    // A club's link pictures (Oct 23, 2026): a read and a drawn picture each.
+    ["/orgs/sae/opengraph-image", "GET", true],
+    ["/orgs/sae/twitter-image", "GET", true],
+    ["/orgs/sae/opengraph-image", "OPTIONS", false],
+    ["/orgs/sae/setup", "GET", false],
+    ["/orgs/sae/opengraph-image/x", "GET", false],
+    ["/profile/sae_frank/opengraph-image", "GET", false],
     ["/posts", "GET", false],
     ["/profiles/sae_frank", "GET", false],
     ["/x/profile/sae_frank", "GET", false],

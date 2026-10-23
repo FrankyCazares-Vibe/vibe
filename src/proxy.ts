@@ -51,7 +51,8 @@ import {
  *     is src/lib/security/csp.ts. /offline.html and /sw.js skip this file
  *     (the matcher); next.config.ts covers the first, the second has none.
  *  6. Counts signed-out reads of the profile, club and post pages per network
- *     (limits plan Wave 2, B2.3), and answers a small 429 page past the cap.
+ *     (limits plan Wave 2, B2.3), and of a club's link pictures (Oct 23,
+ *     2026), and answers a small 429 page past the cap.
  *     src/lib/security/anon-read-limit.ts holds the numbers and the why. It
  *     is the one database call this file makes, and only for those pages
  *     with nobody signed in.
