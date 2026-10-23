@@ -361,3 +361,18 @@ Shipped from the wave 1 session (`busy-aryabhata-7b6991`); this branch's own ses
   phone it is Club tools › Edit the page or Club settings › Edit page. Walked at 390 (Night and Light), 860, 960,
   1440: + Post opened the sheet, Club tools → Club settings → Edit page opened the dialog on the club page, focus
   came back to Club tools; members unchanged; no errors.
+- **Oct 23 (Franky: "lets get the command center for mobile"; six phone mockups on the canvas, the first three
+  "too large"; he picked E, the Inline tray, "Also drop the Board switch from officers' ⋯ menu"):** plan
+  `handoffs/2026-10-22-club-tools-arc/PLAN-6.md`.
+  - **Phones:** the row's Club tools pill is a toggle (pressed coral face, chevron, "Club tools, 1 wants to join")
+    that opens a tray INSIDE the page under the row (no overlay): Needs you (the oldest request, Approve /
+    Decline, "and N more"), the seven tools as named bubbles + All Club tools, and each tool's card opening in
+    the tray. The cards are the Arc's own (`ClubToolsTray.tsx`, `ClubToolsTrayParts.tsx`); the request read and
+    answers moved into `use-join-requests.ts`, which the Arc's Join requests card now uses too (no change there).
+    Escape: card → tools → shut. The page is read again on close when something changed. The tray is kept above
+    the tab bar.
+  - **⋯ menu:** no Board row for officers any more (Club settings has the switch); Mute posts and Leave club stay.
+  - Computers unchanged (the Arc, the Campus bar). Walked at 390 (Night and Light) as Maya and Blake and at 1440:
+    toggle, cards (Members, Join requests, Club settings → Edit page opened the dialog), Escape twice back to the
+    pill, no sideways scroll, the tray's bottom above the tab bar, the officer's ⋯ = Mute posts · Leave club,
+    the member's row unchanged, the Arc still opens. Approve/Decline not clicked (local data left as it was).

@@ -1,17 +1,16 @@
 "use client";
 
-import { useEffect, useRef, useState, type JSX, type ReactNode } from "react";
+import type { JSX, ReactNode } from "react";
 
-import { LoadFailed, asLoadFailure, type LoadFailure } from "@/components/feedback/LoadFailed";
-import { ineligibleLine, requestRefusal } from "@/components/orgs/tools/member-rules";
+import { LoadFailed } from "@/components/feedback/LoadFailed";
+import { ineligibleLine } from "@/components/orgs/tools/member-rules";
 import type { RequestRow } from "@/components/orgs/tools/types";
-import { vibeRequest } from "@/lib/feedback/request";
-import { toast } from "@/lib/feedback/toast";
 import { ORG_COPY, shortDateText } from "@/lib/orgs/join-copy";
 
 import { arcTool, displayName, requestsSub } from "./club-tools-arc";
 import { panelOpener, type ArcCardProps } from "./ClubToolsLauncherCards";
 import { ArcCardFrame, ArcNote, ArcPageLink, ArcPersonRow, ArcRise, ArcSkeleton, ghostStyle, pillStyle, primaryStyle } from "./ClubToolsLauncherParts";
+import { useJoinRequests } from "./use-join-requests";
 
 /**
  * The Arc's Join requests card (Oct 22, 2026): the people waiting, oldest
@@ -23,9 +22,8 @@ import { ArcCardFrame, ArcNote, ArcPageLink, ArcPersonRow, ArcRise, ArcSkeleton,
  * refusal (`requestRefusal`). A row leaves once it's answered; the count on
  * the planet follows (`onCount`), and the page is read again when the arc
  * closes (`onChanged`), so its member count and "needs you" line catch up.
+ * The read and the answers are `useJoinRequests` (use-join-requests.ts).
  */
-
-const LOAD_LINE = "Couldn't load join requests.";
 
 /** How many people the card shows; the rest are a tap away on the Requests page. */
 const SHOWN = 4;
@@ -38,89 +36,18 @@ export function RequestsCard({
   onCount,
   onChanged,
 }: ArcCardProps & { onCount: (n: number) => void; onChanged: () => void }): JSX.Element {
-  const base = `/api/orgs/${encodeURIComponent(club.handle)}/requests`;
-  const [rows, setRows] = useState<RequestRow[] | null>(null);
-  const [failure, setFailure] = useState<LoadFailure | null>(null);
-  const [busy, setBusy] = useState<ReadonlySet<string>>(new Set());
-  const [tick, setTick] = useState(0);
-  const loaded = useRef(false);
-
-  useEffect(() => {
-    let live = true;
-    void (async () => {
-      const r = await vibeRequest<{ requests?: RequestRow[] }>(base, { cache: "no-store", quiet: true, failure: LOAD_LINE });
-      if (!live) return;
-      if (r.ok && Array.isArray(r.data.requests)) {
-        loaded.current = true;
-        setFailure(null);
-        setRows(r.data.requests);
-        return;
-      }
-      const f = asLoadFailure(r, LOAD_LINE);
-      // A re-read after an answer keeps the rows on screen and toasts.
-      if (loaded.current) toast({ message: f.message, tone: "error", action: f.action });
-      else setFailure(f);
-    })();
-    return () => {
-      live = false;
-    };
-  }, [base, tick]);
-
-  // The planet's and the bubble's count follow the list once it's read.
-  useEffect(() => {
-    if (rows) onCount(rows.length);
-  }, [rows, onCount]);
-
-  const drop = (id: string) => setRows((prev) => (prev ? prev.filter((x) => x.id !== id) : prev));
-  const mark = (id: string, on: boolean) =>
-    setBusy((prev) => {
-      const next = new Set(prev);
-      if (on) next.add(id);
-      else next.delete(id);
-      return next;
-    });
-
-  const act = async (row: RequestRow, action: "approve" | "deny") => {
-    if (busy.has(row.id)) return;
-    mark(row.id, true);
-    const r = await vibeRequest(`${base}/${encodeURIComponent(row.id)}`, {
-      method: "POST",
-      json: { action },
-      quiet: true,
-      failure: action === "approve" ? "Couldn't approve this request." : "Couldn't decline this request.",
-    });
-    mark(row.id, false);
-    if (r.ok) {
-      drop(row.id);
-      onChanged();
-      toast({
-        message: action === "approve" ? `${displayName(row.name, row.handle)} joined ${club.name}.` : "Request declined.",
-        tone: "info",
-      });
-      return;
-    }
-    // A Sign in or See details refusal keeps its own line and button.
-    const { line, then } = requestRefusal(r.status, r.code, r.message);
-    toast({ message: r.action ? r.message : line, tone: "error", action: r.action });
-    if (then === "drop") {
-      drop(row.id);
-      onChanged();
-    } else if (then === "reload") setTick((t) => t + 1);
-  };
+  // The read and the two answers live in useJoinRequests (Oct 23, 2026), so
+  // the phone's Club tools tray asks and answers the same way.
+  const { rows, failure, busy, act, retry } = useJoinRequests({
+    handle: club.handle,
+    clubName: club.name,
+    onCount,
+    onChanged,
+  });
 
   let body: ReactNode;
   if (failure && !rows) {
-    body = (
-      <LoadFailed
-        failure={failure}
-        tone="dark"
-        compact
-        onRetry={() => {
-          setFailure(null);
-          setTick((t) => t + 1);
-        }}
-      />
-    );
+    body = <LoadFailed failure={failure} tone="dark" compact onRetry={retry} />;
   } else if (!rows) {
     body = <ArcSkeleton rows={2} />;
   } else if (rows.length === 0) {

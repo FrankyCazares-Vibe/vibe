@@ -701,7 +701,7 @@ test("leave confirm: Keep following starts checked only for a follow they tapped
   assert.equal(keepFollowingDefault(undefined), false);
 });
 
-test("⋯ menu: Mute or Unmute for everyone signed in, Leave for members but the owner", () => {
+test("⋯ menu: Mute or Unmute for everyone signed in, Leave for members but the owner, no Board row", () => {
   const kinds = (input: Parameters<typeof orgMenuItems>[0]) => orgMenuItems(input).map((i) => i.kind);
   assert.deepEqual(kinds({ signedIn: false, role: null, muted: false }), []);
   assert.deepEqual(kinds({ signedIn: true, role: null, muted: false }), ["mute"]);
@@ -714,6 +714,15 @@ test("⋯ menu: Mute or Unmute for everyone signed in, Leave for members but the
     orgMenuItems({ signedIn: true, role: "member", muted: false }).map((i) => i.label),
     ["Mute posts", "Leave club"],
   );
+  // The officers' "Let followers read the Board" row is gone (Franky, Oct 23,
+  // 2026): Club settings holds that switch, on a phone and a computer alike.
+  for (const role of ["owner", "admin"] as const) {
+    for (const muted of [false, true]) {
+      const labels = orgMenuItems({ signedIn: true, role, muted }).map((i) => i.label);
+      assert.ok(!labels.some((l) => /Board/.test(l)), `${role}: ${labels.join(", ")}`);
+    }
+  }
+  assert.ok(!("menuReadersOn" in ORG_COPY.board) && !("menuReadersOff" in ORG_COPY.board));
   assert.equal(orgErrorCopy("owner_cannot_leave"), ORG_COPY.menu.ownerCantLeave);
 });
 

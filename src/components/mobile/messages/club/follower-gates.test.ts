@@ -69,6 +69,10 @@ test("FollowerBoard: read only, its one button is Earlier messages", () => {
 
 test("OrgMenu hands the viewer's role to orgMenuItems unchanged (the owner is never offered Leave)", () => {
   const src = read("../../../orgs/OrgMenu.tsx");
-  assert.match(src, /orgMenuItems\(\{ signedIn: true, role: p\.role, muted, readersOn \}\)/);
+  assert.match(src, /orgMenuItems\(\{ signedIn: true, role: p\.role, muted \}\)/);
   assert.equal((src.match(/orgMenuItems\(/g) ?? []).length, 1);
+  // No Board switch in the ⋯ any more (Franky, Oct 23, 2026: Club settings
+  // holds it), but the leave confirm still reads it for its keep-following line.
+  assert.ok(!/followers_read_board|"readers"/.test(src), "no Board switch left in the menu");
+  assert.match(src, /boardOn=\{p\.boardReadersOn === true\}/);
 });

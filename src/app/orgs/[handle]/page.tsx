@@ -56,6 +56,8 @@ import { ClubCampusBar } from "./club-page/ClubCampusBar";
 import { ClubCover, ClubHeader, LockGlyph } from "./club-page/ClubHeader";
 import { ClubEventsProvider } from "./club-page/ClubEventsProvider";
 import { ClubToolsLauncher } from "./club-page/ClubToolsLauncher";
+import type { ArcClub } from "./club-page/ClubToolsLauncherCards";
+import { ClubToolsTrayRow } from "./club-page/ClubToolsTray";
 import { MembershipBox } from "./club-page/MembershipBox";
 import { ClubSwitchSync } from "./club-page/ClubSwitchSync";
 import { MoreAboutUs } from "./club-page/MoreAboutUs";
@@ -480,7 +482,9 @@ export default async function OrgProfilePage({ params }: Params) {
   // bio, the switch chevron, their two lines and, on a wide screen outside
   // the app frame, the Club tools card. Not + Post on a hidden club. The
   // cover's corner is empty on every screen and Edit page lives in Club
-  // settings and Club tools (PLAN-5, Oct 22, 2026; phones the same day).
+  // settings and Club tools (PLAN-5, Oct 22, 2026; phones the same day). On
+  // a phone the row's Club tools opens the tray under it (PLAN-6, Oct 23,
+  // 2026: Franky's pick E, the Inline tray).
   const officerRole = officerView && (viewerRole === "owner" || viewerRole === "admin") ? viewerRole : null;
   // Out of the app frame the Club tools card is the page's own, beside the
   // club on a wide screen, as before; in it, Club tools come out of the right
@@ -507,6 +511,57 @@ export default async function OrgProfilePage({ params }: Params) {
     members: org.member_count,
     followers: org.follower_count,
   };
+  // The club as the phone's tray reads it (Oct 23, 2026): the same fields
+  // the computer's Arc builds from its props (ClubToolsLauncher).
+  const trayClub: ArcClub = {
+    handle: org.handle,
+    orgId: org.id,
+    name: org.name,
+    verified: org.verified,
+    hidden: org.hidden,
+    joinPolicy: org.join_policy,
+    audience: org.audience,
+    viewerId: user?.id ?? null,
+  };
+
+  // + Post (coral, first; not on a hidden club) and Edit page (mounted out
+  // of sight: Club settings and Club tools open it), for the owner and
+  // officers; Share page for everyone, but a hidden club has no page to
+  // share. One copy of each, for the phone's tray row and everyone else's.
+  const postButton =
+    officerRole && !org.hidden ? (
+      <RowPostButton
+        orgId={org.id}
+        orgHandle={org.handle}
+        orgName={org.name}
+        verified={org.verified}
+        viewerRole={officerRole}
+        boardId={boardFacts.boardId}
+      />
+    ) : null;
+  const editPageButton = officerRole ? (
+    <EditPageButton
+      orgHandle={org.handle}
+      orgName={org.name}
+      // The Look section and the Name field (Oct 22, 2026).
+      initialName={org.name}
+      initialBackdrop={org.backdrop_preset}
+      logoUrl={org.logo_url}
+      bannerUrl={org.banner_url}
+      hidden={org.hidden}
+      openToCampus={openToCampus}
+      joinPolicy={org.join_policy}
+      audience={org.audience}
+      initialDescription={org.description}
+      initialLinks={org.links ?? []}
+      initialPhilanthropy={org.philanthropy}
+      initialMeetingTime={org.meeting_time}
+      meetingTimeReady={meetingTimeReady}
+    />
+  ) : null;
+  const shareButton = org.hidden ? null : (
+    <SharePageButton orgHandle={org.handle} orgName={org.name} compact={!officerRole || !framed} />
+  );
 
   const page = (
     <main
@@ -576,55 +631,45 @@ export default async function OrgProfilePage({ params }: Params) {
                 page and Club tools (the CSS hides that from 1024px, where the
                 Arc's planet shows). A hidden club has no page to share.
                 Edit page is mounted once, out of sight (globals.css): Club
-                settings and Club tools open it, by the opener or ?edit=1. */}
-            <div className="vibe-club-actions">
-              {officerRole && !org.hidden ? (
-                <RowPostButton
-                  orgId={org.id}
-                  orgHandle={org.handle}
-                  orgName={org.name}
-                  verified={org.verified}
-                  viewerRole={officerRole}
-                  boardId={boardFacts.boardId}
-                />
-              ) : null}
-              {officerRole ? (
-                <EditPageButton
-                  orgHandle={org.handle}
-                  orgName={org.name}
-                  // The Look section and the Name field (Oct 22, 2026).
-                  initialName={org.name}
-                  initialBackdrop={org.backdrop_preset}
-                  logoUrl={org.logo_url}
-                  bannerUrl={org.banner_url}
-                  hidden={org.hidden}
-                  openToCampus={openToCampus}
-                  joinPolicy={org.join_policy}
-                  audience={org.audience}
-                  initialDescription={org.description}
-                  initialLinks={org.links ?? []}
-                  initialPhilanthropy={org.philanthropy}
-                  initialMeetingTime={org.meeting_time}
-                  meetingTimeReady={meetingTimeReady}
-                />
-              ) : (
-                <div className="vibe-club-join">
-                  {relation ? (
-                    <OrgProfileJoinButton relation={relation} />
-                  ) : (
-                    <LoadFailed
-                      tone="dark"
-                      failure={{ message: "Couldn't load your membership. Try again." }}
-                    />
-                  )}
-                </div>
-              )}
-              {officerRole && !framed ? <RowClubToolsButton orgHandle={org.handle} /> : null}
-              {org.hidden ? null : (
-                <SharePageButton orgHandle={org.handle} orgName={org.name} compact={!officerRole || !framed} />
-              )}
-              {officerRole && framed ? <RowClubToolsButton orgHandle={org.handle} /> : null}
-            </div>
+                settings and Club tools open it, by the opener or ?edit=1.
+                On a phone (PLAN-6, Oct 23, 2026) the officers' Club tools is
+                a toggle and the tools open in a tray right under the row,
+                in the page, pushing what follows down (ClubToolsTray.tsx). */}
+            {officerRole && !framed ? (
+              <ClubToolsTrayRow
+                before={
+                  <>
+                    {postButton}
+                    {editPageButton}
+                  </>
+                }
+                after={shareButton}
+                club={trayClub}
+                counts={toolsCounts}
+              />
+            ) : (
+              <div className="vibe-club-actions">
+                {officerRole ? (
+                  <>
+                    {postButton}
+                    {editPageButton}
+                  </>
+                ) : (
+                  <div className="vibe-club-join">
+                    {relation ? (
+                      <OrgProfileJoinButton relation={relation} />
+                    ) : (
+                      <LoadFailed
+                        tone="dark"
+                        failure={{ message: "Couldn't load your membership. Try again." }}
+                      />
+                    )}
+                  </div>
+                )}
+                {shareButton}
+                {officerRole ? <RowClubToolsButton orgHandle={org.handle} /> : null}
+              </div>
+            )}
 
             {setup && !setup.complete ? (
               <FinishSetupLine href={clubSetupPath(org.handle)} done={setup.done} total={setup.total} />

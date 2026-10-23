@@ -17,16 +17,15 @@ import { LeaveWarning, useLeavePreview } from "./LeaveWarning";
  *   - Mute posts / Unmute posts, for everyone signed in. The club's posts
  *     leave this student's feed and nothing else changes: a member stays in
  *     every chat, and nobody who runs the club is told (`/api/orgs/[slug]/mute`).
- *   - For the owner and officers, "Stop followers reading the Board" / "Let
- *     followers read the Board" (`PATCH /api/orgs/[slug]`, the switch desktop
- *     Settings → Followers holds): the phone's way to it. Member titles stay
- *     on desktop (Settings → Members) for launch.
  *   - Leave club, for members except the owner, who hands the club on first.
  *     The confirm asks whether to keep following (`DELETE /join` with
  *     `{keep_following}`); the box starts checked only for a follow they
  *     tapped themselves (`keepFollowingDefault`). It also warns about the
  *     club's Members only events they're going to, which a leave takes them
  *     off (`LeaveWarning`, Oct 22, 2026), and the toast says how many.
+ *
+ * The officers' "Let followers read the Board" row is gone (Franky, Oct 23,
+ * 2026): Club settings holds that switch, on a phone and a computer alike.
  *
  * The rows and every word come from `join-copy.ts` (`orgMenuItems`,
  * `ORG_COPY.menu`). No optimistic flips: a tap waits for the server, and the
@@ -43,7 +42,7 @@ export type OrgMenuProps = {
   /**
    * The club's "Followers can read the Board" switch, for a MEMBER only (null
    * for anyone else: next to a card that isn't there it would tell a barred
-   * follower what happened). The leave line and the officers' row read it.
+   * follower what happened). The leave confirm's keep-following line reads it.
    */
   boardReadersOn?: boolean | null;
 };
@@ -57,14 +56,10 @@ export function OrgMenu(p: OrgMenuProps): JSX.Element | null {
   /** The server's mute answer, until the page passes a different `muted`. */
   const [local, setLocal] = useState<{ basis: boolean; muted: boolean } | null>(null);
   const muted = local && local.basis === p.muted ? local.muted : p.muted;
-  /** The switch as the last save left it, until the page passes a different one. */
-  const [readersLocal, setReadersLocal] = useState<{ basis: boolean | null; on: boolean } | null>(null);
-  const basisReaders = p.boardReadersOn ?? null;
-  const readersOn = readersLocal && readersLocal.basis === basisReaders ? readersLocal.on : basisReaders;
   const wrapRef = useRef<HTMLDivElement | null>(null);
   const triggerRef = useRef<HTMLButtonElement | null>(null);
   const org = p.orgName.trim() || "this club";
-  const items = orgMenuItems({ signedIn: true, role: p.role, muted, readersOn });
+  const items = orgMenuItems({ signedIn: true, role: p.role, muted });
 
   useEffect(() => {
     if (!open) return;
@@ -120,24 +115,6 @@ export function OrgMenu(p: OrgMenuProps): JSX.Element | null {
     toast({ message: fillCopy(line, { org }), tone: "info" });
   };
 
-  const toggleReaders = async () => {
-    if (readersOn === null) return;
-    const next = !readersOn;
-    setOpen(false);
-    setBusy(true);
-    const r = await vibeRequest(`/api/orgs/${encodeURIComponent(p.orgHandle)}`, {
-      method: "PATCH",
-      json: { followers_read_board: next },
-      quiet: true,
-      failure: ORG_COPY.board.readersFailed,
-    });
-    setBusy(false);
-    if (!r.ok) return refuse(r);
-    setReadersLocal({ basis: basisReaders, on: next });
-    toast({ message: next ? ORG_COPY.board.readersOn : ORG_COPY.board.readersOff, tone: "info" });
-    router.refresh();
-  };
-
   const leave = async (keepFollowing: boolean) => {
     setBusy(true);
     const r = await vibeRequest<{ left?: unknown; org_follow_state?: unknown; rsvps_dropped?: unknown }>(
@@ -184,8 +161,7 @@ export function OrgMenu(p: OrgMenuProps): JSX.Element | null {
                 if (item.kind === "leave") {
                   setOpen(false);
                   setLeaving(true);
-                } else if (item.kind === "readers") void toggleReaders();
-                else void toggleMute();
+                } else void toggleMute();
               }}
               style={{ ...itemStyle, color: item.kind === "leave" ? "var(--error-ink)" : "var(--charcoal)" }}
             >
@@ -200,7 +176,7 @@ export function OrgMenu(p: OrgMenuProps): JSX.Element | null {
           org={org}
           busy={busy}
           initialKeep={p.keepFollowing}
-          boardOn={readersOn === true}
+          boardOn={p.boardReadersOn === true}
           onCancel={() => {
             setLeaving(false);
             triggerRef.current?.focus();

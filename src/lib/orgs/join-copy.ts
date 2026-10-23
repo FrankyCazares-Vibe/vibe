@@ -329,8 +329,6 @@ export const ORG_COPY = freezeDeep({
     readersOff: "Only members can read the Board now.",
     readersLoadFailed: "Couldn't load the Board setting.",
     readersFailed: "Couldn't change the Board setting.",
-    menuReadersOff: "Stop followers reading the Board",
-    menuReadersOn: "Let followers read the Board",
   },
   // The club page's ⋯ menu (club model gaps 1 and 2).
   menu: {
@@ -1280,27 +1278,22 @@ export function leaveToastText(org: string, answer: { org_follow_state?: unknown
 
 /**
  * The ⋯ menu's rows, in order. Everyone signed in can mute a club's posts
- * (its posts reach the whole campus); the owner and officers can turn the
- * followers' Board reading on or off (`readersOn`, the club's switch, known
- * only to members), the phone's home for that setting (wave-2 repair,
- * finding 3); members can also leave, except the owner, who has to hand the
- * club on first (`join/route.ts` DELETE).
+ * (its posts reach the whole campus); members can also leave, except the
+ * owner, who has to hand the club on first (`join/route.ts` DELETE). The
+ * officers' "Let followers read the Board" row is gone (Franky, Oct 23,
+ * 2026): Club settings holds that switch on a phone and a computer alike.
  */
 export function orgMenuItems(input: {
   signedIn: boolean;
   role: OrgRole | null;
   muted: boolean;
-  readersOn?: boolean | null;
-}): Array<{ kind: "mute" | "unmute" | "readers" | "leave"; label: string }> {
+}): Array<{ kind: "mute" | "unmute" | "leave"; label: string }> {
   if (!input.signedIn) return [];
-  const items: Array<{ kind: "mute" | "unmute" | "readers" | "leave"; label: string }> = [
+  const items: Array<{ kind: "mute" | "unmute" | "leave"; label: string }> = [
     input.muted
       ? { kind: "unmute", label: ORG_COPY.menu.unmute }
       : { kind: "mute", label: ORG_COPY.menu.mute },
   ];
-  if ((input.role === "owner" || input.role === "admin") && typeof input.readersOn === "boolean") {
-    items.push({ kind: "readers", label: input.readersOn ? ORG_COPY.board.menuReadersOff : ORG_COPY.board.menuReadersOn });
-  }
   if (input.role != null && input.role !== "owner") {
     items.push({ kind: "leave", label: ORG_COPY.menu.leave });
   }
