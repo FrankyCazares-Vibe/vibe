@@ -375,9 +375,10 @@ async function itemFor(
 /**
  * PATCH /api/events/[id] -> { ok: true, event: <one GET /api/events item> }
  *
- * Edits title, description, location, starts_at, ends_at and visibility
- * (POST's names; visibility "everyone" | "members", Oct 22, 2026); a field
- * left out keeps its stored value. Only while the event hasn't ended.
+ * Edits title, description, location, starts_at, ends_at, visibility and
+ * icon (POST's names; visibility "everyone" | "members", Oct 22, 2026; icon
+ * one of event-icons.ts's twelve keys, or null to take it off, Oct 23,
+ * 2026); a field left out keeps its stored value. Only while the event hasn't ended.
  * Validation is POST's own (src/lib/events/validate.ts), checking only what
  * changed: an unchanged title isn't re-run through a word list that grew
  * since, and an event already under way keeps its past start (a moved start
@@ -405,7 +406,8 @@ async function itemFor(
  * 403 org_role_required / org_hidden · 403 org_unverified · 409 event_ended ·
  * 400 org_cannot_change · 400 title_required / title_too_long /
  * description_too_long / location_too_long / invalid_times /
- * invalid_visibility · 422 content_blocked (+ field) · 500 request_failed.
+ * invalid_visibility / invalid_icon · 422 content_blocked (+ field) ·
+ * 500 request_failed.
  * Rate limited: 30 per 10 minutes per officer, like post edits.
  */
 export async function PATCH(req: Request, ctx: RouteContext) {

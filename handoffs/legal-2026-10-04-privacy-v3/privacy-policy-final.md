@@ -1,6 +1,6 @@
 # Vibe Privacy Policy
 
-Effective October 22, 2026
+Effective October 23, 2026
 
 Vibe is a campus social app for people with an Indiana University or Purdue University email address. It is run by **CONNECTVIBE. LLC**, an Indiana limited liability company. In this policy, "we" means that company. Vibe is independent. It is not run or backed by Indiana University, Purdue University, or any campus, school or club.
 
@@ -102,7 +102,7 @@ Your profile holds:
 - Posts, drafts, comments, likes, reposts and saves.
 - Who you follow and who follows you.
 - Clubs: memberships and roles, the title a club's owner or an officer gave you, clubs you follow, requests to join with your message, and invites. Asking to join a club also follows it. If a club's owner or an officer takes you out of the club, adds you to a room, gives you a title or removes you as a follower, we store who did it and when.
-- Club events and whether each is marked "Members only", your RSVPs (Going or Interested) and personal calendar entries.
+- Club events and whether each is marked "Members only", the icon its club picked for it, your RSVPs (Going or Interested) and personal calendar entries.
 - Event check-ins: the club events you checked in at. You check in yourself, with the 4-digit code or the QR code on the club's check-in screen, or the club's owner or an officer marks you as here. Our database does not store the time you checked in or which way you did it, but Vercel's visit logs can show both (section 6).
 - Messages and everything in them.
 - Which messages are pinned in a chat, who pinned each one, and when.

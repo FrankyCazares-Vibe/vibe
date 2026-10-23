@@ -119,6 +119,15 @@ import {
   showCheckinSplit,
   splitAttendees,
 } from "@/lib/events/event-checkin";
+import {
+  EVENT_ICON_DEFAULT,
+  EVENT_ICON_KEYS,
+  EVENT_ICON_VIEWBOX,
+  EVENT_ICONS,
+  eventIconOf,
+  eventIconShape,
+  type EventIconKey,
+} from "@/lib/events/event-icons";
 import { captionSegments } from "@/lib/feed/caption-segments";
 import { copyText, type VibeFailure, type VibeResult, vibeRequest } from "@/lib/feedback/request";
 import { toast, type ToastInput } from "@/lib/feedback/toast";
@@ -10241,6 +10250,11 @@ export type CampusEvent = {
   // /api/events and PATCH send it from this deploy on; optional, and read
   // through members-only.ts, so a payload without it is "everyone".
   visibility?: EventVisibility;
+  // Event icons (Oct 23, 2026, club view wave 3, B4): one of the twelve keys
+  // of event-icons.ts, or null for none (the calendar). GET /api/events and
+  // PATCH send it from this deploy on; optional, and read through
+  // `eventIconOf`, so a payload without it (or with junk) draws the calendar.
+  icon?: EventIconKey | null;
   org: {
     id: string;
     handle: string;
@@ -10638,6 +10652,64 @@ function useIsMyClub(orgId: string | null): boolean | null {
   return orgId && clubIds ? clubIds.has(orgId) : null;
 }
 
+/**
+ * One event icon (Oct 23, 2026, club view wave 3, B4): the stroke path of
+ * src/lib/events/event-icons.ts, in `currentColor`, the TonightBits line
+ * icons' way. `icon` null (or junk) draws the calendar. Decorative: the
+ * caller says the name when it matters.
+ */
+export function EventIconGlyph({ icon, size = 20 }: { icon: unknown; size?: number }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox={EVENT_ICON_VIEWBOX}
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.8}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      focusable="false"
+      style={{ display: "block", flexShrink: 0 }}
+    >
+      <path d={eventIconShape(icon).path} />
+    </svg>
+  );
+}
+
+/**
+ * The leading tile on an event card and a past-events row (Oct 23, 2026,
+ * B4): the event's icon on its club's accent tint (the same colorForOrg
+ * value as the card's left stripe). The glyph stays near-white so every
+ * accent, the dark forest one included, reads on the dark glass. An event
+ * with an icon names it to a screen reader ("Food"); the calendar of an
+ * event without one is decoration.
+ */
+export function EventIconTile({ ev, size = 40 }: { ev: Pick<CampusEvent, "icon" | "org" | "creator_id">; size?: number }) {
+  const accent = colorForOrg(ev.org?.id ?? ev.creator_id);
+  const key = eventIconOf(ev.icon);
+  return (
+    <span
+      {...(key ? { role: "img", "aria-label": EVENT_ICONS[key].name } : { "aria-hidden": true })}
+      style={{
+        flexShrink: 0,
+        width: size,
+        height: size,
+        boxSizing: "border-box",
+        borderRadius: Math.round(size * 0.3),
+        display: "grid",
+        placeItems: "center",
+        background: hexToRgba(accent, 0.22),
+        border: `1px solid ${hexToRgba(accent, 0.45)}`,
+        color: "rgba(255,255,255,0.92)",
+      }}
+    >
+      <EventIconGlyph icon={key} size={Math.round(size * 0.5)} />
+    </span>
+  );
+}
+
 export function EventCard({
   ev,
   onMutate,
@@ -10777,6 +10849,9 @@ export function EventCard({
           marginBottom: 8,
         }}
       >
+        {/* Event icons (Oct 23, 2026, B4): the officer's pick, or the
+            calendar, on the club's accent tint. */}
+        <EventIconTile ev={ev} />
         <div style={{ flex: 1, minWidth: 0 }}>
           <div
             style={{
@@ -12327,6 +12402,9 @@ export function CreateEventModal(props: CreateEventModalProps) {
     // Members only (Oct 22, 2026): an edit keeps the event's own choice; a
     // new event starts at Everyone, the column's default.
     visibility: eventVisibility(editing),
+    // Event icons (Oct 23, 2026, B4): an edit keeps the event's own icon; a
+    // new event starts with none (the calendar).
+    icon: eventIconOf(editing?.icon),
   }));
   const [title, setTitle] = useState(initial.title);
   const [description, setDescription] = useState(initial.description);
@@ -12335,6 +12413,7 @@ export function CreateEventModal(props: CreateEventModalProps) {
   const [endsAt, setEndsAt] = useState(initial.endsAt);
   const [orgId, setOrgId] = useState<string>(editing?.org_id ?? eligibleOrgs[0]?.id ?? "");
   const [visibility, setVisibility] = useState<EventVisibility>(initial.visibility);
+  const [icon, setIcon] = useState<EventIconKey | null>(initial.icon);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [badField, setBadField] = useState<EventFormField | null>(null);
@@ -12345,7 +12424,8 @@ export function CreateEventModal(props: CreateEventModalProps) {
   // What an edit would send: only the fields that changed. A picker compares
   // as the string it shows, so an untouched start (which may be in the past
   // for an event under way) is never re-sent and re-checked.
-  const changes: Record<string, string> = {};
+  // `icon` may be null: that takes an event's icon off.
+  const changes: Record<string, string | null> = {};
   if (title.trim() !== initial.title.trim()) changes.title = title.trim();
   if (description.trim() !== initial.description.trim()) changes.description = description.trim();
   if (location.trim() !== initial.location.trim()) changes.location = location.trim();
@@ -12358,6 +12438,7 @@ export function CreateEventModal(props: CreateEventModalProps) {
     changes.ends_at = new Date(endMs).toISOString();
   }
   if (visibility !== initial.visibility) changes.visibility = visibility;
+  if (icon !== initial.icon) changes.icon = icon;
   const dirty = !editing || Object.keys(changes).length > 0;
   const canSubmit = !busy && !!title.trim() && !!startsAt && !!endsAt && !!orgId && dirty;
 
@@ -12398,6 +12479,7 @@ export function CreateEventModal(props: CreateEventModalProps) {
             ends_at: new Date(endMs).toISOString(),
             org_id: orgId,
             visibility,
+            icon,
           },
           quiet: true,
           failure: "Couldn't create the event.",
@@ -12499,6 +12581,9 @@ export function CreateEventModal(props: CreateEventModalProps) {
           style={fieldStyle("title")}
           {...fieldA11y("title")}
         />
+        {/* Event icons (Oct 23, 2026, B4): right under the title it goes
+            with. Optional: the calendar is the "none" choice. */}
+        <EventIconField value={icon} onChange={setIcon} disabled={busy} />
         <textarea
           value={description}
           onChange={(e) => {
@@ -12658,6 +12743,117 @@ export function CreateEventModal(props: CreateEventModalProps) {
       </motion.div>
     </div>,
     document.body,
+  );
+}
+
+/** The icon field's choices: the calendar ("none", null) first, then the twelve. */
+const EVENT_ICON_CHOICES: ReadonlyArray<EventIconKey | null> = [null, ...EVENT_ICON_KEYS];
+
+/**
+ * "Icon" (Oct 23, 2026, club view wave 3, B4): the create/edit form's
+ * optional pick of one of event-icons.ts's twelve icons, the calendar
+ * first as the "none" choice (what every event shows without one). A grid
+ * that wraps (five a row on a phone, nine on a computer), so every choice
+ * is in sight; each is at least 52 × 56 px, the icon with its name under.
+ *
+ * EventVisibilityField's radio group contract: one tab stop, the arrows and
+ * Home / End move the choice and the focus (wrapping at the ends). Drawn in
+ * the modal's dark glass with modalSegmentStyle, like the choice below it.
+ */
+function EventIconField({
+  value,
+  onChange,
+  disabled,
+}: {
+  value: EventIconKey | null;
+  onChange: (next: EventIconKey | null) => void;
+  disabled: boolean;
+}) {
+  const labelId = useId();
+  const buttonsRef = useRef(new Map<EventIconKey | null, HTMLButtonElement | null>());
+
+  const pick = (next: EventIconKey | null) => {
+    onChange(next);
+    buttonsRef.current.get(next)?.focus();
+  };
+
+  const onKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (disabled) return;
+    const at = EVENT_ICON_CHOICES.indexOf(value);
+    const last = EVENT_ICON_CHOICES.length - 1;
+    let to: number;
+    if (e.key === "ArrowRight" || e.key === "ArrowDown") to = at >= last ? 0 : at + 1;
+    else if (e.key === "ArrowLeft" || e.key === "ArrowUp") to = at <= 0 ? last : at - 1;
+    else if (e.key === "Home") to = 0;
+    else if (e.key === "End") to = last;
+    else return;
+    e.preventDefault();
+    pick(EVENT_ICON_CHOICES[to]);
+  };
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+      <span id={labelId} style={eventModalLabel}>
+        Icon
+      </span>
+      <div
+        role="radiogroup"
+        aria-labelledby={labelId}
+        onKeyDown={onKeyDown}
+        style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(52px, 1fr))", gap: 6 }}
+      >
+        {EVENT_ICON_CHOICES.map((key) => {
+          const on = value === key;
+          const name = key ? EVENT_ICONS[key].name : EVENT_ICON_DEFAULT.name;
+          return (
+            <button
+              key={key ?? "none"}
+              type="button"
+              role="radio"
+              aria-checked={on}
+              aria-label={name}
+              disabled={disabled}
+              tabIndex={on ? 0 : -1}
+              className="vibe-press"
+              ref={(el) => {
+                buttonsRef.current.set(key, el);
+              }}
+              onClick={() => onChange(key)}
+              style={{
+                ...modalSegmentStyle(on),
+                minWidth: 0,
+                minHeight: 56,
+                padding: "7px 2px 6px",
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 5,
+                color: on ? "#fff" : "rgba(255,255,255,0.78)",
+                cursor: disabled ? "default" : "pointer",
+              }}
+            >
+              <EventIconGlyph icon={key} size={20} />
+              <span
+                aria-hidden="true"
+                style={{
+                  maxWidth: "100%",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
+                  fontFamily: "DM Sans, sans-serif",
+                  fontSize: 10.5,
+                  fontWeight: on ? 700 : 600,
+                  lineHeight: 1.1,
+                }}
+              >
+                {name}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
   );
 }
 

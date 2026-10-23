@@ -12,21 +12,27 @@
  * Oct 22, 2026, "Members only" events), the very last key for the same
  * reason. The row's own `visibility` is lifted out of its select-order place
  * and put there, read by `eventVisibilityOf` (missing or junk = "everyone").
+ * Then `icon` (Oct 23, 2026, club view wave 3, batch B4): one of the twelve
+ * keys of event-icons.ts or null (none: the calendar), lifted out the same
+ * way and put after `visibility`, the new very last key, read by
+ * `eventIconOf` (missing or junk = null).
  */
 
 import { checkinListFields, type CheckinStateRow } from "@/lib/events/event-checkin";
 import { orgAssetProxyUrl } from "@/lib/org-asset-url";
 
+import { eventIconOf } from "./event-icons";
 import { viewerCanManage, withoutClubCreator } from "./manage";
 import { eventVisibilityOf } from "./validate";
 
 /**
  * The columns every events read selects (plus the creator embed on GET).
- * `visibility` (20261025100000) is last: the code needs the column, so the
- * migration is applied before this deploys (its header says so).
+ * `visibility` (20261025100000), then `icon` (20261027100000, Oct 23, 2026),
+ * last: the code needs both columns, so each migration is applied before
+ * the code that reads it deploys (their headers say so).
  */
 export const EVENT_ROW_COLUMNS =
-  "id,org_id,creator_id,title,description,starts_at,ends_at,location,created_at,visibility";
+  "id,org_id,creator_id,title,description,starts_at,ends_at,location,created_at,visibility,icon";
 
 export type EventListRow = {
   id: string;
@@ -40,6 +46,8 @@ export type EventListRow = {
   created_at: string;
   /** "everyone" | "members" from the database; optional so older fixtures still type. */
   visibility?: string | null;
+  /** One of event-icons.ts's keys or null (none); optional for the same reason. */
+  icon?: string | null;
   // Club rows come back with `{ id }` only (the club creator embed) and leave
   // as `creator: null` (withoutClubCreator); org-less rows, in full.
   creator: {
@@ -89,7 +97,7 @@ export function toEventListItem(
 ) {
   const org = ctx.org;
   // Out of the row's place, back in at the very end (see the header).
-  const { visibility, ...rest } = row;
+  const { visibility, icon, ...rest } = row;
   return {
     ...withoutClubCreator(rest),
     going_count: ctx.goingCount,
@@ -108,8 +116,10 @@ export function toEventListItem(
     org: org ? { ...org, logo_url: orgAssetProxyUrl(org.handle, org.logo_url, "logo") } : null,
     // After `org` on purpose: the three new keys come last.
     ...checkinListFields(ctx.checkin),
-    // Last of all (Oct 22, 2026): who can see it, for the "Members only" chip.
+    // Then (Oct 22, 2026): who can see it, for the "Members only" chip.
     visibility: eventVisibilityOf(visibility),
+    // After it (Oct 23, 2026): the event's icon, null for the calendar.
+    icon: eventIconOf(icon),
   };
 }
 

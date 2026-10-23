@@ -83,10 +83,10 @@ const OLD_KEYS = [
   "org",
 ];
 const CHECKIN_KEYS = ["checkin_open", "checked_in_count", "viewer_checked_in"];
-/** Oct 22, 2026 ("Members only" events): the very last key. */
-const VISIBILITY_KEYS = ["visibility"];
+/** Oct 22, 2026 ("Members only" events), then Oct 23, 2026 (event icons): the last two keys. */
+const VISIBILITY_KEYS = ["visibility", "icon"];
 
-test("the old keys keep their order, the three check-in keys come next, visibility last", () => {
+test("the old keys keep their order, the three check-in keys come next, then visibility and icon", () => {
   const item = toEventListItem(ROW, CTX);
   assert.deepEqual(Object.keys(item), [...OLD_KEYS, ...CHECKIN_KEYS, ...VISIBILITY_KEYS]);
   const withRow = toEventListItem(ROW, { ...CTX, checkin: { open: true, count: 7, viewerCheckedIn: true } });
@@ -95,7 +95,7 @@ test("the old keys keep their order, the three check-in keys come next, visibili
   // it leaves its select-order place and lands last.
   const read = { id: ROW.id, org_id: ORG, creator_id: ME, title: ROW.title, description: ROW.description,
     starts_at: ROW.starts_at, ends_at: ROW.ends_at, location: ROW.location, created_at: ROW.created_at,
-    visibility: "members", creator: ROW.creator };
+    visibility: "members", icon: "food", creator: ROW.creator };
   assert.deepEqual(Object.keys(toEventListItem(read, CTX)), [...OLD_KEYS, ...CHECKIN_KEYS, ...VISIBILITY_KEYS]);
 });
 
@@ -107,9 +107,19 @@ test("visibility: \"members\" stays; missing, null or junk reads \"everyone\"", 
   assert.equal(toEventListItem({ ...ROW, visibility: "Members" }, CTX).visibility, "everyone");
 });
 
-test("EVENT_ROW_COLUMNS names visibility last", async () => {
+test("EVENT_ROW_COLUMNS names visibility, then icon, last", async () => {
   const { EVENT_ROW_COLUMNS } = (await import(spec)) as typeof import("./event-item");
-  assert.equal(EVENT_ROW_COLUMNS.split(",").at(-1), "visibility");
+  assert.deepEqual(EVENT_ROW_COLUMNS.split(",").slice(-2), ["visibility", "icon"]);
+});
+
+test("icon (Oct 23, 2026): one of the twelve keys stays; missing, null or junk reads null (the calendar)", () => {
+  assert.equal(toEventListItem({ ...ROW, icon: "food" }, CTX).icon, "food");
+  assert.equal(toEventListItem({ ...ROW, icon: "party" }, CTX).icon, "party");
+  assert.equal(toEventListItem(ROW, CTX).icon, null, "a row without the column");
+  assert.equal(toEventListItem({ ...ROW, icon: null }, CTX).icon, null);
+  for (const junk of ["Food", " food", "", "calendar", "<svg>"]) {
+    assert.equal(toEventListItem({ ...ROW, icon: junk }, CTX).icon, null, junk);
+  }
 });
 
 test("without a check-in row: not open, no count, not checked in", () => {

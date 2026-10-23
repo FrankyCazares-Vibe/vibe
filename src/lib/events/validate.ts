@@ -25,9 +25,19 @@
  * `invalid_visibility`, checked last so POST's old refusals keep their order.
  * The database's events_visibility_check holds the same two words
  * (20261025100000).
+ *
+ * ITS ICON (Oct 23, 2026, club view wave 3, batch B4: handoffs/
+ * 2026-10-23-club-view-wave-3/PLAN.md): `icon` is one of the twelve keys of
+ * event-icons.ts, or null for none (the calendar). An enum like
+ * `visibility`: no word filter, no length cap. Left out of a create it is
+ * null; left out of an edit it keeps the stored value; a sent null takes it
+ * off. Anything else (a name, a cased or unknown key, "", a number) is a
+ * 400 `invalid_icon`, checked after `visibility`, last of all. The
+ * database's events_icon_check holds the same twelve (20261027100000).
  */
 
 import { checkChangedText } from "../moderation/text-filter";
+import { eventIconOf, isEventIcon, type EventIconKey } from "./event-icons";
 import {
   EVENT_MAX_DESCRIPTION,
   EVENT_MAX_LOCATION,
@@ -63,6 +73,8 @@ export type StoredEventFields = {
   ends_at: string;
   /** Optional so a row read before the column existed still types; read by `eventVisibilityOf`. */
   visibility?: string | null;
+  /** Optional for the same reason (Oct 23, 2026); read by `eventIconOf` (junk = none). */
+  icon?: string | null;
 };
 
 /** Trimmed request values; times are still the raw strings. */
@@ -74,6 +86,8 @@ export type EventFields = {
   endsAt: string;
   /** Trimmed when a string was sent; "" for a non-string (refused); the stored or default value when left out. */
   visibility: string;
+  /** null = none (sent null, or left out with none stored); else as `visibility` reads: trimmed, "" refused. */
+  icon: string | null;
 };
 
 /** What the database row gets. Times are ISO strings in UTC. */
@@ -84,6 +98,7 @@ export type ValidEventFields = {
   starts_at: string;
   ends_at: string;
   visibility: EventVisibility;
+  icon: EventIconKey | null;
 };
 
 export type EventFieldsProblem =
@@ -95,10 +110,11 @@ function asTrimmed(value: unknown): string {
 }
 
 /**
- * Reads the six fields from a parsed JSON object. For an edit, a field the
+ * Reads the seven fields from a parsed JSON object. For an edit, a field the
  * body leaves out keeps its stored value; a field that is present but isn't a
  * string reads as "" (as POST always has), so `{"title": 5}` is "Title is
- * required", not a silent no-op.
+ * required", not a silent no-op. One exception (Oct 23, 2026): a sent
+ * `"icon": null` is "no icon", the way to take one off.
  */
 export function readEventFields(
   body: Record<string, unknown>,
@@ -118,14 +134,22 @@ export function readEventFields(
           ? eventVisibilityOf(stored.visibility)
           : "everyone"
         : asTrimmed(body.visibility),
+    icon:
+      body.icon === undefined
+        ? stored
+          ? eventIconOf(stored.icon)
+          : null
+        : body.icon === null
+          ? null
+          : asTrimmed(body.icon),
   };
 }
 
 /**
  * The whole check, in POST's order: title required, the three length caps
  * (the database CHECKs' numbers, see manage.ts), the word filter (title,
- * description, location), the times, then who can see it (Oct 22, 2026).
- * `stored` present = an edit.
+ * description, location), the times, who can see it (Oct 22, 2026), then
+ * its icon (Oct 23, 2026). `stored` present = an edit.
  */
 export function checkEventFields(
   fields: EventFields,
@@ -169,6 +193,11 @@ export function checkEventFields(
   if (!visibility) {
     return invalid("invalid_visibility", "Choose who can see it: Everyone or Members only");
   }
+  // After visibility, for the same reason (Oct 23, 2026).
+  const icon = fields.icon === null ? null : isEventIcon(fields.icon) ? fields.icon : undefined;
+  if (icon === undefined) {
+    return invalid("invalid_icon", "Choose one of the event icons, or none");
+  }
 
   return {
     ok: true,
@@ -179,6 +208,7 @@ export function checkEventFields(
       starts_at: new Date(start).toISOString(),
       ends_at: new Date(end).toISOString(),
       visibility,
+      icon,
     },
   };
 }

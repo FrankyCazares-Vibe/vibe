@@ -1,14 +1,14 @@
 {
   "pass": true,
   "url": "http://localhost:3100/legal/privacy",
-  "md": "handoffs/legal-2026-10-04-privacy-v3/privacy-policy-final.md",
+  "md": "/Users/franciscocazares/vibe/.claude/worktrees/club-page-in-shell-0b76e3/handoffs/legal-2026-10-04-privacy-v3/privacy-policy-final.md",
   "counts": {
-    "mdSentences": 1292,
-    "pageSentences": 1292,
-    "same": 1292,
-    "mentions": 109,
+    "mdSentences": 1300,
+    "pageSentences": 1300,
+    "same": 1300,
+    "mentions": 110,
     "dates": {
-      "October 21, 2026": 1,
+      "October 23, 2026": 1,
       "October 5, 2026": 8,
       "October 8, 2026": 2,
       "October 12, 2026": 2,

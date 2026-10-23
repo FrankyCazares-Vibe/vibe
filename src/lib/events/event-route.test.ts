@@ -457,7 +457,7 @@ test("PATCH: the refusals touch no card (ended 409, not an officer 403, invalid 
 
 type PatchAnswer = { ok: boolean; event: Record<string, unknown> | null };
 
-test("PATCH: the answer's event carries the check-in state, the three keys, then visibility, last", async (t) => {
+test("PATCH: the answer's event carries the check-in state, the three keys, then visibility and icon, last", async (t) => {
   quiet(t);
   setup({
     event: UPCOMING,
@@ -468,7 +468,7 @@ test("PATCH: the answer's event carries the check-in state, the three keys, then
   assert.equal(res.status, 200);
   const { event } = (await res.json()) as PatchAnswer;
   assert.ok(event);
-  assert.deepEqual(Object.keys(event).slice(-5), ["org", "checkin_open", "checked_in_count", "viewer_checked_in", "visibility"]);
+  assert.deepEqual(Object.keys(event).slice(-6), ["org", "checkin_open", "checked_in_count", "viewer_checked_in", "visibility", "icon"]);
   assert.deepEqual([event.checkin_open, event.checked_in_count, event.viewer_checked_in], [true, 7, true]);
   assert.deepEqual([event.going_count, event.interested_count], [3, 1]);
 });
@@ -573,4 +573,37 @@ test("DELETE of a members-only event: the notices go to the club's current membe
   const legacy = setup({ event: UPCOMING });
   assert.equal((await del()).status, 200);
   assert.deepEqual(legacy.collectOpts, [{ membersOf: null }], "a row read without the column is Everyone");
+});
+
+// ── Event icons (Oct 23, 2026; club view wave 3, batch B4) ──────────────────
+
+test("PATCH with an icon: written and answered; null takes it off; left out keeps the stored one", async (t) => {
+  quiet(t);
+  const withFood = { ...UPCOMING, icon: "food" };
+  for (const [stored, body, written, saved] of [
+    [UPCOMING, { icon: "food" }, "food", withFood],
+    [withFood, { icon: "party" }, "party", { ...UPCOMING, icon: "party" }],
+    [withFood, { icon: null }, null, { ...UPCOMING, icon: null }],
+    [withFood, { location: "Room 2" }, "food", { ...withFood, location: "Room 2" }],
+    [UPCOMING, { description: "x" }, null, { ...UPCOMING, description: "x" }],
+  ] as const) {
+    const { log, updates } = setup({ event: stored, updatedEvent: saved });
+    const res = await patch(body);
+    assert.equal(res.status, 200, JSON.stringify(body));
+    assert.deepEqual(log, ["event:update"], JSON.stringify(body));
+    assert.equal(updates[0].icon, written, JSON.stringify(body));
+    const { event } = (await res.json()) as PatchAnswer;
+    assert.equal(event?.icon, (saved as { icon?: string | null }).icon ?? null);
+  }
+});
+
+test("PATCH with an icon that isn't one of the twelve: 400 invalid_icon, nothing written", async (t) => {
+  quiet(t);
+  for (const icon of ["Food", "calendar", "", 5]) {
+    const { log } = setup({ event: UPCOMING, updatedEvent: UPCOMING });
+    const res = await patch({ icon });
+    assert.equal(res.status, 400, JSON.stringify(icon));
+    assert.equal(((await res.json()) as { code: string }).code, "invalid_icon");
+    assert.deepEqual(log, []);
+  }
 });

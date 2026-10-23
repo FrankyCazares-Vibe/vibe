@@ -79,6 +79,7 @@ test("create: a normal event passes, trimmed, with ISO times", () => {
     starts_at: iso(NOW + DAY),
     ends_at: iso(NOW + DAY + 2 * HOUR),
     visibility: "everyone",
+    icon: null,
   });
 });
 
@@ -136,6 +137,7 @@ test("edit: a field left out keeps its stored value; one sent replaces it", () =
     startsAt: stored.starts_at,
     endsAt: stored.ends_at,
     visibility: "everyone",
+    icon: null,
   });
   // Sent but not a string: "" (so `null` clears a description, as POST reads it).
   assert.equal(readEventFields({ description: null }, stored).description, "");
@@ -236,4 +238,57 @@ test("eventVisibilityOf: only an exact \"members\" is members-only", async () =>
     ["members", "everyone", "MEMBERS", " members", null, undefined, 3].map((v) => eventVisibilityOf(v)),
     ["members", "everyone", "everyone", "everyone", "everyone", "everyone", "everyone"],
   );
+});
+
+// ── Its icon (Oct 23, 2026, club view wave 3, batch B4) ─────────────────────
+
+const INVALID_ICON = {
+  kind: "invalid", status: 400, code: "invalid_icon", error: "Choose one of the event icons, or none",
+};
+
+test("icon: left out of a create or sent null is none; each of the twelve keys passes (trimmed); anything else is 400 invalid_icon", async () => {
+  const { EVENT_ICON_KEYS } = await import("./event-icons");
+  const check = (patch: Record<string, unknown>) => checkEventFields(readEventFields({ ...good, ...patch }), NOW);
+  for (const patch of [{}, { icon: null }]) {
+    const r = check(patch);
+    assert.ok(r.ok, JSON.stringify(patch));
+    assert.equal(r.value.icon, null);
+  }
+  for (const key of [...EVENT_ICON_KEYS, " food "]) {
+    const r = check({ icon: key });
+    assert.ok(r.ok, key);
+    assert.equal(r.value.icon, key.trim());
+  }
+  for (const value of ["Food", "Meeting", "calendar", "", "   ", "url(x)", 1, true, ["food"], { key: "food" }]) {
+    assert.deepEqual(problemOf(check({ icon: value })), INVALID_ICON, JSON.stringify(value));
+  }
+});
+
+test("icon is checked last and never word-filtered: an older refusal still wins", () => {
+  const r = checkEventFields(readEventFields({ ...good, title: "", icon: "nope" }), NOW);
+  assert.equal((problemOf(r) as { code: string }).code, "title_required");
+  const vis = checkEventFields(readEventFields({ ...good, visibility: "friends", icon: "nope" }), NOW);
+  assert.equal((problemOf(vis) as { code: string }).code, "invalid_visibility");
+  const blockedWord = checkEventFields(readEventFields({ ...good, icon: BLOCKED }), NOW);
+  assert.deepEqual(problemOf(blockedWord), INVALID_ICON, "an enum, not text");
+});
+
+test("icon on an edit: left out keeps the stored key (junk stored reads none); sent replaces it; null takes it off", () => {
+  const withIcon = { ...stored, icon: "music" };
+  const kept = checkEventFields(readEventFields({ location: "Union 305" }, withIcon), NOW, withIcon);
+  assert.ok(kept.ok);
+  assert.equal(kept.value.icon, "music");
+  const swapped = checkEventFields(readEventFields({ icon: "party" }, withIcon), NOW, withIcon);
+  assert.ok(swapped.ok);
+  assert.equal(swapped.value.icon, "party");
+  const off = checkEventFields(readEventFields({ icon: null }, withIcon), NOW, withIcon);
+  assert.ok(off.ok);
+  assert.equal(off.value.icon, null);
+  for (const legacy of [{ ...stored, icon: null }, { ...stored, icon: "Music" }, stored]) {
+    const r = checkEventFields(readEventFields({}, legacy), NOW, legacy);
+    assert.ok(r.ok);
+    assert.equal(r.value.icon, null);
+  }
+  const junk = checkEventFields(readEventFields({ icon: "secret" }, withIcon), NOW, withIcon);
+  assert.deepEqual(problemOf(junk), INVALID_ICON);
 });

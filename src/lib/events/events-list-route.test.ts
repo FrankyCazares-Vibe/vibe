@@ -312,7 +312,8 @@ test("event_checkin_state rides with the RSVP counts on the viewer's client; its
   const fields = (e: Item | undefined) => [e?.checkin_open, e?.checked_in_count, e?.viewer_checked_in];
   assert.deepEqual(fields(list[0]), [true, 12, true]);
   assert.deepEqual(fields(list[1]), [false, null, false], "no row: nothing known");
-  assert.deepEqual(Object.keys(list[0] ?? {}).slice(-4), ["checkin_open", "checked_in_count", "viewer_checked_in", "visibility"]);
+  // Then visibility (Oct 22, 2026) and the icon (Oct 23, 2026), the last two.
+  assert.deepEqual(Object.keys(list[0] ?? {}).slice(-5), ["checkin_open", "checked_in_count", "viewer_checked_in", "visibility", "icon"]);
 });
 
 test("a failed state read (check-in not installed yet): 200, every item 'nothing known', the counts kept, a code-only log", async (t) => {

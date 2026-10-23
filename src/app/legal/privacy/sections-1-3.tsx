@@ -212,7 +212,8 @@ export function Sections1To3() {
         </li>
         <li>
           Club events and whether each is marked &ldquo;Members only&rdquo;,
-          your RSVPs (Going or Interested) and personal calendar entries.
+          the icon its club picked for it, your RSVPs (Going or Interested)
+          and personal calendar entries.
         </li>
         <li>
           Event check-ins: the club events you checked in at. You check in

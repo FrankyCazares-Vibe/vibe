@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { AttendeesModal, type CampusEvent } from "@/app/campus/campus-home";
+import { AttendeesModal, type CampusEvent, EventIconTile } from "@/app/campus/campus-home";
 import { CHECKIN_COPY, CHECKIN_ERRORS, checkinCountLine } from "@/lib/events/event-checkin";
 import { vibeRequest } from "@/lib/feedback/request";
 
@@ -27,6 +27,10 @@ import { LinkedFlash, LinkedFocusStyle, useLinkedEvent, useLinkedEventParam } fr
  * (Oct 19, 2026 repair): a club that meets three times a week has more than
  * 10 events in the 30 days My Calendar looks back, and an RSVP from three
  * weeks ago would otherwise be "not listed".
+ *
+ * Each row leads with the event's icon (Oct 23, 2026, club view wave 3,
+ * B4): the officer's pick or the calendar, on the club's accent tint, the
+ * event cards' EventIconTile at 32 px.
  */
 export function OrgPastEvents({ orgId, orgHandle }: { orgId: string; orgHandle: string }) {
   const [events, setEvents] = useState<CampusEvent[] | null>(null);
@@ -90,6 +94,7 @@ export function OrgPastEvents({ orgId, orgHandle }: { orgId: string; orgHandle: 
             >
               {/* Wider than the row: its text starts at the row's own edge. */}
               {ev.id === linkedId ? <LinkedFlash radius={10} inset="-2px -10px" /> : null}
+              <EventIconTile ev={ev} size={32} />
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={titleStyle}>{ev.title}</div>
                 <div style={dateStyle}>{pastEventDate(ev.starts_at)}</div>

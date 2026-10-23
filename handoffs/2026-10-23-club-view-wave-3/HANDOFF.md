@@ -25,7 +25,14 @@ Checked live: `/orgs/sae` names `/orgs/sae/opengraph-image`, which answers SAE's
   QR row, the table card on screen and in print, the member redirect, the picture PNG for a real and a missing club.
   The local test event was deleted afterwards.
 
-## Part 2, built, NOT shipped: event icons (waits for Franky's own yes here)
+## Part 2, shipped Oct 23: event icons (Franky's yes in this session)
+- Production: pre-flight [f | 0; anon f|f, authenticated f|f; t | t; 22 events; last 20261026100000], applied
+  with the connector, history row renamed 20261023180122 → 20261027100000 `event_icons`, post-check [text, null,
+  no default; events_icon_check the only rule, validated; 22 | 0 with an icon; grants as before].
+- Privacy Policy effective October 23, 2026: 3c "the icon its club picked for it" (page + text; checker PASS;
+  `src/lib/legal/event-icons-policy.test.ts`).
+
+### Part 2 as built (kept for the record)
 - Migration `supabase/migrations/20261027100000_event_icons.sql` (`events.icon` text null + a CHECK of twelve keys;
   PRE-FLIGHT / POST-CHECK / ROLLBACK in its header). Applied on the LOCAL stack only.
 - Code (kept out of main until the migration is on production): `src/lib/events/event-icons.ts` (+ test),

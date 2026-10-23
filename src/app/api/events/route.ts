@@ -133,8 +133,13 @@ function fail(status: number, code: string, error: string) {
  * client, so `event_visible` (20261025100000) leaves a members-only event
  * out for everyone but its club's members and platform admins: members see
  * theirs in the campus list and Tonight too. Each item carries
- * `visibility` ("everyone" | "members", its last key) for the chip. The
- * service-role reads above only resolve ids and names, never rows.
+ * `visibility` ("everyone" | "members") for the chip. The service-role
+ * reads above only resolve ids and names, never rows.
+ *
+ * EVENT ICONS (Oct 23, 2026, club view wave 3, batch B4). Every item also
+ * carries `icon`, its very last key: one of the twelve keys of
+ * src/lib/events/event-icons.ts, or null for none (the card draws the
+ * calendar). Read off the same row (events.icon, 20261027100000).
  *
  * CACHING. Every answer, refusals included, says Cache-Control: no-store
  * (contract 3.0): each one is per viewer (their RSVPs, whether they checked
@@ -556,6 +561,9 @@ export async function POST(req: Request) {
   //    is 400 invalid_visibility. The database decides who sees a
   //    members-only event (event_visible, 20261025100000), so the officer
   //    check below is all this route adds.
+  //  - Its icon (Oct 23, 2026): `icon` one of the twelve keys of
+  //    event-icons.ts, or null / left out for none (the calendar); anything
+  //    else is 400 invalid_icon. An enum, never word-filtered.
   const checked = checkEventFields(readEventFields(body), Date.now());
   if (!checked.ok) {
     const p = checked.problem;
@@ -618,6 +626,7 @@ export async function POST(req: Request) {
       starts_at: fields.starts_at,
       ends_at: fields.ends_at,
       visibility: fields.visibility,
+      icon: fields.icon,
     })
     .select(EVENT_ROW_COLUMNS)
     .single();
