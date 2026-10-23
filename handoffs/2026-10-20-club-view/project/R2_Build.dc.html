@@ -16,11 +16,11 @@ a{color:inherit;text-decoration:none}
 a:hover{color:inherit}
 </style>
 </helmet>
-<div style="min-height: 1660px; position: relative; isolation: isolate; background: #0C0B0B; color: #F6F1EA; font-family: 'DM Sans', system-ui, sans-serif; padding: 56px 24px 64px">
+<div style="min-height: 1780px; position: relative; isolation: isolate; background: #0C0B0B; color: #F6F1EA; font-family: 'DM Sans', system-ui, sans-serif; padding: 56px 24px 64px">
   <div aria-hidden="true" style="position: absolute; inset: 0; z-index: -1; pointer-events: none; background: radial-gradient(800px 640px at 0% 0%, rgba(255,92,53,0.24), rgba(255,92,53,0.05) 45%, transparent 70%)"></div>
   <div style="max-width: 1360px; margin: 0 auto; display: flex; flex-direction: column; gap: 32px">
     <header style="display: flex; flex-direction: column; gap: 10px; max-width: 960px">
-      <div style="font-size: 12px; letter-spacing: 0.14em; text-transform: uppercase; color: #CFC8BE"><span style="color: #FF5C35">●</span> Build order · approved by Franky · Oct 20</div>
+      <div style="font-size: 12px; letter-spacing: 0.14em; text-transform: uppercase; color: #CFC8BE"><span style="color: #FF5C35">●</span> Build order · approved Oct 20 · updated Oct 23</div>
       <h1 style="font-family: Fraunces, serif; font-weight: 900; font-size: 64px; letter-spacing: -0.035em; line-height: 1">Build order.</h1>
       <p style="font-size: 18px; line-height: 1.5; color: #CFC8BE">Clubs come first: a club can get on by Fri Oct 23, so you can start onboarding. Then officers run it from the phone, then the night itself. What only matters once clubs have members and data comes after launch.</p>
     </header>
@@ -82,40 +82,38 @@ a:hover{color:inherit}
         <h2 style="font-family: Fraunces, serif; font-weight: 800; font-size: 22px; letter-spacing: -0.02em">Never cut.</h2>
         <p style="font-size: 15px; line-height: 1.55; color: #E4DDD3">Roles, the setup link and the members’ link (with the sign-up change), the setup list, the switch, the club page, join requests on the phone, and Share with the club’s link picture and QR.</p>
         <h2 style="font-family: Fraunces, serif; font-weight: 800; font-size: 22px; letter-spacing: -0.02em; margin-top: 6px">Needs your yes.</h2>
-        <p style="font-size: 15px; line-height: 1.55; color: #E4DDD3">A production database change in each wave (roles and the links; the meeting time; event covers; hand-over), each at the time. Privacy Policy lines the same day: the links, event covers, and later the club email.</p>
+        <p style="font-size: 15px; line-height: 1.55; color: #E4DDD3">A production database change in each wave (roles and the links; the meeting time; event covers; the hand-over in week 1), each at the time. Privacy Policy lines the same day: the links, event covers, and later the club email.</p>
       </section>
     </div>
   </div>
 </div>
 </x-dc>
-<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1660}}'>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1780}}'>
 class Component extends DCLogic {
   renderVals() {
     const must = { tag: 'Must', tagBg: 'rgba(255,92,53,0.16)', tagInk: '#FF8A66' };
     const should = { tag: 'Should', tagBg: 'rgba(246,196,104,0.16)', tagInk: '#F6C468' };
     const yours = { tag: 'Your call · first to slip', tagBg: 'rgba(150,186,255,0.16)', tagInk: '#96BAFF' };
     const check = { tag: 'Must', tagBg: 'rgba(79,208,138,0.16)', tagInk: '#6FDB9A' };
+    const shipped = { tag: 'Shipped Oct 21', tagBg: 'rgba(79,208,138,0.16)', tagInk: '#6FDB9A' };
     const I = (t, d, size, k) => Object.assign({ t, d, size: size === '–' ? 'No build' : 'Size ' + size }, k);
     return {
       waves: [
-        { when: 'Wed Oct 21 to Thu Oct 22', name: '1 · A club can get on', line: '#FF5C35', items: [
-          I('Roles: Owner and Officers', 'Mods become officers; only the owner adds or removes officers.', 'S', must),
-          I('Setup link and members’ link', 'One mechanism for both. It changes the sign-up gate, so it goes first and gets the longest review.', 'L', must),
-          I('Setup link in Admin › Clubs', 'With its QR, to hand over in person.', 'S', must),
-          I('Setup landing and setup list', 'The first screen a new owner sees. Today the phone can’t create a club.', 'M', must)
+        { when: 'Shipped Oct 21 · main 64004a1', name: '1 · A club can get on', line: '#4FD08A', items: [
+          I('Roles: Owner and Officers', 'Mods become officers; only the owner adds or removes officers.', 'S', shipped),
+          I('Setup link and members’ link', 'One mechanism for both. It changes the sign-up gate, so it goes first and gets the longest review.', 'L', shipped),
+          I('Setup link in Admin › Clubs', 'With its QR, to hand over in person.', 'S', shipped),
+          I('Setup landing and setup list', 'The first screen a new owner sees. Today the phone can’t create a club.', 'M', shipped)
         ] },
-        { when: 'Fri Oct 23 to Sat Oct 24', name: '2 · Officers run it from the phone', line: '#FF5C35', items: [
-          I('The switch', 'Tap your name or hold the Profile tab; the switcher; “Clubs you run” on desktop.', 'M', must),
-          I('The club page, Instagram-style', 'Header with About folded in, Edit, Share, +, Posts first, the needs-you line, exact counts.', 'M', must),
-          I('Club tools on the phone', 'Join requests, members, officers and titles first; followers and settings can slip a week.', 'L', must)
+        { when: 'Shipped Oct 21 · main 4948ce6', name: '2 · Officers run it from the phone', line: '#4FD08A', items: [
+          I('The switch', 'Tap your name or hold the Profile tab; the switcher; “Clubs you run” on desktop.', 'M', shipped),
+          I('The club page, Instagram-style', 'Header with About folded in, Edit, Share, +, Posts first, the needs-you line, exact counts.', 'M', shipped),
+          I('Club tools on the phone', 'Requests, members, officers and titles, followers and settings: none of it slipped.', 'L', shipped)
         ] },
-        { when: 'Sun Oct 25 to Mon Oct 26', name: '3 · The night, and sharing', line: '#FF5C35', items: [
+        { when: 'Started Fri Oct 23', name: '3 · The night, and sharing', line: '#FF5C35', items: [
           I('Up next with its steps', 'The button is always the next thing. If short on time, keep the button, drop the rail.', 'M', must),
           I('Share: link, link picture, table QR', 'The club’s own picture when a link is pasted; the QR part exists.', 'M', must),
-          I('Event covers', 'A picture or a simple icon. If late, icons only.', 'M', should)
-        ] },
-        { when: 'Tue Oct 27', name: '4 · Hand-over', line: '#96BAFF', items: [
-          I('Hand the club to an officer', 'Your call is before launch. Mine: first to slip; nobody needs it until spring elections.', 'M', yours)
+          I('Event covers', 'Icons first (your call, Oct 23); pictures follow in week 1.', 'M', should)
         ] },
         { when: 'Wed Oct 28', name: 'Review, then freeze', line: '#4FD08A', items: [
           I('Review and sentinels', 'Adversarial review of each wave, the feature sentinel on club paths, a security pass on the sign-up change.', '–', check),
@@ -126,7 +124,9 @@ class Component extends DCLogic {
         { name: 'Week 1', when: 'Nov 2 to 8', items: [
           { t: 'Event pages', d: 'Every shared event needs somewhere to land, with RSVP.' },
           { t: 'Story cards', d: 'Club, event, after an event.' },
-          { t: 'Notices in the app', d: 'New events and Board posts, one a day per club, mute a club.' }
+          { t: 'Notices in the app', d: 'New events and Board posts, one a day per club, mute a club.' },
+          { t: 'Hand-over', d: 'Moved from wave 4 (your call, Oct 23). Owner picks an officer, who accepts.' },
+          { t: 'Event cover pictures', d: 'Wave 3 ships icons; pictures come with event pages.' }
         ] },
         { name: 'Week 2', when: 'Nov 9 to 15', items: [
           { t: 'One picture on Board posts', d: 'Until then, flyers go up as club posts.' },
@@ -139,11 +139,7 @@ class Component extends DCLogic {
         ] }
       ],
       cuts: [
-        { n: '1', t: 'Hand-over (to week 1).' },
-        { n: '2', t: 'Event cover pictures (keep icons).' },
-        { n: '3', t: 'The step rail on Up next (keep its button).' },
-        { n: '4', t: 'Followers and settings on the phone (desktop has them).' },
-        { n: '5', t: '“Clubs you run” on desktop (Manage club stays).' }
+        { n: '1', t: 'The step rail on Up next (keep its button). The only cut left: the hand-over and cover pictures moved to week 1, and the rest shipped in wave 2.' }
       ]
     };
   }

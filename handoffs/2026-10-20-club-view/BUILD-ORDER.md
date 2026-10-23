@@ -2,7 +2,8 @@
 
 What must work on launch night (Thu Oct 29) and what follows in the first weeks. The decisions are in
 `DECISIONS.md`; what exists today, with file references, is in `INVENTORY.md`. Sizes are S / M / L, not hours.
-**Approved by Franky, Oct 20.** Wave 1 starts now in its own session.
+**Approved by Franky, Oct 20.** Waves 1 and 2 shipped Oct 21 (main `64004a1`, `4948ce6`). **Oct 23: Franky started
+wave 3 and moved the hand-over (wave 4) to week 1.**
 
 **The idea behind the order:** clubs come first, so the first thing to work is a club getting on Vibe. Franky
 can start onboarding the first clubs on **Fri Oct 23**. Then officers running the club from their phone, then
@@ -26,17 +27,15 @@ the night itself and sharing. Anything that only matters once clubs have members
 | **The club page, Instagram-style:** header with counts, bio, one link, who can join, meeting time (new field), "More about us"; Edit page, Share page, +; tabs Posts, Events, Board (the phone already opens on Posts); the "needs you" line; exact counts for officers. Mostly a re-style of today's page and its officer bar. | M | Must. On launch night this page is every club's storefront. |
 | **Club tools on the phone:** join requests, members, officers and titles first; then followers and club settings. Today all of this is a desktop-only window. | L | Must for requests, members and officers; followers and settings can slip a week. |
 
-### Wave 3 · Sun Oct 25 to Mon Oct 26 · "The night itself, and sharing"
+### Wave 3 · from Fri Oct 23 (started early) · "The night itself, and sharing"
 | Piece | Size | Recommendation |
 |---|---|---|
 | **Up next with its steps** (posted, going, check-in, who came, thank-you); the button is always the next thing (share, start check-in, who came, post a thank-you). | M | Must, but if time runs short, keep the one button and drop the step rail. |
 | **Share page / share event:** the phone's share sheet and copy link, the club's own link picture (today a pasted link shows the generic Vibe picture), and the table QR (the check-in QR component exists). | M | Must. This is how clubs market for us on launch night. |
-| **Event covers:** a picture or a simple icon on every event. | M | Should. If late, icons only, pictures in week 1. |
+| **Event covers:** icons first (Franky, Oct 23); pictures follow in week 1. | M | Should. |
 
-### Wave 4 · Tue Oct 27 · hand-over, then stop building
-| Piece | Size | Recommendation |
-|---|---|---|
-| **Hand-over:** the owner picks an officer, who accepts; the old owner becomes an officer or leaves. | M | Your call: before launch. Mine: first to slip. Nobody needs it until spring elections, and it's the only piece with no launch-night job. |
+### Wave 4 · moved to week 1 (Franky, Oct 23)
+The hand-over is no longer before launch; it's in week 1 below.
 
 ### Wed Oct 28 · review, not building
 Adversarial review of every wave's diff, the feature sentinel on the club paths, a security pass on the sign-up
@@ -50,6 +49,8 @@ on the Profile tab, start check-in). Freeze that night. **Thu Oct 29: launch nig
 | Week 1 · Nov 2 to 8 | **Event pages** (a link people can open and RSVP from, with the cover) | M | First after launch: every shared event needs somewhere to land. |
 | Week 1 | **Story cards** (club, event, after an event) | M | Right after event pages; the event card links to one. |
 | Week 1 | **Notices** in the app for new events (members and followers) and Board posts (members), one a day per club, mute a club | M | Week 1, once clubs are posting. |
+| Week 1 | **Hand-over:** the owner picks an officer, who accepts; the old owner becomes an officer or leaves | M | Moved from wave 4 (Franky, Oct 23). Nobody needs it until spring elections. Needs a production database change. |
+| Week 1 | **Event cover pictures** (wave 3 ships icons) | S | With event pages, which show the cover. Privacy Policy line if it adds anything new. |
 | Week 2 · Nov 9 to 15 | **One picture on Board posts** | M | Week 2. Flyers can go up as club posts until then. |
 | Week 2 | **Insights** (followers by week, turnout by event) | S | Week 2, when there's data to show. |
 | Week 2 or later | **Phone push** for the same notices | S | When Apple accepts the app (store work stays parked until then). |
@@ -57,18 +58,16 @@ on the Profile tab, start check-in). Freeze that night. **Thu Oct 29: launch nig
 | As space allows | Anything cut from the waves above | | In the cut order below. |
 
 ## If we run late, cut in this order
-1. Hand-over (to week 1).
-2. Event cover pictures (keep icons).
-3. The step rail on Up next (keep its one button).
-4. Followers and club settings on the phone (desktop keeps them a week longer).
-5. Desktop "Clubs you run" (desktop keeps its Manage club link).
+As of Oct 23 only one item is left to cut: **the step rail on Up next** (keep its one button). The rest already
+happened: the hand-over and cover pictures moved to week 1, and followers, club settings and desktop "Clubs you run"
+shipped in wave 2.
 
 **Never cut:** roles, the two links and the gate change, the setup list, the switch, the club page, join requests on
 the phone, and Share with the link picture and QR.
 
 ## What needs Franky's yes, and when
 - **Production database changes**, each with his yes at the time, bundled to keep them few: Wave 1 (roles; club
-  codes and the sign-up gate change), Wave 2 (the meeting-time field), Wave 3 (event covers), Wave 4 (hand-over).
+  codes and the sign-up gate change), Wave 2 (the meeting-time field), Wave 3 (event covers), week 1 (hand-over).
 - **Privacy Policy**, same day: club codes (Wave 1), event covers (Wave 3), the club email (week 3).
 - **Staying out of the way:** the Otto page redesign stays after launch; `TRENDING_MIN_AUTHORS` 1 → 2 is still a
   launch-morning job.
