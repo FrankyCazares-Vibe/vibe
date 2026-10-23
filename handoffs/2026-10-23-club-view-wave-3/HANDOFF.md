@@ -2,7 +2,8 @@
 
 Plan: `PLAN.md` (this folder). Two parts.
 
-## Part 1, shipped Oct 23 (no database change, no Privacy Policy change)
+## Part 1, shipped Oct 23 (main `02e0fed`, merged as `3d8d3cd`; no database change, no Privacy Policy change)
+Checked live: `/orgs/sae` names `/orgs/sae/opengraph-image`, which answers SAE's own card (crest, name, bio).
 - **Up next with its steps** (owner and officers; everyone else keeps the event card): one card with the time and
   place, a badge, the five steps (Posted · Going · Check-in · Who came · Thank-you) and one button that is the next
   thing to do: Share the event (+ Edit) before; Start / Show check-in (+ Who came) in the check-in window; Post a
