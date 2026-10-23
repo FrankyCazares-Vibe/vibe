@@ -47,7 +47,11 @@ File versions are numbers, not ship dates (all went on Oct 21 to 23). Fingerprin
   address (`src/app/api/orgs/[slug]/asset/[kind]/route.ts` checks only "club hidden"); club events only; where it
   shows; what happens to the picture when an event or club is deleted (the S78 rule keeps pictures under a
   deleted club as moderation evidence); fix the stale "Only one thing is deleted on a schedule" sentence while in
-  the policy. **Ship by Tue Oct 27 or it moves back to week 1.** STATUS: _filled in below when it lands._
+  the policy. **Ship by Tue Oct 27 or it moves back to week 1.** STATUS (Oct 23, evening): built, reviewed and
+  walked locally (4,015 tests and the policy checker pass); **nothing on production yet**. It waits on Franky's yes
+  in that session for migration `20261028100000` (event covers), then the code and the Privacy Policy line ship
+  the same day. If it isn't live when S81 starts, ask that session (or Franky) where it stands before touching
+  event files.
 
 ## The CS club (new, Oct 23)
 Franky talked with the **president of the computer science club**, who thought what we built was amazing.
