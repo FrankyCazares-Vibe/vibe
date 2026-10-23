@@ -1,7 +1,36 @@
 # The club's view: decisions (Franky, Oct 20, 2026)
 
 Board: https://claude.ai/artifact/FZQgjLYfoBojmPFuKF3NKe (opens on Round 2). What exists today, with file
-references: `INVENTORY.md`. Nothing below is built yet.
+references: `INVENTORY.md`. When this was written (Oct 20) nothing below was built; most of it is live now (see
+the status block).
+
+## Status, Oct 23, 2026
+**The three waves before launch night are live.** The full record:
+`../2026-10-23-session-80-club-view-shipped-and-launch-priorities.md`; the plan with dates: `BUILD-ORDER.md`.
+- **Wave 1 shipped Oct 21** (main `64004a1`): Owner and Officers, setup links and members' links, the setup list.
+  It went out with the sign-up pre-registration fix.
+- **Wave 2 shipped Oct 21** (main `4948ce6`): the Profile-tab switch, the Instagram-style club page with exact
+  counts for officers and "when it meets", Club tools on the phone. On a computer, "Clubs you run" became one
+  "Your clubs" row in the left menu's profile card (`b7c783d`).
+- **Wave 3 shipped Oct 23** (`02e0fed`, merged as `3d8d3cd`; `50a49ea`): Up next with its steps, the share sheet,
+  the club's own link picture, the table card with its QR, and event icons.
+- **Extras built Oct 21 to 23** (Franky's asks, all shipped): club pages inside the app frame on a computer; the
+  Club tools Arc with Follow vs Membership and the 14-day wait; Members only events (leaving a club drops those
+  RSVPs); the Look with 10 backgrounds; the phone's Club tools tray under the row. Plans:
+  `../2026-10-22-club-tools-arc/`.
+- **Where Round 1's calls stand:** 1, 2 and 6 are live. 3: event icons are live; **event photos are in progress
+  (Oct 23)** in another session (database change and Privacy Policy line the same day; back to week 1 if not
+  ready by Tue Oct 27); a picture on Board posts is week 2. 4 (notices) is week 1. 5: the link picture and table
+  QR are live; story cards and event pages are week 1. 7: exact counts are live; Insights is week 2. **8 (the
+  hand-over) moved from before launch to week 1** (Franky, Oct 23). The club email is week 3.
+- **The cut list is empty:** nothing was cut.
+- **Production database changes: 11**, each with Franky's yes at the time: `20261021100000_club_officers`,
+  `20261021110000_club_links`, `20261021120000_club_links_gate`, `20261022100000_password_needed_column`,
+  `20261022110000_first_confirm_drops_password`, `20261022120000_no_self_service_email_change`,
+  `20261023100000_club_meeting_time`, `20261024100000_org_join_request_notification`,
+  `20261025100000_event_visibility`, `20261026100000_club_backdrop_presets`, `20261027100000_event_icons` (all
+  applied Oct 21 to 23; the file versions are numbers, not ship dates). The Privacy Policy is effective
+  October 23, 2026.
 
 ## The design (Round 2)
 
@@ -38,6 +67,8 @@ references: `INVENTORY.md`. Nothing below is built yet.
    and an Insights page in Club tools (followers by week, turnout by event). No "seen by".
 8. **Hand-over, before launch.** The owner picks an officer, who accepts; the old owner becomes an officer or
    leaves. If an owner disappears, Vibe moves the club after checking with the club's email or two officers.
+   **Oct 23: moved to week 1 (Franky).** Nobody needs it until spring elections; it still needs a production
+   database change.
 
 ## What each one touches (for the build plan)
 

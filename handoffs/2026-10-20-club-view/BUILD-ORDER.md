@@ -1,5 +1,41 @@
 # The club's view: build order (Oct 20, 2026)
 
+## Status, Oct 23, 2026
+**All three waves before launch night are live, ahead of the dates below.** Everything under this block is the
+plan as written on Oct 20 and 23; read it as history. The full record: `../2026-10-23-session-80-club-view-shipped-and-launch-priorities.md`.
+- **Wave 1 shipped Oct 21** (main `64004a1`), together with the sign-up pre-registration fix. Records:
+  `../2026-10-20-club-view-wave-1.md`, `../2026-10-21-signup-preregistration-fix.md`.
+- **Wave 2 shipped Oct 21** (main `4948ce6`), two days early. Followers and club settings didn't slip. Record:
+  `../2026-10-21-club-view-wave-2.md`.
+- **Wave 3 shipped Oct 23.** Part 1 (Up next with its steps, the share sheet, the club's own link picture, the
+  table card at `/orgs/<h>/table-card`): `02e0fed`, merged as `3d8d3cd`. Part 2 (event icons, 12 to pick from):
+  `50a49ea`. Record: `../2026-10-23-club-view-wave-3/HANDOFF.md`.
+- **Built Oct 21 to 23 that wasn't in this order** (each was Franky's ask, each shipped; plans in
+  `../2026-10-22-club-tools-arc/`):
+  - Club pages inside the app frame on a computer (`076e869`), with Campus's own top bar (`66b3cce`, `2651703`),
+    and "Your clubs" in the left menu's profile card (`b7a9dc0`, `b7c783d`).
+  - The Club tools **Arc** (a planet on the right edge), Follow vs Membership, the 14-day wait after a declined
+    request, invite your followers (`44b0923`); tools open in place (`3ca8db4`). Officers are told about new join
+    requests in Otto (no phone push on production yet).
+  - **Members only events** (`3ca8db4`); leaving a club warns first and drops its Members only RSVPs (`e58942e`).
+  - **The Look:** Edit page opens on photo, cover and 10 backgrounds, 5 of them new (`f04fa77`, `97b5fd5`).
+  - **The phone tray:** the cover's corner is empty, the row is "+ Post · Club tools · share", and Club tools open
+    as a tray under the row with "Needs you" (`bba504b`, `479fd2d`).
+- **The hand-over (wave 4) moved to week 1** (Franky, Oct 23). Nobody needs it until spring elections.
+- **Event cover pictures were pulled forward** by Franky's Oct 23 ask ("upload photos for the event"): **in
+  progress (Oct 23)** in another session. It needs a production database change with his yes and a Privacy Policy
+  line the same day. If it isn't ready by Tue Oct 27, it goes back to week 1.
+- **The cut list is empty.** Nothing was cut: the step rail on Up next, the last item left, shipped.
+- **Production database changes: 11, not the four bundles planned below**, each with Franky's yes at the time:
+  `20261021100000_club_officers`, `20261021110000_club_links`, `20261021120000_club_links_gate`,
+  `20261022100000_password_needed_column`, `20261022110000_first_confirm_drops_password`,
+  `20261022120000_no_self_service_email_change`, `20261023100000_club_meeting_time`,
+  `20261024100000_org_join_request_notification`, `20261025100000_event_visibility`,
+  `20261026100000_club_backdrop_presets`, `20261027100000_event_icons`. The file versions are numbers, not ship
+  dates: all 11 went on Oct 21 to 23. The Privacy Policy was re-dated the same days and is effective October 23, 2026.
+- **`TRENDING_MIN_AUTHORS` 1 → 2** (last line below) is a code change, and nothing deploys on Thu Oct 29, so it goes
+  into the Oct 28 freeze build.
+
 What must work on launch night (Thu Oct 29) and what follows in the first weeks. The decisions are in
 `DECISIONS.md`; what exists today, with file references, is in `INVENTORY.md`. Sizes are S / M / L, not hours.
 **Approved by Franky, Oct 20.** Waves 1 and 2 shipped Oct 21 (main `64004a1`, `4948ce6`). **Oct 23: Franky started
