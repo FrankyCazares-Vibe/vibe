@@ -306,6 +306,11 @@ export function useMobileTour(leg: Leg) {
           }
           stripWelcomeParam();
           const steps = campus ? campusTourSteps(campusName, targetHasSize, light) : STEPS_BY_LEG[leg];
+          if (!steps.length) {
+            // Nothing drawn to point at: no tour this visit, and nothing held.
+            if (campus) lightAll();
+            return;
+          }
           window.OttoTour.start(steps, {
             onDone: () => handleDone(leg, "done"),
             onSkip: () => handleDone(leg, "skip"),

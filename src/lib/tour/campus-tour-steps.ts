@@ -154,7 +154,7 @@ export const PHONE_TONIGHT_TARGET = "#otto-mobile-tour-feed .tonight-card";
  * The phone tour (no floating Otto on phones): the Otto tab, the feed, the
  * Tonight card when there is one, then the tabs. With first light the feed
  * and the card each come in as their bubble opens. The dead Chat tab and the
- * "Your turn… post" ask are gone. `hasSize` drops a step with nothing to
+ * "Your turn… post" ask are gone. `hasSize` drops any step with nothing to
  * point at (by default nothing is dropped).
  */
 export function phoneCampusTourSteps(
@@ -183,7 +183,10 @@ export function phoneCampusTourSteps(
       endLabel: "Got it",
     },
   ];
-  return steps.filter((s) => s.selector !== PHONE_TONIGHT_TARGET || hasSize(s.selector));
+  // Any step whose target isn't drawn is dropped, as on the computer: the
+  // Tonight card when nothing is on, and the Otto tab when the tab bar is
+  // hidden (an open dialog hides it), so no bubble points at nothing.
+  return steps.filter((s) => hasSize(s.selector));
 }
 
 // ── On the page (computer) ─────────────────────────────────────────────────

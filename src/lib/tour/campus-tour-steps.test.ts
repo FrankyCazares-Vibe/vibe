@@ -137,6 +137,11 @@ test("phone: the Otto tab, the feed, the Tonight card, then the tabs, ending on 
   assert.deepEqual(lit, ["feed", "tonight"]);
 });
 
+test("phone: a hidden tab bar drops the Otto step rather than point at nothing", () => {
+  const steps = phoneCampusTourSteps(null, (sel) => sel !== "#otto-mobile-tour-network-otto");
+  assert.deepEqual(steps.map((s) => s.selector), ["#otto-mobile-tour-feed", PHONE_TONIGHT_TARGET, "#otto-mobile-tour-tabs"]);
+});
+
 test("phone: no Tonight card (nothing on tonight) drops only that step", () => {
   const steps = phoneCampusTourSteps(null, (sel) => sel !== PHONE_TONIGHT_TARGET);
   assert.deepEqual(steps.map((s) => s.selector), [
