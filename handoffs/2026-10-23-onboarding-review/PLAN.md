@@ -6,7 +6,9 @@ feed), Eli (Vibe is app number six, so pay off before asking for anything).
 
 This is the merged plan: the director's pick (`director-recommendation.md`) with every fix from the attack
 (`critique.md`) applied. The code maps are `map-*.md`; the three designs are `design-*.md`.
-**Status: proposal. Nothing is built. Franky answers the questions at the end first.**
+**Status (Sat Oct 24): APPROVED.** Franky took all nine recommendations ("Go with all nine onboarding
+recommendations ... and start Deploy A in a new session"). Deploy A is being built in its own session; Deploy B
+follows on Mon Oct 26 with an off switch, or moves to week 1.
 
 ## What's wrong today (short)
 - **Everything shows at once.** A newcomer's computer Campus page has the feed, Tonight, Your clubs, My Calendar,
