@@ -67,9 +67,11 @@ the phone's first bubble sits on the otto tab with the tab bar showing (measured
 frame showed the tab bar missing; it didn't happen again in two re-runs, and a0b83e5 makes that case drop the
 step rather than point at nothing.
 
+**Franky walked the new tour on his phone and laptop (Sat Oct 24, late): "it looks good."**
+
 ## Left for later
-- **Franky: walk it once on your phone and laptop** (Settings > Replay tour, or a new account). If anything feels
-  wrong on launch weekend, `FIRST_LIGHT=off` on Vercel and redeploy turns the hold off; the tour still runs.
+- Franky's live sign-up test on the new flow, before more club links go out. If anything feels wrong on launch
+  weekend, `FIRST_LIGHT=off` on Vercel and redeploy turns the hold off; the tour still runs.
 - On iOS the bubble doesn't yet dodge the on-screen keyboard (no keyboard is open during the tour).
 - The engine's bubble still fades on a fixed 240 ms curve, not a spring, and its hover lift ignores reduced
   motion: week 1's engine pass (tokens, Escape, focus, springs).
