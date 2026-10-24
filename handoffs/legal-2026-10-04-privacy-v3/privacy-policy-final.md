@@ -1,6 +1,6 @@
 # Vibe Privacy Policy
 
-Effective October 23, 2026
+Effective October 24, 2026
 
 Vibe is a campus social app for people with an Indiana University or Purdue University email address. It is run by **CONNECTVIBE. LLC**, an Indiana limited liability company. In this policy, "we" means that company. Vibe is independent. It is not run or backed by Indiana University, Purdue University, or any campus, school or club.
 
@@ -102,7 +102,7 @@ Your profile holds:
 - Posts, drafts, comments, likes, reposts and saves.
 - Who you follow and who follows you.
 - Clubs: memberships and roles, the title a club's owner or an officer gave you, clubs you follow, requests to join with your message, and invites. Asking to join a club also follows it. If a club's owner or an officer takes you out of the club, adds you to a room, gives you a title or removes you as a follower, we store who did it and when.
-- Club events and whether each is marked "Members only", the icon its club picked for it, your RSVPs (Going or Interested) and personal calendar entries.
+- Club events and whether each is marked "Members only", the cover photo and the icon its club picked for it, your RSVPs (Going or Interested) and personal calendar entries.
 - Event check-ins: the club events you checked in at. You check in yourself, with the 4-digit code or the QR code on the club's check-in screen, or the club's owner or an officer marks you as here. Our database does not store the time you checked in or which way you did it, but Vercel's visit logs can show both (section 6).
 - Messages and everything in them.
 - Which messages are pinned in a chat, who pinned each one, and when.
@@ -113,7 +113,7 @@ Your profile holds:
 **Photo details.** A camera saves hidden details inside a photo or video, such as where it was taken.
 
 - **We strip them from:** your profile photo and cover, photos on your own posts, work logos and résumé images. Photos uploaded before late September 2026 may still carry theirs.
-- **We do not strip them from:** videos, photos on a club's posts, club logos and banners, photos and videos sent in chats, group chat photos, and résumé PDFs.
+- **We do not strip them from:** videos, photos on a club's posts, club logos and banners, event cover photos, photos and videos sent in chats, group chat photos, and résumé PDFs.
 
 **Chat photos.** Since our release of October 12, 2026, the app often makes a large photo (over about 1 MB) smaller on your device before it is sent in a chat. When it does, only the smaller copy is sent. The copy is a new picture and does not carry the hidden details the camera saved. This happens on your device, and we do not promise it for every photo. GIFs, videos and photos of about 1 MB or less are sent exactly as you picked them. So is any photo the app leaves as it is, for example a picture with see-through parts, a very long or very wide picture such as a scrolling screenshot or a panorama, or one your device could not make smaller. Photos sent in chats before that release were stored exactly as they were picked.
 
@@ -240,7 +240,7 @@ This means every account, verified or not, at every campus.
 
 - Everything above, plus your comments and reposts, and the lists of the people you follow and who follows you.
 - Totals of likes, views and saves on each post. The author gets a notification naming each liker. Vibe shows nobody else who liked, and shows nobody who saved.
-- Club events, with Going and Interested totals and, once at least 5 people have checked in at one, how many did. One exception: an event its club marks "Members only", which only its members see. Only they can RSVP to it or check themselves in.
+- Club events, with Going and Interested totals and, once at least 5 people have checked in at one, how many did. One exception: an event its club marks "Members only", which only its members see. Only they can RSVP to it or check themselves in. An event's cover photo is shown to whoever can see the event.
 - Search finds verified accounts that finished setting up, across both universities. The Map lists people by campus and major. For a club that anyone can join, it also lists the members who show that club on their profile.
 - For any account: when it was made, when its handle last changed and its total profile views. No screen shows the department or school an account typed at set-up, but a signed-in account could still read it.
 
@@ -395,7 +395,7 @@ These companies use providers of their own. Supabase and Resend, for example, ru
 
 The two words again: **deleted** means gone from Vibe's systems. **Removed** means hidden by the Vibe team or by a club, and still stored.
 
-Vibe does not delete things just because they are old. They stay until you, a club or we delete them. Only one thing is deleted on a schedule today: waitlist entries (section 11). The page-open tally and the use totals (section 3d) are not deleted either, and deleting an account does not take anything out of them. They hold day and week totals, with no account in them.
+Vibe does not delete things just because they are old. They stay until you, a club or we delete them. Three things are deleted on a schedule today: waitlist entries and any place on a club's link that was never tied to an account (section 11), and the abuse counts, within three days (section 3d). The page-open tally and the use totals (section 3d) are not deleted either, and deleting an account does not take anything out of them. They hold day and week totals, with no account in them.
 
 | What | Kept until |
 |---|---|
@@ -427,12 +427,14 @@ Vibe does not delete things just because they are old. They stay until you, a cl
   - the replies under a Board post you delete stay;
   - we then try to delete its photo or video file. If the Vibe team or a club removed the message, or a report about it is open or was acted on, the file is kept as evidence. It is also kept while another message in the chat points to the same file. If the delete fails, the file stays in our storage, even after you delete your account. While the file is still stored, a link to it opened before the delete can work for up to an hour.
 - **A profile photo, cover or résumé file.** When you replace a profile photo or cover, we try to delete the old file, or we keep it as evidence if a report about you is open. When you take a résumé file off your profile, we try to delete it. If a delete fails, the file stays until you delete your account.
+- **An event's cover photo.** When a club's owner or an officer replaces or removes an event's cover photo, or cancels or deletes the event, we try to delete that photo's file. If a report about the event is open, the file is kept as evidence. If a delete fails, the file stays until the club is deleted. While the file is still stored, a link to it opened before the delete can work for up to an hour. Deleting the club also deletes its events' cover photos. It keeps any the Vibe team removed, and the cover an event had when it was reported, if that report is still open.
 
 **What Vibe does not delete yet.**
 
 - Group chat photos.
 - A work logo you replaced, and a photo you uploaded but never used. They stay at their public links until you delete your account.
 - The files of posts you made as a club, when you delete your account. The posts go. The files stay until the club is deleted.
+- The cover photo of an event that was deleted with the account that made it, and a cover photo uploaded for an event but never saved with it. They stay until the club is deleted.
 - Comments. There is no delete button. A comment goes when its post or your account does.
 - Your messages in a chat or club you have left. They go when you delete your account.
 

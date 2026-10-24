@@ -2,7 +2,7 @@
 
 import { useEffect, useId, useRef, useState, type CSSProperties, type ReactNode } from "react";
 
-import { AttendeesModal, CreateEventModal, type CampusEvent } from "@/app/campus/campus-home";
+import { AttendeesModal, CreateEventModal, type CampusEvent, useEventCoverSrc } from "@/app/campus/campus-home";
 import { emitCalendarChanged } from "@/lib/calendar/calendar-sync";
 import { useHideTabBar } from "@/lib/chat/use-hide-tabbar";
 import { CHECKIN_COPY, doorPagePath, type DoorResponse } from "@/lib/events/event-checkin";
@@ -61,6 +61,9 @@ export function UpNextSteps({
   const { refresh, update } = useClubEvents();
   const ev = pick.event;
   const view = upNextView(pick, nowMs);
+  // The event's cover photo (Oct 23, 2026): a slim strip across the top, or
+  // nothing (none, or it failed to load).
+  const cover = useEventCoverSrc(ev.cover_url);
   const titleId = useId();
   const [opened, setOpened] = useState<Opened | null>(null);
   // The button that opened a dialog, to hand focus back on close.
@@ -156,6 +159,11 @@ export function UpNextSteps({
 
   return (
     <article aria-labelledby={titleId} style={cardStyle}>
+      {/* Decoration: the title is right under it. */}
+      {cover.src ? (
+        // eslint-disable-next-line @next/next/no-img-element -- the event's own picture route answers with a redirect
+        <img src={cover.src} alt="" loading="lazy" decoding="async" onError={cover.onError} style={coverStripStyle} />
+      ) : null}
       <div style={topRowStyle}>
         <span style={whenStyle}>{view.when}</span>
         <span style={badgeStyle}>{view.badge}</span>
@@ -276,6 +284,22 @@ const cardStyle: CSSProperties = {
   boxShadow: "0 0 28px rgba(255,92,53,0.12)",
   color: "var(--charcoal)",
   fontFamily: "DM Sans, sans-serif",
+};
+
+/**
+ * The cover strip: out to the card's edges (past its 14px / 16px padding),
+ * its top corners the card's less its 1px ring, and slim, a quarter as tall
+ * as it is wide and never past 120px, so the steps stay the card's point.
+ */
+const coverStripStyle: CSSProperties = {
+  display: "block",
+  width: "calc(100% + 32px)",
+  margin: "-14px -16px 12px",
+  aspectRatio: "4 / 1",
+  maxHeight: 120,
+  objectFit: "cover",
+  borderRadius: "17px 17px 0 0",
+  background: "rgba(var(--scrim-rgb),0.08)",
 };
 
 const topRowStyle: CSSProperties = {

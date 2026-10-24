@@ -8,6 +8,7 @@ import {
   requirePlatformAdmin,
 } from "@/lib/auth/require-platform-admin";
 import {
+  imageLogScope,
   type ImageLogRow,
   type ImageMeta,
   type ImageSlot,
@@ -40,7 +41,8 @@ const NOT_LATEST =
  * Log tab sends its row id, the Photos panel the removal it shows). When the
  * newest row for the slot is not that removal, or a restore of it, the answer
  * is 409 not_latest and nothing moves: acting on the newest row would put
- * back a LATER takedown's picture.
+ * back a LATER takedown's picture. An event cover goes back like a club
+ * banner: the key into the empty column, nothing moved (Oct 23, 2026).
  * The newest image row for the slot decides:
  *   - none, or nothing readable       → 200 changed:false
  *   - a restore within 10 minutes     → finish it (move back again, fill the
@@ -132,6 +134,9 @@ export async function POST(req: Request) {
           previous: meta.previous,
           paths: meta.paths,
           handle: typeof row.handle === "string" ? row.handle : null,
+          // An event cover's restore names the club too (imageLogScope), or
+          // checkRemovedPicture would never see the put-back (Oct 23, 2026).
+          ...imageLogScope(type, row, meta.previous.cover),
         },
       });
       if (!logged) return adminFail(500, "request_failed", "Couldn't record this, so nothing was changed. Try again.");

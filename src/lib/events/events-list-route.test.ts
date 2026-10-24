@@ -312,8 +312,26 @@ test("event_checkin_state rides with the RSVP counts on the viewer's client; its
   const fields = (e: Item | undefined) => [e?.checkin_open, e?.checked_in_count, e?.viewer_checked_in];
   assert.deepEqual(fields(list[0]), [true, 12, true]);
   assert.deepEqual(fields(list[1]), [false, null, false], "no row: nothing known");
-  // Then visibility (Oct 22, 2026) and the icon (Oct 23, 2026), the last two.
-  assert.deepEqual(Object.keys(list[0] ?? {}).slice(-5), ["checkin_open", "checked_in_count", "viewer_checked_in", "visibility", "icon"]);
+  // Then visibility (Oct 22, 2026), the icon and the cover's address (Oct 23, 2026), the last three.
+  assert.deepEqual(Object.keys(list[0] ?? {}).slice(-6), ["checkin_open", "checked_in_count", "viewer_checked_in", "visibility", "icon", "cover_url"]);
+});
+
+// ── Cover photos (Oct 23, 2026, event covers, batch B1) ─────────────────────
+
+test("a row's cover_key leaves as cover_url, the address only; the key is never in the answer", async (t) => {
+  fixed(t);
+  const cover = `orgs/${ORG}/events/3f0e7c1a-1b2c-4d5e-8f90-a1b2c3d4e5f6.png`;
+  const { eventReads } = setup({ events: [{ ...ROWS[0], cover_key: cover }, { ...ROWS[1], cover_key: null }] });
+  const res = await get(`?org_id=${ORG}`);
+  const text = await res.clone().text();
+  const list = await items(res);
+  assert.equal(list[0]?.cover_url, `/api/events/${EV1}/cover?v=3f0e7c1a-1b2c-4d5e-8f90-a1b2c3d4e5f6.png`);
+  assert.equal(list[1]?.cover_url, null);
+  assert.equal(text.includes(cover), false, "the storage key stays on the server");
+  assert.equal(text.includes("cover_key"), false);
+  // The read selects the column (EVENT_ROW_COLUMNS) on the viewer's client.
+  const select = eventReads()[0]?.calls.find((c) => c[0] === "select")?.[1];
+  assert.match(String(select), /,cover_key,/);
 });
 
 test("a failed state read (check-in not installed yet): 200, every item 'nothing known', the counts kept, a code-only log", async (t) => {

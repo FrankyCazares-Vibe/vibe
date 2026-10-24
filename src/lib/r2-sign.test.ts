@@ -229,13 +229,14 @@ test("every route's allow-list type is in the table, under the same extension", 
 });
 
 /**
- * The seven client PUT sites (rate limits plan, critique #20), in file order,
- * each with the name its sign answer has there: the left side of the
- * Content-Type fallback has to be that answer's `contentType`, or the
- * fallback could be written backwards and always send the declared type.
+ * The eight client PUT sites (rate limits plan, critique #20; the event form's
+ * cover photo, Oct 23, 2026, the eighth), in file order, each with the name
+ * its sign answer has there: the left side of the Content-Type fallback has
+ * to be that answer's `contentType`, or the fallback could be written
+ * backwards and always send the declared type.
  */
 const CLIENT_PUT_SITES: Record<string, string[]> = {
-  "src/app/campus/campus-home.tsx": ["sig"],
+  "src/app/campus/campus-home.tsx": ["sig", "sign.data"],
   "src/app/orgs/[handle]/admin-actions.tsx": ["signData", "signData"],
   "src/components/mobile/PostComposerMobile.tsx": ["sig.data"],
   "src/components/mobile/messages/ConversationView.tsx": ["sign.data"],
@@ -244,7 +245,7 @@ const CLIENT_PUT_SITES: Record<string, string[]> = {
 
 const PUT_SITE_RE = /(?:fetch|vibeRequest)\(\s*[\w.]*uploadUrl\b|\.open\(\s*["']PUT["']\s*,\s*[\w.]*uploadUrl\b/g;
 
-test("there are exactly seven client PUT sites, where the list says", () => {
+test("there are exactly eight client PUT sites, where the list says", () => {
   const found: Record<string, number> = {};
   for (const f of sourceFiles()) {
     if (f.startsWith("src/app/api/")) continue;
@@ -253,7 +254,7 @@ test("there are exactly seven client PUT sites, where the list says", () => {
   }
   const listed = Object.fromEntries(Object.entries(CLIENT_PUT_SITES).map(([f, roots]) => [f, roots.length]));
   assert.deepEqual(found, listed);
-  assert.equal(Object.values(found).reduce((a, b) => a + b, 0), 7);
+  assert.equal(Object.values(found).reduce((a, b) => a + b, 0), 8);
 });
 
 test("every client PUT sends the route's contentType, else the declared one", () => {
@@ -275,5 +276,48 @@ test("every client PUT sends the route's contentType, else the declared one", ()
         `${file} @${start}: sends "${header[1]}", not ${roots[i]}.contentType ?? the declared one`,
       );
     }
+  }
+});
+
+// ── The event cover deleter (Oct 23, 2026; event covers, batch B1) ──────────
+
+test("deleteEventCoverKey refuses, before any request, every key but one orgs/<uuid>/events/<file>", async () => {
+  const org = "dddddddd-0000-4000-8000-000000000001";
+  for (const key of [
+    `orgs/${org}/banner/${U}.jpg`,
+    `orgs/${org}/logo/${U}.png`,
+    `orgs/${org}/posts/${U}.jpg`,
+    `orgs/${org}/events/`,
+    `orgs/${org}/events`,
+    `orgs/${org}/`,
+    `orgs/${org}/events/sub/${U}.jpg`,
+    `orgs/${org}/events/../banner/${U}.jpg`,
+    `orgs/${org}/events/a..jpg`,
+    `orgs/${org}/events/.hidden`,
+    `orgs/${org.toUpperCase()}/events/${U}.jpg`,
+    `orgs/not-a-uuid/events/${U}.jpg`,
+    `Orgs/${org}/events/${U}.jpg`,
+    `clips/${U}/${U}.mp4`,
+    `messages/${U}/${U}.jpg`,
+    ` orgs/${org}/events/${U}.jpg`,
+    `orgs/${org}/events/${U}.jpg\n`,
+    "",
+    5 as unknown as string,
+  ]) {
+    await assert.rejects(r2.deleteEventCoverKey(key), /only deletes one "orgs\/<uuid>\/events\/<file>" key/, JSON.stringify(key));
+  }
+});
+
+test("the deleter's shape takes every key upload-url writes for a cover", async () => {
+  const { isEventCoverKey, EVENT_COVER_EXTENSIONS } = (await import("./events/event-cover-url.ts" as string)) as typeof import("./events/event-cover-url");
+  const org = "dddddddd-0000-4000-8000-000000000001";
+  for (const ext of EVENT_COVER_EXTENSIONS) {
+    const key = `orgs/${org}/events/${U}.${ext}`;
+    assert.equal(isEventCoverKey(key, org), true, ext);
+    assert.equal(r2.EVENT_COVER_KEY_RE.test(key), true, ext);
+    // And GET signs it as the picture it is, inline.
+    const p = params(await r2.signOrgAssetGetUrl(key, 3600));
+    assert.equal(p.get("response-content-disposition"), "inline", ext);
+    assert.equal(p.get("response-content-type"), R2_MEDIA_TYPES[ext], ext);
   }
 });

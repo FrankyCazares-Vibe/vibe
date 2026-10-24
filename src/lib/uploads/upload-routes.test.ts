@@ -8,7 +8,10 @@
  *     blip into an upload outage (critique #19);
  *   - group photos and club uploads take the gate of the save that uses their
  *     keys, and a group photo needs a `group` channel and a current
- *     membership (threads/[id]/route.ts PATCH).
+ *     membership (threads/[id]/route.ts PATCH);
+ *   - an event cover (kind "event-cover", Oct 23, 2026) is a jpg, png or
+ *     webp of up to 10MB, signed into `orgs/<org_id>/events/`, for an
+ *     officer of a verified club that isn't hidden.
  * No daily upload budget: Franky's call, Oct 15.
  *
  * Run with:
@@ -126,8 +129,13 @@ function fakeClient(lookup: Lookup, reads: string[], label: string) {
   };
 }
 
-/** `channelType: null` is a channel the caller can't see (RLS hides it); `role` is the caller's club role. */
-function install(opts: { channelType?: string | null; member?: boolean; refuse?: boolean; role?: string } = {}): World {
+/**
+ * `channelType: null` is a channel the caller can't see (RLS hides it); `role` is the caller's club role
+ * (null: not a member); `club` overrides the club row (Oct 23, 2026: event covers read `verified`).
+ */
+function install(
+  opts: { channelType?: string | null; member?: boolean; refuse?: boolean; role?: string | null; club?: Record<string, unknown> } = {},
+): World {
   const reads: string[] = [];
   const world: World = {
     cookie: fakeClient((table, eqs) => {
@@ -136,8 +144,8 @@ function install(opts: { channelType?: string | null; member?: boolean; refuse?:
       throw new Error(`unexpected read of ${table} on the caller's client`);
     }, reads, "cookie"),
     service: fakeClient((table) => {
-      if (table === "orgs") return { id: ORG, hidden_at: null };
-      if (table === "org_members") return { role: opts.role ?? "owner" };
+      if (table === "orgs") return { id: ORG, hidden_at: null, verified: true, ...opts.club };
+      if (table === "org_members") return opts.role === null ? null : { role: opts.role ?? "owner" };
       throw new Error(`unexpected read of ${table} on the service client`);
     }, reads, "service"),
     signed: [],
@@ -245,4 +253,73 @@ test("a club upload still needs an officer once the publishing gate passes", asy
   assert.equal(answer.body.error, "Admin only");
   assert.deepEqual(world.gated, [ME]);
   assert.equal(world.signed.length, 0);
+});
+
+// ── Event covers (Oct 23, 2026; club view wave 3, event covers, batch B1) ────
+
+const cover = (body: Record<string, unknown> = {}) =>
+  call("org", { kind: "event-cover", contentType: "image/jpeg", sizeBytes: 250_000, ...body });
+
+test("an event cover is signed into the club's events folder, a fresh name, the exact type", async () => {
+  for (const [sent, signedAs, ext] of [
+    ["image/jpeg", "image/jpeg", "jpg"],
+    ["Image/PNG", "image/png", "png"],
+    ["image/webp; q=1", "image/webp", "webp"],
+  ] as const) {
+    const world = install();
+    const answer = await cover({ contentType: sent });
+    assert.equal(answer.status, 200, sent);
+    assert.equal(world.signed.length, 1);
+    const { name, key, contentType, contentLength } = world.signed[0];
+    assert.equal(name, "org");
+    assert.match(key, new RegExp(`^orgs/${ORG}/events/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\\.${ext}$`), sent);
+    assert.equal(contentType, signedAs);
+    assert.equal(contentLength, 250_000);
+    assert.deepEqual(Object.keys(answer.body), ["ok", "uploadUrl", "objectKey", "contentType"]);
+    assert.deepEqual([answer.body.objectKey, answer.body.contentType], [key, signedAs]);
+  }
+  const again = install();
+  await cover();
+  await cover();
+  assert.notEqual(again.signed[0].key, again.signed[1].key, "every upload is a new key");
+});
+
+test("an event cover is a still picture of up to 10MB: no gif, no video, nothing bigger", async () => {
+  for (const [body, error] of [
+    [{ contentType: "image/gif" }, "Unsupported image type (jpg, png, webp only)"],
+    [{ contentType: "video/mp4" }, "Unsupported image type (jpg, png, webp only)"],
+    [{ contentType: "image/svg+xml" }, "Unsupported image type (jpg, png, webp only)"],
+    [{ sizeBytes: 10 * 1024 * 1024 + 1 }, "File too large (max 10MB)"],
+    [{ sizeBytes: 0 }, "Invalid file size"],
+  ] as const) {
+    const world = install();
+    const answer = await cover(body);
+    assert.equal(answer.status, 400, JSON.stringify(body));
+    assert.equal(answer.body.error, error);
+    assert.equal(world.signed.length, 0);
+  }
+  const world = install();
+  assert.equal((await cover({ sizeBytes: 10 * 1024 * 1024 })).status, 200, "exactly 10MB passes");
+  assert.equal(world.signed.length, 1);
+});
+
+test("an event cover needs an officer of a verified club moderators haven't hidden", async () => {
+  const refusals: [Parameters<typeof install>[0], number, string][] = [
+    [{ club: { verified: false } }, 403, "Only verified orgs can post events"],
+    [{ club: { hidden_at: "2026-10-01T00:00:00Z" } }, 403, "You can't change this club's events right now."],
+    [{ club: { hidden_at: "2026-10-01T00:00:00Z" }, role: null }, 404, "Not found"],
+    [{ role: "member" }, 403, "Admin only"],
+    [{ role: null }, 403, "Admin only"],
+  ];
+  for (const [opts, status, error] of refusals) {
+    const world = install(opts);
+    const answer = await cover();
+    assert.equal(answer.status, status, JSON.stringify(opts));
+    assert.equal(answer.body.error, error, JSON.stringify(opts));
+    assert.equal(world.signed.length, 0, "nothing is signed for a refused cover");
+  }
+  // The other kinds are as they were: an unverified club's banner still signs.
+  const banner = install({ club: { verified: false } });
+  assert.equal((await call("org", { kind: "banner", contentType: "image/gif", sizeBytes: 1000 })).status, 200);
+  assert.match(banner.signed[0].key, new RegExp(`^orgs/${ORG}/banner/`));
 });

@@ -14,13 +14,20 @@
  * and put there, read by `eventVisibilityOf` (missing or junk = "everyone").
  * Then `icon` (Oct 23, 2026, club view wave 3, batch B4): one of the twelve
  * keys of event-icons.ts or null (none: the calendar), lifted out the same
- * way and put after `visibility`, the new very last key, read by
- * `eventIconOf` (missing or junk = null).
+ * way and put after `visibility`, read by `eventIconOf` (missing or junk =
+ * null). Then `cover_url` (Oct 23, 2026, event covers, batch B1:
+ * handoffs/2026-10-23-club-view-wave-3/COVERS-PLAN.md), the new very last
+ * key: the address the event's cover photo is shown at
+ * (`eventCoverProxyUrl`), or null when it has none. The row's `cover_key`
+ * is lifted out and NEVER sent: a client sees the picture's address, not
+ * the storage key, and a key that isn't a cover of this event's own club
+ * (`isEventCoverKey`) reads as none.
  */
 
 import { checkinListFields, type CheckinStateRow } from "@/lib/events/event-checkin";
 import { orgAssetProxyUrl } from "@/lib/org-asset-url";
 
+import { eventCoverProxyUrl, isEventCoverKey } from "./event-cover-url";
 import { eventIconOf } from "./event-icons";
 import { viewerCanManage, withoutClubCreator } from "./manage";
 import { eventVisibilityOf } from "./validate";
@@ -28,11 +35,12 @@ import { eventVisibilityOf } from "./validate";
 /**
  * The columns every events read selects (plus the creator embed on GET).
  * `visibility` (20261025100000), then `icon` (20261027100000, Oct 23, 2026),
- * last: the code needs both columns, so each migration is applied before
- * the code that reads it deploys (their headers say so).
+ * then `cover_key` (20261028100000, Oct 23, 2026), last: the code needs
+ * every one of them, so each migration is applied before the code that
+ * reads it deploys (their headers say so).
  */
 export const EVENT_ROW_COLUMNS =
-  "id,org_id,creator_id,title,description,starts_at,ends_at,location,created_at,visibility,icon";
+  "id,org_id,creator_id,title,description,starts_at,ends_at,location,created_at,visibility,icon,cover_key";
 
 export type EventListRow = {
   id: string;
@@ -48,6 +56,8 @@ export type EventListRow = {
   visibility?: string | null;
   /** One of event-icons.ts's keys or null (none); optional for the same reason. */
   icon?: string | null;
+  /** The cover photo's storage key or null (none); optional for the same reason. Never sent on. */
+  cover_key?: string | null;
   // Club rows come back with `{ id }` only (the club creator embed) and leave
   // as `creator: null` (withoutClubCreator); org-less rows, in full.
   creator: {
@@ -97,7 +107,7 @@ export function toEventListItem(
 ) {
   const org = ctx.org;
   // Out of the row's place, back in at the very end (see the header).
-  const { visibility, icon, ...rest } = row;
+  const { visibility, icon, cover_key: coverKey, ...rest } = row;
   return {
     ...withoutClubCreator(rest),
     going_count: ctx.goingCount,
@@ -120,6 +130,8 @@ export function toEventListItem(
     visibility: eventVisibilityOf(visibility),
     // After it (Oct 23, 2026): the event's icon, null for the calendar.
     icon: eventIconOf(icon),
+    // Then (Oct 23, 2026, event covers): its cover photo's address, never the key.
+    cover_url: eventCoverProxyUrl(row.id, isEventCoverKey(coverKey, row.org_id) ? coverKey : null),
   };
 }
 

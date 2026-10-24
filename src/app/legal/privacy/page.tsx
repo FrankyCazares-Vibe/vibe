@@ -21,7 +21,7 @@ import { Sections11To15 } from "./sections-11-15";
 
 // The day this page last changed. Section 13 promises the new date goes at
 // the top with every change, and check/checks.mjs pins the same date.
-const EFFECTIVE_DATE = "October 23, 2026";
+const EFFECTIVE_DATE = "October 24, 2026";
 
 // The live policy must never show a placeholder where its date goes (section
 // 13 promises the real day at the top). A draft may carry one on a laptop or

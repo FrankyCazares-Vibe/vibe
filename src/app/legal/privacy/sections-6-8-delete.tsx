@@ -76,6 +76,18 @@ export function DeleteOneThing() {
           résumé file off your profile, we try to delete it. If a delete fails,
           the file stays until you delete your account.
         </li>
+        <li>
+          <strong>An event&apos;s cover photo.</strong> When a club&apos;s
+          owner or an officer replaces or removes an event&apos;s cover photo,
+          or cancels or deletes the event, we try to delete that photo&apos;s
+          file. If a report about the event is open, the file is kept as
+          evidence. If a delete fails, the file stays until the club is
+          deleted. While the file is still stored, a link to it opened before
+          the delete can work for up to an hour. Deleting the club also
+          deletes its events&apos; cover photos. It keeps any the Vibe team
+          removed, and the cover an event had when it was reported, if that
+          report is still open.
+        </li>
       </LegalUL>
     </>
   );
@@ -96,6 +108,11 @@ export function NotDeletedYet() {
         <li>
           The files of posts you made as a club, when you delete your account.
           The posts go. The files stay until the club is deleted.
+        </li>
+        <li>
+          The cover photo of an event that was deleted with the account that
+          made it, and a cover photo uploaded for an event but never saved
+          with it. They stay until the club is deleted.
         </li>
         <li>
           Comments. There is no delete button. A comment goes when its post or

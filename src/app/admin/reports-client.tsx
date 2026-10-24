@@ -62,9 +62,10 @@ const REMOVABLE = new Set(["post", "comment", "message"]);
 /**
  * Reported things with photos a moderator can take down on their own
  * (POST /api/admin/images/remove): a person's profile photo, cover and logos,
- * a club's logo and banner, a group chat's photo.
+ * a club's logo and banner, a group chat's photo, an event's cover photo
+ * (Oct 23, 2026).
  */
-const PHOTO_TARGETS = new Set(["user", "org", "channel"]);
+const PHOTO_TARGETS = new Set(["user", "org", "channel", "event"]);
 
 export type QueueStatus = "open" | "actioned" | "dismissed";
 
@@ -196,7 +197,8 @@ export function SnapshotBox({
     typeof snapshot[key] === "string" ? (snapshot[key] as string) : "";
   const heading = str("title") || str("name") || (str("handle") ? `@${str("handle")}` : "");
   const body = str("content") || str("description") || str("bio") || str("tagline");
-  const hasMedia = !!str("media_url") || !!str("media_thumbnail_url");
+  // An event's cover photo counts too (Oct 23, 2026): the Photos panel shows it.
+  const hasMedia = !!str("media_url") || !!str("media_thumbnail_url") || !!str("cover_key");
   // The snapshot records who owned the reported thing at the moment it was
   // reported. When that disagrees with the owner resolved now, the
   // disagreement is the interesting part — a club changing hands between the
@@ -876,7 +878,7 @@ function ReportGroup({
 
       {photos && PHOTO_TARGETS.has(t.type) ? (
         <ImageSlots
-          targetType={t.type as "user" | "org" | "channel"}
+          targetType={t.type as "user" | "org" | "channel" | "event"}
           targetId={t.id}
           // Only the reports listed on this card, and only on the open tab.
           // The panel lists them with tick boxes (intimate image, sexual and

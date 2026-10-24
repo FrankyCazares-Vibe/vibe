@@ -328,3 +328,68 @@ test("scopeToLatestSlots: one file off both slots, a later takedown of the photo
   assert.equal(M.readImageMeta(none.meta), null);
   assert.equal(M.restoreStep(none, { avatar: null }, 0), "nothing");
 });
+
+/* ---------------- event cover photos (Oct 23, 2026) */
+
+const CLUB = "11111111-2222-4333-8444-555555555555";
+const EVENT = "66666666-7777-4888-8999-aaaaaaaaaaaa";
+const COVER = `orgs/${CLUB}/events/4b1c2d3e-1111-4222-8333-944445555666.jpg`;
+
+test("an event has one slot, its cover, in events.cover_key, private like a club banner", () => {
+  assert.deepEqual(M.IMAGE_SLOTS.event, ["cover"]);
+  assert.equal(M.IMAGE_TARGET_TABLE.event, "events");
+  assert.ok(M.isImageTargetType("event"));
+  assert.ok(M.isImageSlot("event", "cover"));
+  assert.ok(!M.isImageSlot("event", "banner"), "an event has no banner");
+  assert.ok(!M.isImageSlot("org", "cover"), "a club has no cover slot of its own");
+  assert.ok(!M.isImageSlot("user", "cover"), "a student's cover is the banner slot");
+  assert.equal(M.imageSlotColumn("event", "cover"), "cover_key");
+  assert.equal(M.imageSlotColumn("event", "photo"), null);
+  assert.equal(M.imageSlotLabel("event", "cover"), "Event cover photo");
+  assert.equal(M.isPublicImageSlot("event"), false);
+  // The existing slots are untouched.
+  assert.deepEqual(M.IMAGE_SLOTS.org, ["logo", "banner"]);
+  assert.deepEqual(M.IMAGE_SLOTS.channel, ["photo"]);
+});
+
+test("an event cover key is a private R2 key: nothing moves, the key stays as evidence", () => {
+  assert.equal(M.classifyImageRef(COVER, "cover", null, PROJECT).kind, "private");
+  const p = M.planImageRemoval({ slot: "cover", refs: [COVER], ownerId: null, supabaseUrl: PROJECT });
+  assert.deepEqual(p.paths, []);
+  assert.equal(p.left.private, 1);
+  assert.deepEqual(M.leftNotes(p.left), [], "a private key needs no note");
+  // A traversal in the key is not private (and never moved).
+  const bad = M.planImageRemoval({ slot: "cover", refs: [`orgs/${CLUB}/events/../logo/x.png`], ownerId: null, supabaseUrl: PROJECT });
+  assert.deepEqual(bad.paths, []);
+  assert.equal(bad.left.private, 0);
+});
+
+test("cover takedown rows read back, finish when empty, and a re-set key is a new takedown", () => {
+  const meta = { slots: ["cover"], previous: { cover: COVER }, paths: [], swept: [], left: { private: 1 }, org_id: CLUB };
+  assert.deepEqual(M.readImageMeta(meta)?.slots, ["cover"]);
+  assert.equal(M.readImageMeta(meta)?.previous.cover, COVER);
+  const removed = row("e1", "image_remove", meta);
+  assert.equal(M.removalStep(removed, "cover", { cover: null }), "finish", "a half-done press");
+  assert.equal(M.removalStep(removed, "cover", { cover: COVER }), "new", "the same key back is live again");
+  assert.equal(M.removalStep(null, "cover", { cover: null }), "nothing");
+  assert.equal(M.restoreStep(removed, { cover: null }, 0), "new");
+  const other = `orgs/${CLUB}/events/9a8b7c6d-5e4f-4a3b-8c2d-1e0f9a8b7c6d.jpg`;
+  assert.equal(M.restoreStep(removed, { cover: other }, 0), "replaced", "a new cover since: nothing put back");
+  assert.equal(M.latestPerSlot([removed]).cover?.id, "e1");
+});
+
+test("imageLogScope: an event's rows carry its club's id; nothing for other targets", () => {
+  assert.deepEqual(M.imageLogScope("event", { id: EVENT, org_id: CLUB, cover_key: COVER }), { org_id: CLUB });
+  // No club on the row: the club folder of the key (the restore passes the removed one).
+  assert.deepEqual(M.imageLogScope("event", { id: EVENT, org_id: null, cover_key: null }, COVER), { org_id: CLUB });
+  assert.deepEqual(M.imageLogScope("event", { id: EVENT, org_id: null, cover_key: COVER }), { org_id: CLUB });
+  assert.deepEqual(M.imageLogScope("event", { id: EVENT, org_id: null, cover_key: `orgs/${CLUB}/logo/x.png` }), {});
+  assert.deepEqual(M.imageLogScope("event", { id: EVENT, org_id: "not-a-uuid" }), {});
+  for (const type of ["user", "org", "channel"] as const) {
+    assert.deepEqual(M.imageLogScope(type, { id: EVENT, org_id: CLUB, cover_key: COVER }), {});
+  }
+});
+
+test("the private-photo note names events too", () => {
+  assert.match(M.PRIVATE_CACHE_NOTE, /event/);
+});

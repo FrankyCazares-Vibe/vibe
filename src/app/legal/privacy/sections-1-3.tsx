@@ -212,8 +212,8 @@ export function Sections1To3() {
         </li>
         <li>
           Club events and whether each is marked &ldquo;Members only&rdquo;,
-          the icon its club picked for it, your RSVPs (Going or Interested)
-          and personal calendar entries.
+          the cover photo and the icon its club picked for it, your RSVPs
+          (Going or Interested) and personal calendar entries.
         </li>
         <li>
           Event check-ins: the club events you checked in at. You check in
@@ -253,8 +253,8 @@ export function Sections1To3() {
         </li>
         <li>
           <strong>We do not strip them from:</strong> videos, photos on a
-          club&apos;s posts, club logos and banners, photos and videos sent in
-          chats, group chat photos, and résumé PDFs.
+          club&apos;s posts, club logos and banners, event cover photos, photos
+          and videos sent in chats, group chat photos, and résumé PDFs.
         </li>
       </LegalUL>
       <LegalP>

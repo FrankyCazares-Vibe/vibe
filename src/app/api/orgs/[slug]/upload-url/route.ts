@@ -7,6 +7,7 @@ import {
   isR2Configured,
   signOrgAssetPutUrl,
 } from "@/lib/r2";
+import { EVENT_COVER_SUBDIR } from "@/lib/events/event-cover-url";
 import { requireCanPublish } from "@/lib/moderation/access";
 import { officerGate } from "@/lib/orgs/hidden-gate";
 import { SETTINGS_ROLES, isOrgRole } from "@/lib/orgs/join-state";
@@ -32,20 +33,29 @@ const VIDEO_TYPES: Record<string, string> = {
   "video/quicktime": "mov",
   "video/webm": "webm",
 };
+// An event's cover photo (Oct 23, 2026): pictures only, and no gif (a still
+// cover; the cropper sends a JPEG). The extensions are EVENT_COVER_EXTENSIONS
+// (src/lib/events/event-cover-url.ts), the only ones a cover key may end in.
+const COVER_TYPES: Record<string, string> = {
+  "image/jpeg": "jpg",
+  "image/png": "png",
+  "image/webp": "webp",
+};
 
 const LIMITS = {
   banner: 10 * 1024 * 1024, // 10MB
   logo: 5 * 1024 * 1024, // 5MB
   "post-image": 15 * 1024 * 1024, // 15MB
   "post-video": 200 * 1024 * 1024, // 200MB
+  "event-cover": 10 * 1024 * 1024, // 10MB, a banner's (Oct 23, 2026)
 } as const;
 type Kind = keyof typeof LIMITS;
 
-const VALID_KINDS = new Set<Kind>(["banner", "logo", "post-image", "post-video"]);
+const VALID_KINDS = new Set<Kind>(["banner", "logo", "post-image", "post-video", "event-cover"]);
 
 /**
  * POST /api/orgs/[slug]/upload-url
- * Body: { kind: 'banner' | 'logo' | 'post-image' | 'post-video',
+ * Body: { kind: 'banner' | 'logo' | 'post-image' | 'post-video' | 'event-cover',
  *         contentType: string, sizeBytes: number }
  *
  * Returns: { uploadUrl, objectKey, contentType }
@@ -64,6 +74,15 @@ const VALID_KINDS = new Set<Kind>(["banner", "logo", "post-image", "post-video"]
  * service client (RLS isn't sufficient since signed URLs aren't a row).
  * A non-member asking about a HIDDEN club gets 404, never 403 (S67 sec wave
  * 2, hidden-club Low).
+ *
+ * EVENT COVERS (Oct 23, 2026; club view wave 3, event covers, batch B1:
+ * handoffs/2026-10-23-club-view-wave-3/COVERS-PLAN.md): kind "event-cover"
+ * signs a jpg, png or webp of up to 10MB at `orgs/<org_id>/events/<uuid>.<ext>`,
+ * the only key POST and PATCH /api/events take as `cover_key`. Only where
+ * those routes would take it: a VERIFIED club (403 "Only verified orgs can
+ * post events") that moderators haven't hidden (its officers: 403; a
+ * stranger already got the 404 above). Same gate, roles and limiter as the
+ * other kinds.
  */
 export async function POST(req: Request, { params }: Params) {
   if (!isR2Configured()) {
@@ -97,7 +116,7 @@ export async function POST(req: Request, { params }: Params) {
   const service = createSupabaseServiceClient();
   const { data: org } = await service
     .from("orgs")
-    .select("id, hidden_at")
+    .select("id, hidden_at, verified")
     .eq("handle", slug)
     .maybeSingle();
   if (!org) {
@@ -135,7 +154,7 @@ export async function POST(req: Request, { params }: Params) {
     return NextResponse.json(
       {
         ok: false,
-        error: "kind must be banner, logo, post-image, or post-video",
+        error: "kind must be banner, logo, post-image, post-video, or event-cover",
       },
       { status: 400 },
     );
@@ -145,15 +164,39 @@ export async function POST(req: Request, { params }: Params) {
     typeof body.contentType === "string"
       ? body.contentType.split(";")[0].trim().toLowerCase()
       : "";
+  // A cover goes where an event can (see the header): a verified club that
+  // isn't hidden. Before the type, so an officer of such a club hears why.
+  if (kind === "event-cover") {
+    if (!org.verified) {
+      return NextResponse.json(
+        { ok: false, error: "Only verified orgs can post events" },
+        { status: 403 },
+      );
+    }
+    if (org.hidden_at) {
+      return NextResponse.json(
+        { ok: false, error: "You can't change this club's events right now." },
+        { status: 403 },
+      );
+    }
+  }
+
   const acceptingVideo = kind === "post-video";
-  const ext = acceptingVideo ? VIDEO_TYPES[contentType] : IMAGE_TYPES[contentType];
+  const acceptingCover = kind === "event-cover";
+  const ext = acceptingVideo
+    ? VIDEO_TYPES[contentType]
+    : acceptingCover
+      ? COVER_TYPES[contentType]
+      : IMAGE_TYPES[contentType];
   if (!ext) {
     return NextResponse.json(
       {
         ok: false,
         error: acceptingVideo
           ? "Unsupported video type (mp4, mov, webm only)"
-          : "Unsupported image type (jpg, png, webp, gif only)",
+          : acceptingCover
+            ? "Unsupported image type (jpg, png, webp only)"
+            : "Unsupported image type (jpg, png, webp, gif only)",
       },
       { status: 400 },
     );
@@ -176,9 +219,17 @@ export async function POST(req: Request, { params }: Params) {
 
   // Folder convention: orgs/<org_id>/<bucket>/<uuid>.<ext>
   // banner / logo replace the previous file logically (stale assets remain
-  // in storage and can be GC'd later — out of scope for v1).
+  // in storage and can be GC'd later — out of scope for v1). An event cover
+  // that is replaced or removed, or whose event goes, is deleted by
+  // /api/events/[id] (Oct 23, 2026); one uploaded and never saved stays.
   const subdir =
-    kind === "banner" ? "banner" : kind === "logo" ? "logo" : "posts";
+    kind === "banner"
+      ? "banner"
+      : kind === "logo"
+        ? "logo"
+        : kind === "event-cover"
+          ? EVENT_COVER_SUBDIR
+          : "posts";
   const objectKey = `${ORG_ASSET_KEY_PREFIX}${org.id}/${subdir}/${randomUUID()}.${ext}`;
 
   try {

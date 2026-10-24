@@ -42,6 +42,31 @@ Checked live: `/orgs/sae` names `/orgs/sae/opengraph-image`, which answers SAE's
   the Privacy Policy line (section 3c "the icon each shows"), its .md twin, EFFECTIVE_DATE, checks.mjs, all the
   same day. Before the column exists, every events list, create, edit and cancel would fail, so never the other way.
 
+## Part 3, shipped Oct 24: event cover photos (main `38a6653`, merged as `eacc8a7`; Franky's yes in this session)
+Plan and design: `COVERS-PLAN.md`. Franky's ask (relayed): "upload photos for the event, like event profile photos".
+- **What it does:** officers add, change or remove a 16:9 cover in the event form (crop, upload, Change / Remove).
+  It shows across the top of the event card, as a strip on the officers' Up next card, and in small event tiles
+  (else the icon). Not yet: chat cards, the club link picture, event pages (week 1).
+- **Who sees it:** whoever can see the event. `GET /api/events/<id>/cover` reads with the viewer's client
+  (`event_visible`; hidden clubs checked too) and answers a 1-hour signed link; signed out 404.
+- **Files:** upload-url kind `event-cover` (jpg/png/webp, 10 MB, `orgs/<org>/events/<uuid>.<ext>`). The old file
+  is deleted on replace, remove and delete, unless a report is open on it, a moderator took it down, or a logo,
+  banner, post or another event uses it. Reports keep the cover as evidence; admins have an event-cover takedown
+  slot, and a taken-down key is refused again.
+- **Production:** pre-flight [f | 0 | 0; anon f|f, authenticated f|f; t | t; org_id uuid; triggers chat_events_room;
+  22 events; last 20261027100000], applied with the connector (its own post-check passed), history row renamed
+  20261024052815 → 20261028100000 `event_covers`, post-check [text, nullable, no default; triggers
+  chat_events_room + events_check_cover_key, both enabled; event_cover_key_ok immutable, search_path "", anon and
+  authenticated may call it; events_check_cover_key callable by neither; 22 | 0 with a cover; browser writes f|f;
+  authenticated reads table + cover_key].
+- **Privacy Policy effective October 24, 2026:** covers in 3c, the photo-details list, 5b and section 8, and the
+  stale "deleted on a schedule" sentence fixed (both copies; checker PASS; `src/lib/legal/event-covers-policy.test.ts`).
+- `npm test` now escapes `[handle]`-style paths (`set -f` + sed), so all 4,015 tests run instead of skipping 5 files.
+- Built in four batches, each adversarially reviewed, then walked locally as an officer (the local test event was
+  deleted and Rapid Night's cover set back to none afterwards). Not checked on production with a real upload yet.
+
 ## Open
+- **Franky owes:** the S78 phone check of the upload file-type lock (0b9bc7e); covers use the same upload path.
+- A first real cover upload on production (none yet: 0 of 22 events have one).
 - QR scanning not checked with a real phone camera (same encoder as the door screen).
 - Story cards, event pages, notices: week 1 (BUILD-ORDER.md). Hand-over moved to week 1.

@@ -11,6 +11,8 @@
  *                          `<uid>/logos/…`, or any outside address
  *   club logo / banner     orgs.logo_url / banner_url      PRIVATE R2 key
  *   group chat photo       channels.photo_url              PRIVATE R2 key
+ *   event cover photo      events.cover_key                PRIVATE R2 key
+ *                          `orgs/<org_id>/events/…` (Oct 23, 2026)
  *
  * ONLY THE TARGET'S OWN FILES MOVE. Every one of these values is something a
  * student can send, so it can name ANOTHER student's file. Moving "whatever
@@ -19,8 +21,15 @@
  * adds WHICH own files a given slot may move (act on the slot, never on
  * "not null"): avatar/banner removal moves root avatar-/banner- files, logos
  * removal moves `logos/` files. The owner's own post photo is never moved from
- * here (post removal owns it). Club/chat R2 keys are never moved: they are
- * private already, and the key left in R2 is the evidence.
+ * here (post removal owns it). Club/chat/event R2 keys are never moved: they
+ * are private already, and the key left in R2 is the evidence.
+ *
+ * AN EVENT COVER (Oct 23, 2026) is the EVENT's slot (target type `event`, so
+ * a report about the event closes with it), but the picture belongs to the
+ * club's folder: the routes write the club's id into the log row's
+ * `meta.org_id`, and checkRemovedPicture for the club reads those rows too,
+ * so the same key can't come back as another event's cover, the club's logo
+ * or banner, or club post media.
  *
  * THE LOG ROW IS THE ONLY RECORD. The column is cleared, so `meta.previous`
  * is what a restore puts back. The routes write the row FIRST and use
@@ -32,14 +41,15 @@
 
 import { ownProfileImageKey, type ProfileImageSlot } from "../media/profile-image-key";
 
-export type ImageTargetType = "user" | "org" | "channel";
-export type ImageSlot = "avatar" | "banner" | "logos" | "logo" | "photo";
+export type ImageTargetType = "user" | "org" | "channel" | "event";
+export type ImageSlot = "avatar" | "banner" | "logos" | "logo" | "photo" | "cover";
 
 /** The slots a moderator can clear, per target. */
 export const IMAGE_SLOTS: Readonly<Record<ImageTargetType, readonly ImageSlot[]>> = {
   user: ["avatar", "banner", "logos"],
   org: ["logo", "banner"],
   channel: ["photo"],
+  event: ["cover"],
 };
 
 /** The table each target lives in. */
@@ -47,10 +57,11 @@ export const IMAGE_TARGET_TABLE: Readonly<Record<ImageTargetType, string>> = {
   user: "users",
   org: "orgs",
   channel: "channels",
+  event: "events",
 };
 
 export function isImageTargetType(value: unknown): value is ImageTargetType {
-  return value === "user" || value === "org" || value === "channel";
+  return value === "user" || value === "org" || value === "channel" || value === "event";
 }
 
 export function isImageSlot(type: ImageTargetType, slot: unknown): slot is ImageSlot {
@@ -65,6 +76,7 @@ export function imageSlotColumn(type: ImageTargetType, slot: ImageSlot): string 
     return null;
   }
   if (type === "org") return slot === "logo" ? "logo_url" : slot === "banner" ? "banner_url" : null;
+  if (type === "event") return slot === "cover" ? "cover_key" : null;
   return slot === "photo" ? "photo_url" : null;
 }
 
@@ -76,10 +88,11 @@ export function imageSlotLabel(type: ImageTargetType, slot: ImageSlot): string {
     return "Experience and working-on logos";
   }
   if (type === "org") return slot === "logo" ? "Club logo" : "Club banner";
+  if (type === "event") return "Event cover photo";
   return "Group chat photo";
 }
 
-/** Profile slots are public files behind a CDN; club and chat photos are signed per view. */
+/** Profile slots are public files behind a CDN; club, event and chat photos are signed per view. */
 export function isPublicImageSlot(type: ImageTargetType): boolean {
   return type === "user";
 }
@@ -87,7 +100,7 @@ export function isPublicImageSlot(type: ImageTargetType): boolean {
 /** The moderator notes (admin screens only; the legal pages keep their own wording). */
 export const CACHE_NOTE = "A removed photo can take a few days to disappear from every cache.";
 export const PRIVATE_CACHE_NOTE =
-  "Club and group chat photos stop loading within an hour, when the last signed link runs out.";
+  "Club, event and group chat photos stop loading within an hour, when the last signed link runs out.";
 export const UNFURL_NOTE =
   "Link previews already shared in other apps keep their own copy, which Vibe can't reach.";
 export const LEFT_NOTES = {
@@ -110,7 +123,7 @@ export type ImagePlan = {
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 const PUBLIC_PREFIX = "/storage/v1/object/public/profiles/";
-/** A private R2 key for a club asset or a group photo: no scheme, known prefix. */
+/** A private R2 key for a club asset (event covers included) or a group photo: no scheme, known prefix. */
 const PRIVATE_KEY_RE = /^(orgs|groups)\/[0-9a-f-]{36}\/[A-Za-z0-9._/-]+$/;
 
 /** Which own-file kinds a removal of this slot may move. */
@@ -143,7 +156,7 @@ export type RefVerdict = { kind: "own"; path: string } | { kind: LeftKind; folde
 
 /**
  * One stored reference, judged for a removal of `slot`. `ownerId` is the
- * student for a user target and null for a club or chat (nothing in
+ * student for a user target and null for a club, event or chat (nothing in
  * `profiles` is ever moved on a club's behalf: the uploader is unknowable).
  */
 export function classifyImageRef(
@@ -220,6 +233,32 @@ export function sweepPaths(
     out.push(key.path);
   }
   return out;
+}
+
+/** An event cover's key: `orgs/<org uuid>/events/<file>`, the club's folder first. */
+const EVENT_COVER_KEY_RE = /^orgs\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\/events\/[A-Za-z0-9._-]+$/;
+
+/**
+ * The extra `meta` an image_remove / image_restore row about an EVENT carries
+ * (Oct 23, 2026): the club's id. The event is the row's target, but its cover
+ * lives in the club's folder, so checkRemovedPicture for the club and the
+ * club-deletion sweep (clubKeysToKeep) find the row by `meta.org_id`, even
+ * after the event went with the club. The event's own `org_id`, else the
+ * club folder of `key` (the restore passes the removed key: the column is
+ * empty by then), else of the stored cover; nothing for any other target. A
+ * restore row needs it as much as a removal: without it a put-back cover
+ * would stay refused for good.
+ */
+export function imageLogScope(
+  type: ImageTargetType,
+  row: Record<string, unknown>,
+  key?: unknown,
+): { org_id?: string } {
+  if (type !== "event") return {};
+  if (typeof row.org_id === "string" && UUID_RE.test(row.org_id)) return { org_id: row.org_id };
+  const ref = typeof key === "string" && key.trim() ? key : row.cover_key;
+  const m = typeof ref === "string" ? EVENT_COVER_KEY_RE.exec(ref.trim()) : null;
+  return m ? { org_id: m[1] } : {};
 }
 
 /* ------------------------------------------------ logos (JSON on users) */
@@ -323,7 +362,7 @@ export type ImageMeta = {
   removalId: string | null;
 };
 
-const ALL_SLOTS: readonly ImageSlot[] = ["avatar", "banner", "logos", "logo", "photo"];
+const ALL_SLOTS: readonly ImageSlot[] = ["avatar", "banner", "logos", "logo", "photo", "cover"];
 
 function strings(value: unknown): string[] {
   return Array.isArray(value) ? value.filter((x): x is string => typeof x === "string") : [];
@@ -407,8 +446,8 @@ export type SlotValues = Partial<Record<ImageSlot, string | null>>;
  *           removal MOVED offline): redo its moves and clears, no second row.
  *   nothing the slot is empty and no removal is pending.
  *   new     log a new removal, then act.
- * The same value back in a slot whose picture was NOT moved (a club or chat
- * R2 key kept as evidence, another account's file, an outside address) is the
+ * The same value back in a slot whose picture was NOT moved (a club, event or
+ * chat R2 key kept as evidence, another account's file, an outside address) is the
  * picture live again: that is a new takedown with its own row and reason. A
  * half-done press on one of those then logs a harmless second row instead of
  * acting unlogged.

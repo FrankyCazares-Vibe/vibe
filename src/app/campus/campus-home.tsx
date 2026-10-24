@@ -10255,6 +10255,12 @@ export type CampusEvent = {
   // PATCH send it from this deploy on; optional, and read through
   // `eventIconOf`, so a payload without it (or with junk) draws the calendar.
   icon?: EventIconKey | null;
+  // Event cover photos (Oct 23, 2026, COVERS-PLAN.md): the same-origin
+  // picture route (/api/events/<id>/cover?v=…), never the stored key, or
+  // null for none. GET /api/events and PATCH send it from this deploy on;
+  // optional, and read through `eventCoverUrl`, so a payload without it
+  // (or with anything that isn't that route) draws no picture.
+  cover_url?: string | null;
   org: {
     id: string;
     handle: string;
@@ -10679,16 +10685,76 @@ export function EventIconGlyph({ icon, size = 20 }: { icon: unknown; size?: numb
 }
 
 /**
+ * An event's cover photo URL, or null (Oct 23, 2026, event covers): only
+ * the same-origin picture route GET /api/events sends (B1's
+ * eventCoverProxyUrl), so a stale payload or a fixture can never point a
+ * picture at another host.
+ */
+export function eventCoverUrl(value: unknown): string | null {
+  return typeof value === "string" && value.startsWith("/api/events/") ? value : null;
+}
+
+/**
+ * The cover to draw, or null (Oct 23, 2026, event covers): `eventCoverUrl`,
+ * minus a picture that failed to load (taken down, a hidden club's after a
+ * leave, storage down). The failed URL is what's remembered, so a changed
+ * cover (a new `?v=`) tries again on its own.
+ */
+export function useEventCoverSrc(value: unknown): { src: string | null; onError: () => void } {
+  const url = eventCoverUrl(value);
+  const [failed, setFailed] = useState<string | null>(null);
+  return { src: url && url !== failed ? url : null, onError: () => setFailed(url) };
+}
+
+/**
  * The leading tile on an event card and a past-events row (Oct 23, 2026,
  * B4): the event's icon on its club's accent tint (the same colorForOrg
  * value as the card's left stripe). The glyph stays near-white so every
  * accent, the dark forest one included, reads on the dark glass. An event
  * with an icon names it to a screen reader ("Food"); the calendar of an
  * event without one is decoration.
+ *
+ * With a cover photo (Oct 23, 2026, event covers) the tile is that photo
+ * cropped square instead, decoration too: the title is beside it. The event
+ * card passes `showCover={false}`, since its cover runs across the top and
+ * the tile keeps the icon.
  */
-export function EventIconTile({ ev, size = 40 }: { ev: Pick<CampusEvent, "icon" | "org" | "creator_id">; size?: number }) {
+export function EventIconTile({
+  ev,
+  size = 40,
+  showCover = true,
+}: {
+  ev: Pick<CampusEvent, "icon" | "org" | "creator_id" | "cover_url">;
+  size?: number;
+  showCover?: boolean;
+}) {
   const accent = colorForOrg(ev.org?.id ?? ev.creator_id);
   const key = eventIconOf(ev.icon);
+  const cover = useEventCoverSrc(showCover ? ev.cover_url : null);
+  if (cover.src) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element -- the event's own picture route answers with a redirect
+      <img
+        src={cover.src}
+        alt=""
+        width={size}
+        height={size}
+        loading="lazy"
+        decoding="async"
+        onError={cover.onError}
+        style={{
+          flexShrink: 0,
+          width: size,
+          height: size,
+          boxSizing: "border-box",
+          borderRadius: Math.round(size * 0.3),
+          objectFit: "cover",
+          background: hexToRgba(accent, 0.22),
+          border: `1px solid ${hexToRgba(accent, 0.45)}`,
+        }}
+      />
+    );
+  }
   return (
     <span
       {...(key ? { role: "img", "aria-label": EVENT_ICONS[key].name } : { "aria-hidden": true })}
@@ -10811,6 +10877,9 @@ export function EventCard({
   // left-stripe color), with higher alpha so the per-event tint reads
   // clearly against the dark glass surface.
   const spotlightColor = hexToRgba(accent, 0.34);
+  // Event cover photos (Oct 23, 2026): across the top of the card, or
+  // nothing (a failed load hides it and the card reads as before).
+  const cover = useEventCoverSrc(ev.cover_url);
 
   return (
     // The anchor the rolling strip and the phone scroll to (contract C2).
@@ -10839,6 +10908,29 @@ export function EventCard({
         borderLeft: `3px solid ${accent}`,
       }}
     >
+      {/* The cover (Oct 23, 2026): 16:9 across the top. Its own top corners
+          follow the card's inside edge (18 less the 3px stripe and the 1px
+          border), since on a phone the card doesn't clip. Decoration: the
+          title is right under it. */}
+      {cover.src ? (
+        // eslint-disable-next-line @next/next/no-img-element -- the event's own picture route answers with a redirect
+        <img
+          src={cover.src}
+          alt=""
+          loading="lazy"
+          decoding="async"
+          onError={cover.onError}
+          style={{
+            display: "block",
+            width: "100%",
+            aspectRatio: "16 / 9",
+            objectFit: "cover",
+            borderTopLeftRadius: "15px 17px",
+            borderTopRightRadius: 17,
+            background: hexToRgba(accent, 0.22),
+          }}
+        />
+      ) : null}
       <div style={{ padding: 20 }}>
       <div
         style={{
@@ -10850,8 +10942,9 @@ export function EventCard({
         }}
       >
         {/* Event icons (Oct 23, 2026, B4): the officer's pick, or the
-            calendar, on the club's accent tint. */}
-        <EventIconTile ev={ev} />
+            calendar, on the club's accent tint. The icon even with a cover:
+            the photo is already across the top. */}
+        <EventIconTile ev={ev} showCover={false} />
         <div style={{ flex: 1, minWidth: 0 }}>
           <div
             style={{
@@ -12356,8 +12449,9 @@ type CreateEventModalProps = {
     }
 );
 
-/** The inputs a refusal can point at; "times" is both date pickers. */
-type EventFormField = "title" | "description" | "location" | "times";
+/** The inputs a refusal can point at; "times" is both date pickers, "cover"
+ *  the cover photo (refused as another club's, or one moderators took down). */
+type EventFormField = "title" | "description" | "location" | "times" | "cover";
 
 /**
  * The line and the input for a refused create or edit. The events routes'
@@ -12380,8 +12474,16 @@ function eventFormFailure(r: VibeFailure): { message: string; field: EventFormFi
             ? "description"
             : r.code === "location_too_long"
               ? "location"
-              : null;
-  const serverLine = r.status === 400 && r.code !== "invalid_json" ? r.error?.trim() : "";
+              : r.code === "invalid_cover" || r.code === "picture_removed"
+                ? "cover"
+                : null;
+  // A cover moderators took down is a 422 (Oct 23, 2026), which describeFailure
+  // would say as "Couldn't save… Try again.": trying again changes nothing,
+  // so its own sentence ("…Choose a different one.") is kept too.
+  const serverLine =
+    (r.status === 400 && r.code !== "invalid_json") || (r.status === 422 && r.code === "picture_removed")
+      ? r.error?.trim()
+      : "";
   const message = serverLine
     ? /[.!?]$/.test(serverLine)
       ? serverLine
@@ -12414,12 +12516,142 @@ export function CreateEventModal(props: CreateEventModalProps) {
   const [orgId, setOrgId] = useState<string>(editing?.org_id ?? eligibleOrgs[0]?.id ?? "");
   const [visibility, setVisibility] = useState<EventVisibility>(initial.visibility);
   const [icon, setIcon] = useState<EventIconKey | null>(initial.icon);
+  // Cover photo (Oct 23, 2026, COVERS-PLAN.md). `coverKey` is what a save
+  // sends: `undefined` keeps an edited event's stored photo (never re-sent),
+  // null is none, a string is a new upload's key under the club's
+  // orgs/<id>/events/ folder. The key never comes back from the server; an
+  // edit starts from the picture route the event carries.
+  const [coverKey, setCoverKey] = useState<string | null | undefined>(editing ? undefined : null);
+  // A new upload's local preview (a blob: URL), and the one of the photo
+  // uploading now, shown dimmed until it lands. Every blob: URL made here is
+  // revoked when it's replaced, dropped, or the form closes.
+  const [coverLocal, setCoverLocal] = useState<string | null>(null);
+  const [coverDraft, setCoverDraft] = useState<string | null>(null);
+  const coverBlobs = useRef(new Set<string>());
+  // The photo picked and waiting in the cropper; null when it's closed.
+  const [pendingCover, setPendingCover] = useState<File | null>(null);
+  const [coverUploading, setCoverUploading] = useState(false);
+  const [coverErr, setCoverErr] = useState<string | null>(null);
+  // Bumped by every upload and by Remove, so a slow upload that lands after
+  // a newer choice is dropped instead of overwriting it.
+  const coverSeq = useRef(0);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [badField, setBadField] = useState<EventFormField | null>(null);
   const errorId = useId();
   // The club the hint names: the event's own on an edit, else the picked one.
   const clubName = editing ? editing.org?.name : eligibleOrgs.find((o) => o.id === orgId)?.name;
+  // The club the cover uploads to: the event's own on an edit, else the
+  // picked one. None (an old event with no club) → no cover field.
+  const coverHandle = editing ? editing.org?.handle : eligibleOrgs.find((o) => o.id === orgId)?.handle;
+  const coverPreview = coverUploading
+    ? coverDraft
+    : typeof coverKey === "string"
+      ? coverLocal
+      : coverKey === undefined
+        ? eventCoverUrl(editing?.cover_url)
+        : null;
+
+  useEffect(() => {
+    const blobs = coverBlobs.current;
+    return () => {
+      for (const url of blobs) URL.revokeObjectURL(url);
+      blobs.clear();
+    };
+  }, []);
+
+  const dropBlob = (url: string | null) => {
+    if (!url || !coverBlobs.current.delete(url)) return;
+    URL.revokeObjectURL(url);
+  };
+
+  // The cropped photo: sign a PUT for this club's events folder, send the
+  // bytes straight to storage with the exact type the link was signed for,
+  // and keep the key for the save (UploadAssetModal's two steps; the event
+  // save is the third). The form's own button waits while this runs.
+  const uploadCover = async (blob: Blob) => {
+    setPendingCover(null);
+    if (!coverHandle) return;
+    const seq = ++coverSeq.current;
+    const file = new File([blob], "event-cover.jpg", { type: blob.type || "image/jpeg" });
+    const draft = URL.createObjectURL(file);
+    coverBlobs.current.add(draft);
+    setCoverDraft(draft);
+    setCoverErr(null);
+    if (badField === "cover") setBadField(null);
+    setCoverUploading(true);
+    const failed = (line: string) => {
+      dropBlob(draft);
+      if (seq !== coverSeq.current) return;
+      setCoverDraft(null);
+      setCoverUploading(false);
+      setCoverErr(line);
+    };
+    const sign = await vibeRequest<{ uploadUrl?: string; objectKey?: string; contentType?: string }>(
+      `/api/orgs/${encodeURIComponent(coverHandle)}/upload-url`,
+      {
+        method: "POST",
+        json: { kind: "event-cover", contentType: file.type, sizeBytes: file.size },
+        quiet: true,
+        failure: "Couldn't upload the photo.",
+      },
+    );
+    if (!sign.ok) {
+      // The route's 400s say what's wrong ("File too large (max 10MB)").
+      const line = sign.status === 400 && sign.error?.trim() ? sign.error.trim() : sign.message;
+      failed(/[.!?]$/.test(line) ? line : `${line}.`);
+      // Signed out, Terms, a restriction: the toast carries the way out.
+      if (sign.action && seq === coverSeq.current) {
+        toast({ message: sign.message, tone: "error", action: sign.action });
+      }
+      return;
+    }
+    const objectKey = sign.data.objectKey;
+    if (typeof sign.data.uploadUrl !== "string" || typeof objectKey !== "string") {
+      failed("Couldn't upload the photo.");
+      return;
+    }
+    let put: Response | null = null;
+    try {
+      put = await fetch(sign.data.uploadUrl, {
+        method: "PUT",
+        headers: { "content-type": sign.data.contentType ?? file.type },
+        body: file,
+      });
+    } catch (e) {
+      console.error("[events] cover upload", e);
+    }
+    if (!put?.ok) {
+      failed("Couldn't upload the photo. Try again.");
+      return;
+    }
+    if (seq !== coverSeq.current) {
+      dropBlob(draft);
+      return;
+    }
+    // The draft becomes the preview; the one it replaces goes.
+    dropBlob(coverLocal);
+    setCoverLocal(draft);
+    setCoverDraft(null);
+    setCoverKey(objectKey);
+    setCoverUploading(false);
+  };
+
+  // Remove: none on a new event; on an edit, null takes the stored one off
+  // (an upload nobody saved just goes unused). Also how a cover made for one
+  // club is dropped when the picker moves to another (its key is that
+  // club's folder, which the save would refuse).
+  const removeCover = () => {
+    coverSeq.current += 1;
+    dropBlob(coverDraft);
+    dropBlob(coverLocal);
+    setCoverDraft(null);
+    setCoverLocal(null);
+    setCoverUploading(false);
+    setCoverErr(null);
+    if (badField === "cover") setBadField(null);
+    setCoverKey(null);
+  };
 
   // What an edit would send: only the fields that changed. A picker compares
   // as the string it shows, so an untouched start (which may be in the past
@@ -12439,16 +12671,24 @@ export function CreateEventModal(props: CreateEventModalProps) {
   }
   if (visibility !== initial.visibility) changes.visibility = visibility;
   if (icon !== initial.icon) changes.icon = icon;
+  // The cover only when it changed: a new key, or null to take a stored one
+  // off (an edit that adds a photo and removes it again sends nothing).
+  if (coverKey !== undefined && (coverKey !== null || !!editing?.cover_url)) changes.cover_key = coverKey;
   const dirty = !editing || Object.keys(changes).length > 0;
-  const canSubmit = !busy && !!title.trim() && !!startsAt && !!endsAt && !!orgId && dirty;
+  // An upload in flight holds the save: its key isn't known yet.
+  const canSubmit = !busy && !coverUploading && !!title.trim() && !!startsAt && !!endsAt && !!orgId && dirty;
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && !busy) onClose();
+      if (e.key !== "Escape") return;
+      // The cropper sits over the form with no Escape of its own: Escape
+      // closes it, not the form behind (and the half-filled event with it).
+      if (pendingCover) setPendingCover(null);
+      else if (!busy) onClose();
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [busy, onClose]);
+  }, [busy, onClose, pendingCover]);
 
   const submit = async () => {
     if (!canSubmit) return;
@@ -12480,6 +12720,8 @@ export function CreateEventModal(props: CreateEventModalProps) {
             org_id: orgId,
             visibility,
             icon,
+            // Only with a photo: none is the column's default.
+            ...(typeof coverKey === "string" ? { cover_key: coverKey } : {}),
           },
           quiet: true,
           failure: "Couldn't create the event.",
@@ -12584,6 +12826,23 @@ export function CreateEventModal(props: CreateEventModalProps) {
         {/* Event icons (Oct 23, 2026, B4): right under the title it goes
             with. Optional: the calendar is the "none" choice. */}
         <EventIconField value={icon} onChange={setIcon} disabled={busy} />
+        {/* Cover photo (Oct 23, 2026): under the icon, optional. Needs a
+            club, since it's stored in the club's folder. */}
+        {coverHandle ? (
+          <EventCoverField
+            preview={coverPreview}
+            uploading={coverUploading}
+            error={coverErr}
+            disabled={busy}
+            invalid={badField === "cover"}
+            errorId={errorId}
+            onPick={(f) => {
+              setCoverErr(null);
+              setPendingCover(f);
+            }}
+            onRemove={removeCover}
+          />
+        ) : null}
         <textarea
           value={description}
           onChange={(e) => {
@@ -12656,7 +12915,17 @@ export function CreateEventModal(props: CreateEventModalProps) {
             Posting on behalf of
             <select
               value={orgId}
-              onChange={(e) => setOrgId(e.target.value)}
+              onChange={(e) => {
+                // A new cover lives in the club's own folder: moving to
+                // another club drops it, and the field says so.
+                if (e.target.value !== orgId && typeof coverKey === "string") {
+                  removeCover();
+                  setCoverErr("The cover photo was for the other club. Add it again for this one.");
+                }
+                setOrgId(e.target.value);
+              }}
+              // Not mid-upload: the photo is going to the club picked now.
+              disabled={coverUploading}
               style={eventModalInput}
             >
               {eligibleOrgs.map((o) => (
@@ -12740,6 +13009,24 @@ export function CreateEventModal(props: CreateEventModalProps) {
                 : "Create event"}
           </button>
         </div>
+        {/* Inside the panel, so a tap in the cropper (a portal) bubbles to
+            the panel's stopPropagation, never to the scrim that closes the
+            form. 16:9 like the card's cover, 1600 px wide at most. */}
+        {pendingCover ? (
+          <ImageCropperModal
+            src={pendingCover}
+            aspect={16 / 9}
+            shape="rect"
+            outputMaxSize={1600}
+            title="Adjust cover photo"
+            onCancel={() => setPendingCover(null)}
+            onConfirm={(blob) => void uploadCover(blob)}
+            onError={(message) => {
+              setPendingCover(null);
+              setCoverErr(message);
+            }}
+          />
+        ) : null}
       </motion.div>
     </div>,
     document.body,
@@ -12856,6 +13143,184 @@ function EventIconField({
     </div>
   );
 }
+
+/**
+ * "Cover photo" (Oct 23, 2026, COVERS-PLAN.md): the create/edit form's
+ * optional picture, under the icon. Empty, one wide button; with a photo,
+ * the 16:9 preview (what the event card shows across its top) with Change /
+ * Remove under it. While a photo uploads the preview is dimmed and says
+ * "Uploading…", and the form's own button waits; Remove stays live, so a
+ * stalled upload can be dropped. CreateEventModal owns the
+ * crop and the upload; this picks, shows and says. Every button is 44px
+ * tall, drawn in the modal's dark glass like the fields around it.
+ */
+function EventCoverField({
+  preview,
+  uploading,
+  error,
+  disabled,
+  invalid,
+  errorId,
+  onPick,
+  onRemove,
+}: {
+  /** What to show: a stored cover's picture route or a new upload's blob: URL. */
+  preview: string | null;
+  uploading: boolean;
+  /** The field's own line (an upload or a crop that failed). */
+  error: string | null;
+  disabled: boolean;
+  /** The save was refused over the cover; the form's line (errorId) says why. */
+  invalid: boolean;
+  errorId: string;
+  onPick: (file: File) => void;
+  onRemove: () => void;
+}) {
+  const labelId = useId();
+  const ownErrorId = useId();
+  const inputRef = useRef<HTMLInputElement | null>(null);
+  // A stored cover that won't load (taken down, storage down) keeps its box
+  // with a line instead, so Remove stays in reach.
+  const [failed, setFailed] = useState<string | null>(null);
+  const shown = preview && preview !== failed ? preview : null;
+  const off = disabled || uploading;
+  const describedBy = [invalid ? errorId : null, error ? ownErrorId : null].filter(Boolean).join(" ") || undefined;
+
+  return (
+    <div role="group" aria-labelledby={labelId} style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+      <span id={labelId} style={eventModalLabel}>
+        Cover photo
+      </span>
+      <input
+        ref={inputRef}
+        type="file"
+        accept="image/jpeg,image/png,image/webp,image/gif"
+        tabIndex={-1}
+        aria-hidden
+        style={{ display: "none" }}
+        onChange={(e) => {
+          const f = e.target.files?.[0] ?? null;
+          // Cleared, so picking the same photo again still fires.
+          e.target.value = "";
+          if (f) onPick(f);
+        }}
+      />
+      {preview ? (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={SPRING_SOFT}
+          style={{
+            position: "relative",
+            aspectRatio: "16 / 9",
+            borderRadius: 12,
+            overflow: "hidden",
+            border: invalid ? "1px solid #FF8A7A" : "1px solid rgba(255,255,255,0.16)",
+            background: "rgba(255,255,255,0.06)",
+            display: "grid",
+            placeItems: "center",
+          }}
+        >
+          {shown ? (
+            // eslint-disable-next-line @next/next/no-img-element -- a blob: preview or the event's own picture route
+            <img
+              src={shown}
+              alt="Cover photo"
+              onError={() => setFailed(shown)}
+              style={{
+                position: "absolute",
+                inset: 0,
+                width: "100%",
+                height: "100%",
+                objectFit: "cover",
+                opacity: uploading ? 0.5 : 1,
+              }}
+            />
+          ) : (
+            <span style={{ fontFamily: "DM Sans, sans-serif", fontSize: 12, color: "rgba(255,255,255,0.55)" }}>
+              Couldn’t show this photo.
+            </span>
+          )}
+          {uploading ? (
+            <span
+              style={{
+                position: "relative",
+                padding: "6px 12px",
+                borderRadius: 999,
+                background: "rgba(8,6,12,0.66)",
+                color: "#fff",
+                fontFamily: "DM Sans, sans-serif",
+                fontSize: 12,
+                fontWeight: 700,
+              }}
+            >
+              Uploading…
+            </span>
+          ) : null}
+        </motion.div>
+      ) : null}
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+        <button
+          type="button"
+          className="vibe-press"
+          onClick={() => inputRef.current?.click()}
+          disabled={off}
+          aria-describedby={describedBy}
+          style={preview ? coverButtonStyle(off) : { ...coverButtonStyle(off), flex: 1, border: "1px dashed rgba(255,255,255,0.18)" }}
+        >
+          {preview ? "Change" : "Add a cover photo"}
+        </button>
+        {preview ? (
+          // Live while a photo uploads (Oct 23, 2026 review): an upload that
+          // stalls would otherwise hold Save with no way out but closing
+          // the form. Its late answer is dropped (coverSeq).
+          <button type="button" className="vibe-press" onClick={onRemove} disabled={disabled} style={coverButtonStyle(disabled)}>
+            Remove
+          </button>
+        ) : null}
+      </div>
+      {/* Said once the upload starts, for a screen reader (the dimmed preview is the sighted cue). */}
+      <span role="status" style={coverSrOnly}>
+        {uploading ? "Uploading the cover photo" : ""}
+      </span>
+      {error ? (
+        <div
+          id={ownErrorId}
+          role="alert"
+          style={{ fontFamily: "DM Sans, sans-serif", fontSize: 12, color: "#FFB1A8" }}
+        >
+          {error}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+/** Change / Remove / Add a cover photo: the modal's quiet pill, 44px tall. */
+function coverButtonStyle(off: boolean): React.CSSProperties {
+  return {
+    minHeight: 44,
+    padding: "0 16px",
+    borderRadius: 999,
+    border: "1px solid rgba(255,255,255,0.18)",
+    background: "rgba(255,255,255,0.04)",
+    color: "rgba(255,255,255,0.86)",
+    fontFamily: "DM Sans, sans-serif",
+    fontWeight: 600,
+    fontSize: 13,
+    cursor: off ? "default" : "pointer",
+    opacity: off ? 0.6 : 1,
+  };
+}
+
+const coverSrOnly: React.CSSProperties = {
+  position: "absolute",
+  width: 1,
+  height: 1,
+  overflow: "hidden",
+  clip: "rect(0 0 0 0)",
+  whiteSpace: "nowrap",
+};
 
 /**
  * "Who can see it: Everyone / Members only" (Oct 22, 2026, PLAN-2.md): the

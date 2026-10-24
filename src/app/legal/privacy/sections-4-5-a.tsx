@@ -82,7 +82,8 @@ export function Sections5aTo5d() {
           Club events, with Going and Interested totals and, once at least 5
           people have checked in at one, how many did. One exception: an event
           its club marks &ldquo;Members only&rdquo;, which only its members
-          see. Only they can RSVP to it or check themselves in.
+          see. Only they can RSVP to it or check themselves in. An
+          event&apos;s cover photo is shown to whoever can see the event.
         </li>
         <li>
           Search finds verified accounts that finished setting up, across both

@@ -85,8 +85,10 @@ export function Sections6To8() {
       </LegalP>
       <LegalP>
         Vibe does not delete things just because they are old. They stay until
-        you, a club or we delete them. Only one thing is deleted on a schedule
-        today: waitlist entries (<Sec to="11">section 11</Sec>). The page-open
+        you, a club or we delete them. Three things are deleted on a schedule
+        today: waitlist entries and any place on a club&apos;s link that was
+        never tied to an account (<Sec to="11">section 11</Sec>), and the
+        abuse counts, within three days (<Sec to="3d">section 3d</Sec>). The page-open
         tally and the use totals (<Sec to="3d">section 3d</Sec>) are not
         deleted either, and deleting an account does not take anything out of
         them. They hold day and week totals, with no account in them.

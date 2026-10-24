@@ -50,6 +50,12 @@ const STUBS: Record<string, string> = {
   "@/lib/orgs/following": stub(
     "export async function loadOrgRole() { return { ok: true, role: globalThis.__ev.role }; }",
   ),
+  // Event covers (Oct 23, 2026): storage on unless a test turns it off; a
+  // cover delete is logged, and throws when a test says storage is down.
+  "@/lib/r2": stub(
+    "export function isR2Configured() { return globalThis.__ev.r2 !== false; }\n" +
+      "export async function deleteEventCoverKey(key) { globalThis.__ev.log.push('cover:delete'); globalThis.__ev.coverDeletes.push(key); if (globalThis.__ev.coverDeleteFails) throw new Error('storage down'); }",
+  ),
   "@/lib/events/notify-cancel": stub(
     "export async function collectCancelRecipients(service, eventId, actorId, opts) { globalThis.__ev.log.push('notices:collect'); globalThis.__ev.collectOpts.push(opts); return globalThis.__ev.collect; }\n" +
       "export async function sendCancelNotices(service, args) { globalThis.__ev.log.push('notices:send'); return globalThis.__ev.send; }",
@@ -119,6 +125,18 @@ type World = {
   rsvpUserIds?: string[];
   memberIds?: string[];
   rsvpDeleteError?: Err;
+  /** Event covers (Oct 23, 2026): what the cleanup and the takedown check read. */
+  openReport?: boolean;
+  reportsError?: Err;
+  /** Keys an image_remove row of the club names. */
+  removedCovers?: string[];
+  moderationError?: Err;
+  otherEventWithCover?: boolean;
+  postWithCover?: boolean;
+  /** The club's banner is this key (Oct 23, 2026 review: a crafted club PATCH can set one). */
+  clubBanner?: string;
+  r2?: boolean;
+  coverDeleteFails?: boolean;
 };
 
 type Call = [string, ...unknown[]];
@@ -130,8 +148,43 @@ function setup(w: World) {
   const updates: Record<string, unknown>[] = [];
   const dropped: string[][] = [];
   const collectOpts: unknown[] = [];
+  const coverDeletes: string[] = [];
   const answerService = (table: string, calls: Call[]): { data: unknown; error: unknown } => {
     const first = calls[0]?.[0];
+    const eq = (column: string) => calls.find((c) => c[0] === "eq" && c[1] === column)?.[2];
+    if (table === "events" && first === "select" && eq("cover_key") !== undefined) {
+      log.push("cover:other-events");
+      return { data: w.otherEventWithCover ? [{ id: mid(90) }] : [], error: null };
+    }
+    if (table === "reports") {
+      log.push("cover:reports");
+      assert.deepEqual([eq("target_type"), eq("target_id"), eq("status")], ["event", EVENT, "open"]);
+      return { data: w.openReport ? [{ id: mid(80) }] : [], error: w.reportsError ?? null };
+    }
+    if (table === "moderation_actions") {
+      // checkRemovedPicture reads the club's own rows, then its events' rows
+      // (a cover's takedown is logged on the event, meta.org_id the club).
+      const onEvents = eq("target_type") === "event";
+      log.push(onEvents ? "cover:moderation:events" : "cover:moderation:club");
+      if (onEvents) {
+        assert.deepEqual(calls.find((c) => c[0] === "contains")?.slice(1), ["meta", { org_id: ORG }]);
+      } else {
+        assert.equal(eq("target_id"), ORG);
+      }
+      const rows = onEvents
+        ? (w.removedCovers ?? []).map((k, i) => ({
+            id: mid(70 + i),
+            action: "image_remove",
+            meta: { org_id: ORG, slots: ["cover"], previous: { cover: k } },
+          }))
+        : [];
+      return { data: w.moderationError ? null : rows, error: w.moderationError ?? null };
+    }
+    if (table === "posts") {
+      log.push("cover:posts");
+      assert.equal(eq("org_id"), ORG);
+      return { data: w.postWithCover && eq("media_url") !== undefined ? [{ id: mid(60) }] : [], error: null };
+    }
     if (table === "events" && first === "select") return { data: w.event, error: null };
     if (table === "events" && first === "update") {
       log.push("event:update");
@@ -156,7 +209,7 @@ function setup(w: World) {
       dropped.push(ids);
       return { data: w.rsvpDeleteError ? null : ids.map((user_id) => ({ user_id })), error: w.rsvpDeleteError ?? null };
     }
-    if (table === "orgs") return { data: ORG_ROW, error: null };
+    if (table === "orgs") return { data: { ...ORG_ROW, banner_url: w.clubBanner ?? null }, error: null };
     if (table === "messages" && first === "select") {
       log.push("cards:read");
       return { data: (w.cardIds ?? []).map((id) => ({ id })), error: w.cardsReadError ?? null };
@@ -188,7 +241,7 @@ function setup(w: World) {
   const chain = (table: string, answer: (t: string, c: Call[]) => { data: unknown; error: unknown }) => {
     const calls: Call[] = [];
     const builder: Record<string, unknown> = {};
-    for (const m of ["select", "eq", "in", "is", "order", "limit", "range", "update", "delete", "gt"]) {
+    for (const m of ["select", "eq", "in", "is", "order", "limit", "range", "update", "delete", "gt", "contains"]) {
       builder[m] = (...args: unknown[]) => {
         calls.push([m, ...args]);
         return builder;
@@ -225,8 +278,11 @@ function setup(w: World) {
     collect: w.collect ?? { ok: true, ids: ["u1", "u2"] },
     send: w.send ?? { notified: 2, failed: false },
     collectOpts,
+    r2: w.r2,
+    coverDeleteFails: w.coverDeleteFails,
+    coverDeletes,
   };
-  return { log, writes, updates, dropped, collectOpts };
+  return { log, writes, updates, dropped, collectOpts, coverDeletes };
 }
 
 const CTX = { params: Promise.resolve({ id: EVENT }) };
@@ -457,7 +513,7 @@ test("PATCH: the refusals touch no card (ended 409, not an officer 403, invalid 
 
 type PatchAnswer = { ok: boolean; event: Record<string, unknown> | null };
 
-test("PATCH: the answer's event carries the check-in state, the three keys, then visibility and icon, last", async (t) => {
+test("PATCH: the answer's event carries the check-in state, the three keys, then visibility, icon and cover_url, last", async (t) => {
   quiet(t);
   setup({
     event: UPCOMING,
@@ -468,7 +524,7 @@ test("PATCH: the answer's event carries the check-in state, the three keys, then
   assert.equal(res.status, 200);
   const { event } = (await res.json()) as PatchAnswer;
   assert.ok(event);
-  assert.deepEqual(Object.keys(event).slice(-6), ["org", "checkin_open", "checked_in_count", "viewer_checked_in", "visibility", "icon"]);
+  assert.deepEqual(Object.keys(event).slice(-7), ["org", "checkin_open", "checked_in_count", "viewer_checked_in", "visibility", "icon", "cover_url"]);
   assert.deepEqual([event.checkin_open, event.checked_in_count, event.viewer_checked_in], [true, 7, true]);
   assert.deepEqual([event.going_count, event.interested_count], [3, 1]);
 });
@@ -606,4 +662,162 @@ test("PATCH with an icon that isn't one of the twelve: 400 invalid_icon, nothing
     assert.equal(((await res.json()) as { code: string }).code, "invalid_icon");
     assert.deepEqual(log, []);
   }
+});
+
+// ── Cover photos (Oct 23, 2026; COVERS-PLAN.md, batch B1) ──────────────────
+
+const coverKey = (n: number, ext = "jpg") => `orgs/${ORG}/events/${mid(n).replace(/^aaaaaaaa/, "3f0e7c1a")}.${ext}`;
+const OLD_COVER = coverKey(1);
+const NEW_COVER = coverKey(2, "webp");
+const WITH_COVER = { ...UPCOMING, cover_key: OLD_COVER };
+/** The cleanup's reads, in any order (they run side by side). */
+const CLEANUP_READS = [
+  "cover:moderation:club",
+  "cover:moderation:events",
+  "cover:other-events",
+  "cover:posts",
+  "cover:posts",
+  "cover:reports",
+];
+/** The takedown check before a new cover is saved: the club's rows, then its events'. */
+const TAKEDOWN_READS = ["cover:moderation:club", "cover:moderation:events"];
+const coverReads = (log: string[]) => log.filter((l) => l.startsWith("cover:") && l !== "cover:delete").sort();
+
+test("PATCH adding a cover: the takedown log is read, the key written, the answer carries its address only", async (t) => {
+  quiet(t);
+  const { log, updates, coverDeletes } = setup({ event: UPCOMING, updatedEvent: { ...UPCOMING, cover_key: NEW_COVER } });
+  const res = await patch({ cover_key: NEW_COVER });
+  assert.equal(res.status, 200);
+  assert.deepEqual(log, [...TAKEDOWN_READS, "event:update"], "nothing to clean up: there was no cover");
+  assert.equal(updates[0].cover_key, NEW_COVER);
+  const text = await res.text();
+  assert.equal(text.includes(NEW_COVER), false, "the key never leaves the server");
+  const { event } = JSON.parse(text) as PatchAnswer;
+  assert.equal(event?.cover_url, `/api/events/${EVENT}/cover?v=${NEW_COVER.split("/").pop()}`);
+  assert.deepEqual(coverDeletes, []);
+});
+
+test("PATCH replacing or removing a cover: saved first, then the old file goes when nothing needs it", async (t) => {
+  quiet(t);
+  for (const [body, saved] of [
+    [{ cover_key: NEW_COVER }, NEW_COVER],
+    [{ cover_key: null }, null],
+  ] as const) {
+    const { log, updates, coverDeletes } = setup({ event: WITH_COVER, updatedEvent: { ...UPCOMING, cover_key: saved } });
+    assert.equal((await patch(body)).status, 200, JSON.stringify(body));
+    assert.equal(updates[0].cover_key, saved);
+    assert.ok(log.indexOf("event:update") < log.indexOf("cover:delete"), "deleted only after the save");
+    assert.deepEqual(coverReads(log.slice(log.indexOf("event:update"))), CLEANUP_READS);
+    assert.deepEqual(coverDeletes, [OLD_COVER], JSON.stringify(body));
+  }
+});
+
+test("PATCH keeping the cover (left out, or sent back as stored): no takedown read, no delete", async (t) => {
+  quiet(t);
+  for (const body of [{ location: "Room 2" }, { location: "Room 2", cover_key: OLD_COVER }]) {
+    const { log, updates, coverDeletes } = setup({ event: WITH_COVER, updatedEvent: { ...WITH_COVER, location: "Room 2" } });
+    assert.equal((await patch(body)).status, 200, JSON.stringify(body));
+    assert.deepEqual(log, ["event:update"], JSON.stringify(body));
+    // Not written back (Oct 23, 2026 review): a takedown in between would be undone.
+    assert.equal("cover_key" in updates[0], false, JSON.stringify(body));
+    assert.deepEqual(coverDeletes, []);
+  }
+});
+
+test("PATCH racing a moderator's takedown: the cover isn't written back, and the removed file stays", async (t) => {
+  quiet(t);
+  // Read with the cover; the takedown cleared it before the save landed.
+  const { updates, coverDeletes } = setup({
+    event: WITH_COVER,
+    updatedEvent: { ...UPCOMING, location: "Room 2", cover_key: null },
+    removedCovers: [OLD_COVER],
+  });
+  assert.equal((await patch({ location: "Room 2" })).status, 200);
+  assert.equal("cover_key" in updates[0], false, "the edit doesn't put the picture back");
+  assert.deepEqual(coverDeletes, [], "the takedown keeps the file as the record");
+});
+
+test("PATCH removing a cover something still needs (or that can't be checked): saved, and the old file stays", async (t) => {
+  quiet(t);
+  // Removing, not replacing: a replacement's own takedown check would
+  // answer the failing log read first (500, tested below).
+  for (const keepIt of [
+    { openReport: true },
+    { removedCovers: [OLD_COVER] },
+    { otherEventWithCover: true },
+    { postWithCover: true },
+    { clubBanner: OLD_COVER },
+    { reportsError: { code: "XX000", message: "boom" } },
+    { moderationError: { code: "XX000", message: "boom" } },
+    { r2: false },
+  ] as Partial<World>[]) {
+    const { updates, coverDeletes } = setup({ event: WITH_COVER, updatedEvent: { ...UPCOMING, cover_key: null }, ...keepIt });
+    const res = await patch({ cover_key: null });
+    assert.equal(res.status, 200, JSON.stringify(keepIt));
+    assert.equal(updates[0].cover_key, null, JSON.stringify(keepIt));
+    assert.deepEqual(coverDeletes, [], JSON.stringify(keepIt));
+  }
+  // A replacement whose old file an open report names keeps it too.
+  const { coverDeletes } = setup({ event: WITH_COVER, updatedEvent: { ...UPCOMING, cover_key: NEW_COVER }, openReport: true });
+  assert.equal((await patch({ cover_key: NEW_COVER })).status, 200);
+  assert.deepEqual(coverDeletes, []);
+});
+
+test("PATCH whose old-file delete fails still answers the same 200", async (t) => {
+  quiet(t);
+  setup({ event: WITH_COVER, updatedEvent: { ...UPCOMING, cover_key: NEW_COVER } });
+  const expected = await answer(await patch({ cover_key: NEW_COVER }));
+  const { coverDeletes } = setup({ event: WITH_COVER, updatedEvent: { ...UPCOMING, cover_key: NEW_COVER }, coverDeleteFails: true });
+  assert.deepEqual(await answer(await patch({ cover_key: NEW_COVER })), expected);
+  assert.deepEqual(coverDeletes, [OLD_COVER], "it was tried");
+});
+
+test("PATCH with a cover moderators took down: 422 picture_removed; a failed log read: 500; nothing written", async (t) => {
+  quiet(t);
+  const removed = setup({ event: WITH_COVER, updatedEvent: WITH_COVER, removedCovers: [NEW_COVER] });
+  const res = await patch({ cover_key: NEW_COVER });
+  assert.equal(res.status, 422);
+  assert.equal(((await res.json()) as { code: string }).code, "picture_removed");
+  assert.deepEqual([[...removed.log].sort(), removed.updates, removed.coverDeletes], [TAKEDOWN_READS, [], []]);
+  const failed = setup({ event: WITH_COVER, updatedEvent: WITH_COVER, moderationError: { code: "XX000", message: "boom" } });
+  assert.equal((await patch({ cover_key: NEW_COVER })).status, 500);
+  // Only the takedown log was read (the club's rows, and its events' rows
+  // when checkRemovedPicture asks both side by side); nothing is written.
+  assert.ok(failed.log.includes("cover:moderation:club"), JSON.stringify(failed.log));
+  assert.ok(failed.log.every((l) => TAKEDOWN_READS.includes(l)), JSON.stringify(failed.log));
+  assert.deepEqual(failed.updates, []);
+});
+
+test("PATCH with a key that isn't this club's cover: 400 invalid_cover before anything is read or written", async (t) => {
+  quiet(t);
+  for (const key of [
+    `orgs/bbbbbbbb-0000-4000-8000-000000000009/events/3f0e7c1a-0000-4000-8000-000000000002.jpg`,
+    `orgs/${ORG}/banner/3f0e7c1a-0000-4000-8000-000000000002.jpg`,
+    "",
+    7,
+  ]) {
+    const { log, updates } = setup({ event: WITH_COVER, updatedEvent: WITH_COVER });
+    const res = await patch({ cover_key: key });
+    assert.equal(res.status, 400, JSON.stringify(key));
+    assert.equal(((await res.json()) as { code: string }).code, "invalid_cover");
+    assert.deepEqual([log, updates], [[], []]);
+  }
+});
+
+test("DELETE of an event with a cover: after the delete, the file goes; an open report keeps it", async (t) => {
+  quiet(t);
+  const gone = setup({ event: { ...WITH_COVER }, collect: { ok: true, ids: [] } });
+  assert.equal((await del()).status, 200);
+  assert.ok(gone.log.indexOf("event:delete") < gone.log.indexOf("cover:delete"));
+  assert.deepEqual(coverReads(gone.log), CLEANUP_READS);
+  assert.deepEqual(gone.coverDeletes, [OLD_COVER]);
+  const reported = setup({ event: { ...WITH_COVER }, openReport: true });
+  assert.deepEqual(await answer(await del()), { status: 200, text: JSON.stringify({ ok: true, notified: 2 }) });
+  assert.deepEqual(reported.coverDeletes, []);
+  const ended = setup({ event: { ...ENDED, cover_key: OLD_COVER } });
+  assert.equal((await del()).status, 200);
+  assert.deepEqual(ended.coverDeletes, [OLD_COVER], "an ended event's cover goes too");
+  const refused = setup({ event: { ...WITH_COVER }, deleteRows: [] });
+  assert.equal((await del()).status, 404);
+  assert.deepEqual(refused.coverDeletes, [], "nothing deleted, nothing cleaned");
 });

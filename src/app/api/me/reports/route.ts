@@ -12,6 +12,7 @@ import {
   type ReportTargetFacts,
 } from "@/lib/moderation/report-visibility";
 import {
+  EVENT_SNAPSHOT_COLUMNS,
   isReportReasonCode,
   isReportTargetType,
   type ReportTargetType,
@@ -340,7 +341,8 @@ async function readTarget(
     org: { table: "orgs", columns: "id,handle,name,description,owner_id", owner: "owner_id" },
     event: {
       table: "events",
-      columns: "id,title,description,creator_id,org_id,starts_at",
+      // The cover's key rides along as evidence (Oct 23, 2026; see reports.ts).
+      columns: EVENT_SNAPSHOT_COLUMNS,
       owner: "creator_id",
     },
   };

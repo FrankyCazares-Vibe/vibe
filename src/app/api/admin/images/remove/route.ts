@@ -10,6 +10,7 @@ import {
 import {
   CACHE_NOTE,
   type ImageMeta,
+  imageLogScope,
   type ImageSlot,
   imageSlotColumn,
   isPublicImageSlot,
@@ -56,10 +57,13 @@ type Body = {
 
 /**
  * POST /api/admin/images/remove
- * Body: { targetType: 'user'|'org'|'channel', targetId, slot, reason, expected, reportIds? }
+ * Body: { targetType: 'user'|'org'|'channel'|'event', targetId, slot, reason, expected, reportIds? }
  *
  * Take a photo down: a student's profile photo, cover or experience /
- * working-on logos; a club's logo or banner; a group chat's photo.
+ * working-on logos; a club's logo or banner; a group chat's photo; an event's
+ * cover photo (Oct 23, 2026: `events.cover_key`, a private R2 key in the
+ * club's folder, kept in R2 as evidence like a banner; the row also carries
+ * the club's id in `meta.org_id`, so the club can't put it back anywhere).
  *
  * LOG FIRST, THEN ACT. The column is cleared, so the log row's
  * `meta.previous` is the only record of what was there (for a club or chat
@@ -189,6 +193,7 @@ export async function POST(req: Request) {
           foreign_owners: plan.foreignOwners,
           requested_report_ids: validIds,
           handle: typeof row.handle === "string" ? row.handle : null,
+          ...imageLogScope(type, row),
         },
       });
       if (!logged) return adminFail(500, "request_failed", "Couldn't record this, so nothing was changed. Try again.");

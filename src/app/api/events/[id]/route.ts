@@ -1,11 +1,14 @@
 import { NextResponse } from "next/server";
 
+import { checkRemovedPicture } from "@/app/api/admin/images/_lib/removed-picture-store";
+import { REMOVED_PICTURE_MESSAGE } from "@/app/api/admin/images/_lib/removed-picture";
 import {
   loadEventCardMessages,
   refreshEventCardTexts,
   rewriteEventCardTexts,
 } from "@/lib/chat/cards/refresh-event-cards";
 import { cancelSendsNotices } from "@/lib/events/cancel-notice";
+import { isEventCoverKey } from "@/lib/events/event-cover-url";
 import { parseCheckinStateRows } from "@/lib/events/event-checkin";
 import {
   EVENT_ROW_COLUMNS,
@@ -15,7 +18,12 @@ import {
   type EventOrgCard,
 } from "@/lib/events/event-item";
 import { collectCancelRecipients, sendCancelNotices } from "@/lib/events/notify-cancel";
-import { checkEventFields, eventVisibilityOf, readEventFields } from "@/lib/events/validate";
+import {
+  checkEventFields,
+  eventVisibilityOf,
+  readEventFields,
+  storedCoverKey,
+} from "@/lib/events/validate";
 import {
   contentBlockedResponse,
   requireCanPublish,
@@ -23,6 +31,7 @@ import {
 } from "@/lib/moderation/access";
 import { loadOrgRole } from "@/lib/orgs/following";
 import { isUuid } from "@/lib/pgrest";
+import { deleteEventCoverKey, isR2Configured } from "@/lib/r2";
 import { rateLimit, tooManyRequests } from "@/lib/rate-limit";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import {
@@ -152,7 +161,10 @@ async function loadForOfficer(id: string, userId: string, logTag: string): Promi
  * logged and the answer is { ok: true, notified: 0, notify_failed: true }.
  * A failed card read or rewrite is logged by the helper and changes nothing:
  * not the answer, not the notices. An event that had ended deletes quietly
- * and its cards keep their history text.
+ * and its cards keep their history text. Then (Oct 23, 2026) its cover
+ * photo's file comes off storage unless something still needs it
+ * (`dropOldCover`: an open report on the event keeps it), before the
+ * notices; awaited, never throws, never changes the answer.
  *
  * Errors: 401 unauthorized · 429 (tooManyRequests) · 404 not_found ·
  * 403 org_role_required / org_hidden · 403 account_restricted / terms_required
@@ -223,6 +235,10 @@ export async function DELETE(_req: Request, ctx: RouteContext) {
       });
     }
   }
+
+  // The event is gone, so its cover goes too, unless something still needs it.
+  const cover = storedCoverKey(event.cover_key);
+  if (cover) await dropOldCover(service, event, cover);
 
   if (!notify || recipientIds.length === 0) {
     return NextResponse.json({ ok: true, notified: 0 });
@@ -319,6 +335,72 @@ async function dropNonMemberRsvps(
 }
 
 /**
+ * An event's old cover photo, once nothing shows it (Oct 23, 2026; club
+ * view wave 3, event covers, batch B1: handoffs/2026-10-23-club-view-wave-3/
+ * COVERS-PLAN.md): after an edit replaced or removed it, or after the event
+ * was cancelled, the file comes off storage, so a picture an officer took
+ * down is really gone. It STAYS when:
+ *  - an open report is about this event (it is evidence; the report's
+ *    snapshot names it, and the admin queue must still be able to show it);
+ *  - moderators took this picture down from the club (an image_remove row
+ *    names it: a takedown keeps the file as the record, call 4);
+ *  - another event still shows it, a post of the club uses it as its
+ *    media, or the club uses it as its logo or banner (every upload is a
+ *    fresh key, so only a crafted request shares one, but this delete must
+ *    not break or erase it);
+ *  - it isn't a cover of this event's own club (`isEventCoverKey`), which
+ *    the database's events_check_cover_key already makes impossible.
+ * Any read that fails keeps the file: a stale picture costs a few
+ * kilobytes, a deleted one can't come back. `deleteEventCoverKey` refuses
+ * any key outside `orgs/<uuid>/events/` on its own.
+ *
+ * SERVICE ROLE (reports, moderation_actions and other clubs' events have no
+ * client read). NEVER THROWS, and is awaited; a failure is logged with the
+ * event id only, never the key, and the edit or the cancel stands whatever
+ * happens here.
+ */
+async function dropOldCover(
+  service: ReturnType<typeof createSupabaseServiceClient>,
+  event: { id: string; org_id: string },
+  key: string,
+): Promise<"deleted" | "kept" | "skipped" | "failed"> {
+  const tag = "[events/:id cover cleanup]";
+  try {
+    if (!isEventCoverKey(key, event.org_id)) return "kept";
+    if (!isR2Configured()) return "skipped";
+    const [reports, removed, events, posts, thumbs, club] = await Promise.all([
+      service
+        .from("reports")
+        .select("id")
+        .eq("target_type", "event")
+        .eq("target_id", event.id)
+        .eq("status", "open")
+        .limit(1),
+      checkRemovedPicture(service, "org", event.org_id, [key]),
+      service.from("events").select("id").eq("cover_key", key).limit(1),
+      service.from("posts").select("id").eq("org_id", event.org_id).eq("media_url", key).limit(1),
+      service.from("posts").select("id").eq("org_id", event.org_id).eq("media_thumbnail_url", key).limit(1),
+      // The club PATCH takes any key in the club's folder as its logo or banner.
+      service.from("orgs").select("logo_url,banner_url").eq("id", event.org_id).maybeSingle(),
+    ]);
+    const reads = [reports, events, posts, thumbs];
+    if (removed === "error" || club.error || reads.some((r) => r.error)) {
+      console.error(tag, "a read failed; the file stays", { eventId: event.id });
+      return "kept";
+    }
+    const pictures = (club.data ?? {}) as { logo_url?: unknown; banner_url?: unknown };
+    const clubShowsIt = pictures.logo_url === key || pictures.banner_url === key;
+    // Still needed (see above): kept, and nothing to log.
+    if (removed === "removed" || clubShowsIt || reads.some((r) => (r.data ?? []).length > 0)) return "kept";
+    await deleteEventCoverKey(key);
+    return "deleted";
+  } catch (err) {
+    console.error(tag, { eventId: event.id, error: err instanceof Error ? err.message : "unknown" });
+    return "failed";
+  }
+}
+
+/**
  * The edited event as one GET /api/events item: counts from the same
  * `event_rsvp_counts` RPC (numbers only), the caller's own RSVP, the club
  * card. The caller was just checked as a current owner / admin, so
@@ -375,10 +457,12 @@ async function itemFor(
 /**
  * PATCH /api/events/[id] -> { ok: true, event: <one GET /api/events item> }
  *
- * Edits title, description, location, starts_at, ends_at, visibility and
- * icon (POST's names; visibility "everyone" | "members", Oct 22, 2026; icon
- * one of event-icons.ts's twelve keys, or null to take it off, Oct 23,
- * 2026); a field left out keeps its stored value. Only while the event hasn't ended.
+ * Edits title, description, location, starts_at, ends_at, visibility,
+ * icon and cover_key (POST's names; visibility "everyone" | "members", Oct
+ * 22, 2026; icon one of event-icons.ts's twelve keys, or null to take it
+ * off, Oct 23, 2026; cover_key a key upload-url signed for this club's
+ * events, or null to take the cover off, Oct 23, 2026); a field left out
+ * keeps its stored value. Only while the event hasn't ended.
  * Validation is POST's own (src/lib/events/validate.ts), checking only what
  * changed: an unchanged title isn't re-run through a word list that grew
  * since, and an event already under way keeps its past start (a moved start
@@ -398,6 +482,12 @@ async function itemFor(
  * answer's counts are read. The event's Board cards stay where they are:
  * every follower read leaves a members-only event's card out (the space,
  * the Board page and its previews), and members still see them.
+ * A NEW cover key is refused (422 picture_removed) when moderators took that
+ * picture down from the club (checkRemovedPicture; a failed read is a 500,
+ * nothing written). When the saved cover differs from the stored one
+ * (replaced or removed), the old file comes off storage unless something
+ * still needs it (`dropOldCover`: an open report on the event keeps it),
+ * awaited, its result only logged, before the answer is built.
  *
  * Gate: requireCanPublish, like POST (editing is publishing: Terms, a
  * verified school email, no restriction), then a current owner / admin.
@@ -406,8 +496,8 @@ async function itemFor(
  * 403 org_role_required / org_hidden · 403 org_unverified · 409 event_ended ·
  * 400 org_cannot_change · 400 title_required / title_too_long /
  * description_too_long / location_too_long / invalid_times /
- * invalid_visibility / invalid_icon · 422 content_blocked (+ field) ·
- * 500 request_failed.
+ * invalid_visibility / invalid_icon / invalid_cover · 422 content_blocked
+ * (+ field) · 422 picture_removed · 500 request_failed.
  * Rate limited: 30 per 10 minutes per officer, like post edits.
  */
 export async function PATCH(req: Request, ctx: RouteContext) {
@@ -452,7 +542,8 @@ export async function PATCH(req: Request, ctx: RouteContext) {
     return fail(400, "org_cannot_change", "An event can't move to another club.");
   }
 
-  const checked = checkEventFields(readEventFields(body, event), nowMs, event);
+  // `event.org_id`: a cover must be one of this club's (validate.ts).
+  const checked = checkEventFields(readEventFields(body, event), nowMs, event, event.org_id);
   if (!checked.ok) {
     const p = checked.problem;
     return p.kind === "content_blocked"
@@ -461,9 +552,24 @@ export async function PATCH(req: Request, ctx: RouteContext) {
   }
 
   const service = createSupabaseServiceClient();
+  // A new cover moderators took down from this club stays down (POST's
+  // rule); a failed read of the log refuses.
+  const oldCover = storedCoverKey(event.cover_key);
+  const newCover = checked.value.cover_key;
+  if (newCover && newCover !== oldCover) {
+    const removed = await checkRemovedPicture(service, "org", event.org_id, [newCover]);
+    if (removed === "error") return fail(500, "request_failed", FAILED);
+    if (removed === "removed") return fail(422, "picture_removed", REMOVED_PICTURE_MESSAGE);
+  }
+
+  // The cover is written only when it changes (Oct 23, 2026 review): writing
+  // back the key read above would undo a moderator's takedown that landed in
+  // between (it clears the column), putting a removed picture back on the event.
+  const changes: Partial<typeof checked.value> = { ...checked.value };
+  if (newCover === oldCover) delete changes.cover_key;
   const { data: updated, error: updErr } = await service
     .from("events")
-    .update(checked.value)
+    .update(changes)
     .eq("id", event.id)
     .eq("org_id", event.org_id)
     .gt("ends_at", new Date(nowMs).toISOString())
@@ -491,6 +597,12 @@ export async function PATCH(req: Request, ctx: RouteContext) {
         updated: refreshed.updated,
       });
     }
+  }
+
+  // The cover replaced or removed (Oct 23, 2026): the old file goes, unless
+  // something still needs it (another event holding the same key included).
+  if (oldCover && oldCover !== storedCoverKey(saved.cover_key)) {
+    await dropOldCover(service, event, oldCover);
   }
 
   // Members only now, and not before: non-members' RSVPs come off.
