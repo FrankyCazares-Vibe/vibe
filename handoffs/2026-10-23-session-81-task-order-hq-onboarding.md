@@ -95,5 +95,5 @@ Partiful study (how they make money, where they started).
 | Supabase Pro before launch | Yes, by Oct 28 (backups) |
 | Vercel Pro before launch | Yes, by Oct 30 (commercial use, firewall, spend alerts) |
 | The suggested goals in Vibe HQ | Franky edits them; they are starting points |
-| James's and Rylan's admin flags (solo since Oct 24) | Turn them off before launch night, with the Privacy Policy's "three cofounders" lines rewritten the same day; his yes at the time |
+| James's and Rylan's admin flags (solo since Oct 24) | DECIDED Oct 24: leave them on for now; the Privacy Policy stays as it is |
 | A Monday routine that refreshes Vibe HQ | Yes (a scheduled Claude task, counts only) |
