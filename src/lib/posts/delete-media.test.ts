@@ -186,3 +186,12 @@ test("orgKeysNamedIn finds the club's keys inside JSON, and only that club's", (
   assert.deepEqual(Array.from(found).sort(), [`orgs/${ORG}/logo/old.png`, `orgs/${ORG}/posts/p.jpg`]);
   assert.equal(orgKeysNamedIn([meta], "not-a-uuid").size, 0);
 });
+
+test("orgKeysNamedIn keeps an event cover named by an event report or an event takedown (Oct 23, 2026)", () => {
+  const cover = `orgs/${ORG}/events/4b1c2d3e-1111-4222-8333-944445555666.jpg`;
+  const snap = { id: "e", title: "Mixer", org_id: ORG, cover_key: cover };
+  const takedown = { slots: ["cover"], previous: { cover }, paths: [], org_id: ORG };
+  assert.deepEqual(Array.from(orgKeysNamedIn([snap], ORG)), [cover]);
+  assert.deepEqual(Array.from(orgKeysNamedIn([takedown], ORG)), [cover]);
+  assert.equal(orgKeysNamedIn([{ cover_key: `orgs/${OTHER_ORG}/events/x.jpg` }], ORG).size, 0, "another club's");
+});

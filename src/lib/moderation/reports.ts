@@ -89,6 +89,19 @@ export function isReportStatus(value: unknown): value is ReportStatus {
 }
 
 /**
+ * What a report about an EVENT keeps as evidence (`reports.target_snapshot`),
+ * read by POST /api/me/reports with the reporter's own client. Here rather
+ * than in the route so the test can hold it: two things lean on it.
+ *   - `cover_key` (Oct 23, 2026): the cover photo's R2 key. The picture is
+ *     often the very thing reported, and the club-deletion sweep
+ *     (clubKeysToKeep) keeps every key an open report's snapshot names.
+ *   - `org_id`: whose event it was. Once a club is deleted its events go with
+ *     it, and that sweep finds the club's open event reports by this field.
+ * The key is never shown to a student: reports are service-role only.
+ */
+export const EVENT_SNAPSHOT_COLUMNS = "id,title,description,creator_id,org_id,starts_at,cover_key";
+
+/**
  * "a post", "a club" — written to drop into a sentence ("Someone reported a
  * post on Vibe"), which is why each one carries its article.
  */

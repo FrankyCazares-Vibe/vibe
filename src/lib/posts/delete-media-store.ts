@@ -220,6 +220,33 @@ async function clubKeysToKeep(
     return null;
   }
   named.push(...(actions.data ?? []).map((a) => a.meta));
+  // So does an event cover a moderator took down (Oct 23, 2026). That row's
+  // target is the EVENT, gone with the club by now (events cascade), so it is
+  // found by the club's id the routes write into its meta (imageLogScope).
+  const eventActions = await service
+    .from("moderation_actions")
+    .select("meta")
+    .eq("target_type", "event")
+    .contains("meta", { org_id: orgId });
+  if (eventActions.error) {
+    console.error(LOG, "club event actions read", eventActions.error.message);
+    return null;
+  }
+  named.push(...(eventActions.data ?? []).map((a) => a.meta));
+  // An open report about one of the club's events keeps that event's cover
+  // (Oct 23, 2026): the snapshot holds its `cover_key`, and its `org_id` says
+  // whose event it was (the event ids can't be read any more).
+  const eventReports = await service
+    .from("reports")
+    .select("target_snapshot")
+    .eq("status", "open")
+    .eq("target_type", "event")
+    .eq("target_snapshot->>org_id", orgId);
+  if (eventReports.error) {
+    console.error(LOG, "club event reports read", eventReports.error.message);
+    return null;
+  }
+  named.push(...(eventReports.data ?? []).map((r) => r.target_snapshot));
   // Anything an open report about the club or one of its posts snapshotted.
   const ids = [orgId, ...postIds];
   for (let i = 0; i < ids.length; i += ID_CHUNK) {
@@ -240,11 +267,12 @@ async function clubKeysToKeep(
 /**
  * After a club is deleted (its posts went with it: posts_org_id_fkey CASCADE,
  * 20260929110000): remove each deleted post's own files, then sweep the
- * club's R2 folder `orgs/<orgId>/` (logo, banner, post media, stale uploads),
- * keeping the files of the club's posts that survived it (`detachedRemoved`:
- * the moderator-removed posts the database detached, trigger
- * orgs_keep_removed_posts), any logo/banner a moderator took down, and
- * anything an open report names.
+ * club's R2 folder `orgs/<orgId>/` (logo, banner, post media, event covers,
+ * stale uploads), keeping the files of the club's posts that survived it
+ * (`detachedRemoved`: the moderator-removed posts the database detached,
+ * trigger orgs_keep_removed_posts), any logo, banner or event cover a
+ * moderator took down, and anything an open report names (an event's cover
+ * included, Oct 23, 2026).
  * Best-effort and NEVER throws; a read error skips the sweep (keeps files).
  */
 export async function purgeDeletedClubMedia(

@@ -39,6 +39,7 @@ registerHooks({
 });
 
 const {
+  EVENT_SNAPSHOT_COLUMNS,
   REPORT_PRIORITY_REASON_CODES,
   REPORT_REASON_CODES,
   isPriorityReportReason,
@@ -214,4 +215,16 @@ test("the static Report sheet (public/html/_safetyActions.js) offers the same re
   const block = js.slice(js.indexOf("const REPORT_REASONS = ["), js.indexOf("];", js.indexOf("const REPORT_REASONS = [")));
   const rows = [...block.matchAll(/code:\s*"([a-z0-9_]+)",\s*label:\s*"([^"]+)"/g)].map((m) => [m[1], m[2]]);
   assert.deepEqual(rows, reportReasonOptions().map((o) => [o.code, o.label]));
+});
+
+test("an event report keeps the cover's key and the club's id as evidence (Oct 23, 2026)", () => {
+  // The club-deletion sweep (delete-media-store.ts clubKeysToKeep) keeps the
+  // keys an open event report's snapshot names, and finds those reports by
+  // the snapshot's org_id once the club's events are gone.
+  const columns = EVENT_SNAPSHOT_COLUMNS.split(",");
+  for (const c of ["id", "title", "description", "creator_id", "org_id", "starts_at", "cover_key"]) {
+    assert.ok(columns.includes(c), c);
+  }
+  assert.equal(new Set(columns).size, columns.length, "no column twice");
+  assert.ok(columns.every((c) => /^[a-z_]+$/.test(c)), "plain column names only");
 });

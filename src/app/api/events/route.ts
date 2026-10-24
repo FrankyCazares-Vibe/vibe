@@ -1,9 +1,12 @@
 import { NextResponse } from "next/server";
 
+import { checkRemovedPicture } from "@/app/api/admin/images/_lib/removed-picture-store";
+import { REMOVED_PICTURE_MESSAGE } from "@/app/api/admin/images/_lib/removed-picture";
 import { resolveCampusRequest, scopeViewerFromRow } from "@/lib/iu/campus-request";
 import { scopeCampusIds } from "@/lib/iu/campus-scope";
 import { ALL_CAMPUSES, isSchoolSystem, legacyLabel, type SchoolSystem } from "@/lib/iu/campuses";
 import { campusScopeError, homeCampusIdFor } from "@/lib/iu/community-scope";
+import { eventCoverProxyUrl } from "@/lib/events/event-cover-url";
 import { parseCheckinStateRows, type CheckinStateRow } from "@/lib/events/event-checkin";
 import {
   EVENT_ROW_COLUMNS,
@@ -564,7 +567,20 @@ export async function POST(req: Request) {
   //  - Its icon (Oct 23, 2026): `icon` one of the twelve keys of
   //    event-icons.ts, or null / left out for none (the calendar); anything
   //    else is 400 invalid_icon. An enum, never word-filtered.
-  const checked = checkEventFields(readEventFields(body), Date.now());
+  //  - Its cover photo (Oct 23, 2026, event covers): `cover_key` the key
+  //    upload-url (kind "event-cover") signed for THIS club, or null / left
+  //    out for none; anything else is 400 invalid_cover. The club is the
+  //    body's `org_id` (checked properly below; a malformed one has no
+  //    folder, so any cover is refused), lower-cased as the database
+  //    prints it (its events_check_cover_key compares that text). Whether
+  //    moderators took the picture down is asked after the officer check.
+  const rawOrgId = typeof body.org_id === "string" ? body.org_id.trim() : "";
+  const checked = checkEventFields(
+    readEventFields(body),
+    Date.now(),
+    undefined,
+    isUuid(rawOrgId) ? rawOrgId.toLowerCase() : null,
+  );
   if (!checked.ok) {
     const p = checked.problem;
     return p.kind === "content_blocked"
@@ -576,7 +592,6 @@ export async function POST(req: Request) {
   // Events must be posted on behalf of a verified org. Verified status
   // is platform-admin-controlled (see /admin) so this gates spam without
   // demanding an approval queue per event.
-  const rawOrgId = typeof body.org_id === "string" ? body.org_id.trim() : "";
   if (!rawOrgId || !isUuid(rawOrgId)) {
     return fail(400, "org_required", "Events must be posted on behalf of a verified org");
   }
@@ -611,7 +626,18 @@ export async function POST(req: Request) {
   if (role !== "owner" && role !== "admin") {
     return fail(403, "org_role_required", "You can't post events on behalf of that org");
   }
-  const orgId: string = rawOrgId;
+  // Lower-cased as the database prints a uuid (Oct 23, 2026): the takedown
+  // log's `meta.org_id` is compared as text (removed-picture-store.ts).
+  const orgId: string = rawOrgId.toLowerCase();
+
+  // A cover moderators took down from this club can't come back on a new
+  // event (the club PATCH's rule for a logo or banner). A failed read of the
+  // log refuses: letting it through could put a removed picture back online.
+  if (fields.cover_key) {
+    const removed = await checkRemovedPicture(service, "org", orgId, [fields.cover_key]);
+    if (removed === "error") return fail(500, "request_failed", "Request failed");
+    if (removed === "removed") return fail(422, "picture_removed", REMOVED_PICTURE_MESSAGE);
+  }
 
   // SERVICE role on purpose (see the top of this handler): every check has run,
   // and creator_id is the signed-in user, never a value from the body.
@@ -627,6 +653,7 @@ export async function POST(req: Request) {
       ends_at: fields.ends_at,
       visibility: fields.visibility,
       icon: fields.icon,
+      cover_key: fields.cover_key,
     })
     .select(EVENT_ROW_COLUMNS)
     .single();
@@ -636,5 +663,11 @@ export async function POST(req: Request) {
     return fail(500, "request_failed", "Request failed");
   }
 
-  return NextResponse.json({ ok: true, event: row });
+  // The row as it was saved, except the cover's storage key, which never
+  // leaves the server (Oct 23, 2026): its address takes the key's place, last.
+  const { cover_key: coverKey, ...saved } = row as Omit<EventRow, "creator">;
+  return NextResponse.json({
+    ok: true,
+    event: { ...saved, cover_url: eventCoverProxyUrl(saved.id, coverKey) },
+  });
 }

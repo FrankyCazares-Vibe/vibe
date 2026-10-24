@@ -1,5 +1,6 @@
 import "server-only";
 import {
+  DeleteObjectCommand,
   DeleteObjectsCommand,
   GetObjectCommand,
   HeadBucketCommand,
@@ -492,6 +493,41 @@ export async function deleteR2FolderExcept(
   } while (continuationToken);
 
   return { deleted, kept };
+}
+
+/**
+ * The ONLY key shape `deleteEventCoverKey` will ever delete: one event cover
+ * directly in a club's events folder, `orgs/<uuid>/events/<file>` (Oct 23,
+ * 2026; club view wave 3, event covers, batch B1: upload-url's kind
+ * "event-cover" writes `orgs/<org_id>/events/<uuid>.<ext>`). One explicit
+ * key, never a prefix: no trailing slash, no nested path, no `..`, and a
+ * file name that can't start with a dot. The club id is the strict UUID form
+ * of ORG_FOLDER_PREFIX_RE. Case-SENSITIVE, like every guard here.
+ */
+export const EVENT_COVER_KEY_RE =
+  /^orgs\/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\/events\/[A-Za-z0-9_-][A-Za-z0-9._-]*$/;
+
+/**
+ * Delete ONE event cover (Oct 23, 2026): the old file after an officer
+ * replaced or removed it, or after its event was cancelled
+ * (/api/events/[id]). The caller decides whether the file may go (an open
+ * report on the event, a moderator's takedown, another event or a club post
+ * still using it all keep it) and that the key is in the event's own club
+ * folder; this only refuses any key that isn't `EVENT_COVER_KEY_RE`'s shape,
+ * by throwing before a request is made, so no caller can reach a banner, a
+ * logo, a post's media or a folder through it.
+ *
+ * THROWS on a refused key or a storage error (callers treat a cover delete
+ * as best-effort and log it). S3 deletes a missing key as a success, so a
+ * second call is harmless.
+ */
+export async function deleteEventCoverKey(key: string): Promise<void> {
+  if (typeof key !== "string" || !EVENT_COVER_KEY_RE.test(key) || key.includes("..")) {
+    throw new Error('deleteEventCoverKey only deletes one "orgs/<uuid>/events/<file>" key');
+  }
+  const bucket = requireEnv("R2_BUCKET_NAME");
+  const client = getR2S3Client();
+  await client.send(new DeleteObjectCommand({ Bucket: bucket, Key: key }));
 }
 
 export async function probeR2Bucket(): Promise<

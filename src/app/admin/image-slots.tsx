@@ -2,15 +2,16 @@
 
 /**
  * The photo panel: take down (or put back) a student's profile photo, cover
- * and experience / working-on logos, a club's logo and banner, or a group
- * chat's photo (S67 security wave 2, wave B, batch B1; finding #2).
+ * and experience / working-on logos, a club's logo and banner, a group
+ * chat's photo (S67 security wave 2, wave B, batch B1; finding #2), or an
+ * event's cover photo (Oct 23, 2026).
  *
  * Mounted from the Users and Clubs tabs (no reports: nothing is closed)
- * and from a report card about a person, club or chat. On a card, the panel
- * lists that card's open reports with a tick box each: the ones about an
- * intimate image, sexual content or child safety start ticked, the rest
- * start unticked, and only the ticked ones close when a photo comes down
- * (a person's other reports may be about something else entirely).
+ * and from a report card about a person, club, chat or event. On a card,
+ * the panel lists that card's open reports with a tick box each: the ones
+ * about an intimate image, sexual content or child safety start ticked, the
+ * rest start unticked, and only the ticked ones close when a photo comes
+ * down (a person's other reports may be about something else entirely).
  *
  * WHAT YOU SAW IS WHAT COMES DOWN. Each slot carries the token the server
  * made from the value it showed; Take down sends it back, and if the student
@@ -27,8 +28,8 @@
  *
  * THE CACHE NOTE IS ALWAYS ON SCREEN. A profile photo is a public file behind
  * a CDN: taking it down here does not clear every cached copy at once
- * (the cache fix is deferred). Club and chat photos are private and stop
- * loading within an hour.
+ * (the cache fix is deferred). Club, event and chat photos are private and
+ * stop loading within an hour.
  */
 
 import { useCallback, useEffect, useState } from "react";
@@ -76,7 +77,7 @@ const KIND_WORDS: Record<string, string> = {
   other: "their file, stored for something else",
   foreign: "another account's file",
   external: "hosted on another site",
-  private: "private club / chat file",
+  private: "private club, event or chat file",
 };
 
 /** One blurred picture with its own Show toggle. */

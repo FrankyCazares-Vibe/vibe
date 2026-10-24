@@ -106,6 +106,34 @@ test("clearing, empty values, junk rows and no rows are never refused", () => {
   assert.equal(firstRemovedPicture(junk, [LOGO]), null);
 });
 
+/* Event covers (Oct 23, 2026): the store joins the club's rows and its events' rows. */
+const COVER = `orgs/${ORG}/events/2d3c4b5a-6f7e-4d8c-9b0a-1f2e3d4c5b6a.jpg`;
+function eventRemoval(id: string, previous: Record<string, unknown>) {
+  return { id, action: "image_remove", meta: { slots: ["cover"], previous, paths: [], swept: [], org_id: ORG } };
+}
+
+test("a removed event cover is refused as another event's cover, the logo or club post media", () => {
+  const clubRows = [removal("r1", ["logo"], { logo: LOGO })];
+  const eventRows = [eventRemoval("e1", { cover: COVER })];
+  const rows = [...clubRows, ...eventRows];
+  assert.equal(firstRemovedPicture(rows, [COVER]), COVER, "back as an event cover");
+  assert.equal(firstRemovedPicture(rows, [undefined, COVER]), COVER, "as the banner");
+  assert.equal(firstRemovedPicture(rows, [COVER, ""]), COVER, "as club post media");
+  assert.equal(firstRemovedPicture(rows, [LOGO]), LOGO, "the club's own takedowns still count");
+  const fresh = `orgs/${ORG}/events/0f1e2d3c-4b5a-4968-8776-655443322110.jpg`;
+  assert.equal(firstRemovedPicture(rows, [fresh]), null, "a new cover upload passes");
+  assert.notEqual(firstRemovedPicture(rows, [COVER.replace("/events/", "//events/")]), null, "spelling tricks too");
+});
+
+test("an event cover the moderators put back is let through, whichever list came first", () => {
+  const back = { id: "s1", action: "image_restore", meta: { slots: ["cover"], removal_id: "e1", previous: {}, org_id: ORG } };
+  assert.equal(firstRemovedPicture([eventRemoval("e1", { cover: COVER }), back], [COVER]), null);
+  assert.equal(firstRemovedPicture([back, eventRemoval("e1", { cover: COVER })], [COVER]), null);
+  // Removed again after the put-back: refused again.
+  const again = eventRemoval("e2", { cover: COVER });
+  assert.equal(firstRemovedPicture([again, back, eventRemoval("e1", { cover: COVER })], [COVER]), COVER);
+});
+
 test("canonicalPictureRef", () => {
   assert.equal(canonicalPictureRef(null), null);
   assert.equal(canonicalPictureRef(""), null);

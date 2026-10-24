@@ -80,6 +80,7 @@ test("create: a normal event passes, trimmed, with ISO times", () => {
     ends_at: iso(NOW + DAY + 2 * HOUR),
     visibility: "everyone",
     icon: null,
+    cover_key: null,
   });
 });
 
@@ -138,6 +139,7 @@ test("edit: a field left out keeps its stored value; one sent replaces it", () =
     endsAt: stored.ends_at,
     visibility: "everyone",
     icon: null,
+    coverKey: null,
   });
   // Sent but not a string: "" (so `null` clears a description, as POST reads it).
   assert.equal(readEventFields({ description: null }, stored).description, "");
@@ -291,4 +293,106 @@ test("icon on an edit: left out keeps the stored key (junk stored reads none); s
   }
   const junk = checkEventFields(readEventFields({ icon: "secret" }, withIcon), NOW, withIcon);
   assert.deepEqual(problemOf(junk), INVALID_ICON);
+});
+
+// ── Its cover photo (Oct 23, 2026, event covers, batch B1) ──────────────────
+
+const ORG = "dddddddd-0000-4000-8000-000000000001";
+const OTHER_ORG = "eeeeeeee-0000-4000-8000-000000000002";
+const COVER = `orgs/${ORG}/events/3f0e7c1a-1b2c-4d5e-8f90-a1b2c3d4e5f6.jpg`;
+const NEW_COVER = `orgs/${ORG}/events/9a8b7c6d-1b2c-4d5e-8f90-a1b2c3d4e5f6.webp`;
+const INVALID_COVER = {
+  kind: "invalid", status: 400, code: "invalid_cover", error: "That cover photo can't be used. Add it again, or remove it.",
+};
+
+test("cover: left out of a create or sent null is none; this club's cover passes (trimmed)", () => {
+  const check = (patch: Record<string, unknown>) =>
+    checkEventFields(readEventFields({ ...good, ...patch }), NOW, undefined, ORG);
+  for (const patch of [{}, { cover_key: null }]) {
+    const r = check(patch);
+    assert.ok(r.ok, JSON.stringify(patch));
+    assert.equal(r.value.cover_key, null);
+  }
+  for (const value of [COVER, ` ${NEW_COVER} `]) {
+    const r = check({ cover_key: value });
+    assert.ok(r.ok, value);
+    assert.equal(r.value.cover_key, value.trim());
+  }
+});
+
+test("cover: anything but a cover of THIS club's events is 400 invalid_cover", () => {
+  const check = (patch: Record<string, unknown>, orgId: string | null | undefined = ORG) =>
+    problemOf(checkEventFields(readEventFields({ ...good, ...patch }), NOW, undefined, orgId));
+  for (const value of [
+    `orgs/${OTHER_ORG}/events/3f0e7c1a-1b2c-4d5e-8f90-a1b2c3d4e5f6.jpg`,
+    `orgs/${ORG}/banner/3f0e7c1a-1b2c-4d5e-8f90-a1b2c3d4e5f6.jpg`,
+    `orgs/${ORG}/events/3f0e7c1a-1b2c-4d5e-8f90-a1b2c3d4e5f6.gif`,
+    `orgs/${ORG}/events/../x.jpg`,
+    "https://example.com/a.jpg",
+    "",
+    "   ",
+    5,
+    true,
+    [COVER],
+    { key: COVER },
+  ]) {
+    assert.deepEqual(check({ cover_key: value }), INVALID_COVER, JSON.stringify(value));
+  }
+  // No club (a create whose org_id is missing or malformed): no folder, so no cover.
+  assert.deepEqual(check({ cover_key: COVER }, null), INVALID_COVER);
+  assert.deepEqual(problemOf(checkEventFields(readEventFields({ ...good, cover_key: COVER }), NOW)), INVALID_COVER);
+  // ...and no cover asks nothing of the club.
+  assert.equal(check({}, null), null);
+});
+
+test("cover is checked last and never word-filtered: an older refusal still wins", () => {
+  const check = (patch: Record<string, unknown>) =>
+    problemOf(checkEventFields(readEventFields({ ...good, ...patch }), NOW, undefined, ORG));
+  assert.equal((check({ title: "", cover_key: "nope" }) as { code: string }).code, "title_required");
+  assert.equal((check({ icon: "nope", cover_key: "nope" }) as { code: string }).code, "invalid_icon");
+  assert.equal((check({ visibility: "x", cover_key: "nope" }) as { code: string }).code, "invalid_visibility");
+  assert.deepEqual(check({ cover_key: BLOCKED }), INVALID_COVER, "a key, not text");
+});
+
+test("cover on an edit: left out keeps the stored key; sent replaces it; null takes it off", () => {
+  const withCover = { ...stored, cover_key: COVER };
+  const kept = checkEventFields(readEventFields({ location: "Union 305" }, withCover), NOW, withCover, ORG);
+  assert.ok(kept.ok);
+  assert.equal(kept.value.cover_key, COVER);
+  const swapped = checkEventFields(readEventFields({ cover_key: NEW_COVER }, withCover), NOW, withCover, ORG);
+  assert.ok(swapped.ok);
+  assert.equal(swapped.value.cover_key, NEW_COVER);
+  const off = checkEventFields(readEventFields({ cover_key: null }, withCover), NOW, withCover, ORG);
+  assert.ok(off.ok);
+  assert.equal(off.value.cover_key, null);
+  for (const legacy of [stored, { ...stored, cover_key: null }, { ...stored, cover_key: "" }]) {
+    const r = checkEventFields(readEventFields({}, legacy), NOW, legacy, ORG);
+    assert.ok(r.ok);
+    assert.equal(r.value.cover_key, null);
+  }
+  const junk = checkEventFields(readEventFields({ cover_key: "secret" }, withCover), NOW, withCover, ORG);
+  assert.deepEqual(problemOf(junk), INVALID_COVER);
+});
+
+test("cover on an edit: the stored key sent back unchanged isn't checked again; a new one is", () => {
+  // A stored key the rule wouldn't take today (say, written before it) still saves an edit.
+  const odd = `orgs/${ORG}/events/legacy-name.jpg`;
+  const legacy = { ...stored, cover_key: odd };
+  for (const body of [{ location: "Union 305" }, { location: "Union 305", cover_key: odd }]) {
+    const r = checkEventFields(readEventFields(body, legacy), NOW, legacy, ORG);
+    assert.ok(r.ok, JSON.stringify(body));
+    assert.equal(r.value.cover_key, odd);
+  }
+  // Another club's key is refused even on an event that has a cover.
+  const foreign = `orgs/${OTHER_ORG}/events/3f0e7c1a-1b2c-4d5e-8f90-a1b2c3d4e5f6.jpg`;
+  const r = checkEventFields(readEventFields({ cover_key: foreign }, legacy), NOW, legacy, ORG);
+  assert.deepEqual(problemOf(r), INVALID_COVER);
+});
+
+test("storedCoverKey: only a non-empty string is a key", async () => {
+  const { storedCoverKey } = await import("./validate");
+  assert.deepEqual(
+    [COVER, "", null, undefined, 5, {}].map((v) => storedCoverKey(v)),
+    [COVER, null, null, null, null, null],
+  );
 });

@@ -29,11 +29,16 @@ import { isUuid } from "@/lib/pgrest";
 type Service = SupabaseClient;
 export type TargetRow = Record<string, unknown> & { id: string };
 
-/** Only the columns a photo lives in, plus what the guards need. No emails. */
+/**
+ * Only the columns a photo lives in, plus what the guards need. No emails.
+ * An event (Oct 23, 2026): its cover key, its club (the log row's
+ * `meta.org_id`, see imageLogScope) and its title for the panel.
+ */
 const SELECT: Record<ImageTargetType, string> = {
   user: "id, handle, is_platform_admin, avatar_url, banner_url, work_experience, current_on",
   org: "id, handle, name, logo_url, banner_url",
   channel: "id, type, name, photo_url",
+  event: "id, org_id, title, cover_key",
 };
 
 export type Parsed = { type: ImageTargetType; id: string; slot: ImageSlot };
@@ -45,7 +50,7 @@ export function parseTarget(
   rawSlot: unknown,
 ): { ok: true; value: Parsed } | { ok: false; response: Response } {
   if (!isImageTargetType(rawType)) {
-    return { ok: false, response: adminFail(400, "invalid_body", "targetType must be user, org or channel") };
+    return { ok: false, response: adminFail(400, "invalid_body", "targetType must be user, org, channel or event") };
   }
   if (!isUuid(rawId)) return { ok: false, response: adminFail(400, "invalid_body", "targetId must be a uuid") };
   if (!isImageSlot(rawType, rawSlot)) {
@@ -74,8 +79,13 @@ export function userGuard(type: ImageTargetType, id: string, adminId: string, ro
   return null;
 }
 
-/** A chat has a photo slot only when it is a group chat or already carries one. */
+/**
+ * A chat has a photo slot only when it is a group chat or already carries one.
+ * An event has a cover slot only when it is a club's event (covers live in the
+ * club's folder) or already carries one (Oct 23, 2026).
+ */
 export function hasSlot(type: ImageTargetType, slot: ImageSlot, row: TargetRow): boolean {
+  if (type === "event") return slot === "cover" && (text(row.org_id) !== null || text(row.cover_key) !== null);
   if (type !== "channel") return true;
   return slot === "photo" && (row.type === "group" || text(row.photo_url) !== null);
 }

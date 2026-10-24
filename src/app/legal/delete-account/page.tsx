@@ -234,8 +234,9 @@ export default function DeleteAccountPage() {
       </LegalUL>
       <LegalP>
         A club you owned stays, with no owner. Your posts and your role in it
-        are deleted. The photos and videos of posts you made as the club stay
-        until the club is deleted (Privacy Policy, section 8).
+        are deleted. The photos and videos of posts you made as the club, and
+        the cover photos of its events you made, stay until the club is
+        deleted (Privacy Policy, section 8).
       </LegalP>
       <LegalP>
         If you have Vibe+, it is cancelled first, with no refund, before

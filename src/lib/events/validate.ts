@@ -32,11 +32,25 @@
  * `visibility`: no word filter, no length cap. Left out of a create it is
  * null; left out of an edit it keeps the stored value; a sent null takes it
  * off. Anything else (a name, a cased or unknown key, "", a number) is a
- * 400 `invalid_icon`, checked after `visibility`, last of all. The
- * database's events_icon_check holds the same twelve (20261027100000).
+ * 400 `invalid_icon`, checked after `visibility`. The database's
+ * events_icon_check holds the same twelve (20261027100000).
+ *
+ * ITS COVER PHOTO (Oct 23, 2026, event covers, batch B1: handoffs/
+ * 2026-10-23-club-view-wave-3/COVERS-PLAN.md): `cover_key` is the storage
+ * key upload-url handed back (kind "event-cover"), or null for none. Left
+ * out of a create it is null; left out of an edit it keeps the stored key; a
+ * sent null takes it off. A key that is not a cover uploaded for THIS club's
+ * events (`isEventCoverKey`: `orgs/<org_id>/events/<uuid>.<ext>`), or any
+ * other value ("", a URL, a number), is a 400 `invalid_cover`, checked
+ * after `icon`, last of all. An edit that sends the stored key back unchanged
+ * isn't checked again (the word filter's rule). Whether moderators took the
+ * picture down is the routes' question (checkRemovedPicture reads the
+ * moderation log, which this pure file can't); the database's
+ * events_check_cover_key holds the folder rule too (20261028100000).
  */
 
 import { checkChangedText } from "../moderation/text-filter";
+import { isEventCoverKey } from "./event-cover-url";
 import { eventIconOf, isEventIcon, type EventIconKey } from "./event-icons";
 import {
   EVENT_MAX_DESCRIPTION,
@@ -75,7 +89,14 @@ export type StoredEventFields = {
   visibility?: string | null;
   /** Optional for the same reason (Oct 23, 2026); read by `eventIconOf` (junk = none). */
   icon?: string | null;
+  /** Optional for the same reason (Oct 23, 2026, event covers); read by `storedCoverKey`. */
+  cover_key?: string | null;
 };
+
+/** A stored `cover_key` as a key or null: anything but a non-empty string reads as none. */
+export function storedCoverKey(value: unknown): string | null {
+  return typeof value === "string" && value !== "" ? value : null;
+}
 
 /** Trimmed request values; times are still the raw strings. */
 export type EventFields = {
@@ -88,6 +109,8 @@ export type EventFields = {
   visibility: string;
   /** null = none (sent null, or left out with none stored); else as `visibility` reads: trimmed, "" refused. */
   icon: string | null;
+  /** The cover's storage key, read as `icon` is: null = none, else trimmed ("" and junk refused). */
+  coverKey: string | null;
 };
 
 /** What the database row gets. Times are ISO strings in UTC. */
@@ -99,6 +122,8 @@ export type ValidEventFields = {
   ends_at: string;
   visibility: EventVisibility;
   icon: EventIconKey | null;
+  /** Oct 23, 2026: a cover of this club's events (`isEventCoverKey`), or null. */
+  cover_key: string | null;
 };
 
 export type EventFieldsProblem =
@@ -110,11 +135,12 @@ function asTrimmed(value: unknown): string {
 }
 
 /**
- * Reads the seven fields from a parsed JSON object. For an edit, a field the
+ * Reads the eight fields from a parsed JSON object. For an edit, a field the
  * body leaves out keeps its stored value; a field that is present but isn't a
  * string reads as "" (as POST always has), so `{"title": 5}` is "Title is
- * required", not a silent no-op. One exception (Oct 23, 2026): a sent
- * `"icon": null` is "no icon", the way to take one off.
+ * required", not a silent no-op. Two exceptions (Oct 23, 2026): a sent
+ * `"icon": null` is "no icon" and a sent `"cover_key": null` is "no cover
+ * photo", the ways to take one off.
  */
 export function readEventFields(
   body: Record<string, unknown>,
@@ -142,19 +168,31 @@ export function readEventFields(
         : body.icon === null
           ? null
           : asTrimmed(body.icon),
+    coverKey:
+      body.cover_key === undefined
+        ? stored
+          ? storedCoverKey(stored.cover_key)
+          : null
+        : body.cover_key === null
+          ? null
+          : asTrimmed(body.cover_key),
   };
 }
 
 /**
  * The whole check, in POST's order: title required, the three length caps
  * (the database CHECKs' numbers, see manage.ts), the word filter (title,
- * description, location), the times, who can see it (Oct 22, 2026), then
- * its icon (Oct 23, 2026). `stored` present = an edit.
+ * description, location), the times, who can see it (Oct 22, 2026), its
+ * icon, then its cover photo (Oct 23, 2026). `stored` present = an edit.
+ * `orgId` is the event's club (POST: the body's `org_id`; PATCH: the stored
+ * event's): a cover must sit in that club's events folder, so left out (or
+ * null) every new cover key is refused.
  */
 export function checkEventFields(
   fields: EventFields,
   nowMs: number,
   stored?: StoredEventFields,
+  orgId?: string | null,
 ): { ok: true; value: ValidEventFields } | { ok: false; problem: EventFieldsProblem } {
   const invalid = (code: string, error: string) =>
     ({ ok: false, problem: { kind: "invalid", status: 400, code, error } }) as const;
@@ -198,6 +236,13 @@ export function checkEventFields(
   if (icon === undefined) {
     return invalid("invalid_icon", "Choose one of the event icons, or none");
   }
+  // Then the cover, last of all (Oct 23, 2026). A key sent back as it is
+  // stored is kept without a second look, like unchanged text.
+  const coverKey = fields.coverKey;
+  const keptCover = !!stored && coverKey !== null && coverKey === storedCoverKey(stored.cover_key);
+  if (coverKey !== null && !keptCover && !isEventCoverKey(coverKey, orgId)) {
+    return invalid("invalid_cover", "That cover photo can't be used. Add it again, or remove it.");
+  }
 
   return {
     ok: true,
@@ -209,6 +254,7 @@ export function checkEventFields(
       ends_at: new Date(end).toISOString(),
       visibility,
       icon,
+      cover_key: coverKey,
     },
   };
 }

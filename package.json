@@ -8,7 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
-    "test": "node --test $(git ls-files -co --exclude-standard 'src/**/*.test.ts')"
+    "test": "set -f; node --test $(git ls-files -co --exclude-standard 'src/**/*.test.ts' | sed 's/\\[/[[]/g')"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1040.0",

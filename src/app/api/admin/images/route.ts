@@ -27,17 +27,19 @@ const PREVIEW_SEC = 120;
 type Service = ReturnType<typeof createSupabaseServiceClient>;
 
 /**
- * GET /api/admin/images?type=user|org|channel&id=<uuid>
+ * GET /api/admin/images?type=user|org|channel|event&id=<uuid>
  *
- * The photo slots of one account, club or group chat, for the moderator's
- * panel: what is up now (with a way to look at it) and whether the newest
- * action on each slot is a removal (so the panel offers Restore).
+ * The photo slots of one account, club, group chat or event, for the
+ * moderator's panel: what is up now (with a way to look at it) and whether
+ * the newest action on each slot is a removal (so the panel offers Restore).
  *
  * Reads only the photo columns (users: avatar, cover, the two logo JSON
- * lists; orgs: logo, banner; channels: type, photo), with the service role.
+ * lists; orgs: logo, banner; channels: type, photo; events since Oct 23,
+ * 2026: club, title, cover), with the service role.
  * No emails, no other profile fields. Previews: a public `profiles` file is
- * its own address; a private club/chat key gets a 2-minute signed link; a
- * removed file gets a 2-minute signed link out of `quarantine`. An outside
+ * its own address; a private club/chat/event key gets a 2-minute signed
+ * link; a removed file gets a 2-minute signed link out of `quarantine`, and
+ * a removed club, chat or event key one from R2 (it stays there). An outside
  * address is never loaded by the panel (it would tell that site the
  * moderator's IP); it comes back as a link to open on purpose.
  *
@@ -55,7 +57,7 @@ export async function GET(req: Request) {
   const url = new URL(req.url);
   const type = url.searchParams.get("type");
   const id = url.searchParams.get("id");
-  if (!isImageTargetType(type)) return adminFail(400, "invalid_query", "type must be user, org or channel");
+  if (!isImageTargetType(type)) return adminFail(400, "invalid_query", "type must be user, org, channel or event");
   if (!isUuid(id)) return adminFail(400, "invalid_query", "id must be a uuid");
 
   const rl = await rateLimit(`admin-images:${gate.userId}`, ADMIN_READ_LIMIT);
@@ -128,6 +130,7 @@ export async function GET(req: Request) {
 
 function nameOf(type: ImageTargetType, row: Record<string, unknown>): string | null {
   if (type === "channel") return text(row.name);
+  if (type === "event") return text(row.title);
   const handle = text(row.handle);
   return handle ? `@${handle}` : null;
 }

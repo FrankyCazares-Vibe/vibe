@@ -13,7 +13,9 @@
  * role) and refuse a value one of them names.
  *
  *  - Any slot of the same target counts: a removed logo sent back as the
- *    banner is the same picture.
+ *    banner is the same picture. For a club that includes its events'
+ *    covers (slot `cover`, Oct 23, 2026): removed-picture-store.ts hands in
+ *    the club's own rows and its events' rows together.
  *  - A removal the moderators later PUT BACK (an image_restore row whose
  *    meta.removal_id is that removal and whose meta.slots holds the slot)
  *    no longer counts for that slot: they decided the picture is fine.
