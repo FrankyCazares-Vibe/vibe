@@ -94,7 +94,7 @@ There is no CI in the repo. Run the three checks before you push.
 | `public/html/` | Three hand-written static pages (`profile.html`, `messages.html`, `onboarding.html`) and their scripts. Part of the desktop app, not leftovers |
 | `public/sw.js`, `public/offline.html` | The service worker and its offline page |
 | `supabase/migrations/` | Every database change, one SQL file each, in timestamp order |
-| `supabase/config.toml`, `supabase/seed.sql`, `supabase/templates/` | Local stack settings, the local-only seed, the sign-up email template |
+| `supabase/config.toml`, `supabase/seed.sql`, `supabase/templates/` | Local stack settings, the local-only seed, Supabase's email templates (the sign-up code, and the reset, magic-link and change-email notices, which carry no link and no code on purpose) |
 | `scripts/` | One-off and maintenance scripts. See `scripts/README.md` |
 | `mobile/` | The App Store and Google Play shell (Capacitor). Own `package.json`; excluded from the root lint, typecheck and Vercel build |
 | `handoffs/` | Session notes, plans and contracts. Code comments cite these files by path. The newest file is the current state |
