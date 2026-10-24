@@ -9,7 +9,9 @@ This is the merged plan: the director's pick (`director-recommendation.md`) with
 **Status (Sat Oct 24): APPROVED.** Franky took all nine recommendations ("Go with all nine onboarding
 recommendations ... and start Deploy A in a new session"). **Deploy A SHIPPED Sat Oct 24 (main 3653178, merge d676ed5;
 `deploy-a-shipped.md` in this folder)**, plus a one-word fix that makes the tour spotlight actually cut its hole.
-Franky re-runs his live sign-up test on it. Deploy B follows on Mon Oct 26 with an off switch, or moves to week 1.
+Franky re-runs his live sign-up test on it. **Deploy B ("first light") SHIPPED the same evening (main eb5006a,
+a0b83e5; phone tour fixes 16be4ba; `first-light-shipped.md`) in Franky's new order: Otto alone, then the feed,
+then the left (Your clubs), then the right (Tonight)**, with the off switch `FIRST_LIGHT=off`.
 
 ## What's wrong today (short)
 - **Everything shows at once.** A newcomer's computer Campus page has the feed, Tonight, Your clubs, My Calendar,
