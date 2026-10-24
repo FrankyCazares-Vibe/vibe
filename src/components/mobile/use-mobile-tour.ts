@@ -3,7 +3,14 @@
 import { useEffect } from "react";
 
 import { campusRowById } from "@/lib/iu/campuses";
-import { phoneCampusTourSteps, tourStartDecision, type CampusTourStep } from "@/lib/tour/campus-tour-steps";
+import {
+  PHONE_TONIGHT_TARGET,
+  phoneCampusTourSteps,
+  targetHasSize,
+  tourStartDecision,
+  type CampusTourStep,
+} from "@/lib/tour/campus-tour-steps";
+import { light, lightAll, lightAllUnlessRunning, lightAllUnlessTourRunning } from "@/lib/tour/first-light";
 
 /**
  * Hook that runs the Otto spotlight tour on mobile surfaces.
@@ -44,6 +51,7 @@ declare global {
           body: string;
           endLabel?: string;
           nextLabel?: string;
+          onShow?: () => void;
         }>,
         options?: {
           onDone?: () => void;
@@ -226,16 +234,27 @@ export function useMobileTour(leg: Leg) {
       welcome = false;
     }
     const decision = tourStartDecision({ leg, pending, seen, welcome });
+    // First light (src/lib/tour/first-light.ts) holds the campus feed for the
+    // tour; whenever this visit won't run it, everything comes in now.
+    const campus = leg === "campus";
     if (decision === "strip") {
       stripWelcomeParam();
+      if (campus) lightAllUnlessTourRunning();
       return;
     }
-    if (decision !== "start") return;
+    if (decision !== "start") {
+      if (campus) lightAllUnlessTourRunning();
+      return;
+    }
 
     // If a tour is already running (e.g., the desktop effect briefly
     // mounted before the viewport-switch swapped to the mobile tree),
     // bail rather than stacking two engines.
     if (window.OttoTour?.isRunning?.()) return;
+    // ... and if this one isn't running within the ceiling, the page comes in anyway.
+    const cancelCeiling = campus
+      ? lightAllUnlessRunning(() => window.OttoTour?.isRunning?.() === true)
+      : () => {};
 
     const MAX_POLL_MS = 8000;
     const POLL_INTERVAL_MS = 250;
@@ -247,24 +266,27 @@ export function useMobileTour(leg: Leg) {
         if (cancelled) return;
         // Campus leg: resolve the campus name (≤1.5 s) before starting, so
         // the feed bubble can say where the posts come from.
-        const steps =
-          leg === "campus"
-            ? campusTourSteps(await loadCampusShortName(aborter.signal))
-            : STEPS_BY_LEG[leg];
+        const campusName = campus ? await loadCampusShortName(aborter.signal) : null;
         if (cancelled) return;
+        // The campus leg waits for every target it needs (its first, the Otto
+        // tab, is in the tab bar on every page, before Campus has drawn its
+        // own); the Tonight card is only there when something is on, so its
+        // step is kept or dropped when the tour starts. Other legs wait for
+        // their first target, as before.
+        const required = campus
+          ? campusTourSteps(null).filter((s) => s.selector !== PHONE_TONIGHT_TARGET)
+          : STEPS_BY_LEG[leg].slice(0, 1);
         // Wait for the first target to render. ProfileMobile / CampusMobile
         // do their own data fetches and mount the anchored elements only
         // after data arrives, so we poll until the target exists or we
         // hit a max so we don't spin forever on a busted route.
         const start = () => {
           if (cancelled || !window.OttoTour) return;
-          // The campus leg waits for every target, not just the first: its
-          // first, the Otto tab, is in the tab bar on every page, before
-          // Campus has drawn its own. The other legs keep the old rule.
-          const waitFor = leg === "campus" ? steps : steps.slice(0, 1);
-          if (waitFor.some((s) => !document.querySelector(s.selector))) {
+          if (required.some((s) => !document.querySelector(s.selector))) {
             if (Date.now() - startedAt > MAX_POLL_MS) {
-              // Restore the flag so a refresh / next visit can retry.
+              // Restore the flag so a refresh / next visit can retry; the
+              // page comes in now rather than wait for a tour that won't run.
+              if (campus) lightAll();
               return;
             }
             setTimeout(start, POLL_INTERVAL_MS);
@@ -283,6 +305,7 @@ export function useMobileTour(leg: Leg) {
             }
           }
           stripWelcomeParam();
+          const steps = campus ? campusTourSteps(campusName, targetHasSize, light) : STEPS_BY_LEG[leg];
           window.OttoTour.start(steps, {
             onDone: () => handleDone(leg, "done"),
             onSkip: () => handleDone(leg, "skip"),
@@ -292,11 +315,13 @@ export function useMobileTour(leg: Leg) {
       })
       .catch(() => {
         /* network error — silent fail; user can try again from Settings */
+        if (campus) lightAll();
       });
 
     return () => {
       cancelled = true;
       aborter.abort();
+      cancelCeiling();
     };
   }, [leg]);
 }
@@ -316,6 +341,8 @@ function stripWelcomeParam() {
 }
 
 function handleDone(leg: Leg, reason: "done" | "skip") {
+  // Whatever first light still holds (a Tonight card that came late) comes in.
+  if (leg === "campus") lightAll();
   try {
     localStorage.setItem(SEEN_KEYS[leg], "1");
   } catch {

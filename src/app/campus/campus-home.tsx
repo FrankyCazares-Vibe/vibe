@@ -10,6 +10,7 @@ import {
   useContext,
   useEffect,
   useId,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -216,6 +217,13 @@ import {
   tourStartDecision,
   waitUntil,
 } from "@/lib/tour/campus-tour-steps";
+import {
+  holdOnClientArrival,
+  light,
+  lightAll,
+  lightAllUnlessRunning,
+  lightAllUnlessTourRunning,
+} from "@/lib/tour/first-light";
 import { useIsMobile } from "@/lib/use-is-mobile";
 import { campusStatsLine, type CampusStats } from "@/lib/usage/active-now";
 import { countOpen, touchActivity } from "@/lib/usage/touch-client";
@@ -230,6 +238,7 @@ declare global {
           body: string;
           endLabel?: string;
           nextLabel?: string;
+          onShow?: () => void;
         }>,
         options?: {
           onDone?: () => void;
@@ -660,6 +669,10 @@ export function CampusHome({
     return undefined;
   }, [tab]);
 
+  // First light for an arrival inside the app (no page load, so the boot
+  // script didn't run): held before the paint, by the same rule.
+  useLayoutEffect(holdOnClientArrival, []);
+
   // Campus tour (first run, Oct 24 2026: handoffs/2026-10-23-onboarding-
   // review/PLAN.md beats 9-12). Otto, the feed, Tonight on the right, Your
   // clubs on the left; the last button, "Show me clubs", opens the Orgs tab.
@@ -677,7 +690,9 @@ export function CampusHome({
     // briefly during the SSR → mobile-viewport swap), the desktop
     // selectors don't exist.
     if (typeof window !== "undefined" && window.matchMedia("(max-width: 899px)").matches) {
-      return;
+      // The phone tree runs the tour; until it mounts, a held page still gets
+      // its ceiling (the boot script's last resort covers a stalled swap).
+      return lightAllUnlessRunning(() => window.OttoTour?.isRunning?.() === true);
     }
     const seenKey = "vibe_campus_tour_seen_v1";
     let pending: string | null = null;
@@ -692,12 +707,21 @@ export function CampusHome({
       seen,
       welcome: searchParams.get("welcome") === "1",
     });
+    // First light (src/lib/tour/first-light.ts): the page arrived holding the
+    // feed and both sides for the tour. Whenever this visit won't run it,
+    // everything comes in now; if the tour isn't running within the ceiling,
+    // everything comes in anyway.
     if (decision === "strip") {
       stripWelcomeParam();
+      lightAllUnlessTourRunning();
       return;
     }
-    if (decision !== "start") return;
+    if (decision !== "start") {
+      lightAllUnlessTourRunning();
+      return;
+    }
     let cancelled = false;
+    const cancelCeiling = lightAllUnlessRunning(() => window.OttoTour?.isRunning?.() === true);
     // The feed bubble names the viewer's campus: wait for it (the banner
     // shares this cached request) but never longer than 1.5 s. A club-link
     // guest's folded clubs strip (1100-1399px) draws only once their clubs
@@ -711,10 +735,16 @@ export function CampusHome({
       ]),
       waitUntil(() => !document.querySelector(CLUBS_LOADING_SELECTOR), 1500),
     ]).then(([, viewer]) => {
-      if (cancelled || !window.OttoTour) return;
-      // From the fixed campus table (never the URL or a server string).
-      const steps = campusTourSteps(viewer?.campus?.shortName ?? null, targetHasSize);
+      if (cancelled) return;
+      if (!window.OttoTour) {
+        lightAll();
+        return;
+      }
+      // From the fixed campus table (never the URL or a server string). Each
+      // step brings its part of the page in as its bubble opens.
+      const steps = campusTourSteps(viewer?.campus?.shortName ?? null, targetHasSize, light);
       if (!steps.length) {
+        lightAll();
         // Nothing to point at: drop the flag rather than hold this visit's
         // cards (the email offer waits on it) for a tour that can't run.
         try {
@@ -726,6 +756,8 @@ export function CampusHome({
       // The tour ends where it is: seen, nothing pending, no redirect; Done
       // on "Show me clubs" opens the Orgs tab.
       const finish = (openClubs: boolean) => {
+        // Whatever is still held (Skip part-way, a strip that came late) comes in.
+        lightAll();
         // The flag first, on its own: if marking it seen fails (storage
         // full), a flag left behind would start the tour again at once.
         try {
@@ -743,11 +775,19 @@ export function CampusHome({
       });
     }).catch(() => {
       /* the tour script didn't load; the page works without it */
+      lightAll();
     });
     return () => {
       cancelled = true;
+      cancelCeiling();
     };
   }, [searchParams]);
+
+  // First light holds only the Feed tab's parts: leaving the Feed (before
+  // the tour starts, or by "Show me clubs") brings everything in.
+  useEffect(() => {
+    if (tab !== "feed") lightAll();
+  }, [tab]);
 
   // Load joined orgs on mount, and again on Retry after a failed load.
   useEffect(() => {

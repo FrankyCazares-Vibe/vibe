@@ -61,3 +61,14 @@ test("the computer onboarding's fold curve is SPRING_SOFT over 480ms", async () 
   assert.match(page, /animation: pf-more-in 480ms var\(--onb-spring-soft\)/);
   assert.ok(Math.abs(springProgress(SPRING_SOFT, 0.48) - 1) < 0.005);
 });
+
+test("first light's burst curves are SPRING_POP over 600ms and SPRING_SOFT over 480ms", async () => {
+  const { SPRING_POP, SPRING_SOFT } = await import("./springs");
+  const css = readFileSync(new URL("../../app/globals.css", import.meta.url), "utf8");
+  assert.equal(css.match(/--vibe-spring-pop:\s*(linear\([^;]*\));/)?.[1] ?? null, springLinear(SPRING_POP, 600));
+  assert.equal(css.match(/--vibe-spring-soft:\s*(linear\([^;]*\));/)?.[1] ?? null, springLinear(SPRING_SOFT, 480));
+  assert.match(css, /first-light-pop 600ms var\(--vibe-spring-pop\)/);
+  assert.match(css, /first-light-fade 480ms var\(--vibe-spring-soft\)/);
+  // POP has settled by 600ms (one overshoot, then still).
+  assert.ok(Math.abs(springProgress(SPRING_POP, 0.6) - 1) < 0.005);
+});

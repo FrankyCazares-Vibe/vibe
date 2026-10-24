@@ -19,6 +19,7 @@ declare global {
           body: string;
           endLabel?: string;
           nextLabel?: string;
+          onShow?: () => void;
         }>,
         options?: {
           onDone?: () => void;

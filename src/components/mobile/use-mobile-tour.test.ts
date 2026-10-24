@@ -74,26 +74,16 @@ test("none: no flag and no welcome, or welcome on another leg", () => {
 // First run, Oct 24 2026 (PLAN.md beat 14): the Otto tab, the feed, then the
 // tabs. No dead Chat tab, no post ask. The words are pinned in full by
 // src/lib/tour/campus-tour-steps.test.ts.
-test("campus bubbles: the Otto tab, the feed with the campus name, then the tabs", () => {
+test("campus bubbles: the Otto tab, the feed with the campus name, Tonight, then the tabs", () => {
   const steps = campusTourSteps("Indianapolis");
-  assert.deepEqual(steps, [
-    {
-      selector: "#otto-mobile-tour-network-otto",
-      title: 'Hi again. I\'m <span class="accent">Otto</span>.',
-      body: "That's me down here, the otto tab: what's coming up and what's new for you. Messages is right next door.",
-    },
-    {
-      selector: "#otto-mobile-tour-feed",
-      title: 'This is Indianapolis, <span class="accent">live</span>.',
-      body: "What students and clubs here are posting. Clubs and people you follow come first.",
-    },
-    {
-      selector: "#otto-mobile-tour-tabs",
-      title: 'Clubs and events, <span class="accent">one swipe over</span>.',
-      body: "Feed, Events, Orgs and Map. Orgs has every club on campus.",
-      endLabel: "Got it",
-    },
-  ]);
+  assert.deepEqual(
+    steps.map((s) => s.selector),
+    ["#otto-mobile-tour-network-otto", "#otto-mobile-tour-feed", "#otto-mobile-tour-feed .tonight-card", "#otto-mobile-tour-tabs"],
+  );
+  assert.equal(steps[0]?.title, 'Hi again. I\'m <span class="accent">Otto</span>.');
+  assert.equal(steps[1]?.title, 'This is Indianapolis, <span class="accent">live</span>.');
+  assert.equal(steps[1]?.body, "What students and clubs here are posting. Clubs and people you follow come first.");
+  assert.equal(steps[3]?.endLabel, "Got it");
   for (const s of steps) assert.doesNotMatch(`${s.title} ${s.body}`, /Chat|Tap \+|post text/);
 });
 

@@ -2456,6 +2456,59 @@ body.vibe-hide-otto #otto-corner { display: none !important; }
    nobody else ever sees it go. Hidden, not faded: nothing to tap by mistake. */
 body.otto-tour-active #otto-mobile-tour-compose { visibility: hidden; }
 
+/* First light (Franky, Oct 24, 2026; src/lib/tour/first-light.ts). A
+   newcomer's first Campus visit arrives with only Otto: a script before the
+   first paint sets html[data-first-light="feed clubs tonight"], and each
+   listed part waits here, invisible, unclickable, still taking its space.
+   The tour brings them in one by one (light()), and every way out brings
+   them all. The selectors are FIRST_LIGHT_TARGETS (first-light.test.ts
+   checks the two lists match). A child hidden here stays hidden inside a
+   part that has come in: the phone's Tonight card waits inside its feed. */
+html[data-first-light~="feed"] .tonight-feed-main,
+html[data-first-light~="feed"] #otto-mobile-tour-feed,
+html[data-first-light~="clubs"] .tonight-feed-left,
+html[data-first-light~="clubs"] .tonight-feed-right .tonight-fold,
+html[data-first-light~="tonight"] .tonight-feed-right .tonight-panel-aside,
+html[data-first-light~="tonight"] #otto-mobile-tour-feed .tonight-card,
+html[data-first-light] #otto-mobile-tour-compose { visibility: hidden; }
+
+/* The burst: a part pops in from 94% on SPRING_POP (one small overshoot)
+   while it fades in on SPRING_SOFT, transform and opacity only. "backwards"
+   holds the first frame before it starts and nothing after: a part never
+   keeps a transform, which would box in the fixed sheets inside the feed.
+   Reduce motion keeps the fade alone. The curves are the springs sampled
+   by src/lib/motion/spring-curve.ts (spring-curve.test.ts pins them). */
+:root {
+  --vibe-spring-pop: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --vibe-spring-soft: cubic-bezier(0.22, 1, 0.36, 1);
+}
+@supports (transition-timing-function: linear(0, 1)) {
+  :root {
+    --vibe-spring-pop: linear(0, 0.144 3%, 0.462 6%, 0.901 10%, 1.175 14%, 1.236 19%, 1.12 24%, 0.977 30%, 0.943 37%, 0.993 45%, 1.013 55%, 0.997 67%, 1 82%, 1);
+    --vibe-spring-soft: linear(0, 0.026 3%, 0.088 6%, 0.198 10%, 0.319 14%, 0.464 19%, 0.589 24%, 0.71 30%, 0.812 37%, 0.889 45%, 0.945 55%, 0.977 67%, 0.993 82%, 1);
+  }
+}
+.first-light-burst {
+  transform-origin: 50% 24%;
+  animation:
+    first-light-fade 480ms var(--vibe-spring-soft) backwards,
+    first-light-pop 600ms var(--vibe-spring-pop) backwards;
+}
+@keyframes first-light-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes first-light-pop { from { transform: scale(0.94); } to { transform: none; } }
+/* The phone's feed is the full screen wide: an overshoot past 100% would
+   poke out sideways, so it rises on SPRING_SOFT (no overshoot) instead. */
+#otto-mobile-tour-feed.first-light-burst {
+  transform-origin: 50% 0;
+  animation:
+    first-light-fade 480ms var(--vibe-spring-soft) backwards,
+    first-light-pop 480ms var(--vibe-spring-soft) backwards;
+}
+@media (prefers-reduced-motion: reduce) {
+  .first-light-burst { animation: first-light-pop 480ms var(--vibe-spring-soft) backwards; }
+  @keyframes first-light-pop { from { opacity: 0; } to { opacity: 1; } }
+}
+
 /* Phone focus zoom. iOS Safari zooms the page when a text field under
    16px takes focus, and never zooms back out. The phone screens size
    their fields inline at 13-15px, hence the !important. Checkboxes,

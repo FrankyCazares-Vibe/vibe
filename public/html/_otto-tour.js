@@ -177,7 +177,9 @@
     var tall = r.height > vh * 0.6;
     var inView = tall ? (r.top >= 0 && r.top < vh * 0.5) : (r.top >= 0 && r.bottom <= vh);
     if (inView || typeof el.scrollIntoView !== 'function') return;
-    el.scrollIntoView({ behavior: prefersReducedMotion() ? 'auto' : 'smooth', block: tall ? 'start' : 'center' });
+    // 'instant', not 'auto': a page with `scroll-behavior: smooth` (the static
+    // profile) turns 'auto' smooth again.
+    el.scrollIntoView({ behavior: prefersReducedMotion() ? 'instant' : 'smooth', block: tall ? 'start' : 'center' });
   }
 
   function positionBubble(bubble, spot) {
@@ -227,12 +229,15 @@
   }
 
   var _running = false;
+  // The last tour's fade-out removal, so a start inside it keeps its nodes.
+  var _removeTimer = 0;
 
   function start(steps, options) {
     if (_running) return;
     if (!steps || !steps.length) return;
     options = options || {};
     _running = true;
+    clearTimeout(_removeTimer);
     injectStyles();
     document.body.classList.add(ACTIVE_CLASS);
 
@@ -241,7 +246,7 @@
     var idx = 0;
     var current = null;
     var placeFrame = 0;
-    var settleTimers = [];
+    var followFrame = 0;
     // The spot follows its target as it moves or grows (a panel loading in).
     var watcher = typeof ResizeObserver === 'function' ? new ResizeObserver(function () { schedulePlace(); }) : null;
     var vv = window.visualViewport || null;
@@ -255,6 +260,8 @@
     function place() {
       placeFrame = 0;
       if (!_running) return;
+      // A target that left the page (a panel remounting) is looked up again.
+      if (!current || !current.isConnected) observe(findTarget(steps[idx].selector));
       var spot = rectFor(current);
       if (!spot) {
         // No target (or it left the screen): the bubble still shows its words mid-screen.
@@ -271,6 +278,28 @@
     function schedulePlace() {
       if (!placeFrame) placeFrame = requestAnimationFrame(place);
     }
+    function observe(el) {
+      current = el;
+      if (watcher) {
+        watcher.disconnect();
+        if (el) watcher.observe(el);
+      }
+    }
+    /**
+     * Every frame for a moment after a step opens: a smooth scroll, late
+     * layout and a part bursting in (a transform, which no ResizeObserver
+     * reports) all move the target, and the spot moves with it.
+     */
+    function follow(ms) {
+      cancelAnimationFrame(followFrame);
+      var until = Date.now() + ms;
+      var tick = function () {
+        if (!_running) return;
+        place();
+        if (Date.now() < until) followFrame = requestAnimationFrame(tick);
+      };
+      followFrame = requestAnimationFrame(tick);
+    }
 
     function teardown(reason) {
       _running = false;
@@ -279,10 +308,13 @@
       if (vv) { vv.removeEventListener('resize', schedulePlace); vv.removeEventListener('scroll', schedulePlace); }
       if (watcher) watcher.disconnect();
       if (placeFrame) cancelAnimationFrame(placeFrame);
-      settleTimers.forEach(clearTimeout);
+      cancelAnimationFrame(followFrame);
       document.body.classList.remove(ACTIVE_CLASS);
+      // The fading bubble takes no more taps (a double tap on "Got it" would
+      // otherwise finish twice).
+      bubble.onclick = null;
       bubble.classList.remove('visible');
-      setTimeout(function () {
+      _removeTimer = setTimeout(function () {
         if (bubble && bubble.parentNode) bubble.parentNode.removeChild(bubble);
         if (svg && svg.parentNode) svg.parentNode.removeChild(svg);
       }, 260);
@@ -299,11 +331,7 @@
       if (typeof step.onShow === 'function') {
         try { step.onShow(); } catch (e) { /* the tour goes on */ }
       }
-      current = findTarget(step.selector);
-      if (watcher) {
-        watcher.disconnect();
-        if (current) watcher.observe(current);
-      }
+      observe(findTarget(step.selector));
       bringIntoView(current);
       renderBubble(bubble, step, i, steps.length, {
         next: function () {
@@ -314,9 +342,7 @@
         skip: function () { teardown('skip'); },
       });
       schedulePlace();
-      // Measure again as a smooth scroll and late layout settle.
-      settleTimers.forEach(clearTimeout);
-      settleTimers = [setTimeout(schedulePlace, 250), setTimeout(schedulePlace, 600)];
+      follow(750);
     }
 
     window.addEventListener('resize', schedulePlace);

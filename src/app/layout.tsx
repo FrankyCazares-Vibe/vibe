@@ -12,6 +12,7 @@ import { ActivityTouch } from "@/components/usage/ActivityTouch";
 import { NONCE_HEADER } from "@/lib/security/csp";
 import { GOOGLE_FONTS_HREF } from "@/lib/theme/fonts";
 import { THEME_BOOT_SCRIPT } from "@/lib/theme/theme";
+import { FIRST_LIGHT_BOOT_SCRIPT, FIRST_LIGHT_ON_ATTR } from "@/lib/tour/first-light";
 import { ThemeSync } from "@/lib/theme/ThemeSync";
 
 const SITE_TITLE = "Vibe · Your campus. Your people. Yourself.";
@@ -80,6 +81,10 @@ export default async function RootLayout({
   // would ship them nonce-less and the browser would refuse to run them.
   // Undefined only where the proxy sets no rule, and then nothing checks it.
   const nonce = (await headers()).get(NONCE_HEADER) ?? undefined;
+  // First light's off switch (src/lib/tour/first-light.ts): FIRST_LIGHT=off
+  // leaves the hold out (the boot script below and the mark on <html> that
+  // the in-app arrival checks), so a first Campus visit shows everything.
+  const firstLight = process.env.FIRST_LIGHT !== "off";
 
   return (
     // data-theme is the RESOLVED theme (light | dark, never "system"). The
@@ -88,7 +93,7 @@ export default async function RootLayout({
     // then keeps whatever the DOM says (suppressHydrationWarning), the Next
     // "preventing flash before hydration" recipe. DEFAULT_THEME_PREF is
     // "system" (Auto) since S68 wave 5, so a dark device gets Night here.
-    <html lang="en" data-theme="light" suppressHydrationWarning>
+    <html lang="en" data-theme="light" {...(firstLight ? { [FIRST_LIGHT_ON_ATTR]: "" } : {})} suppressHydrationWarning>
       <head>
         {/* FIRST child of <head>: reads localStorage.vibe_theme, resolves
             "system" with matchMedia and sets data-theme. Nothing else; the
@@ -97,6 +102,13 @@ export default async function RootLayout({
             this same string; theme.test.ts fails per file when it drifts.
             The nonce is what lets it run under the browser code rule. */}
         <script nonce={nonce} dangerouslySetInnerHTML={{ __html: THEME_BOOT_SCRIPT }} />
+        {/* Second, also before the first paint: on a newcomer's first Campus
+            visit it marks <html data-first-light>, so the feed and the sides
+            wait for Otto to bring them in (src/lib/tour/first-light.ts). It
+            only reads two localStorage keys and the address. */}
+        {firstLight ? (
+          <script nonce={nonce} dangerouslySetInnerHTML={{ __html: FIRST_LIGHT_BOOT_SCRIPT }} />
+        ) : null}
         {/* The font stylesheet blocks the first paint. React already puts a
             preload for it at the top of <head>, which opens that connection;
             the font files come from gstatic, fetched in CORS mode, so that is

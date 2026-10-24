@@ -97,6 +97,7 @@ import {
   type FeedClub,
   withoutClubPosts,
 } from "@/lib/posts/feed-actions";
+import { holdOnClientArrival, lightAll } from "@/lib/tour/first-light";
 import { countOpen } from "@/lib/usage/touch-client";
 
 /**
@@ -204,6 +205,9 @@ const NO_CLUB_EVENTS: CampusEvent[] = [];
 // ---------- Component ----------
 
 export function CampusMobile() {
+  // First light for an arrival inside the app (tapping Campus after a club
+  // page): held before the paint, by the boot script's rule.
+  useLayoutEffect(holdOnClientArrival, []);
   // Otto spotlight tour — fires on visit when Settings → Replay tour
   // sets the campus pending flag. No-op otherwise.
   useMobileTour("campus");
@@ -218,6 +222,11 @@ export function CampusMobile() {
       ? t
       : "feed";
   });
+  // First light (src/lib/tour/first-light.ts) holds only the Feed's parts
+  // for the tour: on any other tab everything comes in.
+  useEffect(() => {
+    if (tab !== "feed") lightAll();
+  }, [tab]);
 
   // Which campus is on screen (S67 wave 4, contracts C5). `?campus=<id>` is
   // the truth; home is the student's own campus, from the same cached read
