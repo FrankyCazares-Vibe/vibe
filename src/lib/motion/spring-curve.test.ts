@@ -72,3 +72,22 @@ test("first light's burst curves are SPRING_POP over 600ms and SPRING_SOFT over 
   // POP has settled by 600ms (one overshoot, then still).
   assert.ok(Math.abs(springProgress(SPRING_POP, 0.6) - 1) < 0.005);
 });
+
+test("the tour engine moves on the app's springs, transform and opacity only", async () => {
+  const { SPRING_SOFT } = await import("./springs");
+  const js = readFileSync(new URL("../../../public/html/_otto-tour.js", import.meta.url), "utf8");
+  assert.ok(js.includes(`--otto-tour-soft: ${springLinear(SPRING_SOFT, 480)};`), "SPRING_SOFT over 480ms");
+  assert.ok(js.includes(`--otto-tour-snappy: ${springLinear(SPRING_SNAPPY, 320)};`), "SPRING_SNAPPY over 320ms");
+  assert.match(js, /transition: opacity 480ms var\(--otto-tour-soft\), transform 480ms var\(--otto-tour-soft\);/);
+  assert.match(js, /transition: transform 320ms var\(--otto-tour-snappy\);/);
+  // No fixed timings left, and nothing but transform or opacity animates.
+  assert.doesNotMatch(js, /\d+ms (ease|cubic-bezier)/);
+  for (const m of js.matchAll(/transition: ([^;']+);/g)) {
+    for (const part of m[1].split(",")) {
+      const prop = part.trim().split(/\s+/)[0];
+      assert.ok(prop === "none" || prop === "opacity" || prop === "transform", `transitions ${prop}`);
+    }
+  }
+  // Reduced motion: no rise, no hover lift.
+  assert.match(js, /\.otto-tour-next:hover \{ transform: none; \}/);
+});

@@ -46,7 +46,20 @@
       '    0 0 0 1px rgba(255, 92, 53, 0.18),',
       '    0 0 36px rgba(255, 92, 53, 0.22);',
       '  opacity: 0; transform: translateY(8px);',
-      '  transition: opacity 240ms cubic-bezier(.22,1,.36,1), transform 240ms cubic-bezier(.22,1,.36,1);',
+      // The app's springs (src/lib/motion/springs.ts), sampled into CSS by
+      // spring-curve.ts: SPRING_SOFT for the bubble arriving, SPRING_SNAPPY
+      // for the button's lift (Oct 24, 2026; was a fixed 240ms curve). Kept
+      // here, not in globals.css: the static profile page loads this file
+      // without the app's stylesheet. spring-curve.test.ts pins both.
+      '  --otto-tour-soft: cubic-bezier(0.22, 1, 0.36, 1);',
+      '  --otto-tour-snappy: cubic-bezier(0.22, 1, 0.36, 1);',
+      '  transition: opacity 480ms var(--otto-tour-soft), transform 480ms var(--otto-tour-soft);',
+      '}',
+      '@supports (transition-timing-function: linear(0, 1)) {',
+      '  .otto-tour-bubble {',
+      '    --otto-tour-soft: linear(0, 0.026 3%, 0.088 6%, 0.198 10%, 0.319 14%, 0.464 19%, 0.589 24%, 0.71 30%, 0.812 37%, 0.889 45%, 0.945 55%, 0.977 67%, 0.993 82%, 1);',
+      '    --otto-tour-snappy: linear(0, 0.029 3%, 0.097 6%, 0.218 10%, 0.346 14%, 0.495 19%, 0.62 24%, 0.738 30%, 0.834 37%, 0.904 45%, 0.953 55%, 0.981 67%, 0.994 82%, 1);',
+      '  }',
       '}',
       '.otto-tour-bubble.visible { opacity: 1; transform: translateY(0); }',
       '.otto-tour-eyebrow {',
@@ -88,14 +101,17 @@
       '  padding: 9px 16px; border-radius: 999px;',
       '  background: #ff5c35; color: var(--on-coral, #160A06);',
       '  box-shadow: 0 6px 18px rgba(255, 92, 53, 0.4), inset 0 1px 0 rgba(255,255,255,0.18);',
-      '  transition: transform 180ms ease, box-shadow 180ms ease;',
+      // Transform only on the spring; the glow changes with no animation.
+      '  transition: transform 320ms var(--otto-tour-snappy);',
       '}',
       '.otto-tour-next:hover {',
       '  transform: translateY(-1px);',
       '  box-shadow: 0 10px 26px rgba(255, 92, 53, 0.55), inset 0 1px 0 rgba(255,255,255,0.25);',
       '}',
       '@media (prefers-reduced-motion: reduce) {',
-      '  .otto-tour-bubble, .otto-tour-bubble.visible { transition: none !important; }',
+      '  .otto-tour-bubble, .otto-tour-bubble.visible { transition: none !important; transform: none; }',
+      '  .otto-tour-next { transition: none; }',
+      '  .otto-tour-next:hover { transform: none; }',
       '}'
     ].join('\n');
     var style = document.createElement('style');
@@ -182,31 +198,48 @@
     el.scrollIntoView({ behavior: prefersReducedMotion() ? 'instant' : 'smooth', block: tall ? 'start' : 'center' });
   }
 
+  /**
+   * The part of the screen a person can actually see: the visual viewport
+   * where the browser has one. On iOS the on-screen keyboard shrinks it (and
+   * a zoom moves it) while fixed elements keep the full layout viewport, so
+   * a bubble placed against innerHeight could sit under the keyboard.
+   */
+  function viewBox() {
+    var vv = window.visualViewport;
+    if (vv && vv.width > 0 && vv.height > 0) {
+      return { x: vv.offsetLeft, y: vv.offsetTop, w: vv.width, h: vv.height };
+    }
+    return { x: 0, y: 0, w: window.innerWidth, h: window.innerHeight };
+  }
+
   function positionBubble(bubble, spot) {
-    var vw = window.innerWidth;
-    var vh = window.innerHeight;
+    var box = viewBox();
     var bw = Math.min(320, Math.max(bubble.offsetWidth, 260));
     var bh = bubble.offsetHeight || 160;
     var gap = 16;
+    var minX = box.x + 16, maxX = box.x + box.w - bw - 16;
+    var minY = box.y + 16, maxY = box.y + box.h - bh - 16;
 
     // Prefer below the spot. If not enough room, try above. Otherwise, side.
+    // Always inside the visible part of the screen (viewBox).
     var top, left;
-    if (spot.y + spot.h + gap + bh < vh - 16) {
+    if (spot.y + spot.h + gap + bh < box.y + box.h - 16) {
       top = spot.y + spot.h + gap;
-      left = clamp(spot.x + spot.w / 2 - bw / 2, 16, vw - bw - 16);
-    } else if (spot.y - gap - bh > 16) {
+      left = clamp(spot.x + spot.w / 2 - bw / 2, minX, maxX);
+    } else if (spot.y - gap - bh > box.y + 16) {
       top = spot.y - gap - bh;
-      left = clamp(spot.x + spot.w / 2 - bw / 2, 16, vw - bw - 16);
-    } else if (spot.x + spot.w + gap + bw < vw - 16) {
+      left = clamp(spot.x + spot.w / 2 - bw / 2, minX, maxX);
+    } else if (spot.x + spot.w + gap + bw < box.x + box.w - 16) {
       left = spot.x + spot.w + gap;
-      top = clamp(spot.y + spot.h / 2 - bh / 2, 16, vh - bh - 16);
+      top = clamp(spot.y + spot.h / 2 - bh / 2, minY, maxY);
     } else {
-      left = clamp(spot.x - gap - bw, 16, vw - bw - 16);
-      top = clamp(spot.y + spot.h / 2 - bh / 2, 16, vh - bh - 16);
+      left = clamp(spot.x - gap - bw, minX, maxX);
+      top = clamp(spot.y + spot.h / 2 - bh / 2, minY, maxY);
     }
-    bubble.style.left = left + 'px';
-    bubble.style.top = top + 'px';
+    bubble.style.left = clamp(left, minX, maxX) + 'px';
+    bubble.style.top = clamp(top, minY, maxY) + 'px';
   }
+  // When the box is narrower than the bubble, the low edge wins (it stays readable from its start).
   function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
 
   function renderBubble(bubble, step, idx, total, handlers) {
