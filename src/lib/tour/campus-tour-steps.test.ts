@@ -108,7 +108,7 @@ test("phone: the Otto tab, the feed, then the tabs, ending on Got it", () => {
     "#otto-mobile-tour-feed",
     "#otto-mobile-tour-tabs",
   ]);
-  assert.equal(steps[0]?.body, "This tab is me: what's coming up and what's new for you. Messages is right next door.");
+  assert.equal(steps[0]?.body, "That's me down here, the otto tab: what's coming up and what's new for you. Messages is right next door.");
   assert.deepEqual({ title: steps[1]?.title, body: steps[1]?.body }, feedBubble("Indianapolis"));
   assert.equal(steps[2]?.title, 'Clubs and events, <span class="accent">one swipe over</span>.');
   assert.equal(steps[2]?.body, "Feed, Events, Orgs and Map. Orgs has every club on campus.");

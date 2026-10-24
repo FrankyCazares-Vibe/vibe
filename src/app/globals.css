@@ -2450,6 +2450,12 @@ body:has([aria-modal="true"], [data-hides-otto]) .vibe-app-shell--page-tabbar .v
    Kept outside the @media block so it works on every viewport. */
 body.vibe-hide-otto #otto-corner { display: none !important; }
 
+/* The phone's + steps aside while the campus tour runs (Oct 24, 2026): it
+   sat beside the first bubble, "I'm Otto", and read as the thing it named.
+   The engine sets .otto-tour-active only while a tour is on screen, so
+   nobody else ever sees it go. Hidden, not faded: nothing to tap by mistake. */
+body.otto-tour-active #otto-mobile-tour-compose { visibility: hidden; }
+
 /* Phone focus zoom. iOS Safari zooms the page when a text field under
    16px takes focus, and never zooms back out. The phone screens size
    their fields inline at 13-15px, hence the !important. Checkboxes,

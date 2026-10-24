@@ -137,7 +137,7 @@ export function phoneCampusTourSteps(campus: string | null): CampusTourStep[] {
     {
       selector: "#otto-mobile-tour-network-otto",
       title: OTTO_TITLE,
-      body: "This tab is me: what's coming up and what's new for you. Messages is right next door.",
+      body: "That's me down here, the otto tab: what's coming up and what's new for you. Messages is right next door.",
     },
     { selector: "#otto-mobile-tour-feed", ...feedBubble(campus) },
     {

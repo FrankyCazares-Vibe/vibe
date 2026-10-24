@@ -80,7 +80,7 @@ test("campus bubbles: the Otto tab, the feed with the campus name, then the tabs
     {
       selector: "#otto-mobile-tour-network-otto",
       title: 'Hi again. I\'m <span class="accent">Otto</span>.',
-      body: "This tab is me: what's coming up and what's new for you. Messages is right next door.",
+      body: "That's me down here, the otto tab: what's coming up and what's new for you. Messages is right next door.",
     },
     {
       selector: "#otto-mobile-tour-feed",

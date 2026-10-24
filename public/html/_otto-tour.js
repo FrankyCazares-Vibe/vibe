@@ -11,6 +11,9 @@
  *     { selector: '#bio',    title: "A few lines.", body: "Tell people what you're into." },
  *   ], { onDone(), onSkip(), nextLabel? });
  *
+ * A step may carry `onShow()`, run once as its bubble opens (before the
+ * target is measured), and `endLabel` / `nextLabel` for its button.
+ *
  * Visual: a full-screen SVG mask dims the page except for a rounded cutout
  * around each target element. A coral speech bubble floats next to the cutout
  * with the step copy + Next/Skip controls.
@@ -138,18 +141,43 @@
     try { return document.querySelector(selector); } catch (e) { return null; }
   }
 
+  /**
+   * The spot around `el`, padded 10px and clipped to the screen (Oct 24,
+   * 2026: a target taller than the screen, like the phone's feed, made a
+   * 1,800px spot that the bubble couldn't sit beside). Null when it has no
+   * size or nothing of it is on screen.
+   */
   function rectFor(el) {
     if (!el) return null;
     var r = el.getBoundingClientRect();
     if (r.width === 0 && r.height === 0) return null;
-    // Padding around the spot
     var pad = 10;
-    return {
-      x: Math.max(8, r.left - pad),
-      y: Math.max(8, r.top - pad),
-      w: r.width + pad * 2,
-      h: r.height + pad * 2,
-    };
+    var x1 = Math.max(8, r.left - pad);
+    var y1 = Math.max(8, r.top - pad);
+    var x2 = Math.min(window.innerWidth - 8, r.right + pad);
+    var y2 = Math.min(window.innerHeight - 8, r.bottom + pad);
+    if (x2 <= x1 || y2 <= y1) return null;
+    return { x: x1, y: y1, w: x2 - x1, h: y2 - y1 };
+  }
+
+  function prefersReducedMotion() {
+    try { return window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) { return false; }
+  }
+
+  /**
+   * Scrolls only when the target isn't already in view: a fixed or sticky
+   * target (the Otto orb, the phone's tab bar and tabs) never moves the page,
+   * and a target taller than the screen only needs its top in view. Smooth
+   * unless reduced motion is on.
+   */
+  function bringIntoView(el) {
+    if (!el || typeof el.getBoundingClientRect !== 'function') return;
+    var r = el.getBoundingClientRect();
+    var vh = window.innerHeight;
+    var tall = r.height > vh * 0.6;
+    var inView = tall ? (r.top >= 0 && r.top < vh * 0.5) : (r.top >= 0 && r.bottom <= vh);
+    if (inView || typeof el.scrollIntoView !== 'function') return;
+    el.scrollIntoView({ behavior: prefersReducedMotion() ? 'auto' : 'smooth', block: tall ? 'start' : 'center' });
   }
 
   function positionBubble(bubble, spot) {
@@ -211,12 +239,47 @@
     var svg = ensureSvgOverlay();
     var bubble = ensureBubble();
     var idx = 0;
-    var onResize = function () { showStep(idx); };
+    var current = null;
+    var placeFrame = 0;
+    var settleTimers = [];
+    // The spot follows its target as it moves or grows (a panel loading in).
+    var watcher = typeof ResizeObserver === 'function' ? new ResizeObserver(function () { schedulePlace(); }) : null;
+    var vv = window.visualViewport || null;
+
+    /**
+     * Scrolling, resizing and the target changing size only MOVE the spot and
+     * the bubble. Until Oct 24, 2026 every scroll event re-ran the whole step:
+     * it scrolled again and rebuilt the bubble, so on a phone the Next button
+     * was replaced under the finger and taps were lost.
+     */
+    function place() {
+      placeFrame = 0;
+      if (!_running) return;
+      var spot = rectFor(current);
+      if (!spot) {
+        // No target (or it left the screen): the bubble still shows its words mid-screen.
+        spot = { x: window.innerWidth / 2 - 60, y: window.innerHeight / 2 - 60, w: 120, h: 120 };
+      }
+      var rect = svg.querySelector('.otto-tour-spot');
+      rect.setAttribute('x', spot.x);
+      rect.setAttribute('y', spot.y);
+      rect.setAttribute('width', spot.w);
+      rect.setAttribute('height', spot.h);
+      positionBubble(bubble, spot);
+      bubble.classList.add('visible');
+    }
+    function schedulePlace() {
+      if (!placeFrame) placeFrame = requestAnimationFrame(place);
+    }
 
     function teardown(reason) {
       _running = false;
-      window.removeEventListener('resize', onResize);
-      window.removeEventListener('scroll', onResize, true);
+      window.removeEventListener('resize', schedulePlace);
+      window.removeEventListener('scroll', schedulePlace, true);
+      if (vv) { vv.removeEventListener('resize', schedulePlace); vv.removeEventListener('scroll', schedulePlace); }
+      if (watcher) watcher.disconnect();
+      if (placeFrame) cancelAnimationFrame(placeFrame);
+      settleTimers.forEach(clearTimeout);
       document.body.classList.remove(ACTIVE_CLASS);
       bubble.classList.remove('visible');
       setTimeout(function () {
@@ -227,42 +290,40 @@
       if (reason === 'done' && typeof options.onDone === 'function') options.onDone();
     }
 
+    /** Once per step: the step's own hook, the scroll (if any), the bubble's words. */
     function showStep(i) {
       idx = i;
       var step = steps[i];
-      var el = findTarget(step.selector);
-      // Scroll into view first; small RAF so layout settles before we measure.
-      if (el && typeof el.scrollIntoView === 'function') {
-        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      // `onShow` (optional) runs once as its bubble opens, before the target
+      // is measured: a page can bring the target into being here.
+      if (typeof step.onShow === 'function') {
+        try { step.onShow(); } catch (e) { /* the tour goes on */ }
       }
-      requestAnimationFrame(function () {
-        var spot = rectFor(el);
-        if (!spot) {
-          // Fallback: center the spot in the viewport so the bubble still
-          // shows readable copy.
-          spot = { x: window.innerWidth / 2 - 60, y: window.innerHeight / 2 - 60, w: 120, h: 120 };
-        }
-        var rect = svg.querySelector('.otto-tour-spot');
-        rect.setAttribute('x', spot.x);
-        rect.setAttribute('y', spot.y);
-        rect.setAttribute('width', spot.w);
-        rect.setAttribute('height', spot.h);
-        renderBubble(bubble, step, i, steps.length, {
-          next: function () {
-            if (i + 1 >= steps.length) teardown('done');
-            else showStep(i + 1);
-          },
-          skip: function () { teardown('skip'); },
-        });
-        positionBubble(bubble, spot);
-        bubble.classList.add('visible');
+      current = findTarget(step.selector);
+      if (watcher) {
+        watcher.disconnect();
+        if (current) watcher.observe(current);
+      }
+      bringIntoView(current);
+      renderBubble(bubble, step, i, steps.length, {
+        next: function () {
+          if (idx !== i) return;
+          if (i + 1 >= steps.length) teardown('done');
+          else showStep(i + 1);
+        },
+        skip: function () { teardown('skip'); },
       });
+      schedulePlace();
+      // Measure again as a smooth scroll and late layout settle.
+      settleTimers.forEach(clearTimeout);
+      settleTimers = [setTimeout(schedulePlace, 250), setTimeout(schedulePlace, 600)];
     }
 
-    window.addEventListener('resize', onResize);
-    window.addEventListener('scroll', onResize, true);
+    window.addEventListener('resize', schedulePlace);
+    window.addEventListener('scroll', schedulePlace, true);
+    if (vv) { vv.addEventListener('resize', schedulePlace); vv.addEventListener('scroll', schedulePlace); }
     // Brief delay so the page can settle (post-warp arrival, fonts, layout).
-    setTimeout(function () { showStep(0); }, 350);
+    setTimeout(function () { if (_running) showStep(0); }, 350);
   }
 
   window.OttoTour = { start: start, isRunning: function () { return _running; } };
