@@ -78,12 +78,18 @@ test("campus bubbles: the Otto tab, the feed with the campus name, Tonight, then
   const steps = campusTourSteps("Indianapolis");
   assert.deepEqual(
     steps.map((s) => s.selector),
-    ["#otto-mobile-tour-network-otto", "#otto-mobile-tour-feed", "#otto-mobile-tour-feed .tonight-card", "#otto-mobile-tour-tabs"],
+    [
+      "#otto-mobile-tour-network-otto",
+      "#otto-mobile-tour-feed",
+      "#otto-mobile-tour-feed .your-clubs-row",
+      "#otto-mobile-tour-feed .tonight-card",
+      "#otto-mobile-tour-tabs",
+    ],
   );
   assert.equal(steps[0]?.title, 'Hi again. I\'m <span class="accent">Otto</span>.');
   assert.equal(steps[1]?.title, 'This is Indianapolis, <span class="accent">live</span>.');
   assert.equal(steps[1]?.body, "What students and clubs here are posting. Clubs and people you follow come first.");
-  assert.equal(steps[3]?.endLabel, "Got it");
+  assert.equal(steps[4]?.endLabel, "Got it");
   for (const s of steps) assert.doesNotMatch(`${s.title} ${s.body}`, /Chat|Tap \+|post text/);
 });
 

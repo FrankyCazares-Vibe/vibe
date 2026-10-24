@@ -150,10 +150,14 @@ export function endsOnClubs(steps: readonly CampusTourStep[]): boolean {
 /** The phone's Tonight card, inside the feed (null while loading or with nothing on). */
 export const PHONE_TONIGHT_TARGET = "#otto-mobile-tour-feed .tonight-card";
 
+/** The phone's Your clubs band, inside the feed (null only when both of its reads failed). */
+export const PHONE_CLUBS_TARGET = "#otto-mobile-tour-feed .your-clubs-row";
+
 /**
- * The phone tour (no floating Otto on phones): the Otto tab, the feed, the
- * Tonight card when there is one, then the tabs. With first light the feed
- * and the card each come in as their bubble opens. The dead Chat tab and the
+ * The phone tour (no floating Otto on phones), in Franky's order: the Otto
+ * tab, the feed, Your clubs, the Tonight card when there is one, then the
+ * tabs. With first light the feed, the clubs band and the card each come in
+ * as their bubble opens. The dead Chat tab and the
  * "Your turn… post" ask are gone. `hasSize` drops any step with nothing to
  * point at (by default nothing is dropped).
  */
@@ -170,6 +174,12 @@ export function phoneCampusTourSteps(
       body: "That's me down here, the otto tab: what's coming up and what's new for you. Messages is right next door.",
     },
     { selector: "#otto-mobile-tour-feed", ...feedBubble(campus), onShow: () => light("feed") },
+    {
+      selector: PHONE_CLUBS_TARGET,
+      title: `Your ${accent("clubs")}.`,
+      body: "Every club you follow or join posts its newest Board update here.",
+      onShow: () => light("clubs"),
+    },
     {
       selector: PHONE_TONIGHT_TARGET,
       title: `What's on ${accent("tonight")}.`,

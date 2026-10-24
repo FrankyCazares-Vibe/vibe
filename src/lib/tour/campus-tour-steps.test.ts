@@ -22,6 +22,7 @@ const {
   escapeTourText,
   feedBubble,
   phoneCampusTourSteps,
+  PHONE_CLUBS_TARGET,
   PHONE_TONIGHT_TARGET,
   tourStartDecision,
 } = (await import(spec)) as typeof import("./campus-tour-steps");
@@ -118,28 +119,33 @@ test("the campus name is escaped before it reaches the bubble's HTML", () => {
   assert.equal(feedBubble("  ").title, 'This is your campus, <span class="accent">live</span>.');
 });
 
-test("phone: the Otto tab, the feed, the Tonight card, then the tabs, ending on Got it", () => {
+test("phone: the Otto tab, the feed, Your clubs, the Tonight card, then the tabs, ending on Got it", () => {
   const lit: string[] = [];
-  const steps = phoneCampusTourSteps("Indianapolis", () => true, (p) => lit.push(p));
-  assert.deepEqual(steps.map((s) => s.selector), [
+  const all = phoneCampusTourSteps("Indianapolis", () => true, (p) => lit.push(p));
+  assert.deepEqual(all.map((s) => s.selector), [
     "#otto-mobile-tour-network-otto",
     "#otto-mobile-tour-feed",
+    PHONE_CLUBS_TARGET,
     PHONE_TONIGHT_TARGET,
     "#otto-mobile-tour-tabs",
   ]);
+  assert.equal(all[2]?.title, 'Your <span class="accent">clubs</span>.');
+  assert.equal(all[2]?.body, "Every club you follow or join posts its newest Board update here.");
+  for (const s of all) s.onShow?.();
+  assert.deepEqual(lit, ["feed", "clubs", "tonight"]);
+  // The rest of this test reads the steps without the clubs band.
+  const steps = all.filter((s) => s.selector !== PHONE_CLUBS_TARGET);
   assert.equal(steps[0]?.body, "That's me down here, the otto tab: what's coming up and what's new for you. Messages is right next door.");
   assert.deepEqual({ title: steps[1]?.title, body: steps[1]?.body }, feedBubble("Indianapolis"));
   assert.equal(steps[2]?.title, 'What\'s on <span class="accent">tonight</span>.');
   assert.equal(steps[3]?.title, 'Clubs and events, <span class="accent">one swipe over</span>.');
   assert.equal(steps[3]?.body, "Feed, Events, Orgs and Map. Orgs has every club on campus.");
   assert.equal(steps[3]?.endLabel, "Got it");
-  for (const s of steps) s.onShow?.();
-  assert.deepEqual(lit, ["feed", "tonight"]);
 });
 
 test("phone: a hidden tab bar drops the Otto step rather than point at nothing", () => {
   const steps = phoneCampusTourSteps(null, (sel) => sel !== "#otto-mobile-tour-network-otto");
-  assert.deepEqual(steps.map((s) => s.selector), ["#otto-mobile-tour-feed", PHONE_TONIGHT_TARGET, "#otto-mobile-tour-tabs"]);
+  assert.deepEqual(steps.map((s) => s.selector), ["#otto-mobile-tour-feed", PHONE_CLUBS_TARGET, PHONE_TONIGHT_TARGET, "#otto-mobile-tour-tabs"]);
 });
 
 test("phone: no Tonight card (nothing on tonight) drops only that step", () => {
@@ -147,6 +153,7 @@ test("phone: no Tonight card (nothing on tonight) drops only that step", () => {
   assert.deepEqual(steps.map((s) => s.selector), [
     "#otto-mobile-tour-network-otto",
     "#otto-mobile-tour-feed",
+    PHONE_CLUBS_TARGET,
     "#otto-mobile-tour-tabs",
   ]);
 });

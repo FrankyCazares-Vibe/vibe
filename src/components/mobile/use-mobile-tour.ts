@@ -4,6 +4,7 @@ import { useEffect } from "react";
 
 import { campusRowById } from "@/lib/iu/campuses";
 import {
+  PHONE_CLUBS_TARGET,
   PHONE_TONIGHT_TARGET,
   phoneCampusTourSteps,
   targetHasSize,
@@ -270,11 +271,13 @@ export function useMobileTour(leg: Leg) {
         if (cancelled) return;
         // The campus leg waits for every target it needs (its first, the Otto
         // tab, is in the tab bar on every page, before Campus has drawn its
-        // own); the Tonight card is only there when something is on, so its
-        // step is kept or dropped when the tour starts. Other legs wait for
-        // their first target, as before.
+        // own); the Tonight card is only there when something is on, and the
+        // Your clubs band not when both its reads failed, so their steps are
+        // kept or dropped when the tour starts. Other legs wait for their
+        // first target, as before.
+        const optional = [PHONE_TONIGHT_TARGET, PHONE_CLUBS_TARGET];
         const required = campus
-          ? campusTourSteps(null).filter((s) => s.selector !== PHONE_TONIGHT_TARGET)
+          ? campusTourSteps(null).filter((s) => !optional.includes(s.selector))
           : STEPS_BY_LEG[leg].slice(0, 1);
         // Wait for the first target to render. ProfileMobile / CampusMobile
         // do their own data fetches and mount the anchored elements only

@@ -1,0 +1,159 @@
+/*
+ * The phone's "Your clubs" band on the Feed (YourClubsRow.tsx, Oct 24 2026).
+ * The same glass card as the Tonight card below it (tonight-phone.css), with
+ * a sideways row of club tiles. Theme tokens only (globals.css and the
+ * --tonight-* ones in tonight.css), so Night and Light both come from those
+ * files and nothing here needs a dark twin.
+ */
+
+.your-clubs-row {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 0 12px;
+  border-radius: 18px;
+  background: var(--glass);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--card-shadow);
+  color: var(--charcoal);
+}
+.your-clubs-row-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 0 12px;
+}
+/* The Tonight card's heading voice: small, heavy, the tag ink. */
+.your-clubs-row-h {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 16px;
+  color: var(--tag-ink);
+}
+.your-clubs-row-all {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  min-height: 32px;
+  padding: 0 4px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink-muted);
+  text-decoration: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* The tiles scroll sideways inside the Feed's own swipe pager (like the
+   rolling strip): the row takes the gesture first, the pager the rest. */
+.your-clubs-row-list {
+  display: flex;
+  gap: 8px;
+  margin: 0;
+  padding: 0 12px;
+  list-style: none;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scroll-snap-type: x mandatory;
+  scroll-padding: 0 12px;
+  scrollbar-width: none;
+}
+.your-clubs-row-item {
+  flex: 0 0 auto;
+  scroll-snap-align: start;
+}
+.your-clubs-tile {
+  box-sizing: border-box;
+  width: 220px;
+  min-height: 64px;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px;
+  border-radius: 14px;
+  background: var(--tonight-tray);
+  border: 1px solid var(--tonight-tray-border);
+  color: inherit;
+  text-decoration: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.your-clubs-tile--skel {
+  flex: 0 0 auto;
+}
+.your-clubs-tile-skelmark {
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  flex-shrink: 0;
+}
+.your-clubs-tile-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.your-clubs-tile-namerow {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+}
+.your-clubs-tile-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 13.5px;
+  line-height: 1.25;
+}
+.your-clubs-tile-age {
+  flex-shrink: 0;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ink-muted);
+}
+.your-clubs-tile-line {
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--ink-2);
+  overflow-wrap: anywhere;
+}
+.your-clubs-tile-line--empty {
+  color: var(--ink-muted);
+}
+
+/* No clubs yet: the panel's line and its one way forward. */
+.your-clubs-row-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 0 12px;
+}
+.your-clubs-row-empty-line {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--ink-2);
+}
+.your-clubs-row-find {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 36px;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--tag-ink);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}

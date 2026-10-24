@@ -3,7 +3,7 @@
  * with only Otto. As the tour goes, Otto brings the page into being, one
  * part per bubble: the feed bursts in, then the left side (Your clubs, each
  * club's Board), then the right (Tonight: school and club events). On a
- * phone: the feed, then the Tonight card. Plan: handoffs/2026-10-23-
+ * phone: the feed, the Your clubs band, the Tonight card. Plan: handoffs/2026-10-23-
  * onboarding-review/PLAN.md "Deploy B" and critique.md fixes 1-3, 9.
  *
  * HOW IT HOLDS. `FIRST_LIGHT_BOOT_SCRIPT` runs before the first paint (in
@@ -52,7 +52,7 @@ export const FIRST_LIGHT_PARTS: readonly FirstLightPart[] = ["feed", "clubs", "t
  */
 export const FIRST_LIGHT_TARGETS: Readonly<Record<FirstLightPart, readonly string[]>> = {
   feed: [".tonight-feed-main", "#otto-mobile-tour-feed"],
-  clubs: [".tonight-feed-left", ".tonight-feed-right .tonight-fold"],
+  clubs: [".tonight-feed-left", ".tonight-feed-right .tonight-fold", "#otto-mobile-tour-feed .your-clubs-row"],
   tonight: [".tonight-feed-right .tonight-panel-aside", "#otto-mobile-tour-feed .tonight-card"],
 };
 

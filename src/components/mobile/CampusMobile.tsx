@@ -30,6 +30,8 @@ import { TonightSheet } from "@/components/campus/tonight/TonightSheet";
 import type { SchoolEventsState, TonightFilter } from "@/components/campus/tonight/types";
 import { useCampusNow } from "@/components/campus/tonight/use-campus-now";
 import { useSchoolEvents } from "@/components/campus/tonight/use-school-events";
+import { useYourClubs } from "@/components/campus/tonight/use-your-clubs";
+import { YourClubsRow } from "@/components/campus/tonight/YourClubsRow";
 import {
   campusViewName,
   isOpenCampus,
@@ -306,6 +308,9 @@ export function CampusMobile() {
   // switch off, it answers school_on false and every school part hides.
   const schoolUrl = withCampus("/api/school-events", viewingId, homeId);
   const school = useSchoolEvents(schoolUrl);
+  // "Your clubs" on the Feed (Oct 24 2026): the desktop panel's reads (the
+  // student's own clubs, also while visiting), for the band above Tonight.
+  const yourClubs = useYourClubs();
   // The Events tab's All / School / Clubs chips (shown only while school is on).
   const [eventsFilter, setEventsFilter] = useState<TonightFilter>("all");
   const [tonightOpen, setTonightOpen] = useState(false);
@@ -1132,6 +1137,21 @@ export function CampusMobile() {
         }}
       >
         <section style={paneStyle}>
+          {/* "Your clubs" (Oct 24 2026): each club's newest Board line, the
+              desktop's left panel as one sideways band. Above Tonight, in
+              the order the tour names them; gone under a tag filter, like
+              Tonight. Its empty state opens the Orgs tab. */}
+          {feedTag ? null : (
+            <QuietBoundary name="your-clubs-row">
+              <YourClubsRow
+                state={yourClubs}
+                onFindClubs={() => {
+                  setPreviewTab(null);
+                  setTab("orgs");
+                }}
+              />
+            </QuietBoundary>
+          )}
           {/* "What's the vibe tonight?": above the strip, and gone under a
               tag filter (the strip is the filter's control there). Null
               while loading and when nothing is on tonight. */}

@@ -2468,6 +2468,7 @@ html[data-first-light~="feed"] .tonight-feed-main,
 html[data-first-light~="feed"] #otto-mobile-tour-feed,
 html[data-first-light~="clubs"] .tonight-feed-left,
 html[data-first-light~="clubs"] .tonight-feed-right .tonight-fold,
+html[data-first-light~="clubs"] #otto-mobile-tour-feed .your-clubs-row,
 html[data-first-light~="tonight"] .tonight-feed-right .tonight-panel-aside,
 html[data-first-light~="tonight"] #otto-mobile-tour-feed .tonight-card,
 html[data-first-light] #otto-mobile-tour-compose { visibility: hidden; }
