@@ -3,6 +3,13 @@
 **S82 starts here.** Previous close: `2026-10-23-session-80-club-view-shipped-and-launch-priorities.md` (its
 priorities still hold; this file reorders them with Eli's notes folded in).
 
+**Update Sat Oct 24:** Franky is going solo: nothing is assigned to James or Rylan any more, in this file, the S80
+close (its "James's lawyer file" is now Franky's lawyer list) or anywhere else. Deploy A, first light (Deploy B) and
+event covers all shipped Oct 24 (`handoffs/2026-10-23-onboarding-review/deploy-a-shipped.md`, `first-light-shipped.md`).
+Still Franky's calls, unchanged: James's and Rylan's admin flags (3 platform admins on production), the Privacy
+Policy's "three cofounders" lines (they change the same day as any access change), and the INBiz record (a lawyer
+question).
+
 ## Start here (next session)
 1. `git pull` in `~/vibe`, then `git branch -r | grep claude/`.
 2. Event covers: ask the club page session (local_55efdd06) or Franky whether migration `20261028100000` got his
@@ -32,7 +39,8 @@ priorities still hold; this file reorders them with Eli's notes folded in).
   `~/vibe/vibe-hq/data/` (kept out of git through `.git/info/exclude`). Goals are suggestions for Franky to change.
 - **Club Pipeline** (shared page with its own database): https://claude.ai/artifact/W9NNdByF55Cjmypa8RY52B. Clubs by
   stage (CS club: Met; SAE: On Vibe), Mom Test interviews (Eli's questions are the form), user tests (Parker's 2 + 2).
-  Page source `~/vibe/vibe-hq/club-pipeline.html`. James and Rylan need to be shared in as editors to write.
+  Page source `~/vibe/vibe-hq/club-pipeline.html`. (Oct 24: the "who's on it", "asked by" and "run by" fields came
+  out when Franky went solo.)
 - **Finance sheet:** `DOCS/FINANCES.csv` replaced with the rebuilt ledger (old one kept as
   `DOCS/FINANCES-old-2026-09.csv`). Found: Supabase is on the **Free** plan (checked Oct 23), not Pro as the old sheet
   said, so there are **no daily backups**. The amounts and the research behind them stay local (`DOCS/` is private:
@@ -51,7 +59,8 @@ Day; **Sat Oct 31** public launch.
 **Now (tonight and this weekend), Franky**
 1. Answer the two waiting sessions (above): the event-covers yes or no; the journal question.
 2. P0, about 25 minutes, before any club link goes out: the Supabase dashboard steps, then the live sign-up test with
-   James's or Rylan's school address (check Inbox AND Junk). Codes in Junk come before everything else.
+   a school address that has no Vibe account yet (a friend's, with their OK; his own IU address already has one).
+   Check Inbox AND Junk. Codes in Junk come before everything else.
 3. Then the CS club's setup link and SAE's members' link. Log both in the Club Pipeline.
 4. Money calls that touch launch: Supabase Pro (backups), Vercel Pro (commercial use), Resend paid plan + the
    40-an-hour cap. All three are in Vibe HQ › Money with a recommendation.
@@ -86,5 +95,5 @@ Partiful study (how they make money, where they started).
 | Supabase Pro before launch | Yes, by Oct 28 (backups) |
 | Vercel Pro before launch | Yes, by Oct 30 (commercial use, firewall, spend alerts) |
 | The suggested goals in Vibe HQ | Franky edits them; they are starting points |
-| Share Vibe HQ and the pipeline with James and Rylan | Yes, as editors on the pipeline, viewers on HQ |
+| James's and Rylan's admin flags (solo since Oct 24) | Turn them off before launch night, with the Privacy Policy's "three cofounders" lines rewritten the same day; his yes at the time |
 | A Monday routine that refreshes Vibe HQ | Yes (a scheduled Claude task, counts only) |
