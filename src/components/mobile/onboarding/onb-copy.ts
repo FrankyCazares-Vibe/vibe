@@ -38,9 +38,12 @@ export const ONB_COPY = freezeDeep({
     replay: "REPLAY MODE",
   },
   hello: {
+    // First run, Oct 24 2026 (handoffs/2026-10-23-onboarding-review/PLAN.md
+    // beat 2): clubs in the hello, "who's here" (never "who's around": Vibe
+    // shows no one nearby).
     intro:
-      "“think of me as your campus compass. i'll point you to what's loud, what's tonight, and who's on your wavelength — your guide while you build out your home on vibe.”",
-    note: "about two minutes: your campus, your profile, a photo, then your people",
+      "“i keep an eye on campus: what's on tonight, which clubs are meeting, who's here. a few quick things and it's yours.”",
+    note: "about two minutes: your campus, your name, a photo, then your clubs and people",
     cta: "Let's go →",
   },
   campus: {
@@ -70,8 +73,11 @@ export const ONB_COPY = freezeDeep({
     saving: "Saving…",
   },
   profile: {
-    title: "let's pin down your profile",
-    sub: "“same fields as your Vibe profile. name and handle are the must-haves. a photo is next.”",
+    // Name and handle only on screen; the rest folds under `more`, closed
+    // (PLAN.md beat 4). What is saved doesn't change.
+    title: "what should your clubs call you?",
+    sub: "“just a name and a handle. the rest can wait.”",
+    more: "Add more about you (optional)",
     labels: {
       name: "Name (required)",
       handle: "Handle (required)",
@@ -104,7 +110,7 @@ export const ONB_COPY = freezeDeep({
   },
   photo: {
     title: "put a face to the name",
-    otto: "“people follow faces. add a photo so classmates know it's you. swap it any time.”",
+    otto: "“people follow faces. add one now or later, your call.”",
     choose: "Choose a photo",
     skip: "Skip for now",
     uploading: "Uploading…",
@@ -112,13 +118,14 @@ export const ONB_COPY = freezeDeep({
     continue: "Continue →",
   },
   clubs: {
-    title: "Follow clubs",
-    sub: "Their posts show up in your feed. You can join the ones that let you.",
+    // Clubs, not the feed (Parker: club updates and events beat the feed).
+    title: "find your clubs",
+    sub: "Follow a club to get its updates and events. Join the ones that let you.",
     search: "Search clubs by name",
     sparse:
-      "Clubs are just getting started at {campus}. Follow the ones you like — posts land in your feed.",
+      "Clubs are just getting started at {campus}. Follow the ones you like to get their updates and events.",
     sparseNoCampus:
-      "Clubs are just getting started here. Follow the ones you like — posts land in your feed.",
+      "Clubs are just getting started here. Follow the ones you like to get their updates and events.",
     emptyTitle: "no clubs here yet",
     emptyBody:
       "“you could be the first. clubs can be started from vibe on a computer, and they'll show up for everyone at {campus}.”",
@@ -132,9 +139,9 @@ export const ONB_COPY = freezeDeep({
   people: {
     title: "follow a few people",
     ottoShared:
-      "“students at {campus}, IU and Purdue both. follow a few and their posts rise to the top of your feed.”",
-    ottoSingle: "“students at {campus}. follow a few and their posts rise to the top of your feed.”",
-    ottoNoCampus: "“students on vibe. follow a few and their posts rise to the top of your feed.”",
+      "“students at {campus}, IU and Purdue both. follow a few so you know who's here.”",
+    ottoSingle: "“students at {campus}. follow a few so you know who's here.”",
+    ottoNoCampus: "“students on vibe. follow a few so you know who's here.”",
     groupClubs: "From your clubs",
     groupCampus: "At {campus}",
     groupCampusFallback: "On your campus",

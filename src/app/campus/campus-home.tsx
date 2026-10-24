@@ -208,6 +208,14 @@ import {
 import { feedClubOf, muteClubRowLabel, type FeedClub, withoutClubPosts } from "@/lib/posts/feed-actions";
 import { CLUB_TITLE_MAX, clubFlairLabel, normalizeClubTitle } from "@/lib/profile/club-flair";
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser";
+import {
+  CLUBS_LOADING_SELECTOR,
+  campusTourSteps,
+  endsOnClubs,
+  targetHasSize,
+  tourStartDecision,
+  waitUntil,
+} from "@/lib/tour/campus-tour-steps";
 import { useIsMobile } from "@/lib/use-is-mobile";
 import { campusStatsLine, type CampusStats } from "@/lib/usage/active-now";
 import { countOpen, touchActivity } from "@/lib/usage/touch-client";
@@ -569,9 +577,9 @@ export function CampusHome({
   const searchParams = useSearchParams();
   const [tab, setTab] = useState<CampusTab>(() => {
     // When the campus tour is triggered (?welcome=1 or pending-flag) land
-    // on the Feed tab so the first highlighted surface — #campus-feed —
-    // actually exists in the DOM regardless of what tab a deep link may
-    // have requested. Same goes for /campus?post=<id> deep links from
+    // on the Feed tab so what it highlights (the feed and both side
+    // columns, which only the Feed tab draws) actually exists in the DOM
+    // regardless of what tab a deep link may have requested. Same goes for /campus?post=<id> deep links from
     // Otto mention notifications — they only make sense on the feed.
     if (searchParams.get("welcome") === "1") return "feed";
     if (searchParams.get("post")) return "feed";
@@ -652,101 +660,87 @@ export function CampusHome({
     return undefined;
   }, [tab]);
 
-  // Campus tour: triggered by `?welcome=1` (post-onboarding) or by a
-  // `vibe_tour_pending=campus` localStorage flag (handed off from the
-  // profile leg; survives redirects that strip the URL param). Walks the
-  // user through feed, tabs, and search, and ends here on /campus with
-  // "Got it" (no hand-off to /network; the phone tour ends the same way).
+  // Campus tour (first run, Oct 24 2026: handoffs/2026-10-23-onboarding-
+  // review/PLAN.md beats 9-12). Otto, the feed, Tonight on the right, Your
+  // clubs on the left; the last button, "Show me clubs", opens the Orgs tab.
+  // The bubbles and the start rule live in src/lib/tour/campus-tour-steps.ts,
+  // shared with the phone. Triggered by `?welcome=1` (post-onboarding) or the
+  // `vibe_tour_pending=campus` flag (a club-link guest lands on the club page
+  // first; the flag outlives that). The flag starts it even where this
+  // browser has seen it, so the second person to sign up on a shared laptop
+  // still gets it (the phone's rule).
   useEffect(() => {
     // Desktop-only tour. The mobile equivalent lives in `useMobileTour`
     // and targets the mobile-specific element IDs in `CampusMobile`. If
     // this effect fires on a mobile viewport (CampusSwitch picks the
     // tree at hydration time, but the desktop branch can still mount
     // briefly during the SSR → mobile-viewport swap), the desktop
-    // selectors don't exist and the engine falls back to a centered
-    // bubble with desktop copy.
+    // selectors don't exist.
     if (typeof window !== "undefined" && window.matchMedia("(max-width: 899px)").matches) {
       return;
     }
-    const fromUrl = searchParams.get("welcome") === "1";
-    let fromPending = false;
-    try { fromPending = localStorage.getItem("vibe_tour_pending") === "campus"; } catch {}
-    if (!fromUrl && !fromPending) return;
     const seenKey = "vibe_campus_tour_seen_v1";
-    if (typeof localStorage !== "undefined" && localStorage.getItem(seenKey) === "1") {
+    let pending: string | null = null;
+    let seen = false;
+    try {
+      pending = localStorage.getItem("vibe_tour_pending");
+      seen = localStorage.getItem(seenKey) === "1";
+    } catch {}
+    const decision = tourStartDecision({
+      leg: "campus",
+      pending,
+      seen,
+      welcome: searchParams.get("welcome") === "1",
+    });
+    if (decision === "strip") {
       stripWelcomeParam();
-      try { localStorage.removeItem("vibe_tour_pending"); } catch {}
       return;
     }
+    if (decision !== "start") return;
     let cancelled = false;
-    // The feed bubble names the viewer's campus. Wait for it (the banner
-    // shares this cached request) but never longer than 1.5 s; `label` is
-    // deliberately NOT an effect dep, so an already-started tour never
-    // starts twice.
+    // The feed bubble names the viewer's campus: wait for it (the banner
+    // shares this cached request) but never longer than 1.5 s. A club-link
+    // guest's folded clubs strip (1100-1399px) draws only once their clubs
+    // are in, so give that read the same 1.5 s. `label` is deliberately NOT
+    // an effect dep, so an already-started tour never starts twice.
     Promise.all([
       loadOttoTourScript(),
       Promise.race([
         viewerCampusPromise(),
         new Promise<null>((resolve) => window.setTimeout(() => resolve(null), 1500)),
       ]),
+      waitUntil(() => !document.querySelector(CLUBS_LOADING_SELECTOR), 1500),
     ]).then(([, viewer]) => {
-      if (cancelled) return;
-      // From the fixed campus table (never the URL or a server string), so
-      // it's safe inside the tour bubble's HTML.
-      const campusName = viewer?.campus?.shortName ?? null;
-      const feedBody = campusName
-        ? `What students at ${campusName} are posting. People and clubs you follow rise to the top.`
-        : "What students on your campus are posting. People and clubs you follow rise to the top.";
-      window.OttoTour?.start(
-        [
-          {
-            // Heads-up about the LeftNav profile chip first — without an
-            // avatar + banner, the chip renders as a grey shell, which
-            // is the #1 thing users miss after onboarding. Tap it and
-            // they land on /profile in edit mode to fix it.
-            selector: "#nav-identity-chip",
-            title: "This is <span class=\"accent\">you</span> on Vibe.",
-            body: "Pop in a profile picture and a banner — click your card to jump into your profile and customize it. Without them, the card stays grey.",
-          },
-          {
-            selector: "#campus-feed",
-            title: "Your campus <span class=\"accent\">pulse</span>.",
-            body: feedBody,
-          },
-          {
-            selector: "#campus-tabs",
-            title: "Switch lanes anytime.",
-            body: "Feed, Events, Orgs, Map — same Otto, different angle on what's happening.",
-          },
-          {
-            // Below 1024px the top bar folds search into its round button
-            // (#campus-search-toggle); point at what's actually on screen.
-            selector: window.matchMedia(TOPBAR_SEARCH_COLLAPSED_QUERY).matches
-              ? "#campus-search-toggle"
-              : "#campus-search",
-            title: "Find your <span class=\"accent\">people</span>.",
-            body: "Search students, clubs, or events. Otto threads the right matches in.",
-            endLabel: "Got it",
-          },
-        ],
-        {
-          // The tour ends where it is: seen, nothing pending, no redirect.
-          onDone: () => {
-            try {
-              localStorage.setItem(seenKey, "1");
-              localStorage.removeItem("vibe_tour_pending");
-            } catch {}
-            stripWelcomeParam();
-          },
-          onSkip: () => {
-            try {
-              localStorage.setItem(seenKey, "1");
-              localStorage.removeItem("vibe_tour_pending");
-            } catch {}
-            stripWelcomeParam();
-          },
-        },
-      );
+      if (cancelled || !window.OttoTour) return;
+      // From the fixed campus table (never the URL or a server string).
+      const steps = campusTourSteps(viewer?.campus?.shortName ?? null, targetHasSize);
+      if (!steps.length) {
+        // Nothing to point at: drop the flag rather than hold this visit's
+        // cards (the email offer waits on it) for a tour that can't run.
+        try {
+          localStorage.removeItem("vibe_tour_pending");
+        } catch {}
+        stripWelcomeParam();
+        return;
+      }
+      // The tour ends where it is: seen, nothing pending, no redirect; Done
+      // on "Show me clubs" opens the Orgs tab.
+      const finish = (openClubs: boolean) => {
+        // The flag first, on its own: if marking it seen fails (storage
+        // full), a flag left behind would start the tour again at once.
+        try {
+          localStorage.removeItem("vibe_tour_pending");
+        } catch {}
+        try {
+          localStorage.setItem(seenKey, "1");
+        } catch {}
+        stripWelcomeParam();
+        if (openClubs) setTab("orgs");
+      };
+      window.OttoTour.start(steps, {
+        onDone: () => finish(endsOnClubs(steps)),
+        onSkip: () => finish(false),
+      });
     }).catch(() => {
       /* the tour script didn't load; the page works without it */
     });
@@ -7312,77 +7306,83 @@ function FeedTabBody({
         boxSizing: "border-box",
       }}
     >
-      {tagFilter ? (
-        <SceneHeader
-          eyebrow={`Feed · #${tagFilter}`}
-          title={`Posts tagged #${tagFilter}`}
-          subtitle="Tap any post to open it. Back to the main feed below."
-          tone="dark"
-        />
-      ) : (
-        <SceneHeader
-          eyebrow={campusEyebrow("Feed", view.isVisiting ? view.label : campusLabel)}
-          title="What’s on campus today"
-          subtitle="Posts from clubs, orgs, and your network."
-          tone="dark"
-        />
-      )}
+      {/* The feed's first screen (heading, strip, composer): what the
+          campus tour's feed bubble points at, so it never scrolls the page
+          away from the side columns. The same column and 14px gap as the
+          section, so wrapping changes nothing on screen. */}
+      <div id="campus-feed-top" style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+        {tagFilter ? (
+          <SceneHeader
+            eyebrow={`Feed · #${tagFilter}`}
+            title={`Posts tagged #${tagFilter}`}
+            subtitle="Tap any post to open it. Back to the main feed below."
+            tone="dark"
+          />
+        ) : (
+          <SceneHeader
+            eyebrow={campusEyebrow("Feed", view.isVisiting ? view.label : campusLabel)}
+            title="What’s on campus today"
+            subtitle="Posts from clubs, orgs, and your network."
+            tone="dark"
+          />
+        )}
 
-      {/* The rolling strip: RSVP'd events, then trending tags, one 40px row
-          the width of the column, directly above the composer. Feed tab
-          only, and only on the main feed (a tag filter hides it: the
-          "← Back" button below is the way out). Renders nothing while both
-          lists are empty, so the composer simply moves up. Because the strip
-          never shows under a filter here, no chip is ever "active" on the
-          desktop; C1's tap-again-to-clear is the phone's affordance. */}
-      {!tagFilter ? (
-        <RollingStrip
-          data={strip}
-          roll
-          onPickTag={onPickTag}
-          onPickEvent={onPickEvent}
-          activeTag={null}
-          visiting={view.isVisiting}
-        />
-      ) : null}
+        {/* The rolling strip: RSVP'd events, then trending tags, one 40px row
+            the width of the column, directly above the composer. Feed tab
+            only, and only on the main feed (a tag filter hides it: the
+            "← Back" button below is the way out). Renders nothing while both
+            lists are empty, so the composer simply moves up. Because the strip
+            never shows under a filter here, no chip is ever "active" on the
+            desktop; C1's tap-again-to-clear is the phone's affordance. */}
+        {!tagFilter ? (
+          <RollingStrip
+            data={strip}
+            roll
+            onPickTag={onPickTag}
+            onPickEvent={onPickEvent}
+            activeTag={null}
+            visiting={view.isVisiting}
+          />
+        ) : null}
 
-      {tagFilter ? (
-        <button
-          type="button"
-          onClick={onClearTagFilter}
-          style={{
-            alignSelf: "flex-start",
-            padding: "9px 18px",
-            borderRadius: 999,
-            border: "1px solid rgba(255,255,255,0.16)",
-            background: "rgba(20,16,32,0.72)",
-            color: "#fff",
-            fontFamily: "DM Sans, sans-serif",
-            fontWeight: 700,
-            fontSize: 13,
-            cursor: "pointer",
-            backdropFilter: "blur(20px)",
-            WebkitBackdropFilter: "blur(20px)",
-            boxShadow: "inset 0 1px 0 rgba(255,255,255,0.18), 0 6px 22px rgba(0,0,0,0.35)",
-          }}
-        >
-          ← Back to main feed
-        </button>
-      ) : null}
+        {tagFilter ? (
+          <button
+            type="button"
+            onClick={onClearTagFilter}
+            style={{
+              alignSelf: "flex-start",
+              padding: "9px 18px",
+              borderRadius: 999,
+              border: "1px solid rgba(255,255,255,0.16)",
+              background: "rgba(20,16,32,0.72)",
+              color: "#fff",
+              fontFamily: "DM Sans, sans-serif",
+              fontWeight: 700,
+              fontSize: 13,
+              cursor: "pointer",
+              backdropFilter: "blur(20px)",
+              WebkitBackdropFilter: "blur(20px)",
+              boxShadow: "inset 0 1px 0 rgba(255,255,255,0.18), 0 6px 22px rgba(0,0,0,0.35)",
+            }}
+          >
+            ← Back to main feed
+          </button>
+        ) : null}
 
-      {/* Away from home the composer's slot says where a post would land
-          (R5: the trigger files every post on the author's home campus, so
-          a composer here would post somewhere other than the page shows). */}
-      {!tagFilter && view.isVisiting ? (
-        <VisitingComposerNote homeId={view.homeId} />
-      ) : !tagFilter ? (
-        <FeedComposer
-          glass={FEED_CARD_SURFACE}
-          onPosted={() => {
-            void refresh();
-          }}
-        />
-      ) : null}
+        {/* Away from home the composer's slot says where a post would land
+            (R5: the trigger files every post on the author's home campus, so
+            a composer here would post somewhere other than the page shows). */}
+        {!tagFilter && view.isVisiting ? (
+          <VisitingComposerNote homeId={view.homeId} />
+        ) : !tagFilter ? (
+          <FeedComposer
+            glass={FEED_CARD_SURFACE}
+            onPosted={() => {
+              void refresh();
+            }}
+          />
+        ) : null}
+      </div>
 
       {/* Posts: one card per post, 12px apart, like the phone. The loading /
           error / empty states share a single card so the column never reads

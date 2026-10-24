@@ -23,8 +23,11 @@ import { COLORS, fieldErrorStyle, inputStyle, secondaryLinkStyle } from "./onb-t
  *
  * Back is hidden (but keeps its column) on step 1 and calls `onBack`, which
  * the parent wires to `history.back()` so the header, the browser and the iOS
- * swipe all go back the same way. Skip shows on all six steps, step 1
- * included. Both are disabled while the parent is saving.
+ * swipe all go back the same way. Skip is hidden the same way on steps 1 and
+ * 2, so nobody finishes without a campus (first run, Oct 24 2026: a skip from
+ * step 1 left "Pick your campus" and no club creation); the "⋯" below stays
+ * the way out there. Replay saves nothing and its Skip only leaves, so it
+ * keeps Skip on every step. Both are disabled while the parent is saving.
  *
  * The "⋯" at the end opens the account sheet (Sign out, Delete account), so
  * nobody has to finish onboarding to leave, or to take their account off
@@ -34,6 +37,8 @@ import { COLORS, fieldErrorStyle, inputStyle, secondaryLinkStyle } from "./onb-t
 export function OnbHeader(p: {
   step: number;
   total: number;
+  /** Replay (`?replay=1`): Skip shows on every step. */
+  replay?: boolean;
   backDisabled: boolean;
   skipDisabled: boolean;
   onBack: () => void;
@@ -41,6 +46,7 @@ export function OnbHeader(p: {
 }): JSX.Element {
   // `total` is part of the contract; the copy ("{n} of 6") already carries it.
   const { step, backDisabled, skipDisabled, onBack, onSkip } = p;
+  const skipHidden = step <= 2 && !p.replay;
   const copy = ONB_COPY.header;
   const progress = copy.progress.replace("{n}", String(step));
   const [accountOpen, setAccountOpen] = useState(false);
@@ -66,9 +72,13 @@ export function OnbHeader(p: {
       <span style={progressTextStyle}>{progress}</span>
       <button
         type="button"
-        disabled={skipDisabled}
+        disabled={skipDisabled || skipHidden}
         onClick={onSkip}
-        style={{ ...skipBtnStyle, opacity: skipDisabled ? 0.4 : 1 }}
+        style={{
+          ...skipBtnStyle,
+          visibility: skipHidden ? "hidden" : "visible",
+          opacity: skipDisabled ? 0.4 : 1,
+        }}
       >
         {copy.skip}
       </button>

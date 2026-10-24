@@ -1087,6 +1087,7 @@ export function OnboardingMobile({
       <OnbHeader
         step={step}
         total={ONBOARDING_TOTAL_STEPS}
+        replay={replay}
         backDisabled={busy}
         skipDisabled={busy || skipOpen}
         onBack={() => window.history.back()}

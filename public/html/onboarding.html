@@ -39,7 +39,13 @@
      --bg-rgb is --charcoal as channels (the top bar's fade); --surface and
      --surface-2 are the confirm card and the club/person logo disc;
      --option-ink is the year picker's native option list. */
-  --bg-rgb:28,28,30; --surface:#1f1f22; --surface-2:#26252A; --option-ink:#1C1C1E; }
+  --bg-rgb:28,28,30; --surface:#1f1f22; --surface-2:#26252A; --option-ink:#1C1C1E;
+  /* SPRING_SOFT sampled over 480ms (src/lib/motion/spring-curve.ts), with an
+     ease-out first for browsers without linear(). */
+  --onb-spring-soft: cubic-bezier(0.22, 1, 0.36, 1); }
+@supports (transition-timing-function: linear(0, 1)) {
+  :root { --onb-spring-soft: linear(0, 0.026 3%, 0.088 6%, 0.198 10%, 0.319 14%, 0.464 19%, 0.589 24%, 0.71 30%, 0.812 37%, 0.889 45%, 0.945 55%, 0.977 67%, 0.993 82%, 1); }
+}
 /* Night (S67 contracts C0). This page is dark chrome in BOTH themes:
    --charcoal is its BACKGROUND (body, below) and the ink stays white, so the
    night twin does not swap the two. The background deepens to Night's page
@@ -106,6 +112,7 @@ input, textarea, [contenteditable="true"] { cursor:text!important; }
   color: rgba(255,255,255,.55); background: none; border: none;
   padding: 8px 12px; border-radius: 100px; transition: color .15s, opacity .15s;
 }
+.onb-top-end { justify-self: end; display: flex; align-items: center; }
 .onb-skip:hover:not(:disabled) { color: white; }
 .onb-skip:disabled { opacity: .4; }
 
@@ -270,6 +277,31 @@ input, textarea, [contenteditable="true"] { cursor:text!important; }
   cursor: pointer;
 }
 .pf-looking-row input { accent-color: var(--accent); width: 15px; height: 15px; }
+/* "Add more about you (optional)": a quiet row shaped like the fields, and the
+   folded fields under it. Opening rises them 8px and fades them in on
+   SPRING_SOFT (src/lib/motion/springs.ts) sampled over 480ms, transform and
+   opacity only; with reduced motion they only fade. The curve is pinned by
+   src/lib/motion/spring-curve.test.ts. */
+.pf-more {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  width: 100%; min-height: 44px; padding: 10px 14px; border-radius: 12px;
+  background: rgba(255,255,255,.04); border: 0.5px dashed rgba(255,255,255,.18);
+  font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 600; text-align: left;
+  color: rgba(255,255,255,.72); transition: color .15s, border-color .15s;
+}
+.pf-more:hover { color: white; border-color: rgba(255,255,255,.3); }
+.pf-more:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.pf-more-chev { display: inline-block; font-size: 16px; line-height: 1; transition: transform 480ms var(--onb-spring-soft); }
+.pf-more[aria-expanded="true"] .pf-more-chev { transform: rotate(180deg); }
+.pf-more-body { display: flex; flex-direction: column; gap: 14px; }
+.pf-more-body[hidden] { display: none; }
+.pf-more-body.pf-more-in { animation: pf-more-in 480ms var(--onb-spring-soft) both; }
+@keyframes pf-more-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+@keyframes pf-more-fade { from { opacity: 0; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) {
+  .pf-more-chev { transition: none; }
+  .pf-more-body.pf-more-in { animation-name: pf-more-fade; }
+}
 
 /* Confirm dialog (close button on top) */
 .confirm-overlay {
@@ -505,7 +537,13 @@ body.ott-warping .progress-dots {
   <button type="button" class="onb-back" id="onbBack"><span aria-hidden="true">←</span></button>
   <a href="/campus" class="onb-logo" id="onbLogo">vibe<span>.</span></a>
   <span></span>
-  <button type="button" class="onb-skip" id="onbSkip" data-copy="header.skip"></button>
+  <!-- Skip from step 3 on; on steps 1 and 2 (no campus yet) a quiet Sign out
+       holds its place, since this page has no other way out (first run,
+       Oct 24 2026). -->
+  <span class="onb-top-end">
+    <button type="button" class="onb-skip" id="onbSkip" data-copy="header.skip"></button>
+    <button type="button" class="onb-skip" id="onbSignOut" data-desktop-copy="header.signOut" hidden></button>
+  </span>
 </header>
 
 <div class="progress-dots" id="progressDots">
@@ -606,6 +644,15 @@ body.ott-warping .progress-dots {
         <p class="pf-hint" data-local="hintHandle"></p>
         <p class="pf-error" id="pfHandleError" role="alert" hidden></p>
       </div>
+      <!-- First run (Oct 24, 2026): name and handle on screen, everything else
+           under one closed row. The fields are the same and save the same way;
+           only what shows changes (PLAN.md beat 4). Opens on its own when a
+           restored draft or the prefill already filled one of them. -->
+      <button type="button" class="pf-more" id="pfMoreToggle" aria-expanded="false" aria-controls="pfMore">
+        <span data-copy="profile.more"></span>
+        <span class="pf-more-chev" aria-hidden="true">⌄</span>
+      </button>
+      <div class="pf-more-body" id="pfMore" hidden>
       <div>
         <label class="pf-label" for="pfBio" data-copy="profile.labels.bio"></label>
         <textarea id="pfBio" class="pf-textarea" rows="3" maxlength="600" data-placeholder="placeholders.bio"></textarea>
@@ -642,6 +689,7 @@ body.ott-warping .progress-dots {
         <!-- One checkbox per ONB_LOCAL_COPY.lookingFor, class .pf-looking. -->
         <div class="pf-looking-wrap" id="pfLookingWrap"></div>
       </fieldset>
+      </div>
     </div>
 
     <div class="cta-row" style="margin-top: 28px;">
@@ -845,8 +893,8 @@ const ONB_COPY = Object.freeze({
     replay: "REPLAY MODE",
   }),
   hello: Object.freeze({
-    intro: "“think of me as your campus compass. i'll point you to what's loud, what's tonight, and who's on your wavelength — your guide while you build out your home on vibe.”",
-    note: "about two minutes: your campus, your profile, a photo, then your people",
+    intro: "“i keep an eye on campus: what's on tonight, which clubs are meeting, who's here. a few quick things and it's yours.”",
+    note: "about two minutes: your campus, your name, a photo, then your clubs and people",
     cta: "Let's go →",
   }),
   campus: Object.freeze({
@@ -874,8 +922,9 @@ const ONB_COPY = Object.freeze({
     saving: "Saving…",
   }),
   profile: Object.freeze({
-    title: "let's pin down your profile",
-    sub: "“same fields as your Vibe profile. name and handle are the must-haves. a photo is next.”",
+    title: "what should your clubs call you?",
+    sub: "“just a name and a handle. the rest can wait.”",
+    more: "Add more about you (optional)",
     labels: Object.freeze({
       name: "Name (required)",
       handle: "Handle (required)",
@@ -908,7 +957,7 @@ const ONB_COPY = Object.freeze({
   }),
   photo: Object.freeze({
     title: "put a face to the name",
-    otto: "“people follow faces. add a photo so classmates know it's you. swap it any time.”",
+    otto: "“people follow faces. add one now or later, your call.”",
     choose: "Choose a photo",
     skip: "Skip for now",
     uploading: "Uploading…",
@@ -916,11 +965,11 @@ const ONB_COPY = Object.freeze({
     continue: "Continue →",
   }),
   clubs: Object.freeze({
-    title: "Follow clubs",
-    sub: "Their posts show up in your feed. You can join the ones that let you.",
+    title: "find your clubs",
+    sub: "Follow a club to get its updates and events. Join the ones that let you.",
     search: "Search clubs by name",
-    sparse: "Clubs are just getting started at {campus}. Follow the ones you like — posts land in your feed.",
-    sparseNoCampus: "Clubs are just getting started here. Follow the ones you like — posts land in your feed.",
+    sparse: "Clubs are just getting started at {campus}. Follow the ones you like to get their updates and events.",
+    sparseNoCampus: "Clubs are just getting started here. Follow the ones you like to get their updates and events.",
     emptyTitle: "no clubs here yet",
     emptyBody: "“you could be the first. clubs can be started from vibe on a computer, and they'll show up for everyone at {campus}.”",
     emptyBodyNoCampus: "“you could be the first. clubs can be started from vibe on a computer, and they'll show up for everyone here.”",
@@ -930,9 +979,9 @@ const ONB_COPY = Object.freeze({
   }),
   people: Object.freeze({
     title: "follow a few people",
-    ottoShared: "“students at {campus}, IU and Purdue both. follow a few and their posts rise to the top of your feed.”",
-    ottoSingle: "“students at {campus}. follow a few and their posts rise to the top of your feed.”",
-    ottoNoCampus: "“students on vibe. follow a few and their posts rise to the top of your feed.”",
+    ottoShared: "“students at {campus}, IU and Purdue both. follow a few so you know who's here.”",
+    ottoSingle: "“students at {campus}. follow a few so you know who's here.”",
+    ottoNoCampus: "“students on vibe. follow a few so you know who's here.”",
     groupClubs: "From your clubs",
     groupCampus: "At {campus}",
     groupCampusFallback: "On your campus",
@@ -1175,7 +1224,7 @@ const ONB_LOCAL_COPY = Object.freeze({
   placeholders: Object.freeze({
     name: "How you want to appear on Vibe",
     handle: "yourhandle",
-    bio: "A few lines about you — what you're into, what you're building.",
+    bio: "A few lines about you — what you're into.",
     major: "e.g. Informatics",
     department: "e.g. Luddy School of Informatics…",
     interests: "Clubs, side projects, topics",
@@ -2114,6 +2163,12 @@ function firstName(full) {
 // outside the mirror block: ONB_COPY there must stay JSON-equal to
 // onb-copy.ts. Bound by `data-desktop-copy` in applyCopy.
 const ONB_DESKTOP_COPY = Object.freeze({
+  // Settings' sign-out words, word for word (suspended-actions.tsx).
+  header: Object.freeze({
+    signOut: "Sign out",
+    signingOut: "Signing out…",
+    signOutFailed: "Couldn't sign you out. Try again.",
+  }),
   people: Object.freeze({
     getApp: "Get Vibe on your phone",
     getAppBody: "Scan with your phone's camera to take Vibe with you.",
@@ -2150,6 +2205,9 @@ const ONB_RESTORE = restoreOnboarding({
   prefill: ONB_PREFILL,
   singleCampusId: ONB_BOOT.singleCampusId,
 });
+
+/** Sign out (steps 1 and 2) is running; see signOutHere. */
+let signingOut = false;
 
 const onb = {
   /** The verified university; the Purdue switch can change it. */
@@ -2196,7 +2254,7 @@ function freshPeople() {
 function $(id) { return document.getElementById(id); }
 
 function isBusy() {
-  return onb.savingCampus || onb.savingProfile || onb.switching || onb.uploading || onb.finishing || onb.skipping;
+  return onb.savingCampus || onb.savingProfile || onb.switching || onb.uploading || onb.finishing || onb.skipping || signingOut;
 }
 
 /** The single-campus preselect from the email, when it's one of this university's campuses. */
@@ -2335,6 +2393,10 @@ function showStep(n) {
   if (curStep) { curStep.style.animation = 'none'; curStep.offsetHeight; curStep.style.animation = ''; }
   updateProgress();
   $('onbBack').style.visibility = n <= 1 ? 'hidden' : 'visible';
+  // No skipping past the campus: Skip waits for step 3, Sign out stands in.
+  // Replay saves nothing and its Skip only leaves, so it keeps Skip throughout.
+  $('onbSkip').hidden = n <= 2 && !IS_REPLAY;
+  $('onbSignOut').hidden = n > 2 || IS_REPLAY;
   bindCursorHover();
   window.scrollTo({ top: 0 });
   scheduleDraft();
@@ -2378,6 +2440,7 @@ function renderBusy() {
   renderPhoto();
   renderClubsFooter();
   renderSkip();
+  renderSignOut();
 }
 
 function onPopState(e) {
@@ -2854,6 +2917,29 @@ function writeFields(f) {
   document.querySelectorAll('.pf-looking').forEach((box) => { box.checked = onb.lookingFor.includes(box.value); });
   $('skipName').value = f.name;
   $('skipHandle').value = f.handle;
+  // Restored answers stay in view: the fold opens (without moving) when any
+  // of its fields already holds something.
+  if (hasOptionalFields(f)) setMoreOpen(true, false);
+}
+
+/** Anything typed or saved in the folded fields. */
+function hasOptionalFields(f) {
+  return [f.bio, f.major, f.department, f.year, f.interests, f.skills].some((v) => String(v || '').trim() !== '')
+    || f.looking_for.length > 0;
+}
+
+/** Opens or closes "Add more about you". Only a tap animates the opening. */
+function setMoreOpen(open, animate) {
+  const toggle = $('pfMoreToggle');
+  const body = $('pfMore');
+  toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+  body.hidden = !open;
+  body.classList.remove('pf-more-in');
+  if (open && animate) {
+    body.offsetHeight; // restart the rise on every open
+    body.classList.add('pf-more-in');
+  }
+  if (open) bindCursorHover();
 }
 
 /** Majors follow the campus: a curated list where one exists, else free text. */
@@ -4056,23 +4142,91 @@ async function runSkip() {
   stop();
 }
 
-/** Header logo: replay just leaves; a first run asks first (the app would bounce back here). */
+/**
+ * Header logo: replay just leaves; a first run asks first (the app would
+ * bounce back here). Before the campus is picked there is nothing to ask:
+ * skipping would finish with no campus, so the logo stays put.
+ */
 function leaveViaLogo() {
   if (isBusy()) return;
   if (IS_REPLAY) window.__vibeTopNav('/campus');
-  else openSkip();
+  else if (onb.step > 2) openSkip();
+}
+
+// ── Sign out (steps 1 and 2) ──────────────────────────────────────────────
+// The page around this iframe (OnboardingSwitch.tsx) lends its sign-out,
+// the phone's and Settings' own (useLeaveAccount: the logout, the device
+// clean-up, the drafts), as window.__vibeOnbSignOut, which answers true when
+// it is leaving for /auth/login. Opened on its own (no frame), the page signs
+// out itself. Never disabled by a save (leaving must not wait on one), but
+// while it runs everything else holds still (isBusy), so no Continue can
+// write a draft back after the clean-up. (`signingOut` is declared with the
+// page state, above, since isBusy reads it.)
+
+function renderSignOut() {
+  const btn = $('onbSignOut');
+  btn.disabled = signingOut;
+  btn.textContent = signingOut ? ONB_DESKTOP_COPY.header.signingOut : ONB_DESKTOP_COPY.header.signOut;
+}
+
+/** Drops every onboarding draft and the account's stored copies on this browser. */
+function forgetThisBrowser() {
+  clearDraftNow();
+  try {
+    const keys = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && k.startsWith(DRAFT_KEY_PREFIX)) keys.push(k);
+    }
+    keys.forEach((k) => localStorage.removeItem(k));
+  } catch (e) {
+    /* storage blocked: nothing kept */
+  }
+  if (typeof vibeClearAll === 'function') vibeClearAll();
+}
+
+async function signOutHere() {
+  if (signingOut) return;
+  signingOut = true;
+  renderBusy();
+  let leaving = false;
+  try {
+    const host = window.parent !== window ? window.parent : null;
+    if (host && typeof host.__vibeOnbSignOut === 'function') {
+      leaving = (await host.__vibeOnbSignOut()) === true;
+      // The host cleared the drafts; this stops this page writing one back.
+      if (leaving) clearDraftNow();
+    } else {
+      const r = await fetch('/api/auth/logout', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+      const data = await r.json().catch(() => ({}));
+      if (r.ok && data && data.ok === true) {
+        forgetThisBrowser();
+        window.__vibeTopNav('/auth/login');
+        leaving = true;
+      }
+    }
+  } catch (e) {
+    leaving = false;
+  }
+  if (leaving) return;
+  signingOut = false;
+  renderBusy();
+  $('onbSignOut').focus();
+  window.vibeToast(ONB_DESKTOP_COPY.header.signOutFailed, { tone: 'error' });
 }
 
 // ── Wiring ────────────────────────────────────────────────────────────────
 function bindEvents() {
   $('onbBack').addEventListener('click', () => { if (!isBusy()) history.back(); });
   $('onbSkip').addEventListener('click', openSkip);
+  $('onbSignOut').addEventListener('click', () => { void signOutHere(); });
   $('onbLogo').addEventListener('click', (e) => { e.preventDefault(); leaveViaLogo(); });
   window.addEventListener('popstate', onPopState);
 
   $('onbHelloContinue').addEventListener('click', () => { if (!isBusy()) goForward(2); });
   $('onbCampusContinue').addEventListener('click', () => { void continueCampus(); });
   $('onbProfileContinue').addEventListener('click', () => { void continueProfile(); });
+  $('pfMoreToggle').addEventListener('click', () => { setMoreOpen($('pfMore').hidden, true); });
   $('onbClubsContinue').addEventListener('click', () => { if (!isBusy()) goForward(6); });
   $('onbFinish').addEventListener('click', () => { void finish(); });
 

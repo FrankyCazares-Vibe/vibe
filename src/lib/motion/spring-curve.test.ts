@@ -52,3 +52,12 @@ test("SPRING_SNAPPY has settled by 320ms, with no visible overshoot", () => {
     assert.ok(springProgress(SPRING_SNAPPY, ms / 1000) < 1.005, `${ms}ms`);
   }
 });
+
+test("the computer onboarding's fold curve is SPRING_SOFT over 480ms", async () => {
+  const { SPRING_SOFT } = await import("./springs");
+  const page = readFileSync(new URL("../../../public/html/onboarding.html", import.meta.url), "utf8");
+  const found = page.match(/--onb-spring-soft:\s*(linear\([^;]*\));/)?.[1] ?? null;
+  assert.equal(found, springLinear(SPRING_SOFT, 480));
+  assert.match(page, /animation: pf-more-in 480ms var\(--onb-spring-soft\)/);
+  assert.ok(Math.abs(springProgress(SPRING_SOFT, 0.48) - 1) < 0.005);
+});

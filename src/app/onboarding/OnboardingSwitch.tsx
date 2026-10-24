@@ -1,7 +1,8 @@
 "use client";
 
-import { useSyncExternalStore, type ComponentType, type CSSProperties } from "react";
+import { useEffect, useSyncExternalStore, type ComponentType, type CSSProperties } from "react";
 
+import { useLeaveAccount } from "@/app/account/suspended/suspended-actions";
 import { OnboardingMobile } from "@/components/mobile/OnboardingMobile";
 import type { OnboardingBoot } from "@/lib/onboarding/boot";
 import { MOBILE_BREAKPOINT_PX } from "@/lib/use-is-mobile";
@@ -96,9 +97,34 @@ export function OnboardingSwitch({ boot }: { boot: OnboardingBoot }) {
     );
   }
 
+  return <DesktopOnboarding replay={boot.replay} />;
+}
+
+declare global {
+  interface Window {
+    /** Lent to the framed computer page for its Sign out (steps 1-2). */
+    __vibeOnbSignOut?: () => Promise<boolean>;
+  }
+}
+
+/**
+ * The computer flow: the static page in a full-screen frame. Steps 1 and 2
+ * have no Skip (no finishing without a campus, first run Oct 24 2026), so the
+ * page's header offers Sign out there, and this lends it the phone's and
+ * Settings' own sign-out (`useLeaveAccount`: the logout, this device's push
+ * and stored account data, every onboarding draft) rather than a second copy.
+ */
+function DesktopOnboarding({ replay }: { replay: boolean }) {
+  const { signOut } = useLeaveAccount(null);
+  useEffect(() => {
+    window.__vibeOnbSignOut = signOut;
+    return () => {
+      if (window.__vibeOnbSignOut === signOut) delete window.__vibeOnbSignOut;
+    };
+  }, [signOut]);
   return (
     <iframe
-      src={`/onboarding/classic${boot.replay ? "?replay=1" : ""}`}
+      src={`/onboarding/classic${replay ? "?replay=1" : ""}`}
       title="Onboarding"
       style={{
         position: "fixed",

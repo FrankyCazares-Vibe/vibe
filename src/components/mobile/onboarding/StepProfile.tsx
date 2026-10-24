@@ -13,8 +13,11 @@ import {
   type SetStateAction,
 } from "react";
 
+import { motion } from "motion/react";
+
 import { vibeRequest } from "@/lib/feedback/request";
 import type { CampusMajors } from "@/lib/iu/majors";
+import { RISE_PX, SPRING_SNAPPY, SPRING_SOFT } from "@/lib/motion/springs";
 import type { OnboardingTypedFields, OnboardingYear } from "@/lib/onboarding/draft";
 
 import { ONB_COPY } from "./onb-copy";
@@ -33,7 +36,12 @@ import {
  * Onboarding step 3, the profile (wave plan
  * `handoffs/2026-09-16-wave-plan-follow-onboarding-edit.md` §9 B12 item 9).
  *
- * All nine profile fields, name and handle required. The values and every
+ * All nine profile fields, name and handle required. Only those two show:
+ * the other seven fold under "Add more about you (optional)", closed (first
+ * run, Oct 24 2026; handoffs/2026-10-23-onboarding-review/PLAN.md beat 4).
+ * The fold changes what shows, never what is saved: every field still goes
+ * through `profileStepBody`, and "Showing my work" stays among the options
+ * until week 1 retires it everywhere (looking-for.test.ts). The values and every
  * error live in the parent (`OnboardingMobile`), so Back, the skip sheet and
  * a reload (through the draft) all see the same text. The root is a fragment
  * from the `h2` down: the parent renders the `<section>`, the Otto orb and
@@ -74,7 +82,7 @@ export const YEAR_OPTIONS: readonly { value: OnboardingYear; label: string }[] =
 export const PROFILE_PLACEHOLDERS = {
   name: "How you want to appear on Vibe",
   handle: "yourhandle",
-  bio: "A few lines about you — what you're into, what you're building.",
+  bio: "A few lines about you — what you're into.",
   major: "e.g. Informatics",
   department: "e.g. Luddy School of Informatics…",
   interests: "Clubs, side projects, topics",
@@ -262,6 +270,11 @@ export function StepProfile(p: {
   const majorHint = majorList
     ? copy.majorHintList.replace("{label}", () => majorList.label)
     : copy.majorHintFree;
+  // Open from the start when a restored draft or the prefill already filled
+  // one of the folded fields, so nobody's answers sit out of sight.
+  const [moreOpen, setMoreOpen] = useState(() => hasOptionalFields(f));
+  // Only a tap animates the opening; a fold that starts open just is.
+  const [moreTapped, setMoreTapped] = useState(false);
 
   return (
     <>
@@ -321,129 +334,171 @@ export function StepProfile(p: {
           )}
         </Field>
 
-        <Field label={labels.bio} hint={PROFILE_HINTS.bio} htmlFor="onbBio">
-          <textarea
-            id="onbBio"
-            value={f.bio}
-            onChange={(e) => onField("bio", e.target.value)}
-            maxLength={600}
-            rows={3}
-            placeholder={PROFILE_PLACEHOLDERS.bio}
-            style={textareaStyle}
-          />
-        </Field>
-
-        <Field label={labels.major} hint={majorHint} htmlFor="onbMajor">
-          <input
-            id="onbMajor"
-            type="text"
-            value={f.major}
-            onChange={(e) => onField("major", e.target.value)}
-            maxLength={80}
-            list={majorList ? "onbMajors" : undefined}
-            autoComplete="off"
-            placeholder={PROFILE_PLACEHOLDERS.major}
-            style={inputStyle}
-          />
-          {majorList && (
-            <datalist id="onbMajors">
-              {majorList.majors.map((m) => (
-                <option key={m} value={m} />
-              ))}
-            </datalist>
-          )}
-        </Field>
-
-        <Field label={labels.department} htmlFor="onbDept">
-          <input
-            id="onbDept"
-            type="text"
-            value={f.department}
-            onChange={(e) => onField("department", e.target.value)}
-            maxLength={120}
-            list={majorList ? "onbSchools" : undefined}
-            autoComplete="off"
-            placeholder={PROFILE_PLACEHOLDERS.department}
-            style={inputStyle}
-          />
-          {majorList && (
-            <datalist id="onbSchools">
-              {majorList.schools.map((s) => (
-                <option key={s} value={s} />
-              ))}
-            </datalist>
-          )}
-        </Field>
-
-        <Field label={labels.year} htmlFor="onbYear">
-          <select
-            id="onbYear"
-            value={f.year}
-            onChange={(e) => onField("year", asOnboardingYear(e.target.value))}
-            style={inputStyle}
+        <button
+          type="button"
+          aria-expanded={moreOpen}
+          aria-controls="onbProfileMore"
+          onClick={() => {
+            setMoreTapped(true);
+            setMoreOpen((open) => !open);
+          }}
+          style={moreRowStyle}
+        >
+          <span>{copy.more}</span>
+          <motion.span
+            aria-hidden="true"
+            animate={{ rotate: moreOpen ? 180 : 0 }}
+            transition={SPRING_SNAPPY}
+            style={moreChevronStyle}
           >
-            {YEAR_OPTIONS.map((o) => (
-              <option key={o.value || "none"} value={o.value}>
-                {o.label}
-              </option>
-            ))}
-          </select>
-        </Field>
+            ⌄
+          </motion.span>
+        </button>
 
-        <Field label={labels.interests} hint={PROFILE_HINTS.interests} htmlFor="onbInterests">
-          <textarea
-            id="onbInterests"
-            value={f.interests}
-            onChange={(e) => onField("interests", e.target.value)}
-            maxLength={600}
-            rows={3}
-            placeholder={PROFILE_PLACEHOLDERS.interests}
-            style={textareaStyle}
-          />
-        </Field>
+        <div id="onbProfileMore" hidden={!moreOpen}>
+          {moreOpen ? (
+            // Rises 8px and fades in on SPRING_SOFT; MotionRoot keeps only the
+            // fade under reduced motion.
+            <motion.div
+              initial={moreTapped ? { opacity: 0, y: RISE_PX } : false}
+              animate={{ opacity: 1, y: 0 }}
+              transition={SPRING_SOFT}
+              style={moreBodyStyle}
+            >
+              <Field label={labels.bio} hint={PROFILE_HINTS.bio} htmlFor="onbBio">
+                <textarea
+                  id="onbBio"
+                  value={f.bio}
+                  onChange={(e) => onField("bio", e.target.value)}
+                  maxLength={600}
+                  rows={3}
+                  placeholder={PROFILE_PLACEHOLDERS.bio}
+                  style={textareaStyle}
+                />
+              </Field>
 
-        <Field label={labels.skills} hint={PROFILE_HINTS.skills} htmlFor="onbSkills">
-          <textarea
-            id="onbSkills"
-            value={f.skills}
-            onChange={(e) => onField("skills", e.target.value)}
-            maxLength={600}
-            rows={3}
-            placeholder={PROFILE_PLACEHOLDERS.skills}
-            style={textareaStyle}
-          />
-        </Field>
+              <Field label={labels.major} hint={majorHint} htmlFor="onbMajor">
+                <input
+                  id="onbMajor"
+                  type="text"
+                  value={f.major}
+                  onChange={(e) => onField("major", e.target.value)}
+                  maxLength={80}
+                  list={majorList ? "onbMajors" : undefined}
+                  autoComplete="off"
+                  placeholder={PROFILE_PLACEHOLDERS.major}
+                  style={inputStyle}
+                />
+                {majorList && (
+                  <datalist id="onbMajors">
+                    {majorList.majors.map((m) => (
+                      <option key={m} value={m} />
+                    ))}
+                  </datalist>
+                )}
+              </Field>
 
-        <fieldset style={fieldsetStyle}>
-          <legend style={legendStyle}>{labels.lookingFor}</legend>
-          <div style={lookingForWrapStyle}>
-            {LOOKING_FOR_OPTIONS.map((opt) => {
-              const checked = f.looking_for.includes(opt.value);
-              return (
-                <label key={opt.value} style={lookingForRowStyle(checked)}>
-                  <input
-                    type="checkbox"
-                    checked={checked}
-                    onChange={(e) => {
-                      onField(
-                        "looking_for",
-                        e.target.checked
-                          ? [...f.looking_for.filter((v) => v !== opt.value), opt.value]
-                          : f.looking_for.filter((v) => v !== opt.value),
-                      );
-                    }}
-                    style={{ accentColor: COLORS.accent }}
-                  />
-                  <span>{opt.label}</span>
-                </label>
-              );
-            })}
-          </div>
-        </fieldset>
+              <Field label={labels.department} htmlFor="onbDept">
+                <input
+                  id="onbDept"
+                  type="text"
+                  value={f.department}
+                  onChange={(e) => onField("department", e.target.value)}
+                  maxLength={120}
+                  list={majorList ? "onbSchools" : undefined}
+                  autoComplete="off"
+                  placeholder={PROFILE_PLACEHOLDERS.department}
+                  style={inputStyle}
+                />
+                {majorList && (
+                  <datalist id="onbSchools">
+                    {majorList.schools.map((s) => (
+                      <option key={s} value={s} />
+                    ))}
+                  </datalist>
+                )}
+              </Field>
+
+              <Field label={labels.year} htmlFor="onbYear">
+                <select
+                  id="onbYear"
+                  value={f.year}
+                  onChange={(e) => onField("year", asOnboardingYear(e.target.value))}
+                  style={inputStyle}
+                >
+                  {YEAR_OPTIONS.map((o) => (
+                    <option key={o.value || "none"} value={o.value}>
+                      {o.label}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+
+              <Field label={labels.interests} hint={PROFILE_HINTS.interests} htmlFor="onbInterests">
+                <textarea
+                  id="onbInterests"
+                  value={f.interests}
+                  onChange={(e) => onField("interests", e.target.value)}
+                  maxLength={600}
+                  rows={3}
+                  placeholder={PROFILE_PLACEHOLDERS.interests}
+                  style={textareaStyle}
+                />
+              </Field>
+
+              <Field label={labels.skills} hint={PROFILE_HINTS.skills} htmlFor="onbSkills">
+                <textarea
+                  id="onbSkills"
+                  value={f.skills}
+                  onChange={(e) => onField("skills", e.target.value)}
+                  maxLength={600}
+                  rows={3}
+                  placeholder={PROFILE_PLACEHOLDERS.skills}
+                  style={textareaStyle}
+                />
+              </Field>
+
+              <fieldset style={fieldsetStyle}>
+                <legend style={legendStyle}>{labels.lookingFor}</legend>
+                <div style={lookingForWrapStyle}>
+                  {LOOKING_FOR_OPTIONS.map((opt) => {
+                    const checked = f.looking_for.includes(opt.value);
+                    return (
+                      <label key={opt.value} style={lookingForRowStyle(checked)}>
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={(e) => {
+                            onField(
+                              "looking_for",
+                              e.target.checked
+                                ? [...f.looking_for.filter((v) => v !== opt.value), opt.value]
+                                : f.looking_for.filter((v) => v !== opt.value),
+                            );
+                          }}
+                          style={{ accentColor: COLORS.accent }}
+                        />
+                        <span>{opt.label}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+              </fieldset>
+            </motion.div>
+          ) : null}
+        </div>
       </div>
 
       <p style={changeLaterNoteStyle}>{copy.changeLater}</p>
     </>
+  );
+}
+
+/** Anything typed or saved in the seven folded fields. */
+export function hasOptionalFields(f: ProfileFields): boolean {
+  return (
+    [f.bio, f.major, f.department, f.year, f.interests, f.skills].some((v) => v.trim() !== "") ||
+    f.looking_for.length > 0
   );
 }
 
@@ -476,6 +531,37 @@ function Field({
 const hintInlineStyle: CSSProperties = {
   fontWeight: 400,
   color: "rgba(255,255,255,.45)",
+};
+
+/** The fold's row: shaped like a field, quieter (a dashed edge, no fill words). */
+const moreRowStyle: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "space-between",
+  gap: 10,
+  width: "100%",
+  minHeight: 48,
+  padding: "12px 14px",
+  borderRadius: 12,
+  background: COLORS.fieldBg,
+  border: "1px dashed rgba(255,255,255,.18)",
+  color: "rgba(255,255,255,.75)",
+  fontFamily: "inherit",
+  fontSize: 14,
+  fontWeight: 600,
+  textAlign: "left",
+  cursor: "pointer",
+};
+const moreChevronStyle: CSSProperties = {
+  display: "inline-block",
+  fontSize: 18,
+  lineHeight: 1,
+};
+/** The folded fields keep the form's own 18px rhythm. */
+const moreBodyStyle: CSSProperties = {
+  display: "flex",
+  flexDirection: "column",
+  gap: 18,
 };
 
 const changeLaterNoteStyle: CSSProperties = {

@@ -126,7 +126,8 @@ export type LeaveAccount = {
   error: string | null;
   /** The sign-out request failed: shown next to Sign out, which stays. */
   signOutError: string | null;
-  signOut: () => Promise<void>;
+  /** True when it is leaving for /auth/login, false when it stayed put (busy, or the logout failed). */
+  signOut: () => Promise<boolean>;
   deleteAccount: () => Promise<void>;
   /** Closing the confirm box: forget what was typed and any error. */
   reset: () => void;
@@ -174,8 +175,8 @@ export function useLeaveAccount(handle: string | null | undefined): LeaveAccount
   // instead and give the address of a person who can do it.
   const canConfirm = expected.length > 0;
 
-  async function signOut() {
-    if (signingOut || deleting) return;
+  async function signOut(): Promise<boolean> {
+    if (signingOut || deleting) return false;
     setSigningOut(true);
     setSignOutError(null);
     let signedOut = false;
@@ -200,7 +201,7 @@ export function useLeaveAccount(handle: string | null | undefined): LeaveAccount
       // failure, and trying again is the right advice.
       setSignOutError(SIGN_OUT_FAILED);
       setSigningOut(false);
-      return;
+      return false;
     }
     // Only now, with the logout done: take this device off push, close what's
     // still on screen and drop the account's cached data, so the next person
@@ -215,6 +216,7 @@ export function useLeaveAccount(handle: string | null | undefined): LeaveAccount
     // reflected everywhere.
     clearDraft();
     window.location.href = "/auth/login";
+    return true;
   }
 
   async function deleteAccount() {

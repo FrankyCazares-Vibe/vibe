@@ -3584,8 +3584,8 @@ function OrgsPane({
 
   const campus = visiting?.name ?? campusRowById(lists.campusId)?.shortName ?? null;
   const line = campus
-    ? `Clubs are just getting started at ${campus}. Follow the ones you like — posts land in your feed.`
-    : "Clubs are just getting started here. Follow the ones you like — posts land in your feed.";
+    ? `Clubs are just getting started at ${campus}. Follow the ones you like to get their updates and events.`
+    : "Clubs are just getting started here. Follow the ones you like to get their updates and events.";
   const total = inviteRows.length + followingRows.length + verified.length + others.length;
   // While any list has failed, or is still being retried, an empty pane is
   // not "no clubs".

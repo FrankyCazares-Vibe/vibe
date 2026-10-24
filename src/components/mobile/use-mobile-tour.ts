@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 
 import { campusRowById } from "@/lib/iu/campuses";
+import { phoneCampusTourSteps, tourStartDecision, type CampusTourStep } from "@/lib/tour/campus-tour-steps";
 
 /**
  * Hook that runs the Otto spotlight tour on mobile surfaces.
@@ -15,7 +16,8 @@ import { campusRowById } from "@/lib/iu/campuses";
  *
  * Legs:
  *   profile  → ProfileMobile (cover → identity → actions)
- *   campus   → CampusMobile  (tabs → feed → composer FAB)
+ *   campus   → CampusMobile  (the Otto tab → feed → tabs; first run, Oct 24
+ *              2026, the bubbles in src/lib/tour/campus-tour-steps.ts)
  *   network  → NetworkMobile (tabs → otto tab in bottom bar)
  *
  * Settings → Replay tour sets `vibe_tour_pending=profile`; the profile leg
@@ -53,13 +55,7 @@ declare global {
   }
 }
 
-type TourStep = {
-  selector: string;
-  title: string;
-  body: string;
-  endLabel?: string;
-  nextLabel?: string;
-};
+type TourStep = CampusTourStep;
 
 const SCRIPT_SRC = "/html/_otto-tour.js";
 
@@ -92,38 +88,14 @@ const PROFILE_STEPS: TourStep[] = [
   },
 ];
 
-/** Feed bubble body. `campus` is a `shortName` from the static campus table. */
-export function campusFeedBody(campus: string | null): string {
-  return campus
-    ? `What students at ${campus} are posting. People and clubs you follow rise to the top.`
-    : "What students on your campus are posting. People and clubs you follow rise to the top.";
-}
-
 /**
- * The campus leg's bubbles. The engine renders `title` / `body` as HTML, so
- * the campus name only ever comes from `campusRowById(...).shortName` (our
- * own table), never from the URL or a server string.
+ * The campus leg's bubbles: the Otto tab, the feed, the tabs (no floating
+ * Otto on phones; the dead Chat tab and the post ask are gone). The engine
+ * renders `title` / `body` as HTML, so the campus name only ever comes from
+ * `campusRowById(...).shortName` (our own table), never from the URL or a
+ * server string, and is escaped on the way in.
  */
-export function campusTourSteps(campus: string | null): TourStep[] {
-  return [
-    {
-      selector: "#otto-mobile-tour-tabs",
-      title: "Everything's one swipe away.",
-      body: "Feed, Events, Orgs, Chat, and the Map. Swipe or tap to switch.",
-    },
-    {
-      selector: "#otto-mobile-tour-feed",
-      title: "The campus feed.",
-      body: campusFeedBody(campus),
-    },
-    {
-      selector: "#otto-mobile-tour-compose",
-      title: "Your turn.",
-      body: "Tap + to post text, photos, or video.",
-      endLabel: "Got it",
-    },
-  ];
-}
+export const campusTourSteps = phoneCampusTourSteps;
 
 const CAMPUS_STEPS: TourStep[] = campusTourSteps(null);
 
@@ -184,29 +156,10 @@ function loadTourScript(): Promise<void> {
 }
 
 // ── Start rule ─────────────────────────────────────────────────────────────
-export type TourStartInput = {
-  leg: Leg;
-  /** `localStorage.vibe_tour_pending`; null when unset or storage failed. */
-  pending: string | null;
-  /** This leg's seen key is "1"; false when unset or storage failed. */
-  seen: boolean;
-  /** `?welcome=1` is on the URL. */
-  welcome: boolean;
-};
-
-/**
- * What the hook does on mount:
- * - "start": the pending flag names this leg, or it's the campus leg on
- *   `?welcome=1` and the student hasn't seen it.
- * - "strip": campus leg on `?welcome=1` that was already seen, with no
- *   pending flag for it: drop the param so a refresh stays quiet.
- * - "none": nothing to do.
- */
-export function tourStartDecision(i: TourStartInput): "start" | "strip" | "none" {
-  if (i.pending === i.leg) return "start";
-  if (i.leg !== "campus" || !i.welcome) return "none";
-  return i.seen ? "strip" : "start";
-}
+// The same rule as the computer's (src/lib/tour/campus-tour-steps.ts):
+// "start" when the pending flag names this leg, or on the campus leg's
+// `?welcome=1` when it hasn't been seen; "strip" drops a seen `?welcome=1`.
+export { tourStartDecision };
 
 /** How long the campus leg waits for the campus name before using the fallback. */
 const CAMPUS_NAME_TIMEOUT_MS = 1500;
@@ -305,8 +258,11 @@ export function useMobileTour(leg: Leg) {
         // hit a max so we don't spin forever on a busted route.
         const start = () => {
           if (cancelled || !window.OttoTour) return;
-          const firstSel = steps[0]?.selector;
-          if (firstSel && !document.querySelector(firstSel)) {
+          // The campus leg waits for every target, not just the first: its
+          // first, the Otto tab, is in the tab bar on every page, before
+          // Campus has drawn its own. The other legs keep the old rule.
+          const waitFor = leg === "campus" ? steps : steps.slice(0, 1);
+          if (waitFor.some((s) => !document.querySelector(s.selector))) {
             if (Date.now() - startedAt > MAX_POLL_MS) {
               // Restore the flag so a refresh / next visit can retry.
               return;

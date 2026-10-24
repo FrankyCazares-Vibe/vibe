@@ -64,6 +64,10 @@ const ACCOUNT_KEYS = [
   // The club the phone's Profile tab stands for (wave 2, src/lib/orgs/
   // club-switch.ts): the next person on this phone starts as themselves.
   "vibe.profile-as-club.v1",
+  // A first-run tour this account was about to see (first run, Oct 24 2026):
+  // the flag starts the campus tour even where it was seen before, so left
+  // here it would greet the next person to sign in on this browser.
+  "vibe_tour_pending",
 ] as const;
 
 /**

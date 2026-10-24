@@ -43,7 +43,7 @@ registerHooks({
   },
 });
 
-const { campusFeedBody, campusTourSteps, tourStartDecision } = await import("./use-mobile-tour");
+const { campusTourSteps, tourStartDecision } = await import("./use-mobile-tour");
 
 const base = { leg: "campus" as const, pending: null, seen: false, welcome: false };
 
@@ -71,34 +71,34 @@ test("none: no flag and no welcome, or welcome on another leg", () => {
   assert.equal(tourStartDecision({ ...base, leg: "network", welcome: true }), "none");
 });
 
-test("campus bubbles: three, with the campus name in the feed bubble", () => {
+// First run, Oct 24 2026 (PLAN.md beat 14): the Otto tab, the feed, then the
+// tabs. No dead Chat tab, no post ask. The words are pinned in full by
+// src/lib/tour/campus-tour-steps.test.ts.
+test("campus bubbles: the Otto tab, the feed with the campus name, then the tabs", () => {
   const steps = campusTourSteps("Indianapolis");
   assert.deepEqual(steps, [
     {
-      selector: "#otto-mobile-tour-tabs",
-      title: "Everything's one swipe away.",
-      body: "Feed, Events, Orgs, Chat, and the Map. Swipe or tap to switch.",
+      selector: "#otto-mobile-tour-network-otto",
+      title: 'Hi again. I\'m <span class="accent">Otto</span>.',
+      body: "This tab is me: what's coming up and what's new for you. Messages is right next door.",
     },
     {
       selector: "#otto-mobile-tour-feed",
-      title: "The campus feed.",
-      body: "What students at Indianapolis are posting. People and clubs you follow rise to the top.",
+      title: 'This is Indianapolis, <span class="accent">live</span>.',
+      body: "What students and clubs here are posting. Clubs and people you follow come first.",
     },
     {
-      selector: "#otto-mobile-tour-compose",
-      title: "Your turn.",
-      body: "Tap + to post text, photos, or video.",
+      selector: "#otto-mobile-tour-tabs",
+      title: 'Clubs and events, <span class="accent">one swipe over</span>.',
+      body: "Feed, Events, Orgs and Map. Orgs has every club on campus.",
       endLabel: "Got it",
     },
   ]);
+  for (const s of steps) assert.doesNotMatch(`${s.title} ${s.body}`, /Chat|Tap \+|post text/);
 });
 
-test("campus bubbles: fallback body when the name didn't load", () => {
-  assert.equal(
-    campusFeedBody(null),
-    "What students on your campus are posting. People and clubs you follow rise to the top.",
-  );
-  assert.equal(campusTourSteps(null)[1]?.body, campusFeedBody(null));
+test("campus bubbles: fallback when the name didn't load", () => {
+  assert.equal(campusTourSteps(null)[1]?.title, 'This is your campus, <span class="accent">live</span>.');
 });
 
 test("the campus leg ends the tour: no handoff to /network, old copy gone", () => {

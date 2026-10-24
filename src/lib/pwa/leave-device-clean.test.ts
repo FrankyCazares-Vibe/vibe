@@ -44,6 +44,14 @@ test("the club the Profile tab stands for is cleared at sign-out", () => {
   assert.doesNotMatch(repoFile("src/lib/orgs/club-switch.ts"), /sessionStorage\.(get|set)Item/);
 });
 
+test("a tour this account was about to see is cleared at sign-out (shared laptop)", () => {
+  const pending = keyNamed("src/components/mobile/use-mobile-tour.ts", "PENDING_KEY");
+  assert.equal(pending, "vibe_tour_pending");
+  assert.ok(accountKeys.includes(pending), `${pending} stays after sign-out`);
+  // The seen keys stay on purpose: clearing them would replay every tour.
+  assert.ok(!accountKeys.some((k) => k.endsWith("_tour_seen_v1")));
+});
+
 test("the static profile writes the same titles key, so the same line clears it", () => {
   const html = repoFile("public/html/profile.html");
   const named = [...html.matchAll(/(["'])(vibe\.club-titles-seen\.v\d+)\1/g)].map((m) => m[2]);

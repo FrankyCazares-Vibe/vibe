@@ -26,7 +26,9 @@
     var css = [
       '.otto-tour-svg { position: fixed; inset: 0; z-index: ' + Z_BASE + '; pointer-events: auto; }',
       '.otto-tour-svg-fill { fill: rgba(10, 10, 20, 0.74); }',
-      '.otto-tour-spot { fill: white; }',
+      // Black in the mask is the hole: white here (May to Oct 24, 2026) dimmed
+      // the target with everything else, so no tour ever spotlit anything.
+      '.otto-tour-spot { fill: black; }',
       '.otto-tour-bubble {',
       '  position: fixed; z-index: ' + (Z_BASE + 2) + '; box-sizing: border-box;',
       '  max-width: 320px; min-width: 240px;',

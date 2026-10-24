@@ -139,6 +139,29 @@ test("the sections the club step reads are whole copies of the app's", () => {
   assert.deepEqual((page.ONB_COPY as typeof ONB_COPY).clubs, ONB_COPY.clubs);
 });
 
+// First run, Oct 24 2026 (handoffs/2026-10-23-onboarding-review/PLAN.md): the
+// words changed on both devices together, so the whole table is compared now,
+// not only the club step's part of it.
+test("the page's ONB_COPY is the phone's, every string", () => {
+  assert.deepEqual(page.ONB_COPY, ONB_COPY);
+});
+
+test("onboarding talks about clubs, not the feed, and never 'who's around'", () => {
+  const strings: string[] = [];
+  const walk = (node: unknown) => {
+    if (typeof node === "string") strings.push(node);
+    else if (node && typeof node === "object") Object.values(node).forEach(walk);
+  };
+  walk(ONB_COPY);
+  for (const s of strings) {
+    assert.doesNotMatch(s, /your feed|posts land|who's around/i, s);
+  }
+  assert.match(ONB_COPY.hello.note, /your clubs and people/);
+  assert.match(ONB_COPY.hello.intro, /clubs/);
+  // Indianapolis is shared: its people line still says so.
+  assert.match(ONB_COPY.people.ottoShared, /IU and Purdue both/);
+});
+
 // ── 3. The row view and the tap rules ───────────────────────────────────────
 
 const STATES: OrgRelation["state"][] = [

@@ -454,11 +454,37 @@ function SchoolCheckinCard({ checkin, onDone }: { checkin: Checkin; onDone: () =
 }
 
 /**
+ * This visit is the one onboarding hands over to (`?welcome=1`, or the
+ * campus tour's pending flag, which a club-link guest carries to their first
+ * Campus visit): the tour runs, or is about to.
+ */
+function readWelcomeVisit(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    if (new URLSearchParams(window.location.search).get("welcome") === "1") return true;
+  } catch {
+    // Fall through to the flag.
+  }
+  try {
+    return localStorage.getItem("vibe_tour_pending") === "campus";
+  } catch {
+    return false;
+  }
+}
+
+/**
  * The one card Campus shows about the account's emails: the school check-in
  * while one is open, otherwise the one-time "add a personal email" offer.
  * Never both.
+ *
+ * The offer waits out the welcome visit on both devices (first run, Oct 24
+ * 2026): it sits by the Otto orb, where the tour's first bubble opens, and
+ * nothing should ask before Vibe has shown anything. Read once, at mount, as
+ * CampusMobile reads `?welcome=1` for its push ask: the tour drops both the
+ * param and the flag. It asks on the next visit instead; nothing is stored.
  */
 export function CampusAccountCard() {
+  const [welcomeVisit] = useState(readWelcomeVisit);
   const [checkin, setCheckin] = useState<Checkin | null | "none">(null);
   useEffect(() => {
     let live = true;
@@ -475,6 +501,6 @@ export function CampusAccountCard() {
     };
   }, []);
   if (checkin === null) return null;
-  if (checkin === "none") return <PersonalEmailPrompt />;
+  if (checkin === "none") return welcomeVisit ? null : <PersonalEmailPrompt />;
   return <SchoolCheckinCard checkin={checkin} onDone={() => setCheckin("none")} />;
 }
