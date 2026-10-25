@@ -69,10 +69,22 @@ step rather than point at nothing.
 
 **Franky walked the new tour on his phone and laptop (Sat Oct 24, late): "it looks good."**
 
+## 3. The leftovers (Oct 24, late; all live)
+- **3a93ff2, the tour engine:** the bubble arrives on SPRING_SOFT and the button lifts on SPRING_SNAPPY (CSS twins
+  kept inside `_otto-tour.js`, since the static profile page loads it without the app's stylesheet; pinned by
+  `spring-curve.test.ts`); transform and opacity only; reduced motion: no rise, no hover lift. The bubble is
+  placed inside the visual viewport, so the iOS keyboard (or a zoom) never covers it (checked with a simulated
+  keyboard: the visible area cut to 420px, the bubble stayed above it). The static profile tour still runs.
+- **c16d44e, the phone's Your clubs (Franky's yes on the 375px screenshots):** `YourClubsRow.tsx` +
+  `your-clubs-phone.css`, the desktop panel's reads and words as one band above the Tonight card: a sideways row
+  of club tiles (mark, name, age, the newest Board line), each opening its Board; no clubs yet: "Find clubs on
+  campus", which opens Orgs; both reads failed: nothing. First light holds it with the "clubs" parts and the
+  phone tour has its own bubble, in Franky's order: Otto tab, feed, Your clubs, Tonight, tabs.
+- Checked: non-admin local accounts at 375 (Light, Night, reduced motion), 1000, 1200 and 1440; 4,053 tests;
+  live, the row fills in with the account's clubs once its two reads answer (the inbox read took 2-5 s on a cold
+  start, the still tiles hold its place meanwhile).
+
 ## Left for later
 - Franky's live sign-up test on the new flow, before more club links go out. If anything feels wrong on launch
   weekend, `FIRST_LIGHT=off` on Vercel and redeploy turns the hold off; the tour still runs.
-- On iOS the bubble doesn't yet dodge the on-screen keyboard (no keyboard is open during the tour).
-- The engine's bubble still fades on a fixed 240 ms curve, not a spring, and its hover lift ignores reduced
-  motion: week 1's engine pass (tokens, Escape, focus, springs).
-- The phone has no Your clubs row, so its tour goes feed → Tonight → tabs (a phone Your clubs row is week 1).
+- Week 1's engine pass: colour tokens, Escape, focus and a screen-reader label for the bubble.
