@@ -11,7 +11,9 @@ recommendations ... and start Deploy A in a new session"). **Deploy A SHIPPED Sa
 `deploy-a-shipped.md` in this folder)**, plus a one-word fix that makes the tour spotlight actually cut its hole.
 Franky re-runs his live sign-up test on it. **Deploy B ("first light") SHIPPED the same evening (main eb5006a,
 a0b83e5; phone tour fixes 16be4ba; `first-light-shipped.md`) in Franky's new order: Otto alone, then the feed,
-then the left (Your clubs), then the right (Tonight)**, with the off switch `FIRST_LIGHT=off`.
+then the left (Your clubs), then the right (Tonight)**, with the off switch `FIRST_LIGHT=off`. **Sun Oct 25: Otto's
+wormhole (arrival on sign-up, the reverse on Finish) and the 7-20 handle rule SHIPPED (main 630c517;
+`wormhole-shipped.md`).**
 
 ## What's wrong today (short)
 - **Everything shows at once.** A newcomer's computer Campus page has the feed, Tonight, Your clubs, My Calendar,
