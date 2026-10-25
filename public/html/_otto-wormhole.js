@@ -55,6 +55,8 @@
       '.owh-flare { position: absolute; left: -8px; top: -8px; width: 16px; height: 16px; border-radius: 50%; opacity: 0;',
       '  background: radial-gradient(circle, #fff 0%, #FFD9C9 30%, #FF5C35 55%, rgba(255,92,53,0) 72%); }',
       '.owh-flare.on { animation: owh-flare 760ms var(--owh-soft) both; }',
+      '.owh-system { position: absolute; left: 0; top: 0; }',
+      '.owh-system.out { animation: owh-fade-out 480ms var(--owh-soft) forwards; }',
       '.owh-ring { position: absolute; border-radius: 50%; border: 1px solid var(--rc); opacity: 0; }',
       '.owh-ring b { position: absolute; top: -3px; left: 50%; margin-left: -3px; width: 6px; height: 6px; border-radius: 50%; background: var(--rc); box-shadow: 0 0 10px var(--rc); }',
       '.owh-ring.on { animation: owh-ring-in 700ms var(--owh-pop) var(--w) both, owh-spin var(--s) linear var(--w) infinite; }',
@@ -62,6 +64,9 @@
       '.owh-orb { position: absolute; transform: scale(0); opacity: 0; }',
       '.owh-orb.on { animation: owh-pop 600ms var(--owh-pop) both; }',
       '.owh-orb.hold { transform: none; opacity: 1; }',
+      // The copy hands over to the page's orb underneath it: a fade, not a cut,
+      // and a beat after the void starts to clear, so Otto never dims.
+      '.owh-orb.out { transform: none; opacity: 1; animation: owh-fade-out 480ms var(--owh-soft) 160ms forwards; }',
       '.owh-disc { position: absolute; left: -10px; top: -10px; width: 20px; height: 20px; border-radius: 50%; transform: scale(0); }',
       '.owh-disc.on { animation: owh-swallow 560ms cubic-bezier(0.55, 0, 0.85, 0.3) forwards; }',
       '.owh-fold { animation: owh-fold 460ms var(--owh-soft) forwards; }',
@@ -122,16 +127,17 @@
     }
   }
 
-  /** Three orbits, sized off the orb, each with a planet. */
+  /** Three orbits, sized off the orb, each with a planet (in one layer, so they fade as one). */
   function addRings(centre, size) {
     var rings = [];
+    var system = el('owh-system', centre);
     var spec = [
       { r: size * 0.62, c: 'rgba(255,92,53,0.75)', s: '5.5s', w: 0 },
       { r: size * 0.95, c: 'rgba(200,184,255,0.7)', s: '8s', w: 90 },
       { r: size * 1.4, c: 'rgba(255,217,201,0.55)', s: '12s', w: 180 }
     ];
     spec.forEach(function (o) {
-      var ring = el('owh-ring', centre);
+      var ring = el('owh-ring', system);
       ring.style.width = ring.style.height = (o.r * 2).toFixed(0) + 'px';
       ring.style.left = ring.style.top = (-o.r).toFixed(0) + 'px';
       ring.style.setProperty('--rc', o.c);
@@ -156,7 +162,48 @@
     wrap.style.height = at.rect.height + 'px';
     clone.style.margin = '0';
     wrap.appendChild(clone);
+    syncSpin(at.anchor, clone);
     return wrap;
+  }
+
+  /**
+   * The copy spins in step with the page's own orb: each of its CSS
+   * animations takes the original's current time (same tree, same order).
+   */
+  function syncSpin(orig, copy) {
+    try {
+      var a = [orig].concat([].slice.call(orig.querySelectorAll('*')));
+      var b = [copy].concat([].slice.call(copy.querySelectorAll('*')));
+      for (var i = 0; i < a.length && i < b.length; i++) {
+        if (!a[i].getAnimations || !b[i].getAnimations) return;
+        var oa = a[i].getAnimations(), ob = b[i].getAnimations();
+        for (var j = 0; j < oa.length && j < ob.length; j++) {
+          if (oa[j].currentTime != null) ob[j].currentTime = oa[j].currentTime;
+        }
+      }
+    } catch (e) {}
+  }
+
+  /**
+   * Keeps the copy (and the system around it) on the page's orb frame by
+   * frame: the step under it is still sliding into place, and fonts can
+   * move it, so a place measured once would leave two Ottos at the hand-over.
+   */
+  function follow(anchor, wrap, centre) {
+    var stopped = false;
+    var tick = function () {
+      if (stopped) return;
+      var r = anchor.getBoundingClientRect();
+      if (r.width > 0) {
+        wrap.style.left = r.left + 'px';
+        wrap.style.top = r.top + 'px';
+        centre.style.left = (r.left + r.width / 2) + 'px';
+        centre.style.top = (r.top + r.height / 2) + 'px';
+      }
+      requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+    return function () { stopped = true; };
   }
 
   function makeOverlay(kind, bg) {
@@ -203,11 +250,13 @@
     var flare = el('owh-flare', centre);
     var rings = addRings(centre, Math.max(at.w, 90));
     var orb = addOrb(overlay, at);
+    var unfollow = orb && !at.moved ? follow(opts.anchor, orb, centre) : function () {};
 
     var timers = [];
     var later = function (ms, fn) { timers.push(setTimeout(fn, ms)); };
     var end = function () {
       timers.forEach(clearTimeout);
+      unfollow();
       if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
       done();
     };
@@ -218,15 +267,17 @@
     later(430, function () { flare.classList.add('on'); });
     later(620, function () {
       rings.forEach(function (r) { r.classList.add('on'); });
-      if (orb) orb.classList.add('on');
+      if (orb) { orb.classList.add('on'); syncSpin(opts.anchor, orb.firstChild); }
     });
-    // The void clears and the page brings its words in under the last spin.
+    // The void clears and the page brings its words in under the last spin;
+    // the system and the copy of Otto fade with it, leaving the page's orb.
     later(1450, function () {
       made.voidEl.classList.add('out');
-      rings.forEach(function (r) { r.style.transition = 'opacity 480ms var(--owh-soft)'; r.style.opacity = '0'; });
+      if (rings[0]) rings[0].parentNode.classList.add('out');
+      if (orb) orb.classList.add('out');
       reveal();
     });
-    later(2000, function () {
+    later(2100, function () {
       window.removeEventListener('keydown', skip);
       end();
     });

@@ -58,3 +58,18 @@ test("Otto scrolled out of sight (Finish at the bottom of a long step) leaves fr
   assert.match(engine, /moved: true/);
   assert.match(engine, /orb\.classList\.add\(at\.moved \? 'on' : 'hold'\)/);
 });
+
+test("the copy of Otto stays on the real one and spins with it, so he never doubles", () => {
+  // The step under him slides up as it opens: the copy follows him every frame.
+  assert.match(engine, /var unfollow = orb && !at\.moved \? follow\(opts\.anchor, orb, centre\)/);
+  assert.match(engine, /unfollow\(\);\s*if \(overlay\.parentNode\)/);
+  // And takes his animations' current time when it is made and when it pops in.
+  assert.match(engine, /syncSpin\(at\.anchor, clone\);/);
+  assert.match(engine, /syncSpin\(opts\.anchor, orb\.firstChild\);/);
+});
+
+test("at the hand-over the rings and the copy fade with the dark, nothing cuts out", () => {
+  assert.match(engine, /'\.owh-system\.out \{ animation: owh-fade-out 480ms var\(--owh-soft\) forwards; \}'/);
+  assert.match(engine, /'\.owh-orb\.out \{ transform: none; opacity: 1; animation: owh-fade-out 480ms var\(--owh-soft\) 160ms forwards; \}'/);
+  assert.match(engine, /rings\[0\]\.parentNode\.classList\.add\('out'\);\s*if \(orb\) orb\.classList\.add\('out'\);/);
+});
