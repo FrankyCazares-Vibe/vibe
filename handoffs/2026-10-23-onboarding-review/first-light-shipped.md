@@ -84,6 +84,19 @@ step rather than point at nothing.
   live, the row fills in with the account's clubs once its two reads answer (the inbox read took 2-5 s on a cold
   start, the still tiles hold its place meanwhile).
 
+## Supabase dashboard steps: DONE (Sun Oct 25, Franky, each screen checked by screenshot)
+The P0 list's dashboard steps (`handoffs/2026-10-21-signup-preregistration-fix.md`, "Dashboard"):
+- Confirm signup: code only, no link (matches `supabase/templates/confirmation.html`).
+- Change email address (was the old button-and-link email), Reset password and Magic link: replaced with the
+  link-free notices from `supabase/templates/` and their subjects. The magic-link text first landed on
+  Reauthentication by mistake; that one goes back to a code (Supabase's default or a Vibe-styled code email).
+- Site URL `https://www.connectvibe.app`. Redirect URLs: the two host wildcards
+  `vibe-*-fracazar-1988s-projects.vercel.app` (and `/**`) removed (a stranger could name a Vercel project to
+  match them; preview builds can't sign in anyway); 11 exact URLs left.
+- Confirm email ON, Secure email change ON, the Before User Created hook `auth_hooks.hook_waitlist_gate` enabled,
+  all seven Security notification emails OFF (Password changed and Email changed stay off through launch).
+Next for Franky: the live sign-up test with a fresh school address (Inbox AND Junk), then club links.
+
 ## Left for later
 - Franky's live sign-up test on the new flow, before more club links go out. If anything feels wrong on launch
   weekend, `FIRST_LIGHT=off` on Vercel and redeploy turns the hold off; the tour still runs.
