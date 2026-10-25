@@ -210,7 +210,7 @@ export const ONBOARDING_STEP_ERROR_COPY: Readonly<
 > = Object.freeze({
   name_required: "Add your name. It's how people recognize you.",
   handle_required: "Pick a handle so friends can find you.",
-  handle_invalid: "3–20 letters, numbers or _.",
+  handle_invalid: "7–20 letters, numbers or _.",
   handle_reserved: "That handle is reserved.",
   handle_taken: "That handle is taken. Try another.",
   campus_invalid: "Pick one of your university's campuses.",
@@ -292,7 +292,9 @@ export function sanitizeProfileStep(input: unknown): ProfileStepResult {
   if (!rawHandle) return profileStepFail("handle_required", "handle");
   // Same rules as validateHandle, split by cause: HANDLE_FORMAT_RE covers the
   // 3–20 length and the character set, so once it passes the only remaining
-  // validateHandle failure is the reserved list.
+  // validateHandle failure is the reserved list. The 7 minimum for a NEW
+  // handle needs the stored one (a kept shorter handle is fine), so the claim
+  // (changeHandleForUser) checks it and answers handle_invalid.
   if (!HANDLE_FORMAT_RE.test(rawHandle)) return profileStepFail("handle_invalid", "handle");
   const handle = validateHandle(rawHandle);
   if (!handle.ok) return profileStepFail("handle_reserved", "handle");

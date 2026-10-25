@@ -10594,7 +10594,9 @@ function buildProfileSyncPayload(server) {
 // Format mirrors src/lib/profile/handle.ts so the client check matches
 // the server validator. 14-day cooldown also mirrored — when the input
 // is disabled we say why ("change again in N days").
-const HANDLE_FORMAT_RE = /^[a-z0-9_]{3,20}$/;
+// A newly chosen handle is 7-20 (NEW_HANDLE_MIN, Oct 25 2026); your current
+// handle, whatever its length, is never checked.
+const HANDLE_FORMAT_RE = /^[a-z0-9_]{7,20}$/;
 const HANDLE_COOLDOWN_DAYS = 14;
 let _handleCheckTimer = null;
 let _handleCheckSeq = 0;
@@ -10639,7 +10641,7 @@ function _toggleProfileHandleEdit(on) {
       const v = (inp.value || '').trim().toLowerCase();
       inp.value = v;
       if (!v || v === window.__myHandle) { _setHandleStatus('', ''); return; }
-      if (v.length < 3) { _setHandleStatus('too short', 'bad'); return; }
+      if (v.length < 7) { _setHandleStatus('too short (7 minimum)', 'bad'); return; }
       if (v.length > 20) { _setHandleStatus('too long', 'bad'); return; }
       if (!HANDLE_FORMAT_RE.test(v)) { _setHandleStatus('letters, numbers, _', 'bad'); return; }
       _setHandleStatus('checking…', 'checking');

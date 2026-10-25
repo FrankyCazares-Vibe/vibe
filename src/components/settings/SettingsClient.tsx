@@ -898,7 +898,8 @@ function CampusCard({ initial }: { initial: SettingsCampusInput | null }) {
 // first claim (matches the PATCH endpoint behavior).
 const HANDLE_COOLDOWN_DAYS = 14;
 const HANDLE_COOLDOWN_MS = HANDLE_COOLDOWN_DAYS * 24 * 60 * 60 * 1000;
-const HANDLE_RE = /^[a-z0-9_]{3,20}$/;
+/** A newly chosen handle: 7–20 (src/lib/profile/handle.ts NEW_HANDLE_MIN); your current one is never checked. */
+const HANDLE_RE = /^[a-z0-9_]{7,20}$/;
 
 function HandleCard({
   currentHandle,
@@ -958,8 +959,8 @@ function HandleCard({
       return {
         state: "invalid",
         reason:
-          normalized.length < 3
-            ? "Too short — 3 characters minimum"
+          normalized.length < 7
+            ? "Too short — 7 characters minimum"
             : normalized.length > 20
               ? "Too long — 20 characters max"
               : "Letters, numbers, and underscore only",

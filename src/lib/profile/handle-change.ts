@@ -1,7 +1,9 @@
 import { isOttoOnboardingComplete } from "@/lib/auth/post-login";
 import {
   HANDLE_COOLDOWN_DAYS,
+  NEW_HANDLE_TOO_SHORT,
   handleCooldownDaysLeft,
+  tooShortForNewHandle,
   validateHandle,
 } from "@/lib/profile/handle";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
@@ -110,6 +112,12 @@ export async function changeHandleForUser(
   if (me.handle === v.handle) {
     // No-op: don't re-arm the cooldown for a save-without-change.
     return { ok: true, handle: v.handle, unchanged: true };
+  }
+
+  // A new handle needs NEW_HANDLE_MIN (Oct 25, 2026); the person's own
+  // shorter one, kept, returned above.
+  if (tooShortForNewHandle(v.handle, me.handle)) {
+    return { ok: false, status: 400, error: NEW_HANDLE_TOO_SHORT };
   }
 
   // Free, clock-off claim only while onboarding is genuinely unfinished. A

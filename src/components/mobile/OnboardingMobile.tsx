@@ -25,10 +25,10 @@ import {
 } from "@/components/mobile/onboarding/StepPeople";
 import { StepPhoto } from "@/components/mobile/onboarding/StepPhoto";
 import {
-  HANDLE_RE,
   LOOKING_FOR_OPTIONS,
   StepProfile,
   asOnboardingYear,
+  handleAllowed,
   identityProblem,
   profileFieldForCode,
   profileStepBody,
@@ -339,11 +339,14 @@ export function OnboardingMobile({
   const [handleError, setHandleError] = useState<string | null>(null);
   const nameRef = useRef<HTMLInputElement | null>(null);
   const handleRef = useRef<HTMLInputElement | null>(null);
+  // The handle already on the row (a real one), which may be kept whatever
+  // its length; a new one needs 7–20 (handleAllowed).
+  const keepHandle = prefill?.hasRealHandle ? prefill.handle : null;
   const {
     status: handleStatus,
     setStatus: setHandleStatus,
     onHandleInput: checkHandle,
-  } = useHandleCheck();
+  } = useHandleCheck(keepHandle);
   /** A real name and a claimed handle are on the row. */
   const [identitySaved, setIdentitySaved] = useState(
     () => !!prefill?.hasRealHandle && !!prefill?.name,
@@ -481,7 +484,7 @@ export function OnboardingMobile({
 
   /** The step-3 client checks; errors go under the fields. */
   const checkIdentity = (): "name" | "handle" | null => {
-    const problem = identityProblem(fields);
+    const problem = identityProblem(fields, keepHandle);
     setNameError(problem?.field === "name" ? problem.message : null);
     setHandleError(problem?.field === "handle" ? problem.message : null);
     return problem?.field ?? null;
@@ -755,7 +758,7 @@ export function OnboardingMobile({
     if (busyRef.current) return;
     // In replay nothing is saved, so what's typed decides the variant.
     const hasIdentity = replay
-      ? !!fields.name.trim() && HANDLE_RE.test(fields.handle)
+      ? !!fields.name.trim() && handleAllowed(fields.handle, keepHandle)
       : identitySaved;
     setSkipBase(hasIdentity ? "saved" : "identity");
     setForceIdentity(false);

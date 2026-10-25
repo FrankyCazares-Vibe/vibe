@@ -60,8 +60,23 @@ import {
  * character for character by `public/html/onboarding.html` (B13).
  */
 
-/** 3–20 lowercase letters, numbers or _ (the server's `HANDLE_FORMAT_RE`). */
-export const HANDLE_RE = /^[a-z0-9_]{3,20}$/;
+/**
+ * A newly chosen handle: 7–20 lowercase letters, numbers or _ (the server's
+ * `HANDLE_FORMAT_RE` plus `NEW_HANDLE_MIN`, Oct 25 2026).
+ */
+export const HANDLE_RE = /^[a-z0-9_]{7,20}$/;
+
+/** Any handle that exists: 3–20 (the server's `HANDLE_FORMAT_RE`). */
+const EXISTING_HANDLE_RE = /^[a-z0-9_]{3,20}$/;
+
+/**
+ * True for a handle that may be saved: a new one of 7–20, or the student's
+ * own handle kept as it is (`keep`, the one already on the row), whatever
+ * its length. The server answers the same (changeHandleForUser).
+ */
+export function handleAllowed(handle: string, keep?: string | null): boolean {
+  return HANDLE_RE.test(handle) || (!!keep && handle === keep && EXISTING_HANDLE_RE.test(handle));
+}
 
 export const LOOKING_FOR_OPTIONS = [
   { value: "meeting-people", label: "Meeting people" },
@@ -90,7 +105,7 @@ export const PROFILE_PLACEHOLDERS = {
 } as const;
 
 export const PROFILE_HINTS = {
-  handle: "how friends find you (3-20, letters/numbers/_)",
+  handle: "how friends find you (7-20, letters/numbers/_)",
   bio: "up to 600 characters",
   interests: "up to 10 items — comma or new-line separated",
   skills: "up to 12 items, 30 chars each",
@@ -148,11 +163,12 @@ export function profileStepBody(f: ProfileFields) {
  */
 export function identityProblem(
   f: Pick<ProfileFields, "name" | "handle">,
+  keep?: string | null,
 ): { field: "name" | "handle"; message: string } | null {
   const e = ONB_COPY.profile.errors;
   if (!f.name.trim()) return { field: "name", message: e.nameRequired };
   if (!f.handle) return { field: "handle", message: e.handleRequired };
-  if (!HANDLE_RE.test(f.handle)) return { field: "handle", message: e.handleInvalid };
+  if (!handleAllowed(f.handle, keep)) return { field: "handle", message: e.handleInvalid };
   return null;
 }
 
@@ -181,7 +197,7 @@ export function profileFieldForCode(code: string | null | undefined): "name" | "
  * sets the status, and returns the normalized value for the caller to store.
  * A well-formed handle is checked 280 ms after the last keystroke.
  */
-export function useHandleCheck(): {
+export function useHandleCheck(keep?: string | null): {
   status: HandleStatus;
   setStatus: Dispatch<SetStateAction<HandleStatus>>;
   onHandleInput: (raw: string) => string;
@@ -203,7 +219,7 @@ export function useHandleCheck(): {
       setStatus(null);
       return v;
     }
-    if (!HANDLE_RE.test(v)) {
+    if (!handleAllowed(v, keep)) {
       setStatus({ kind: "format", text: copy.handleFormat });
       return v;
     }
@@ -233,7 +249,7 @@ export function useHandleCheck(): {
       })();
     }, 280);
     return v;
-  }, []);
+  }, [keep]);
 
   useEffect(
     () => () => {

@@ -53,7 +53,7 @@ registerHooks({
 });
 
 const { changeHandleForUser, handleClaimPolicy } = await import("./handle-change");
-const { HANDLE_COOLDOWN_DAYS } = await import("./handle");
+const { HANDLE_COOLDOWN_DAYS, NEW_HANDLE_MIN, NEW_HANDLE_TOO_SHORT, tooShortForNewHandle } = await import("./handle");
 
 const USER = "00000000-0000-4000-8000-000000000001";
 const OTHER = "00000000-0000-4000-8000-000000000002";
@@ -207,12 +207,12 @@ test("onboarding claim before Finish: skips the cooldown and writes handle_chang
     handle_changed_at: daysAgo(1),
     otto_answers: {},
   });
-  const r = await changeHandleForUser(USER, "franky", { onboarding: true });
+  const r = await changeHandleForUser(USER, "franky_c", { onboarding: true });
   assert.deepEqual(log.selects, ["handle,handle_changed_at,otto_answers", "id"]);
-  assert.deepEqual(log.updates, [{ payload: { handle: "franky", handle_changed_at: null }, id: USER }]);
+  assert.deepEqual(log.updates, [{ payload: { handle: "franky_c", handle_changed_at: null }, id: USER }]);
   assert.deepEqual(r, {
     ok: true,
-    handle: "franky",
+    handle: "franky_c",
     unchanged: false,
     handle_changed_at: null,
     cooldown_days: 0,
@@ -221,14 +221,15 @@ test("onboarding claim before Finish: skips the cooldown and writes handle_chang
 });
 
 test("onboarding claim before Finish: still 409 when taken, no-op when unchanged", async () => {
-  let log = installFakeService({ handle: "old_one", handle_changed_at: null, otto_answers: null }, { franky: OTHER });
-  assert.deepEqual(await changeHandleForUser(USER, "franky", { onboarding: true }), {
+  let log = installFakeService({ handle: "old_one", handle_changed_at: null, otto_answers: null }, { franky_c: OTHER });
+  assert.deepEqual(await changeHandleForUser(USER, "franky_c", { onboarding: true }), {
     ok: false,
     status: 409,
     error: "Taken",
   });
   assert.equal(log.updates.length, 0);
 
+  // Kept as it is, a handle shorter than 7 (from before Oct 25) is still fine.
   log = installFakeService({ handle: "franky", handle_changed_at: null, otto_answers: null }, { franky: USER });
   assert.deepEqual(await changeHandleForUser(USER, "franky", { onboarding: true }), {
     ok: true,
@@ -236,6 +237,35 @@ test("onboarding claim before Finish: still 409 when taken, no-op when unchanged
     unchanged: true,
   });
   assert.equal(log.updates.length, 0);
+});
+
+test("a NEW handle needs 7 characters (Oct 25, 2026); a kept shorter one doesn't", async () => {
+  for (const onboarding of [true, false]) {
+    let log = installFakeService({ handle: "u0f1e2d3c4b5a69788796a5b4c3d2e1f0", handle_changed_at: null, otto_answers: null });
+    assert.deepEqual(await changeHandleForUser(USER, "sam_k", { onboarding }), {
+      ok: false,
+      status: 400,
+      error: NEW_HANDLE_TOO_SHORT,
+    });
+    assert.equal(log.updates.length, 0);
+
+    log = installFakeService({ handle: "sam", handle_changed_at: null, otto_answers: null }, { sam: USER });
+    assert.deepEqual(await changeHandleForUser(USER, "sam", { onboarding }), { ok: true, handle: "sam", unchanged: true });
+    assert.equal(log.updates.length, 0);
+
+    // Exactly 7 is enough.
+    log = installFakeService({ handle: "sam", handle_changed_at: null, otto_answers: null });
+    const r = await changeHandleForUser(USER, "sam_kim", { onboarding });
+    assert.equal(r.ok, true);
+  }
+});
+
+test("tooShortForNewHandle: under 7 and not the current one", () => {
+  assert.equal(NEW_HANDLE_MIN, 7);
+  assert.equal(tooShortForNewHandle("abcdef", null), true);
+  assert.equal(tooShortForNewHandle("abcdef", "abcdef"), false);
+  assert.equal(tooShortForNewHandle("abcdefg", null), false);
+  assert.equal(tooShortForNewHandle("abc", "abd"), true);
 });
 
 test("onboarding claim after Finish: same cooldown and stamp as the default path", async () => {

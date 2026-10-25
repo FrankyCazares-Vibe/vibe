@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { validateHandle } from "@/lib/profile/handle";
+import { NEW_HANDLE_TOO_SHORT, NEW_HANDLE_MIN, validateHandle } from "@/lib/profile/handle";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 /**
@@ -10,7 +10,9 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
  *   - { ok:true, available:false, reason:"..." }   (taken or invalid)
  *
  * Treats the viewer's own current handle as "available" so the inline
- * editor doesn't flag it as taken when the user just opens the field.
+ * editor doesn't flag it as taken when the user just opens the field. Any
+ * other handle under NEW_HANDLE_MIN (7, Oct 25 2026) is "too short": the
+ * 3-6 character handles people already have stay theirs, nobody new gets one.
  */
 export async function GET(req: Request) {
   const supabase = await createSupabaseServerClient();
@@ -39,7 +41,13 @@ export async function GET(req: Request) {
     return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
   }
 
-  if (data && data.id !== user.id) {
+  if (data && data.id === user.id) {
+    return NextResponse.json({ ok: true, available: true });
+  }
+  if (v.handle.length < NEW_HANDLE_MIN) {
+    return NextResponse.json({ ok: true, available: false, reason: NEW_HANDLE_TOO_SHORT });
+  }
+  if (data) {
     return NextResponse.json({ ok: true, available: false, reason: "Taken" });
   }
   return NextResponse.json({ ok: true, available: true });

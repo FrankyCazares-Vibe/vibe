@@ -860,6 +860,9 @@ function readOnbBoot() {
 }
 const ONB_BOOT = readOnbBoot() || {};
 const ONB_PREFILL = ONB_BOOT.prefill && typeof ONB_BOOT.prefill === 'object' ? ONB_BOOT.prefill : {};
+// The handle already on the row (a real one): kept, it may be any length;
+// a new one needs 7–20 (handleAllowed, Oct 25 2026).
+const KEEP_HANDLE = ONB_PREFILL.hasRealHandle && typeof ONB_PREFILL.handle === 'string' ? ONB_PREFILL.handle : null;
 
 // ── Replay mode ───────────────────────────────────────────────────────────
 // `?replay=1` (or the boot's own flag) re-views onboarding after it's done:
@@ -942,12 +945,12 @@ const ONB_COPY = Object.freeze({
     handleAvailable: "✓ available",
     handleTaken: "✗ taken",
     handleReason: "✗ {reason}",
-    handleFormat: "✗ 3–20 letters, numbers or _",
+    handleFormat: "✗ 7–20 letters, numbers or _",
     handleUnchecked: "couldn't check. we'll check when you continue",
     errors: Object.freeze({
       nameRequired: "Add your name. It's how people recognize you.",
       handleRequired: "Pick a handle so friends can find you.",
-      handleInvalid: "3–20 letters, numbers or _.",
+      handleInvalid: "7–20 letters, numbers or _.",
       handleTaken: "That handle is taken. Try another.",
       handleReserved: "That handle is reserved.",
     }),
@@ -1217,7 +1220,7 @@ const ONB_LOCAL_COPY = Object.freeze({
   profileSaveFailed: "Couldn't save your profile.",
   handleCheckFailed: "Couldn't check that handle.",
   verified: "Verified",
-  hintHandle: "how friends find you (3-20, letters/numbers/_)",
+  hintHandle: "how friends find you (7-20, letters/numbers/_)",
   hintBio: "up to 600 characters",
   hintInterests: "up to 10 items — comma or new-line separated",
   hintSkills: "up to 12 items, 30 chars each",
@@ -1955,8 +1958,15 @@ function onboardingResumeStep(draft, saved) {
 
 // ── StepProfile.tsx / OnboardingMobile.tsx: the profile step's pure half ──
 
-/** 3–20 lowercase letters, numbers or _ (the server's HANDLE_FORMAT_RE). */
-const HANDLE_RE = /^[a-z0-9_]{3,20}$/;
+/** A newly chosen handle: 7–20 lowercase letters, numbers or _ (HANDLE_FORMAT_RE + NEW_HANDLE_MIN). */
+const HANDLE_RE = /^[a-z0-9_]{7,20}$/;
+/** Any handle that exists: 3–20 (the server's HANDLE_FORMAT_RE). */
+const EXISTING_HANDLE_RE = /^[a-z0-9_]{3,20}$/;
+
+/** A new handle of 7–20, or the student's own handle kept as it is (`keep`), whatever its length. */
+function handleAllowed(handle, keep) {
+  return HANDLE_RE.test(handle) || (!!keep && handle === keep && EXISTING_HANDLE_RE.test(handle));
+}
 const LOOKING_FOR_VALUES = Object.freeze(["meeting-people", "showing-work", "finding-clubs", "exploring"]);
 const PROFILE_FIELD_KEYS = Object.freeze([
   "name", "handle", "bio", "major", "department", "year", "interests", "skills", "looking_for",
@@ -1991,12 +2001,12 @@ function profileStepBody(f) {
   };
 }
 
-/** The step-3 client checks, in order: a name, a handle, a well-formed handle. */
-function identityProblem(f) {
+/** The step-3 client checks, in order: a name, a handle, a well-formed handle (`keep`: see handleAllowed). */
+function identityProblem(f, keep) {
   const e = ONB_COPY.profile.errors;
   if (!f.name.trim()) return { field: "name", message: e.nameRequired };
   if (!f.handle) return { field: "handle", message: e.handleRequired };
-  if (!HANDLE_RE.test(f.handle)) return { field: "handle", message: e.handleInvalid };
+  if (!handleAllowed(f.handle, keep)) return { field: "handle", message: e.handleInvalid };
   return null;
 }
 
@@ -3013,7 +3023,7 @@ function checkHandle(raw) {
     setHandleStatus(null);
     return v;
   }
-  if (!HANDLE_RE.test(v)) {
+  if (!handleAllowed(v, KEEP_HANDLE)) {
     setHandleStatus({ kind: 'format', text: copy.handleFormat });
     return v;
   }
@@ -3064,7 +3074,7 @@ function setFieldError(field, text) {
 
 /** The step-3 client checks; errors go under the fields. Returns the failing field, or null. */
 function checkIdentity() {
-  const problem = identityProblem(readFields());
+  const problem = identityProblem(readFields(), KEEP_HANDLE);
   setFieldError('name', problem && problem.field === 'name' ? problem.message : '');
   setFieldError('handle', problem && problem.field === 'handle' ? problem.message : '');
   return problem ? problem.field : null;
@@ -4056,7 +4066,7 @@ function openSkip() {
   if (isBusy() || onb.skipOpen) return;
   // In replay nothing is saved, so what's typed decides the variant.
   const f = readFields();
-  const hasIdentity = IS_REPLAY ? !!f.name.trim() && HANDLE_RE.test(f.handle) : onb.identitySaved;
+  const hasIdentity = IS_REPLAY ? !!f.name.trim() && handleAllowed(f.handle, KEEP_HANDLE) : onb.identitySaved;
   onb.skipBase = hasIdentity ? 'saved' : 'identity';
   onb.forceIdentity = false;
   $('skipName').value = f.name;
