@@ -91,3 +91,23 @@ test("the tour engine moves on the app's springs, transform and opacity only", a
   // Reduced motion: no rise, no hover lift.
   assert.match(js, /\.otto-tour-next:hover \{ transform: none; \}/);
 });
+
+test("Otto's wormhole lands on the app's springs, transform and opacity only", async () => {
+  const { SPRING_POP, SPRING_SOFT } = await import("./springs");
+  const js = readFileSync(new URL("../../../public/html/_otto-wormhole.js", import.meta.url), "utf8");
+  assert.ok(js.includes(`var SOFT = '${springLinear(SPRING_SOFT, 480)}';`), "SPRING_SOFT over 480ms");
+  assert.ok(js.includes(`var POP = '${springLinear(SPRING_POP, 600)}';`), "SPRING_POP over 600ms");
+  assert.match(js, /owh-pop 600ms var\(--owh-pop\)/);
+  assert.match(js, /owh-fade-out 480ms var\(--owh-soft\)/);
+  assert.match(js, /owh-fold 460ms var\(--owh-soft\)/);
+  // The fold runs on the page's own elements, outside the overlay: they need the curves too.
+  assert.match(js, /\.owh, \.owh-fold \{ --owh-soft: ' \+ SOFT/);
+  // Every keyframe moves transform (or its rotate part) and opacity, nothing else.
+  for (const m of js.matchAll(/@keyframes [\w-]+ \{(.*?)\}'/g)) {
+    for (const decl of m[1].matchAll(/([a-z-]+):/g)) {
+      assert.ok(["transform", "opacity", "rotate"].includes(decl[1]), `animates ${decl[1]}`);
+    }
+  }
+  // Reduced motion: no streaks and nothing moves.
+  assert.match(js, /if \(running \|\| reduced\(\)\) \{ reveal\(\); done\(\); return; \}/);
+});

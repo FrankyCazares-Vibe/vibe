@@ -8,6 +8,7 @@ import {
   useState,
   type CSSProperties,
   type ReactNode,
+  type Ref,
 } from "react";
 
 import { OnbHeader } from "@/components/mobile/onboarding/OnbHeader";
@@ -66,6 +67,7 @@ import {
   type DraftSaver,
 } from "@/lib/onboarding/draft";
 import { anyClubFollowed } from "@/lib/onboarding/social-steps";
+import { appColour, loadWormhole } from "@/lib/onboarding/wormhole";
 
 /**
  * Mobile-native Otto onboarding, six steps (wave plan
@@ -244,11 +246,13 @@ function computeBoot(p: {
 }
 
 // ── Otto orb ────────────────────────────────────────────────────────────────
-function OttoOrb({ size }: { size: "big" | "small" }) {
+function OttoOrb({ size, orbRef }: { size: "big" | "small"; orbRef?: Ref<HTMLDivElement> }) {
   const px = size === "big" ? 132 : 64;
   const corePx = size === "big" ? 16 : 10;
   return (
     <div
+      ref={orbRef}
+      className="onb-owh-orb"
       style={{
         position: "relative",
         width: px,
@@ -376,6 +380,67 @@ export function OnboardingMobile({
   const busy = savingCampus || savingProfile || uploading || switching || finishing || skipping;
 
   const [warping, setWarping] = useState(false);
+
+  // ── Otto's wormhole (Oct 25 2026, public/html/_otto-wormhole.js) ─────────
+  // Opening on step 1, Otto arrives: the page holds everything back
+  // (`data-onb-arrive="hold"`), his solar system forms, then the words rise
+  // in ("rise"). Finish runs it in reverse into the app's page colour. The
+  // script loads at mount either way, so Finish never waits on it.
+  const shellRef = useRef<HTMLDivElement | null>(null);
+  const orbRef = useRef<HTMLDivElement | null>(null);
+  const [arrive, setArrive] = useState<"hold" | "rise" | null>(() => (boot.step === 1 ? "hold" : null));
+  const holdingRef = useRef(boot.step === 1);
+  const arriveStartedRef = useRef(false);
+  const leavingRef = useRef(false);
+  const endHold = useCallback(() => {
+    holdingRef.current = false;
+    setArrive((a) => (a === "hold" ? "rise" : a));
+  }, []);
+  useEffect(() => {
+    if (arriveStartedRef.current) return;
+    arriveStartedRef.current = true;
+    void loadWormhole().then((wormhole) => {
+      if (!holdingRef.current) return;
+      if (!wormhole) {
+        endHold();
+        return;
+      }
+      wormhole.arrive({ anchor: orbRef.current, bg: COLORS.charcoal, onReveal: endHold });
+    });
+  }, [endHold]);
+  useEffect(() => {
+    // The last resort: nothing stays held, whatever the script did.
+    if (arrive === null) return;
+    const t = window.setTimeout(
+      () => (arrive === "hold" ? endHold() : setArrive(null)),
+      arrive === "hold" ? 4000 : 1000,
+    );
+    return () => window.clearTimeout(t);
+  }, [arrive, endHold]);
+
+  /** Leaves for the app through Otto; the old warp when the script never came. */
+  const leaveThroughOtto = (dest: string) => {
+    if (leavingRef.current) return;
+    leavingRef.current = true;
+    const warp = () => {
+      setWarping(true);
+      window.setTimeout(() => leave(dest), 700);
+    };
+    void loadWormhole().then((wormhole) => {
+      if (!wormhole) return warp();
+      const shell = shellRef.current;
+      try {
+        wormhole.depart({
+          anchor: orbRef.current,
+          collapse: shell ? Array.from(shell.querySelectorAll(":scope > header, :scope > main, :scope > footer")) : [],
+          color: appColour(document.documentElement.dataset.theme),
+          onDone: () => leave(dest),
+        });
+      } catch {
+        leave(dest);
+      }
+    });
+  };
   const [skipOpen, setSkipOpen] = useState(false);
   /** The sheet's variant as it opened; `forceIdentity` overrides it after a refused save. */
   const [skipBase, setSkipBase] = useState<"saved" | "identity">("identity");
@@ -653,15 +718,13 @@ export function OnboardingMobile({
     }
     // Used verbatim: the server's path already carries the welcome flag.
     const dest = typeof next === "string" && isSafeRelativePath(next) ? next : "/campus?welcome=1";
-    setWarping(true);
-    window.setTimeout(() => leave(dest), 700);
+    leaveThroughOtto(dest);
   };
 
   const finish = async () => {
     if (busyRef.current) return;
     if (replay) {
-      setWarping(true);
-      window.setTimeout(() => leave("/campus"), 700);
+      leaveThroughOtto("/campus");
       return;
     }
     busyRef.current = true;
@@ -1078,11 +1141,11 @@ export function OnboardingMobile({
   }
 
   return (
-    <div style={shellStyle}>
+    <div ref={shellRef} style={shellStyle} data-onb-arrive={arrive ?? undefined}>
       <StyleTag />
 
       {/* Soft glow accents, clipped by their own fixed layer (not the shell) */}
-      <div style={glowLayerStyle} aria-hidden="true">
+      <div className="onb-owh-glow" style={glowLayerStyle} aria-hidden="true">
         <span style={bg1Style} />
         <span style={bg2Style} />
       </div>
@@ -1103,16 +1166,20 @@ export function OnboardingMobile({
         <section key={step} style={stepSectionStyle}>
           {step === 1 ? (
             <>
-              <OttoOrb size="big" />
-              <h1 style={h1Style}>
+              <OttoOrb size="big" orbRef={orbRef} />
+              <h1 className="onb-owh-line" style={h1Style}>
                 {"i'm "}<em style={emStyle}>otto</em>.
               </h1>
-              <p style={introStyle}>{ONB_COPY.hello.intro}</p>
-              <p style={noteStyle}>{ONB_COPY.hello.note}</p>
+              <p className="onb-owh-line" style={{ ...introStyle, ["--onb-owh-delay" as string]: "90ms" }}>
+                {ONB_COPY.hello.intro}
+              </p>
+              <p className="onb-owh-line" style={{ ...noteStyle, ["--onb-owh-delay" as string]: "260ms" }}>
+                {ONB_COPY.hello.note}
+              </p>
             </>
           ) : (
             <>
-              <OttoOrb size="small" />
+              <OttoOrb size="small" orbRef={orbRef} />
               {body}
             </>
           )}
@@ -1197,6 +1264,31 @@ function StyleTag() {
         border-radius: 50%;
         background: ${COLORS.accent};
         box-shadow: 0 0 6px ${COLORS.accent};
+      }
+
+      /* Otto's wormhole: held (hidden, can't be tapped) while he arrives,
+         then the words rise in on SPRING_SOFT, the bars only fade. */
+      [data-onb-arrive="hold"] > header,
+      [data-onb-arrive="hold"] > footer,
+      [data-onb-arrive="hold"] .onb-owh-glow,
+      [data-onb-arrive="hold"] .onb-owh-orb,
+      [data-onb-arrive="hold"] .onb-owh-line { visibility: hidden; }
+      [data-onb-arrive="rise"] .onb-owh-line {
+        animation: onb-owh-rise 480ms var(--vibe-spring-soft) var(--onb-owh-delay, 0ms) backwards;
+      }
+      [data-onb-arrive="rise"] > header,
+      [data-onb-arrive="rise"] > footer,
+      [data-onb-arrive="rise"] .onb-owh-glow {
+        animation: onb-owh-appear 480ms var(--vibe-spring-soft) 180ms backwards;
+      }
+      @keyframes onb-owh-rise {
+        from { opacity: 0; transform: translateY(8px); }
+      }
+      @keyframes onb-owh-appear {
+        from { opacity: 0; }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        [data-onb-arrive="rise"] .onb-owh-line { animation-name: onb-owh-appear; }
       }
     `}</style>
   );

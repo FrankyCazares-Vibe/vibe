@@ -20,6 +20,9 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,300..800;1,400&family=Fraunces:ital,wght,SOFT@0,400..900,100;1,400,100&display=swap" rel="stylesheet">
 <script src="/html/_persistence.js"></script>
+<!-- window.OttoWormhole: Otto's arrival on step 1 and the leave for the app
+     (Oct 25, 2026; the phone's onboarding loads the same file). -->
+<script src="/html/_otto-wormhole.js"></script>
 <!-- window.vibeMajorsForCampus: the curated majors list for the campus the
      student picks, generated from src/lib/iu/majors.ts (same include as
      profile.html). -->
@@ -471,61 +474,33 @@ input, textarea, [contenteditable="true"] { cursor:text!important; }
   .progress-text { display: none; }
 }
 
-/* ── Hyperdrive on Finish — same beat as the landing's warp ─────────────── */
-.ott-warp {
-  position: fixed; inset: 0; pointer-events: none; z-index: 9990;
-  opacity: 0; transition: opacity 80ms ease;
-}
-.ott-warp.active { opacity: 1; }
-.ott-warp-streak {
-  position: absolute; top: 50%; left: 50%;
-  width: 2px; height: 2px;
-  background: #ffffff;
-  border-radius: 50%;
-  box-shadow: 0 0 8px #ffffff, 0 0 18px #ffe5db, 0 0 36px rgba(255,92,53,.8);
-  transform: translate(-50%, -50%);
-  will-change: transform, opacity;
-}
-.ott-warp.active .ott-warp-streak {
-  animation: ott-warp-streak 750ms cubic-bezier(0.5, 0, 0.85, 0.4) forwards;
-}
-.ott-warp::after {
-  content: "";
-  position: absolute; inset: 0;
-  background: radial-gradient(circle at 50% 50%, #ffd9b5 0%, #ffe5db 40%, #ffffff 100%);
-  opacity: 0; pointer-events: none;
-}
-.ott-warp.active::after {
-  animation: ott-warp-flash 750ms ease-in forwards;
-}
-body.ott-warping main.onb-shell,
-body.ott-warping .progress-dots {
-  animation: ott-warp-content 750ms cubic-bezier(0.6, 0, 0.85, 0.3) forwards;
-  transform-origin: 50% 50%;
-}
-@keyframes ott-warp-streak {
-  0%   { transform: translate(-50%, -50%) rotate(var(--ang)) scaleX(1) scaleY(1); opacity: .9; }
-  25%  { transform: translate(-50%, -50%) rotate(var(--ang)) scaleX(18) scaleY(1.2); opacity: 1; }
-  100% { transform: translate(calc(-50% + var(--cos) * 2800px), calc(-50% + var(--sin) * 2800px)) rotate(var(--ang)) scaleX(90) scaleY(0.6); opacity: 0; }
-}
-@keyframes ott-warp-flash {
-  0%  { opacity: 0; }
-  80% { opacity: 0; }
-  100% { opacity: 1; }
-}
-@keyframes ott-warp-content {
-  0%   { transform: scale(1); opacity: 1; filter: blur(0); }
-  35%  { transform: scale(1.15); opacity: .9; filter: blur(2px); }
-  100% { transform: scale(8); opacity: 0; filter: blur(22px); }
-}
+/* ── Otto's arrival and the leave for the app (Oct 25, 2026) ─────────────
+   The effect itself is public/html/_otto-wormhole.js, drawn above the page;
+   here the page's own part: step 1's words, the header and the dots wait
+   under the wormhole (body.owh-arriving), then rise in on SPRING_SOFT once
+   Otto has formed (body.owh-rising). The header and dots only fade: they
+   are positioned with transforms of their own. Reduced motion: fade only. */
+body.owh-arriving .onb-step[data-step="1"] > :not(.otto-big),
+body.owh-arriving .onb-top,
+body.owh-arriving .progress-dots { visibility: hidden; }
+body.owh-rising .onb-step[data-step="1"] > :not(.otto-big) { animation: owh-rise 480ms var(--onb-spring-soft) backwards; }
+body.owh-rising .onb-step[data-step="1"] > .intro { animation-delay: 90ms; }
+body.owh-rising .onb-step[data-step="1"] > .cta-row { animation-delay: 180ms; }
+body.owh-rising .onb-step[data-step="1"] > .note { animation-delay: 260ms; }
+body.owh-rising .onb-top,
+body.owh-rising .progress-dots { animation: owh-appear 480ms var(--onb-spring-soft) 200ms backwards; }
+@keyframes owh-rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+@keyframes owh-appear { from { opacity: 0; } to { opacity: 1; } }
 @media (prefers-reduced-motion: reduce) {
-  .ott-warp.active .ott-warp-streak,
-  body.ott-warping main.onb-shell,
-  body.ott-warping .progress-dots { animation: none !important; }
+  body.owh-rising .onb-step[data-step="1"] > :not(.otto-big) { animation-name: owh-appear; }
 }
 </style>
 </head>
 <body>
+<!-- Otto's arrival: until the wormhole has formed him, step 1's words, the
+     header and the dots wait. startArrival() lifts this at boot (at once on
+     any other step); the timer is a safety should the page script fail. -->
+<script>document.body.classList.add('owh-arriving');setTimeout(function(){document.body.classList.remove('owh-arriving');},4000);</script>
 
 <div class="cursor" id="cursor"></div>
 <div class="cursor-ring" id="cursorRing"></div>
@@ -781,8 +756,6 @@ body.ott-warping .progress-dots {
 
 </main>
 
-<!-- Hyperdrive overlay (populated + activated by triggerHyperdrive) -->
-<div class="ott-warp" id="ottWarp" aria-hidden="true"></div>
 
 <!-- Skip sheet: "saved" (Keep going / Skip anyway) or "identity" (name and
      handle first, then Save & skip). Its inputs mirror step 3's. -->
@@ -3923,14 +3896,14 @@ function succeed(next, ottoConfig) {
   vibeSave('vibe_user_v1', { name: $('pfName').value.trim(), tagline: '', headline: '', location: '', vibeTags: [], _onboarded: true });
   // Used verbatim: the server's path already carries the welcome flag.
   const dest = typeof next === 'string' && isSafeRelativePath(next) ? next : '/campus?welcome=1';
-  triggerHyperdrive(function () { window.__vibeTopNav(dest); });
+  leaveForApp(function () { window.__vibeTopNav(dest); });
 }
 
 async function finish() {
   if (isBusy()) return;
   if (IS_REPLAY) {
     $('onbFinish').disabled = true;
-    triggerHyperdrive(function () { window.__vibeTopNav('/campus'); });
+    leaveForApp(function () { window.__vibeTopNav('/campus'); });
     return;
   }
   setBusy('finishing', true);
@@ -4337,35 +4310,56 @@ function markTouchDevice() {
   renderBusy();
   buildHistoryStack();
   showStep(onb.step);
+  startArrival();
 })();
 
-// ── Hyperdrive: streak the screen out, then call `onDone`. ────────────────
-function triggerHyperdrive(onDone) {
-  const overlay = document.getElementById('ottWarp');
-  if (!overlay) { onDone && onDone(); return; }
-  // Build ~24 streaks at evenly-spaced angles with slight jitter so they
-  // feel organic rather than a starburst clipart.
-  const COUNT = 24;
-  const frag = document.createDocumentFragment();
-  for (let i = 0; i < COUNT; i++) {
-    const jitter = (Math.random() - 0.5) * (Math.PI / COUNT);
-    const ang = (i / COUNT) * Math.PI * 2 + jitter;
-    const cos = Math.cos(ang).toFixed(4);
-    const sin = Math.sin(ang).toFixed(4);
-    const el = document.createElement('span');
-    el.className = 'ott-warp-streak';
-    el.style.setProperty('--ang', ang.toFixed(4) + 'rad');
-    el.style.setProperty('--cos', cos);
-    el.style.setProperty('--sin', sin);
-    frag.appendChild(el);
+// ── Otto's arrival and the leave for the app (Oct 25, 2026) ─────────────
+// public/html/_otto-wormhole.js draws both; the phone's onboarding uses the
+// same file.
+
+/**
+ * On a page that opens on step 1 (where sign-up lands), Otto's solar system
+ * forms out of a wormhole first, then step 1's words rise in. Any other
+ * step, or no wormhole script, shows the page at once.
+ */
+function startArrival() {
+  const body = document.body;
+  const anchor = document.querySelector('.onb-step[data-step="1"] .otto-big');
+  if (onb.step !== 1 || !window.OttoWormhole || !anchor) {
+    body.classList.remove('owh-arriving');
+    return;
   }
-  overlay.innerHTML = '';
-  overlay.appendChild(frag);
-  // Force reflow so the animation actually runs when we add `.active`.
-  overlay.getBoundingClientRect();
-  overlay.classList.add('active');
-  document.body.classList.add('ott-warping');
-  setTimeout(function () { onDone && onDone(); }, 750);
+  window.OttoWormhole.arrive({
+    anchor,
+    bg: getComputedStyle(body).backgroundColor,
+    onReveal: () => {
+      body.classList.remove('owh-arriving');
+      body.classList.add('owh-rising');
+      setTimeout(() => body.classList.remove('owh-rising'), 1000);
+    },
+  });
+}
+
+/** The page colour of the app (Campus) in this theme: what the screen turns into. */
+function appColour() {
+  return document.documentElement.getAttribute('data-theme') === 'dark' ? '#0C0B0B' : '#FAF7F2';
+}
+
+/**
+ * Leaving for the app: the step folds into Otto, his rings pull in, light
+ * streaks out and the screen becomes the app's colour; then `onDone`
+ * navigates (Campus opens with Otto alone, first light).
+ */
+function leaveForApp(onDone) {
+  const step = document.querySelector('.onb-step.active');
+  const anchor = step && step.querySelector('.otto-big, .otto-mid, .otto-sm');
+  if (!window.OttoWormhole) { if (onDone) onDone(); return; }
+  window.OttoWormhole.depart({
+    anchor,
+    collapse: [step, $('progressDots'), document.querySelector('.onb-top')],
+    color: appColour(),
+    onDone,
+  });
 }
 </script>
 
