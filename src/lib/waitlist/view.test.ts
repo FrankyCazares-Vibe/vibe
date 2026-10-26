@@ -93,6 +93,8 @@ test("gateRefusalCopy: a sentence for every reason, none naming the hook", () =>
   assert.match(gateRefusalCopy("access_code_expired"), /expired/);
   assert.match(gateRefusalCopy("access_code_used"), /already been used/);
   assert.match(gateRefusalCopy("access_code_in_use"), /15 minutes/);
+  assert.match(gateRefusalCopy("access_code_full"), /as many times/);
+  assert.match(gateRefusalCopy("access_code_school_email"), /iu\.edu or purdue\.edu/);
 });
 
 test("landingCta: closed is the waitlist, tagged; open is today's sign-up", () => {

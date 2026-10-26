@@ -40,6 +40,8 @@ const REFUSAL_COPY: Record<GateRefusal, string> = {
     "That access code has already been used to make an account. Not you? Reply to your invite email.",
   access_code_in_use:
     "That code is being used with a different email right now. Use the same email, or try again in 15 minutes.",
+  access_code_full: "That code has been used as many times as it can be. Ask whoever gave it to you for another way in.",
+  access_code_school_email: "Use your school email (the one ending in iu.edu or purdue.edu) with this code.",
   club_link_invalid: "That link doesn't work. Ask whoever shared it for a new one.",
   club_link_used: "That setup link has already been used. Ask Vibe for a new one.",
   club_link_expired: "That link has ended. Ask whoever shared it for a new one.",

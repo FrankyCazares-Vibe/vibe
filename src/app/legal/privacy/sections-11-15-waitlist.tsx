@@ -142,6 +142,10 @@ export function Section11Waitlist() {
           ],
           ["The confirm link", "Works for 7 days"],
           ["An access code", "Works once, for up to 14 days"],
+          [
+            "A shared access code",
+            "Works for up to 30 days and up to the number of sign-ups we set",
+          ],
           ["A club setup link", "Works once, for up to 7 days"],
           [
             "A club's members' link",
@@ -213,6 +217,18 @@ export function Section11Waitlist() {
         short note and the date. Deleting your account in Settings takes your
         address off the list. If we delete your account for you, we take it off
         by hand.
+      </LegalP>
+      <LegalP>
+        <strong>A shared access code.</strong> A cofounder may give out one
+        access code that several people can use, so a friend can sign up
+        without waiting for our email. It works only with a school email, for
+        up to the number of sign-ups we set, until an end date we set, at most
+        30 days after we make it. For it we keep a scrambled form of the code,
+        a short name for it, how many times it has been used and when it ends.
+        The code&apos;s own record does not say who used it. As with any access
+        code, your account keeps a record of the code you used, deleted with
+        the account. Signing up this way makes no waitlist entry and no wave
+        note.
       </LegalP>
 
       <LegalP>

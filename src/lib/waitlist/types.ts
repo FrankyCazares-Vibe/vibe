@@ -156,6 +156,9 @@ export const GATE_REFUSALS = [
   "access_code_expired",
   "access_code_used",
   "access_code_in_use",
+  // A shared code (one code, many school addresses), 20261029100000_signup_master_code.sql.
+  "access_code_full",
+  "access_code_school_email",
   // A club link (setup or members'), 20261021120000_club_links_gate.sql.
   "club_link_invalid",
   "club_link_used",

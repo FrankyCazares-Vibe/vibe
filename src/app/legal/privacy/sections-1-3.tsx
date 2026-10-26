@@ -85,7 +85,8 @@ export function Sections1To3() {
       <LegalP>
         <strong>Making an account.</strong> Sign-up asks for your school email,
         a password and the checkbox. While we let people in one group at a time
-        (a wave), it also asks for the access code we emailed you. Signing up
+        (a wave), it also asks for an access code: the one we emailed you, or
+        a shared one a cofounder gave you. Signing up
         through a club link needs no access code (
         <Sec to="11">section 11</Sec>). We email a code to your school email. Typing it confirms your account and verifies
         your school email in one step. The password that works is the one

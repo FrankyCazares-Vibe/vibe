@@ -1,6 +1,6 @@
 # Vibe Privacy Policy
 
-Effective October 24, 2026
+Effective October 25, 2026
 
 Vibe is a campus social app for people with an Indiana University or Purdue University email address. It is run by **CONNECTVIBE. LLC**, an Indiana limited liability company. In this policy, "we" means that company. Vibe is independent. It is not run or backed by Indiana University, Purdue University, or any campus, school or club.
 
@@ -66,7 +66,7 @@ When and why we read private messages is in section 5h.
 
 **Age and agreement.** You must be 18 or older (section 12). Sign-up has one checkbox: "I'm 18 or older and I agree to the Terms of Service and Privacy Policy." Checking it is how you agree to this policy. We do not ask for a date of birth or check age any other way.
 
-**Making an account.** Sign-up asks for your school email, a password and the checkbox. While we let people in one group at a time (a wave), it also asks for the access code we emailed you. Signing up through a club link needs no access code (section 11). We email a code to your school email. Typing it confirms your account and verifies your school email in one step. The password that works is the one chosen by the person who types the code, so confirming removes any password set for your address before then. If you type the code on the page where you just typed your password (the sign-up page or Log in), Vibe sets that password again at once. If you confirm anywhere else, Vibe asks you to choose a password. Unless you confirm on the sign-up page, Vibe also asks you to check the box again. You then set up a profile. Some accounts sign in with a different email and verify a school email as a separate step: accounts made before sign-up worked this way, and a few that we add ourselves.
+**Making an account.** Sign-up asks for your school email, a password and the checkbox. While we let people in one group at a time (a wave), it also asks for an access code: the one we emailed you, or a shared one a cofounder gave you. Signing up through a club link needs no access code (section 11). We email a code to your school email. Typing it confirms your account and verifies your school email in one step. The password that works is the one chosen by the person who types the code, so confirming removes any password set for your address before then. If you type the code on the page where you just typed your password (the sign-up page or Log in), Vibe sets that password again at once. If you confirm anywhere else, Vibe asks you to choose a password. Unless you confirm on the sign-up page, Vibe also asks you to check the box again. You then set up a profile. Some accounts sign in with a different email and verify a school email as a separate step: accounts made before sign-up worked this way, and a few that we add ourselves.
 
 **What "verified" means.** We send a verification code to your school email and you type it into Vibe. That proves you could read mail at that address at that moment. It does not prove that you are enrolled, employed or admitted, or that you are who your profile says. A school email here means an address whose part after the @ is iu.edu or purdue.edu, or ends in .iu.edu or .purdue.edu. University staff and faculty have these addresses too. We do not contact the university. One school email is meant to verify one account. Your campus is your own choice, and we do not check it.
 
@@ -572,6 +572,7 @@ One more place could hold what you typed. Sentry is the service we use to find b
 | An entry you never confirm, with no access code sent | Up to 30 days after its last confirm email |
 | The confirm link | Works for 7 days |
 | An access code | Works once, for up to 14 days |
+| A shared access code | Works for up to 30 days and up to the number of sign-ups we set |
 | A club setup link | Works once, for up to 7 days |
 | A club's members' link | Works for 3 weeks and up to 150 sign-ups, while the club leaves it on |
 
@@ -591,6 +592,8 @@ The 40 days are the longest any entry stays, whether or not you confirmed, got a
 **When you sign up with an access code.** The email you sign up with is stored on your waitlist entry, linked to your new account, until the entry is deleted. Your account keeps a record of the access code you used and a wave note. The note holds your wave, how you got in (through the form or added by a cofounder), the day your access code was sent and the day you joined. Both are deleted with the account. Your waitlist answers are not copied into your profile.
 
 We keep a short list of addresses that can sign up without an access code. For each one the list holds the address, the reason, an optional short note and the date. Deleting your account in Settings takes your address off the list. If we delete your account for you, we take it off by hand.
+
+**A shared access code.** A cofounder may give out one access code that several people can use, so a friend can sign up without waiting for our email. It works only with a school email, for up to the number of sign-ups we set, until an end date we set, at most 30 days after we make it. For it we keep a scrambled form of the code, a short name for it, how many times it has been used and when it ends. The code's own record does not say who used it. As with any access code, your account keeps a record of the code you used, deleted with the account. Signing up this way makes no waitlist entry and no wave note.
 
 **When you sign up through a club link.** A club link lets someone with a school email sign up, even while sign-up is closed. There are two kinds:
 

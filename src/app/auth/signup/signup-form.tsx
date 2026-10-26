@@ -220,6 +220,7 @@ export function SignupForm({
   // A club link's sign-up needs no access code: the link is the way in.
   const [codeShown, setCodeShown] = useState(!signupOpen && !club);
   const codeInput = useRef<HTMLInputElement>(null);
+  const emailInput = useRef<HTMLInputElement>(null);
   const [focusCode, setFocusCode] = useState(0);
   // The "are you a person" box (TurnstileBox). With no site key it is "off"
   // for good: no box, the button never waits, and signUp sends what it
@@ -253,10 +254,10 @@ export function SignupForm({
   // accounts and the store review accounts sign up with other addresses.
   const typedEmail = email.trim();
   const otherEmailTyped = /^[^@\s]+@[^@\s]+\.[^@\s]{2,}$/.test(typedEmail) && !isSchoolEmail(typedEmail);
-  // While sign-up is closed, the account just made spent the code: starting
-  // over with another address would only meet "already used". Say so instead
-  // of offering it (a founder sends a new code; the database allows that
-  // while the first account is unconfirmed).
+  // While sign-up is closed, an invite email's code is now spent: starting
+  // over with another address would only meet "already used" (a founder
+  // sends a new code; the database allows that while the first account is
+  // unconfirmed). A shared code works again, so the pending view says both.
   const codeTied = codeShown && readTypedAccessCode(accessCode.trim()) !== null;
   const rateLimitedUntil = pending?.rateLimitedUntil ?? null;
 
@@ -364,6 +365,14 @@ export function SignupForm({
           // own words. The access code field stays away: the link was the
           // way in, and the words say what to do instead.
           setError(signUpErrorMessage(signErr, human));
+          return;
+        }
+        if (refusal === "access_code_school_email") {
+          // A shared code with a personal address: the code is fine, the
+          // address is what to change.
+          setError(signUpErrorMessage(signErr, human));
+          emailInput.current?.focus();
+          emailInput.current?.select();
           return;
         }
         if (refusal) {
@@ -535,11 +544,24 @@ export function SignupForm({
                 Wrong address? Ask whoever gave you the link for a new one.
               </p>
             ) : codeTied ? (
-              <p className="vibe-auth-tip" style={{ overflowWrap: "anywhere" }}>
-                Your access code is now tied to <strong>{pending.email}</strong>.
-                Wrong address? Reply to your invite email and we&apos;ll send you
-                a new code.
-              </p>
+              // The page can't tell an invite email's code (now tied to this
+              // address) from a shared one (20261029100000), which works
+              // again with another address: say both, keep the way back.
+              <div>
+                <p className="vibe-auth-tip" style={{ overflowWrap: "anywhere" }}>
+                  Wrong address? If your code came in an invite email, it&apos;s
+                  now tied to <strong>{pending.email}</strong>: reply to that
+                  email and we&apos;ll send you a new code. If someone shared the
+                  code with you, start over.
+                </p>
+                <button
+                  type="button"
+                  className="vibe-auth-disclosure"
+                  onClick={onStartOver}
+                >
+                  Start over
+                </button>
+              </div>
             ) : (
               <div>
                 <button
@@ -653,6 +675,7 @@ export function SignupForm({
               <span className="vibe-auth-label-hint">your .edu</span>
             </span>
             <input
+              ref={emailInput}
               type="email"
               autoComplete="email"
               placeholder="you@iu.edu"
