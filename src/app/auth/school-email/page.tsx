@@ -715,13 +715,16 @@ function SchoolEmailInner() {
             {linksOpenBrowser ? (
               <p className="vibe-auth-tip">
                 Not there after a minute? Check Junk, and your school
-                Outlook&apos;s Quarantine. Then type the code here.
+                Outlook&apos;s Quarantine. Found it in Junk? Choose &ldquo;Not
+                junk&rdquo; so the next one lands in your Inbox. Then type the
+                code here.
               </p>
             ) : (
               <p className="vibe-auth-tip">
                 Not there after a minute? Check Junk, and your school
-                Outlook&apos;s Quarantine. Opened it on your phone? Just type
-                the code here.
+                Outlook&apos;s Quarantine. Found it in Junk? Choose &ldquo;Not
+                junk&rdquo; so the next one lands in your Inbox. Opened it on
+                your phone? Just type the code here.
               </p>
             )}
           </form>

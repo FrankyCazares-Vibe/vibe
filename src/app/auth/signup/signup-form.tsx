@@ -477,7 +477,9 @@ export function SignupForm({
           <p className="vibe-auth-sub" style={{ overflowWrap: "anywhere" }}>
             We sent an 8-digit code to <strong>{pending.email}</strong> from
             noreply@connectvibe.app. Type it below to confirm your account.
-            School inboxes can take a minute: check Junk too.
+            School inboxes can take a minute. Not in your Inbox? Look in Junk,
+            and choose &ldquo;Not junk&rdquo; so the next one lands in your
+            Inbox.
           </p>
 
           {/* No number here: the resend button below counts down live, and
