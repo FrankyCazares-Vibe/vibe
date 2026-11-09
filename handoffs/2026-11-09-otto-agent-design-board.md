@@ -29,7 +29,10 @@ and every board says "design, not live". It also covers the Otto page redesign q
 - **Row B also draws the rest** (added at Franky's ask to keep stats, notifications and the orb's side panel
   in mind): B4, the phone's Today page further down (Otto did, and "Otto saw" for notifications), the Stats
   tab, and Otto's settings; B5, the side panel open over Campus (its Otto tab and its Messages tab); B6,
-  Stats on the computer (one number and a 7-day bar strip, Vibe's own icons in neat columns: the D9 fix).
+  Stats on the computer (one number and a 7-day bar strip, Vibe's own icons in neat columns: the D9 fix);
+  B7, chatting from Today on the phone (Franky: "you should still be able to talk and chat with otto on today
+  mobile"): the conversation stays at the top of Today, the ask bar docks above the tab bar while you scroll,
+  a reply that lands while you're scrolled down rides on the docked bar, and yesterday folds into one row.
 
 The rule every direction keeps (the spec's): you ask, Otto shows what it's checking, Otto shows **a card,
 not a post** (the action in plain words, the result as it will look, where it goes and who sees it with a
@@ -39,7 +42,7 @@ the app's own undo (delete it). A failure says what happened and that nothing we
 | | Direction | The Otto tab | The ask drawn | The failure drawn |
 |---|---|---|---|---|
 | A | **Just talk** | One conversation; Otto's morning note opens the day | "post this event for my club…" | Vibe didn't answer: nothing was posted, the draft is kept |
-| B | **Today + Ask** | A calm Today page with the chat at its top; on the computer, the corner orb's side panel | "remind people about friday's run" | Not an officer of that club: "Remind just me" instead |
+| B | **Today + Ask** | A calm Today page that is also an ongoing chat: the conversation stays at its top and the ask bar docks above the tab bar while you scroll; on the computer, the corner orb's side panel | "remind people about friday's run" | Not an officer of that club: "Remind just me" instead |
 | C | **Otto's desk** | Jobs you approve: Ready for you, Scheduled, Done; each spells out "What will happen" | "message all our members…" (an announcement on the Board that notifies the members) | The club already sent today's one announcement: "Schedule for tomorrow" |
 
 ## Recommendation
@@ -99,7 +102,7 @@ club's members, and `OTTO_AI=off` puts back today's Otto.
 
 ## Status
 
-- Done: the board is published (15 boards), this note, and the link sent to the spec's session to add to
+- Done: the board is published (16 boards), this note, and the link sent to the spec's session to add to
   the spec.
 - Ahead of v1 on purpose: B draws a scheduled reminder (the spec starts with "remind now"), and C's
   announcement needs the new announce route.
