@@ -17,7 +17,7 @@ function getFrom(): string {
   const from = process.env.RESEND_FROM?.trim();
   if (!from) {
     throw new Error(
-      "Set RESEND_FROM (e.g. Vibe <noreply@yourdomain.com>) to send transactional email.",
+      "Set RESEND_FROM (e.g. Vibe <hello@yourdomain.com>, an address that takes replies) to send transactional email.",
     );
   }
   return from;
