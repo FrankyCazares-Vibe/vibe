@@ -34,8 +34,9 @@ events, RSVPs or club links since Oct 28. Franky has no time frame for anything 
 2. **Franky, 2 min:** Resend > Domains > connectvibe.app: open and click tracking OFF.
 3. **Franky, 10 min, about $20/mo:** upgrade Resend to Pro (no daily cap) and raise Supabase's auth email rate limit
    (Authentication > Rate Limits) to about 100 an hour. This is what keeps codes from stopping during a rush.
-4. **Code, ~30 min, one deploy:** the sign-up and school-email pages say "Not in your Inbox? Look in Junk, and choose
-   'Not junk' so your next Vibe email lands in your Inbox." (Each student's Not junk is honored by Microsoft.)
+4. **SHIPPED Nov 9 (main 8b0d18ba):** the sign-up "check your email" screen and the school-email code panel now say to
+   choose "Not junk" so the next one lands in the Inbox (each student's Not junk is honored by Microsoft). Checked live
+   on the sign-up page's served script; the school-email page needs a signed-in visit to see.
 5. **Franky + code, ~20 min:** send from an address that takes replies (`hello@`, already routed by Cloudflare):
    Supabase SMTP sender, Vercel `RESEND_FROM`, and the one line on the sign-up page that names `noreply@`.
 6. **Franky, one email (Claude drafts):** ask IU UITS and Purdue IT, ideally through a staff contact, for an allow entry
