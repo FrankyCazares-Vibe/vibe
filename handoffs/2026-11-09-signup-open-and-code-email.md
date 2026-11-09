@@ -39,7 +39,7 @@ events, RSVPs or club links since Oct 28. Franky has no time frame for anything 
    on the sign-up page's served script; the school-email page needs a signed-in visit to see.
 5. **SHIPPED Nov 9 (main 0a98266f):** every email now comes from `hello@connectvibe.app` (routed to Franky by
    Cloudflare). Franky changed Supabase's SMTP sender and Vercel's `RESEND_FROM`; the code changed the sign-up page line
-   and the example settings. Checked live: the sign-up page names hello@. Not yet seen: a real code email's From line.
+   and the example settings. Checked live: the sign-up page names hello@. Not yet seen: a real code email's From line. Vibe's own emails follow from main 417ec11b: Franky's RESEND_FROM save was only picked up by a NEW build, because Redeploy of the same commit had been silently canceled by the ignore rule since Oct 11 (fixed in that commit).
 6. **Franky, one email (Claude drafts):** ask IU UITS and Purdue IT, ideally through a staff contact, for an allow entry
    for connectvibe.app (sender domain + dmarc=pass), with the header evidence from step 1. Uncertain, likely weeks.
 7. **Later:** Supabase Send Email Hook so the code email gets a plain-text copy and a reply address (half a day; small
