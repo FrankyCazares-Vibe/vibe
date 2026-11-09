@@ -19,8 +19,17 @@ and every board says "design, not live". It also covers the Otto page redesign q
 - **Otto's states:** the spec's four (idle, thinking, talking, waiting on you) plus working, done and didn't
   work. Night, Light and reduced motion. The motion on the app's springs, and where Otto lives (the phone's
   Otto tab, the computer's corner orb and side panel).
+- **Otto's look** (added after Franky asked "should we redesign otto as a different mascot? does the solar
+  system feel too cold?"): three ways to warm Otto, each at tab, chat, corner and hero size, Night and Light:
+  **Warm orb** (today's orb, no purple at rest, no spin at rest), **Ember** (a glowing coal that breathes; the
+  orbit shows only while Otto works) and **Little face** (the ember with two dot eyes), plus how the ember
+  behaves (leans in, glances, bounces, dims).
 - **One row per direction:** the Otto tab on the phone, the ask in four screens (thinking, confirm, done,
   didn't work), and the computer. Night above Light everywhere.
+- **Row B also draws the rest** (added at Franky's ask to keep stats, notifications and the orb's side panel
+  in mind): B4, the phone's Today page further down (Otto did, and "Otto saw" for notifications), the Stats
+  tab, and Otto's settings; B5, the side panel open over Campus (its Otto tab and its Messages tab); B6,
+  Stats on the computer (one number and a 7-day bar strip, Vibe's own icons in neat columns: the D9 fix).
 
 The rule every direction keeps (the spec's): you ask, Otto shows what it's checking, Otto shows **a card,
 not a post** (the action in plain words, the result as it will look, where it goes and who sees it with a
@@ -60,6 +69,10 @@ the app's own undo (delete it). A failure says what happened and that nothing we
    moving only while an approved action is going out.
 7. **How long are chats with Otto kept?** **Rec: 30 days, deletable any time.** The spec already ties Otto
    to a Privacy Policy update.
+8. **Otto's look: a new mascot?** Warm orb, Ember or Little face. **Rec: the Ember, no face.** A face reads
+   young for officers posting to a whole club, smudges at the 24px tab size, needs every state drawn, and the
+   brand guide and the spec both say "no face". The Ember is warm without one; the onboarding wormhole would
+   end with its rings settling into the ember.
 
 Settled by the spec, so not asked here: Otto shows the exact result before it acts, only what your role
 allows, one action per card, undo is the app's own delete, the calm lowercase watcher who never judges a
@@ -86,7 +99,7 @@ club's members, and `OTTO_AI=off` puts back today's Otto.
 
 ## Status
 
-- Done: the board is published (11 boards), this note, and the link sent to the spec's session to add to
+- Done: the board is published (15 boards), this note, and the link sent to the spec's session to add to
   the spec.
 - Ahead of v1 on purpose: B draws a scheduled reminder (the spec starts with "remind now"), and C's
   announcement needs the new announce route.
