@@ -37,8 +37,9 @@ events, RSVPs or club links since Oct 28. Franky has no time frame for anything 
 4. **SHIPPED Nov 9 (main 8b0d18ba):** the sign-up "check your email" screen and the school-email code panel now say to
    choose "Not junk" so the next one lands in the Inbox (each student's Not junk is honored by Microsoft). Checked live
    on the sign-up page's served script; the school-email page needs a signed-in visit to see.
-5. **Franky + code, ~20 min:** send from an address that takes replies (`hello@`, already routed by Cloudflare):
-   Supabase SMTP sender, Vercel `RESEND_FROM`, and the one line on the sign-up page that names `noreply@`.
+5. **SHIPPED Nov 9 (main 0a98266f):** every email now comes from `hello@connectvibe.app` (routed to Franky by
+   Cloudflare). Franky changed Supabase's SMTP sender and Vercel's `RESEND_FROM`; the code changed the sign-up page line
+   and the example settings. Checked live: the sign-up page names hello@. Not yet seen: a real code email's From line.
 6. **Franky, one email (Claude drafts):** ask IU UITS and Purdue IT, ideally through a staff contact, for an allow entry
    for connectvibe.app (sender domain + dmarc=pass), with the header evidence from step 1. Uncertain, likely weeks.
 7. **Later:** Supabase Send Email Hook so the code email gets a plain-text copy and a reply address (half a day; small
