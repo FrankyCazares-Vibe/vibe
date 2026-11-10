@@ -66,6 +66,10 @@ next-env.d.ts
 !/.claude/skills/
 /.claude/skills/*
 !/.claude/skills/audit-sentinels/
+# The designer agent that draws the design boards (Franky, Nov 10).
+!/.claude/agents/
+/.claude/agents/*
+!/.claude/agents/vibe-designer.md
 
 # workshop content (private — local only, never commit or deploy)
 /DOCS/
