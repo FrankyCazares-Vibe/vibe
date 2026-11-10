@@ -66,31 +66,36 @@ Read left to right, top to bottom. Round 1's rows stay at the bottom, unchanged,
 - **The sample story** is one club all the way through: Canal Run Club, 38 members and 112 followers. This
   Friday's run is already posted with a reminder scheduled; the draft waiting on the desk is next week's run.
 
-### Calls for Franky (my pick for each)
+### Franky's answers (all on Nov 10, one by one)
 
-1. **Which Otto?** **Answered Nov 10: Planet** (Franky: "Yes, Planet").
-2. **Face or no face?** **Answered Nov 10 with call 1: a face**, two eyes, no mouth at small sizes. The
-   spec's "no face" line has to change.
-3. **The base textures?** The seven drawn on Start here. Say so if you want Planet in felt.
-4. **Still or living by default?** Still everywhere, living for Otto and moments, one switch in settings.
-5. **Default color, and what is paid?** Ember by default, the ten still colors free, living texture skins as
-   Vibe+ candidates. Billing stays off; this is a picture of a picker.
-6. **Still textures: free or Vibe+?** Free.
-7. **How much space stays?** The sky is the header (option B on the Space board).
-8. **Do cool skies like Canal end in a warm horizon?** Yes, a thin one. Otto himself stays teal.
-9. **Stats numbers?** Two: things Otto did, and views on what he posted, over the last 30 days.
-10. **Otto's waiting dot beside a verb button?** Quiet (ink). Coral only where no verb button is on screen,
-    so each frame keeps one coral fill.
-11. **Does "Undo for 10 seconds" mean the notice waits 10 seconds before it goes out?** Yes.
-12. **Does the page dim under the side panel on the computer?** No.
-13. **A chat-history row in Settings?** Yes.
-14. **Does the designer agent file go into git?** Not yet.
+1. **Which Otto?** Planet ("Yes, Planet").
+2. **Face or no face?** A face: two eyes, no mouth at small sizes. The spec's "no face" line has to change.
+3. **The base textures?** The seven on Start here, as drawn. Felt and contour lines stay on the bench.
+4. **Still or living by default?** Still everywhere; living for Otto, his sky and moments; one switch in
+   settings.
+5. **Default color, and what is paid?** Ember by default, the ten still colors free, the living texture
+   skins are the Vibe+ candidates. Billing stays off.
+6. **Still textures: free or Vibe+?** Free. (He thought about putting some behind Vibe+, then: "keep free".)
+7. **How much space stays?** The sky is the header, **but no buildings**: "i dont like the random
+   buildings, it looks weird off". What sits at the bottom of the sky is open: he wants to see soft hills, a
+   corn field, a farm, the warm horizon glow, a forest, flowers and mountains side by side.
+8. **Do cool skies end in a warm horizon?** Yes, a thin one. Otto keeps the chosen color.
+9. **Stats numbers?** The free card: things Otto did and views on what he posted, last 30 days. Then a
+   deeper analytics page for Vibe+, built like Instagram's and LinkedIn's paid insights, that school clubs
+   never need. It shows deeper counts, never who (counts public, identities private).
+10. **Waiting dot beside a verb button?** Quiet (ink); coral only where no verb button is on screen.
+11. **Undo window?** **30 seconds**, not 10: an approved notice waits 30 seconds before it goes out.
+12. **Page dims under the side panel?** No.
+13. **Chat-history row in Settings?** Yes: "Kept for 30 days" and "Delete all chats". The Privacy Policy
+    must say the same the day it ships.
+14. **Designer agent into git?** Yes. Committed Nov 10 (only `.claude/agents/vibe-designer.md` is
+    re-included in `.gitignore`), with its texture table brought up to date.
 
-Smaller calls, each with my pick on Start here: what opens first on the desk (the top draft, already open);
-keep "Otto saw" and "Earlier" on the computer (keep both); the like-milestone notice (keep it in the list,
-switched off); keep the purple colors (keep all ten); Blueprint as a skin (drop it, ship five); thermal and
-iridescent warm or purple (warm); the orbit's coral dot (drop it in the app); the bench of eleven extra
-textures (none ships until a screen needs it); keep Planet or swap to Comet (keep Planet).
+Smaller calls: the top draft opens first on the desk; keep "Otto saw" and "Earlier" on the computer desk;
+the like-milestone notice stays in the list, switched off; keep all ten colors (purples included); drop
+Blueprint as a skin and ship five; Ember in Light is a warm peach sky; thermal and iridescent go warm; the
+bench of extra textures waits until a screen needs one; Planet stays. **Open:** the coral dot that travels
+Planet's orbit, keep or drop; he wants the two side by side.
 
 ### How it was made
 
@@ -172,7 +177,12 @@ the app's own undo (delete it). A failure says what happened and that nothing we
   switch off the optional ones.
 - It fits Eli's note (prove the core before agent work): B is the only direction that's useful without the agent.
 
-## Round 1's calls (calls 1 and 8 are answered by round 2: C, and a new Otto; the rest still stand)
+## Round 1's calls (ALL answered by Nov 10)
+
+Answered on Nov 10: 1, C (Otto's desk); 8, Planet with a face; 2, **ship the new Otto page first**, before
+the agent, with no model needed; 3, purple means thinking only; 4, **show the thinking steps**; 5, **the
+card is sentence case**, Otto's own lines lowercase; 6, the tab icon is a small still Planet (round 2's
+dot rules); 7, chats kept 30 days, deletable. The original picks, kept for the record:
 
 1. **Which direction?** A, B or C. **Rec: B, with C's step list on the card.**
 2. **Ship the Today page before the agent?** **Rec: yes, now**, as the Otto page redesign. It replaces the
@@ -224,5 +234,7 @@ club's members, and `OTTO_AI=off` puts back today's Otto.
   announcement needs the new announce route.
 - Done (Nov 10, later): Franky picked Planet, with a face (calls 1 and 2). Start here and the Planet board
   now say so (canvas Version 17).
-- Not done: no app code. Round-2 calls 3 to 14 are open, and so are round 1's calls 2 to 7. The spec's
-  "no face" line needs changing (the spec's session owns the spec).
+- Done (Nov 10, later still): Franky answered calls 3 to 14 and the smaller calls one by one (above).
+- Not done: no app code. Two things wait on pictures: the ground under the sky header, and the orbit dot.
+  The Vibe+ analytics page is to be drawn. Round 1's calls are all answered too. The spec needs: "no face"
+  changed, the 30-second undo, and the 30-day chat history (the spec's session owns the spec).
