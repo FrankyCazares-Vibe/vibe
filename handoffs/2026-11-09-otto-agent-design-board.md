@@ -1,4 +1,4 @@
-# Otto as an agent: the design board (Nov 9, 2026; round 2 on Nov 10)
+# Otto as an agent: the design board (Nov 9, 2026; rounds 2 and 3 on Nov 10)
 
 **Board:** https://claude.ai/artifact/SUW2iyFFTdCLYjx62rZtXk
 (a Design canvas, private to Franky's account until he shares it from the page's Share menu, so Arash can't
@@ -10,6 +10,33 @@ open it yet. It holds invented people, clubs and numbers only: Jordan Reyes, Can
 This is the visual track for Otto becoming an agent. **No app code changed.** Nothing about the AI is live,
 and every board says "design, not live". It also covers the Otto page redesign queued since Oct 20 (D8 in
 `2026-10-19-critique/PLAN.md`): direction B's Today page is that redesign.
+
+## Round 3 (Nov 10, evening): his answers on the board, and three new boards
+
+Franky answered every call one by one (list below, under round 2). Canvas Version 18 carries them:
+
+- **Start here** now shows "Your answers" instead of open calls, and its header lost the rooftop line.
+- **Ground** (new, top row): the sky header with the seven grounds he named under it, Night and Light,
+  the two strongest in Canal, and the computer's sky band. Every ground is a flat, still shape in the page
+  colour under 30px tall (`ground.css`: `gr-glow`, `gr-hills`, `gr-corn`, `gr-farm`, `gr-forest`,
+  `gr-flowers`, `gr-mountains`). **My pick: soft hills**; the warm glow is the fallback. Corn and the farm
+  say "Indiana" too loudly; the corn row still reads a little like a fence.
+- **Orbit** (new, top row): Planet with the travelling coral dot and without it, the same frames side by
+  side (sky header, computer corner, beside his line, tab icon at 4x), each with a coral and loop count.
+  With the dot, four of five frames break a rule. **My pick: without the dot.**
+- **Insights** (new, end of the desk row): the free Stats card with a quiet "See insights · Vibe+" row,
+  then the Vibe+ page on the phone and the computer: range picker, Highlights with change vs the last
+  period, Reach over time, Top posts and events, Events (RSVPs vs check-ins), When your people are around,
+  Who you reach in totals (groups under 5 show "<5", and a second small group hides with it so it can't be
+  worked out), What Otto did. Counts only, never who; numbers sized to a 38-member club. **My pick: ship
+  the range, Highlights, Top posts and events, and Events first** (counts the app already keeps; the one new
+  piece is counting each person once), and "See insights" as a row in Club tools.
+- **Carried onto the existing boards:** undo is 30 seconds on D1, D2, D4 and in the kit; no rooftops on D1,
+  D2, Colors and Start here; thermal and iridescent skins are warm; every cool colourway sky now ends in a
+  thin warm horizon (kit); Colors lost Blueprint from the picker and shows "Your answers".
+- Made by a workflow (three board designers, an adversarial critic who repaired each new board, one fixes
+  pass), then I looked at every board as a picture and at the live canvas.
+- **Still open for Franky:** which ground, and dot or no dot. Then his say to build.
 
 ## Round 2 (Nov 10): built on C, Otto's desk
 
@@ -235,6 +262,8 @@ club's members, and `OTTO_AI=off` puts back today's Otto.
 - Done (Nov 10, later): Franky picked Planet, with a face (calls 1 and 2). Start here and the Planet board
   now say so (canvas Version 17).
 - Done (Nov 10, later still): Franky answered calls 3 to 14 and the smaller calls one by one (above).
-- Not done: no app code. Two things wait on pictures: the ground under the sky header, and the orbit dot.
-  The Vibe+ analytics page is to be drawn. Round 1's calls are all answered too. The spec needs: "no face"
+- Done (Nov 10, evening): round 3 on the canvas (Version 18): Ground, Orbit, Insights, and the answers carried
+  onto the old boards.
+- Not done: no app code. Two picks wait on Franky: the ground under the sky header (my pick: soft hills)
+  and the orbit dot (my pick: without). Round 1's calls are all answered too. The spec needs: "no face"
   changed, the 30-second undo, and the 30-day chat history (the spec's session owns the spec).
