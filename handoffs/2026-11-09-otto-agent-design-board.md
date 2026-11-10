@@ -1,4 +1,4 @@
-# Otto as an agent: the design board (Nov 9, 2026)
+# Otto as an agent: the design board (Nov 9, 2026; round 2 on Nov 10)
 
 **Board:** https://claude.ai/artifact/SUW2iyFFTdCLYjx62rZtXk
 (a Design canvas, private to Franky's account until he shares it from the page's Share menu, so Arash can't
@@ -11,7 +11,122 @@ This is the visual track for Otto becoming an agent. **No app code changed.** No
 and every board says "design, not live". It also covers the Otto page redesign queued since Oct 20 (D8 in
 `2026-10-19-critique/PLAN.md`): direction B's Today page is that redesign.
 
-## What's on the board
+## Round 2 (Nov 10): built on C, Otto's desk
+
+Franky turned down "build B + Ember": "actually i like C but maybe we should build on it a little more, lets
+make this beautifully designed." He sent four soft 3D mascot pictures (mood only), a list of design skills, a
+texture list (felt, fluted glass, grainy gradients, contour lines, blueprint grids, halftone, paper, ASCII and
+pixels, and more), and three asks: a UI/UX designer agent, keep the space direction, and try different colors
+(a possible paid customization later). On textures: "why are textures static and not animated", then "make
+different versions of static and animated, you decide".
+
+**Round 2 is published to the same link** (27 boards now). It is still design only: no app code, no database,
+nothing deployed.
+
+### The look, in one line
+
+A warm night sky is the header, paper cards are the desk, and a small planet lives there.
+
+### What's new on the canvas
+
+Read left to right, top to bottom. Round 1's rows stay at the bottom, unchanged, labelled "Round 1".
+
+- **Start here** (rewritten): the direction, the lead Otto, the texture jobs, the calls.
+- **Row "Otto himself, space and textures":**
+  - **Planet (the lead), Moon, Rover, Comet:** four original Ottos drawn in code, each at tab 24, chat 28,
+    corner 64 and hero size, in every state (idle, thinking, working, done, didn't work, waiting on you),
+    Night and Light, with a still version. Each runner-up board says why it isn't the lead.
+  - **Space, warmer:** the night sky over campus instead of deep space. The sky is the header of the page,
+    stars are stippled, orbits are contour lines, and the onboarding wormhole ends in the new Otto.
+  - **Textures:** Franky's whole list, each drawn twice (still and living), and the working set with a job
+    each: felt = Otto's body, grainy and stippled gradients = the sky, contour lines = orbit paths, blueprint
+    grid = a draft waiting for approval, paper = the desk's cards, halftone = "done" stamps, fluted glass =
+    the side panel, ASCII and pixels = Otto's thinking steps.
+- **Row "Otto's desk (the direction you picked)":**
+  - **D1** the Otto tab on a phone: Ready for you, Scheduled, Done this week.
+  - **D2** the ask: you ask, he checks, you send. "What will happen" and "Acting as" are on the card.
+  - **D3** the computer: the corner Otto and the side panel.
+  - **D4** notifications ("Otto saw"), Stats and settings on a phone.
+  - **Colors:** one Otto in ten colors (the app's ten backdrop names: Dusk, Midnight, Violet, Rose, Cardinal,
+    Ember, Lantern, Forest, Canal, Onyx) plus texture skins, still and living, and a mock "Otto's look" picker.
+
+### Decisions I made (say if any is wrong)
+
+- **Planet is the lead Otto.** It grows today's orb instead of replacing it, reads at 24px, and keeps the
+  space idea. Moon, Rover and Comet stay on the board as runners-up.
+- **Otto is drawn in code** (SVG and CSS), not as 3D picture files, so he can blink, lean and bounce on the
+  app's springs, stay sharp at tab size and be recolored with no new files.
+- **Still is the base, living is for Otto and for moments.** Cards, lists, the side panel and the 24px tab
+  Otto are still. The hero Otto and the sky move gently. Reduced motion and Low Power Mode get the still
+  version everywhere.
+- **Living textures move by sliding or fading a layer.** The noise is drawn once and never animated, so it
+  stays cheap on phones and inside the app's move-and-fade rule.
+- **Colors reuse the ten backdrop names**, so club backgrounds and Otto's colors are one system. Ember is the
+  default.
+- **The sample story** is one club all the way through: Canal Run Club, 38 members and 112 followers. This
+  Friday's run is already posted with a reminder scheduled; the draft waiting on the desk is next week's run.
+
+### Calls for Franky (my pick for each)
+
+1. **Which Otto?** Planet.
+2. **Face or no face?** A face: two eyes, no mouth at small sizes. The spec says "no face", so the spec
+   changes if this stands.
+3. **The base textures?** The seven drawn on Start here. Say so if you want Planet in felt.
+4. **Still or living by default?** Still everywhere, living for Otto and moments, one switch in settings.
+5. **Default color, and what is paid?** Ember by default, the ten still colors free, living texture skins as
+   Vibe+ candidates. Billing stays off; this is a picture of a picker.
+6. **Still textures: free or Vibe+?** Free.
+7. **How much space stays?** The sky is the header (option B on the Space board).
+8. **Do cool skies like Canal end in a warm horizon?** Yes, a thin one. Otto himself stays teal.
+9. **Stats numbers?** Two: things Otto did, and views on what he posted, over the last 30 days.
+10. **Otto's waiting dot beside a verb button?** Quiet (ink). Coral only where no verb button is on screen,
+    so each frame keeps one coral fill.
+11. **Does "Undo for 10 seconds" mean the notice waits 10 seconds before it goes out?** Yes.
+12. **Does the page dim under the side panel on the computer?** No.
+13. **A chat-history row in Settings?** Yes.
+14. **Does the designer agent file go into git?** Not yet.
+
+Smaller calls, each with my pick on Start here: what opens first on the desk (the top draft, already open);
+keep "Otto saw" and "Earlier" on the computer (keep both); the like-milestone notice (keep it in the list,
+switched off); keep the purple colors (keep all ten); Blueprint as a skin (drop it, ship five); thermal and
+iridescent warm or purple (warm); the orbit's coral dot (drop it in the app); the bench of eleven extra
+textures (none ships until a screen needs it); keep Planet or swap to Comet (keep Planet).
+
+### How it was made
+
+- Three workflows: the four Ottos, Textures and Space; then Colors and the desk rebuilt; then two adversarial
+  reviews and a repair pass. I looked at every new board as a picture before publishing, and at the live
+  canvas after.
+- Skills added for this (local, in the gitignored `.claude/skills`): Emil Kowalski's set, Web Design
+  Guidelines, BrandKit, Extract Design System, Image to Code; UI/UX Pro Max was already there. They were used
+  as craft reading only: none of their scripts or outside tools were run. `skills-lock.json` is new and
+  untracked in the repo root.
+- A designer agent for UI, UX, design concepts and branding: `.claude/agents/vibe-designer.md`. It is local
+  to Franky's Mac because `.claude/` is gitignored (call 14).
+
+### Known and left open
+
+- Start here is drawn in Night only.
+- D3 has a stretch of bare page in its third frame and one invented number ("4 new followers this week").
+- D4 does not draw the "are you sure" sheet for Delete all chats.
+- The shared kit still has three purple textures (thermal, iridescent, impressionist) and a teal end on the
+  Canal sky; the Textures and Space boards redraw them warm as a proposal (calls 8 and the smaller calls).
+- Some boards still show the older Light sky.
+- No focus ring is defined yet in the kit.
+
+### Not checked
+
+Motion watched live on a phone, focus rings, measured contrast, and real devices. The reviewers could not
+check these either. They belong to the build.
+
+### Where the sources are
+
+The published boards are self-contained: each carries its styles between `/* name.css */` markers (`otto.css`,
+`tex.css`, `mascot.css`, `m-planet.css`, `desk.css`, `skins.css`). The un-inlined sources, the kit, the briefs
+and the two reviews are backed up in the side session's shared notes folder on Franky's Mac (`otto-kit-backup`),
+not in git.
+
+## Round 1 (Nov 9): what's on the board
 
 - **Start here:** what Otto can do first (post an event, announce to members, what's on tonight, send a
   reminder), the rule every direction keeps, the three directions, the recommendation, the calls, and what
@@ -45,7 +160,7 @@ the app's own undo (delete it). A failure says what happened and that nothing we
 | B | **Today + Ask** | A calm Today page that is also an ongoing chat: the conversation stays at its top and the ask bar docks above the tab bar while you scroll; on the computer, the corner orb's side panel | "remind people about friday's run" | Not an officer of that club: "Remind just me" instead |
 | C | **Otto's desk** | Jobs you approve: Ready for you, Scheduled, Done; each spells out "What will happen" | "message all our members…" (an announcement on the Board that notifies the members) | The club already sent today's one announcement: "Schedule for tomorrow" |
 
-## Recommendation
+## Round 1's recommendation (superseded: Franky picked C on Nov 9)
 
 **B, with C's "What will happen" list on the confirm card.**
 - B's page ships before the model is ready: its Today page is the Otto page redesign by itself (no purple
@@ -57,7 +172,7 @@ the app's own undo (delete it). A failure says what happened and that nothing we
   switch off the optional ones.
 - It fits Eli's note (prove the core before agent work): B is the only direction that's useful without the agent.
 
-## Calls for Franky (my recommendation for each)
+## Round 1's calls (calls 1 and 8 are answered by round 2: C, and a new Otto; the rest still stand)
 
 1. **Which direction?** A, B or C. **Rec: B, with C's step list on the card.**
 2. **Ship the Today page before the agent?** **Rec: yes, now**, as the Otto page redesign. It replaces the
@@ -102,8 +217,10 @@ club's members, and `OTTO_AI=off` puts back today's Otto.
 
 ## Status
 
-- Done: the board is published (16 boards), this note, and the link sent to the spec's session to add to
-  the spec.
-- Ahead of v1 on purpose: B draws a scheduled reminder (the spec starts with "remind now"), and C's
+- Done (Nov 9): round 1 published (16 boards), this note, and the link sent to the spec's session to add
+  to the spec.
+- Done (Nov 10): round 2 published to the same link (27 boards). Franky picked C; round 2 rebuilds it.
+- Ahead of v1 on purpose: the desk draws a scheduled reminder (the spec starts with "remind now"), and the
   announcement needs the new announce route.
-- Not done: no app code. Franky hasn't picked a direction or answered the calls.
+- Not done: no app code. The 14 round-2 calls are open, and so are round 1's calls 2 to 7. If Franky picks
+  a face, the spec's "no face" line needs changing.
