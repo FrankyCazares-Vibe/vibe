@@ -68,9 +68,9 @@ Read left to right, top to bottom. Round 1's rows stay at the bottom, unchanged,
 
 ### Calls for Franky (my pick for each)
 
-1. **Which Otto?** Planet.
-2. **Face or no face?** A face: two eyes, no mouth at small sizes. The spec says "no face", so the spec
-   changes if this stands.
+1. **Which Otto?** **Answered Nov 10: Planet** (Franky: "Yes, Planet").
+2. **Face or no face?** **Answered Nov 10 with call 1: a face**, two eyes, no mouth at small sizes. The
+   spec's "no face" line has to change.
 3. **The base textures?** The seven drawn on Start here. Say so if you want Planet in felt.
 4. **Still or living by default?** Still everywhere, living for Otto and moments, one switch in settings.
 5. **Default color, and what is paid?** Ember by default, the ten still colors free, living texture skins as
@@ -222,5 +222,7 @@ club's members, and `OTTO_AI=off` puts back today's Otto.
 - Done (Nov 10): round 2 published to the same link (27 boards). Franky picked C; round 2 rebuilds it.
 - Ahead of v1 on purpose: the desk draws a scheduled reminder (the spec starts with "remind now"), and the
   announcement needs the new announce route.
-- Not done: no app code. The 14 round-2 calls are open, and so are round 1's calls 2 to 7. If Franky picks
-  a face, the spec's "no face" line needs changing.
+- Done (Nov 10, later): Franky picked Planet, with a face (calls 1 and 2). Start here and the Planet board
+  now say so (canvas Version 17).
+- Not done: no app code. Round-2 calls 3 to 14 are open, and so are round 1's calls 2 to 7. The spec's
+  "no face" line needs changing (the spec's session owns the spec).
