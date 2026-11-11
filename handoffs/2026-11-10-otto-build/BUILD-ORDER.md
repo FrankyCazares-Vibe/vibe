@@ -2,7 +2,8 @@
 
 ## Status
 - Nov 10: plan approved by Franky. **Wave 1 SHIPPED Nov 10** (main f14a7ce0; record `wave-1.md`).
-  Next: Wave 2A, the desk.
+- Nov 11: **Wave 2A (the desk) BUILT and checked** on branch `claude/otto-wave-2a` (record `wave-2a.md`);
+  waits for his yes to ship.
 
 The idea behind the order: Otto's new look goes everywhere first (one small, look-only change), then the
 desk page on data the app already has, then the corner and side panel. Anything that needs a database
