@@ -1,0 +1,269 @@
+"use client";
+
+import { useSearchParams } from "next/navigation";
+import { useCallback, useState } from "react";
+
+import type {
+  ActivityRow,
+  AskingRow,
+  OttoPayload,
+  OttoSettings as OttoSettingsT,
+  UpcomingRow,
+} from "@/app/api/me/otto/route";
+import { vibeRequest } from "@/lib/feedback/request";
+import { followFailureLine, personName } from "@/lib/people/follow-label";
+
+import { OttoActivity } from "./OttoActivity";
+import { OttoHero } from "./OttoHero";
+import { OttoMetricsLegacy as OttoMetrics } from "./OttoMetricsLegacy";
+import { OttoRequests } from "./OttoRequests";
+import { OttoSettingsLegacy as OttoSettings } from "./OttoSettingsLegacy";
+import { OttoTellInput } from "./OttoTellInput";
+import { OttoUpcoming } from "./OttoUpcoming";
+import { useUpcomingFollowsCalendar } from "./use-upcoming-follows-calendar";
+
+type Props = { initial: OttoPayload };
+
+type Tab = "today" | "stats";
+
+/** Puts a removed row back at its old index, unless it's already back. */
+function reinsertAt<T>(list: T[], index: number, row: T, isRow: (r: T) => boolean): T[] {
+  if (list.some(isRow)) return list;
+  const next = list.slice();
+  next.splice(Math.min(index, next.length), 0, row);
+  return next;
+}
+
+/**
+ * TODAY'S OTTO PAGE, KEPT FOR THE OFF SWITCH (Wave 2A, Nov 10, 2026). Moved
+ * here unchanged from OttoPageClient.tsx, which is now the computer desk;
+ * its Stats and Settings are today's too (OttoMetricsLegacy, OttoSettingsLegacy).
+ * OttoPageClient draws this when `OTTO_DESK=off` (src/lib/otto/desk-flag.ts).
+ * Delete it, with `.otto-room*`, about two weeks after it has gone unused.
+ *
+ * Owns the live state for Otto's Room. Every mutation runs optimistically —
+ * the user sees instant feedback, and if the server refuses, the row goes
+ * back where it was and a toast says why.
+ *
+ * Two tabs share the hero: "Today" (activity + upcoming + asking + tell-otto
+ * + settings) and "Stats" (the metrics block). Tab state is URL-backed via
+ * ?tab=stats so the side panel's "full breakdown →" link can deep-link
+ * straight to the right view.
+ *
+ * Counts (the hero stats line) recompute purely from local state so they
+ * stay honest after dismissals + creates without a re-fetch.
+ */
+export function OttoPageLegacy({ initial }: Props) {
+  // Tab state seeded from URL ?tab=stats so the side panel's deep-link works.
+  // After mount, the tab state is owned by local React; we update the URL via
+  // history.replaceState on click (no Next router round-trip, no back-button
+  // accumulation). Back/forward across tab toggles isn't a flow we care about.
+  const searchParams = useSearchParams();
+  const [tab, setTab] = useState<Tab>(
+    searchParams.get("tab") === "stats" ? "stats" : "today",
+  );
+
+  const setActiveTab = useCallback((next: Tab) => {
+    setTab(next);
+    try {
+      const url = new URL(window.location.href);
+      if (next === "today") url.searchParams.delete("tab");
+      else url.searchParams.set("tab", next);
+      window.history.replaceState({}, "", url.toString());
+    } catch {
+      /* SSR / non-browser env — ignore. */
+    }
+  }, []);
+
+  const [activity] = useState<ActivityRow[]>(initial.activity);
+  const [upcoming, setUpcoming] = useState<UpcomingRow[]>(initial.upcoming);
+  // An RSVP anywhere (the Otto-corner window, Messages, another tab) reads
+  // Upcoming again (Oct 19, 2026, critique B8 repair).
+  useUpcomingFollowsCalendar(setUpcoming);
+  const [asking, setAsking] = useState<AskingRow[]>(initial.asking);
+  const [settings] = useState<OttoSettingsT>(initial.settings);
+
+  // The sections /api/me/otto couldn't read. Each one says so in its own
+  // place instead of showing its empty copy, and the hero stat above it
+  // shows an em dash rather than a 0 that would read as a real count. A
+  // payload from before the field existed carries nothing, which reads as
+  // "nothing failed".
+  const failed = initial.failed ?? [];
+  const activityFailed = failed.includes("activity");
+  const upcomingFailed = failed.includes("upcoming");
+  const askingFailed = failed.includes("asking");
+  // The unread-DM read is its own section server-side — it fails without
+  // taking followers or reminders with it — but its row lives in "Asking
+  // for you", so either one means that list is incomplete.
+  const dmsFailed = failed.includes("dms");
+
+  // Hero counts: nudges = unread notifications still in the feed; reminders =
+  // every active reminder (dated upcoming + undated asking); unread = DMs
+  // (this one isn't currently re-derived after dismissal — that would need
+  // peeking into asking for the unread_dms row).
+  const reminderCount =
+    upcoming.filter((u) => u.kind === "reminder").length +
+    asking.filter((r) => r.kind === "reminder").length;
+  const unreadDmRow = asking.find((r) => r.kind === "unread_dms");
+  const unreadCount = unreadDmRow?.kind === "unread_dms" ? unreadDmRow.count : 0;
+
+  // Done / Dismiss / Follow back remove the row first. Each snapshots the row and
+  // its index beforehand and puts it back there if the server refuses
+  // (vibeRequest has already toasted why). A refetch is never the rollback.
+  const removeReminder = useCallback(
+    async (id: string, url: string, method: "DELETE" | "POST", failure: string) => {
+      const isRow = (r: UpcomingRow | AskingRow) => r.kind === "reminder" && r.id === id;
+      const uIndex = upcoming.findIndex(isRow);
+      const aIndex = asking.findIndex(isRow);
+      const uRow = uIndex >= 0 ? upcoming[uIndex] : null;
+      const aRow = aIndex >= 0 ? asking[aIndex] : null;
+      setUpcoming((u) => u.filter((r) => !isRow(r)));
+      setAsking((a) => a.filter((r) => !isRow(r)));
+      const res = await vibeRequest(url, { method, failure });
+      if (res.ok) return;
+      if (uRow) setUpcoming((u) => reinsertAt(u, uIndex, uRow, isRow));
+      if (aRow) setAsking((a) => reinsertAt(a, aIndex, aRow, isRow));
+    },
+    [upcoming, asking],
+  );
+
+  const dismissReminder = useCallback(
+    (id: string) =>
+      removeReminder(
+        id,
+        `/api/me/otto/reminders/${id}`,
+        "DELETE",
+        "Couldn't dismiss that reminder.",
+      ),
+    [removeReminder],
+  );
+
+  const actReminder = useCallback(
+    (id: string) =>
+      removeReminder(
+        id,
+        `/api/me/otto/reminders/${id}/act`,
+        "POST",
+        "Couldn't mark that reminder done.",
+      ),
+    [removeReminder],
+  );
+
+  const followBack = useCallback(
+    async (userId: string) => {
+      const isRow = (r: AskingRow) => r.kind === "follower" && r.user_id === userId;
+      const index = asking.findIndex(isRow);
+      const row = index >= 0 ? asking[index] : null;
+      setAsking((a) => a.filter((r) => !isRow(r)));
+      const res = await vibeRequest("/api/me/follow", {
+        method: "POST",
+        json: { target_id: userId },
+        failure: followFailureLine("follow", row?.kind === "follower" ? personName(row) : null),
+      });
+      if (!res.ok && row) setAsking((a) => reinsertAt(a, index, row, isRow));
+    },
+    [asking],
+  );
+
+  const passFollower = useCallback((userId: string) => {
+    // "Pass" is local-only at v1 — we drop the row from this session's
+    // asking list, but the underlying follower row stays put. A future pass
+    // can persist a pass-list table or surface it differently.
+    setAsking((a) => a.filter((r) => !(r.kind === "follower" && r.user_id === userId)));
+  }, []);
+
+  const handleCreated = useCallback(
+    (reminder: { id: string; title: string; body: string | null; remind_at: string | null; created_at: string }) => {
+      if (reminder.remind_at) {
+        setUpcoming((u) =>
+          [
+            ...u,
+            {
+              kind: "reminder" as const,
+              id: reminder.id,
+              title: reminder.title,
+              body: reminder.body,
+              remind_at: reminder.remind_at!,
+            },
+          ].sort((a, b) => {
+            const at = a.kind === "event" ? a.starts_at : a.remind_at;
+            const bt = b.kind === "event" ? b.starts_at : b.remind_at;
+            return at.localeCompare(bt);
+          }),
+        );
+      } else {
+        setAsking((a) => [
+          {
+            kind: "reminder" as const,
+            id: reminder.id,
+            title: reminder.title,
+            body: reminder.body,
+            created_at: reminder.created_at,
+          },
+          ...a,
+        ]);
+      }
+    },
+    [],
+  );
+
+  return (
+    <div className="otto-room">
+      <div className="otto-room-stars" aria-hidden />
+      <main className="otto-room-main">
+        <OttoHero
+          counts={{
+            nudges: activityFailed ? null : initial.counts.nudges,
+            reminders: upcomingFailed || askingFailed ? null : reminderCount,
+            unread: askingFailed || dmsFailed ? null : unreadCount,
+          }}
+        />
+
+        <nav className="otto-room-tabs" role="tablist" aria-label="Otto's Room">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={tab === "today"}
+            className={`otto-room-tab ${tab === "today" ? "is-active" : ""}`}
+            onClick={() => setActiveTab("today")}
+          >
+            Today
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={tab === "stats"}
+            className={`otto-room-tab ${tab === "stats" ? "is-active" : ""}`}
+            onClick={() => setActiveTab("stats")}
+          >
+            Stats
+          </button>
+        </nav>
+
+        {tab === "today" ? (
+          <>
+            <OttoActivity rows={activity} failed={activityFailed} />
+            <OttoUpcoming
+              rows={upcoming}
+              onDismissReminder={dismissReminder}
+              onActReminder={actReminder}
+              failed={upcomingFailed}
+            />
+            <OttoRequests
+              rows={asking}
+              onFollowBack={followBack}
+              onPassFollower={passFollower}
+              onDismissReminder={dismissReminder}
+              onActReminder={actReminder}
+              failed={askingFailed || dmsFailed}
+            />
+            <OttoTellInput onCreated={handleCreated} />
+            <OttoSettings settings={settings} />
+          </>
+        ) : (
+          <OttoMetrics />
+        )}
+      </main>
+    </div>
+  );
+}

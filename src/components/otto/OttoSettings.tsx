@@ -1,6 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import "./kit/sky.css";
+import "./kit/desk.css";
+import "./kit/more.css";
+
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 
 import type { OttoSettings } from "@/app/api/me/otto/route";
 import { vibeRequest } from "@/lib/feedback/request";
@@ -8,103 +12,80 @@ import { DEFAULT_LOOK, LOOK_STORAGE_KEY, type OttoLook } from "@/lib/otto/look";
 import { setOttoLook, useOttoLook } from "@/lib/otto/use-otto-look";
 
 import { OTTO_COLOUR_NAMES, OTTO_MOTION_NAMES, OttoLookSheet, useOttoLookSaver } from "./OttoLookSheet";
-import { OttoSection } from "./OttoSection";
+import { OttoPlanet } from "./planet/OttoPlanet";
 
-type Props = {
-  settings: OttoSettings;
-};
+/**
+ * Otto's Settings tab on the desk (Nov 10, 2026, the Otto build's Wave 2A;
+ * board D4 "Numbers and settings"): How chatty (three steps, the chosen one
+ * ink with a tick), Notices (switches that show on/off by shape), and Otto's
+ * look. Today's card lives on as OttoSettingsLegacy.tsx for `OTTO_DESK=off`.
+ * The board's "Delete all chats" row waits for chats (Wave 3).
+ *
+ * HONEST ABOUT WHAT IS SENT. Of these switches only mentions reach anyone
+ * today (`mention_pings`, the same key as Settings → Notifications). The rest
+ * are kept for when those notices exist, and the card says so in one line
+ * rather than letting a switch promise a message. Like milestones are listed
+ * and off by default (DEFAULT_SETTINGS): the only vanity notice here.
+ *
+ * Saving is the old card's: each change shows at once, one trailing PATCH
+ * 350ms after the last; a refused save rolls the whole flush back to what the
+ * server last confirmed; flushes never overlap.
+ */
 
-const CHATTINESS: Array<{ value: OttoSettings["chattiness"]; label: string }> = [
-  { value: "quiet", label: "Quiet" },
-  { value: "moderate", label: "Moderate" },
-  { value: "loud", label: "Loud" },
+type Props = { settings: OttoSettings };
+type Chatty = OttoSettings["chattiness"];
+type PresetKeys = "rsvp_day_before" | "milestone_pings" | "daily_summary" | "unanswered_dm_pings";
+
+const CHATTINESS: Array<{ value: Chatty; label: string; say: string }> = [
+  { value: "quiet", label: "Quiet", say: "Every notice below off. Mentions keep their own switch." },
+  { value: "moderate", label: "Moderate", say: "RSVP reminders on. Like milestones and the summary off." },
+  { value: "loud", label: "Loud", say: "Every notice below on." },
 ];
 
 /**
- * Chattiness is a preset that bulk-sets the toggles below. Picking one is
- * a shortcut — fine-tuning individual toggles after is still allowed, the
- * preset just stays selected as a "starting point" label. If the live
- * toggle pattern doesn't match any preset, no preset highlights.
- *
- * "Ping on mentions" is left out of every preset: `mention_pings` is also
- * the one key behind the Mentions switch in Settings → Notifications (plan
- * §8 W3), so picking "Quiet" must not quietly turn mention pushes back on.
- * The "which preset is active" check ignores it for the same reason.
+ * A preset bulk-sets the switches; fine-tuning after is fine, and no step
+ * lights when the switches match none. Mentions are in no preset: that key is
+ * also Settings → Notifications' Mentions switch, so Quiet mustn't flip it.
+ * Moderate, the default, leaves like milestones off, matching the defaults.
  */
-const PRESETS: Record<
-  OttoSettings["chattiness"],
-  Pick<
-    OttoSettings,
-    | "rsvp_day_before"
-    | "milestone_pings"
-    | "daily_summary"
-    | "unanswered_dm_pings"
-  >
-> = {
-  quiet: {
-    rsvp_day_before: false,
-    milestone_pings: false,
-    daily_summary: false,
-    unanswered_dm_pings: false,
-  },
-  moderate: {
-    rsvp_day_before: true,
-    milestone_pings: true,
-    daily_summary: false,
-    unanswered_dm_pings: false,
-  },
-  loud: {
-    rsvp_day_before: true,
-    milestone_pings: true,
-    daily_summary: true,
-    unanswered_dm_pings: true,
-  },
+const PRESETS: Record<Chatty, Pick<OttoSettings, PresetKeys>> = {
+  quiet: { rsvp_day_before: false, milestone_pings: false, daily_summary: false, unanswered_dm_pings: false },
+  moderate: { rsvp_day_before: true, milestone_pings: false, daily_summary: false, unanswered_dm_pings: false },
+  loud: { rsvp_day_before: true, milestone_pings: true, daily_summary: true, unanswered_dm_pings: true },
 };
 
-const TOGGLES: Array<{ key: keyof OttoSettings; label: string }> = [
-  { key: "rsvp_day_before", label: "Ping me about RSVPs the day before" },
-  { key: "mention_pings", label: "Ping on mentions" },
-  { key: "milestone_pings", label: "Ping on like milestones (10 / 50 / 100)" },
-  { key: "daily_summary", label: "Daily summary at 9 AM" },
-  { key: "unanswered_dm_pings", label: "Ping on unanswered DMs >24h" },
+const NOTICES: Array<{ key: PresetKeys | "mention_pings"; label: string }> = [
+  { key: "rsvp_day_before", label: "RSVP reminders, the day before" },
+  { key: "mention_pings", label: "When I’m mentioned" },
+  { key: "milestone_pings", label: "Like milestones (10, 50, 100)" },
+  { key: "daily_summary", label: "A daily summary at 9 AM" },
+  { key: "unanswered_dm_pings", label: "DMs still unanswered after a day" },
 ];
 
-/** Returns the chattiness preset that exactly matches the toggle state, or null. */
-function detectPreset(s: OttoSettings): OttoSettings["chattiness"] | null {
-  for (const [name, preset] of Object.entries(PRESETS) as Array<
-    [OttoSettings["chattiness"], (typeof PRESETS)[OttoSettings["chattiness"]]]
-  >) {
+/** The preset the switches match exactly, or null. */
+function detectPreset(s: OttoSettings): Chatty | null {
+  for (const { value } of CHATTINESS) {
+    const p = PRESETS[value];
     if (
-      preset.rsvp_day_before === s.rsvp_day_before &&
-      preset.milestone_pings === s.milestone_pings &&
-      preset.daily_summary === s.daily_summary &&
-      preset.unanswered_dm_pings === s.unanswered_dm_pings
+      p.rsvp_day_before === s.rsvp_day_before &&
+      p.milestone_pings === s.milestone_pings &&
+      p.daily_summary === s.daily_summary &&
+      p.unanswered_dm_pings === s.unanswered_dm_pings
     ) {
-      return name;
+      return value;
     }
   }
   return null;
 }
 
-/**
- * Settings card with debounced PATCH on change. Each toggle / chattiness
- * choice updates local state immediately (optimistic), then a single
- * trailing-edge PATCH fires 350ms after the last change so a user toggling
- * a few in a row only triggers one network roundtrip.
- *
- * One PATCH can carry several keys (a preset sets five), so a refused save
- * rolls the whole card back to the last settings the server confirmed and
- * shows one toast for that flush. Flushes never overlap: changes made while
- * one is in flight wait for it, so confirmations land in order. Shared by
- * Otto's Room (desktop) and OttoMobile.
- */
 export function OttoSettings({ settings }: Props) {
   const [state, setState] = useState<OttoSettings>(settings);
   const pendingRef = useRef<Partial<OttoSettings>>({});
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // The rollback target: the settings the server last confirmed as saved.
   const lastConfirmedRef = useRef<OttoSettings>(settings);
   const inFlightRef = useRef(false);
+  const chattyId = useId();
+  const noticesId = useId();
 
   useEffect(
     () => () => {
@@ -115,7 +96,6 @@ export function OttoSettings({ settings }: Props) {
 
   function flush() {
     timerRef.current = null;
-    // A flush already in flight picks up the queue when it settles.
     if (inFlightRef.current) return;
     const body = pendingRef.current;
     if (Object.keys(body).length === 0) return;
@@ -128,14 +108,9 @@ export function OttoSettings({ settings }: Props) {
     }).then((r) => {
       inFlightRef.current = false;
       if (r.ok) {
-        lastConfirmedRef.current = {
-          ...lastConfirmedRef.current,
-          ...body,
-          ...(r.data.settings ?? {}),
-        };
+        lastConfirmedRef.current = { ...lastConfirmedRef.current, ...body, ...(r.data.settings ?? {}) };
       } else {
-        // Undo every key this flush carried, not just the last one tapped.
-        // Changes queued behind it stay on screen; they're sent next.
+        // Undo every key this flush carried; changes queued behind it stay and go next.
         setState({ ...lastConfirmedRef.current, ...pendingRef.current });
       }
       if (Object.keys(pendingRef.current).length > 0 && !timerRef.current) flush();
@@ -148,80 +123,79 @@ export function OttoSettings({ settings }: Props) {
     timerRef.current = setTimeout(flush, 350);
   }
 
-  function setKey<K extends keyof OttoSettings>(k: K, v: OttoSettings[K]) {
+  function setKey(k: PresetKeys | "mention_pings", v: boolean) {
     setState((s) => ({ ...s, [k]: v }));
-    queuePatch({ [k]: v } as Partial<OttoSettings>);
+    queuePatch({ [k]: v });
   }
 
-  function applyPreset(name: OttoSettings["chattiness"]) {
-    const preset = PRESETS[name];
-    const next: OttoSettings = { ...state, chattiness: name, ...preset };
-    setState(next);
-    queuePatch({ chattiness: name, ...preset });
+  function applyPreset(name: Chatty) {
+    setState((s) => ({ ...s, chattiness: name, ...PRESETS[name] }));
+    queuePatch({ chattiness: name, ...PRESETS[name] });
   }
 
-  const activePreset = detectPreset(state);
+  const active = detectPreset(state);
+  const say = CHATTINESS.find((c) => c.value === active)?.say ?? "Your own mix. Tweak the switches below.";
 
   return (
-    <OttoSection eyebrow="How chatty should I be">
-      <div className="otto-room-settings">
-        <div className="otto-room-chatty">
-          <span className="otto-room-chatty-label">Chattiness</span>
-          <div className="otto-room-segmented" role="radiogroup" aria-label="Chattiness">
-            {CHATTINESS.map((opt) => (
-              <button
-                key={opt.value}
-                type="button"
-                role="radio"
-                aria-checked={activePreset === opt.value}
-                className={`otto-room-segment ${
-                  activePreset === opt.value ? "is-active" : ""
-                }`}
-                onClick={() => applyPreset(opt.value)}
-              >
+    <div className="dk-body otto-settings">
+      <div className="dk-sec">
+        <h3 id={chattyId}>How chatty</h3>
+      </div>
+      <div className="tx-host dk-card">
+        <i className="tx tx-paper" aria-hidden="true" />
+        <div className="dk-seg" role="radiogroup" aria-labelledby={chattyId}>
+          {CHATTINESS.map((opt) => {
+            const on = active === opt.value;
+            return (
+              <button key={opt.value} type="button" role="radio" aria-checked={on} onClick={() => applyPreset(opt.value)}>
+                {on ? (
+                  <svg className="dk-tick" viewBox="0 0 16 16" aria-hidden="true">
+                    <path d="M3 8.5l3.2 3.2L13 4.8" />
+                  </svg>
+                ) : null}
                 {opt.label}
               </button>
-            ))}
-          </div>
-        </div>
-        {activePreset === null ? (
-          <p className="otto-room-chatty-hint">Custom — tweak the toggles below.</p>
-        ) : null}
-
-        <ul className="otto-room-toggles">
-          {TOGGLES.map((t) => {
-            const v = state[t.key] as boolean;
-            return (
-              <li key={t.key} className="otto-room-toggle">
-                <label>
-                  <input
-                    type="checkbox"
-                    checked={v}
-                    onChange={(e) => setKey(t.key, e.target.checked as never)}
-                  />
-                  <span>{t.label}</span>
-                </label>
-              </li>
             );
           })}
-        </ul>
+        </div>
+        <p className="dk-seg-say">{say}</p>
+      </div>
 
+      <div className="dk-sec">
+        <h3 id={noticesId}>Notices</h3>
+      </div>
+      <div className="tx-host dk-card list" role="group" aria-labelledby={noticesId}>
+        <i className="tx tx-paper" aria-hidden="true" />
+        {NOTICES.map((n) => {
+          const on = state[n.key];
+          return (
+            // A label around the switch: tapping the words presses it too, and names it.
+            <label key={n.key} className="dk-sw-row">
+              <span>{n.label}</span>
+              <button type="button" role="switch" aria-checked={on} className="dk-sw" onClick={() => setKey(n.key, !on)} />
+            </label>
+          );
+        })}
+        <p className="dk-sw-foot">Only mentions are sent today. The other switches keep your choice for later.</p>
+      </div>
+
+      <div className="tx-host dk-card list">
+        <i className="tx tx-paper" aria-hidden="true" />
         <OttoLookRow account={settings.look} />
       </div>
-    </OttoSection>
+    </div>
   );
 }
 
 /**
  * "Otto's look" (Nov 10, 2026): his colour and Still / Living, picked in
- * OttoLookSheet. The row shows this device's look (use-otto-look.ts). It
- * saves through its own PATCH, never this card's queue, so a chattiness
- * rollback can't undo a look.
+ * OttoLookSheet. The row shows this device's look (use-otto-look.ts) and his
+ * still planet in it. It saves through its own PATCH, never this card's
+ * queue, so a chattiness rollback can't undo a look.
  *
  * A device that has never stored a look takes the account's copy once, so a
  * new phone shows the colour picked on the computer. A device with its own
- * pick keeps it: a Settings page Next reuses on Back could carry an older
- * account copy, and that must never undo a newer pick (the theme's lesson).
+ * pick keeps it: an older account copy must never undo a newer pick.
  */
 function OttoLookRow({ account }: { account: OttoLook }) {
   const look = useOttoLook();
@@ -242,36 +216,24 @@ function OttoLookRow({ account }: { account: OttoLook }) {
   }, [account]);
 
   return (
-    <div className="otto-room-chatty" data-holds-reload={saving ? "" : "false"}>
-      <span className="otto-room-chatty-label">Otto&apos;s look</span>
-      <button type="button" aria-haspopup="dialog" onClick={() => setOpen(true)} style={lookButtonStyle}>
-        <span className={`sk-dot sk-${look.colour}`} style={{ width: 18, height: 18 }} aria-hidden />
-        <span>
-          {OTTO_COLOUR_NAMES[look.colour]} · {OTTO_MOTION_NAMES[look.motion]}
+    <div data-holds-reload={saving ? "" : "false"}>
+      <button type="button" className="dk-row" aria-haspopup="dialog" onClick={() => setOpen(true)}>
+        <span className="dk-row-ic dk-look-ic" aria-hidden="true">
+          <OttoPlanet size={28} colour={look.colour} />
         </span>
-        <span aria-hidden style={{ opacity: 0.6 }}>
-          ›
+        <span className="dk-row-tx">
+          <b>Otto&apos;s look</b>
+          <span>
+            {OTTO_COLOUR_NAMES[look.colour]} · {OTTO_MOTION_NAMES[look.motion]}
+          </span>
+        </span>
+        <span className="dk-row-go" aria-hidden="true">
+          <svg className="dk-ico" viewBox="0 0 24 24">
+            <path d="M9 6l6 6-6 6" />
+          </svg>
         </span>
       </button>
       {open ? <OttoLookSheet onClose={close} onPick={pick} saving={saving} /> : null}
     </div>
   );
 }
-
-// The Otto room is dark in both themes, so the row takes the room's own
-// light-on-dark ink (the .otto-room-segmented look), not the page tokens.
-const lookButtonStyle: React.CSSProperties = {
-  display: "inline-flex",
-  alignItems: "center",
-  gap: 8,
-  minHeight: 44,
-  padding: "0 14px 0 10px",
-  borderRadius: 999,
-  border: "1px solid rgba(250, 247, 242, 0.14)",
-  background: "rgba(250, 247, 242, 0.06)",
-  color: "#faf7f2",
-  fontFamily: "DM Sans, sans-serif",
-  fontSize: 13,
-  fontWeight: 600,
-  cursor: "pointer",
-};

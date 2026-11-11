@@ -42,7 +42,8 @@ const DEFAULTS = {
   chattiness: "moderate",
   rsvp_day_before: true,
   mention_pings: true,
-  milestone_pings: true,
+  // Off by default since Nov 10, 2026 (Wave 2A): the only vanity notice.
+  milestone_pings: false,
   daily_summary: false,
   summary_time: "09:00",
   unanswered_dm_pings: false,
@@ -155,4 +156,11 @@ test("mergeSettings lays the stored blob over the defaults, as the Otto route di
   const a = S.mergeSettings(null);
   a.look.colour = "onyx";
   assert.equal(S.mergeSettings(null).look.colour, "ember");
+});
+
+test("like milestones are off by default, and a stored yes still wins", () => {
+  assert.equal(S.DEFAULT_SETTINGS.milestone_pings, false);
+  assert.equal(S.mergeSettings(null).milestone_pings, false);
+  assert.equal(S.mergeSettings({}).milestone_pings, false);
+  assert.equal(S.mergeSettings({ milestone_pings: true }).milestone_pings, true);
 });

@@ -1,0 +1,74 @@
+/* Otto's phone desk, the layout around the kit parts (Nov 10, 2026, the Otto build's Wave 2A; board D1 + D4).
+   The parts themselves (sky, paper, blueprint, rows, the ask bar) are src/components/otto/kit/{sky,desk}.css;
+   this file only places them on the phone: the tall sky, the folded bar that fades in, the Acting as chip, the
+   Desk | Saw | Stats | Settings strip, the panes and the reminder bar above the tab bar. Light is the plain rule,
+   Night under the app's dark selectors. Transform and opacity only; under reduced motion the bar just appears.
+   Markup: OttoMobile.tsx. */
+
+.odm{min-height:100dvh;background:var(--cream);color:var(--charcoal);padding-bottom:96px;--otto-raise:#F2EFE9;--otto-line-2:rgba(28,28,30,.15)}
+:root[data-theme="dark"] .odm,.vibe-night-island .odm{--otto-raise:#1F1D1C;--otto-line-2:rgba(255,255,255,.16)}
+
+/* the tall sky: the phone's own top inset (a browser tab has none, so a little air instead) */
+.odm .dk-sky{--otto-sky-top:max(env(safe-area-inset-top,0px),12px)}
+.odm-top{position:relative}
+/* the bottom of the tall sky (its horizon and hills): once this passes under the folded bar, the bar fades in, so
+   no strip of the tall sky ever shows beneath it */
+.odm-mark{position:absolute;left:0;top:calc(max(env(safe-area-inset-top,0px),12px) + 171px);width:1px;height:1px;pointer-events:none;visibility:hidden}
+/* Saw, Stats and Settings sit under the short bar (D4: the numbers and switches are the page): it holds its place */
+.odm-top-short{height:calc(60px + env(safe-area-inset-top,0px))}
+
+/* the folded bar: fixed at the top, faded out until the big Otto is covered. Nothing changes size */
+.odm-fold{position:fixed;top:0;left:0;right:0;z-index:40;opacity:0;transform:translateY(-8px);pointer-events:none;transition:opacity .26s var(--vibe-spring-soft),transform .34s var(--vibe-spring-soft)}
+.odm-fold.on{opacity:1;transform:none;pointer-events:auto}
+.odm-fold .dk-sky{--otto-sky-top:env(safe-area-inset-top,0px)}
+.odm-fold::after{content:"";position:absolute;left:0;right:0;top:100%;height:18px;background:linear-gradient(var(--cream),transparent);pointer-events:none}
+
+/* Acting as: a quiet chip under the hills that opens the switch sheet */
+.odm-as-row{display:flex;padding:2px 16px 0}
+.odm-as{display:inline-flex;align-items:center;gap:8px;max-width:100%;min-height:44px;box-sizing:border-box;padding:0 12px 0 8px;border-radius:999px;border:1px solid var(--otto-line-2);background:var(--paper);color:var(--ink-2);font:400 14px/1.2 var(--font-body);cursor:pointer;-webkit-tap-highlight-color:transparent;transition:transform .32s var(--vibe-spring-soft)}
+.odm-as:active{transform:scale(.97)}
+.odm-as:focus-visible{outline:2px solid var(--charcoal);outline-offset:2px}
+.odm-as>span:not(.dk-club){min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.odm-as b{color:var(--charcoal);font-weight:700}
+.odm-as .dk-ico{width:16px;height:16px}
+.odm-you{width:28px;height:28px;flex:none;border-radius:9px;background:var(--otto-raise);color:var(--ink-2);display:flex;align-items:center;justify-content:center}
+
+/* the strip: four tabs in a raised well, the open one in ink (never coral). Sticks under the folded bar */
+.odm-strip{position:sticky;top:calc(60px + env(safe-area-inset-top,0px));z-index:30;background:var(--cream);padding:10px 16px 6px}
+.odm-seg{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:4px;padding:4px;border-radius:16px;background:var(--otto-raise);isolation:isolate}
+.odm-seg button{position:relative;height:44px;border:0;border-radius:12px;background:none;color:var(--ink-2);font:600 14px/1 var(--font-body);padding:0;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.odm-seg button[aria-selected="true"]{color:var(--cream);font-weight:700;z-index:1}
+.odm-seg button:focus-visible{outline:2px solid var(--charcoal);outline-offset:2px}
+.odm-seg-pill{position:absolute;inset:0;border-radius:12px;background:var(--charcoal);transform-origin:0 50%;pointer-events:none}
+.odm-seg-tx{position:relative;z-index:2}
+
+/* the panes: side by side under the one page scroll, swiped or tapped */
+.odm-panes{display:flex;overflow-x:auto;overflow-y:hidden;scroll-snap-type:x mandatory;scrollbar-width:none;width:100%}
+.odm-panes::-webkit-scrollbar{display:none}
+.odm-pane{position:relative;flex:0 0 100%;min-width:0;scroll-snap-align:start;box-sizing:border-box;padding:0 16px 24px;display:flex;flex-direction:column;gap:6px}
+.odm-pane>*{flex:none}
+.odm-pane .dk-sec{padding-top:14px}
+/* Stats and Settings bring their own 16px column; the pane already gives it, so they line up with the desk cards */
+.odm-pane>.dk-body{padding-left:0;padding-right:0;background:none}
+.odm-hidden{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+
+/* a quiet note under a pile that only partly loaded */
+.odm-note{margin:6px 4px 0;font-size:13px;line-height:1.4;color:var(--ink-2)}
+/* Otto saw: no button, no arrow. The time sits on the right */
+.odm-saw .dk-row-day{padding-right:8px}
+.odm-row-btn{margin-right:6px}
+.odm-retry{align-self:flex-start}
+
+/* the reminder bar: fixed above the tab bar (64px + the home indicator) on every tab and scroll position. Its page
+   colour runs down behind the tab bar's glass, so no row shows through between the two */
+.odm-ask{position:fixed;left:0;right:0;bottom:0;z-index:40;padding-bottom:calc(64px + env(safe-area-inset-bottom,0px));background:var(--cream)}
+.odm-ask .dk-ask{padding-bottom:8px}
+.odm-ask .dk-ask-go .dk-ico{width:18px;height:18px}
+.odm-ask-hint{margin:0;padding:0 20px 8px;background:var(--cream);font-size:13px;line-height:1.35;color:var(--ink-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.odm-ask-hint b{color:var(--charcoal);font-weight:600}
+
+@media (prefers-reduced-motion:reduce){
+  .odm-fold,.odm-as{transition:none}
+  .odm-fold{transform:none}
+  .odm-as:active{transform:none}
+}

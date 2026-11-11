@@ -1,0 +1,132 @@
+/* Otto's sky and textures (Nov 10, 2026, the Otto build's Wave 2A). Ported from the board kit: tex.css (sky, grain,
+   stipple, stars, orbit, paper, blueprint, halftone, flute), the sky part of desk.css (dk-sky), skins.css (the ten
+   sky-<name> gradients, every one ending in a thin warm horizon) and ground.css (.gr + .gr-hills only).
+   Light is the plain rule, Night under the app's dark selectors. Board tokens map to the app's (--page = --cream,
+   --ink = --charcoal, --muted = --ink-muted, --line = --hairline, --tag = --tag-ink, --shadow = --card-shadow);
+   the kit's own tokens start --otto-. EVERYTHING HERE IS STILL: no keyframes, no transitions. The stars, the orbit
+   rings and the hills hold still; the only thing that moves in a sky is Otto himself (planet.css).
+   Use: a host with class tx-host, then <i class="tx tx-NAME"> layers as its first children. Markup: OttoSky.tsx.
+   Held by sky-css.test.ts. */
+
+/* the kit's own tokens: the raised fill, the stronger hairline, the done tint, the star colour */
+:where(.dk-sky,.dk-sec,.dk-card,.dk-draft,.dk-row,.dk-done,.dk-stamp,.dk-ask,.dk-btn,.dk-empty){--otto-raise:#F2EFE9;--otto-line-2:rgba(28,28,30,.15);--otto-ok-bg:rgba(20,122,69,.1)}
+:root[data-theme="dark"] :where(.dk-sky,.dk-sec,.dk-card,.dk-draft,.dk-row,.dk-done,.dk-stamp,.dk-ask,.dk-btn,.dk-empty),
+.vibe-night-island :where(.dk-sky,.dk-sec,.dk-card,.dk-draft,.dk-row,.dk-done,.dk-stamp,.dk-ask,.dk-btn,.dk-empty){--otto-raise:#1F1D1C;--otto-line-2:rgba(255,255,255,.16);--otto-ok-bg:rgba(79,208,138,.12)}
+
+/* layers. --otto-c tints a layer, --otto-o sets its strength */
+.tx-host{position:relative;isolation:isolate;overflow:hidden}
+.tx{position:absolute;inset:0;display:block;pointer-events:none;border-radius:inherit;overflow:hidden;z-index:-1;--otto-c:var(--charcoal);--otto-o:.2;
+--otto-n-fine:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n' x='0' y='0' width='100%25' height='100%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85 .85' numOctaves='2' seed='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 2.2 0 0 0 -.75'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+--otto-n-dots:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n' x='0' y='0' width='100%25' height='100%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.1 1.1' numOctaves='1' seed='5' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 14 0 0 0 -9'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")}
+.tx::before,.tx::after{content:"";position:absolute;inset:0;pointer-events:none}
+
+/* sky: the dusk gradient. A colourway plugs in through --otto-sky (sky-<name> below) */
+.tx-sky{background:var(--otto-sky,linear-gradient(180deg,#F3DCCD 0%,#F8E8DC 52%,#FFD2B4 84%,#FFB48A 100%))}
+:root[data-theme="dark"] .tx-sky,.vibe-night-island .tx-sky{background:var(--otto-sky,linear-gradient(180deg,#140A0C 0%,#1E0E11 34%,#34161A 58%,#62261F 76%,#B84A30 91%,#F0935A 100%))}
+
+/* grain: fine noise */
+.tx-grain{--otto-o:.16}
+.tx-grain::before{background:var(--otto-c);mask:var(--otto-n-fine) 0 0/200px 200px;opacity:var(--otto-o)}
+
+/* stipple: dots that thin out downward */
+.tx-stipple{--otto-o:.5}
+.tx-stipple::before{background:var(--otto-c);mask:var(--otto-n-dots) 0 0/220px 220px,linear-gradient(180deg,#000,transparent 88%);mask-composite:intersect;opacity:var(--otto-o)}
+
+/* stars: a few sizes on prime-ish tiles so they never line up. Still: in a sky Otto's moon is the one travelling light */
+.tx-stars{--otto-o:.85}
+.tx-stars::before,.tx-stars::after{mask:linear-gradient(180deg,#000 35%,transparent 94%)}
+.tx-stars::before{background:radial-gradient(1.2px 1.2px at 21px 33px,var(--otto-c) 99%,transparent) 0 0/173px 191px,radial-gradient(1px 1px at 88px 119px,var(--otto-c) 99%,transparent) 0 0/127px 149px,radial-gradient(1.7px 1.7px at 150px 61px,var(--otto-c) 99%,transparent) 0 0/251px 223px,radial-gradient(1px 1px at 47px 71px,var(--otto-c) 99%,transparent) 0 0/113px 97px,radial-gradient(.9px .9px at 70px 12px,var(--otto-c) 99%,transparent) 0 0/89px 131px,radial-gradient(1.4px 1.4px at 9px 88px,var(--otto-c) 99%,transparent) 0 0/149px 107px;opacity:var(--otto-o)}
+.tx-stars::after{background:radial-gradient(1.3px 1.3px at 64px 20px,var(--otto-c) 99%,transparent) 0 0/197px 163px,radial-gradient(1px 1px at 30px 96px,var(--otto-c) 99%,transparent) 0 0/139px 211px,radial-gradient(1.1px 1.1px at 83px 44px,var(--otto-c) 99%,transparent) 0 0/101px 127px;opacity:.35}
+
+/* orbit: contour rings laid flat. No traveller: the moon is the dot. --otto-ring sets the gap between rings */
+.tx-orbit{--otto-o:.4;--otto-ring:46px}
+.tx-orbit::before{inset:-30%;background:repeating-radial-gradient(circle at 50% 50%,transparent 0 var(--otto-ring),var(--otto-c) var(--otto-ring) calc(var(--otto-ring) + 1px));mask:radial-gradient(closest-side,#000 45%,transparent);transform:rotate(-16deg) scaleY(.42);opacity:var(--otto-o)}
+
+/* paper: an even tooth */
+.tx-paper{--otto-o:.08}
+.tx-paper::before{background:var(--otto-c);mask:var(--otto-n-fine) 0 0/200px 200px;opacity:var(--otto-o)}
+
+/* blueprint: a drafting grid, under anything not sent yet */
+.tx-blueprint{--otto-o:.16}
+.tx-blueprint::before{background:linear-gradient(var(--otto-c) 1px,transparent 1px) 0 0/96px 96px,linear-gradient(90deg,var(--otto-c) 1px,transparent 1px) 0 0/96px 96px;opacity:var(--otto-o)}
+.tx-blueprint::after{inset:-24px;background:linear-gradient(var(--otto-c) 1px,transparent 1px) 0 0/24px 24px,linear-gradient(90deg,var(--otto-c) 1px,transparent 1px) 0 0/24px 24px;opacity:calc(var(--otto-o)*.45)}
+
+/* halftone: print dots fading across. Only in the done stamp */
+.tx-halftone{--otto-o:.5}
+.tx-halftone::before{background:radial-gradient(circle at 50% 50%,var(--otto-c) 0 1.5px,transparent 2px) 0 0/7px 7px,radial-gradient(circle at 50% 50%,var(--otto-c) 0 1.5px,transparent 2px) 3.5px 3.5px/7px 7px;mask:linear-gradient(135deg,#000,transparent 72%);opacity:var(--otto-o)}
+
+/* fluted glass: ribs over a blurred backdrop. Text never sits on the ribs: put it on paper inside */
+.tx-flute{backdrop-filter:blur(12px) saturate(1.2);-webkit-backdrop-filter:blur(12px) saturate(1.2);background:var(--glass)}
+.tx-flute::before{background:repeating-linear-gradient(90deg,color-mix(in srgb,var(--charcoal) 10%,transparent) 0,transparent 4px,color-mix(in srgb,var(--charcoal) 5%,transparent) 11px,color-mix(in srgb,var(--charcoal) 10%,transparent) 12px)}
+:root[data-theme="dark"] .tx-flute::before,.vibe-night-island .tx-flute::before{background:repeating-linear-gradient(90deg,rgba(255,255,255,.13) 0,rgba(255,255,255,.02) 4px,rgba(0,0,0,.1) 11px,rgba(255,255,255,.13) 12px)}
+
+/* dk-sky: the sky header. Use with tx-host; layers tx-sky, tx-grain, tx-stipple, tx-stars, then a dk-sky-orbit holding Otto,
+   then his line (dk-sky-say), then the hills (gr gr-hills) LAST. Default = the tall phone header: 172px plus
+   --otto-sky-top (44px on the board, the phone's safe area). .short = the folded bar (60px plus the same top).
+   .band = the computer's strip (200px, rounded). */
+.dk-sky{--otto-sky-top:44px;--otto-star:var(--paper);flex:none;height:calc(172px + var(--otto-sky-top));color:var(--charcoal);z-index:1}
+:root[data-theme="dark"] .dk-sky,.vibe-night-island .dk-sky{--otto-star:var(--charcoal)}
+/* the state mark's ring: a soft tint of the page, so it sits on any sky colour */
+.dk-sky .m-planet{--m-surface:color-mix(in srgb,var(--cream) 50%,transparent)}
+.dk-sky>.tx-stars,.dk-sky>.tx-stipple{--otto-c:var(--otto-star)}
+.dk-sky>.tx-stipple{--otto-o:.15}
+.dk-sky>.tx-grain{--otto-o:.12}
+/* stars keep out of his line: a strip along the top, plus the right side fading toward the horizon. Faint in Light on purpose */
+.dk-sky>.tx-stars{--otto-o:1;mask-image:linear-gradient(#000 0,#000 24%,transparent 30%),linear-gradient(90deg,transparent 60%,#000 72%),linear-gradient(#000 40%,transparent 94%);mask-composite:add,intersect}
+:root[data-theme="dark"] .dk-sky>.tx-stars,.vibe-night-island .dk-sky>.tx-stars{--otto-o:.85}
+/* the orbit box, centred on Otto: rings only */
+.dk-sky-orbit{position:absolute;right:-88px;top:calc(var(--otto-sky-top) - 42px);width:320px;height:220px;display:flex;align-items:center;justify-content:center;pointer-events:none}
+.dk-sky-orbit>.tx-orbit{--otto-ring:74px;--otto-c:var(--charcoal);--otto-o:.4}
+:root[data-theme="dark"] .dk-sky-orbit>.tx-orbit,.vibe-night-island .dk-sky-orbit>.tx-orbit{--otto-c:var(--otto-star);--otto-o:.5}
+/* his line (lowercase, short), and the small name used in the folded bar */
+.dk-sky-say{position:absolute;left:20px;top:calc(22px + var(--otto-sky-top));width:204px;margin:0;font:italic 400 21px/1.24 var(--font-display);letter-spacing:-.005em;color:var(--charcoal)}
+.dk-sky-name{font:900 20px/1 var(--font-display);letter-spacing:-.03em;color:var(--charcoal)}
+.dk-sky-name i{font-style:normal;color:var(--tag-ink)}
+.dk-sky-note{font-size:14px;line-height:1.3;color:var(--ink-2)}
+/* short: keeps the top of the sky (stars), the glow folds away. A 28px Otto, the name and one short note */
+.dk-sky.short{height:calc(60px + var(--otto-sky-top));display:flex;align-items:flex-end;gap:10px;padding:0 16px 14px;box-sizing:border-box;border-bottom:1px solid var(--otto-line-2)}
+.dk-sky.short>.tx-sky{bottom:auto;height:190px}
+.dk-sky.short>.tx-grain{--otto-o:.06}
+.dk-sky.short>.tx-stars{mask-image:linear-gradient(#000 0,#000 40%,transparent 54%);mask-composite:add}
+.dk-sky.short>.gr{z-index:-1}
+.dk-sky.short .dk-sky-note{margin-left:auto}
+/* band: the computer. Text on the left, a 96px Otto in his orbit on the right */
+.dk-sky.band{height:200px;border-radius:20px}
+.dk-sky.band .dk-sky-say{left:32px;top:48px;width:min(460px,calc(100% - 352px));font-size:26px}
+.dk-sky.band .dk-sky-orbit{right:24px;top:-10px}
+.dk-sky.band .dk-sky-orbit>.tx-orbit{--otto-ring:110px}
+
+/* ground: soft hills at the bottom of the sky, cut in the page colour so the sky meets the desk along them. STILL.
+   A far layer (::before) at --otto-gr-far-o, a solid near layer (::after). Tile 750 x 30, repeat-x, so a wide band has no seam.
+   Light: the tops take a little of the horizon's warmth and fade to the page by the bottom edge. Night: plain page colour. */
+.gr{position:absolute;left:0;right:0;bottom:-1px;height:30px;pointer-events:none;z-index:0;--otto-gr-far-o:.55}
+.gr::before,.gr::after{content:"";position:absolute;inset:0;-webkit-mask-repeat:repeat-x;mask-repeat:repeat-x;-webkit-mask-position:0 100%;mask-position:0 100%;-webkit-mask-size:750px 30px;mask-size:750px 30px}
+.gr::before{opacity:var(--otto-gr-far-o);-webkit-mask-image:var(--otto-gr-far);mask-image:var(--otto-gr-far);background:linear-gradient(180deg,color-mix(in srgb,var(--cream) 34%,#D4937A) 30%,color-mix(in srgb,var(--cream) 62%,#DDA88E) 80%,var(--cream) 100%)}
+.gr::after{-webkit-mask-image:var(--otto-gr-near);mask-image:var(--otto-gr-near);background:linear-gradient(180deg,color-mix(in srgb,var(--cream) 14%,#B66F55) 50%,color-mix(in srgb,var(--cream) 28%,#C47E62) 74%,color-mix(in srgb,var(--cream) 62%,#D9A18A) 90%,var(--cream) 100%)}
+:root[data-theme="dark"] .gr,.vibe-night-island .gr{--otto-gr-far-o:.4}
+:root[data-theme="dark"] .gr::before,:root[data-theme="dark"] .gr::after,.vibe-night-island .gr::before,.vibe-night-island .gr::after{background:var(--cream)}
+.gr-hills{--otto-gr-far:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='750' height='30' viewBox='0 0 750 30'%3E%3Cpath d='M0 30V19C76.5 19 93.5 8 170 8C253.3 8 271.8 18 355 18C447.3 18 467.8 6 560 6C645.5 6 664.5 19 750 19V30Z'/%3E%3C/svg%3E");--otto-gr-near:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='750' height='30' viewBox='0 0 750 30'%3E%3Cpath d='M0 30V22C63 22 77 25 140 25C218.8 25 236.3 15 315 15C396 15 414 25 495 25C567 25 583 16 655 16C697.8 16 707.3 22 750 22V30Z'/%3E%3C/svg%3E")}
+
+/* the ten colourways' skies (sky-<name> on the dk-sky, from the person's look). Light: pale, the colour gathers at the
+   horizon. Night: the backdrop's three tones rising to a lighter glow. Every sky ends in a thin warm horizon; the cool
+   ones turn warm only in the last few percent. */
+.sky-dusk{--otto-sky:linear-gradient(180deg,#D9D2EE 0%,#EEDFEA 52%,#F8CFD6 84%,#F2B2B8 100%)}
+.sky-midnight{--otto-sky:linear-gradient(180deg,#C6D4F4 0%,#E1E8F8 50%,#D6DFF6 74%,#F7D9BD 91%,#FFC49C 100%)}
+.sky-violet{--otto-sky:linear-gradient(180deg,#D9CFF5 0%,#EBE4F8 50%,#E6DDF4 74%,#F7D9BD 91%,#FFC49C 100%)}
+.sky-rose{--otto-sky:linear-gradient(180deg,#F2D3E0 0%,#F8E5EB 52%,#FBCBDA 84%,#F5A9C4 100%)}
+.sky-cardinal{--otto-sky:linear-gradient(180deg,#F0D5D2 0%,#F8E6E2 52%,#F8C6BF 84%,#EE9D94 100%)}
+.sky-ember{--otto-sky:linear-gradient(180deg,#F3DCCD 0%,#F8E8DC 52%,#FFD2B4 84%,#FFB48A 100%)}
+.sky-lantern{--otto-sky:linear-gradient(180deg,#F0E3C2 0%,#F8EFD9 52%,#FBE2A6 84%,#F6CD72 100%)}
+.sky-forest{--otto-sky:linear-gradient(180deg,#CFE3CC 0%,#E7F0E1 50%,#E1EDD9 74%,#F7D9BD 91%,#FFC49C 100%)}
+.sky-canal{--otto-sky:linear-gradient(180deg,#C8E4E2 0%,#E2F1EE 50%,#DDEDE4 74%,#F7D9BD 91%,#FFC49C 100%)}
+.sky-onyx{--otto-sky:linear-gradient(180deg,#DAD6D0 0%,#ECE8E2 50%,#E6E0D8 74%,#F7D9BD 91%,#FFC49C 100%)}
+:root[data-theme="dark"] .sky-dusk,.vibe-night-island .sky-dusk{--otto-sky:linear-gradient(180deg,#140F24 0%,#1A1430 34%,#2B1E48 58%,#50305F 76%,#9C5C86 91%,#E8A9A2 100%)}
+:root[data-theme="dark"] .sky-midnight,.vibe-night-island .sky-midnight{--otto-sky:linear-gradient(180deg,#07091A 0%,#0E1230 38%,#162050 60%,#24388A 78%,#3E5FB8 87%,#C98A5E 95%,#F6B98A 100%)}
+:root[data-theme="dark"] .sky-violet,.vibe-night-island .sky-violet{--otto-sky:linear-gradient(180deg,#0D061E 0%,#140B2A 38%,#22124A 60%,#3A1F7A 78%,#6B45C0 87%,#C98A5E 95%,#F6B98A 100%)}
+:root[data-theme="dark"] .sky-rose,.vibe-night-island .sky-rose{--otto-sky:linear-gradient(180deg,#16081A 0%,#1D0B22 34%,#3A1236 58%,#6E1F4E 76%,#C2477C 91%,#F5A3BF 100%)}
+:root[data-theme="dark"] .sky-cardinal,.vibe-night-island .sky-cardinal{--otto-sky:linear-gradient(180deg,#16080A 0%,#1F0B0F 34%,#3A0F15 58%,#6B151C 76%,#B5282C 91%,#EE7C6C 100%)}
+:root[data-theme="dark"] .sky-ember,.vibe-night-island .sky-ember{--otto-sky:linear-gradient(180deg,#140A0C 0%,#1E0E11 34%,#34161A 58%,#62261F 76%,#B84A30 91%,#F0935A 100%)}
+:root[data-theme="dark"] .sky-lantern,.vibe-night-island .sky-lantern{--otto-sky:linear-gradient(180deg,#120E07 0%,#19130A 34%,#33240C 58%,#63430F 76%,#C28A1C 91%,#F7D272 100%)}
+:root[data-theme="dark"] .sky-forest,.vibe-night-island .sky-forest{--otto-sky:linear-gradient(180deg,#0A1412 0%,#0D1C17 38%,#12301F 60%,#1D5230 78%,#3F7A44 87%,#C98A5E 95%,#F6B98A 100%)}
+:root[data-theme="dark"] .sky-canal,.vibe-night-island .sky-canal{--otto-sky:linear-gradient(180deg,#061316 0%,#0A1A20 40%,#123038 62%,#2E5754 78%,#C98A5E 92%,#F6B98A 100%)}
+:root[data-theme="dark"] .sky-onyx,.vibe-night-island .sky-onyx{--otto-sky:linear-gradient(180deg,#0E0D0D 0%,#121111 38%,#1E1C1B 60%,#34312F 78%,#5E5650 87%,#C98A5E 95%,#F6B98A 100%)}

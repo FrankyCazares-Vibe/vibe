@@ -48,8 +48,16 @@ export function PushAsk(p: {
   placement: AskPlacement;
   suppressed?: boolean;
   onVisibleChange?: (visible: boolean) => void;
+  /**
+   * Otto's desk (Wave 2A, Nov 10, 2026): the "otto" ask on a paper card with
+   * the desk's quiet buttons (sky.css + desk.css, loaded by the desk). No
+   * coral: the desk's one coral fill is its top Ready item. Without it the
+   * "otto" ask keeps today's dark glass (the legacy page).
+   */
+  look?: "desk";
 }): JSX.Element | null {
   const { placement, suppressed = false, onVisibleChange } = p;
+  const onDesk = placement === "otto" && p.look === "desk";
   const shell = useAppShell();
   const standalone = useIsStandalone();
   const platform = usePlatform();
@@ -187,7 +195,7 @@ export function PushAsk(p: {
     setPhase("gone");
   };
 
-  const s = STYLES[placement];
+  const s = onDesk ? DESK_LOOK : STYLES[placement];
   const done = phase === "done";
 
   const action =
@@ -248,9 +256,10 @@ export function PushAsk(p: {
     <section
       ref={(el) => void (rootRef.current = el)}
       aria-labelledby={done ? undefined : titleId}
-      className={placement === "otto" ? "otto-room-section" : undefined}
+      className={onDesk ? "tx-host dk-card" : placement === "otto" ? "otto-room-section" : undefined}
       style={s.card}
     >
+      {onDesk ? <i className="tx tx-paper" aria-hidden="true" /> : null}
       {done ? null : (
         <>
           <div id={titleId} style={s.title}>
@@ -428,4 +437,24 @@ const STYLES: Record<AskPlacement, Look> = {
     result: { fontSize: 12.5, lineHeight: 1.4, color: "var(--ink-2)" },
     resultMargin: "6px 0",
   },
+};
+
+// Otto's desk: a paper card (dk-card) with the desk's quiet pill buttons
+// (dk-btn, dk-btn ghost). Theme tokens only, so Night and Light both work.
+const DESK_LOOK: Look = {
+  card: {},
+  title: {
+    fontFamily: "var(--font-body)",
+    fontSize: 16,
+    fontWeight: 700,
+    lineHeight: 1.3,
+    color: "var(--charcoal)",
+  },
+  body: { margin: "4px 0 0", fontSize: 14, lineHeight: 1.4, color: "var(--ink-2)" },
+  primaryClass: "dk-btn",
+  primary: {},
+  secondaryClass: "dk-btn ghost",
+  secondary: {},
+  result: { fontSize: 13, lineHeight: 1.4, color: "var(--ink-2)" },
+  resultMargin: "10px 0 0",
 };

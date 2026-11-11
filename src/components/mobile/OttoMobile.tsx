@@ -1,543 +1,170 @@
 "use client";
 
-import { useAnimate } from "motion/react";
-import { useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import "@/components/otto/kit/sky.css";
+import "@/components/otto/kit/desk.css";
+import "./otto-desk-mobile.css";
 
-import type {
-  ActivityRow,
-  AskingRow,
-  OttoPayload,
-  OttoSettings as OttoSettingsT,
-  UpcomingRow,
-} from "@/app/api/me/otto/route";
-import { OttoActivity } from "@/components/otto/OttoActivity";
+import { useSearchParams } from "next/navigation";
+import { useCallback, useEffect, useRef, useState } from "react";
+
+import type { OttoPayload } from "@/app/api/me/otto/route";
 import { useTabScrollMemory } from "@/components/mobile/use-tab-scroll-memory";
 import { OttoMetrics } from "@/components/otto/OttoMetrics";
-import { OttoPlanet } from "@/components/otto/planet/OttoPlanet";
-import { OttoRequests } from "@/components/otto/OttoRequests";
 import { OttoSettings } from "@/components/otto/OttoSettings";
-import { OttoTellInput } from "@/components/otto/OttoTellInput";
-import { OttoUpcoming } from "@/components/otto/OttoUpcoming";
-import { useUpcomingFollowsCalendar } from "@/components/otto/use-upcoming-follows-calendar";
-import { PushAsk } from "@/components/push/PushAsk";
-import { vibeRequest } from "@/lib/feedback/request";
-import { SPRING_SNAPPY } from "@/lib/motion/springs";
-import { followFailureLine, personName } from "@/lib/people/follow-label";
+import { OttoSky } from "@/components/otto/desk/OttoSky";
+import { ClubSwitcherSheet } from "@/components/orgs/ClubSwitcherSheet";
 
-type Tab = "today" | "stats";
-const TAB_ORDER: Tab[] = ["today", "stats"];
-
-/** Puts a row the student cleared back at `index`, unless it's already back. */
-function restoreAt<T>(list: T[], row: T, index: number): T[] {
-  if (list.includes(row)) return list;
-  const next = list.slice();
-  next.splice(Math.min(index, next.length), 0, row);
-  return next;
-}
+import { OttoDeskPanes } from "./OttoDeskPanes";
+import { ActingAsChip, DESK_TABS, DeskTabs, paneId, tabId, type DeskTab } from "./OttoDeskParts";
+import { OttoMobileLegacy } from "./OttoMobileLegacy";
+import { ReminderBar } from "./ReminderBar";
+import { useOttoDesk } from "./use-otto-desk";
 
 /**
- * iOS-native rebuild of /otto for mobile. Compact hero + swipeable
- * Today / Stats tabs. Reuses the existing OttoActivity / OttoUpcoming /
- * OttoRequests / OttoTellInput / OttoSettings / OttoMetrics components
- * inside the panes — they're all single-column-friendly already.
- *
- * State logic mirrors OttoPageClient: optimistic mutations (a row the
- * server refuses to clear goes back where it was, with a toast), hero
- * counts derive from local state, ?tab=stats URL deep-link respected.
+ * The phone's Otto tab. With the desk on (the default; `OTTO_DESK=off` turns
+ * it off, src/lib/otto/desk-flag.ts) it is Otto's desk; with it off, today's
+ * page, unchanged (OttoMobileLegacy.tsx). `desk` comes from the page
+ * (OttoSwitch reads the switch); without it, a payload that carries the desk
+ * (or names it in `failed`) means the switch is on.
  */
-export function OttoMobile({ initial }: { initial: OttoPayload }) {
+export function OttoMobile({ initial, desk }: { initial: OttoPayload; desk?: boolean }) {
+  const on = desk ?? (initial.desk !== undefined || (initial.failed ?? []).includes("desk"));
+  return on ? <OttoDeskMobile initial={initial} /> : <OttoMobileLegacy initial={initial} />;
+}
+
+const ASK_FOOT = "Otto's desk shows what this club needs. Your Profile tab doesn't change.";
+
+/**
+ * Otto's desk on a phone (Nov 10, 2026, the Otto build's Wave 2A; board D1,
+ * D4). His warm sky on top with his one line, soft hills, then the paper:
+ * Ready for you, Scheduled, Done this week. Swipe or tap to Saw, Stats and
+ * Settings. The reminder bar sits above the tab bar everywhere.
+ *
+ * THE FOLD. The tall sky scrolls away with the page; once the big Otto has
+ * gone under the top edge, the short bar (28px Otto, "otto.", what's ready)
+ * fades in, fixed at the top. Opacity and position only, nothing resizes;
+ * reduced motion makes it simply appear. The tall sky's own observer stops
+ * Otto once it is off screen (OttoSky).
+ *
+ * HONESTY. Nothing here says Otto did, drafted or sent anything: the model
+ * (src/lib/otto/desk.ts) words every line, Accept goes through the club's
+ * existing approve route, and the bar saves a reminder.
+ */
+function OttoDeskMobile({ initial }: { initial: OttoPayload }) {
   const searchParams = useSearchParams();
-  const [tab, setTab] = useState<Tab>(
-    searchParams.get("tab") === "stats" ? "stats" : "today",
-  );
-
-  const tabScrollRef = useRef<HTMLDivElement | null>(null);
-  const isProgrammaticScrollRef = useRef(false);
-  // Each tab keeps its own place under the one page scroll (Oct 18, 2026).
+  const asked = searchParams.get("tab");
+  const [tab, setTab] = useState<DeskTab>(DESK_TABS.includes(asked as DeskTab) ? (asked as DeskTab) : "desk");
   useTabScrollMemory(tab, "/otto");
+  const state = useOttoDesk(initial);
+  const { desk } = state;
+  const [sheet, setSheet] = useState(false);
 
-  const setActiveTab = useCallback((next: Tab) => {
+  const setActiveTab = useCallback((next: DeskTab) => {
     setTab(next);
     try {
       const url = new URL(window.location.href);
-      if (next === "today") url.searchParams.delete("tab");
+      if (next === "desk") url.searchParams.delete("tab");
       else url.searchParams.set("tab", next);
-      window.history.replaceState({}, "", url.toString());
+      window.history.replaceState(window.history.state, "", url.toString());
     } catch {
-      /* SSR / non-browser env */
+      /* not in a browser */
     }
   }, []);
 
-  const [activity] = useState<ActivityRow[]>(initial.activity);
-  const [upcoming, setUpcoming] = useState<UpcomingRow[]>(initial.upcoming);
-  // An RSVP anywhere (the Otto-corner window, Messages, another tab) reads
-  // Upcoming again (Oct 19, 2026, critique B8 repair).
-  useUpcomingFollowsCalendar(setUpcoming);
-  const [asking, setAsking] = useState<AskingRow[]>(initial.asking);
-  const [settings] = useState<OttoSettingsT>(initial.settings);
+  // Only the Desk tab has the tall sky; Saw, Stats and Settings sit under the
+  // short bar from the top (D4), so their numbers and switches aren't pushed
+  // below a sky that talks about the desk.
+  const tall = tab === "desk";
 
-  // The sections /api/me/otto couldn't read. Each says so in its own place
-  // instead of showing its empty copy, and the chip above it shows "—"
-  // rather than a 0 that would read as a real count. A payload from before
-  // the field existed carries nothing, which reads as "nothing failed".
-  const failed = initial.failed ?? [];
-  const activityFailed = failed.includes("activity");
-  const upcomingFailed = failed.includes("upcoming");
-  const askingFailed = failed.includes("asking");
-  // The unread-DM read is its own section server-side — it fails without
-  // taking followers or reminders with it — but its row sits in "Asking for
-  // you", so that list is incomplete either way.
-  const dmsFailed = failed.includes("dms");
-
-  const reminderCount =
-    upcoming.filter((u) => u.kind === "reminder").length +
-    asking.filter((r) => r.kind === "reminder").length;
-  const unreadDmRow = asking.find((r) => r.kind === "unread_dms");
-  const unreadCount = unreadDmRow?.kind === "unread_dms" ? unreadDmRow.count : 0;
-
-  // Done / Dismiss / Pass clear the reminder straight away. If the server
-  // refuses, it goes back where it was (snapshot from this render, never a
-  // refetch) and vibeRequest's toast says why.
-  const clearReminder = useCallback(
-    async (
-      id: string,
-      url: string,
-      method: "POST" | "DELETE",
-      failure: string,
-    ) => {
-      const isIt = (r: UpcomingRow | AskingRow) =>
-        r.kind === "reminder" && r.id === id;
-      const upIndex = upcoming.findIndex(isIt);
-      const askIndex = asking.findIndex(isIt);
-      const upRow = upIndex >= 0 ? upcoming[upIndex] : null;
-      const askRow = askIndex >= 0 ? asking[askIndex] : null;
-      setUpcoming((u) => u.filter((r) => !isIt(r)));
-      setAsking((a) => a.filter((r) => !isIt(r)));
-      const res = await vibeRequest(url, { method, failure });
-      if (res.ok) return;
-      if (upRow) setUpcoming((u) => restoreAt(u, upRow, upIndex));
-      if (askRow) setAsking((a) => restoreAt(a, askRow, askIndex));
-    },
-    [upcoming, asking],
-  );
-
-  const dismissReminder = useCallback(
-    (id: string) =>
-      clearReminder(
-        id,
-        `/api/me/otto/reminders/${id}`,
-        "DELETE",
-        "Couldn't dismiss that reminder.",
-      ),
-    [clearReminder],
-  );
-
-  const actReminder = useCallback(
-    (id: string) =>
-      clearReminder(
-        id,
-        `/api/me/otto/reminders/${id}/act`,
-        "POST",
-        "Couldn't mark that reminder done.",
-      ),
-    [clearReminder],
-  );
-
-  // Follow back clears the row straight away; a refused follow (a block,
-  // the rate limit) puts it back where it was so it can be tapped again.
-  const followBack = useCallback(
-    async (userId: string) => {
-      const isIt = (r: AskingRow) =>
-        r.kind === "follower" && r.user_id === userId;
-      const index = asking.findIndex(isIt);
-      const row = index >= 0 ? asking[index] : null;
-      setAsking((a) => a.filter((r) => !isIt(r)));
-      const res = await vibeRequest("/api/me/follow", {
-        method: "POST",
-        json: { target_id: userId },
-        failure: followFailureLine("follow", row?.kind === "follower" ? personName(row) : null),
-      });
-      if (!res.ok && row) setAsking((a) => restoreAt(a, row, index));
-    },
-    [asking],
-  );
-
-  const passFollower = useCallback((userId: string) => {
-    setAsking((a) =>
-      a.filter((r) => !(r.kind === "follower" && r.user_id === userId)),
-    );
-  }, []);
-
-  const handleCreated = useCallback(
-    (reminder: {
-      id: string;
-      title: string;
-      body: string | null;
-      remind_at: string | null;
-      created_at: string;
-    }) => {
-      if (reminder.remind_at) {
-        setUpcoming((u) =>
-          [
-            ...u,
-            {
-              kind: "reminder" as const,
-              id: reminder.id,
-              title: reminder.title,
-              body: reminder.body,
-              remind_at: reminder.remind_at!,
-            },
-          ].sort((a, b) => {
-            const at = a.kind === "event" ? a.starts_at : a.remind_at;
-            const bt = b.kind === "event" ? b.starts_at : b.remind_at;
-            return at.localeCompare(bt);
-          }),
-        );
-      } else {
-        setAsking((a) => [
-          {
-            kind: "reminder" as const,
-            id: reminder.id,
-            title: reminder.title,
-            body: reminder.body,
-            created_at: reminder.created_at,
-          },
-          ...a,
-        ]);
-      }
-    },
-    [],
-  );
-
-  // Programmatic scroll to the active tab pane when tab changes.
+  // The fold: the bottom of the tall sky passing beneath the short bar.
+  const markRef = useRef<HTMLSpanElement | null>(null);
+  const foldRef = useRef<HTMLDivElement | null>(null);
+  const [folded, setFolded] = useState(false);
   useEffect(() => {
-    const el = tabScrollRef.current;
+    const mark = markRef.current;
+    if (!tall || !mark || typeof IntersectionObserver === "undefined") return;
+    const h = Math.max(1, Math.round(foldRef.current?.offsetHeight ?? 60));
+    const io = new IntersectionObserver(
+      (entries) => {
+        const e = entries[entries.length - 1];
+        if (e) setFolded(!e.isIntersecting && e.boundingClientRect.top < h);
+      },
+      { rootMargin: `-${h}px 0px 0px 0px` },
+    );
+    io.observe(mark);
+    return () => io.disconnect();
+  }, [tall]);
+  const barOn = folded || !tall;
+
+  // Swipe between panes; a tap scrolls the strip there (legacy behaviour).
+  const panesRef = useRef<HTMLDivElement | null>(null);
+  const programmatic = useRef(false);
+  useEffect(() => {
+    const el = panesRef.current;
     if (!el) return;
-    const idx = TAB_ORDER.indexOf(tab);
-    if (idx < 0) return;
-    const target = el.clientWidth * idx;
+    const target = el.clientWidth * DESK_TABS.indexOf(tab);
     if (Math.abs(el.scrollLeft - target) < 4) return;
-    isProgrammaticScrollRef.current = true;
+    programmatic.current = true;
     el.scrollTo({ left: target, behavior: "smooth" });
     const t = window.setTimeout(() => {
-      isProgrammaticScrollRef.current = false;
+      programmatic.current = false;
     }, 420);
     return () => window.clearTimeout(t);
   }, [tab]);
 
+  const readyCount = desk?.ready.length ?? 0;
+  const say = desk ? desk.say : "my desk didn't load. try again in a sec.";
+  const note = !desk ? undefined : readyCount > 0 ? `${readyCount} ready for you` : "all clear";
+
   return (
-    <main
-      style={{
-        background:
-          "radial-gradient(140% 90% at 50% 0%, rgba(255,92,53,0.20) 0%, rgba(255,92,53,0) 55%), " +
-          "radial-gradient(120% 80% at 100% 100%, rgba(198,160,255,0.20) 0%, rgba(198,160,255,0) 60%), " +
-          "linear-gradient(180deg, #1A1A1F 0%, #0E0E13 100%)",
-        minHeight: "100dvh",
-        color: "#fff",
-      }}
-    >
-      {/* Compact hero — Otto + name + tagline + counts pill row */}
-      <header
-        style={{
-          padding: "calc(env(safe-area-inset-top, 0px) + 18px) 18px 14px",
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          gap: 10,
-        }}
-      >
-        {/* Planet brings his own glow; the page is dark in both themes, so
-            his box is a night island (his Night drawing, the light ring). */}
-        <div
-          className="vibe-night-island"
-          style={{
-            position: "relative",
-            width: 84,
-            height: 84,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-          }}
-        >
-          <OttoPlanet size={72} live />
+    <main className="odm">
+      {tall ? (
+        <div className="odm-top">
+          <OttoSky variant="tall" say={say} />
+          <span ref={markRef} className="odm-mark" aria-hidden="true" />
         </div>
-        <h1
-          style={{
-            fontFamily: "Fraunces, serif",
-            fontSize: 30,
-            fontWeight: 900,
-            letterSpacing: "-0.8px",
-            margin: 0,
-            color: "#fff",
-          }}
-        >
-          otto<span style={{ color: "#FF5C35" }}>.</span>
-        </h1>
-        <p
-          style={{
-            fontFamily: "DM Sans, sans-serif",
-            fontSize: 13,
-            color: "rgba(255,255,255,0.68)",
-            margin: 0,
-            letterSpacing: "0.02em",
-          }}
-        >
-          your campus compass
-        </p>
-        <p
-          style={{
-            fontFamily: "Fraunces, serif",
-            fontSize: 14,
-            fontStyle: "italic",
-            color: "rgba(255,255,255,0.78)",
-            margin: "2px 0 0",
-            textAlign: "center",
-          }}
-        >
-          &ldquo;here&rsquo;s what caught my eye.&rdquo;
-        </p>
+      ) : (
+        <div className="odm-top-short" aria-hidden="true" />
+      )}
+      <div ref={foldRef} className={barOn ? "odm-fold on" : "odm-fold"} aria-hidden={!barOn} inert={!barOn}>
+        <OttoSky variant="short" say={say} note={note} />
+      </div>
 
-        <div
-          aria-label="otto status"
-          style={{
-            display: "flex",
-            gap: 8,
-            marginTop: 6,
-            flexWrap: "wrap",
-            justifyContent: "center",
-          }}
-        >
-          <CountChip
-            label="nudges"
-            value={activityFailed ? null : initial.counts.nudges}
-          />
-          <CountChip
-            label="reminders"
-            value={upcomingFailed || askingFailed ? null : reminderCount}
-          />
-          <CountChip
-            label="unread"
-            value={askingFailed || dmsFailed ? null : unreadCount}
-          />
-        </div>
-      </header>
+      {desk && desk.clubs.length > 0 ? <ActingAsChip actingAs={desk.actingAs} onOpen={() => setSheet(true)} /> : null}
+      <DeskTabs active={tab} onChange={setActiveTab} />
 
-      {/* Tab strip — Today / Stats */}
-      <TabStrip active={tab} onChange={setActiveTab} />
-
-      {/* Swipeable panes */}
       <div
-        ref={tabScrollRef}
+        ref={panesRef}
+        className="odm-panes"
+        aria-busy={state.loading || undefined}
         onScroll={(e) => {
-          if (isProgrammaticScrollRef.current) return;
+          if (programmatic.current) return;
           const el = e.currentTarget;
-          const w = el.clientWidth;
-          if (w === 0) return;
-          const idx = Math.round(el.scrollLeft / w);
-          const next = TAB_ORDER[idx];
+          if (el.clientWidth === 0) return;
+          const next = DESK_TABS[Math.round(el.scrollLeft / el.clientWidth)];
           if (next && next !== tab) setActiveTab(next);
         }}
-        className="vibe-no-scrollbar"
-        style={{
-          display: "flex",
-          overflowX: "auto",
-          overflowY: "hidden",
-          scrollSnapType: "x mandatory",
-          scrollbarWidth: "none",
-          msOverflowStyle: "none",
-          WebkitOverflowScrolling: "touch",
-          width: "100%",
-        }}
       >
-        <section
-          aria-labelledby="otto-today-heading"
-          style={paneStyle}
-        >
-          <h2 id="otto-today-heading" style={visuallyHidden}>
-            Today
-          </h2>
-          <PushAsk placement="otto" />
-          <OttoActivity rows={activity} failed={activityFailed} />
-          <OttoUpcoming
-            rows={upcoming}
-            onDismissReminder={dismissReminder}
-            onActReminder={actReminder}
-            failed={upcomingFailed}
-          />
-          <OttoRequests
-            rows={asking}
-            onFollowBack={followBack}
-            onPassFollower={passFollower}
-            onDismissReminder={dismissReminder}
-            onActReminder={actReminder}
-            failed={askingFailed || dmsFailed}
-          />
-          <OttoTellInput onCreated={handleCreated} />
-          <OttoSettings settings={settings} />
+        <OttoDeskPanes state={state} />
+        <section id={paneId("stats")} role="tabpanel" aria-labelledby={tabId("stats")} className="odm-pane">
+          <OttoMetrics club={desk?.actingAs ?? null} />
         </section>
-        <section aria-labelledby="otto-stats-heading" style={paneStyle}>
-          <h2 id="otto-stats-heading" style={visuallyHidden}>
-            Stats
-          </h2>
-          <OttoMetrics />
+        <section id={paneId("settings")} role="tabpanel" aria-labelledby={tabId("settings")} className="odm-pane">
+          <OttoSettings settings={initial.settings} />
         </section>
       </div>
+
+      <ReminderBar onSaved={state.reminderSaved} />
+      {desk && desk.clubs.length > 0 ? (
+        <ClubSwitcherSheet
+          open={sheet}
+          onClose={() => setSheet(false)}
+          onPick={(club) => state.actAs(club?.handle ?? null)}
+          current={desk.actingAs?.handle ?? null}
+          title="Acting as."
+          footnote={ASK_FOOT}
+        />
+      ) : null}
     </main>
-  );
-}
-
-// Oct 19, 2026 (critique B9): `position: relative` anchors each pane's
-// visually hidden <h2> inside the pane. Without it the Stats heading sat
-// against an ancestor outside the sideways scroller, at x=403, and stretched
-// the page and the tab bar 15px past a 390px screen.
-const paneStyle: React.CSSProperties = {
-  position: "relative",
-  flex: "0 0 100%",
-  scrollSnapAlign: "start",
-  padding: "4px 14px 32px",
-  minWidth: 0,
-  display: "flex",
-  flexDirection: "column",
-  gap: 14,
-};
-
-const visuallyHidden: React.CSSProperties = {
-  position: "absolute",
-  width: 1,
-  height: 1,
-  padding: 0,
-  margin: -1,
-  overflow: "hidden",
-  clip: "rect(0,0,0,0)",
-  whiteSpace: "nowrap",
-  border: 0,
-};
-
-const TAB_LABEL: Record<Tab, string> = { today: "Today", stats: "Stats" };
-
-function TabStrip({ active, onChange }: { active: Tab; onChange: (t: Tab) => void }) {
-  // The glass pill slides to the new tab (motion pass, Oct 18 2026), the
-  // same way as the campus strip (CampusMobile TabStrip): it lives in the
-  // active button and, when that changes, starts from the old button's box
-  // (x + scaleX, SPRING_SNAPPY) and settles into its own. By hand rather
-  // than Motion's layoutId, so every phone strip moves alike and a tab
-  // change that also moves the page (useTabScrollMemory) can't throw it.
-  // useAnimate follows reduce motion (the pill just appears).
-  const [scope, animate] = useAnimate<HTMLDivElement>();
-  const buttonsRef = useRef<Partial<Record<Tab, HTMLButtonElement | null>>>({});
-  const pillRef = useRef<HTMLSpanElement | null>(null);
-  const shownRef = useRef(active);
-  useLayoutEffect(() => {
-    const from = buttonsRef.current[shownRef.current];
-    const to = buttonsRef.current[active];
-    shownRef.current = active;
-    const pill = pillRef.current;
-    if (!from || !to || from === to || !pill || !to.offsetWidth) return;
-    animate(
-      pill,
-      { x: [from.offsetLeft - to.offsetLeft, 0], scaleX: [from.offsetWidth / to.offsetWidth, 1] },
-      SPRING_SNAPPY,
-    );
-  }, [active, animate]);
-
-  return (
-    <div
-      ref={scope}
-      style={{
-        display: "flex",
-        gap: 6,
-        padding: "6px 18px 10px",
-        justifyContent: "center",
-        // Keeps the z-order below inside the strip.
-        isolation: "isolate",
-      }}
-    >
-      {TAB_ORDER.map((t) => {
-        const isActive = t === active;
-        return (
-          <button
-            key={t}
-            ref={(el) => {
-              buttonsRef.current[t] = el;
-            }}
-            type="button"
-            onClick={() => onChange(t)}
-            className="vibe-press"
-            style={{
-              position: "relative",
-              // The open tab sits over the other, so its pill slides over
-              // that one's ring; the words (zIndex 2) stay on top.
-              zIndex: isActive ? 1 : undefined,
-              padding: "8px 18px",
-              borderRadius: 999,
-              // The open tab's ring and glass are the pill below.
-              border: isActive
-                ? "1px solid transparent"
-                : "1px solid rgba(255,255,255,0.08)",
-              background: "transparent",
-              color: isActive ? "#fff" : "rgba(255,255,255,0.62)",
-              fontFamily: "DM Sans, sans-serif",
-              fontSize: 13,
-              fontWeight: 700,
-              cursor: "pointer",
-              WebkitTapHighlightColor: "transparent",
-            }}
-          >
-            {isActive ? (
-              <span
-                ref={pillRef}
-                aria-hidden
-                style={{
-                  position: "absolute",
-                  inset: -1,
-                  borderRadius: 999,
-                  border: "1px solid rgba(255,255,255,0.18)",
-                  background: "rgba(255,255,255,0.14)",
-                  boxSizing: "border-box",
-                  transformOrigin: "0 50%",
-                  pointerEvents: "none",
-                }}
-              />
-            ) : null}
-            <span style={{ position: "relative", zIndex: 2 }}>{TAB_LABEL[t]}</span>
-          </button>
-        );
-      })}
-    </div>
-  );
-}
-
-/** `null` when the section behind the count didn't load — "—", not a 0. */
-function CountChip({ label, value }: { label: string; value: number | null }) {
-  return (
-    <span
-      style={{
-        display: "inline-flex",
-        alignItems: "baseline",
-        gap: 5,
-        padding: "5px 11px",
-        borderRadius: 999,
-        background: "rgba(255,255,255,0.08)",
-        border: "1px solid rgba(255,255,255,0.10)",
-        fontFamily: "DM Sans, sans-serif",
-        fontSize: 12,
-        fontWeight: 600,
-        color: "rgba(255,255,255,0.85)",
-        letterSpacing: "0.02em",
-      }}
-    >
-      <span
-        style={{
-          fontFamily: "Fraunces, serif",
-          fontWeight: 800,
-          fontSize: 14,
-          color: "#fff",
-        }}
-      >
-        {value ?? "—"}
-      </span>
-      {label}
-    </span>
   );
 }

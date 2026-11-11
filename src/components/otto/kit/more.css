@@ -1,0 +1,59 @@
+/* Otto's Stats and Settings parts (Nov 10, 2026, the Otto build's Wave 2A; board D4 "Numbers and settings").
+   Ported from the board's d4-stat, d4-seg and d4-sw as dk-*, on the desk kit's paper (load after sky.css and
+   desk.css). Light is the plain rule, Night under the app's dark selectors. Nothing here is coral: the stat is ink,
+   the chosen step is ink with a tick, a switch shows on/off by shape (filled track, knob right) as well as fill.
+   A switch knob slides on transform only, and holds still under reduced motion. Markup: OttoMetrics.tsx and
+   OttoSettings.tsx in src/components/otto/. */
+
+/* the line above the cards: whose numbers, which dates */
+.dk-for{display:flex;align-items:center;gap:10px;padding:14px 4px 2px;font-size:14px;line-height:1.3;color:var(--ink-2);font-variant-numeric:tabular-nums}
+.dk-for b{color:var(--charcoal);font-weight:700}
+.dk-for .dk-club{width:24px;height:24px;border-radius:8px;font-size:11px;line-height:24px}
+
+/* dk-stat: one number, what it is, what it counts. Sits in a dk-card */
+.dk-stat{display:flex;flex-direction:column;gap:10px}
+.dk-stat-top{display:flex;align-items:baseline;gap:10px;font-size:16px;font-weight:600;line-height:1.2;color:var(--charcoal)}
+.dk-stat-num{font:800 40px/1 var(--font-body);letter-spacing:-.02em;font-variant-numeric:tabular-nums;color:var(--charcoal)}
+.dk-stat-what{display:flex;flex-direction:column;gap:4px;min-width:0}
+.dk-stat-what i{display:flex;align-items:center;gap:5px;font-style:normal;font-size:13px;font-weight:400;line-height:1.3;color:var(--ink-2)}
+.dk-stat-what i svg{flex:none;color:var(--ink-muted)}
+.dk-stat-wins{margin:0;padding:0;list-style:none;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+.dk-stat-wins li{display:flex;flex-direction:column;gap:3px;padding:8px 10px;border-radius:12px;background:var(--otto-raise);font-size:12px;line-height:1.2;color:var(--ink-2)}
+.dk-stat-wins li b{font:700 17px/1 var(--font-body);font-variant-numeric:tabular-nums;color:var(--charcoal)}
+.dk-stat-counts{margin:0;padding-top:10px;border-top:1px solid var(--hairline);font-size:13px;line-height:1.4;color:var(--ink-2)}
+.dk-stat-counts b{color:var(--charcoal);font-weight:700}
+.dk-stat-counts a{color:var(--charcoal);font-weight:600}
+.dk-stat-load{margin:0;font-size:15px;line-height:1.4;color:var(--ink-2)}
+
+/* dk-seg: three steps. The chosen one is filled ink and carries a tick, so it doesn't lean on colour */
+.dk-seg{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px;padding:4px;border-radius:16px;background:var(--otto-raise)}
+.dk-seg button{height:44px;border:0;border-radius:12px;background:none;color:var(--ink-2);font:600 15px/1 var(--font-body);display:flex;align-items:center;justify-content:center;gap:6px;padding:0;cursor:pointer}
+.dk-seg button[aria-checked="true"]{background:var(--charcoal);color:var(--cream);font-weight:700}
+.dk-seg .dk-tick{width:14px;height:14px;stroke:currentColor}
+.dk-seg-say{margin:10px 2px 0;font-size:14px;line-height:1.4;color:var(--ink-2)}
+
+/* dk-sw: a switch row. Off is an outline in the muted ink, knob left; on is a filled track, knob right */
+.dk-sw-row{display:flex;align-items:center;gap:12px;min-height:50px;padding:3px 0;box-sizing:border-box;cursor:pointer}
+.dk-sw-row+.dk-sw-row{border-top:1px solid var(--hairline)}
+.dk-sw-row>span{flex:1;min-width:0;font-size:16px;line-height:1.3;color:var(--charcoal)}
+.dk-sw{width:52px;height:44px;flex:none;margin-right:8px;border:0;background:none;padding:0;position:relative;cursor:pointer}
+.dk-sw::before{content:"";position:absolute;left:0;top:7px;width:52px;height:30px;box-sizing:border-box;border-radius:15px;background:var(--otto-raise);border:1.5px solid var(--ink-muted)}
+.dk-sw::after{content:"";position:absolute;left:4px;top:11px;width:22px;height:22px;border-radius:50%;background:var(--ink-muted);transition:transform .32s var(--vibe-spring-soft)}
+.dk-sw[aria-checked="true"]::before{background:var(--charcoal);border-color:var(--charcoal)}
+.dk-sw[aria-checked="true"]::after{background:var(--cream);transform:translateX(22px)}
+.dk-sw-foot{margin:0;padding:8px 0 10px;border-top:1px solid var(--hairline);font-size:13px;line-height:1.4;color:var(--ink-2)}
+
+/* the Otto's look row: the whole row is one button */
+button.dk-row{width:100%;border:0;background:none;font:inherit;text-align:left;cursor:pointer;padding-right:0}
+.dk-look-ic{background:none}
+
+:is(.dk-seg button,.dk-sw):focus-visible{outline:2px solid var(--charcoal);outline-offset:2px}
+button.dk-row:focus-visible{outline:2px solid var(--charcoal);outline-offset:-2px;border-radius:12px}
+
+@media (prefers-reduced-motion:reduce){.dk-sw::after{transition:none}}
+
+/* the Vibe+ "Who viewed you" list: drawn for the old dark room, so it sits in a small night well in both looks */
+.dk-stat-well{display:flex;flex-direction:column;gap:8px;padding:10px;border-radius:14px;background:var(--cream);color:var(--charcoal)}
+.dk-stat-well-h{margin:0;font:700 12px/1.2 var(--font-body);letter-spacing:.06em;text-transform:uppercase;color:var(--ink-2)}
+.dk-stat-load b{color:var(--charcoal);font-weight:700}
+.dk-stat-load a{color:var(--charcoal);font-weight:600}

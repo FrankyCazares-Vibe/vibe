@@ -42,21 +42,26 @@ warmScreen({
 /**
  * Viewport-based fork for `/otto`.
  *
- * Desktop  → CampusAppShell + the existing OttoPageClient (untouched).
- * Mobile   → MobileShell + OttoMobile (iOS-native rebuild — compact hero,
- *            swipeable Today / Stats tabs, same sub-components inside).
+ * Desktop  → CampusAppShell + OttoPageClient (the computer desk).
+ * Mobile   → MobileShell + OttoMobile (the phone desk).
  *
  * The server builds the screen its guess names (`firstGuessPhone`, from
  * page.tsx) and the browser's first paint is the same one. After hydration
  * the window's width decides (`useScreen`), swapping once if the guess was
  * wrong.
+ *
+ * `desk` (Wave 2A, Nov 10, 2026): page.tsx reads `ottoDeskOn()` on the
+ * server and both screens draw Otto's desk; false (`OTTO_DESK=off`) and
+ * each draws today's page unchanged (OttoMobileLegacy, OttoPageLegacy).
  */
 export function OttoSwitch({
   initial,
   firstGuessPhone = false,
+  desk = true,
 }: {
   initial: OttoPayload;
   firstGuessPhone?: boolean;
+  desk?: boolean;
 }) {
   const screen = useScreen(firstGuessPhone);
   // An Otto open for the use totals (src/lib/usage/touch.ts): `/otto` is the
@@ -69,7 +74,7 @@ export function OttoSwitch({
     return (
       <ScreenGuess phone={screen.guess}>
         <MobileShell>
-          <OttoMobile initial={initial} />
+          <OttoMobile initial={initial} desk={desk} />
         </MobileShell>
       </ScreenGuess>
     );
@@ -80,7 +85,7 @@ export function OttoSwitch({
   return (
     <ScreenGuess phone={screen.guess}>
       <CampusAppShell>
-        <OttoPageClient initial={initial} />
+        <OttoPageClient initial={initial} desk={desk} />
       </CampusAppShell>
     </ScreenGuess>
   );

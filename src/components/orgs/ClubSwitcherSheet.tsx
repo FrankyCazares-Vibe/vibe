@@ -52,10 +52,22 @@ export function ClubSwitcherSheet(props: {
   onClose: () => void;
   /** The person's own row; when absent the row says "You" with a plain person glyph. */
   me?: { name: string; avatarUrl: string | null } | null;
+  /**
+   * Otto's desk (Wave 2A, Nov 10, 2026) borrows the sheet for its Acting as
+   * switch. `onPick` replaces the default (switch the Profile tab and go to
+   * the page): it hears the club, or null for "You", and the sheet closes.
+   * `current` says which row is "Now" (a handle, null = you) instead of the
+   * phone's club switch; `title` and `footnote` replace the sheet's words.
+   */
+  onPick?: (club: ClubYouRun | null) => void;
+  current?: string | null;
+  title?: string;
+  footnote?: string;
 }): JSX.Element | null {
-  const { open, onClose, me } = props;
+  const { open, onClose, me, onPick } = props;
   const router = useRouter();
-  const switched = useSwitchedClub();
+  const phoneSwitch = useSwitchedClub();
+  const nowHandle = props.current !== undefined ? props.current : (phoneSwitch?.handle ?? null);
   const runs = useClubsYouRun(open);
   const { refresh } = runs;
 
@@ -64,13 +76,15 @@ export function ClubSwitcherSheet(props: {
   }, [open, refresh]);
 
   const pickMe = () => {
-    setSwitchedClub(null);
     onClose();
+    if (onPick) return onPick(null);
+    setSwitchedClub(null);
     router.push("/profile");
   };
   const pickClub = (club: ClubYouRun) => {
-    setSwitchedClub({ handle: club.handle, name: club.name, logo_url: club.logo_url });
     onClose();
+    if (onPick) return onPick(club);
+    setSwitchedClub({ handle: club.handle, name: club.name, logo_url: club.logo_url });
     router.push(`/orgs/${encodeURIComponent(club.handle)}`);
   };
 
@@ -81,7 +95,7 @@ export function ClubSwitcherSheet(props: {
         <Drawer.Content style={contentStyle} aria-describedby={undefined}>
           <Drawer.Handle style={handleStyle} />
           <div style={headerStyle}>
-            <Drawer.Title style={titleStyle}>{SWITCHER_COPY.title}</Drawer.Title>
+            <Drawer.Title style={titleStyle}>{props.title ?? SWITCHER_COPY.title}</Drawer.Title>
             <button type="button" onClick={onClose} aria-label={SWITCHER_COPY.close} style={closeStyle}>
               <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
                 <path d="M2 2l10 10M12 2L2 12" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
@@ -90,16 +104,16 @@ export function ClubSwitcherSheet(props: {
           </div>
           <div style={bodyStyle}>
             <Row
-              current={!switched}
+              current={!nowHandle}
               onClick={pickMe}
               picture={<MePicture name={me?.name ?? null} url={me?.avatarUrl ?? null} />}
               name={me?.name ?? SWITCHER_COPY.you}
               sub={me ? SWITCHER_COPY.you : null}
-              side={!switched ? <span style={nowStyle}>{SWITCHER_COPY.now}</span> : null}
+              side={!nowHandle ? <span style={nowStyle}>{SWITCHER_COPY.now}</span> : null}
             />
             <p style={eyebrowStyle}>{SWITCHER_COPY.eyebrow}</p>
-            <ClubRows runs={runs} switchedHandle={switched?.handle ?? null} onPick={pickClub} />
-            <p style={footnoteStyle}>{SWITCHER_COPY.footnote}</p>
+            <ClubRows runs={runs} switchedHandle={nowHandle} onPick={pickClub} />
+            <p style={footnoteStyle}>{props.footnote ?? SWITCHER_COPY.footnote}</p>
           </div>
         </Drawer.Content>
       </Drawer.Portal>

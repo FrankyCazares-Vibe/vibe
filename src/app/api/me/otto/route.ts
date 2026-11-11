@@ -4,6 +4,9 @@ import { newestLivePerRoom, readLatestPerRoomWithDeleted } from "@/lib/chat/late
 import { eventVisibilityOf, type EventVisibility } from "@/lib/events/validate";
 import { attachNotificationOrgs, type NotificationOrg } from "@/lib/orgs/notification-orgs";
 import { visibleActorFilter, withEventNotices } from "@/lib/push/event-notice";
+import type { DeskModel } from "@/lib/otto/desk";
+import { ottoDeskOn } from "@/lib/otto/desk-flag";
+import { loadDesk } from "@/lib/otto/desk-server";
 import { mergeSettings, type OttoSettings } from "@/lib/otto/settings";
 import { loadHiddenUsers } from "@/lib/safety/hidden-users";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -32,6 +35,13 @@ import { createSupabaseServiceClient } from "@/lib/supabase/service";
  * A section whose read fails is named in `failed` instead of coming back as
  * an empty array, so the page can say "couldn't load" where it used to say
  * "nothing new on campus yet." Every other section still ships.
+ *
+ * THE DESK (Wave 2A, Nov 10, 2026). The payload also carries `desk`, Otto's
+ * desk (src/lib/otto/desk.ts, read by desk-server.ts from the rows above plus
+ * the clubs the person runs). `?club=<handle>` picks the club an officer acts
+ * as ("me" for their own desk; default: their first club). A desk that can't
+ * load is left out and named "desk" in `failed`. With `OTTO_DESK=off` it is
+ * never read (desk-flag.ts) and the payload is today's.
  */
 
 const ACTIVITY_LIMIT = 12;
@@ -118,7 +128,7 @@ export type AskingRow = AskingFollower | AskingUnreadDm | AskingReminder;
  * unread-DM read behind the "N unread DMs" row and `counts.unread`: it can
  * fail on its own while the rest of "Asking for you" loads fine.
  */
-export type OttoFailedSection = "activity" | "upcoming" | "asking" | "dms";
+export type OttoFailedSection = "activity" | "upcoming" | "asking" | "dms" | "desk";
 
 export type OttoPayload = {
   ok: true;
@@ -135,9 +145,19 @@ export type OttoPayload = {
    * did load.
    */
   failed?: OttoFailedSection[];
+  /** Otto's desk (Wave 2A); absent when OTTO_DESK=off or it couldn't load ("desk" in `failed`). */
+  desk?: DeskModel;
 };
 
-export async function GET() {
+/** A `?club=` value worth passing on: a handle's characters, or "me". */
+function clubParamOf(req: Request | undefined): string | null {
+  if (!req) return null;
+  const raw = new URL(req.url).searchParams.get("club");
+  const v = raw?.trim().toLowerCase() ?? "";
+  return /^[a-z0-9_.-]{1,64}$/.test(v) ? v : null;
+}
+
+export async function GET(req: Request) {
   const supabase = await createSupabaseServerClient();
   const {
     data: { user },
@@ -479,6 +499,42 @@ export async function GET() {
     unread: unreadDmCount,
   };
 
+  // ── The desk (Wave 2A) ──────────────────────────────────────────────
+  let desk: DeskModel | undefined;
+  if (ottoDeskOn()) {
+    const deskRes = await loadDesk({
+      supabase,
+      service: createSupabaseServiceClient(),
+      userId: user.id,
+      blocked: hiddenRes.hidden.blocked,
+      clubParam: clubParamOf(req),
+      now: new Date(),
+      route: {
+        notifications: activity.map((n) => ({
+          id: n.id,
+          type: n.type,
+          createdAt: n.created_at,
+          actorName: n.actor?.name ?? n.actor?.handle ?? null,
+          orgName: n.org?.name ?? null,
+          orgHandle: n.org?.handle ?? null,
+          postId: n.post_id,
+          eventTitle: n.event_title,
+          eventStartsAt: n.event_starts_at,
+        })),
+        followers: followers.map((f) => ({ id: f.user_id, name: f.name, handle: f.handle, followedAt: f.created_at })),
+        unreadDms: failed.includes("dms") ? null : unreadDmCount,
+        reminders: [
+          ...upcomingReminders.map((r) => ({ id: r.id, title: r.title, remindAt: r.remind_at })),
+          ...undatedReminders.map((r) => ({ id: r.id, title: r.title, remindAt: null, createdAt: r.created_at })),
+        ],
+        // So the sky never says "all clear" over a pile that didn't load.
+        missing: [...failed],
+      },
+    });
+    if (deskRes.ok) desk = deskRes.desk;
+    else failed.push("desk");
+  }
+
   const payload: OttoPayload = {
     ok: true,
     activity,
@@ -487,6 +543,7 @@ export async function GET() {
     settings,
     counts,
     failed,
+    ...(desk ? { desk } : {}),
   };
 
   return NextResponse.json(payload);

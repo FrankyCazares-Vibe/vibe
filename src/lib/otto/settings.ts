@@ -32,7 +32,9 @@ export const DEFAULT_SETTINGS: Readonly<OttoSettings> = Object.freeze({
   chattiness: "moderate",
   rsvp_day_before: true,
   mention_pings: true,
-  milestone_pings: true,
+  // Nov 10, 2026 (Wave 2A): off unless the person turns it on. Like counts are
+  // the one vanity notice on the board, and nothing sends it yet anyway.
+  milestone_pings: false,
   daily_summary: false,
   summary_time: "09:00",
   unanswered_dm_pings: false,

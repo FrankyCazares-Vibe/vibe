@@ -1,0 +1,111 @@
+/* Otto's desk parts (Nov 10, 2026, the Otto build's Wave 2A). Ported from the board kit's desk.css (every class
+   starts dk-), with the few board basics the parts lean on renamed into it (o-btn = dk-btn, o-ico = dk-ico,
+   o-tick = dk-tick, o-club = dk-club, o-voice = dk-voice). Load after sky.css (tx layers, the --otto- tokens).
+   Light is the plain rule, Night under the app's dark selectors. Paper, rows, counts and stamps hold still: this is
+   where people say yes. ONE CORAL FILL per frame: dk-btn.primary, on the top Ready item only. Left out on purpose:
+   dk-undo, dk-steps, the chat lines, dk-glass and the rooftop line. Markup: src/components/otto/desk/. */
+
+/* basics */
+.dk-voice{font-family:var(--font-display);font-style:italic;font-weight:400;letter-spacing:-.005em}
+.dk-ico{width:20px;height:20px;flex:none;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.dk-tick{width:16px;height:16px;flex:none;fill:none;stroke:var(--ok-ink);stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+.dk-club{width:28px;height:28px;flex:none;overflow:hidden;border-radius:9px;background:#F6C468;color:#160A06;font:800 12px/28px var(--font-body);text-align:center;letter-spacing:.02em}
+.dk-club img{display:block;width:100%;height:100%;object-fit:cover}
+.dk-btn{height:44px;box-sizing:border-box;padding:0 18px;border-radius:999px;font:600 14px/1 var(--font-body);border:1px solid var(--otto-line-2);background:transparent;color:var(--charcoal);display:inline-flex;align-items:center;justify-content:center;gap:6px;cursor:pointer;white-space:nowrap;text-decoration:none;transition:transform .32s var(--vibe-spring-soft)}
+.dk-btn:active{transform:scale(.97)}
+.dk-btn.primary{background:var(--coral);border-color:var(--coral);color:var(--on-coral);font-weight:700}
+.dk-btn.ghost{border-color:transparent;color:var(--ink-2)}
+.dk-btn:disabled,.dk-btn[aria-disabled="true"]{opacity:.6;cursor:default;transform:none}
+:is(.dk-btn,.dk-row-go,a.dk-row,a.dk-done,.dk-ask-go):focus-visible{outline:2px solid var(--charcoal);outline-offset:2px}
+
+/* dk-body: the column under the sky. Children never squash */
+.dk-body{padding:0 16px;display:flex;flex-direction:column;gap:10px;background:var(--cream)}
+.dk-body>*{flex:none}
+
+/* dk-sec: a section heading with a count. <div class="dk-sec"><h2>Ready for you</h2><b>2</b></div> */
+.dk-sec{display:flex;align-items:center;gap:8px;padding:10px 4px 0;color:var(--charcoal)}
+.dk-sec :is(h2,h3){margin:0;font:700 15px/1.2 var(--font-body);letter-spacing:-.005em}
+.dk-pile{display:flex;flex-direction:column;gap:10px;margin-top:10px}
+.dk-pile>*{flex:none}
+.dk-sec b{min-width:22px;height:22px;box-sizing:border-box;padding:0 7px;border-radius:999px;background:var(--otto-raise);color:var(--ink-2);font:700 12px/22px var(--font-body);font-variant-numeric:tabular-nums;text-align:center}
+
+/* dk-card: a paper card. Use with tx-host and a tx-paper first child. Add .list when it holds dk-row / dk-done rows */
+.dk-card{background:var(--paper);border:1px solid var(--hairline);border-radius:18px;box-shadow:var(--card-shadow);padding:14px 16px;color:var(--charcoal)}
+.dk-card.list{padding:2px 6px 2px 14px}
+.dk-card>.tx-paper{--otto-o:.1}
+:root[data-theme="dark"] .dk-card>.tx-paper,.vibe-night-island .dk-card>.tx-paper{--otto-o:.07}
+
+/* dk-empty: a section with nothing in it. Otto's one lowercase line on plain paper */
+.dk-empty{padding:16px 18px}
+.dk-empty p{margin:0;font-size:17px;line-height:1.4;color:var(--ink-2)}
+
+/* dk-draft: something waiting for a yes, on blueprint. Use with tx-host and a tx-blueprint first child.
+   Rows, in this order: dk-draft-as, dk-draft-pre, dk-draft-what, dk-draft-when, dk-draft-go, dk-draft-foot */
+.dk-draft{background:var(--paper);border:1px dashed var(--otto-line-2);border-radius:18px;box-shadow:var(--card-shadow);padding:12px;display:flex;flex-direction:column;gap:8px;color:var(--charcoal)}
+.dk-draft>.tx-blueprint{--otto-o:.09}
+:root[data-theme="dark"] .dk-draft>.tx-blueprint,.vibe-night-island .dk-draft>.tx-blueprint{--otto-o:.1}
+/* the grid stops above the button row, so no line runs through a button or the footnote */
+.dk-draft:not(.mini)>.tx-blueprint{-webkit-mask-image:linear-gradient(#000 calc(100% - 168px),transparent calc(100% - 112px));mask-image:linear-gradient(#000 calc(100% - 168px),transparent calc(100% - 112px))}
+.dk-draft-as{display:flex;align-items:center;gap:8px;font-size:14px;line-height:1.2;color:var(--ink-2)}
+.dk-draft-as>span:not(.dk-club){min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dk-draft-as b{color:var(--charcoal);font-weight:700}
+.dk-draft-as em{margin-right:auto;flex:none;font:700 12px/1 var(--font-body);font-style:normal;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-2);padding:5px 8px;border:1px dashed var(--otto-line-2);border-radius:999px;background:var(--paper)}
+.dk-draft-pre{display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:14px;background:var(--otto-raise)}
+.dk-draft-pre>div{min-width:0}
+.dk-draft-pre h3{margin:0;font:700 17px/1.25 var(--font-body);color:var(--charcoal);overflow-wrap:anywhere}
+.dk-draft-pre p{margin:2px 0 0;font-size:14px;line-height:1.4;color:var(--ink-2)}
+.dk-date{width:46px;height:50px;flex:none;box-sizing:border-box;border-radius:12px;background:var(--paper);border:1px solid var(--hairline);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px}
+.dk-date i{font:700 12px/1 var(--font-body);font-style:normal;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-2)}
+.dk-date b{font:800 20px/1 var(--font-body);font-variant-numeric:tabular-nums;color:var(--charcoal)}
+.dk-draft-what h4{margin:0 0 6px;font:700 12px/1 var(--font-body);letter-spacing:.06em;text-transform:uppercase;color:var(--ink-2)}
+.dk-draft-what ul{margin:0;padding:0;list-style:none;display:grid;gap:3px}
+.dk-draft-what li{display:grid;grid-template-columns:34px 1fr;gap:8px;font-size:15px;line-height:1.35;color:var(--charcoal)}
+.dk-draft-what li b{font-weight:800;font-variant-numeric:tabular-nums;text-align:right}
+.dk-draft-what li.plain{grid-template-columns:1fr;padding-left:42px}
+.dk-draft-when{display:flex;align-items:center;gap:8px;font-size:14px;line-height:1.3;color:var(--ink-2)}
+.dk-draft-when .dk-ico{width:16px;height:16px}
+.dk-draft-when b{color:var(--charcoal);font-weight:700}
+.dk-draft-go{display:flex;gap:8px}
+.dk-draft-go .primary{flex:1}
+.dk-draft-foot{margin:4px 0 0;font-size:13px;line-height:1.35;color:var(--ink-2)}
+/* .mini: the rest of Ready, folded to one row. Holds one dk-row whose last child is a quiet button */
+.dk-draft.mini{padding:2px 8px 2px 12px}
+.dk-draft.mini .dk-row{min-height:60px;gap:10px}
+.dk-draft.mini .dk-btn{padding:0 14px}
+
+/* dk-row: one thing. Icon square, two lines of text, then a time or a 44px button. Sits in a dk-card.list */
+.dk-row,.dk-done{display:flex;align-items:center;gap:12px;min-height:64px;padding:8px 0;box-sizing:border-box;color:var(--charcoal);text-decoration:none}
+.dk-row+.dk-row,.dk-done+.dk-done{border-top:1px solid var(--hairline)}
+.dk-row-ic{width:40px;height:40px;flex:none;border-radius:12px;background:var(--otto-raise);color:var(--ink-2);display:flex;align-items:center;justify-content:center}
+.dk-row-tx{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.dk-row-tx b{font:600 16px/1.25 var(--font-body);color:var(--charcoal);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dk-row-tx span{font-size:14px;line-height:1.3;color:var(--ink-2);font-variant-numeric:tabular-nums;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dk-row-go{width:44px;height:44px;flex:none;border:0;border-radius:50%;background:none;color:var(--ink-2);display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0}
+.dk-row-go:active{background:var(--otto-raise)}
+.dk-row-day{flex:none;padding-right:10px;font-size:14px;color:var(--ink-2);font-variant-numeric:tabular-nums}
+
+/* dk-stamp: a finished row's mark. The only place halftone shows. Use with tx-host and a tx-halftone first child */
+.dk-stamp{width:40px;height:40px;flex:none;box-sizing:border-box;border-radius:50%;border:1.5px solid var(--ok-ink);background:var(--otto-ok-bg);display:flex;align-items:center;justify-content:center;transform:rotate(-8deg)}
+.dk-stamp>.tx-halftone{--otto-c:var(--ok-ink);--otto-o:.6}
+.dk-stamp .dk-tick{width:18px;height:18px}
+.dk-stamp.big{width:72px;height:72px;border-width:2px}
+.dk-stamp.big .dk-tick{width:32px;height:32px}
+
+/* dk-fail: the calm failure card. Add it to a dk-card. No red fill: a thin edge, a small label, what happened, one way on */
+.dk-fail{border-color:color-mix(in srgb,var(--error-ink) 46%,var(--hairline));display:flex;flex-direction:column;gap:10px}
+.dk-fail-tag{display:flex;align-items:center;gap:6px;font:700 12px/1 var(--font-body);letter-spacing:.06em;text-transform:uppercase;color:var(--error-ink)}
+.dk-fail-tag .dk-ico{width:16px;height:16px}
+.dk-fail p{margin:0;font-size:15px;line-height:1.4;color:var(--ink-2)}
+.dk-fail p b{color:var(--charcoal);font-weight:700}
+.dk-fail-go{display:flex;gap:8px}
+
+/* dk-ask: the reminder bar ("remind me to…"). On the phone a flex child between the page and the tab bar */
+.dk-ask{flex:none;position:relative;z-index:2;display:flex;align-items:center;gap:8px;padding:8px 12px 10px 16px;background:var(--cream)}
+.dk-ask::before{content:"";position:absolute;left:0;right:0;bottom:100%;height:22px;background:linear-gradient(transparent,var(--cream));pointer-events:none}
+.dk-ask-in{flex:1;min-width:0;height:48px;box-sizing:border-box;padding:0 18px;border-radius:999px;border:1px solid var(--otto-line-2);background:var(--paper);color:var(--charcoal);font:400 16px/1 var(--font-body);outline:none;text-overflow:ellipsis}
+.dk-ask-in::placeholder{color:var(--ink-muted);opacity:1}
+.dk-ask-in:focus-visible{border-color:var(--charcoal)}
+.dk-ask-go{width:44px;height:44px;flex:none;border:0;border-radius:50%;background:var(--otto-raise);color:var(--ink-2);display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0}
+.dk-ask-go.on{background:var(--charcoal);color:var(--cream)}
+
+@media (prefers-reduced-motion:reduce){.dk-btn{transition:none}.dk-btn:active{transform:none}}

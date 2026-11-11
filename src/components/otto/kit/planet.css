@@ -34,6 +34,8 @@
 .sk-forest{--m-a:#E2F6D6;--m-b:#98D68C;--m-c:#3F9A4C;--m-d:#175227;--m-eye:#07200E;--m-glow:rgba(63,154,76,.42);--sk-gl:rgba(63,154,76,.26)}
 .sk-canal{--m-a:#D6F6EC;--m-b:#7DD8C6;--m-c:#2A9F92;--m-d:#0F4F49;--m-eye:#06201D;--m-glow:rgba(42,159,146,.4);--sk-gl:rgba(42,159,146,.26)}
 .sk-onyx{--m-a:#FBF8F3;--m-b:#C4BEB6;--m-c:#7A746D;--m-d:#34302D;--m-eye:#0E0D0D;--m-glow:rgba(246,241,234,.24);--sk-gl:rgba(52,48,45,.2)}
+/* Violet, Midnight: a cream rim on the violet thinking moon, so it never blends into him */
+.m-planet:is(.sk-violet,.sk-midnight){--mp-rim:#FFF3E0}
 .sk-dot{display:block;border-radius:50%;background:radial-gradient(120% 120% at 34% 26%,var(--m-a) 0,var(--m-b) 34%,var(--m-c) 68%,var(--m-d) 100%)}
 
 /* parts */

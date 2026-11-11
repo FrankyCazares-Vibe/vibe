@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 
 import { enforceCampusAccess } from "@/lib/auth/campus-access";
 import { isPhoneRequest } from "@/lib/device-hint";
+import { ottoDeskOn } from "@/lib/otto/desk-flag";
 import { headers } from "next/headers";
 
 import { OttoOffline, OttoSwitch } from "./OttoSwitch";
@@ -20,8 +21,18 @@ export const metadata = {
  * hands it to the client component. Doing the fetch here means the page is
  * already populated on first paint (no skeleton flash).
  */
-export default async function OttoPage() {
+export default async function OttoPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   await enforceCampusAccess("/otto");
+  // Otto's desk (Wave 2A): on unless OTTO_DESK=off (desk-flag.ts). `?club=`
+  // picks the club an officer's desk acts as; it is passed on to the read
+  // below, which checks it (a handle's characters, or "me").
+  const desk = ottoDeskOn();
+  const clubRaw = (await searchParams).club;
+  const club = desk && typeof clubRaw === "string" ? clubRaw.trim().slice(0, 64) : "";
 
   const h = await headers();
   const proto = h.get("x-forwarded-proto") ?? "http";
@@ -33,7 +44,8 @@ export default async function OttoPage() {
 
   // Same-origin fetch with the user's cookies — Supabase auth flows through.
   // We don't cache because the payload is per-user and changes constantly.
-  const res = await fetch(`${proto}://${host}/api/me/otto`, {
+  const query = club ? `?club=${encodeURIComponent(club)}` : "";
+  const res = await fetch(`${proto}://${host}/api/me/otto${query}`, {
     headers: { cookie },
     cache: "no-store",
   });
@@ -47,15 +59,16 @@ export default async function OttoPage() {
   const payload = await res.json();
 
   // Suspense boundary: OttoPageClient reads useSearchParams (for the ?tab=
-  // tab state), which Next 16 requires to be inside a Suspense — otherwise
-  // any URL with searchParams forces the whole route into client-render.
+  // tab state and the desk's ?club=), which Next 16 requires to be inside a
+  // Suspense — otherwise any URL with searchParams forces the whole route
+  // into client-render.
   //
   // `firstGuessPhone` is the server's guess at the screen this device needs
   // (src/lib/device-hint.ts), from the headers already read above. OttoSwitch
   // builds that screen here and the browser fetches only that one.
   return (
     <Suspense fallback={null}>
-      <OttoSwitch initial={payload} firstGuessPhone={isPhoneRequest(h)} />
+      <OttoSwitch initial={payload} firstGuessPhone={isPhoneRequest(h)} desk={desk} />
     </Suspense>
   );
 }

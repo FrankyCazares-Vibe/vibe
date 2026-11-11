@@ -1,0 +1,77 @@
+/* The computer desk's frame (Nov 10, 2026, the Otto build's Wave 2A; board D3). Lays out the page only: every desk
+   part (sky, sections, cards, drafts, rows, stamps, the ask bar) comes from kit/sky.css and kit/desk.css. A plain
+   page (--cream, no glow, nothing dims it), the sky band, then three columns sized like the board at 1440 wide
+   (456 | 336 | 352, 24 apart, in the 1240px the left menu leaves). Narrower windows fold Done + Earlier under
+   Scheduled. Light is the plain rule, Night under the app's dark selectors. Still: no keyframes; the one
+   transition is the menu chevron, off under reduced motion. Markup: OttoPageClient.tsx and OttoDesk*.tsx. */
+
+.odc-page{--otto-raise:#F2EFE9;--otto-line-2:rgba(28,28,30,.15);min-height:100vh;min-width:0;background:var(--cream);color:var(--charcoal);font-family:var(--font-body)}
+:root[data-theme="dark"] .odc-page,.vibe-night-island .odc-page{--otto-raise:#1F1D1C;--otto-line-2:rgba(255,255,255,.16)}
+.odc-main{box-sizing:border-box;max-width:1240px;margin:0 auto;padding:24px 24px 0}
+.odc-sr{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
+
+/* the row under the band: tabs on the left, Acting as on the right */
+.odc-bar{display:flex;align-items:center;justify-content:space-between;gap:16px;margin:16px 0 4px}
+.odc-tabs{display:flex;padding:3px;border-radius:999px;background:var(--otto-raise)}
+/* 44px targets; the open tab in ink (never coral), as on the phone strip and D4's segment, so it reads in Night too */
+.odc-tab{height:44px;padding:0 20px;border:0;border-radius:999px;background:none;color:var(--ink-2);font:500 14px/1 var(--font-body);cursor:pointer}
+.odc-tab.on{background:var(--charcoal);color:var(--cream);font-weight:700}
+.odc-tab:focus-visible{outline:2px solid var(--charcoal);outline-offset:2px}
+
+/* Acting as: the chip and its small menu */
+.odc-as{position:relative;min-width:0}
+.odc-as-btn{max-width:360px;padding:0 12px 0 8px;gap:8px}
+.odc-as-btn>span:not(.dk-club){min-width:0;overflow:hidden;text-overflow:ellipsis;font-weight:500;color:var(--ink-2)}
+.odc-as-btn b{color:var(--charcoal);font-weight:700}
+.odc-as-btn .dk-club{width:28px;height:28px}
+.odc-as-chev{width:16px;height:16px;transition:transform .32s var(--vibe-spring-soft)}
+.odc-as-btn[aria-expanded="true"] .odc-as-chev{transform:rotate(180deg)}
+.odc-as-menu{position:absolute;right:0;top:calc(100% + 8px);z-index:20;width:300px;box-sizing:border-box;padding:6px;display:flex;flex-direction:column;gap:2px;box-shadow:var(--card-shadow),0 18px 40px rgba(0,0,0,.14)}
+.odc-as-row{display:flex;align-items:center;gap:10px;min-height:52px;padding:6px 10px;border:0;border-radius:12px;background:none;color:var(--charcoal);text-align:left;cursor:pointer;font:inherit}
+.odc-as-row:hover{background:var(--otto-raise)}
+/* the club you act as: an ink ring and a tick, not a fill that vanishes in Night */
+.odc-as-row[aria-pressed="true"]{box-shadow:inset 0 0 0 1.5px var(--charcoal)}
+.odc-as-tick{width:18px;height:18px;margin-left:auto;flex:none;color:var(--charcoal)}
+.odc-as-row:focus-visible{outline:2px solid var(--charcoal);outline-offset:-2px}
+.odc-as-you{background:var(--otto-raise);color:var(--ink-2);display:flex;align-items:center;justify-content:center}
+.odc-as-you .dk-ico{width:18px;height:18px}
+.odc-as-tx{min-width:0;display:flex;flex-direction:column;gap:1px}
+.odc-as-tx b{font:600 15px/1.25 var(--font-body);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.odc-as-tx span{font-size:13px;color:var(--ink-2)}
+
+/* the columns */
+.odc-cols{display:grid;grid-template-columns:minmax(0,456fr) minmax(0,336fr) minmax(0,352fr);grid-template-areas:"c1 c2 c3" "ask ask .";column-gap:24px;align-items:start;margin-top:8px}
+.odc-col{display:flex;flex-direction:column;gap:10px;min-width:0}
+.odc-col>section+section{margin-top:8px}
+.odc-c1{grid-area:c1}
+.odc-c2{grid-area:c2}
+.odc-c3{grid-area:c3}
+@media (max-width:1279px){
+  .odc-cols{grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);grid-template-areas:"c1 c2" "c1 c3" "ask ask"}
+  .odc-c3{margin-top:18px}
+}
+
+/* Otto saw: he tells you and stops. An eye, the line, when; no button, no arrow, no stamp */
+.odc-saw-card{padding:2px 6px 2px 14px}
+.odc-saw{display:flex;align-items:flex-start;gap:12px;margin:0;padding:12px 10px 12px 0;font-size:15px;line-height:1.4;color:var(--charcoal);text-decoration:none}
+.odc-saw+.odc-saw{border-top:1px solid var(--hairline)}
+.odc-saw>.dk-ico{width:18px;height:18px;margin-top:2px;color:var(--ink-muted)}
+.odc-saw-tx{min-width:0;display:flex;flex-direction:column;gap:2px;overflow-wrap:anywhere}
+.odc-saw-tx time{font-size:13px;color:var(--ink-2);font-variant-numeric:tabular-nums}
+a.odc-saw:focus-visible{outline:2px solid var(--charcoal);outline-offset:-2px;border-radius:10px}
+
+/* the ask bar (the reminder box): under columns 1 and 2, held at the window's bottom while the columns scroll */
+.dk-ask.odc-ask{grid-area:ask;position:sticky;bottom:0;flex-direction:column;align-items:stretch;gap:6px;padding:12px 0 24px;margin-top:16px}
+.odc-ask-row{display:flex;align-items:center;gap:8px}
+.odc-ask-hint{margin:0;padding:0 18px;font-size:13px;line-height:1.35;color:var(--ink-2)}
+/* two columns: the box would sit over Done this week while it scrolls, so it stays in place at the end */
+@media (max-width:1279px){.dk-ask.odc-ask{position:static}}
+
+/* Stats and Settings: one readable column under the band */
+.odc-wide{max-width:816px;margin-top:8px;padding-bottom:48px}
+
+.odc-fail{max-width:456px;margin-top:18px}
+/* a quiet note under a pile that only partly loaded */
+.odc-note{margin:6px 4px 0;font-size:13px;line-height:1.4;color:var(--ink-2)}
+
+@media (prefers-reduced-motion:reduce){.odc-as-chev{transition:none}}
