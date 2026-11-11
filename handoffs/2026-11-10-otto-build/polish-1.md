@@ -1,7 +1,7 @@
 # Otto polish 1: Franky's walk notes (ship record)
 
 - Branch `claude/otto-polish-1` (worktree `.claude/worktrees/otto-wave-1`), from `main` 156cb187 (Waves 1-2B live).
-- Commit accacceb. NOT SHIPPED: waits for Franky's yes.
+- Commit accacceb. **SHIPPED Nov 11** on Franky's "Ship polish 1": `main` fast-forwarded 156cb187 → 61d5ff0b, Vercel deploy succeeded.
 
 ## What he said (Nov 11, after walking the live app) and what he picked
 "the orb looks a little weird when it goes from back to front same with the ring not finishing around, the compose
@@ -48,3 +48,10 @@ Picks: close the ring; flat paper; fold + time filter; delete with Undo.
 - Low, left: Clear all also deletes notifications from people you've muted (your own rows, up to the cutoff);
   Earlier's "This week" can never show anything (Earlier starts at 8 days); a row cleared in the panel stays on the
   desk until reload.
+
+## Shipped (Nov 11)
+- Franky: "Ship polish 1". `main` fast-forwarded to 61d5ff0b; Vercel success (build `dpl_HGA1cY9jV2zta7aMzSWRBtMY9b8U`).
+- Live checks, signed out: `DELETE /api/me/notifications` answers 401; `/html/_otto-planet.css` (closed ring),
+  `_otto.js` and `_miniMessenger.js` match `main` byte for byte.
+- Not checked: Franky's walk on the live app (the moon's lap, folding lists, clear + Undo, name links, the cursor
+  over Messages).
