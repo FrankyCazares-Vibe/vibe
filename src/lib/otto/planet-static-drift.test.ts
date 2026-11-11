@@ -218,7 +218,7 @@ test("both side panels keep the page's Escape, solid glass, the pinned way on an
   assert.match(css, /background: var\(--cream, #FAF7F2\);/);
   assert.match(pcss, /\.otp-glass>\.tx-flute\{[^}]*background:var\(--cream\)\}/);
   // The way on is pinned at the foot in both, outside the scrolling body.
-  assert.match(fnText(js, "buildDeskPanel"), /<div class="otto-panel-body"><\/div>\s*<nav class="otto-panel-footer op-paper"/);
+  assert.match(fnText(js, "buildDeskPanel"), /<div class="otto-panel-body"><\/div>\s*<div class="otto-panel-footer op-paper" role="navigation"/);
   assert.match(tsx, /<\/div>\s*\{\/\*[^*]*\*\/\}\s*<DeskLinks desk=\{desk\} \/>/);
   // The same parts: section labels on paper tabs, the top item on blueprint, icons in Otto saw.
   assert.match(css, /#ottoPanel\.op-desk \.op-sec \{[^}]*border-radius: 999px; background: var\(--paper/);

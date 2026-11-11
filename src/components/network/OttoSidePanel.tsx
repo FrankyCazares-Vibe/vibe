@@ -14,7 +14,7 @@ import { DeskDraft } from "@/components/otto/desk/DeskDraft";
 import { DeskIcon, deskLine } from "@/components/otto/desk/DeskRow";
 import { DeskList, DeskSection } from "@/components/otto/desk/DeskSection";
 import { OttoPlanet } from "@/components/otto/planet/OttoPlanet";
-import { useOttoDesk } from "@/components/otto/use-otto-desk";
+import { DESK_AS_EVENT, useOttoDesk } from "@/components/otto/use-otto-desk";
 import { vibeRequest } from "@/lib/feedback/request";
 import { readSwitchedClub } from "@/lib/orgs/club-switch";
 import type { DeskItem } from "@/lib/otto/desk";
@@ -58,7 +58,7 @@ export type OttoSidePanelProps = {
   onClose: (focusCorner?: boolean) => void;
   /** Messages as the second tab (`useMiniMessages`): laptops with the new chat. */
   messages?: { available: boolean; unread: number };
-  /** False only when OTTO_DESK=off: today's panel. Null while the answer is out: the desk waits for it. */
+  /** False only when OTTO_DESK=off: today's panel. Null while the answer is out: nothing shows yet. */
   deskOn?: boolean | null;
   /** The panel's id, for the corner's aria-controls. */
   id?: string;
@@ -66,9 +66,11 @@ export type OttoSidePanelProps = {
 
 export function OttoSidePanel({ deskOn = true, ...props }: OttoSidePanelProps) {
   if (deskOn === false) return <OttoSidePanelLegacy open={props.open} onClose={() => props.onClose(true)} messages={props.messages} />;
-  // Until the flag answers, the panel opens on "opening your desk…" and reads
-  // nothing, so OTTO_DESK=off never shows a desk failure on its way out.
-  return <OttoDeskPanel {...props} flagKnown={deskOn !== null} />;
+  // Until the flag answers (at most FLAG_WAIT_MS), nothing opens: the corner
+  // shows it's pressed, as the static corner waits (_otto.js), so OTTO_DESK=off
+  // never flashes the new panel before the old one (walk fix, Nov 11).
+  if (deskOn === null) return null;
+  return <OttoDeskPanel {...props} flagKnown />;
 }
 
 /** The flag's answer comes in well before this; a hung read still counts as on. */
@@ -100,6 +102,19 @@ export function useOttoDeskFlag(armed: boolean): boolean | null {
 function readDeskAs(): string | null {
   try {
     return window.localStorage.getItem(DESK_AS_KEY);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * On /otto, the club the desk there shows (`?club=`, kept in the URL by its
+ * Acting as): the panel beside it acts as the same one. Null elsewhere.
+ */
+function deskPageClub(): string | null {
+  try {
+    if (!window.location.pathname.startsWith("/otto")) return null;
+    return new URLSearchParams(window.location.search).get("club");
   } catch {
     return null;
   }
@@ -156,14 +171,15 @@ function OttoDeskPanel({ open, onClose, messages, id, flagKnown }: Omit<OttoSide
     if (open) panelRef.current?.focus({ preventScroll: true });
   }, [open]);
 
-  // Each open reads the desk again, for the desk's saved pick on this device.
+  // Each open reads the desk again: on /otto for the club the desk there
+  // shows (its `?club=`), elsewhere for the desk's saved pick on this device.
   // Quiet: a failure is the panel's own card, not a toast too. Closing resets
   // "settled", so a desk that failed last time opens on "opening…" again.
   useEffect(() => {
     if (!open || !flagKnown) return;
     let live = true;
     void (async () => {
-      paramRef.current = panelClubParam(readDeskAs(), readSwitchedClub()?.handle);
+      paramRef.current = panelClubParam(deskPageClub(), null) ?? panelClubParam(readDeskAs(), readSwitchedClub()?.handle);
       const ok = await load(paramRef.current, { quiet: true });
       if (!live) return;
       setSettled(true);
@@ -173,6 +189,20 @@ function OttoDeskPanel({ open, onClose, messages, id, flagKnown }: Omit<OttoSide
       live = false;
       setSettled(false);
     };
+  }, [open, flagKnown, load]);
+
+  // A pick made on the desk beside the open panel (/otto's Acting as): the
+  // panel follows it at once (use-otto-desk.ts tells it once that desk loads).
+  useEffect(() => {
+    if (!open || !flagKnown) return;
+    const onPick = (e: Event) => {
+      const next = panelClubParam((e as CustomEvent<unknown>).detail as string | null, null);
+      if (!next || next === paramRef.current) return;
+      paramRef.current = next;
+      void load(next, { quiet: true });
+    };
+    window.addEventListener(DESK_AS_EVENT, onPick);
+    return () => window.removeEventListener(DESK_AS_EVENT, onPick);
   }, [open, flagKnown, load]);
 
   // An Otto open for the use totals (src/lib/usage/touch.ts): the panel
@@ -307,7 +337,7 @@ function OttoDeskPanel({ open, onClose, messages, id, flagKnown }: Omit<OttoSide
           the lists for as long as it exists. */}
       {showMessages ? (
         <div id={tabPanelId("messages")} role="tabpanel" aria-labelledby={tabId("messages")} className="otp-frame">
-          <MiniMessagesFrame ref={frameRef} />
+          <MiniMessagesFrame ref={frameRef} followTheme />
         </div>
       ) : (
         <>

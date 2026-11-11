@@ -2,7 +2,7 @@
 
 import { useEffect, type ReactNode } from "react";
 
-import { applyTheme, NIGHT_LOCK_SCRIPT, readThemePref, THEME_LOCK_ATTR } from "@/lib/theme/theme";
+import { applyTheme, frameFollowsTheme, NIGHT_LOCK_SCRIPT, readThemePref, THEME_LOCK_ATTR } from "@/lib/theme/theme";
 
 /**
  * The page inside the small Messages window (`/messages?mini=1`, framed by
@@ -15,8 +15,11 @@ import { applyTheme, NIGHT_LOCK_SCRIPT, readThemePref, THEME_LOCK_ATTR } from "@
  * or a screen change that leaves `/messages` (a profile, a club page, an
  * event, `Find clubs`) would otherwise load the site inside a 420px frame.
  *
- * Always Night: Otto's panel is dark in both themes, and a Light inbox
- * inside it read as a mistake. The lock is set before the first paint
+ * The theme: in Otto's desk panel (Wave 2B), which follows the person's
+ * theme, the frame's element carries `data-mini-theme="app"` and this page
+ * follows the theme too (Light in Light, Night in Night). In the old panel
+ * (OTTO_DESK=off), dark in both themes, a Light inbox read as a mistake, so
+ * there the page is locked to Night: before the first paint
  * (NIGHT_LOCK_SCRIPT) and again on mount, for a frame whose page was not
  * rendered as mini on the server (a reload on `/messages?channel=<id>`).
  */
@@ -53,7 +56,8 @@ function leaving(url: string | URL | null | undefined): string | null {
 
 export function MiniFrame({ children }: { children: ReactNode }) {
   useEffect(() => {
-    document.documentElement.setAttribute(THEME_LOCK_ATTR, "dark");
+    if (frameFollowsTheme()) document.documentElement.removeAttribute(THEME_LOCK_ATTR);
+    else document.documentElement.setAttribute(THEME_LOCK_ATTR, "dark");
     applyTheme(readThemePref());
   }, []);
 

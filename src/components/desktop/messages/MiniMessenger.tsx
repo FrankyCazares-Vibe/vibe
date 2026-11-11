@@ -5,6 +5,7 @@ import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "re
 import { allBadgeCount } from "@/components/mobile/messages/home/home-rules";
 import type { ThreadEntry } from "@/components/mobile/messages/types";
 import type { FeaturesResponse, InboxResponse } from "@/lib/chat/types";
+import { MINI_THEME_ATTR, MINI_THEME_FOLLOW } from "@/lib/theme/theme";
 import { useClientReady } from "@/lib/use-client-ready";
 import { useIsMobile } from "@/lib/use-is-mobile";
 
@@ -103,7 +104,15 @@ export type MiniMessagesHandle = {
  * `data-holds-reload`: a draft typed in the frame is not this page's typed
  * text, so the new-build check is told the frame is in use.
  */
-export const MiniMessagesFrame = forwardRef<MiniMessagesHandle, { style?: React.CSSProperties }>(function MiniMessagesFrame({ style }, ref) {
+export const MiniMessagesFrame = forwardRef<
+  MiniMessagesHandle,
+  {
+    style?: React.CSSProperties;
+    /** The surface around it follows the theme (the desk panel): the framed page does too
+     *  (MINI_THEME_ATTR). Off, the old all-dark panel: the page is locked to Night. */
+    followTheme?: boolean;
+  }
+>(function MiniMessagesFrame({ style, followTheme = false }, ref) {
   const frameRef = useRef<HTMLIFrameElement | null>(null);
   useImperativeHandle(ref, () => ({
     compose() {
@@ -131,6 +140,7 @@ export const MiniMessagesFrame = forwardRef<MiniMessagesHandle, { style?: React.
       src={MINI_SRC}
       title="Messages"
       data-holds-reload=""
+      {...(followTheme ? { [MINI_THEME_ATTR]: MINI_THEME_FOLLOW } : {})}
       // The page left Messages by a full load (a sign-in or Terms redirect):
       // that belongs to the whole tab.
       onLoad={(e) => {
@@ -144,7 +154,7 @@ export const MiniMessagesFrame = forwardRef<MiniMessagesHandle, { style?: React.
       // The frame draws its own cursor: this page's would sit frozen on the
       // frame's edge. Its own "the pointer left the page" handler hides it.
       onMouseEnter={() => document.documentElement.dispatchEvent(new MouseEvent("mouseleave"))}
-      style={{ flex: 1, minHeight: 0, width: "100%", border: "none", display: "block", background: "#141416", colorScheme: "normal", ...style }}
+      style={{ flex: 1, minHeight: 0, width: "100%", border: "none", display: "block", background: followTheme ? "var(--cream)" : "#141416", colorScheme: "normal", ...style }}
     />
   );
 });

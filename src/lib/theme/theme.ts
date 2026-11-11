@@ -50,13 +50,35 @@ export const THEME_EVENT = "vibe:theme";
 export const THEME_LOCK_ATTR = "data-theme-lock";
 
 /**
+ * `<iframe data-mini-theme="app">`: the Messages frame sits in a surface that
+ * follows the person's theme (Otto's desk panel, Wave 2B), so the framed page
+ * follows it too instead of locking to Night. Set by MiniMessenger.tsx and
+ * public/html/_miniMessenger.js; the old all-dark panel (OTTO_DESK=off) leaves
+ * it off and keeps the Night lock.
+ */
+export const MINI_THEME_ATTR = "data-mini-theme";
+export const MINI_THEME_FOLLOW = "app";
+
+/**
  * Locks the document to Night before it paints: for a page that is always
- * shown inside a dark surface (the Messages frame in Otto's panel). Rendered
- * inline at the top of that page, so it runs after the boot script and
- * before the first paint; `applyTheme` keeps the lock afterwards.
+ * shown inside a dark surface (the Messages frame in the old Otto panel).
+ * Rendered inline at the top of that page, so it runs after the boot script
+ * and before the first paint; `applyTheme` keeps the lock afterwards. A frame
+ * whose element carries MINI_THEME_ATTR="app" is left on the person's theme.
+ * Changing this string changes NIGHT_LOCK_SCRIPT_HASH (src/lib/security/csp.ts).
  */
 export const NIGHT_LOCK_SCRIPT =
-  "(function(){var d=document.documentElement;d.setAttribute('data-theme-lock','dark');d.dataset.theme='dark';})();";
+  "(function(){try{var f=window.frameElement;if(f&&f.getAttribute('data-mini-theme')==='app')return;}catch(e){}var d=document.documentElement;d.setAttribute('data-theme-lock','dark');d.dataset.theme='dark';})();";
+
+/** Is this document framed by a surface that follows the theme (MINI_THEME_ATTR)? */
+export function frameFollowsTheme(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    return window.frameElement?.getAttribute(MINI_THEME_ATTR) === MINI_THEME_FOLLOW;
+  } catch {
+    return false;
+  }
+}
 export type ThemeEventDetail = { pref: ThemePref; theme: ResolvedTheme };
 
 const DARK_QUERY = "(prefers-color-scheme: dark)";

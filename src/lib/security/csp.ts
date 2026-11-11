@@ -62,7 +62,7 @@ export const NONCE_HEADER = "x-nonce";
  * a nonce at /messages?mini=1. A constant (not computed here) so this module
  * stays free of node:crypto; csp.test.ts recomputes it and fails on drift.
  */
-export const NIGHT_LOCK_SCRIPT_HASH = "'sha256-GZQ2qm0VytQLC6b9jXXdjSdXEZTrupcFeuLfyLwYlAQ='";
+export const NIGHT_LOCK_SCRIPT_HASH = "'sha256-yftDwSUrFe83e/X3IhWYz7d4OfSyB77vDh646BNOIz8='";
 
 /** pdf.js (src/lib/pdfjs-cdn.ts, profile.html): the only outside script host. */
 const PDFJS_CDN = "https://cdnjs.cloudflare.com";

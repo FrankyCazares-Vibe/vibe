@@ -348,6 +348,12 @@
     pendingReactions: 0,
   };
 
+  // Read by the first badge refresh, which attachWhenReady() starts right
+  // away: declared before that call, or the first count throws (a `let`
+  // read before its line) and waits for the 30 s poll (walk fix, Nov 11).
+  let featuresAsk = null;
+  const mutedNow = (until, now) => !!until && new Date(until).getTime() > now;
+
   function attachWhenReady() {
     if (!document.body) {
       document.addEventListener("DOMContentLoaded", attachWhenReady);
@@ -372,7 +378,7 @@
   }
   // Does this person have the new chat? Asked once per page; a failed ask
   // is asked again next time, and reads as "no" until then (the old panel).
-  let featuresAsk = null;
+  // (featuresAsk is declared above attachWhenReady.)
   function hasNewChat() {
     if (!featuresAsk) {
       featuresAsk = fetch("/api/me/features", { credentials: "include" })
@@ -385,7 +391,6 @@
     }
     return featuresAsk;
   }
-  const mutedNow = (until, now) => !!until && new Date(until).getTime() > now;
   // The new inbox's unread number: `allBadgeCount` in
   // src/components/mobile/messages/home/home-rules.ts, by hand. Unread dms
   // and groups + clubs with an unread Board post or new Lounge messages; a
@@ -566,6 +571,10 @@
     // A draft typed in the frame is not this page's typed text: the
     // new-build check (_buildRefresh.js) is told the frame is in use.
     frame.setAttribute("data-holds-reload", "");
+    // Otto's desk panel (_otto.js, .op-desk) follows the person's theme: the
+    // framed page does too (MINI_THEME_ATTR in src/lib/theme/theme.ts). The
+    // old all-dark panel (OTTO_DESK=off) leaves it off: the page stays Night.
+    if (ottoPanel.classList.contains("op-desk")) frame.setAttribute("data-mini-theme", "app");
     // The page left Messages by a full load (a sign-in or Terms redirect):
     // that belongs to the whole tab, not to a 380px frame.
     frame.addEventListener("load", () => {

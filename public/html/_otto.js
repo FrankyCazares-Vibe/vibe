@@ -637,7 +637,7 @@
     #ottoPanel.op-desk .vmm-tab-open { padding: 0 12px; font-size: 13px; font-weight: 600; }
     #ottoPanel.op-desk .vmm-tab-new svg { width: 17px; height: 17px; }
     #ottoPanel.op-desk :is(.vmm-tab-new, .vmm-tab-open):hover { color: var(--charcoal, #1C1C1E); background: var(--op-raise); }
-    #ottoPanel.op-desk .vmm-frame { flex: 1; border-radius: 16px; border: 1px solid var(--hairline, rgba(28,28,30,.08)); }
+    #ottoPanel.op-desk .vmm-frame { flex: 1; border-radius: 16px; border: 1px solid var(--hairline, rgba(28,28,30,.08)); background: var(--cream, #FAF7F2); }
 
     @media (prefers-reduced-motion: reduce) {
       #ottoPanel.op-desk, #ottoCorner.otto-pop .otto-shell { animation: none; }
@@ -684,6 +684,9 @@
     const planet = corner.querySelector('.m-planet');
     if (planet) planet.classList.toggle('wait', total > 0 || _ottoPublishWait);
     corner.setAttribute('aria-expanded', String(open));
+    // Points at the panel only while it shows, as the React corner does.
+    if (open) corner.setAttribute('aria-controls', 'ottoPanel');
+    else corner.removeAttribute('aria-controls');
     corner.setAttribute('aria-label', open ? 'Close Otto'
       : total > 0 ? 'Open Otto · ' + _ottoUnreadN + ' new' + (_ottoChatsN > 0 ? ', ' + _ottoChatsN + ' unread ' + (_ottoChatsN === 1 ? 'chat' : 'chats') : '')
       : 'Open Otto');
@@ -742,7 +745,6 @@
     _ottoDeskMode = _ottoDeskFlag !== false;
     if (_ottoDeskMode) buildDeskPanel();
     else buildLegacyPanel();
-    corner.setAttribute('aria-controls', 'ottoPanel');
   }
 
   // The desk panel: header, then (from _miniMessenger.js) the Otto |
@@ -755,6 +757,9 @@
     panel.className = 'op-desk';
     panel.setAttribute('aria-labelledby', 'ottoPanelName');
     panel.tabIndex = -1;
+    // The footer is a <div role="navigation">, not a <nav>: the static pages
+    // style every <nav> as their fixed top bar (profile.html), which pulled
+    // the two links to the top of the page (walk fix, Nov 11).
     panel.innerHTML = `
       <i class="tx tx-flute" aria-hidden="true"></i>
       <div class="otto-panel-header op-paper">
@@ -769,10 +774,10 @@
         </button>
       </div>
       <div class="otto-panel-body"></div>
-      <nav class="otto-panel-footer op-paper" aria-label="Otto's desk">
+      <div class="otto-panel-footer op-paper" role="navigation" aria-label="Otto's desk">
         <a class="op-link" data-op-link="desk" href="/otto" target="_top"><span>Open your desk →</span><span class="op-link-sub" id="ottoDeskMore"></span></a>
         <a class="op-link" data-op-link="stats" href="/otto?tab=stats" target="_top"><span>Full breakdown →</span></a>
-      </nav>
+      </div>
     `;
     panel.querySelector('.otto-panel-close').onclick = closeOttoPanel;
     document.body.appendChild(panel);

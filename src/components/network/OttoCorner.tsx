@@ -185,6 +185,23 @@ export function OttoCorner() {
     prevUnreadRef.current = unread;
   }, [unread]);
 
+  // Opened while the desk flag is still out: the panel shows once it answers.
+  const flagWait = open && deskOn === null;
+  // While it waits, no panel is drawn to hear Escape: the corner hears it,
+  // so Escape cancels the open (only when focus is on the corner or the page
+  // body, so Escape in a page field or sheet is left to them).
+  useEffect(() => {
+    if (!flagWait) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      const a = document.activeElement;
+      if (a && a !== document.body && a !== buttonRef.current) return;
+      close(true);
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [flagWait, close]);
+
   // Something unseen: Otto's news or an unread chat, the badge's count.
   const waiting = unread + chats.unread > 0;
 
@@ -209,8 +226,12 @@ export function OttoCorner() {
       onPointerEnter={arm}
       onFocus={arm}
       aria-expanded={open}
-      // Today's panel (OTTO_DESK=off) carries no id: nothing to point at.
-      aria-controls={open && deskOn !== false ? OTTO_PANEL_ID : undefined}
+      // Today's panel (OTTO_DESK=off) carries no id, and none shows while
+      // the flag is out: nothing to point at then.
+      aria-controls={open && deskOn === true ? OTTO_PANEL_ID : undefined}
+      // Opened before /api/me/features answered (at most 4 s): the panel
+      // waits for it, and the corner stays pressed meanwhile.
+      aria-busy={flagWait || undefined}
       aria-label={
         open
           ? "Close Otto"
@@ -240,7 +261,8 @@ export function OttoCorner() {
         boxShadow: "var(--card-shadow)",
         cursor: "pointer",
         transformOrigin: "center",
-        transition: "box-shadow 300ms ease",
+        transform: flagWait ? "scale(0.94)" : undefined,
+        transition: "box-shadow 300ms ease, transform 160ms ease",
         animation: popping
           ? "otto-orb-pop 700ms cubic-bezier(.22,1,.36,1) 1"
           : undefined,

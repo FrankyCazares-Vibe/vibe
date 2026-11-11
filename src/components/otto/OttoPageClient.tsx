@@ -8,7 +8,9 @@ import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from "react";
 
 import type { OttoPayload } from "@/app/api/me/otto/route";
+import { DESK_AS_KEY } from "@/components/mobile/use-otto-desk";
 import { useSwitchedClub } from "@/lib/orgs/club-switch";
+import { panelClubParam } from "@/lib/otto/panel-desk";
 
 import { OttoSky } from "./desk/OttoSky";
 import { OttoDeskActingAs } from "./OttoDeskActingAs";
@@ -42,6 +44,15 @@ const TABS: { id: Tab; label: string }[] = [
 
 const tabId = (t: Tab) => `odc-tab-${t}`;
 const panelId = (t: Tab) => `odc-panel-${t}`;
+
+/** The desk's saved pick on this device, guarded (blocked storage reads as none). */
+function readDeskAs(): string | null {
+  try {
+    return window.localStorage.getItem(DESK_AS_KEY);
+  } catch {
+    return null;
+  }
+}
 
 function tabOf(raw: string | null): Tab {
   return raw === "stats" || raw === "settings" ? raw : "desk";
@@ -91,16 +102,25 @@ function OttoDeskPage({ initial }: { initial: OttoPayload }) {
     [tab, setActiveTab],
   );
 
-  // No `?club=` in the link: the club this browser last switched to (the
-  // club switch, club-switch.ts) is the default when it is one you run.
+  // No `?club=` in the link: the desk's own pick on this device (DESK_AS_KEY,
+  // the phone's and the side panel's too), else the club this browser last
+  // switched to (club-switch.ts), when it is "me" or a club you run. The side
+  // panel reads the same order (panelClubParam), so the two agree.
   const switched = useSwitchedClub();
   const triedSwitch = useRef(false);
   useEffect(() => {
-    if (triedSwitch.current || urlClub || !switched || !desk) return;
+    if (triedSwitch.current || urlClub || !desk) return;
+    const runs = (h: string | null) => !!h && desk.clubs.some((c) => c.handle.toLowerCase() === h);
+    const saved = panelClubParam(readDeskAs(), null);
+    const want = saved === "me" || runs(saved) ? saved : null;
+    if (!want && !switched) return;
     triedSwitch.current = true;
-    const want = switched.handle.toLowerCase();
-    const runs = desk.clubs.some((c) => c.handle.toLowerCase() === want);
-    if (runs && desk.actingAs?.handle.toLowerCase() !== want) void load(want);
+    const target = want ?? switched!.handle.toLowerCase();
+    if (target === "me") {
+      if (desk.actingAs) void load("me");
+      return;
+    }
+    if (runs(target) && desk.actingAs?.handle.toLowerCase() !== target) void load(target);
   }, [switched, urlClub, desk, load]);
 
   return (

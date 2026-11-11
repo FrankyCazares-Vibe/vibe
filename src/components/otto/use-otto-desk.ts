@@ -3,6 +3,7 @@
 import { useCallback, useRef, useState } from "react";
 
 import type { OttoFailedSection, OttoPayload } from "@/app/api/me/otto/route";
+import { DESK_AS_KEY } from "@/components/mobile/use-otto-desk";
 import { requestRefusal } from "@/components/orgs/tools/member-rules";
 import { vibeRequest } from "@/lib/feedback/request";
 import { toast } from "@/lib/feedback/toast";
@@ -31,6 +32,30 @@ const COPY = Object.freeze({
   accepted: "Accepted. They're a member now.",
   doneFailed: "Couldn't mark that reminder done.",
 });
+
+/**
+ * Told when the desk's pick on this device changes (detail: the new `?club=`),
+ * so a side panel open beside the desk follows it (OttoSidePanel.tsx).
+ */
+export const DESK_AS_EVENT = "vibe:otto-desk-as";
+
+/**
+ * Remembers the pick on this device, under the phone desk's key (DESK_AS_KEY),
+ * so the side panel (React and _otto.js) acts as the same club (walk fix,
+ * Nov 11). Blocked storage: the pick lasts for this visit.
+ */
+function writeDeskAs(v: string): void {
+  try {
+    window.localStorage.setItem(DESK_AS_KEY, v);
+  } catch {
+    /* blocked storage */
+  }
+  try {
+    window.dispatchEvent(new CustomEvent<string>(DESK_AS_EVENT, { detail: v }));
+  } catch {
+    /* no window */
+  }
+}
 
 function payloadUrl(club: DeskClubParam): string {
   return club ? `/api/me/otto?club=${encodeURIComponent(club)}` : "/api/me/otto";
@@ -83,11 +108,16 @@ export function useOttoDesk(initial: Pick<OttoPayload, "desk" | "failed">, initi
 
   const reload = useCallback(() => load(club), [load, club]);
 
-  /** Act as a club (its handle) or as yourself ("me"); the URL keeps the pick. */
+  /**
+   * Act as a club (its handle) or as yourself ("me"); the URL keeps the pick,
+   * and so does this device (DESK_AS_KEY), as on the phone: only once the
+   * switched desk has loaded, so a failed read keeps the old pick.
+   */
   const pickClub = useCallback(
     async (next: string) => {
       const ok = await load(next);
       if (!ok) return;
+      writeDeskAs(next);
       try {
         const url = new URL(window.location.href);
         url.searchParams.set("club", next);
