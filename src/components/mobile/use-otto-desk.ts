@@ -97,13 +97,17 @@ export function useOttoDesk(initial: OttoPayload) {
   const refresh = useCallback(() => load(want.current, true), [load]);
   const retry = useCallback(() => load(want.current, false), [load]);
 
-  /** Act as `handle`, or as you with null. */
+  /**
+   * Act as `handle`, or as you with null. The pick is remembered on this
+   * phone only once that desk has loaded; a failed read keeps the old desk
+   * and the old pick (walk fix, Nov 11).
+   */
   const actAs = useCallback(
     (handle: string | null) => {
       const v = handle ?? "me";
-      writeDeskAs(v);
-      want.current = v;
-      void load(v, false);
+      void load(v, false).then((ok) => {
+        if (ok) writeDeskAs(v);
+      });
     },
     [load],
   );

@@ -76,7 +76,13 @@ function Saw({ items }: { items: DeskItem[] }) {
             <DeskIcon name={item.kind} />
             <span className="odc-saw-tx">
               <span>{item.title}</span>
-              {item.whenLabel ? <time dateTime={item.whenISO}>{item.whenLabel}</time> : null}
+              {item.detail || item.whenLabel ? (
+                <span className="odc-saw-sub">
+                  {item.detail}
+                  {item.detail && item.whenLabel ? " · " : null}
+                  {item.whenLabel ? <time dateTime={item.whenISO}>{item.whenLabel}</time> : null}
+                </span>
+              ) : null}
             </span>
           </>
         );

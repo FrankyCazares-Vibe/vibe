@@ -31,6 +31,8 @@ import { ProfileViewersList } from "./ProfileViewersList";
  * 2. Views of your profile (GET /api/me/profile-views), kept from the old tab
  *    with its Vibe+ "Who viewed you" list and the web-only teaser, because
  *    removing the list changes a live feature (BUILD-ORDER.md, raised apart).
+ *    Only on your own desk (You): acting as a club, the tab is the club's
+ *    numbers, so the personal card isn't shown or read (walk fix, Nov 11).
  *
  * Each card owns its failure: a refused read shows "couldn't count" with
  * Try again, never a 0. Today's tab lives on as OttoMetricsLegacy.tsx for the
@@ -131,13 +133,14 @@ export function OttoMetrics({ club = null }: { club?: DeskClub | null }) {
   }, [loadStats]);
 
   useEffect(() => {
+    if (handle) return;
     void (async () => {
       await loadPv();
     })();
     return () => {
       pvRun.current += 1;
     };
-  }, [loadPv]);
+  }, [loadPv, handle]);
 
   const s = stats.state === "ok" ? stats.value : null;
   const range = s ? rangeLabel(s.since, s.until) : "";
@@ -177,7 +180,7 @@ export function OttoMetrics({ club = null }: { club?: DeskClub | null }) {
         </OttoStatCard>
       )}
 
-      <ProfileCard pv={pv} seq={pvSeq} inApp={inApp} busy={busy.pv} onRetry={() => void loadPv()} />
+      {club ? null : <ProfileCard pv={pv} seq={pvSeq} inApp={inApp} busy={busy.pv} onRetry={() => void loadPv()} />}
     </div>
   );
 }

@@ -60,6 +60,8 @@ export function OttoDeskActingAs({
 
   if (desk.clubs.length === 0) return null;
   const now = desk.actingAs;
+  // Acting as a club: the person's own desk (You) may have things waiting too.
+  const youWaiting = now ? (desk.youWaiting ?? 0) : 0;
 
   const pick = (club: string) => {
     setOpen(false);
@@ -69,6 +71,17 @@ export function OttoDeskActingAs({
 
   return (
     <div className="odc-as" ref={wrap}>
+      {youWaiting > 0 ? (
+        <button
+          type="button"
+          className="odc-as-you-wait"
+          disabled={busy}
+          onClick={() => pick("me")}
+          aria-label={`Switch to your own desk: ${youWaiting} waiting`}
+        >
+          You · {youWaiting} waiting
+        </button>
+      ) : null}
       <button
         type="button"
         className="dk-btn odc-as-btn"
@@ -98,7 +111,7 @@ export function OttoDeskActingAs({
             </span>
             <span className="odc-as-tx">
               <b>You</b>
-              <span>Your own desk</span>
+              <span>{youWaiting > 0 ? `Your own desk · ${youWaiting} waiting` : "Your own desk"}</span>
             </span>
             <Tick on={now === null} />
           </button>

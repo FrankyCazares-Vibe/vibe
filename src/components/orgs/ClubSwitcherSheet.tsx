@@ -63,6 +63,10 @@ export function ClubSwitcherSheet(props: {
   current?: string | null;
   title?: string;
   footnote?: string;
+  /** A quiet note on the "You" row when it isn't the current one (the desk's "2 waiting"). */
+  meSide?: string | null;
+  /** Draws each club's picture instead of ClubLogo (the desk's own club mark). */
+  clubPicture?: (club: ClubYouRun) => ReactNode;
 }): JSX.Element | null {
   const { open, onClose, me, onPick } = props;
   const router = useRouter();
@@ -109,10 +113,16 @@ export function ClubSwitcherSheet(props: {
               picture={<MePicture name={me?.name ?? null} url={me?.avatarUrl ?? null} />}
               name={me?.name ?? SWITCHER_COPY.you}
               sub={me ? SWITCHER_COPY.you : null}
-              side={!nowHandle ? <span style={nowStyle}>{SWITCHER_COPY.now}</span> : null}
+              side={
+                !nowHandle ? (
+                  <span style={nowStyle}>{SWITCHER_COPY.now}</span>
+                ) : props.meSide ? (
+                  <span style={reviewStyle}>{props.meSide}</span>
+                ) : null
+              }
             />
             <p style={eyebrowStyle}>{SWITCHER_COPY.eyebrow}</p>
-            <ClubRows runs={runs} switchedHandle={nowHandle} onPick={pickClub} />
+            <ClubRows runs={runs} switchedHandle={nowHandle} onPick={pickClub} picture={props.clubPicture} />
             <p style={footnoteStyle}>{props.footnote ?? SWITCHER_COPY.footnote}</p>
           </div>
         </Drawer.Content>
@@ -125,10 +135,12 @@ function ClubRows({
   runs,
   switchedHandle,
   onPick,
+  picture,
 }: {
   runs: ReturnType<typeof useClubsYouRun>;
   switchedHandle: string | null;
   onPick: (club: ClubYouRun) => void;
+  picture?: (club: ClubYouRun) => ReactNode;
 }): JSX.Element {
   if (runs.status === "ok" && runs.clubs.length === 0) return <p style={noteStyle}>{SWITCHER_COPY.empty}</p>;
   if (runs.status === "error") {
@@ -166,7 +178,7 @@ function ClubRows({
             key={club.org_id}
             current={current}
             onClick={() => onPick(club)}
-            picture={<ClubLogo name={club.name} url={club.logo_url} size={40} />}
+            picture={picture ? picture(club) : <ClubLogo name={club.name} url={club.logo_url} size={40} />}
             name={club.name}
             sub={clubRoleLine(club)}
             side={

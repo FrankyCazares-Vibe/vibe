@@ -160,7 +160,7 @@ test("a student desk: no club, Ready = unread DMs, follow-backs, undated reminde
 test("a student's Scheduled: Going within 7 days and dated reminders, soonest first", () => {
   const m = busyStudent();
   assert.deepEqual(m.scheduled.map((i) => i.id), ["reminder:rem-thu", "rsvp:e-fri"]);
-  assert.equal(m.scheduled[0].whenLabel, "Reminder · Thu");
+  assert.equal(m.scheduled[0].whenLabel, "Reminder · Thu 12:00 PM");
   assert.equal(m.scheduled[1].whenLabel, "Fri, Nov 13 · 6:30 PM");
   assert.equal(m.scheduled[1].href, "/orgs/chess?event=e-fri");
   assert.ok(!m.scheduled.some((i) => i.id === "rsvp:e-far"), "nine days out is not this week");
@@ -175,7 +175,7 @@ test("an officer desk acts as the club: requests, Up next, setup, drafts, in tha
   const [maya, jordan, upNext, setup, draft] = m.ready;
   assert.deepEqual(maya.verb, { kind: "join_request", label: "Accept", orgSlug: "canalrun", requestId: "r1" });
   assert.equal(maya.detail, "Accept makes Maya member 39.");
-  assert.ok(maya.willHappen?.includes("Maya becomes member 39"));
+  assert.ok(maya.willHappen?.includes("Maya joins as member 39"));
   // One that the approve route would refuse gets no Accept and no promises.
   assert.deepEqual(jordan.verb, { kind: "link", label: "Review", href: "/orgs/canalrun/tools/requests" });
   assert.equal(jordan.willHappen, undefined);
@@ -347,15 +347,16 @@ test("honesty: nothing the desk prints says Otto did, sent, drafted or will send
 
 test("honesty: reminders are labelled as reminders, never promised", () => {
   assert.equal(D.reminderLabel(null, NOW.getTime()), "Reminder");
-  assert.equal(D.reminderLabel(at(2 * DAY), NOW.getTime()), "Reminder · Thu");
-  assert.equal(D.reminderLabel(at(H), NOW.getTime()), "Reminder · Today");
-  assert.equal(D.reminderLabel(at(10 * DAY), NOW.getTime()), "Reminder · Nov 20");
+  // A dated reminder shows its time too (walk fix, Nov 11).
+  assert.equal(D.reminderLabel(at(2 * DAY), NOW.getTime()), "Reminder · Thu 12:00 PM");
+  assert.equal(D.reminderLabel(at(H), NOW.getTime()), "Reminder · Today 1:00 PM");
+  assert.equal(D.reminderLabel(at(10 * DAY - 3 * H), NOW.getTime()), "Reminder · Nov 20 9:00 AM");
 });
 
 test("honesty: what will happen on Accept is what the approve route does today", () => {
   const [maya] = busyOfficer().ready;
   assert.deepEqual(maya.willHappen, [
-    "Maya becomes member 39",
+    "Maya joins as member 39",
     "Maya gets a notice that you said yes",
     "Maya joins the club's open chats",
   ]);
@@ -471,6 +472,62 @@ test("Otto saw: notifications in today's words, a cancelled event as its own kin
   assert.deepEqual(m.saw.map((i) => i.href), ["/posts/p9", "/orgs/chess", undefined]);
   assert.deepEqual(m.saw.map((i) => i.whenLabel), ["2h", "1d", "3d"]);
   assert.equal(m.saw[0].title, "Riley liked your post");
-  assert.match(m.saw[1].title, /^Chess cancelled Blitz night/);
+  // The event's name leads, so a narrow row never cuts it; the club and date are the detail.
+  assert.equal(m.saw[1].title, "Blitz night");
+  assert.equal(m.saw[1].detail, "Cancelled · Chess · Wed, Nov 11");
+  assert.equal(m.saw[0].detail, undefined);
   assert.equal(m.saw[2].title, "Something new on your account");
+});
+
+// ── Walk fixes (Nov 11) ────────────────────────────────────────────────────
+
+const personal = {
+  unreadDms: 3,
+  followers: [{ id: "f1", name: "Sam", handle: "sam", followedAt: at(-H) }],
+  reminders: [
+    { id: "r-undated", title: "Order shirts", remindAt: null },
+    { id: "r-dated", title: "Book the room", remindAt: at(DAY) },
+  ],
+};
+
+test("youWaiting: acting as a club counts the person's own Ready pile, from the rows already read", () => {
+  const m = D.buildDesk(officerInput({}, personal), NOW);
+  // 1 unread row + 1 follow-back + 1 undated reminder; the dated one is Scheduled, not waiting.
+  assert.equal(m.youWaiting, 3);
+  assert.equal(D.buildDesk(officerInput(), NOW).youWaiting, 0);
+  // On the You desk they ARE the Ready pile, so nothing extra waits.
+  assert.equal(D.buildDesk(studentInput(personal), NOW).youWaiting, 0);
+});
+
+test("sky line: a clear club with things on your own desk never says a bare all clear", () => {
+  const m = D.buildDesk(officerInput({}, personal), NOW);
+  assert.equal(m.say, "all clear here. three things wait on your own desk.");
+  assert.equal(D.skyLine({ ready: 0, scheduled: 2, you: 1 }), "all clear here. one thing waits on your own desk.");
+  // A club with its own things ready keeps its line; the chip carries "You · 3 waiting".
+  const busy = D.buildDesk(officerInput({ requests: [request("r1", "Maya")] }, personal), NOW);
+  assert.match(busy.say, /^one thing is ready\./);
+  assert.equal(busy.youWaiting, 3);
+  // The person's own reads failed: the club is clear "here", the rest is unknown.
+  const lost = D.buildDesk(officerInput({}, { missing: ["dms"] }), NOW);
+  assert.equal(lost.say, "all clear here. part of your own desk didn't load.");
+});
+
+test("the folded bar's note follows the sky line: never all clear over a failure", () => {
+  const student = D.buildDesk(studentInput(), NOW);
+  assert.equal(D.deskFoldNote(student, []), "all clear");
+  for (const f of ["dms", "asking", "upcoming"]) assert.equal(D.deskFoldNote(student, [f]), "part didn't load", f);
+  assert.equal(D.deskFoldNote(student, ["activity"]), "all clear");
+  assert.equal(D.deskFoldNote(busyStudent(), ["dms"]), "3 ready for you");
+  const club = D.buildDesk(officerInput({}, personal), NOW);
+  assert.equal(D.deskFoldNote(club, []), "clear here · 3 on your desk");
+  assert.equal(D.deskFoldNote(D.buildDesk(officerInput(), NOW), ["asking"]), "clear here · part didn't load");
+  assert.equal(D.deskFoldNote(D.buildDesk(officerInput(), NOW), []), "all clear");
+  for (const t of [D.deskFoldNote(club), club.say]) for (const bad of DISHONEST) assert.doesNotMatch(t, bad, t);
+});
+
+test("a cut-off title never ends in punctuation before the ellipsis", () => {
+  const text = `${"a".repeat(78)}. More words after the cut`;
+  assert.equal(D.oneLine(text), `${"a".repeat(78)}…`);
+  assert.equal(D.oneLine("Short. Fine."), "Short. Fine.");
+  assert.equal(D.oneLine(`${"b".repeat(77)}, — next`), `${"b".repeat(77)}…`);
 });

@@ -19,7 +19,12 @@
 .odc-tab:focus-visible{outline:2px solid var(--charcoal);outline-offset:2px}
 
 /* Acting as: the chip and its small menu */
-.odc-as{position:relative;min-width:0}
+.odc-as{position:relative;min-width:0;display:flex;align-items:center;gap:12px}
+/* "You · 2 waiting": quiet text beside the chip while acting as a club (walk fix, Nov 11) */
+.odc-as-you-wait{flex:none;min-height:40px;padding:0 4px;border:0;background:none;color:var(--ink-2);font:600 13px/1.2 var(--font-body);cursor:pointer;white-space:nowrap}
+.odc-as-you-wait:hover{color:var(--charcoal)}
+.odc-as-you-wait:focus-visible{outline:2px solid var(--charcoal);outline-offset:2px;border-radius:8px}
+.odc-as-you-wait:disabled{opacity:.6}
 .odc-as-btn{max-width:360px;padding:0 12px 0 8px;gap:8px}
 .odc-as-btn>span:not(.dk-club){min-width:0;overflow:hidden;text-overflow:ellipsis;font-weight:500;color:var(--ink-2)}
 .odc-as-btn b{color:var(--charcoal);font-weight:700}
@@ -57,6 +62,7 @@
 .odc-saw+.odc-saw{border-top:1px solid var(--hairline)}
 .odc-saw>.dk-ico{width:18px;height:18px;margin-top:2px;color:var(--ink-muted)}
 .odc-saw-tx{min-width:0;display:flex;flex-direction:column;gap:2px;overflow-wrap:anywhere}
+.odc-saw-sub{font-size:13px;color:var(--ink-2)}
 .odc-saw-tx time{font-size:13px;color:var(--ink-2);font-variant-numeric:tabular-nums}
 a.odc-saw:focus-visible{outline:2px solid var(--charcoal);outline-offset:-2px;border-radius:10px}
 

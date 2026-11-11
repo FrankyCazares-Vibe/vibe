@@ -13,6 +13,8 @@ import { OttoMetrics } from "@/components/otto/OttoMetrics";
 import { OttoSettings } from "@/components/otto/OttoSettings";
 import { OttoSky } from "@/components/otto/desk/OttoSky";
 import { ClubSwitcherSheet } from "@/components/orgs/ClubSwitcherSheet";
+import { DeskClubMark } from "@/components/otto/desk/DeskDraft";
+import { deskFoldNote } from "@/lib/otto/desk";
 
 import { OttoDeskPanes } from "./OttoDeskPanes";
 import { ActingAsChip, DESK_TABS, DeskTabs, paneId, tabId, type DeskTab } from "./OttoDeskParts";
@@ -112,9 +114,10 @@ function OttoDeskMobile({ initial }: { initial: OttoPayload }) {
     return () => window.clearTimeout(t);
   }, [tab]);
 
-  const readyCount = desk?.ready.length ?? 0;
   const say = desk ? desk.say : "my desk didn't load. try again in a sec.";
-  const note = !desk ? undefined : readyCount > 0 ? `${readyCount} ready for you` : "all clear";
+  // The sky line's rule: never "all clear" over a read that failed (desk.ts).
+  const note = desk ? deskFoldNote(desk, state.failed) : undefined;
+  const youWaiting = desk?.actingAs ? (desk.youWaiting ?? 0) : 0;
 
   return (
     <main className="odm">
@@ -130,7 +133,15 @@ function OttoDeskMobile({ initial }: { initial: OttoPayload }) {
         <OttoSky variant="short" say={say} note={note} />
       </div>
 
-      {desk && desk.clubs.length > 0 ? <ActingAsChip actingAs={desk.actingAs} onOpen={() => setSheet(true)} /> : null}
+      {desk && desk.clubs.length > 0 ? (
+        <ActingAsChip
+          actingAs={desk.actingAs}
+          youWaiting={youWaiting}
+          onOpen={() => setSheet(true)}
+          onYou={() => state.actAs(null)}
+          busy={state.loading}
+        />
+      ) : null}
       <DeskTabs active={tab} onChange={setActiveTab} />
 
       <div
@@ -163,6 +174,12 @@ function OttoDeskMobile({ initial }: { initial: OttoPayload }) {
           current={desk.actingAs?.handle ?? null}
           title="Acting as."
           footnote={ASK_FOOT}
+          meSide={youWaiting > 0 ? `${youWaiting} waiting` : null}
+          clubPicture={(c) => (
+            <span className="odm-sheet-mark">
+              <DeskClubMark club={{ orgId: c.org_id, name: c.name, handle: c.handle, role: c.role === "owner" ? "owner" : "officer", avatarUrl: c.logo_url }} />
+            </span>
+          )}
         />
       ) : null}
     </main>

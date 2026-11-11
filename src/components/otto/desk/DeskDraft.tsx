@@ -57,7 +57,12 @@ function splitCount(line: string): { n: string | null; rest: string } {
 
 /** Initials for a club with no picture: "Canal Run Club" → "CR". */
 function initials(name: string): string {
-  const words = name.trim().split(/\s+/).filter(Boolean);
+  // Letters and digits only, so "SAE (local copy)" reads "SL", never "S(".
+  const words = name
+    .trim()
+    .split(/\s+/)
+    .map((w) => w.replace(/[^\p{L}\p{N}]/gu, ""))
+    .filter(Boolean);
   return (words.length > 1 ? words[0][0] + words[1][0] : (words[0] ?? "?").slice(0, 2)).toUpperCase();
 }
 

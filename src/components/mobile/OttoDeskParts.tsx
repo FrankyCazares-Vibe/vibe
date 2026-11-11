@@ -83,8 +83,25 @@ export function DeskTabs({ active, onChange }: { active: DeskTab; onChange: (t: 
   );
 }
 
-/** "Acting as <club>" (or You), opening the switch sheet. Officers only. */
-export function ActingAsChip({ actingAs, onOpen }: { actingAs: DeskClub | null; onOpen: () => void }) {
+/**
+ * "Acting as <club>" (or You), opening the switch sheet. Officers only. While
+ * acting as a club, a quiet "You · 2 waiting" beside it says the person's own
+ * desk has things too, and switches straight to it (walk fix, Nov 11).
+ */
+export function ActingAsChip({
+  actingAs,
+  onOpen,
+  youWaiting = 0,
+  onYou,
+  busy,
+}: {
+  actingAs: DeskClub | null;
+  onOpen: () => void;
+  youWaiting?: number;
+  onYou?: () => void;
+  busy?: boolean;
+}) {
+  const waiting = actingAs && youWaiting > 0 ? youWaiting : 0;
   return (
     <div className="odm-as-row">
       <button type="button" className="odm-as" onClick={onOpen} aria-haspopup="dialog">
@@ -102,6 +119,17 @@ export function ActingAsChip({ actingAs, onOpen }: { actingAs: DeskClub | null; 
           <path d="M6 9l6 6 6-6" />
         </svg>
       </button>
+      {waiting > 0 && onYou ? (
+        <button
+          type="button"
+          className="odm-as-you-wait"
+          onClick={onYou}
+          disabled={busy}
+          aria-label={`Switch to your own desk: ${waiting} waiting`}
+        >
+          You · {waiting} waiting
+        </button>
+      ) : null}
     </div>
   );
 }

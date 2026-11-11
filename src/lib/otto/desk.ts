@@ -22,7 +22,7 @@
  * steps, the cancelled-event words), so desk.test.ts loads it under plain
  * `node --test` with an "@/" resolve hook.
  */
-import { campusDateTime, campusDay } from "@/components/campus/tonight/campus-time";
+import { campusClock, campusDateTime, campusDay } from "@/components/campus/tonight/campus-time";
 import { isMembersOnly } from "@/components/events/members-only";
 import {
   ACTION_LABELS,
@@ -32,7 +32,7 @@ import {
   upNextView,
   type StepEvent,
 } from "@/app/orgs/[handle]/club-page/up-next-steps";
-import { cancelledLine, clubNameText } from "@/lib/push/event-notice";
+import { clubNameText, eventShortDate, eventTitleText } from "@/lib/push/event-notice";
 
 // ── The contract (everyone codes to these) ─────────────────────────────────
 
@@ -77,6 +77,13 @@ export type DeskModel = {
   /** Done items 8-30 days ago (the computer desk). */
   earlier: DeskItem[];
   empty: { ready: string; scheduled: string; done: string; saw: string };
+  /**
+   * While acting as a club: how many things wait on the person's own desk
+   * (You: unread messages, follow-backs, undated reminders), from reads the
+   * route already made. 0 on the You desk itself, where they are the Ready
+   * pile (walk fix, Nov 11).
+   */
+  youWaiting: number;
 };
 
 // ── The input (desk-server.ts fills it) ─────────────────────────────────────
@@ -217,7 +224,10 @@ export function firstName(p: { name: string | null; handle: string | null } | nu
 /** A text as one row's title: one line, trimmed, at most `max` characters. */
 export function oneLine(text: string | null | undefined, max = 80): string {
   const flat = (text ?? "").replace(/\s+/g, " ").trim();
-  return flat.length > max ? `${flat.slice(0, max - 1).trimEnd()}…` : flat;
+  if (flat.length <= max) return flat;
+  // No "." or "," right before the "…" (walk fix, Nov 11).
+  const cut = flat.slice(0, max - 1).replace(/[\s.,;:!?·\-–—]+$/u, "");
+  return `${cut}…`;
 }
 
 /** "Today", "Yesterday", "Tue" this past week, "Nov 3" before that. */
@@ -229,14 +239,14 @@ export function pastDayLabel(atMs: number, nowMs: number): string {
   return days <= 6 ? label.split(",")[0] : label.split(", ")[1] ?? label;
 }
 
-/** "Reminder · Today", "Reminder · Thu", "Reminder · Nov 20"; undated: "Reminder". */
+/** "Reminder · Today 3:00 PM", "Reminder · Thu 9:00 AM", "Reminder · Nov 20 9:00 AM"; undated: "Reminder". */
 export function reminderLabel(remindAt: string | null | undefined, nowMs: number): string {
   const at = ms(remindAt);
   if (!Number.isFinite(at)) return "Reminder";
   const days = campusDaysFrom(nowMs, at);
   const label = campusDay(at).label;
   const day = days <= 0 ? "Today" : days <= 6 ? label.split(",")[0] : label.split(", ")[1] ?? label;
-  return `Reminder · ${day}`;
+  return `Reminder · ${day} ${campusClock(at)}`;
 }
 
 /** "now", "5m", "2h", "3d", then "Nov 3": Otto saw's times. */
@@ -294,7 +304,7 @@ function joinRequestItems(club: DeskClub, facts: DeskClubFacts, nowMs: number): 
       detail: n === null ? `Accept lets ${who} in.` : `Accept makes ${who} member ${n.toLocaleString("en-US")}.`,
       verb: { kind: "join_request", label: "Accept", orgSlug: club.handle, requestId: r.id },
       willHappen: [
-        ...(n === null ? [`${who} becomes a member`] : [`${who} becomes member ${n.toLocaleString("en-US")}`]),
+        ...(n === null ? [`${who} joins as a member`] : [`${who} joins as member ${n.toLocaleString("en-US")}`]),
         `${who} gets a notice that you said yes`,
         `${who} joins the club's open chats`,
       ],
@@ -574,9 +584,10 @@ export function splitDone(dated: Dated[], nowMs: number): { done: DeskItem[]; ea
 
 /** One notification's line, sentence case (OttoActivity.tsx's words). */
 export function noticeTitle(n: DeskNotice): string {
-  if (n.type === "event_cancelled") {
-    return `${clubNameText({ name: n.orgName })} ${cancelledLine(n.eventTitle, n.eventStartsAt)}`;
-  }
+  // The event's name is the whole title, so a narrow row never cuts it off;
+  // "Cancelled", the club and the date are the row's detail (noticeDetail).
+  // Walk fix, Nov 11.
+  if (n.type === "event_cancelled") return eventTitleText(n.eventTitle);
   const actor = n.actorName?.trim().split(/\s+/)[0] || "Someone";
   const club = n.orgName?.trim() || "a club";
   switch (n.type) {
@@ -596,6 +607,13 @@ export function noticeTitle(n: DeskNotice): string {
   }
 }
 
+/** A notification's second line: only a cancelled event has one ("Cancelled · Chess · Fri, Nov 13"). */
+export function noticeDetail(n: DeskNotice): string | undefined {
+  if (n.type !== "event_cancelled") return undefined;
+  const when = eventShortDate(n.eventStartsAt);
+  return ["Cancelled", clubNameText({ name: n.orgName }), when].filter(Boolean).join(" · ");
+}
+
 /** Where a notification opens (OttoActivity.tsx's hrefFor). */
 export function noticeHref(n: DeskNotice): string | undefined {
   const club = n.orgHandle ? clubPath(n.orgHandle) : null;
@@ -613,6 +631,7 @@ function sawItems(notices: DeskNotice[], nowMs: number): DeskItem[] {
       id: `notification:${n.id}`,
       kind: n.type === "event_cancelled" ? ("cancelled" as const) : ("notification" as const),
       title: noticeTitle(n),
+      ...(noticeDetail(n) ? { detail: noticeDetail(n) } : {}),
       whenISO: n.createdAt,
       whenLabel: Number.isFinite(at) ? agoLabel(at, nowMs) : undefined,
       href: noticeHref(n),
@@ -627,18 +646,60 @@ function sawItems(notices: DeskNotice[], nowMs: number): DeskItem[] {
  * out without you" (their drafts and Accepts wait for them); a student has no
  * send queue, so theirs only says what is waiting. `partial`: one of the
  * reads behind Ready or Scheduled failed, so never "all clear".
+ *
+ * An officer acting as a club whose own desk (You) has things waiting
+ * (`you`), or whose own reads failed (`youPartial`), never hears a bare
+ * "all clear": the club is clear "here", and the line says so (walk fix,
+ * Nov 11).
  */
-export function skyLine(counts: { ready: number; scheduled: number; role?: DeskRole; partial?: boolean }): string {
-  const { ready, scheduled, role = "officer", partial = false } = counts;
+export function skyLine(counts: {
+  ready: number;
+  scheduled: number;
+  role?: DeskRole;
+  partial?: boolean;
+  you?: number;
+  youPartial?: boolean;
+}): string {
+  const { ready, scheduled, role = "officer", partial = false, you = 0, youPartial = false } = counts;
   if (ready > 0 && role === "student") {
     return ready === 1 ? "one thing is waiting for you." : `${countWord(ready)} things are waiting for you.`;
   }
   if (ready === 1) return "one thing is ready. nothing goes out without you.";
   if (ready > 1) return `${countWord(ready)} things are ready. nothing goes out without you.`;
   if (partial) return "part of my desk didn't load. try again in a bit.";
+  if (role === "officer" && you > 0) {
+    return you === 1
+      ? "all clear here. one thing waits on your own desk."
+      : `all clear here. ${countWord(you)} things wait on your own desk.`;
+  }
+  if (role === "officer" && youPartial) return "all clear here. part of your own desk didn't load.";
   if (scheduled === 1) return "all clear. one thing on the calendar.";
   if (scheduled > 1) return `all clear. ${countWord(scheduled)} things on the calendar.`;
   return "all clear. i'll put things here when they need you.";
+}
+
+/** The route reads behind a student's (You) Ready and Scheduled piles. */
+const YOU_READY_READS = ["dms", "asking"] as const;
+const YOU_READS = [...YOU_READY_READS, "upcoming"] as const;
+
+/**
+ * The folded phone bar's short note, by the sky line's own rule (walk fix,
+ * Nov 11): what is ready; else, when a read behind the desk failed, that part
+ * didn't load; else what waits on your own desk; only then "all clear".
+ * `failed` is the route's `failed[]` from the same read as `desk`.
+ */
+export function deskFoldNote(
+  desk: Pick<DeskModel, "role" | "ready" | "youWaiting">,
+  failed: readonly string[] = [],
+): string {
+  const ready = desk.ready.length;
+  if (ready > 0) return `${ready.toLocaleString("en-US")} ready for you`;
+  const missing = new Set(failed);
+  if (desk.role === "student" && YOU_READS.some((f) => missing.has(f))) return "part didn't load";
+  const you = desk.youWaiting ?? 0;
+  if (desk.role === "officer" && you > 0) return `clear here · ${you.toLocaleString("en-US")} on your desk`;
+  if (desk.role === "officer" && YOU_READY_READS.some((f) => missing.has(f))) return "clear here · part didn't load";
+  return "all clear";
 }
 
 // ── The desk ───────────────────────────────────────────────────────────────
@@ -680,11 +741,14 @@ export function buildDesk(input: DeskInput, now: Date): DeskModel {
   const moreRequests = facts ? Math.max(0, facts.requests.length - READY_REQUESTS_MAX) : 0;
   const readyCount = ready.length + (moreRequests > 1 ? moreRequests - 1 : 0);
   const missing = new Set(input.missing ?? []);
-  const partial = role === "student" && ["dms", "asking", "upcoming"].some((f) => missing.has(f));
+  const partial = role === "student" && YOU_READS.some((f) => missing.has(f));
+  // Acting as a club: the person's own Ready pile, counted from the same rows.
+  const youWaiting = role === "officer" ? studentReady(input, nowMs).length : 0;
+  const youPartial = role === "officer" && YOU_READY_READS.some((f) => missing.has(f));
 
   return {
     role,
-    say: skyLine({ ready: readyCount, scheduled: scheduled.length, role, partial }),
+    say: skyLine({ ready: readyCount, scheduled: scheduled.length, role, partial, you: youWaiting, youPartial }),
     actingAs: club,
     clubs: input.clubs,
     ready,
@@ -693,5 +757,6 @@ export function buildDesk(input: DeskInput, now: Date): DeskModel {
     saw: sawItems(input.notifications, nowMs),
     earlier,
     empty: role === "officer" ? { ...DESK_EMPTY, scheduled: OFFICER_SCHEDULED_EMPTY } : { ...DESK_EMPTY },
+    youWaiting,
   };
 }
