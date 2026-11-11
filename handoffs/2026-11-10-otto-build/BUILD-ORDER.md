@@ -1,8 +1,8 @@
 # The new Otto page: build order (Nov 10, 2026)
 
 ## Status
-- Nov 10: plan approved by Franky. Wave 1 BUILT and checked on branch
-  `claude/otto-wave-1` (record: `wave-1.md`); waits for his yes to ship.
+- Nov 10: plan approved by Franky. **Wave 1 SHIPPED Nov 10** (main f14a7ce0; record `wave-1.md`).
+  Next: Wave 2A, the desk.
 
 The idea behind the order: Otto's new look goes everywhere first (one small, look-only change), then the
 desk page on data the app already has, then the corner and side panel. Anything that needs a database

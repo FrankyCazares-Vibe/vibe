@@ -1,7 +1,7 @@
 # Otto Wave 1: Planet everywhere (ship record)
 
 - Branch `claude/otto-wave-1` (worktree `.claude/worktrees/otto-wave-1`), from `main` 9b1731f1.
-- Build commit f1d12296. NOT SHIPPED: waits for Franky's yes.
+- Build commit f1d12296. **SHIPPED Nov 10** on Franky's "Ship Wave 1": `main` fast-forwarded 9b1731f1 → f14a7ce0, Vercel deploy succeeded.
 - Plan: `BUILD-ORDER.md` (this folder). Design: `handoffs/2026-11-09-otto-agent-design-board.md`.
 
 ## What's built
@@ -56,3 +56,11 @@
 - **Violet colourway while thinking:** his thinking moon is purple, so on a Violet Otto it nearly matches
   his body (only its rim tells them apart). My pick: keep Violet (you kept all ten) and give the thinking
   moon a cream rim on Violet and Midnight, done in Wave 2.
+
+## Shipped (Nov 10)
+- Franky: "Ship Wave 1". `main` was still 9b1731f1, so the branch fast-forwarded to f14a7ce0 and was pushed.
+- Vercel status for f14a7ce0: success (build `dpl_ENyqT1H67qCMCe1Bv8SsqmgYz2Ht` on /api/version).
+- Live checks, signed out: `/html/_otto-planet.css` is 200 and byte-equal to the repo copy; the live
+  site-wide CSS no longer carries the old orb rules (the previous build had them). Signed-in pages redirect to
+  login when signed out, so Planet on them was not checked live.
+- Not checked: Franky's phone walk on the live app (the tab icon, the corner, the Otto page hero, Otto's look).
