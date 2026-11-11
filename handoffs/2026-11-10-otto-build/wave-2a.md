@@ -1,7 +1,7 @@
 # Otto Wave 2A: the desk (ship record)
 
 - Branch `claude/otto-wave-2a` (worktree `.claude/worktrees/otto-wave-1`), from `main` ab81c0c9 (Wave 1 live).
-- Commits c4dbc39e (the desk) and 522c9c78 (walk fixes). NOT SHIPPED: waits for Franky's yes.
+- Commits c4dbc39e (the desk) and 522c9c78 (walk fixes). **SHIPPED Nov 11** on Franky's "Ship Wave 2A": `main` fast-forwarded ab81c0c9 → 4175c5a4, Vercel deploy succeeded.
 - Plan: `BUILD-ORDER.md`. Design: the board's D1 (phone desk), D3 (computer desk), D4 (Saw, Stats, settings).
 
 ## What's built
@@ -58,3 +58,11 @@
 
 ## Calls for you
 - None blocking. Wave 2B (the corner and side panel restyle) is next once this ships.
+
+## Shipped (Nov 11)
+- Franky: "Ship Wave 2A". `main` was still ab81c0c9, so the branch fast-forwarded to 4175c5a4 and was pushed.
+- Vercel status for 4175c5a4: success (build `dpl_HCFQzNd6maqoECtN63MvwNpJsqEi` on /api/version).
+- Live checks, signed out: the new `/api/me/otto/stats` route answers 401 (a made-up route answers 404), and
+  `/html/_otto-planet.css` (with the cream rim) matches `main`. The desk itself needs a signed-in visit.
+- Not checked: Franky's phone walk on the live desk (officer and You desks, Acting as, Accept, a reminder).
+- Off switch if needed: set `OTTO_DESK=off` on Vercel (Production) and redeploy.
