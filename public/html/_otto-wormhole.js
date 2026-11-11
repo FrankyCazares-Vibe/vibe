@@ -32,7 +32,8 @@
   var SOFT = 'linear(0, 0.026 3%, 0.088 6%, 0.198 10%, 0.319 14%, 0.464 19%, 0.589 24%, 0.71 30%, 0.812 37%, 0.889 45%, 0.945 55%, 0.977 67%, 0.993 82%, 1)';
   var POP = 'linear(0, 0.144 3%, 0.462 6%, 0.901 10%, 1.175 14%, 1.236 19%, 1.12 24%, 0.977 30%, 0.943 37%, 0.993 45%, 1.013 55%, 0.997 67%, 1 82%, 1)';
   var STREAKS = 40;
-  var COLORS = ['#FF5C35', '#C8B8FF', '#FFD9C9', '#FF8A66'];
+  // Warm light only (Nov 10, 2026): purple is Otto thinking, nothing else.
+  var COLORS = ['#FF5C35', '#FFC56B', '#FFD9C9', '#FF8A66'];
 
   function reduced() {
     try { return window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) { return false; }
@@ -127,13 +128,17 @@
     }
   }
 
-  /** Three orbits, sized off the orb, each with a planet (in one layer, so they fade as one). */
+  /**
+   * Three orbits, sized off the orb, each with a planet (in one layer, so they
+   * fade as one). Warm: coral, gold, peach (Nov 10, 2026; the lilac ring went
+   * with the old orb, purple is only ever Otto thinking).
+   */
   function addRings(centre, size) {
     var rings = [];
     var system = el('owh-system', centre);
     var spec = [
       { r: size * 0.62, c: 'rgba(255,92,53,0.75)', s: '5.5s', w: 0 },
-      { r: size * 0.95, c: 'rgba(200,184,255,0.7)', s: '8s', w: 90 },
+      { r: size * 0.95, c: 'rgba(255,197,107,0.7)', s: '8s', w: 90 },
       { r: size * 1.4, c: 'rgba(255,217,201,0.55)', s: '12s', w: 180 }
     ];
     spec.forEach(function (o) {
@@ -167,19 +172,23 @@
   }
 
   /**
-   * The copy spins in step with the page's own orb: each of its CSS
-   * animations takes the original's current time (same tree, same order).
+   * The copy moves in step with the page's own Otto: each of its CSS
+   * animations takes the original's current time. Both trees are the same
+   * markup, so their animations pair up in order; getAnimations({ subtree })
+   * also returns the ones on pseudo-elements, where Planet's moon laps (two
+   * copies of the moon on ::after and ::before). An element's own list
+   * misses those, and two moons would show at the hand-over. A pair only
+   * counts when the name and the pseudo-element agree.
    */
   function syncSpin(orig, copy) {
     try {
-      var a = [orig].concat([].slice.call(orig.querySelectorAll('*')));
-      var b = [copy].concat([].slice.call(copy.querySelectorAll('*')));
-      for (var i = 0; i < a.length && i < b.length; i++) {
-        if (!a[i].getAnimations || !b[i].getAnimations) return;
-        var oa = a[i].getAnimations(), ob = b[i].getAnimations();
-        for (var j = 0; j < oa.length && j < ob.length; j++) {
-          if (oa[j].currentTime != null) ob[j].currentTime = oa[j].currentTime;
-        }
+      if (!orig.getAnimations || !copy.getAnimations) return;
+      var oa = orig.getAnimations({ subtree: true }), ob = copy.getAnimations({ subtree: true });
+      for (var j = 0; j < oa.length && j < ob.length; j++) {
+        var ea = oa[j].effect, eb = ob[j].effect;
+        if ((ea && ea.pseudoElement) !== (eb && eb.pseudoElement)) continue;
+        if (oa[j].animationName !== ob[j].animationName) continue;
+        if (oa[j].currentTime != null) ob[j].currentTime = oa[j].currentTime;
       }
     } catch (e) {}
   }

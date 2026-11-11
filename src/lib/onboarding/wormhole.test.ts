@@ -66,6 +66,23 @@ test("the copy of Otto stays on the real one and spins with it, so he never doub
   // And takes his animations' current time when it is made and when it pops in.
   assert.match(engine, /syncSpin\(at\.anchor, clone\);/);
   assert.match(engine, /syncSpin\(opts\.anchor, orb\.firstChild\);/);
+  // Planet's moon laps on pseudo-elements (Nov 10, 2026): both trees are read
+  // with their pseudo-element animations, paired in order, and a pair only
+  // counts when the pseudo-element and the name agree. Plain getAnimations()
+  // would miss the moon, and two moons would show at the hand-over.
+  assert.equal(engine.match(/\.getAnimations\(\{ subtree: true \}\)/g)?.length, 2);
+  assert.doesNotMatch(engine, /\.getAnimations\(\)/);
+  assert.match(engine, /if \(\(ea && ea\.pseudoElement\) !== \(eb && eb\.pseudoElement\)\) continue;/);
+  assert.match(engine, /if \(oa\[j\]\.animationName !== ob\[j\]\.animationName\) continue;/);
+});
+
+test("the wormhole's light is warm: purple is only ever Otto thinking", () => {
+  assert.doesNotMatch(engine, /C8B8FF|200,\s*184,\s*255|7C5CFC|124,\s*92,\s*252/i);
+  assert.match(engine, /var COLORS = \['#FF5C35', '#FFC56B', '#FFD9C9', '#FF8A66'\];/);
+  // The three rings: coral, gold, peach.
+  assert.match(engine, /c: 'rgba\(255,92,53,0\.75\)'/);
+  assert.match(engine, /c: 'rgba\(255,197,107,0\.7\)'/);
+  assert.match(engine, /c: 'rgba\(255,217,201,0\.55\)'/);
 });
 
 test("at the hand-over the rings and the copy fade with the dark, nothing cuts out", () => {

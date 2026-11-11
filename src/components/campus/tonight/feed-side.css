@@ -24,9 +24,10 @@
 .tonight-fold, .tonight-clubs-sum { display:none; }
 /* The contract's calc(100vh - 192px), with the 64px bar measured instead of
    assumed (FeedSideLayout's --tonight-feed-top: the bar plus any visiting
-   pill or campus-pick strip): feed top + 28 pad + 24 + 52 orb + 24 = 128
-   past it, so the Otto corner stays clear at scroll 0 with a banner too. */
-.tonight-panel { max-height:calc(100vh - 128px - var(--tonight-feed-top, 64px)); }
+   pill or campus-pick strip): feed top + 28 pad + 24 + 64 corner puck + 24
+   = 140 past it, so the Otto corner stays clear at scroll 0 with a banner too
+   (the puck grew from the 52px orb with Otto's Planet, Nov 10 2026). */
+.tonight-panel { max-height:calc(100vh - 140px - var(--tonight-feed-top, 64px)); }
 .tonight-scroll { overflow-y:auto; scrollbar-width:thin; }
 
 /* ── Both panels: a flat, framed tray (no shadow; the feed cards float) ──── */

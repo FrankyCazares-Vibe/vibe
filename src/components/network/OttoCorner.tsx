@@ -3,23 +3,26 @@
 import { useEffect, useRef, useState } from "react";
 
 import { useMiniMessages } from "@/components/desktop/messages/MiniMessenger";
+import { OttoPlanet } from "@/components/otto/planet/OttoPlanet";
 
 import { OttoSidePanel } from "./OttoSidePanel";
+import "./otto-corner.css";
 
 /**
- * Persistent bottom-right Otto presence — visual parity with the legacy
- * `_otto.js` corner ring (dark 52px shell, orange orbit + breathing pulse +
- * pulsing core, optional unread dot).
+ * Persistent bottom-right Otto presence: since Nov 10, 2026 (Otto build
+ * wave 1) a 64px paper puck with Otto drawn as Planet inside (46px, live),
+ * waiting while something is unseen. The static twin in `_otto.js` follows
+ * in the same wave.
  *
  * Polls `/api/me/notifications/count` every 30s for the unread badge — same
  * cadence as `_otto.js`. Click opens the slide-out side panel; the panel
- * marks all notifications read so the dot disappears next poll.
+ * marks all notifications read so the count clears next poll.
  *
  * Live mention pop-up: whenever the unread count increases between polls
  * we peek the newest notification. If it's a mention AND the actor is
  * mutually connected with the viewer, a toast slides up from the corner
  * with a one-tap link to the post. Non-mention notifications, or
- * mentions from non-connections, just bump the dot quietly.
+ * mentions from non-connections, just bump the count quietly.
  */
 type MentionToast = {
   id: string;
@@ -48,11 +51,6 @@ type NotifLite = {
 
 export function OttoCorner() {
   const [unread, setUnread] = useState(0);
-  // Separate from `unread` so the corner can flip the orb's BODY into
-  // a thinking+alert state on mention specifically (the visual
-  // language for "Otto wants to show you something"). Plain unread
-  // notifs — likes, follows, comments — keep the idle viz.
-  const [unreadMention, setUnreadMention] = useState(0);
   const [open, setOpen] = useState(false);
   // Messages lives in the panel too (its second tab, laptops with the new
   // chat): the orb's number is Otto's news plus the unread chats.
@@ -74,7 +72,7 @@ export function OttoCorner() {
       const actor = notif.actor;
       if (!actor?.id) return;
       // Only pop the toast when the mentioner is mutually connected.
-      // Falls through to the silent dot when they aren't — matches the
+      // Falls through to the silent count when they aren't — matches the
       // user's mental model that "ping me only for people I know".
       try {
         const r = await fetch(
@@ -109,11 +107,8 @@ export function OttoCorner() {
         if (cancelled) return;
         if (!data?.ok || typeof data.unread !== "number") return;
         const nextUnread = data.unread as number;
-        const nextMention =
-          typeof data.unread_mention === "number" ? data.unread_mention : 0;
         const prev = lastUnreadRef.current;
         setUnread(nextUnread);
-        setUnreadMention(nextMention);
         lastUnreadRef.current = nextUnread;
         // Only peek the newest notif when we have an established baseline
         // AND the count just went up — keeps the cold-load case silent.
@@ -154,32 +149,29 @@ export function OttoCorner() {
     return () => window.clearTimeout(t);
   }, [toast]);
 
-  // Ripple key — bumped whenever `unread` ticks up so the badge fires
-  // a one-shot ripple ring. Tracks the prior count via a ref so the
-  // ripple ONLY plays on increase (not on initial cold-load with
-  // unread > 0, and not when the panel clears the count to 0).
-  const prevUnreadForRippleRef = useRef(0);
-  const [rippleKey, setRippleKey] = useState(0);
-  // `popping` triggers the orb-scale animation. We can't just set a
-  // CSS animation property and expect it to replay on each rippleKey
-  // change — the browser sees the same animation name and ignores
-  // restarts. Toggle off → next-frame on → off after the duration so
-  // the animation re-mounts cleanly each time.
+  // `popping` triggers the puck's one-shot pop when the unseen count ticks
+  // up (not on a cold load with something unseen, not when the panel clears
+  // it). The browser ignores a restart of the same animation name, so it is
+  // toggled off, then on next frame, then off after the duration.
+  // otto-corner.css stops it under reduced motion.
+  const prevUnreadRef = useRef(0);
   const [popping, setPopping] = useState(false);
   useEffect(() => {
-    if (unread > prevUnreadForRippleRef.current) {
-      setRippleKey((k) => k + 1);
+    if (unread > prevUnreadRef.current) {
       setPopping(false);
       const raf = window.requestAnimationFrame(() => setPopping(true));
       const t = window.setTimeout(() => setPopping(false), 720);
-      prevUnreadForRippleRef.current = unread;
+      prevUnreadRef.current = unread;
       return () => {
         window.cancelAnimationFrame(raf);
         window.clearTimeout(t);
       };
     }
-    prevUnreadForRippleRef.current = unread;
+    prevUnreadRef.current = unread;
   }, [unread]);
+
+  // Something unseen: Otto's news or an unread chat, the badge's count.
+  const waiting = unread + chats.unread > 0;
 
   return (
     <>
@@ -189,11 +181,8 @@ export function OttoCorner() {
       onClick={() => {
         setOpen(true);
         // Optimistic — the panel will mark-read server-side; clear the
-        // dot now so it doesn't blink for the polling interval. Same
-        // treatment for the mention sub-count so the thinking+alert
-        // body relaxes back to idle right away.
+        // badge now so it doesn't blink for the polling interval.
         if (unread > 0) setUnread(0);
-        if (unreadMention > 0) setUnreadMention(0);
       }}
       aria-label={
         unread + chats.unread > 0
@@ -202,139 +191,55 @@ export function OttoCorner() {
             ? "Open Otto and Messages"
             : "Open Otto"
       }
+      // The board's corner puck (Nov 10, 2026): 64px, the page's paper,
+      // a hairline and the card shadow, so Planet reads in Light and Night.
+      // The pop still fires once each time the count ticks up
+      // (otto-orb-pop in globals.css, transform only; otto-corner.css
+      // stops it under reduced motion).
       style={{
         position: "fixed",
         bottom: 24,
         right: 24,
         zIndex: 9990,
         display: "block",
-        // Persistent expand when there's an unread mention: orb grows
-        // from 52px → 64px and stays there until the badge is cleared.
-        // Pairs with the thinking+alert body so the corner reads as
-        // "Otto has something for you" at a glance. Smooth 300ms
-        // cubic-bezier transition keeps the resize from feeling abrupt.
-        width: unreadMention > 0 ? 64 : 52,
-        height: unreadMention > 0 ? 64 : 52,
+        width: 64,
+        height: 64,
         padding: 0,
         borderRadius: "50%",
-        background: "#1C1C1E",
-        // Border + ambient glow lean warmer when the orb is in
-        // thinking+alert mode, matching the mockup's "this is asking
-        // for your attention" treatment without losing the dark shell.
-        border:
-          unreadMention > 0
-            ? "0.5px solid rgba(255,92,53,0.6)"
-            : "0.5px solid rgba(255,92,53,0.3)",
-        boxShadow:
-          unreadMention > 0
-            ? "0 10px 28px rgba(0,0,0,0.20), 0 0 28px rgba(255,92,53,0.36)"
-            : "0 8px 24px rgba(0,0,0,0.18)",
+        background: "var(--paper)",
+        border: "1px solid var(--hairline)",
+        boxShadow: "var(--card-shadow)",
         cursor: "pointer",
         transformOrigin: "center",
-        transition:
-          "width 300ms cubic-bezier(.22,1,.36,1), height 300ms cubic-bezier(.22,1,.36,1), box-shadow 300ms ease, border-color 300ms ease",
-        // Orb expand on new notification — `popping` is briefly true
-        // after each unread bump (see useEffect above), which mounts
-        // the `otto-orb-pop` keyframe for ~700ms. Toggling off→on
-        // re-runs the animation each time. Keyframes live in
-        // globals.css alongside the orb's other shared animations.
+        transition: "box-shadow 300ms ease",
         animation: popping
           ? "otto-orb-pop 700ms cubic-bezier(.22,1,.36,1) 1"
           : undefined,
       }}
       onMouseEnter={(e) => {
         e.currentTarget.style.boxShadow =
-          unreadMention > 0
-            ? "0 12px 32px rgba(255,92,53,0.4), 0 0 28px rgba(255,92,53,0.36)"
-            : "0 12px 32px rgba(255,92,53,0.25)";
+          "var(--card-shadow), 0 12px 32px rgba(255,92,53,0.22)";
       }}
       onMouseLeave={(e) => {
-        e.currentTarget.style.boxShadow =
-          unreadMention > 0
-            ? "0 8px 24px rgba(0,0,0,0.18), 0 0 22px rgba(255,92,53,0.32)"
-            : "0 8px 24px rgba(0,0,0,0.18)";
+        e.currentTarget.style.boxShadow = "var(--card-shadow)";
       }}
     >
-      {/* Unread badge — counted, gently pulsing coral pill on the
-          orb's top-right shoulder. Doubles as the "Otto has news for
-          you" signal: continuous pulse to draw the eye + a one-shot
-          ripple ring whenever the count just ticked up. Keeps under
-          20px so it never camps the orb. */}
+      {/* The count (Nov 10, 2026): ink on the page colour, still. His
+          coral moon at the ring's raised end is the one coral thing that
+          says something waits (the board), so the coral pill, its pulse and
+          its ripple are gone. The aria-label above carries the numbers. */}
       {unread + chats.unread > 0 ? (
-        <>
-          <style>{`
-            @keyframes otto-badge-pulse {
-              0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(255,92,53,0.55); }
-              50%      { transform: scale(1.08); box-shadow: 0 0 0 4px rgba(255,92,53,0); }
-            }
-            @keyframes otto-badge-ripple {
-              from { transform: scale(0.6); opacity: 0.7; }
-              to   { transform: scale(2.6); opacity: 0; }
-            }
-          `}</style>
-          {/* One-shot ripple — re-mounts on rippleKey change so the
-              animation replays from frame 0 each time. */}
-          <span
-            key={`ripple-${rippleKey}`}
-            aria-hidden
-            style={{
-              position: "absolute",
-              top: -4,
-              right: -4,
-              width: 22,
-              height: 22,
-              borderRadius: "50%",
-              border: "1.5px solid rgba(255,92,53,0.55)",
-              animation: "otto-badge-ripple 900ms ease-out forwards",
-              pointerEvents: "none",
-              zIndex: 1,
-            }}
-          />
-          <span
-            aria-hidden
-            style={{
-              position: "absolute",
-              top: -6,
-              right: -6,
-              minWidth: 18,
-              height: 18,
-              padding: "0 5px",
-              borderRadius: 999,
-              background: "#FF5C35",
-              // The ring is a cut-out in the page colour (cream / Night paper).
-              border: "2px solid var(--cream)",
-              boxShadow:
-                "0 0 12px rgba(255,92,53,0.6), 0 2px 6px rgba(0,0,0,0.18)",
-              // Dark number on coral (6.3:1); white was 3.1:1.
-              color: "var(--on-coral, #160A06)",
-              fontFamily: "DM Sans, sans-serif",
-              fontWeight: 800,
-              fontSize: 10,
-              lineHeight: "14px",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              letterSpacing: "0.02em",
-              animation: "otto-badge-pulse 2.4s ease-in-out infinite",
-              zIndex: 2,
-            }}
-          >
-            {unread + chats.unread > 9 ? "9+" : unread + chats.unread}
-          </span>
-        </>
+        <span aria-hidden className="otto-corner-count">
+          {unread + chats.unread > 9 ? "9+" : unread + chats.unread}
+        </span>
       ) : null}
 
-      {/* Centered viz. Two layouts:
-          - Idle (no unread mention): single breathing ring + slow
-            orbit + small pulsing core (matches the legacy _otto.js
-            corner ring).
-          - Thinking + alert (unread mention > 0): two breathing rings
-            (coral + purple), two counter-spinning orbits with mixed
-            coral/purple/cream nodes, and a larger cream-inset coral
-            core. Maps to the "thinking" + "alert" states from the
-            canonical mockup at ~/Downloads/otto_mockups/01_otto_states.html.
-            Reads as "Otto is actively trying to surface something". */}
-      <div
+      {/* Otto as Planet (Nov 10, 2026, Otto build wave 1): 46px, live (the
+          moon's 16 s lap, a bob and a blink, when the person's look is
+          Living). Something unseen (the badge's count) makes him wait: one
+          eye bigger and his coral moon at the ring's raised right end, no
+          separate dot. Reduced motion holds him still, the moon parked. */}
+      <span
         style={{
           position: "absolute",
           inset: 0,
@@ -343,176 +248,8 @@ export function OttoCorner() {
           justifyContent: "center",
         }}
       >
-        {unreadMention > 0 ? (
-          <div
-            style={{
-              position: "relative",
-              width: 40,
-              height: 40,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
-            {/* Outer breathing ring — coral */}
-            <div
-              style={{
-                position: "absolute",
-                inset: 6,
-                borderRadius: "50%",
-                border: "1px solid #FF5C35",
-                animation: "otto-breath 2.8s ease-out infinite",
-              }}
-            />
-            {/* Inner breathing ring — purple, offset delay so they don't
-                pulse in lock-step. */}
-            <div
-              style={{
-                position: "absolute",
-                inset: 6,
-                borderRadius: "50%",
-                border: "1px solid #7C5CFC",
-                animation: "otto-breath 3.4s ease-out infinite",
-                animationDelay: "0.7s",
-              }}
-            />
-            {/* Outer orbit — 3 nodes spinning around the sun: coral
-                top, purple bottom, coral-light right. Inner orbit was
-                removed because its two nodes sat right against the
-                core (the "sun"). Keeping only the outer ring leaves
-                clear breathing room between the orbit and the body. */}
-            <div
-              style={{
-                position: "absolute",
-                inset: 2,
-                borderRadius: "50%",
-                border: "0.5px solid rgba(255,92,53,0.5)",
-                animation: "otto-orbit-spin-rev-med 3.2s linear infinite",
-              }}
-            >
-              <span
-                style={{
-                  position: "absolute",
-                  top: -3,
-                  left: "50%",
-                  transform: "translateX(-50%)",
-                  width: 5,
-                  height: 5,
-                  borderRadius: "50%",
-                  background: "#FF5C35",
-                  boxShadow: "0 0 6px #FF5C35",
-                }}
-              />
-              <span
-                style={{
-                  position: "absolute",
-                  bottom: -2,
-                  left: "50%",
-                  transform: "translateX(-50%)",
-                  width: 4,
-                  height: 4,
-                  borderRadius: "50%",
-                  background: "#7C5CFC",
-                  boxShadow: "0 0 5px #7C5CFC",
-                }}
-              />
-              <span
-                style={{
-                  position: "absolute",
-                  top: "50%",
-                  right: -2,
-                  transform: "translateY(-50%)",
-                  width: 3,
-                  height: 3,
-                  borderRadius: "50%",
-                  background: "#FFB59A",
-                }}
-              />
-            </div>
-            {/* Core — coral ball with cream inset + double-color glow.
-                The cream center is the "alert state" tell from the
-                mockup. */}
-            <div
-              style={{
-                position: "relative",
-                width: 14,
-                height: 14,
-                borderRadius: "50%",
-                background: "#FF5C35",
-                boxShadow:
-                  "0 0 18px #FF5C35, 0 0 30px rgba(124,92,252,0.35)",
-                animation:
-                  "otto-core-pulse-med 1.6s ease-in-out infinite",
-              }}
-            >
-              <div
-                style={{
-                  position: "absolute",
-                  inset: 3,
-                  borderRadius: "50%",
-                  background: "#FFE5DB",
-                }}
-              />
-            </div>
-          </div>
-        ) : (
-          <div
-            style={{
-              position: "relative",
-              width: 32,
-              height: 32,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
-            {/* Inner breathing pulse ring (matches _otto.js .otto-pulse-o) */}
-            <div
-              style={{
-                position: "absolute",
-                inset: 4,
-                borderRadius: "50%",
-                border: "1px solid #FF5C35",
-                animation: "otto-breath 2.8s ease-out infinite",
-              }}
-            />
-            {/* Outer spinning orbit + tracer dot */}
-            <div
-              style={{
-                position: "absolute",
-                inset: 0,
-                borderRadius: "50%",
-                border: "0.5px solid rgba(255,92,53,0.3)",
-                animation: "otto-orbit-spin 8s linear infinite",
-              }}
-            >
-              <div
-                style={{
-                  position: "absolute",
-                  top: 0,
-                  left: "50%",
-                  transform: "translateX(-50%)",
-                  width: 3,
-                  height: 3,
-                  borderRadius: "50%",
-                  background: "#FF5C35",
-                }}
-              />
-            </div>
-            {/* Pulsing core — solid orange ball with glow (matches _otto.js .otto-core) */}
-            <div
-              style={{
-                width: 9,
-                height: 9,
-                borderRadius: "50%",
-                background: "#FF5C35",
-                boxShadow: "0 0 10px #FF5C35",
-                animation: "otto-core-pulse 2.4s ease-in-out infinite",
-              }}
-            />
-          </div>
-        )}
-      </div>
+        <OttoPlanet size={46} live state={waiting ? "wait" : "rest"} />
+      </span>
     </button>
     <OttoSidePanel open={open} onClose={() => setOpen(false)} messages={chats} />
     {toast ? (

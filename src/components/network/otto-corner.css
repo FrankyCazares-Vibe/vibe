@@ -1,0 +1,23 @@
+/* The computer's corner Otto (OttoCorner.tsx, Nov 10 2026): the board's 64px
+   paper puck. The static twin is #ottoCorner in public/html/_otto.js; keep the
+   two in step (planet-static-drift.test.ts holds the static one's size). */
+
+/* The moon's cut-out ring is the puck's paper, not the page's cream. */
+#otto-corner .m-planet { --m-surface: var(--paper); }
+
+/* The unseen count: ink on the page colour, still. His coral moon at the
+   ring's raised end is the one coral thing that says something waits. */
+#otto-corner .otto-corner-count {
+  position: absolute; top: -5px; right: -5px; z-index: 2;
+  box-sizing: border-box; min-width: 20px; height: 20px; padding: 0 5px;
+  border-radius: 999px; border: 2px solid var(--cream);
+  background: var(--charcoal); color: var(--cream);
+  font: 800 10px/16px "DM Sans", sans-serif; letter-spacing: 0.02em;
+  display: flex; align-items: center; justify-content: center;
+  pointer-events: none;
+}
+
+/* Every loop and pop stops under reduced motion (the inline pop included). */
+@media (prefers-reduced-motion: reduce) {
+  #otto-corner { animation: none !important; }
+}

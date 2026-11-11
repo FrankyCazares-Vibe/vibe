@@ -4911,26 +4911,12 @@ function ChoiceField({
   );
 }
 
+// The otto-* keyframes that sat here were copies of globals.css's and
+// nothing on this page used them (Nov 10, 2026, Otto build wave 1).
 const SHEEN_KEYFRAMES = `
   @keyframes campus-tab-glow {
     0%, 100% { opacity: 0.55; }
     50% { opacity: 1; }
-  }
-  @keyframes otto-core-pulse {
-    0%, 100% { transform: scale(1); opacity: 0.9; }
-    50% { transform: scale(1.15); opacity: 1; }
-  }
-  @keyframes otto-orbit-spin {
-    from { transform: rotate(0deg); }
-    to { transform: rotate(360deg); }
-  }
-  @keyframes otto-breath {
-    0%, 100% { transform: scale(1); opacity: 0.25; }
-    50% { transform: scale(1.4); opacity: 0; }
-  }
-  @keyframes otto-synapse {
-    0%, 100% { opacity: 0.15; }
-    50% { opacity: 0.7; }
   }
 `;
 

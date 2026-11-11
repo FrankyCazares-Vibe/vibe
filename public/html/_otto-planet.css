@@ -1,0 +1,157 @@
+/* Otto as Planet (Nov 10, 2026, Franky's board round 3): the kit's mascot.css parts, m-planet.css and the ten skins.css
+   colourways. Markup: OttoPlanet.tsx (PLANET_PARTS). Light is the plain rule, Night under the app's dark selectors.
+   Transform and opacity only; reduced motion parks the moon. Held by kit-css.test.ts.
+   x1 = ring's far side + the moon behind (::after), x2 = near side, x3 = the moon in front. The ring is open at its low
+   left end; the coral moon parks in that gap and truly orbits: two copies on one path, each shown for its half (opacity).
+   m-live (hero, computer corner) = a 16 s lap; thinking 3.4 s violet; working 2.8 s; waiting = the ring's raised right end. */
+
+.m-planet{position:relative;display:inline-block;flex:none;vertical-align:middle;container-type:size;
+--m-a:#FFDDB0;--m-b:#FF9E62;--m-c:#EE5A2E;--m-d:#A2331A;--m-eye:#2A120A;--m-glow:rgba(255,92,53,.42);--sk-gl:rgba(255,92,53,.26);
+--m-surface:var(--cream,#FAF7F2);--otto-think:#7C5CFC;
+--m-check:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M5 12.5l4.5 4.5L19 7.5' fill='none' stroke='%23000' stroke-width='3.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+--m-bang:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 5v8.5M12 18.4v.2' fill='none' stroke='%23000' stroke-width='3.6' stroke-linecap='round'/%3E%3C/svg%3E");
+--mp-tilt:-18deg;--mp-th:180deg;--mp-r:55.5cqw;--mp-moon:15cqw;
+--mp-coral:radial-gradient(circle at 34% 30%,#FFD2B8 0,#FF9A70 20%,#FF5C35 50%,#D8441E 78%,#A82E10 100%);
+--mp-band:color-mix(in srgb,var(--m-d) 34%,transparent);--mp-band-l:color-mix(in srgb,var(--m-a) 26%,transparent);
+--otto-glow:var(--sk-gl);
+--mp-ring:color-mix(in srgb,var(--m-d) 72%,#1A0A05);--mp-ring-b:color-mix(in srgb,var(--m-d) 62%,var(--m-b));--mp-rim:color-mix(in srgb,var(--m-eye) 82%,var(--m-d))}
+/* Night: a light ring, a cream rim, the stronger glow. on-light keeps Light's */
+:root[data-theme="dark"] .m-planet:not(.on-light),.vibe-night-island .m-planet:not(.on-light){--otto-glow:var(--m-glow);
+--mp-ring:color-mix(in srgb,var(--m-a) 80%,#fff);--mp-ring-b:color-mix(in srgb,var(--m-a) 55%,var(--m-d));--mp-rim:#FFF3E0}
+.m-planet.think{--mp-tilt:-30deg}
+.m-planet.work{--mp-tilt:-8deg}
+.m-planet.fail{--mp-tilt:10deg}
+.m-planet.wait{--mp-th:0deg}
+
+/* colourways (Night glow --m-glow, Light --sk-gl), on Otto or a picker's sk-dot */
+.sk-dusk{--m-a:#F8E4F1;--m-b:#DDA9CF;--m-c:#A9689F;--m-d:#5A2C5C;--m-eye:#220E26;--m-glow:rgba(190,120,176,.42);--sk-gl:rgba(169,104,159,.26)}
+.sk-midnight{--m-a:#DCE8FF;--m-b:#8FB0F5;--m-c:#3F66D6;--m-d:#1A2E85;--m-eye:#070E2E;--m-glow:rgba(63,102,214,.46);--sk-gl:rgba(63,102,214,.26)}
+.sk-violet{--m-a:#EFE6FF;--m-b:#BCA6FA;--m-c:#7D58DE;--m-d:#3A2196;--m-eye:#130A38;--m-glow:rgba(125,88,222,.46);--sk-gl:rgba(125,88,222,.26)}
+.sk-rose{--m-a:#FFE3EC;--m-b:#FFA3C2;--m-c:#E2508A;--m-d:#8E1F52;--m-eye:#2E0A1B;--m-glow:rgba(226,80,138,.42);--sk-gl:rgba(226,80,138,.26)}
+.sk-cardinal{--m-a:#FFD9D2;--m-b:#F08A80;--m-c:#C1272D;--m-d:#740D17;--m-eye:#2A0508;--m-glow:rgba(193,39,45,.46);--sk-gl:rgba(193,39,45,.26)}
+.sk-ember{--m-a:#FFDDB0;--m-b:#FF9E62;--m-c:#EE5A2E;--m-d:#A2331A;--m-eye:#2A120A;--m-glow:rgba(255,92,53,.42);--sk-gl:rgba(255,92,53,.26)}
+.sk-lantern{--m-a:#FFF2C2;--m-b:#FFD166;--m-c:#EDA01E;--m-d:#935508;--m-eye:#2A1A06;--m-glow:rgba(237,160,30,.4);--sk-gl:rgba(237,160,30,.26)}
+.sk-forest{--m-a:#E2F6D6;--m-b:#98D68C;--m-c:#3F9A4C;--m-d:#175227;--m-eye:#07200E;--m-glow:rgba(63,154,76,.42);--sk-gl:rgba(63,154,76,.26)}
+.sk-canal{--m-a:#D6F6EC;--m-b:#7DD8C6;--m-c:#2A9F92;--m-d:#0F4F49;--m-eye:#06201D;--m-glow:rgba(42,159,146,.4);--sk-gl:rgba(42,159,146,.26)}
+.sk-onyx{--m-a:#FBF8F3;--m-b:#C4BEB6;--m-c:#7A746D;--m-d:#34302D;--m-eye:#0E0D0D;--m-glow:rgba(246,241,234,.24);--sk-gl:rgba(52,48,45,.2)}
+.sk-dot{display:block;border-radius:50%;background:radial-gradient(120% 120% at 34% 26%,var(--m-a) 0,var(--m-b) 34%,var(--m-c) 68%,var(--m-d) 100%)}
+
+/* parts */
+.m-planet i{position:absolute;display:block;box-sizing:border-box}
+.m-planet i::before,.m-planet i::after{box-sizing:border-box}
+.m-planet .m-aura{inset:-18%;border-radius:50%;background:radial-gradient(closest-side,var(--otto-glow),transparent 72%);opacity:.7}
+.m-planet .m-body{inset:13%;border-radius:50%;background:radial-gradient(120% 120% at 34% 26%,var(--m-a) 0,var(--m-b) 34%,var(--m-c) 68%,var(--m-d) 100%);overflow:hidden}
+.m-planet .m-body::after{content:"";position:absolute;inset:0;border-radius:inherit;box-shadow:inset 0 -5cqw 9cqw rgba(60,16,6,.28),inset 0 2cqw 4cqw rgba(255,255,255,.22);pointer-events:none}
+.m-planet .m-tex{inset:-22%;transform:rotate(-18deg);
+background:linear-gradient(180deg,transparent 50%,var(--mp-band-l) 55%,var(--mp-band-l) 58%,transparent 63%,transparent 66%,var(--mp-band) 72%,var(--mp-band) 80%,transparent 86%,transparent 88%,var(--mp-band) 94%,var(--mp-band) 100%)}
+.m-planet .m-face{inset:0}
+/* big round eyes, one glint, no mouth */
+.m-planet .m-eye{top:28.5%;width:16.5%;height:21%;border-radius:50%;background:var(--m-eye)}
+.m-planet .m-eye.l{left:23%}
+.m-planet .m-eye.r{right:23%}
+.m-planet .m-eye::after{content:"";position:absolute;left:47%;top:11%;width:40%;height:33%;border-radius:50%;background:rgba(255,255,255,.93)}
+.m-planet .m-mark{right:0;bottom:1%;width:36%;height:36%;border-radius:50%;opacity:0;transform:scale(.7);box-shadow:0 0 0 max(1.5px,2.4cqw) var(--m-surface);z-index:2}
+.m-planet .m-mark::after{content:"";position:absolute;inset:15%;background:#08140D;mask:var(--m-check) center/contain no-repeat}
+
+/* states. thinking: eyes up; working: eyes narrow */
+.m-planet.think .m-eye{transform:translate(20%,-36%)}
+.m-planet.work .m-eye{transform:scaleY(.46)}
+/* done: happy eyes, a pop, a check */
+.m-planet.done .m-eye{top:33%;width:18.5%;height:12%;background:transparent;border:0 solid var(--m-eye);border-top-width:max(1.5px,3.8cqw);border-radius:50%/100% 100% 0 0}
+.m-planet.done .m-eye.l{left:22%}
+.m-planet.done .m-eye.r{right:22%}
+.m-planet.done .m-eye::after,.m-planet.fail .m-eye::after{display:none}
+.m-planet.done .m-mark{opacity:1;transform:none;background:var(--ok-ink,#147A45);animation:m-mark 560ms var(--vibe-spring-pop) 120ms both}
+/* didn't work: flat eyes, a shake, a "!" */
+.m-planet.fail .m-eye{top:38%;width:17%;height:5.6%;border-radius:2cqw}
+.m-planet.fail .m-eye.l{left:22.5%;transform:rotate(-13deg)}
+.m-planet.fail .m-eye.r{right:22.5%;transform:rotate(13deg)}
+.m-planet.fail .m-aura{opacity:.2}
+.m-planet.fail .m-mark{opacity:1;transform:none;background:var(--error-ink,#C0392B)}
+.m-planet.fail .m-mark::after{mask-image:var(--m-bang);background:#1A0806}
+/* waiting: head tilt, one eye bigger, the moon at the ring's right end */
+.m-planet.wait .m-body{transform:rotate(7deg)}
+.m-planet.wait .m-eye.l{transform:translateY(-4%) scale(1.24)}
+.m-planet.wait .m-eye.r{transform:scale(1.04)}
+.m-planet.wait .m-mark{display:none}
+
+/* ring: one ellipse twice, thin far side, heavy near side, open at the low left end */
+.m-planet .m-x1,.m-planet .m-x2,.m-planet .m-x3{inset:-12%}
+.m-planet .m-x1::before,.m-planet .m-x2::before{content:"";position:absolute;left:3.23%;top:35.08%;width:93.55%;height:29.84%;border-radius:50%;border:solid var(--mp-ring);border-width:1.7cqw 5.4cqw 3.9cqw;transform:rotate(var(--mp-tilt))}
+.m-planet .m-x1::before{border-color:var(--mp-ring-b);clip-path:inset(0 0 49% 22%)}
+.m-planet .m-x2::before{clip-path:inset(49% 0 0 10%)}
+
+/* the moon: out along the ring's ellipse (radius --mp-r, squash .31, tilt --mp-tilt) to angle --mp-th (180deg = the gap),
+   then the squash and tilt are undone so it stays round. x3::before is in front of the body, x1::after behind it */
+.m-planet .m-x1::after,.m-planet .m-x3::before{content:"";position:absolute;left:50%;top:50%;width:var(--mp-moon);height:var(--mp-moon);margin:calc(var(--mp-moon)*-.5) 0 0 calc(var(--mp-moon)*-.5);border-radius:50%;
+background:var(--mp-coral);box-shadow:0 0 0 max(1px,1.1cqw) var(--m-surface);
+transform:rotate(var(--mp-tilt)) scaleY(.31) rotate(var(--mp-th)) translateX(var(--mp-r)) rotate(calc(-1*var(--mp-th))) scaleY(3.2258) rotate(calc(-1*var(--mp-tilt)));
+transition:transform .7s var(--vibe-spring-soft)}
+.m-planet .m-x1::after{opacity:0}
+
+/* m-live at rest: after 2.5 s a bob and blink every 6 s, a lap every 16 s (far side first, then near) */
+.m-planet.m-live:not(.think,.work,.done,.fail,.wait) .m-eye{animation:m-blink 6s linear 2.5s infinite}
+.m-planet.m-live:not(.think,.work,.done,.fail,.wait) :is(.m-body,.m-x1,.m-x2,.m-x3){animation:m-bob 6s var(--vibe-spring-soft) 2.5s infinite}
+.m-planet.m-live:not(.think,.work,.done,.fail,.wait) .m-x1::after{animation:m-planet-lap 16s linear 2.5s infinite,m-planet-back 16s linear 2.5s infinite}
+.m-planet.m-live:not(.think,.work,.done,.fail,.wait) .m-x3::before{animation:m-planet-lap 16s linear 2.5s infinite,m-planet-front 16s linear 2.5s infinite}
+/* thinking and working: the lap, faster, at every size */
+.m-planet:is(.think,.work) .m-x1::after{animation:m-planet-lap 3.4s linear infinite,m-planet-back 3.4s linear infinite}
+.m-planet:is(.think,.work) .m-x3::before{animation:m-planet-lap 3.4s linear infinite,m-planet-front 3.4s linear infinite}
+.m-planet.work .m-x1::after,.m-planet.work .m-x3::before{animation-duration:2.8s}
+.m-planet.think .m-x1::after,.m-planet.think .m-x3::before{background:var(--otto-think);box-shadow:0 0 0 max(1px,1.7cqw) var(--mp-rim)}
+/* done / didn't work: ring and moon move with the body; the moon drops off */
+.m-planet.done :is(.m-body,.m-x1,.m-x2,.m-x3){animation:m-pop 560ms var(--vibe-spring-pop) both}
+.m-planet.fail :is(.m-body,.m-x1,.m-x2,.m-x3){animation:m-shake 420ms var(--vibe-spring-soft) both}
+.m-planet.fail .m-x3::before{transform:translate(-35cqw,39cqw)}
+
+/* 28px (up to 40): no bands or glow, whole pixels, heavier ring, 6px moon */
+@container (max-width:40px){
+.m-planet .m-tex,.m-planet .m-aura{display:none}
+.m-planet .m-body{inset:3px}
+.m-planet .m-mark{width:42%;height:42%;right:-6%;bottom:-6%}
+.m-planet .m-eye{top:5px;width:5px;height:7px}
+.m-planet .m-eye.l{left:4px}
+.m-planet .m-eye.r{right:4px}
+.m-planet .m-eye::after{left:2.5px;top:1px;width:2px;height:2px}
+.m-planet:is(.done,.fail,.work) .m-eye::after{display:none}
+.m-planet.think .m-eye{transform:translate(0,-2px)}
+.m-planet.work .m-eye{transform:scaleY(.43)}
+.m-planet.done .m-eye{top:7px;width:7px;height:5px;border-top-width:2px}
+.m-planet.done .m-eye.l,.m-planet.fail .m-eye.l{left:3px}
+.m-planet.done .m-eye.r,.m-planet.fail .m-eye.r{right:3px}
+.m-planet.fail .m-eye{top:10px;width:7px;height:2px}
+.m-planet.wait .m-body,.m-planet.wait .m-eye.r{transform:none}
+.m-planet.wait .m-eye.l{transform:none;top:4px;left:3px;width:6px;height:8px}
+.m-planet .m-x1::before,.m-planet .m-x2::before{border-width:max(1.5px,5.5cqw) max(2px,9cqw) max(2px,9cqw);top:33.47%;height:33.06%}
+.m-planet .m-x1::before{clip-path:inset(0 0 49% 26%)}
+.m-planet .m-x2::before{clip-path:inset(49% 0 0 19%)}
+.m-planet .m-x1,.m-planet .m-x3{--mp-moon:6px;--mp-r:54.5cqw}
+.m-planet .m-x1::after,.m-planet .m-x3::before{box-shadow:0 0 0 1px var(--m-surface)}
+.m-planet.think .m-x1::after,.m-planet.think .m-x3::before{box-shadow:0 0 0 1px var(--mp-rim)}
+.m-planet.fail .m-x3::before{transform:translate(-35cqw,42cqw)}
+}
+/* 24px: one pixel smaller, 4x6 eyes, no glint */
+@container (max-width:25px){
+.m-planet .m-eye{top:4px;width:4px;height:6px}
+.m-planet .m-eye.l{left:3px}
+.m-planet .m-eye.r{right:3px}
+.m-planet .m-eye::after{display:none}
+.m-planet.done .m-eye{top:6px;width:6px;height:4px}
+.m-planet.done .m-eye.l,.m-planet.fail .m-eye.l{left:2px}
+.m-planet.done .m-eye.r,.m-planet.fail .m-eye.r{right:2px}
+.m-planet.fail .m-eye{top:8px;width:6px;height:2px}
+.m-planet.wait .m-eye.l{top:3px;left:2px;width:5px;height:7px}
+.m-planet .m-x1,.m-planet .m-x3{--mp-moon:5px}
+}
+
+/* reduced motion: nothing moves, the moon parks */
+@media (prefers-reduced-motion:reduce){.m-planet i,.m-planet i::before,.m-planet i::after{animation:none!important;transition:none!important}}
+
+@keyframes m-pop{from{transform:scale(.92)}to{transform:none}}
+@keyframes m-mark{from{opacity:0;transform:scale(.7)}to{opacity:1;transform:none}}
+@keyframes m-shake{0%,100%{transform:none}25%{transform:translateX(-3cqw)}60%{transform:translateX(2.4cqw)}85%{transform:translateX(-1cqw)}}
+@keyframes m-bob{0%,58%,100%{transform:none}74%{transform:translateY(-3cqw)}}
+@keyframes m-blink{0%,90%,100%{transform:none}94%{transform:scaleY(.1)}}
+@keyframes m-planet-lap{from{transform:rotate(var(--mp-tilt)) scaleY(.31) rotate(180deg) translateX(var(--mp-r)) rotate(-180deg) scaleY(3.2258) rotate(calc(-1*var(--mp-tilt)))}to{transform:rotate(var(--mp-tilt)) scaleY(.31) rotate(540deg) translateX(var(--mp-r)) rotate(-540deg) scaleY(3.2258) rotate(calc(-1*var(--mp-tilt)))}}
+@keyframes m-planet-back{0%,50%{opacity:1}50.05%,100%{opacity:0}}
+@keyframes m-planet-front{0%,49.95%{opacity:0}50%,100%{opacity:1}}

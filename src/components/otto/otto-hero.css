@@ -1,0 +1,7 @@
+/* Otto's hero on /otto (OttoHero.tsx). The orb's column is 88px, and 64px under 760px
+   (globals.css .otto-room-hero-orb); Planet fills whichever it is. His drawing scales
+   with the box (container units), so only the box changes. */
+.otto-room-hero-orb > .m-planet {
+  width: 100% !important;
+  height: 100% !important;
+}

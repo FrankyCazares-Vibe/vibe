@@ -465,103 +465,15 @@
   50% { opacity: 1; transform: scale(1.05); }
 }
 
-/* Otto orb — used on the-map page (and reused inside Lyra constellation).
-   Hex literals on purpose: avoids collision with shadcn's --accent/--muted. */
-@keyframes vibe-orb-pulse-core {
-  0%, 100% { transform: scale(1); opacity: 0.9; }
-  50% { transform: scale(1.18); opacity: 1; }
-}
-@keyframes vibe-orb-spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
-}
-@keyframes vibe-orb-ring-breathe {
-  0%, 100% { transform: scale(1); opacity: 0.35; }
-  50% { transform: scale(1.5); opacity: 0; }
-}
-
-.otto-orb-wrap .orb-pulse-1 {
-  position: absolute; inset: 22%;
-  border-radius: 50%;
-  border: 1px solid #FF5C35;
-  animation: vibe-orb-ring-breathe 2.8s ease-out infinite;
-}
-.otto-orb-wrap .orb-pulse-2 {
-  position: absolute; inset: 22%;
-  border-radius: 50%;
-  border: 1px solid #7C5CFC;
-  animation: vibe-orb-ring-breathe 3.4s ease-out infinite;
-  animation-delay: 0.7s;
-}
-.otto-orb-wrap .orb-track-1 {
-  position: absolute; inset: 12%;
-  border-radius: 50%;
-  border: 0.5px solid rgba(255, 92, 53, 0.3);
-  animation: vibe-orb-spin 9s linear infinite;
-}
-.otto-orb-wrap .orb-track-1::before {
-  content: ""; position: absolute;
-  top: -3px; left: 50%; transform: translateX(-50%);
-  width: 6px; height: 6px; border-radius: 50%;
-  background: #FF5C35;
-  box-shadow: 0 0 10px #FF5C35;
-}
-.otto-orb-wrap .orb-track-2 {
-  position: absolute; inset: 28%;
-  border-radius: 50%;
-  border: 0.5px solid rgba(124, 92, 252, 0.4);
-  animation: vibe-orb-spin 5s linear infinite;
-}
-.otto-orb-wrap .orb-track-2::before {
-  content: ""; position: absolute;
-  top: -2px; left: 50%; transform: translateX(-50%);
-  width: 5px; height: 5px; border-radius: 50%;
-  background: #C8B8FF;
-  box-shadow: 0 0 8px #7C5CFC;
-}
-.otto-orb-wrap .orb-core {
-  width: 22%; height: 22%;
-  border-radius: 50%;
-  background: #FF5C35;
-  box-shadow: 0 0 28px #FF5C35, 0 0 48px rgba(124, 92, 252, 0.4);
-  animation: vibe-orb-pulse-core 2.4s ease-in-out infinite;
-  z-index: 2;
-}
+/* The old orb (.otto-orb-wrap, .orb-*, vibe-orb-* keyframes) was deleted on
+   Nov 10, 2026: every Otto is Planet now (src/components/otto/kit/planet.css). */
 
 /* The UI kit's `.dark` block used to sit here; it lives in
    :root[data-theme="dark"] next to Vibe's own tokens now (S67 wave 3). */
 
-/* —— Otto orb shared keyframes (reused by campus-home + network corner) —— */
-@keyframes otto-core-pulse {
-  0%,
-  100% {
-    transform: scale(1);
-    opacity: 0.9;
-  }
-  50% {
-    transform: scale(1.15);
-    opacity: 1;
-  }
-}
-@keyframes otto-orbit-spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
-}
-@keyframes otto-breath {
-  0%,
-  100% {
-    transform: scale(1);
-    opacity: 0.25;
-  }
-  50% {
-    transform: scale(1.4);
-    opacity: 0;
-  }
-}
+/* —— Otto corner pop (src/components/network/OttoCorner.tsx). The other old
+   orb keyframes (otto-core-pulse, otto-orbit-spin, otto-breath, the -med
+   set, otto-synapse) went with the orb on Nov 10, 2026. —— */
 /* Orb pop — fires once each time the unread badge count ticks up, so the
    orb itself reacts ("hey, look") in addition to the badge pulse. Settle
    ends at scale(1) so subsequent hover / animation states aren't fighting
@@ -580,92 +492,13 @@
     transform: scale(1);
   }
 }
-/* Thinking + alert variants — used by the corner orb when there's an
-   unread mention. Faster orbits + a punchier core pulse make Otto feel
-   actively engaged ("trying to show you something"). Names match the
-   mockup file at ~/Downloads/otto_mockups/01_otto_states.html so this
-   stays the canonical source-of-truth for tuning. */
-@keyframes otto-core-pulse-med {
-  0%,
-  100% {
-    transform: scale(0.9);
-    opacity: 0.85;
-  }
-  50% {
-    transform: scale(1.15);
-    opacity: 1;
-  }
-}
-@keyframes otto-orbit-spin-med {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
-}
-@keyframes otto-orbit-spin-rev-med {
-  from {
-    transform: rotate(360deg);
-  }
-  to {
-    transform: rotate(0deg);
-  }
-}
-@keyframes otto-synapse {
-  0%,
-  100% {
-    opacity: 0.15;
-  }
-  50% {
-    opacity: 0.7;
-  }
-}
 /* ====================================================================== */
-/* Otto's sun halo — left over from the old landing, still used by the     */
-/* /otto hero (src/components/otto/OttoHero.tsx) and .otto-room-section-  */
-/* eyebrow-dot (vibe-landing-sun-breathe). Not landing code any more.      */
+/* Left over from the old landing. The sun halo (.vibe-landing-sun-disc,  */
+/* -halo, -otto, vibe-landing-sun-wave) went on Nov 10, 2026 with the orb; */
+/* vibe-landing-sun-breathe stays for .otto-room-section-eyebrow-dot.      */
 /* ====================================================================== */
 .vibe-landing-typewriter-dot {
   color: #ff5c35;
-}
-.vibe-landing-sun-disc {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.vibe-landing-sun-halo {
-  position: absolute;
-  inset: 0;
-  border-radius: 50%;
-  border: 1px solid rgba(255, 92, 53, 0.5);
-  animation: vibe-landing-sun-wave 3.4s cubic-bezier(0.4, 0, 0.2, 1) infinite;
-  pointer-events: none;
-}
-.vibe-landing-sun-halo-2 {
-  animation-delay: 1.1s;
-}
-.vibe-landing-sun-halo-3 {
-  animation-delay: 2.2s;
-}
-.vibe-landing-sun-otto {
-  position: relative;
-  z-index: 1;
-  filter: drop-shadow(0 0 38px rgba(255, 92, 53, 0.7));
-  animation: vibe-landing-sun-breathe 3.2s ease-in-out infinite;
-  transition: filter 220ms ease, transform 220ms cubic-bezier(0.22, 1, 0.36, 1);
-}
-@keyframes vibe-landing-sun-wave {
-  0% {
-    transform: scale(0.7);
-    opacity: 0.65;
-  }
-  100% {
-    transform: scale(2.5);
-    opacity: 0;
-  }
 }
 @keyframes vibe-landing-sun-breathe {
   0%, 100% {
@@ -673,12 +506,6 @@
   }
   50% {
     transform: scale(1.05);
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  .vibe-landing-sun-halo,
-  .vibe-landing-sun-otto {
-    animation: none !important;
   }
 }
 /* ====================================================================== */

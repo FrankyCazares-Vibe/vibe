@@ -1,6 +1,8 @@
 "use client";
 
-import { OttoOrb } from "@/components/the-map/OttoOrb";
+import "./otto-hero.css";
+
+import { OttoPlanet } from "@/components/otto/planet/OttoPlanet";
 
 type Props = {
   /**
@@ -13,23 +15,18 @@ type Props = {
 };
 
 /**
- * Otto's hero: orb at full scale, name, "watcher" voice line, then the
- * stats triad. Reuses the existing `.vibe-landing-sun-*` halo + breathing
- * animation so the orb on this page reads as the *same* Otto from the
- * landing, just at home instead of mid-pitch.
+ * Otto's hero: Planet at full scale (88px, 64px on a narrow window), name,
+ * "watcher" voice line, then the stats triad. Planet brings his own glow
+ * (m-aura) and his idle loop (`live`, the moon's 16 s lap) when the
+ * person's look is Living. The room is dark in both themes, so the orb's
+ * box is a `vibe-night-island`: his Night drawing, the light ring. The
+ * page's own restyle is the Otto build's Wave 2.
  */
 export function OttoHero({ counts }: Props) {
   return (
     <header className="otto-room-hero">
-      <div className="otto-room-hero-orb">
-        <div className="vibe-landing-sun-disc otto-room-hero-orb-inner">
-          <span className="vibe-landing-sun-halo" aria-hidden />
-          <span className="vibe-landing-sun-halo vibe-landing-sun-halo-2" aria-hidden />
-          <span className="vibe-landing-sun-halo vibe-landing-sun-halo-3" aria-hidden />
-          <div className="vibe-landing-sun-otto">
-            <OttoOrb size={88} />
-          </div>
-        </div>
+      <div className="otto-room-hero-orb vibe-night-island">
+        <OttoPlanet size={88} live />
       </div>
 
       <div className="otto-room-hero-copy">

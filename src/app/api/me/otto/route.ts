@@ -4,6 +4,7 @@ import { newestLivePerRoom, readLatestPerRoomWithDeleted } from "@/lib/chat/late
 import { eventVisibilityOf, type EventVisibility } from "@/lib/events/validate";
 import { attachNotificationOrgs, type NotificationOrg } from "@/lib/orgs/notification-orgs";
 import { visibleActorFilter, withEventNotices } from "@/lib/push/event-notice";
+import { mergeSettings, type OttoSettings } from "@/lib/otto/settings";
 import { loadHiddenUsers } from "@/lib/safety/hidden-users";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
@@ -19,7 +20,8 @@ import { createSupabaseServiceClient } from "@/lib/supabase/service";
  *                      (blocks in either direction excluded; mutes are not —
  *                      see the note above that query)
  *   - channel_members→ unread DM channel count
- *   - users.otto_settings → preset blob (merged with defaults)
+ *   - users.otto_settings → preset blob (merged with defaults), Otto's look
+ *                      included (`settings.look`, src/lib/otto/settings.ts)
  *
  * Counts are derived from the same payload — Otto's hero line shows
  * "N nudges · N reminders · N unread" so the eyebrow stays honest.
@@ -36,25 +38,10 @@ const ACTIVITY_LIMIT = 12;
 const UPCOMING_LIMIT = 12;
 const ASKING_LIMIT = 12;
 
-const DEFAULT_SETTINGS: OttoSettings = {
-  chattiness: "moderate",
-  rsvp_day_before: true,
-  mention_pings: true,
-  milestone_pings: true,
-  daily_summary: false,
-  summary_time: "09:00",
-  unanswered_dm_pings: false,
-};
-
-export type OttoSettings = {
-  chattiness: "quiet" | "moderate" | "loud";
-  rsvp_day_before: boolean;
-  mention_pings: boolean;
-  milestone_pings: boolean;
-  daily_summary: boolean;
-  summary_time: string; // "HH:MM"
-  unanswered_dm_pings: boolean;
-};
+// Otto's settings blob (the type, the defaults, the read-side merge) lives in
+// src/lib/otto/settings.ts since Nov 10, 2026, next to the PATCH allowlist.
+// The type is re-exported here because the Otto pages import it from this route.
+export type { OttoSettings } from "@/lib/otto/settings";
 
 export type ActivityRow = {
   id: string;
@@ -149,25 +136,6 @@ export type OttoPayload = {
    */
   failed?: OttoFailedSection[];
 };
-
-function mergeSettings(raw: unknown): OttoSettings {
-  if (!raw || typeof raw !== "object") return { ...DEFAULT_SETTINGS };
-  const r = raw as Record<string, unknown>;
-  return {
-    chattiness:
-      r.chattiness === "quiet" || r.chattiness === "loud" ? r.chattiness : DEFAULT_SETTINGS.chattiness,
-    rsvp_day_before: typeof r.rsvp_day_before === "boolean" ? r.rsvp_day_before : DEFAULT_SETTINGS.rsvp_day_before,
-    mention_pings: typeof r.mention_pings === "boolean" ? r.mention_pings : DEFAULT_SETTINGS.mention_pings,
-    milestone_pings: typeof r.milestone_pings === "boolean" ? r.milestone_pings : DEFAULT_SETTINGS.milestone_pings,
-    daily_summary: typeof r.daily_summary === "boolean" ? r.daily_summary : DEFAULT_SETTINGS.daily_summary,
-    summary_time:
-      typeof r.summary_time === "string" && /^\d{2}:\d{2}$/.test(r.summary_time)
-        ? r.summary_time
-        : DEFAULT_SETTINGS.summary_time,
-    unanswered_dm_pings:
-      typeof r.unanswered_dm_pings === "boolean" ? r.unanswered_dm_pings : DEFAULT_SETTINGS.unanswered_dm_pings,
-  };
-}
 
 export async function GET() {
   const supabase = await createSupabaseServerClient();

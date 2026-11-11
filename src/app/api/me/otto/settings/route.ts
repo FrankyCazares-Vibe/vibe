@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { PUSH_KINDS, type PushKind } from "@/lib/push/payload";
+import { applySettingsPatch, sanitizePatch } from "@/lib/otto/settings";
 import { rateLimit, tooManyRequests } from "@/lib/rate-limit";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
@@ -10,7 +10,8 @@ import { createSupabaseServiceClient } from "@/lib/supabase/service";
  * Body: partial OttoSettings — any subset of the known keys, plus
  * `push: {previews?: boolean, off?: PushKind[]}` from Settings →
  * Notifications (plan §8 W4) and `theme: "light" | "dark" | "system"` from
- * Settings → Appearance (S67 wave 3).
+ * Settings → Appearance (S67 wave 3), and `look: {colour?, motion?}`, Otto's
+ * look, from the Otto page's look sheet (Nov 10, 2026; src/lib/otto/look.ts).
  * Answer: `{ok, settings, savedAt}` (the saved blob, server ms after the
  * write), or `{ok, settings: null, noop: true}` when nothing valid was sent.
  *
@@ -18,8 +19,10 @@ import { createSupabaseServiceClient } from "@/lib/supabase/service";
  * top-level keys over it (a shallow merge: a key the patch doesn't name is
  * kept), then merge `push` ONE level deeper, so a patch carrying only
  * `push.previews` keeps the stored `push.off`. `push.off` itself is a full
- * replacement list, never add/remove ops. Whitelist + type-check each key so
- * the JSON column can't accumulate garbage from a malicious client.
+ * replacement list, never add/remove ops. `look` merges one level deeper the
+ * same way. Whitelist + type-check each key so the JSON column can't
+ * accumulate garbage from a malicious client. The allowlist and the merge
+ * live in src/lib/otto/settings.ts (sanitizePatch, applySettingsPatch).
  *
  * Mentions have one key, `mention_pings` (W3, critic-w3 item 5): "mention"
  * is dropped from any incoming `push.off`, the same way unknown kinds are
@@ -28,96 +31,7 @@ import { createSupabaseServiceClient } from "@/lib/supabase/service";
  * (120 per 10 minutes) only keeps a stuck client from hammering the row.
  */
 
-const VALID_CHATTINESS = new Set(["quiet", "moderate", "loud"]);
-// Settings → Appearance (S67 wave 3, contracts C4): the code enum. "system"
-// is the product's Auto, "dark" its Night. The Settings page mirrors the
-// saved value into the device's localStorage.vibe_theme on its next visit.
-const VALID_THEMES = new Set(["light", "dark", "system"]);
-const TIME_RE = /^\d{2}:\d{2}$/;
 const SETTINGS_LIMIT = { limit: 120, windowSec: 600 };
-// Longer than any honest list (nine kinds today) but small enough to scan.
-const MAX_OFF_ITEMS = 32;
-// Kinds a student can switch off through `push.off`: every push kind but
-// "mention", which lives in `mention_pings`.
-const OFF_KINDS: ReadonlySet<string> = new Set(PUSH_KINDS.filter((k) => k !== "mention"));
-
-type PushPatch = { previews?: boolean; off?: PushKind[] };
-
-type PatchableSettings = {
-  chattiness?: "quiet" | "moderate" | "loud";
-  rsvp_day_before?: boolean;
-  mention_pings?: boolean;
-  milestone_pings?: boolean;
-  daily_summary?: boolean;
-  summary_time?: string;
-  unanswered_dm_pings?: boolean;
-  theme?: "light" | "dark" | "system";
-  push?: PushPatch;
-};
-
-function isObject(v: unknown): v is Record<string, unknown> {
-  return typeof v === "object" && v !== null && !Array.isArray(v);
-}
-
-/** `push` from the body, or an error. Unknown sub-keys are dropped. */
-function sanitizePush(raw: unknown): PushPatch | { error: string } {
-  if (!isObject(raw)) return { error: "Invalid push" };
-  const out: PushPatch = {};
-  if ("previews" in raw) {
-    if (typeof raw.previews !== "boolean") return { error: "Invalid push.previews" };
-    out.previews = raw.previews;
-  }
-  if ("off" in raw) {
-    if (!Array.isArray(raw.off) || raw.off.length > MAX_OFF_ITEMS) {
-      return { error: "Invalid push.off" };
-    }
-    const wanted = new Set(raw.off.filter((k): k is string => typeof k === "string"));
-    // Known kinds only, deduped, in PUSH_KINDS order so the stored list is stable.
-    out.off = PUSH_KINDS.filter((k) => OFF_KINDS.has(k) && wanted.has(k));
-  }
-  return out;
-}
-
-function sanitizePatch(raw: unknown): PatchableSettings | { error: string } {
-  if (!raw || typeof raw !== "object") return { error: "Body must be an object" };
-  const r = raw as Record<string, unknown>;
-  const out: PatchableSettings = {};
-  for (const [k, v] of Object.entries(r)) {
-    switch (k) {
-      case "chattiness":
-        if (typeof v !== "string" || !VALID_CHATTINESS.has(v)) return { error: "Invalid chattiness" };
-        out.chattiness = v as PatchableSettings["chattiness"];
-        break;
-      case "rsvp_day_before":
-      case "mention_pings":
-      case "milestone_pings":
-      case "daily_summary":
-      case "unanswered_dm_pings":
-        if (typeof v !== "boolean") return { error: `Invalid ${k}` };
-        out[k] = v;
-        break;
-      case "summary_time":
-        if (typeof v !== "string" || !TIME_RE.test(v)) return { error: "Invalid summary_time (HH:MM)" };
-        out.summary_time = v;
-        break;
-      case "theme":
-        if (typeof v !== "string" || !VALID_THEMES.has(v)) return { error: "Invalid theme" };
-        out.theme = v as PatchableSettings["theme"];
-        break;
-      case "push": {
-        const push = sanitizePush(v);
-        if ("error" in push) return push;
-        if (Object.keys(push).length > 0) out.push = push;
-        break;
-      }
-      default:
-        // Unknown key — silently drop rather than 400, so future clients
-        // sending new toggles don't break old deployments.
-        break;
-    }
-  }
-  return out;
-}
 
 export async function PATCH(req: Request) {
   const supabase = await createSupabaseServerClient();
@@ -159,13 +73,8 @@ export async function PATCH(req: Request) {
     console.error("[otto/settings PATCH read]", cur.error);
     return NextResponse.json({ ok: false, error: "Could not load settings" }, { status: 500 });
   }
-  const stored: Record<string, unknown> = isObject(cur.data?.otto_settings)
-    ? cur.data.otto_settings
-    : {};
-  const next: Record<string, unknown> = { ...stored, ...patch };
-  if (patch.push) {
-    next.push = { ...(isObject(stored.push) ? stored.push : {}), ...patch.push };
-  }
+  // A stored blob that isn't an object is treated as empty (applySettingsPatch).
+  const next = applySettingsPatch(cur.data?.otto_settings, patch);
 
   const { data, error } = await service
     .from("users")

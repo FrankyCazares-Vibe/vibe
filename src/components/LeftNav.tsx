@@ -12,6 +12,7 @@ import {
   type LoadFailure,
 } from "@/components/feedback/LoadFailed";
 import { NavIdentityChip } from "@/components/nav-identity-chip";
+import { OttoPlanet } from "@/components/otto/planet/OttoPlanet";
 import {
   CAL_KIND_WORD,
   calChipStyle,
@@ -127,6 +128,8 @@ const navItems = [
   {
     href: "/otto",
     label: "otto",
+    // Otto as Planet (Nov 10, 2026, Otto build wave 1): the 24px still
+    // drawing, centred on the 16px icon column so the labels stay in line.
     icon: (
       <span
         style={{
@@ -135,17 +138,10 @@ const navItems = [
           height: 16,
           alignItems: "center",
           justifyContent: "center",
+          flex: "none",
         }}
       >
-        <span
-          style={{
-            width: 8,
-            height: 8,
-            borderRadius: "50%",
-            background: "#FF5C35",
-            boxShadow: "0 0 6px #FF5C35",
-          }}
-        />
+        <OttoPlanet size={24} />
       </span>
     ),
   },

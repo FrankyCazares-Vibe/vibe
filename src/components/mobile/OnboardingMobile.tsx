@@ -43,6 +43,7 @@ import {
   secondaryLinkStyle,
   stepSectionStyle,
 } from "@/components/mobile/onboarding/onb-theme";
+import { OttoPlanet } from "@/components/otto/planet/OttoPlanet";
 import { isSafeRelativePath } from "@/lib/auth/login-next";
 import { vibeRequest, type VibeFailure } from "@/lib/feedback/request";
 import { toast } from "@/lib/feedback/toast";
@@ -245,14 +246,21 @@ function computeBoot(p: {
   return { fields, campusId, step, maxStep, profileDirty };
 }
 
-// ── Otto orb ────────────────────────────────────────────────────────────────
-function OttoOrb({ size, orbRef }: { size: "big" | "small"; orbRef?: Ref<HTMLDivElement> }) {
+// ── Otto ────────────────────────────────────────────────────────────────────
+/**
+ * Otto as Planet (Nov 10, 2026, the Otto build's Wave 1): 132px and living on
+ * step 1, 64px and still on the others. The box around him is the wormhole's
+ * anchor (`orbRef`): `_otto-wormhole.js` measures it and clones it whole, so
+ * its copy is this same tree (box, then Planet's parts in PLANET_PARTS order)
+ * and the hand-over can't be seen. The page is dark in both themes, so the box
+ * is a night island: his Night drawing, and the clone keeps it under <body>.
+ */
+function OnbOtto({ size, orbRef }: { size: "big" | "small"; orbRef?: Ref<HTMLDivElement> }) {
   const px = size === "big" ? 132 : 64;
-  const corePx = size === "big" ? 16 : 10;
   return (
     <div
       ref={orbRef}
-      className="onb-owh-orb"
+      className="onb-owh-orb vibe-night-island"
       style={{
         position: "relative",
         width: px,
@@ -264,24 +272,7 @@ function OttoOrb({ size, orbRef }: { size: "big" | "small"; orbRef?: Ref<HTMLDiv
         marginBottom: size === "big" ? 22 : 16,
       }}
     >
-      {/* Pulse rings */}
-      <span className="otto-pulse otto-pulse-1" />
-      <span className="otto-pulse otto-pulse-2" />
-      {/* Spinning orbit */}
-      <span className="otto-orbit">
-        <span className="otto-orbit-dot" />
-      </span>
-      {/* Core */}
-      <span
-        style={{
-          width: corePx,
-          height: corePx,
-          borderRadius: "50%",
-          background: COLORS.accent,
-          boxShadow: `0 0 ${size === "big" ? 22 : 14}px ${COLORS.accent}, 0 0 ${size === "big" ? 36 : 22}px rgba(124,92,252,.5)`,
-          animation: "otto-core-pulse 2.4s ease-in-out infinite",
-        }}
-      />
+      <OttoPlanet size={px} live={size === "big"} />
     </div>
   );
 }
@@ -1166,7 +1157,7 @@ export function OnboardingMobile({
         <section key={step} style={stepSectionStyle}>
           {step === 1 ? (
             <>
-              <OttoOrb size="big" orbRef={orbRef} />
+              <OnbOtto size="big" orbRef={orbRef} />
               <h1 className="onb-owh-line" style={h1Style}>
                 {"i'm "}<em style={emStyle}>otto</em>.
               </h1>
@@ -1179,7 +1170,7 @@ export function OnboardingMobile({
             </>
           ) : (
             <>
-              <OttoOrb size="small" orbRef={orbRef} />
+              <OnbOtto size="small" orbRef={orbRef} />
               {body}
             </>
           )}
@@ -1219,18 +1210,6 @@ function cta(disabled: boolean): CSSProperties {
 function StyleTag() {
   return (
     <style>{`
-      @keyframes otto-core-pulse {
-        0%, 100% { transform: scale(1); opacity: .9; }
-        50% { transform: scale(1.15); opacity: 1; }
-      }
-      @keyframes otto-ring-breathe {
-        0%, 100% { transform: scale(1); opacity: .3; }
-        50% { transform: scale(1.45); opacity: 0; }
-      }
-      @keyframes otto-spin {
-        from { transform: rotate(0deg); }
-        to { transform: rotate(360deg); }
-      }
       @keyframes onb-step-in {
         from { opacity: 0; transform: translateY(10px); }
         to { opacity: 1; transform: translateY(0); }
@@ -1239,33 +1218,6 @@ function StyleTag() {
         from { opacity: 0; }
         to { opacity: 1; }
       }
-      .otto-pulse {
-        position: absolute; inset: 14%;
-        border-radius: 50%;
-        border: 1px solid ${COLORS.accent};
-        animation: otto-ring-breathe 2.8s ease-out infinite;
-      }
-      .otto-pulse-2 {
-        border-color: ${COLORS.purple};
-        animation-duration: 3.4s;
-        animation-delay: .9s;
-      }
-      .otto-orbit {
-        position: absolute; inset: 8%;
-        border-radius: 50%;
-        border: 0.5px solid rgba(255,92,53,.3);
-        animation: otto-spin 8s linear infinite;
-      }
-      .otto-orbit-dot {
-        position: absolute;
-        top: 0; left: 50%;
-        transform: translateX(-50%);
-        width: 4px; height: 4px;
-        border-radius: 50%;
-        background: ${COLORS.accent};
-        box-shadow: 0 0 6px ${COLORS.accent};
-      }
-
       /* Otto's wormhole: held (hidden, can't be tapped) while he arrives,
          then the words rise in on SPRING_SOFT, the bars only fade. */
       [data-onb-arrive="hold"] > header,
@@ -1330,6 +1282,7 @@ const bg1Style: CSSProperties = {
   pointerEvents: "none",
   zIndex: 0,
 };
+// Warm gold, not violet: purple is Otto thinking only (Nov 10, 2026).
 const bg2Style: CSSProperties = {
   position: "absolute",
   bottom: -120,
@@ -1338,7 +1291,7 @@ const bg2Style: CSSProperties = {
   height: 360,
   borderRadius: "50%",
   background:
-    "radial-gradient(circle, rgba(124,92,252,.16) 0%, transparent 70%)",
+    "radial-gradient(circle, rgba(255,190,110,.16) 0%, transparent 70%)",
   pointerEvents: "none",
   zIndex: 0,
 };

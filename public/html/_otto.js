@@ -12,6 +12,56 @@
 // ══════════════════════════════════════════════════════════════════════════
 
 (function ottoCompanionInit(){
+  // ── Otto as Planet (Nov 10, 2026, the Otto build's Wave 1) ────────────
+  // The static twin of src/components/otto/planet/OttoPlanet.tsx: the same
+  // parts in PLANET_PARTS order, drawn by /html/_otto-planet.css (a byte copy
+  // of src/components/otto/kit/planet.css; planet-static-drift.test.ts holds
+  // both). His look (colourway, Still/Living) is this device's
+  // localStorage.vibe_otto_look, the key src/lib/otto/use-otto-look.ts
+  // writes. This part runs before the sign-in check below, so the page's own
+  // Ottos (profile.html's loading state) wear the look signed out too.
+  const OTTO_COLOURS = ['dusk', 'midnight', 'violet', 'rose', 'cardinal', 'ember', 'lantern', 'forest', 'canal', 'onyx'];
+  function readOttoLook() {
+    let raw = null;
+    try { raw = JSON.parse(localStorage.getItem('vibe_otto_look') || 'null'); } catch { raw = null; }
+    const ok = raw && typeof raw === 'object';
+    return {
+      colour: ok && OTTO_COLOURS.indexOf(raw.colour) >= 0 ? raw.colour : 'ember',
+      motion: ok && (raw.motion === 'still' || raw.motion === 'living') ? raw.motion : 'living',
+    };
+  }
+  // `live` asks for the idle loop (the hero and the computer's corner only);
+  // it shows when the look is Living and never below 40px, like OttoPlanet.
+  // The ask is kept in data-otto-live so a new look can turn it on or off.
+  function planetHTML(size, opts) {
+    const o = opts || {};
+    const look = readOttoLook();
+    let cls = 'm-otto m-planet sk-' + look.colour;
+    if (o.live && look.motion === 'living' && size >= 40) cls += ' m-live';
+    if (o.state && o.state !== 'rest') cls += ' ' + o.state;
+    return '<span class="' + cls + '"' + (o.live ? ' data-otto-live' : '') + ' aria-hidden="true" style="width:' + size + 'px;height:' + size + 'px">'
+      + '<i class="m-aura"></i><i class="m-x1"></i>'
+      + '<i class="m-body"><i class="m-tex"></i><i class="m-face"><i class="m-eye l"></i><i class="m-eye r"></i></i></i>'
+      + '<i class="m-x2"></i><i class="m-x3"></i><i class="m-mark"></i></span>';
+  }
+  function applyOttoLook(root) {
+    const look = readOttoLook();
+    let planets = [];
+    try { planets = (root || document).querySelectorAll('.m-planet'); } catch { return; }
+    planets.forEach(function (el) {
+      Array.prototype.slice.call(el.classList).forEach(function (c) { if (c.indexOf('sk-') === 0) el.classList.remove(c); });
+      el.classList.add('sk-' + look.colour);
+      if (el.hasAttribute('data-otto-live')) {
+        el.classList.toggle('m-live', look.motion === 'living' && (parseFloat(el.style.width) || el.offsetWidth) >= 40);
+      }
+    });
+  }
+  window.__vibeOttoPlanet = planetHTML;
+  window.__vibeOttoApplyLook = applyOttoLook;
+  applyOttoLook(document);
+  window.addEventListener('vibe:otto-look', function () { applyOttoLook(document); });
+  window.addEventListener('storage', function (e) { if (!e || e.key === 'vibe_otto_look' || e.key === null) applyOttoLook(document); });
+
   // Suppress on Otto's own page or when no user exists.
   const path = (location.pathname || '').toLowerCase();
   if (
@@ -29,7 +79,6 @@
   style.textContent = `
     @keyframes ottoPulseCore { 0%,100% { transform: scale(1); opacity: .9; } 50% { transform: scale(1.15); opacity: 1; } }
     @keyframes ottoSpinSlow { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-    @keyframes ottoRingBreathe { 0%,100% { transform: scale(1); opacity: .25; } 50% { transform: scale(1.4); opacity: 0; } }
     @keyframes ottoSynapse { 0%,100% { opacity: .15; } 50% { opacity: 1; } }
     @keyframes ottoPanelIn { from { transform: translateX(100%); } to { transform: translateX(0); } }
     @keyframes ottoBackdropIn { from { opacity: 0; } to { opacity: 1; } }
@@ -38,42 +87,43 @@
       position: fixed; bottom: 24px; right: 24px; z-index: 9990;
       cursor: none;
     }
-    /* Notification dot — hidden by default, JS adds .has-unread when
-       /api/me/notifications/count returns > 0. */
+    /* Something unseen (Nov 10 2026): a small ink dot, still. His coral
+       moon at the ring's raised end is the one coral thing that says
+       something waits, so the dot is no longer coral. Hidden by default;
+       JS adds .has-unread when /api/me/notifications/count returns > 0. */
     #ottoCorner .otto-notif {
-      position: absolute; top: -2px; right: -2px;
-      width: 11px; height: 11px; border-radius: 50%;
-      background: #FF5C35; border: 2px solid var(--cream, #FAF7F2);
-      z-index: 2; box-shadow: 0 0 8px rgba(255,92,53,.5);
-      display: none;
+      position: absolute; top: -1px; right: -1px;
+      width: 12px; height: 12px; border-radius: 50%; box-sizing: border-box;
+      background: var(--charcoal, #1C1C1E); border: 2px solid var(--cream, #FAF7F2);
+      z-index: 2; display: none;
     }
     #ottoCorner.has-unread .otto-notif { display: block; }
     /* Unread chats light the same dot: Messages is a tab of this panel
        (_miniMessenger.js adds .has-chats). */
     #ottoCorner.has-chats .otto-notif { display: block; }
-    /* Night (S68 wave 5): the dot's ring is the page colour, so it reads the
-       host's --cream (near-black in Night on both host pages). Everything
-       else Otto paints (the 52px shell, the slide-out panels, the ask bubble,
-       the toast) is dark chrome in Light too and stays as it is. */
+    /* The computer's corner Otto: the board's 64px paper puck, the React
+       corner's twin (src/components/network/otto-corner.css, OttoCorner.tsx).
+       It follows the page's Light or Night, so Otto here wears the page's
+       look; the moon's cut-out ring is the puck's paper. Live (the moon's
+       16 s lap) when the look is Living; waiting (the ask bubble) puts the
+       moon at the ring's raised end. */
     #ottoCorner .otto-shell {
-      width: 52px; height: 52px; border-radius: 50%;
-      background: #1C1C1E; border: 0.5px solid rgba(255,92,53,.3);
+      width: 64px; height: 64px; border-radius: 50%; box-sizing: border-box;
+      background: var(--paper, #FFFFFF);
+      border: 1px solid var(--hairline, var(--border, rgba(28,28,30,.08)));
       display: flex; align-items: center; justify-content: center;
-      box-shadow: 0 8px 24px rgba(0,0,0,.18);
-      transition: transform .18s, box-shadow .18s;
+      box-shadow: var(--card-shadow, var(--shadow, 0 4px 14px rgba(0,0,0,.08)));
+      transition: box-shadow .3s ease;
     }
     #ottoCorner:hover .otto-shell {
-      transform: translateY(-2px) scale(1.04);
-      box-shadow: 0 12px 32px rgba(255,92,53,.25);
+      box-shadow: var(--card-shadow, var(--shadow, 0 4px 14px rgba(0,0,0,.08))), 0 12px 32px rgba(255,92,53,.22);
     }
-    #ottoCorner .otto-viz {
-      position: relative; width: 32px; height: 32px;
-      display: flex; align-items: center; justify-content: center;
-    }
-    #ottoCorner .otto-pulse-o { animation: ottoRingBreathe 2.8s ease-out infinite; position: absolute; inset: 4px; border-radius: 50%; border: 1px solid #FF5C35; }
-    #ottoCorner .otto-orbit   { animation: ottoSpinSlow 8s linear infinite; position: absolute; inset: 0; border-radius: 50%; border: 0.5px solid rgba(255,92,53,.3); }
-    #ottoCorner .otto-orbit-dot { position: absolute; top: 0; left: 50%; transform: translateX(-50%); width: 3px; height: 3px; border-radius: 50%; background: #FF5C35; }
-    #ottoCorner .otto-core    { animation: ottoPulseCore 2.4s ease-in-out infinite; width: 9px; height: 9px; border-radius: 50%; background: #FF5C35; box-shadow: 0 0 10px #FF5C35; }
+    #ottoCorner .m-planet { --m-surface: var(--paper, #FFFFFF); }
+    /* Every other Otto this file draws sits on dark chrome, so each wrapper
+       is a .vibe-night-island (the kit's Night drawing in both looks) and
+       the moon's cut-out ring is the surface behind him (--m-surface). */
+    #ottoPanel .m-planet, #ottoPubPanel .m-planet { --m-surface: #141416; }
+    #ottoAskBubble .m-planet, #ottoPubToast .m-planet { --m-surface: #1C1C1E; }
 
     #ottoBackdrop {
       position: fixed; inset: 0; z-index: 9998;
@@ -107,10 +157,7 @@
     #ottoPanel .otto-panel-header-bg .otto-syn.s4 { animation-delay: .9s; }
     #ottoPanel .otto-panel-header-bg .otto-syn.s5 { animation-delay: 1.2s; }
     #ottoPanel .otto-panel-header-row { display: flex; align-items: center; gap: 14px; position: relative; z-index: 1; }
-    #ottoPanel .otto-mini { position: relative; width: 38px; height: 38px; display: flex; align-items: center; justify-content: center; }
-    #ottoPanel .otto-mini .otto-orbit { animation: ottoSpinSlow 8s linear infinite; position: absolute; inset: 0; border-radius: 50%; border: 0.5px solid rgba(255,92,53,.4); }
-    #ottoPanel .otto-mini .otto-orbit-dot { position: absolute; top: -1px; left: 50%; transform: translateX(-50%); width: 4px; height: 4px; border-radius: 50%; background: #FF5C35; }
-    #ottoPanel .otto-mini .otto-core { animation: ottoPulseCore 2.4s ease-in-out infinite; width: 10px; height: 10px; border-radius: 50%; background: #FF5C35; box-shadow: 0 0 10px #FF5C35; }
+    #ottoPanel .otto-mini { position: relative; width: 42px; height: 42px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
     #ottoPanel .otto-panel-name { font-family: 'Fraunces', serif; font-size: 18px; font-weight: 700; color: white; letter-spacing: -.3px; line-height: 1; }
     #ottoPanel .otto-panel-sub { font-size: 10px; color: rgba(255,255,255,.42); letter-spacing: .8px; text-transform: uppercase; margin-top: 4px; font-weight: 500; }
     #ottoPanel .otto-panel-close {
@@ -267,17 +314,14 @@
     .otto-syndicated-badge { display: inline-flex; align-items: center; gap: 6px; font-size: 10px; padding: 4px 10px; background: rgba(255,92,53,.1); color: var(--tag-ink, #B83A1A); border-radius: 100px; font-weight: 600; letter-spacing: .3px; margin-left: auto; flex-shrink: 0; }
     .otto-syndicated-dot { width: 5px; height: 5px; border-radius: 50%; background: #FF5C35; box-shadow: 0 0 4px #FF5C35; animation: ottoPulseCore 2.4s ease-in-out infinite; }
 
-    /* Corner glow during ask state */
-    #ottoCorner.otto-glow .otto-shell { border-color: #FF5C35; box-shadow: 0 6px 20px rgba(0,0,0,.2), 0 0 0 4px rgba(255,92,53,.18); }
+    /* Ask state: the corner Otto waits (his moon at the ring's raised end);
+       no coral glow on the puck, the moon is the one coral thing. */
 
     /* Frame 2 — ask bubble */
     #ottoAskBubble { position: fixed; bottom: 92px; right: 24px; z-index: 9991; background: #1C1C1E; border-radius: 16px; padding: 14px 16px; max-width: 300px; box-shadow: 0 8px 28px rgba(0,0,0,.25); border: 0.5px solid rgba(255,92,53,.3); color: white; font-family: 'DM Sans', sans-serif; animation: ottoBubbleIn .25s cubic-bezier(.2,.8,.2,1); }
     #ottoAskBubble .oab-arrow { position: absolute; bottom: -6px; right: 22px; width: 12px; height: 12px; background: #1C1C1E; border-right: 0.5px solid rgba(255,92,53,.3); border-bottom: 0.5px solid rgba(255,92,53,.3); transform: rotate(45deg); }
     #ottoAskBubble .oab-meta { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
-    #ottoAskBubble .oab-mini-otto { position: relative; width: 22px; height: 22px; display: flex; align-items: center; justify-content: center; }
-    #ottoAskBubble .oab-mini-otto .otto-orbit { animation: ottoSpinSlow 8s linear infinite; position: absolute; inset: 0; border-radius: 50%; border: 0.5px solid rgba(255,92,53,.4); }
-    #ottoAskBubble .oab-mini-otto .otto-orbit-dot { position: absolute; top: -1px; left: 50%; transform: translateX(-50%); width: 3px; height: 3px; border-radius: 50%; background: #FF5C35; }
-    #ottoAskBubble .oab-mini-otto .otto-core { animation: ottoPulseCore 2.4s ease-in-out infinite; width: 7px; height: 7px; border-radius: 50%; background: #FF5C35; box-shadow: 0 0 6px #FF5C35; }
+    #ottoAskBubble .oab-mini-otto { position: relative; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
     #ottoAskBubble .oab-name { font-family: 'Fraunces', serif; font-size: 12px; font-weight: 700; color: white; letter-spacing: -.2px; }
     #ottoAskBubble .oab-q { font-family: 'Fraunces', serif; font-style: italic; font-size: 14px; line-height: 1.5; color: rgba(255,255,255,.92); margin-bottom: 12px; }
     #ottoAskBubble .oab-platforms { display: flex; gap: 5px; margin-bottom: 12px; }
@@ -292,10 +336,7 @@
     #ottoPubBackdrop { position: fixed; inset: 0; z-index: 9996; background: rgba(20,20,22,.35); backdrop-filter: blur(2px); animation: ottoBackdropIn .22s ease-out; }
     #ottoPubPanel { position: fixed; top: 0; right: 0; bottom: 0; z-index: 9997; width: 380px; max-width: 92vw; background: #141416; color: white; border-left: 0.5px solid rgba(255,92,53,.15); box-shadow: -16px 0 48px rgba(0,0,0,.4); display: flex; flex-direction: column; font-family: 'DM Sans', sans-serif; animation: ottoPubPanelIn .26s cubic-bezier(.2,.8,.2,1); }
     #ottoPubPanel .opp-header { padding: 22px 22px 18px; border-bottom: 0.5px solid rgba(255,255,255,.06); display: flex; align-items: center; gap: 14px; flex-shrink: 0; }
-    #ottoPubPanel .opp-mini { position: relative; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; }
-    #ottoPubPanel .opp-mini .otto-orbit { animation: ottoSpinSlow 8s linear infinite; position: absolute; inset: 0; border-radius: 50%; border: 0.5px solid rgba(255,92,53,.4); }
-    #ottoPubPanel .opp-mini .otto-orbit-dot { position: absolute; top: -1px; left: 50%; transform: translateX(-50%); width: 4px; height: 4px; border-radius: 50%; background: #FF5C35; }
-    #ottoPubPanel .opp-mini .otto-core { animation: ottoPulseCore 2.4s ease-in-out infinite; width: 9px; height: 9px; border-radius: 50%; background: #FF5C35; box-shadow: 0 0 8px #FF5C35; }
+    #ottoPubPanel .opp-mini { position: relative; width: 42px; height: 42px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
     #ottoPubPanel .opp-name { font-family: 'Fraunces', serif; font-size: 16px; font-weight: 700; color: white; letter-spacing: -.2px; line-height: 1; }
     #ottoPubPanel .opp-sub { font-size: 10px; color: #FF5C35; letter-spacing: .8px; text-transform: uppercase; margin-top: 4px; font-weight: 600; }
     #ottoPubPanel .opp-sub.muted { color: rgba(255,255,255,.42); font-weight: 500; }
@@ -351,7 +392,7 @@
     /* Frame 5 — toast */
     #ottoPubToast { position: fixed; bottom: 92px; right: 24px; z-index: 9991; background: #1C1C1E; border-radius: 14px; padding: 12px 16px 12px 12px; max-width: 340px; box-shadow: 0 8px 28px rgba(0,0,0,.25); border: 0.5px solid rgba(46,204,113,.3); color: white; font-family: 'DM Sans', sans-serif; display: flex; align-items: center; gap: 10px; animation: ottoToastIn .25s cubic-bezier(.2,.8,.2,1); }
     #ottoPubToast.out { animation: ottoToastOut .3s forwards; }
-    #ottoPubToast .opt-check { width: 22px; height: 22px; border-radius: 50%; background: rgba(46,204,113,.18); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    #ottoPubToast .opt-otto { width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
     #ottoPubToast .opt-text { font-family: 'Fraunces', serif; font-style: italic; font-size: 13px; line-height: 1.5; color: rgba(255,255,255,.92); }
   `;
   document.head.appendChild(style);
@@ -363,13 +404,7 @@
   corner.style.cssText = 'background:none;border:none;padding:0;';
   corner.innerHTML = `
     <div class="otto-notif"></div>
-    <div class="otto-shell">
-      <div class="otto-viz">
-        <div class="otto-pulse-o"></div>
-        <div class="otto-orbit"><div class="otto-orbit-dot"></div></div>
-        <div class="otto-core"></div>
-      </div>
-    </div>
+    <div class="otto-shell">${planetHTML(46, { live: true })}</div>
   `;
   corner.onclick = openOttoPanel;
   document.body.appendChild(corner);
@@ -400,10 +435,7 @@
           <circle cx="22"  cy="88" r="2" fill="#FF5C35" class="otto-syn s4"/>
         </svg>
         <div class="otto-panel-header-row">
-          <div class="otto-mini">
-            <div class="otto-orbit"><div class="otto-orbit-dot"></div></div>
-            <div class="otto-core"></div>
-          </div>
+          <div class="otto-mini vibe-night-island">${planetHTML(42)}</div>
           <div style="flex:1;">
             <div class="otto-panel-name">otto</div>
             <div class="otto-panel-sub">your agent · online</div>
@@ -1084,15 +1116,13 @@
   function showAskBubble(text) {
     if (!pubFlowActive) return;
     corner.classList.add('otto-glow');
+    corner.querySelector('.m-planet')?.classList.add('wait');
     pubBubble = document.createElement('div');
     pubBubble.id = 'ottoAskBubble';
     pubBubble.innerHTML = `
       <div class="oab-arrow"></div>
       <div class="oab-meta">
-        <div class="oab-mini-otto">
-          <div class="otto-orbit"><div class="otto-orbit-dot"></div></div>
-          <div class="otto-core"></div>
-        </div>
+        <div class="oab-mini-otto vibe-night-island">${planetHTML(24, { state: 'wait' })}</div>
         <span class="oab-name">otto</span>
       </div>
       <div class="oab-q">"want me to send this to your other 3 platforms?"</div>
@@ -1120,6 +1150,7 @@
 
   function closeBubble() {
     corner.classList.remove('otto-glow');
+    corner.querySelector('.m-planet')?.classList.remove('wait');
     pubBubble?.remove();
     pubBubble = null;
   }
@@ -1136,10 +1167,7 @@
     pubPanel.id = 'ottoPubPanel';
     pubPanel.innerHTML = `
       <div class="opp-header">
-        <div class="opp-mini">
-          <div class="otto-orbit"><div class="otto-orbit-dot"></div></div>
-          <div class="otto-core"></div>
-        </div>
+        <div class="opp-mini vibe-night-island">${planetHTML(42, { state: 'think' })}</div>
         <div style="flex:1;">
           <div class="opp-name">otto</div>
           <div class="opp-sub">thinking...</div>
@@ -1198,6 +1226,7 @@
   function morphToDrafts(variants) {
     if (!pubPanel) return;
     const sub = pubPanel.querySelector('.opp-sub');
+    pubPanel.querySelector('.opp-mini .m-planet')?.classList.remove('think');
     sub.classList.add('muted');
     sub.textContent = '3 drafts ready';
 
@@ -1363,7 +1392,7 @@
     pubToast = document.createElement('div');
     pubToast.id = 'ottoPubToast';
     pubToast.innerHTML = `
-      <div class="opt-check"><svg width="11" height="11" viewBox="0 0 16 16" fill="none"><path d="M3 8 L7 12 L13 4" stroke="#2ECC71" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+      <div class="opt-otto vibe-night-island">${planetHTML(28, { state: 'done' })}</div>
       <div class="opt-text">"shipped to ${escapeHTML(joined)}. I'll watch how ${verb}."</div>
     `;
     document.body.appendChild(pubToast);

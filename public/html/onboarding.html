@@ -19,6 +19,20 @@
      Fraunces is pinned soft (SOFT 100) like the landing, Oct 19, 2026. -->
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,300..800;1,400&family=Fraunces:ital,wght,SOFT@0,400..900,100;1,400,100&display=swap" rel="stylesheet">
+<!-- Otto as Planet (Nov 10, 2026): a byte copy of the React kit's
+     src/components/otto/kit/planet.css, and the app's two springs it moves on
+     (globals.css). planet-static-drift.test.ts holds both. The page paints the device's look
+     (vibe_otto_look) onto its Ottos at start. -->
+<link rel="stylesheet" href="/html/_otto-planet.css">
+<style>
+:root{ --vibe-spring-pop: cubic-bezier(0.34, 1.56, 0.64, 1); --vibe-spring-soft: cubic-bezier(0.22, 1, 0.36, 1); }
+@supports (transition-timing-function: linear(0, 1)) {
+  :root{
+    --vibe-spring-pop: linear(0, 0.144 3%, 0.462 6%, 0.901 10%, 1.175 14%, 1.236 19%, 1.12 24%, 0.977 30%, 0.943 37%, 0.993 45%, 1.013 55%, 0.997 67%, 1 82%, 1);
+    --vibe-spring-soft: linear(0, 0.026 3%, 0.088 6%, 0.198 10%, 0.319 14%, 0.464 19%, 0.589 24%, 0.71 30%, 0.812 37%, 0.889 45%, 0.945 55%, 0.977 67%, 0.993 82%, 1);
+  }
+}
+</style>
 <script src="/html/_persistence.js"></script>
 <!-- window.OttoWormhole: Otto's arrival on step 1 and the leave for the app
      (Oct 25, 2026; the phone's onboarding loads the same file). -->
@@ -88,7 +102,8 @@ input, textarea, [contenteditable="true"] { cursor:text!important; }
 /* Frame */
 .onb-shell { position: relative; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 40px 20px; overflow: hidden; }
 .onb-bg-1 { position: absolute; top: -200px; right: -200px; width: 700px; height: 700px; border-radius: 50%; background: radial-gradient(circle, rgba(255,92,53,.16) 0%, transparent 70%); pointer-events: none; }
-.onb-bg-2 { position: absolute; bottom: -150px; left: 10%; width: 540px; height: 540px; border-radius: 50%; background: radial-gradient(circle, rgba(124,92,252,.13) 0%, transparent 70%); pointer-events: none; transition: all .8s ease; }
+.onb-bg-2 { position: absolute; bottom: -150px; left: 10%; width: 540px; height: 540px; border-radius: 50%; background: radial-gradient(circle, rgba(255,190,110,.13) 0%, transparent 70%); pointer-events: none; transition: all .8s ease; }
+/* .onb-bg-2 is warm gold, not violet: purple is Otto thinking only (Nov 10 2026). */
 
 /* Top bar: pinned full width on every step (Back, logo, Skip). The fade
    keeps a scrolled step readable under it. */
@@ -152,39 +167,18 @@ input, textarea, [contenteditable="true"] { cursor:text!important; }
 .onb-step.active { display: flex; }
 @keyframes stepIn { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: translateY(0); } }
 
-/* Otto orb sizes */
-@keyframes pulse-core { 0%,100% { transform: scale(1); opacity: .9; } 50% { transform: scale(1.15); opacity: 1; } }
-@keyframes pulse-core-big { 0%,100% { transform: scale(1); opacity: .9; } 50% { transform: scale(1.2); opacity: 1; } }
-@keyframes spin-slow { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-@keyframes spin-med { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-@keyframes ring-breathe { 0%,100% { transform: scale(1); opacity: .25; } 50% { transform: scale(1.4); opacity: 0; } }
-@keyframes ring-breathe-big { 0%,100% { transform: scale(1); opacity: .35; } 50% { transform: scale(1.5); opacity: 0; } }
-
+/* Otto, drawn as Planet (Nov 10, 2026; /html/_otto-planet.css, the byte copy
+   of the React kit). He is the whole box: 180px on step 1, where he lives
+   (the moon's 16 s lap) when the device's look is Living, 110px for
+   .otto-mid and 76px on the other steps, still. This page is dark in both
+   looks, so each box is a .vibe-night-island (the kit's Night drawing) and
+   the moon's cut-out ring is the page colour. paintOttoLook() puts the
+   device's colourway on him at boot. */
 .otto-big, .otto-mid, .otto-sm { position: relative; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
 .otto-big { width: 180px; height: 180px; margin-bottom: 32px; }
 .otto-mid { width: 110px; height: 110px; margin-bottom: 26px; }
 .otto-sm  { width: 76px; height: 76px;  margin-bottom: 22px; }
-
-.otto-big .pulse-1 { position: absolute; inset: 40px; border-radius: 50%; border: 1px solid var(--accent); animation: ring-breathe-big 2.8s ease-out infinite; }
-.otto-big .pulse-2 { position: absolute; inset: 40px; border-radius: 50%; border: 1px solid var(--purple); animation: ring-breathe-big 3.4s ease-out 1.4s infinite; }
-.otto-big .orbit-out { position: absolute; inset: 24px; border-radius: 50%; border: 0.5px solid rgba(255,92,53,.3); animation: spin-slow 8s linear infinite; }
-.otto-big .orbit-out .d1 { position: absolute; top: 0; left: 50%; transform: translateX(-50%); width: 5px; height: 5px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 8px var(--accent); }
-.otto-big .orbit-out .d2 { position: absolute; bottom: 0; left: 50%; transform: translateX(-50%); width: 4px; height: 4px; border-radius: 50%; background: var(--purple); }
-.otto-big .orbit-mid { position: absolute; inset: 50px; border-radius: 50%; border: 0.5px solid rgba(124,92,252,.4); animation: spin-med 4.5s linear infinite reverse; }
-.otto-big .orbit-mid .d { position: absolute; top: 0; left: 50%; transform: translateX(-50%); width: 4px; height: 4px; border-radius: 50%; background: var(--lavender); }
-.otto-big .core { width: 18px; height: 18px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 22px var(--accent), 0 0 40px rgba(124,92,252,.5); animation: pulse-core-big 2.4s ease-in-out infinite; }
-
-.otto-mid .pulse-1 { position: absolute; inset: 26px; border-radius: 50%; border: 1px solid var(--accent); animation: ring-breathe 2.8s ease-out infinite; }
-.otto-mid .pulse-2 { position: absolute; inset: 26px; border-radius: 50%; border: 1px solid var(--purple); animation: ring-breathe 3.4s ease-out .7s infinite; }
-.otto-mid .orbit-out { position: absolute; inset: 14px; border-radius: 50%; border: 0.5px solid rgba(255,92,53,.3); animation: spin-slow 8s linear infinite; }
-.otto-mid .orbit-out .d { position: absolute; top: 0; left: 50%; transform: translateX(-50%); width: 4px; height: 4px; border-radius: 50%; background: var(--accent); }
-.otto-mid .core { width: 12px; height: 12px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 14px var(--accent); animation: pulse-core 2.4s ease-in-out infinite; }
-
-.otto-sm .pulse-1 { position: absolute; inset: 18px; border-radius: 50%; border: 1px solid var(--accent); animation: ring-breathe 2.8s ease-out infinite; }
-.otto-sm .pulse-2 { position: absolute; inset: 18px; border-radius: 50%; border: 1px solid var(--purple); animation: ring-breathe 3.4s ease-out .7s infinite; }
-.otto-sm .orbit-out { position: absolute; inset: 8px; border-radius: 50%; border: 0.5px solid rgba(255,92,53,.3); animation: spin-slow 8s linear infinite; }
-.otto-sm .orbit-out .d { position: absolute; top: 0; left: 50%; transform: translateX(-50%); width: 3px; height: 3px; border-radius: 50%; background: var(--accent); }
-.otto-sm .core { width: 11px; height: 11px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 12px var(--accent); animation: pulse-core 2.4s ease-in-out infinite; }
+.otto-big .m-planet, .otto-mid .m-planet, .otto-sm .m-planet { --m-surface: var(--charcoal); }
 
 /* Type */
 .h1 { font-family: 'Fraunces', serif; font-size: 40px; font-weight: 900; color: white; letter-spacing: -1.5px; line-height: 1.1; margin-bottom: 18px; }
@@ -539,12 +533,8 @@ body.owh-rising .progress-dots { animation: owh-appear 480ms var(--onb-spring-so
 
   <!-- ─────────── STEP 1 — Hello ─────────── -->
   <section class="onb-step active" data-step="1">
-    <div class="otto-big">
-      <div class="pulse-1"></div>
-      <div class="pulse-2"></div>
-      <div class="orbit-out"><div class="d1"></div><div class="d2"></div></div>
-      <div class="orbit-mid"><div class="d"></div></div>
-      <div class="core"></div>
+    <div class="otto-big vibe-night-island">
+      <span class="m-otto m-planet sk-ember m-live" data-otto-live aria-hidden="true" style="width:180px;height:180px"><i class="m-aura"></i><i class="m-x1"></i><i class="m-body"><i class="m-tex"></i><i class="m-face"><i class="m-eye l"></i><i class="m-eye r"></i></i></i><i class="m-x2"></i><i class="m-x3"></i><i class="m-mark"></i></span>
     </div>
     <div class="h1">i'm <em>otto</em>.</div>
     <div class="intro" data-copy="hello.intro"></div>
@@ -556,10 +546,8 @@ body.owh-rising .progress-dots { animation: owh-appear 480ms var(--onb-spring-so
 
   <!-- ─────────── STEP 2 — Campus ─────────── -->
   <section class="onb-step" data-step="2">
-    <div class="otto-sm">
-      <div class="pulse-1"></div>
-      <div class="orbit-out"><div class="d"></div></div>
-      <div class="core"></div>
+    <div class="otto-sm vibe-night-island">
+      <span class="m-otto m-planet sk-ember" aria-hidden="true" style="width:76px;height:76px"><i class="m-aura"></i><i class="m-x1"></i><i class="m-body"><i class="m-tex"></i><i class="m-face"><i class="m-eye l"></i><i class="m-eye r"></i></i></i><i class="m-x2"></i><i class="m-x3"></i><i class="m-mark"></i></span>
     </div>
     <h2 class="h2" id="onbCampusTitle" data-copy="campus.title"></h2>
     <div class="sub-intro" id="onbCampusOtto"></div>
@@ -595,10 +583,8 @@ body.owh-rising .progress-dots { animation: owh-appear 480ms var(--onb-spring-so
 
   <!-- ─────────── STEP 3 — Profile ─────────── -->
   <section class="onb-step" data-step="3">
-    <div class="otto-sm">
-      <div class="pulse-1"></div>
-      <div class="orbit-out"><div class="d"></div></div>
-      <div class="core"></div>
+    <div class="otto-sm vibe-night-island">
+      <span class="m-otto m-planet sk-ember" aria-hidden="true" style="width:76px;height:76px"><i class="m-aura"></i><i class="m-x1"></i><i class="m-body"><i class="m-tex"></i><i class="m-face"><i class="m-eye l"></i><i class="m-eye r"></i></i></i><i class="m-x2"></i><i class="m-x3"></i><i class="m-mark"></i></span>
     </div>
     <h2 class="h2" data-copy="profile.title"></h2>
     <div class="sub-intro" data-copy="profile.sub"></div>
@@ -675,10 +661,8 @@ body.owh-rising .progress-dots { animation: owh-appear 480ms var(--onb-spring-so
 
   <!-- ─────────── STEP 4 — Photo ─────────── -->
   <section class="onb-step" data-step="4">
-    <div class="otto-sm">
-      <div class="pulse-1"></div>
-      <div class="orbit-out"><div class="d"></div></div>
-      <div class="core"></div>
+    <div class="otto-sm vibe-night-island">
+      <span class="m-otto m-planet sk-ember" aria-hidden="true" style="width:76px;height:76px"><i class="m-aura"></i><i class="m-x1"></i><i class="m-body"><i class="m-tex"></i><i class="m-face"><i class="m-eye l"></i><i class="m-eye r"></i></i></i><i class="m-x2"></i><i class="m-x3"></i><i class="m-mark"></i></span>
     </div>
     <h2 class="h2" data-copy="photo.title"></h2>
     <div class="sub-intro" data-copy="photo.otto"></div>
@@ -694,10 +678,8 @@ body.owh-rising .progress-dots { animation: owh-appear 480ms var(--onb-spring-so
 
   <!-- ─────────── STEP 5 — Follow clubs ─────────── -->
   <section class="onb-step" data-step="5">
-    <div class="otto-sm">
-      <div class="pulse-1"></div>
-      <div class="orbit-out"><div class="d"></div></div>
-      <div class="core"></div>
+    <div class="otto-sm vibe-night-island">
+      <span class="m-otto m-planet sk-ember" aria-hidden="true" style="width:76px;height:76px"><i class="m-aura"></i><i class="m-x1"></i><i class="m-body"><i class="m-tex"></i><i class="m-face"><i class="m-eye l"></i><i class="m-eye r"></i></i></i><i class="m-x2"></i><i class="m-x3"></i><i class="m-mark"></i></span>
     </div>
     <h2 class="h2" data-copy="clubs.title"></h2>
     <div class="sub-intro" data-copy="clubs.sub"></div>
@@ -717,10 +699,8 @@ body.owh-rising .progress-dots { animation: owh-appear 480ms var(--onb-spring-so
 
   <!-- ─────────── STEP 6 — Follow people ─────────── -->
   <section class="onb-step" data-step="6">
-    <div class="otto-sm">
-      <div class="pulse-1"></div>
-      <div class="orbit-out"><div class="d"></div></div>
-      <div class="core"></div>
+    <div class="otto-sm vibe-night-island">
+      <span class="m-otto m-planet sk-ember" aria-hidden="true" style="width:76px;height:76px"><i class="m-aura"></i><i class="m-x1"></i><i class="m-body"><i class="m-tex"></i><i class="m-face"><i class="m-eye l"></i><i class="m-eye r"></i></i></i><i class="m-x2"></i><i class="m-x3"></i><i class="m-mark"></i></span>
     </div>
     <h2 class="h2" data-copy="people.title"></h2>
     <div class="sub-intro" id="onbPeopleOtto"></div>
@@ -4310,8 +4290,30 @@ function markTouchDevice() {
   renderBusy();
   buildHistoryStack();
   showStep(onb.step);
+  paintOttoLook();
   startArrival();
 })();
+
+/**
+ * Otto wears the device's look (Nov 10, 2026): the colourway and Still or
+ * Living the app keeps in localStorage.vibe_otto_look (src/lib/otto/look.ts;
+ * _otto.js does the same on the other static pages). The markup is Ember and
+ * Living, the defaults; Still takes the lap off step 1's Otto. Before the
+ * wormhole copies him, so the copy wears it too.
+ */
+function paintOttoLook() {
+  const colours = ['dusk', 'midnight', 'violet', 'rose', 'cardinal', 'ember', 'lantern', 'forest', 'canal', 'onyx'];
+  let raw = null;
+  try { raw = JSON.parse(localStorage.getItem('vibe_otto_look') || 'null'); } catch (e) { raw = null; }
+  const ok = raw && typeof raw === 'object';
+  const colour = ok && colours.indexOf(raw.colour) >= 0 ? raw.colour : 'ember';
+  const living = !(ok && raw.motion === 'still');
+  document.querySelectorAll('.m-planet').forEach((el) => {
+    Array.prototype.slice.call(el.classList).forEach((c) => { if (c.indexOf('sk-') === 0) el.classList.remove(c); });
+    el.classList.add('sk-' + colour);
+    if (el.hasAttribute('data-otto-live')) el.classList.toggle('m-live', living);
+  });
+}
 
 // ── Otto's arrival and the leave for the app (Oct 25, 2026) ─────────────
 // public/html/_otto-wormhole.js draws both; the phone's onboarding uses the

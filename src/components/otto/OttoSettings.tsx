@@ -1,10 +1,13 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import type { OttoSettings } from "@/app/api/me/otto/route";
 import { vibeRequest } from "@/lib/feedback/request";
+import { DEFAULT_LOOK, LOOK_STORAGE_KEY, type OttoLook } from "@/lib/otto/look";
+import { setOttoLook, useOttoLook } from "@/lib/otto/use-otto-look";
 
+import { OTTO_COLOUR_NAMES, OTTO_MOTION_NAMES, OttoLookSheet, useOttoLookSaver } from "./OttoLookSheet";
 import { OttoSection } from "./OttoSection";
 
 type Props = {
@@ -202,7 +205,73 @@ export function OttoSettings({ settings }: Props) {
             );
           })}
         </ul>
+
+        <OttoLookRow account={settings.look} />
       </div>
     </OttoSection>
   );
 }
+
+/**
+ * "Otto's look" (Nov 10, 2026): his colour and Still / Living, picked in
+ * OttoLookSheet. The row shows this device's look (use-otto-look.ts). It
+ * saves through its own PATCH, never this card's queue, so a chattiness
+ * rollback can't undo a look.
+ *
+ * A device that has never stored a look takes the account's copy once, so a
+ * new phone shows the colour picked on the computer. A device with its own
+ * pick keeps it: a Settings page Next reuses on Back could carry an older
+ * account copy, and that must never undo a newer pick (the theme's lesson).
+ */
+function OttoLookRow({ account }: { account: OttoLook }) {
+  const look = useOttoLook();
+  const { pick, saving } = useOttoLookSaver();
+  const [open, setOpen] = useState(false);
+  const close = useCallback(() => setOpen(false), []);
+
+  useEffect(() => {
+    let stored: string | null;
+    try {
+      stored = window.localStorage.getItem(LOOK_STORAGE_KEY);
+    } catch {
+      return;
+    }
+    if (stored !== null) return;
+    if (account.colour === DEFAULT_LOOK.colour && account.motion === DEFAULT_LOOK.motion) return;
+    setOttoLook(account);
+  }, [account]);
+
+  return (
+    <div className="otto-room-chatty" data-holds-reload={saving ? "" : "false"}>
+      <span className="otto-room-chatty-label">Otto&apos;s look</span>
+      <button type="button" aria-haspopup="dialog" onClick={() => setOpen(true)} style={lookButtonStyle}>
+        <span className={`sk-dot sk-${look.colour}`} style={{ width: 18, height: 18 }} aria-hidden />
+        <span>
+          {OTTO_COLOUR_NAMES[look.colour]} · {OTTO_MOTION_NAMES[look.motion]}
+        </span>
+        <span aria-hidden style={{ opacity: 0.6 }}>
+          ›
+        </span>
+      </button>
+      {open ? <OttoLookSheet onClose={close} onPick={pick} saving={saving} /> : null}
+    </div>
+  );
+}
+
+// The Otto room is dark in both themes, so the row takes the room's own
+// light-on-dark ink (the .otto-room-segmented look), not the page tokens.
+const lookButtonStyle: React.CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  gap: 8,
+  minHeight: 44,
+  padding: "0 14px 0 10px",
+  borderRadius: 999,
+  border: "1px solid rgba(250, 247, 242, 0.14)",
+  background: "rgba(250, 247, 242, 0.06)",
+  color: "#faf7f2",
+  fontFamily: "DM Sans, sans-serif",
+  fontSize: 13,
+  fontWeight: 600,
+  cursor: "pointer",
+};

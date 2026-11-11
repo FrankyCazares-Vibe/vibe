@@ -14,13 +14,13 @@ import type {
 import { OttoActivity } from "@/components/otto/OttoActivity";
 import { useTabScrollMemory } from "@/components/mobile/use-tab-scroll-memory";
 import { OttoMetrics } from "@/components/otto/OttoMetrics";
+import { OttoPlanet } from "@/components/otto/planet/OttoPlanet";
 import { OttoRequests } from "@/components/otto/OttoRequests";
 import { OttoSettings } from "@/components/otto/OttoSettings";
 import { OttoTellInput } from "@/components/otto/OttoTellInput";
 import { OttoUpcoming } from "@/components/otto/OttoUpcoming";
 import { useUpcomingFollowsCalendar } from "@/components/otto/use-upcoming-follows-calendar";
 import { PushAsk } from "@/components/push/PushAsk";
-import { OttoOrb } from "@/components/the-map/OttoOrb";
 import { vibeRequest } from "@/lib/feedback/request";
 import { SPRING_SNAPPY } from "@/lib/motion/springs";
 import { followFailureLine, personName } from "@/lib/people/follow-label";
@@ -237,7 +237,7 @@ export function OttoMobile({ initial }: { initial: OttoPayload }) {
         color: "#fff",
       }}
     >
-      {/* Compact hero — orb + name + tagline + counts pill row */}
+      {/* Compact hero — Otto + name + tagline + counts pill row */}
       <header
         style={{
           padding: "calc(env(safe-area-inset-top, 0px) + 18px) 18px 14px",
@@ -247,7 +247,10 @@ export function OttoMobile({ initial }: { initial: OttoPayload }) {
           gap: 10,
         }}
       >
+        {/* Planet brings his own glow; the page is dark in both themes, so
+            his box is a night island (his Night drawing, the light ring). */}
         <div
+          className="vibe-night-island"
           style={{
             position: "relative",
             width: 84,
@@ -257,18 +260,7 @@ export function OttoMobile({ initial }: { initial: OttoPayload }) {
             justifyContent: "center",
           }}
         >
-          <span
-            aria-hidden
-            style={{
-              position: "absolute",
-              inset: -14,
-              borderRadius: "50%",
-              background:
-                "radial-gradient(circle, rgba(255,92,53,0.32) 0%, rgba(255,92,53,0) 70%)",
-              filter: "blur(8px)",
-            }}
-          />
-          <OttoOrb size={72} />
+          <OttoPlanet size={72} live />
         </div>
         <h1
           style={{

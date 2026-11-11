@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { MiniMessagesFrame, type MiniMessagesHandle } from "@/components/desktop/messages/MiniMessenger";
 import { asLoadFailure, LoadFailed, type LoadFailure } from "@/components/feedback/LoadFailed";
+import { OttoPlanet } from "@/components/otto/planet/OttoPlanet";
 import { vibeRequest } from "@/lib/feedback/request";
 import {
   clubInitials,
@@ -570,9 +571,14 @@ function PanelTabs({
   );
 }
 
+/** The header's Otto (Nov 10, 2026, Otto build wave 1): Planet at 28px,
+ *  always still. The panel is dark in both looks, so a night island gives
+ *  him Night's light ring. The 36px slot keeps the header as it was until
+ *  the panel's own redesign (wave 2B). */
 function MiniOrb() {
   return (
-    <div
+    <span
+      className="vibe-night-island"
       style={{
         position: "relative",
         width: 36,
@@ -583,39 +589,8 @@ function MiniOrb() {
         flexShrink: 0,
       }}
     >
-      <div
-        style={{
-          position: "absolute",
-          inset: 0,
-          borderRadius: "50%",
-          border: "0.5px solid rgba(255,92,53,0.4)",
-          animation: "otto-orbit-spin 8s linear infinite",
-        }}
-      >
-        <div
-          style={{
-            position: "absolute",
-            top: -1,
-            left: "50%",
-            transform: "translateX(-50%)",
-            width: 4,
-            height: 4,
-            borderRadius: "50%",
-            background: "#FF5C35",
-          }}
-        />
-      </div>
-      <div
-        style={{
-          width: 11,
-          height: 11,
-          borderRadius: "50%",
-          background: "#FF5C35",
-          boxShadow: "0 0 12px #FF5C35",
-          animation: "otto-core-pulse 2.4s ease-in-out infinite",
-        }}
-      />
-    </div>
+      <OttoPlanet size={28} />
+    </span>
   );
 }
 

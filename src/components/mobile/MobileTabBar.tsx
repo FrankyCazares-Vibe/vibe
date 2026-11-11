@@ -7,6 +7,7 @@ import { useEffect, useState, type CSSProperties } from "react";
 
 import { activeMobileTab, isClubPath, type MobileTabHref } from "@/components/mobile/mobile-tab-active";
 import { ClubSwitcherSheet } from "@/components/orgs/ClubSwitcherSheet";
+import { OttoPlanet } from "@/components/otto/planet/OttoPlanet";
 import { ClubLogo } from "@/components/profile/ClubFlair";
 import { useLongPress } from "@/lib/hooks/use-long-press";
 import { SPRING_SNAPPY } from "@/lib/motion/springs";
@@ -88,27 +89,10 @@ const MOBILE_TABS: MobileTab[] = [
   {
     href: "/otto",
     label: "otto",
-    icon: (
-      <span
-        style={{
-          display: "inline-flex",
-          width: 22,
-          height: 22,
-          alignItems: "center",
-          justifyContent: "center",
-        }}
-      >
-        <span
-          style={{
-            width: 12,
-            height: 12,
-            borderRadius: "50%",
-            background: "#FF5C35",
-            boxShadow: "0 0 8px rgba(255,92,53,0.55)",
-          }}
-        />
-      </span>
-    ),
+    // Otto as Planet (Nov 10, 2026, Otto build wave 1): the 24px drawing,
+    // always still, in the person's own colour. It sits a pixel past the
+    // 22px icon slot on each side; the slot centres it.
+    icon: <OttoPlanet size={24} />,
   },
   {
     href: "/messages",
