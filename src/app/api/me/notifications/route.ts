@@ -1,8 +1,12 @@
 import { NextResponse } from "next/server";
 
+import { limitFor } from "@/lib/limits/budgets";
+import { requireNotRestricted } from "@/lib/moderation/access";
 import { attachNotificationOrgs } from "@/lib/orgs/notification-orgs";
+import { isUuid } from "@/lib/pgrest";
 import { withPostMediaUrls } from "@/lib/post-media-url";
 import { visibleActorFilter, withEventNotices } from "@/lib/push/event-notice";
+import { tooManyRequests } from "@/lib/rate-limit";
 import { loadHiddenUsers } from "@/lib/safety/hidden-users";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
@@ -130,4 +134,80 @@ export async function GET(req: Request) {
   );
 
   return NextResponse.json({ ok: true, notifications });
+}
+
+/** The most ids one clear may name: a page of the desk's Otto saw and then some. */
+const MAX_CLEAR_IDS = 200;
+
+/**
+ * Clear (delete for good) the signed-in person's own notifications (Otto
+ * polish, Nov 11, 2026: the × on an Otto saw row and "Clear all"). The
+ * client holds the delete for ~5 s behind an Undo toast and only then calls
+ * this (src/lib/otto/clear-notifications.ts).
+ *
+ *   { ids: ["uuid", …] } → delete those rows, only where they are the caller's
+ *   { all: true, before } → delete the caller's rows created at or before `before` (ISO; the newest row the list loaded)
+ *
+ * Anything else is a 400 before a row is touched: an empty body, an empty
+ * list, a non-uuid id (never a silent filter), more than 200 ids, or both
+ * shapes at once. Ownership is the `user_id` filter AND row security
+ * (notifications_delete_own: auth.uid() = user_id), so naming someone else's
+ * id deletes nothing. Order: the `notificationsClear` budget right after
+ * sign-in, then the body, then a restriction in force refuses the write (the
+ * proxy refuses it first; this is the wall behind it), then the delete.
+ * Returns how many rows went.
+ */
+export async function DELETE(req: Request) {
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+    error: authErr,
+  } = await supabase.auth.getUser();
+  if (authErr || !user) {
+    return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+  }
+
+  const rl = await limitFor("notificationsClear", user.id);
+  if (!rl.allowed) return tooManyRequests(rl, "Too many changes at once. Try again in a few minutes.");
+
+  let body: { ids?: unknown; all?: unknown; before?: unknown } | null = null;
+  try {
+    body = (await req.json()) as { ids?: unknown; all?: unknown; before?: unknown } | null;
+  } catch {
+    body = null;
+  }
+  const refuse = (error: string) => NextResponse.json({ ok: false, error }, { status: 400 });
+  const shapes = "Pass { all: true, before } or { ids: [...] }";
+  if (!body || typeof body !== "object" || Array.isArray(body)) return refuse(shapes);
+
+  const all = body.all === true;
+  let ids: string[] = [];
+  // Clear all takes only rows at or before `before` (the newest row the list
+  // loaded), never one that arrived after it was drawn; a time past now is
+  // read as now (review, Nov 11).
+  let before = "";
+  if (all) {
+    if (body.ids !== undefined) return refuse(`${shapes}, not both`);
+    const at = typeof body.before === "string" && body.before.length <= 40 ? Date.parse(body.before) : NaN;
+    if (!Number.isFinite(at)) return refuse("Clear all needs before: the newest time the list loaded");
+    before = new Date(Math.min(at, Date.now())).toISOString();
+  } else {
+    if (body.before !== undefined) return refuse(shapes);
+    if (!Array.isArray(body.ids) || body.ids.length === 0) return refuse(shapes);
+    if (body.ids.length > MAX_CLEAR_IDS) return refuse(`Pass at most ${MAX_CLEAR_IDS} ids`);
+    if (!body.ids.every(isUuid)) return refuse("Every id must be a notification id");
+    ids = [...new Set(body.ids as string[])];
+  }
+
+  const restricted = await requireNotRestricted(user.id);
+  if (restricted) return restricted;
+
+  let query = supabase.from("notifications").delete({ count: "exact" }).eq("user_id", user.id);
+  query = all ? query.lte("created_at", before) : query.in("id", ids);
+  const { error, count } = await query;
+  if (error) {
+    console.error("[me/notifications DELETE]", error);
+    return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
+  }
+  return NextResponse.json({ ok: true, deleted: count ?? 0 });
 }

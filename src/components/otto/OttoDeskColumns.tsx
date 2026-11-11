@@ -1,14 +1,17 @@
 "use client";
 
-import Link from "next/link";
 import type { ReactNode } from "react";
 
+import { clearAllArg, noticeIdOf, useUndoClear } from "@/lib/otto/clear-notifications";
 import type { DeskItem, DeskModel } from "@/lib/otto/desk";
+import { FEW } from "@/lib/otto/desk-lists";
 
 import { DeskDone } from "./desk/DeskDone";
 import { DeskDraft } from "./desk/DeskDraft";
+import { DeskLinkRow, DeskTitle } from "./desk/DeskName";
 import { DeskIcon, DeskRow, deskLine } from "./desk/DeskRow";
-import { DeskList, DeskSection } from "./desk/DeskSection";
+import { DeskClearButton, DeskClearToast, DeskList, DeskSection, useFew } from "./desk/DeskSection";
+import { DeskTimeFilter, useDeskRange } from "./desk/DeskTimeFilter";
 
 /**
  * The computer desk's three columns (Wave 2A, Nov 10, 2026; board D3):
@@ -66,16 +69,17 @@ function ReadyItem({ item, index, desk, ...h }: { item: DeskItem; index: number;
   );
 }
 
-function Saw({ items }: { items: DeskItem[] }) {
+function Saw({ items, onClear }: { items: readonly DeskItem[]; onClear: (item: DeskItem) => void }) {
   return (
-    <div className="tx-host dk-card odc-saw-card">
-      <i className="tx tx-paper" aria-hidden="true" />
+    <div className="dk-card odc-saw-card">
       {items.map((item) => {
         const body = (
           <>
             <DeskIcon name={item.kind} />
             <span className="odc-saw-tx">
-              <span>{item.title}</span>
+              <span>
+                <DeskTitle item={item} />
+              </span>
               {item.detail || item.whenLabel ? (
                 <span className="odc-saw-sub">
                   {item.detail}
@@ -86,14 +90,22 @@ function Saw({ items }: { items: DeskItem[] }) {
             </span>
           </>
         );
-        return item.href ? (
-          <Link key={item.id} className="odc-saw" href={item.href}>
+        const row = item.href ? (
+          <DeskLinkRow item={item} href={item.href} className="odc-saw">
             {body}
-          </Link>
+          </DeskLinkRow>
         ) : (
-          <p key={item.id} className="odc-saw">
-            {body}
-          </p>
+          <p className="odc-saw">{body}</p>
+        );
+        return noticeIdOf(item.id) ? (
+          <div key={item.id} className="dk-clear-li">
+            {row}
+            <DeskClearButton item={item} onClear={onClear} />
+          </div>
+        ) : (
+          <div key={item.id} className="dk-clear-li">
+            {row}
+          </div>
         );
       })}
     </div>
@@ -108,7 +120,7 @@ export function OttoDeskColumns({
   failed = [],
   ...h
 }: { desk: DeskModel; ask: ReactNode; failed?: readonly string[] } & Handlers) {
-  const { ready, scheduled, done, saw, earlier, empty } = desk;
+  const { ready, scheduled, done, empty } = desk;
   // A pile whose source didn't load says so instead of Otto's empty line, so
   // an empty pile always means empty (review M1; the phone does the same).
   const student = desk.role === "student";
@@ -116,60 +128,122 @@ export function OttoDeskColumns({
   const scheduledPartial = student && failed.includes("upcoming");
   const sawFailed = failed.includes("activity");
   const note = <p className="odc-note">{PART_FAILED}</p>;
+
+  // Ready: the drafts, then the reminders on plain paper (as on the phone); a few, then Show all.
+  const readyOrdered = [...ready.filter((i) => i.kind !== "reminder"), ...ready.filter((i) => i.kind === "reminder")];
+  const readyFew = useFew(readyOrdered, FEW.ready);
+  const readyDrafts = readyFew.shown.filter((i) => i.kind !== "reminder");
+  const readyReminders = readyFew.shown.filter((i) => i.kind === "reminder");
+  const scheduledFew = useFew(scheduled, FEW.list);
+  const doneFew = useFew(done, FEW.list);
+
+  // Otto saw: cleared rows leave at once and go for good after the Undo; a time frame narrows it.
+  const undo = useUndoClear();
+  const sawLeft = desk.saw.filter((i) => !undo.isHidden(noticeIdOf(i.id) ?? ""));
+  const sawRange = useDeskRange(sawLeft);
+  const sawFew = useFew(sawRange.items, FEW.list);
+  const clearOne = (item: DeskItem) => {
+    const id = noticeIdOf(item.id);
+    if (id) undo.clear({ ids: [id] });
+  };
+  const clearAll = () => {
+    const ids = sawRange.items.map((i) => noticeIdOf(i.id)).filter((x): x is string => !!x);
+    // All on the picker: every notification up to the newest one loaded (also the ones past the list's end,
+    // never one that came after the desk loaded). Otherwise what the frame shows.
+    if (sawRange.range === "all") undo.clear(clearAllArg(desk.saw, ids), ids);
+    else undo.clear({ ids });
+  };
+  const sawClearable = sawRange.items.some((i) => noticeIdOf(i.id));
+
+  const earlierRange = useDeskRange(desk.earlier);
+  const earlierFew = useFew(earlierRange.items, FEW.list);
+
   return (
     <div className="odc-cols">
       <div className="odc-col odc-c1">
-        <DeskSection title="Ready for you" count={ready.length} empty={readyPartial ? undefined : empty.ready}>
-          {/* Reminders sit on plain paper after the rest, as on the phone. */}
-          {ready
-            .filter((item) => item.kind !== "reminder")
-            .map((item, i) => (
-              <ReadyItem key={item.id} item={item} index={i} desk={desk} {...h} />
-            ))}
-          {ready.some((item) => item.kind === "reminder") ? (
+        <DeskSection
+          title="Ready for you"
+          count={ready.length}
+          empty={readyPartial ? undefined : empty.ready}
+          foldKey="ready"
+          more={readyFew.more}
+        >
+          {readyDrafts.map((item, i) => (
+            <ReadyItem key={item.id} item={item} index={i} desk={desk} {...h} />
+          ))}
+          {readyReminders.length > 0 ? (
             <DeskList>
-              {ready
-                .filter((item) => item.kind === "reminder")
-                .map((item) => (
-                  <ReminderRow key={item.id} item={item} {...h} />
-                ))}
+              {readyReminders.map((item) => (
+                <ReminderRow key={item.id} item={item} {...h} />
+              ))}
             </DeskList>
           ) : null}
           {readyPartial ? note : null}
         </DeskSection>
       </div>
       <div className="odc-col odc-c2">
-        <DeskSection title="Scheduled" count={scheduled.length} empty={scheduledPartial ? undefined : empty.scheduled}>
+        <DeskSection
+          title="Scheduled"
+          count={scheduled.length}
+          empty={scheduledPartial ? undefined : empty.scheduled}
+          foldKey="scheduled"
+          more={scheduledFew.more}
+        >
           {scheduled.length > 0 ? (
-          <DeskList>
-            {scheduled.map((item) =>
-              item.kind === "reminder" ? (
-                <ReminderRow key={item.id} item={item} {...h} />
-              ) : (
-                <DeskRow key={item.id} item={item} onVerb={h.onAccept} busy={h.busyId === item.id} />
-              ),
-            )}
-          </DeskList>
+            <DeskList>
+              {scheduledFew.shown.map((item) =>
+                item.kind === "reminder" ? (
+                  <ReminderRow key={item.id} item={item} {...h} />
+                ) : (
+                  <DeskRow key={item.id} item={item} onVerb={h.onAccept} busy={h.busyId === item.id} />
+                ),
+              )}
+            </DeskList>
           ) : null}
           {scheduledPartial ? note : null}
         </DeskSection>
-        <DeskSection title="Otto saw" count={saw.length} empty={sawFailed ? undefined : empty.saw}>
-          {saw.length > 0 ? <Saw items={saw} /> : null}
-          {sawFailed ? (saw.length > 0 ? note : <p className="odc-note">What Otto saw didn&rsquo;t load. Try again in a bit.</p>) : null}
+        <DeskSection
+          title="Otto saw"
+          count={sawRange.items.length}
+          empty={sawFailed ? undefined : sawLeft.length > 0 ? "nothing in this time frame." : empty.saw}
+          foldKey="saw"
+          tools={
+            sawLeft.length > 0 ? (
+              <DeskTimeFilter value={sawRange.range} onChange={sawRange.setRange} label="Otto saw: time frame" />
+            ) : null
+          }
+          more={sawFew.more}
+          foot={
+            sawClearable ? (
+              <button type="button" className="dk-clear-all" onClick={clearAll}>
+                Clear all
+              </button>
+            ) : null
+          }
+        >
+          {sawRange.items.length > 0 ? <Saw items={sawFew.shown} onClear={clearOne} /> : null}
+          {sawFailed ? (desk.saw.length > 0 ? note : <p className="odc-note">What Otto saw didn&rsquo;t load. Try again in a bit.</p>) : null}
         </DeskSection>
       </div>
       <div className="odc-col odc-c3">
-        <DeskSection title="Done this week" count={done.length} empty={empty.done}>
+        <DeskSection title="Done this week" count={done.length} empty={empty.done} foldKey="done" more={doneFew.more}>
           <DeskList>
-            {done.map((item) => (
+            {doneFew.shown.map((item) => (
               <DeskDone key={item.id} item={item} />
             ))}
           </DeskList>
         </DeskSection>
-        {earlier.length > 0 ? (
-          <DeskSection title="Earlier" count={earlier.length}>
+        {desk.earlier.length > 0 ? (
+          <DeskSection
+            title="Earlier"
+            count={earlierRange.items.length}
+            empty={earlierRange.range === "week" ? "this week's are under done this week." : "nothing in this time frame."}
+            foldKey="earlier"
+            tools={<DeskTimeFilter value={earlierRange.range} onChange={earlierRange.setRange} label="Earlier: time frame" />}
+            more={earlierFew.more}
+          >
             <DeskList>
-              {earlier.map((item) => (
+              {earlierFew.shown.map((item) => (
                 <DeskDone key={item.id} item={item} dayRight />
               ))}
             </DeskList>
@@ -177,6 +251,7 @@ export function OttoDeskColumns({
         ) : null}
       </div>
       {ask}
+      <DeskClearToast toast={undo.toast} onUndo={undo.undo} />
     </div>
   );
 }

@@ -515,6 +515,10 @@ export async function GET(req: Request) {
           type: n.type,
           createdAt: n.created_at,
           actorName: n.actor?.name ?? n.actor?.handle ?? null,
+          // Read on the person's own client and already past the block/mute
+          // filter, so a handle here is someone they may see: their name
+          // links to the profile (polish 1, Nov 11).
+          actorHandle: n.actor?.handle ?? null,
           orgName: n.org?.name ?? null,
           orgHandle: n.org?.handle ?? null,
           postId: n.post_id,

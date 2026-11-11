@@ -113,12 +113,60 @@ test("the small-size drawings are present: 28px (up to 40) and 24px", () => {
 test("the moon truly orbits: two copies on one path, each shown for its half of the lap", () => {
   assert.match(css, /\.m-x1::after\{animation:m-planet-lap 16s linear 2\.5s infinite,m-planet-back 16s linear 2\.5s infinite\}/);
   assert.match(css, /\.m-x3::before\{animation:m-planet-lap 16s linear 2\.5s infinite,m-planet-front 16s linear 2\.5s infinite\}/);
-  assert.match(css, /\.m-planet\.work \.m-x1::after,\.m-planet\.work \.m-x3::before\{animation-duration:2\.8s\}/);
+  assert.match(css, /\.m-x3::after\{animation:m-planet-lap 16s linear 2\.5s infinite,m-planet-dim 16s linear 2\.5s infinite\}/);
+  assert.match(css, /\.m-planet\.work \.m-x1::after,\.m-planet\.work \.m-x3::before,\.m-planet\.work \.m-x3::after\{animation-duration:2\.8s\}/);
   assert.match(css, /m-planet-lap 3\.4s linear infinite,m-planet-back 3\.4s/);
   assert.match(css, /\.m-planet\.wait\{--mp-th:0deg\}/);
   assert.match(css, /--mp-th:180deg/);
 });
 
+test("the ring is a full loop (Nov 11): split at its tips into far and near halves, never cut open", () => {
+  assert.match(css, /\.m-planet \.m-x1::before\{border-color:var\(--mp-ring-b\);clip-path:inset\(0 0 49%\)\}/);
+  assert.match(css, /\.m-planet \.m-x2::before\{clip-path:inset\(49% 0 0\)\}/);
+  assert.equal(css.match(/clip-path:/g)?.length, 2, "no other clip opens the ring (the 24/28px drawing included)");
+});
+
+/** [percent, opacity] stops of one keyframes body; "a%,b%{opacity:x}" gives two stops. */
+function stops(body: string): Array<[number, number]> {
+  const out: Array<[number, number]> = [];
+  for (const m of body.matchAll(/([\d.%,\s]+)\{opacity:([\d.]+)\}/g)) {
+    for (const at of m[1].split(",")) out.push([parseFloat(at), Number(m[2])]);
+  }
+  return out;
+}
+
+test("the moon reads as one object: depth in the lap, the hand-off away from his body", () => {
+  const frames = keyframes(css);
+  const lap = frames.get("m-planet-lap") ?? "";
+  // Behind him (the lap's first half) a touch smaller, never bigger; full size at both tips.
+  const scales = [...lap.matchAll(/([\d.]+)%\{[^}]*scale\(([\d.]+)\)\}/g)].map((m) => [Number(m[1]), Number(m[2])]);
+  assert.equal(scales.length, 9, "45deg steps");
+  for (const [at, s] of scales) {
+    if (at === 0 || at === 50 || at === 100) assert.equal(s, 1, `${at}%`);
+    else if (at < 50) assert.ok(s < 1 && s >= 0.8, `${at}% behind: ${s}`);
+    else assert.ok(s >= 1 && s <= 1.06, `${at}% in front: ${s}`);
+  }
+  // The front copy and the dim copy behind swap in one instant, and the veil is fully on at that instant,
+  // so the two pictures are the same: front + veil (opacity 1) === the dim copy.
+  const front = stops(frames.get("m-planet-front") ?? "");
+  const back = stops(frames.get("m-planet-back") ?? "");
+  const veil = stops(frames.get("m-planet-dim") ?? "");
+  const at = (list: Array<[number, number]>, p: number) => list.find(([q]) => q === p)?.[1];
+  for (const [swapOff, swapOn] of [[9.45, 9.5], [40.55, 40.5]]) {
+    assert.equal(at(front, swapOff), 1);
+    assert.equal(at(front, swapOn), 0);
+    assert.equal(at(back, swapOff), 0);
+    assert.equal(at(back, swapOn), 1);
+    assert.equal(at(veil, swapOff), 1, "the veil is fully on as the copies swap");
+  }
+  // The veil is off at both tips (the moon is bright in front) and off while the copy behind shows.
+  assert.equal(at(veil, 0), 0);
+  assert.equal(at(veil, 50), 0);
+  assert.equal(at(veil, 9.5), 0);
+  // The dim copy behind and the veil share one dimmer drawing.
+  assert.match(css, /\.m-planet \.m-x1::after,\.m-planet \.m-x3::after\{opacity:0;background:var\(--mp-dim\)\}/);
+});
+
 test("the kit stays small", () => {
-  assert.ok(Buffer.byteLength(raw) <= 13 * 1024, `planet.css is ${Buffer.byteLength(raw)} bytes`);
+  assert.ok(Buffer.byteLength(raw) <= 15 * 1024, `planet.css is ${Buffer.byteLength(raw)} bytes`);
 });

@@ -11,12 +11,14 @@ import { useCallback, useEffect, useId, useRef, useState, type KeyboardEvent, ty
 import { MiniMessagesFrame, type MiniMessagesHandle } from "@/components/desktop/messages/MiniMessenger";
 import { DESK_AS_KEY } from "@/components/mobile/use-otto-desk";
 import { DeskDraft } from "@/components/otto/desk/DeskDraft";
+import { DeskTitle } from "@/components/otto/desk/DeskName";
 import { DeskIcon, deskLine } from "@/components/otto/desk/DeskRow";
-import { DeskList, DeskSection } from "@/components/otto/desk/DeskSection";
+import { DeskClearToast, DeskList, DeskSection } from "@/components/otto/desk/DeskSection";
 import { OttoPlanet } from "@/components/otto/planet/OttoPlanet";
 import { DESK_AS_EVENT, useOttoDesk } from "@/components/otto/use-otto-desk";
 import { vibeRequest } from "@/lib/feedback/request";
 import { readSwitchedClub } from "@/lib/orgs/club-switch";
+import { clearAllArg, noticeIdOf, useUndoClear, type UndoToast } from "@/lib/otto/clear-notifications";
 import type { DeskItem } from "@/lib/otto/desk";
 import { moreLine, PANEL_READY_MAX, panelClubParam, panelDesk, panelLinks } from "@/lib/otto/panel-desk";
 import { countOpen } from "@/lib/usage/touch-client";
@@ -150,6 +152,7 @@ function OttoDeskPanel({ open, onClose, messages, id, flagKnown }: Omit<OttoSide
   const paramRef = useRef<string | null>(null);
   const titleId = useId();
   const baseId = useId();
+  const clear = usePanelClear();
 
   // Escape closes, and focus goes back to the corner. Only from the panel
   // or the corner: the page stays usable, so an Escape meant for a sheet or
@@ -259,7 +262,6 @@ function OttoDeskPanel({ open, onClose, messages, id, flagKnown }: Omit<OttoSide
     >
       <i className="tx tx-flute" aria-hidden="true" />
       <div className="tx-host dk-card otp-head">
-        <i className="tx tx-paper" aria-hidden="true" />
         <OttoPlanet size={28} />
         <div className="otp-head-tx">
           <h2 id={titleId} className="otp-name">
@@ -310,7 +312,7 @@ function OttoDeskPanel({ open, onClose, messages, id, flagKnown }: Omit<OttoSide
               </button>
             );
           })}
-          {/* The frame's two controls, in the row as today (and as the static twin). */}
+          {/* The frame's two controls: small quiet icons at the row's end (polish 1), as the static twin. */}
           {showMessages ? (
             <>
               <button
@@ -325,8 +327,18 @@ function OttoDeskPanel({ open, onClose, messages, id, flagKnown }: Omit<OttoSide
                   <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7.5 18.5 3 20l1.5-4.5z" />
                 </svg>
               </button>
-              <button type="button" className="otp-tab-open" onClick={() => frameRef.current?.openInMessages()}>
-                Open
+              <button
+                type="button"
+                className="otp-tab-open"
+                aria-label="Open in Messages"
+                title="Open in Messages"
+                onClick={() => frameRef.current?.openInMessages()}
+              >
+                <svg className="dk-ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                  <path d="M14 4h6v6" />
+                  <path d="M20 4l-8.5 8.5" />
+                  <path d="M18 14v4.5A1.5 1.5 0 0 1 16.5 20h-11A1.5 1.5 0 0 1 4 18.5v-11A1.5 1.5 0 0 1 5.5 6H10" />
+                </svg>
               </button>
             </>
           ) : null}
@@ -345,8 +357,10 @@ function OttoDeskPanel({ open, onClose, messages, id, flagKnown }: Omit<OttoSide
             className="otp-body"
             {...(withMessages ? { id: tabPanelId("otto"), role: "tabpanel", "aria-labelledby": tabId("otto") } : {})}
           >
-            <MiniDesk d={d} settled={settled} onRetry={() => void load(paramRef.current, { quiet: true })} />
+            <MiniDesk d={d} settled={settled} clear={clear} onRetry={() => void load(paramRef.current, { quiet: true })} />
           </div>
+          {/* "Cleared. Undo", in the panel by the rows it cleared. */}
+          <DeskClearToast toast={clear.toast} onUndo={clear.undo} slotClass="otp-toast-slot" />
           {/* The way on, pinned at the foot: always in sight, however full the desk. */}
           <DeskLinks desk={desk} />
         </>
@@ -383,24 +397,99 @@ function ReminderRow({ item, d }: { item: DeskItem; d: DeskState }) {
   );
 }
 
+/** One Otto saw row: the row opens its page, the person's name opens theirs, × clears it. */
+function SawRow({ item, onClear }: { item: DeskItem; onClear: () => void }) {
+  // From the keyboard, focus moves on to the next row's × (or the one before, or the panel), not to the page.
+  const onX = (e: MouseEvent<HTMLButtonElement>) => {
+    if (e.detail === 0) {
+      const row = e.currentTarget.closest(".otp-saw");
+      const to =
+        row?.nextElementSibling?.querySelector<HTMLElement>(".otp-saw-x") ??
+        row?.previousElementSibling?.querySelector<HTMLElement>(".otp-saw-x") ??
+        e.currentTarget.closest<HTMLElement>(".otp");
+      to?.focus({ preventScroll: true });
+    }
+    onClear();
+  };
+  return (
+    <div className="otp-saw dk-cover-host">
+      {/* The row's own place, stretched under the name and the ×: a link can't hold a link or a button. */}
+      {item.href ? <Link className="dk-cover" href={item.href} aria-label={item.title} /> : null}
+      <DeskIcon name={item.kind} />
+      <span className="otp-saw-tx">
+        <span className="otp-saw-t">
+          <DeskTitle item={item} />
+        </span>
+        {item.detail || item.whenLabel ? (
+          <span className="otp-saw-sub">
+            {item.detail}
+            {item.detail && item.whenLabel ? " · " : null}
+            {item.whenLabel ? <time dateTime={item.whenISO}>{item.whenLabel}</time> : null}
+          </span>
+        ) : null}
+      </span>
+      <button type="button" className="otp-saw-x" aria-label={`Clear: ${item.title}`} title="Clear" onClick={onX}>
+        <svg className="dk-ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <path d="M7 7l10 10M17 7L7 17" />
+        </svg>
+      </button>
+    </div>
+  );
+}
+
+type PanelClear = {
+  /** Is this desk row cleared (hidden now, deleted when the Undo window closes)? */
+  isGone: (deskId: string) => boolean;
+  clearRows: (deskIds: string[]) => void;
+  /** Everything up to the newest row loaded (`loaded`); `deskIds` are the rows to hide now. */
+  clearAll: (loaded: DeskItem[], deskIds: string[]) => void;
+  toast: UndoToast;
+  undo: () => void;
+};
+
+const noticeIds = (deskIds: string[]) => deskIds.map(noticeIdOf).filter((id): id is string => id !== null);
+
+/**
+ * Clear with Undo (polish 1, Franky: "people also want to clear
+ * notifications"), on the desk's shared queue (`useUndoClear`): the rows go
+ * at once and "Cleared. Undo" shows for 5 s inside the panel (the desk's ink
+ * toast, by the × pressed; review, Nov 11: not the app's coral one at the
+ * page's foot, which also drops a repeat of the same line); only then are
+ * they deleted, the person's own rows only. Undo puts them back; a failed
+ * delete puts them back and says so; leaving the page sends what waits.
+ */
+function usePanelClear(): PanelClear {
+  const { toast, undo, isHidden, clear } = useUndoClear();
+  return {
+    isGone: (deskId) => isHidden(noticeIdOf(deskId) ?? deskId),
+    clearRows: (deskIds) => {
+      clear({ ids: noticeIds(deskIds) });
+    },
+    clearAll: (loaded, deskIds) => {
+      const ids = noticeIds(deskIds);
+      clear(clearAllArg(loaded, ids), ids);
+    },
+    toast,
+    undo,
+  };
+}
+
 function Note({ children }: { children: string }) {
   return (
     <p className="tx-host dk-card otp-note">
-      <i className="tx tx-paper" aria-hidden="true" />
       {children}
     </p>
   );
 }
 
 /** The Otto tab: the top two Ready items, a few Otto saw rows, and the way to the whole desk. */
-function MiniDesk({ d, settled, onRetry }: { d: DeskState; settled: boolean; onRetry: () => void }) {
+function MiniDesk({ d, settled, onRetry, clear }: { d: DeskState; settled: boolean; onRetry: () => void; clear: PanelClear }) {
   const { desk } = d;
   // On /otto the page's top item is the frame's one coral button.
   const onDeskPage = (usePathname() ?? "").startsWith("/otto");
   if (!desk) {
     return settled ? (
       <div className="tx-host dk-card dk-fail" role="alert">
-        <i className="tx tx-paper" aria-hidden="true" />
         <p>
           <b>Your desk didn&rsquo;t load.</b> Everything on it is still where it was.
         </p>
@@ -412,13 +501,14 @@ function MiniDesk({ d, settled, onRetry }: { d: DeskState; settled: boolean; onR
       </div>
     ) : (
       <div className="tx-host dk-card otp-loading">
-        <i className="tx tx-paper" aria-hidden="true" />
         <p>Opening your desk…</p>
       </div>
     );
   }
 
-  const pd = panelDesk(desk, d.failed, { coral: !onDeskPage });
+  // Rows cleared a moment ago are gone from here at once; the delete waits for Undo.
+  const saw = desk.saw.filter((it) => !clear.isGone(it.id));
+  const pd = panelDesk({ ...desk, saw }, d.failed, { coral: !onDeskPage });
   return (
     <>
       <DeskSection title="Ready for you" count={desk.ready.length} level={3} empty={pd.readyPartial ? undefined : desk.empty.ready}>
@@ -442,36 +532,17 @@ function MiniDesk({ d, settled, onRetry }: { d: DeskState; settled: boolean; onR
         {pd.readyPartial ? <Note>{PART_FAILED}</Note> : null}
       </DeskSection>
 
-      <DeskSection title="Otto saw" count={desk.saw.length} level={3} empty={pd.sawFailed ? undefined : desk.empty.saw}>
+      <DeskSection title="Otto saw" count={saw.length} level={3} empty={pd.sawFailed ? undefined : desk.empty.saw}>
         {pd.saw.length > 0 ? (
-          <div className="tx-host dk-card otp-saw-card">
-            <i className="tx tx-paper" aria-hidden="true" />
-            {pd.saw.map((item) => {
-              const body = (
-                <>
-                  <DeskIcon name={item.kind} />
-                  <span className="otp-saw-tx">
-                    <span>{item.title}</span>
-                    {item.detail || item.whenLabel ? (
-                      <span className="otp-saw-sub">
-                        {item.detail}
-                        {item.detail && item.whenLabel ? " · " : null}
-                        {item.whenLabel ? <time dateTime={item.whenISO}>{item.whenLabel}</time> : null}
-                      </span>
-                    ) : null}
-                  </span>
-                </>
-              );
-              return item.href ? (
-                <Link key={item.id} className="otp-saw" href={item.href}>
-                  {body}
-                </Link>
-              ) : (
-                <p key={item.id} className="otp-saw">
-                  {body}
-                </p>
-              );
-            })}
+          <div className="dk-card otp-saw-card">
+            {pd.saw.map((item) => (
+              <SawRow key={item.id} item={item} onClear={() => clear.clearRows([item.id])} />
+            ))}
+            <div className="otp-saw-foot">
+              <button type="button" className="otp-saw-all" onClick={() => clear.clearAll(desk.saw, saw.map((it) => it.id))}>
+                Clear all
+              </button>
+            </div>
           </div>
         ) : null}
         {pd.sawFailed ? <Note>{pd.saw.length > 0 ? PART_FAILED : "What Otto saw didn't load. Try again in a bit."}</Note> : null}
@@ -486,7 +557,6 @@ function DeskLinks({ desk }: { desk: DeskState["desk"] }) {
   const more = desk ? Math.max(0, desk.ready.length - PANEL_READY_MAX) : 0;
   return (
     <nav className="tx-host dk-card otp-links" aria-label="Otto's desk">
-      <i className="tx tx-paper" aria-hidden="true" />
       <Link className="otp-link" href={links.desk}>
         <span>Open your desk →</span>
         {more > 0 ? <span className="otp-link-sub">{moreLine(more)}</span> : null}

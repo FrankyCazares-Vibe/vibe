@@ -531,3 +531,59 @@ test("a cut-off title never ends in punctuation before the ellipsis", () => {
   assert.equal(D.oneLine("Short. Fine."), "Short. Fine.");
   assert.equal(D.oneLine(`${"b".repeat(77)}, — next`), `${"b".repeat(77)}…`);
 });
+
+// ── Names link to profiles (polish 1, Nov 11) ──────────────────────────────
+
+test("names: a follow-back, a notice and a visible requester carry their profile as actor", () => {
+  const student = D.buildDesk(
+    studentInput({
+      followers: [
+        { id: "f1", name: "Kendall Ross", handle: "kendall", followedAt: at(-H) },
+        { id: "f2", name: "No Handle", handle: null, followedAt: at(-2 * H) },
+      ],
+      notifications: [
+        { id: "n1", type: "follow", createdAt: at(-H), actorName: "Kendall Ross", actorHandle: "kendall", orgName: null, orgHandle: null, postId: null, eventTitle: null, eventStartsAt: null },
+        { id: "n2", type: "post_like", createdAt: at(-H), actorName: "Riley", actorHandle: null, orgName: null, orgHandle: null, postId: "p1", eventTitle: null, eventStartsAt: null },
+        { id: "n3", type: "event_cancelled", createdAt: at(-H), actorName: null, actorHandle: "officer", orgName: "Chess", orgHandle: "chess", postId: null, eventTitle: "Blitz", eventStartsAt: at(DAY) },
+        { id: "n4", type: "brand_new_type", createdAt: at(-H), actorName: "Some", actorHandle: "some", orgName: null, orgHandle: null, postId: null, eventTitle: null, eventStartsAt: null },
+        { id: "n5", type: "org_join_request", createdAt: at(-H), actorName: "Casey Lin", actorHandle: "casey_l", orgName: "Chess", orgHandle: "chess", postId: null, eventTitle: null, eventStartsAt: null },
+      ],
+    }),
+    NOW,
+  );
+  const fb = student.ready.filter((i) => i.kind === "follow_back");
+  assert.deepEqual(fb[0].actor, { name: "Kendall", href: "/profile/kendall" });
+  assert.equal(fb[1].actor, undefined, "no handle, no link");
+  assert.deepEqual(student.saw[0].actor, { name: "Kendall", href: "/profile/kendall" });
+  assert.equal(student.saw[1].actor, undefined, "no handle (restricted or gone), no link");
+  assert.equal(student.saw[2].actor, undefined, "a cancelled event names nobody");
+  assert.equal(student.saw[3].actor, undefined, "a title that doesn't open with the name links nobody");
+  assert.equal(student.saw[4].title, "Casey asked to join Chess");
+  assert.deepEqual(student.saw[4].actor, { name: "Casey", href: "/profile/casey_l" });
+
+  const officer = D.buildDesk(
+    officerInput({
+      requests: [
+        { ...request("r1", "Maya Lopez"), linkable: true },
+        { ...request("r2", "Jordan Lee"), linkable: false },
+        request("r3", "Alex Kim"),
+      ],
+    }),
+    NOW,
+  );
+  const reqs = officer.ready.filter((i) => i.kind === "join_request");
+  assert.deepEqual(reqs[0].actor, { name: "Maya", href: "/profile/maya%20lopez" });
+  assert.equal(reqs[1].actor, undefined, "a requester the viewer can't see is never linked");
+  assert.equal(reqs[2].actor, undefined, "linkable must be said, never assumed");
+});
+
+test("names: every actor's name opens its row's title, and only profiles are linked", () => {
+  const items = [...allItems(busyOfficer()), ...allItems(busyStudent())];
+  for (const i of items) {
+    if (!i.actor) continue;
+    assert.ok(i.title.startsWith(`${i.actor.name} `), i.title);
+    assert.match(i.actor.href, /^\/profile\/[^/]+$/);
+  }
+  assert.equal(D.deskActor("Someone liked your post", "Someone", "x").actor, undefined);
+  assert.deepEqual(D.deskActor("@kay followed you", "@kay", "kay").actor, { name: "@kay", href: "/profile/kay" });
+});

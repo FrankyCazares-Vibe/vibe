@@ -31,6 +31,8 @@ export const BUDGETS = {
   block: { limit: 30, windowSec: 600 },
   /** Mark named notifications read (not `{ all: true }`, which Otto sends on its own when opened). */
   markRead: { limit: 60, windowSec: 600 },
+  /** Clear (delete) your own notifications: one row's ×, or Clear all (DELETE /api/me/notifications). */
+  notificationsClear: { limit: 60, windowSec: 600 },
   /** Create an Otto reminder. */
   ottoReminderCreate: { limit: 60, windowSec: 3600 },
   /** Create a personal calendar event. */

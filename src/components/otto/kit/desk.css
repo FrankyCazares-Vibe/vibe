@@ -29,11 +29,12 @@
 .dk-pile>*{flex:none}
 .dk-sec b{min-width:22px;height:22px;box-sizing:border-box;padding:0 7px;border-radius:999px;background:var(--otto-raise);color:var(--ink-2);font:700 12px/22px var(--font-body);font-variant-numeric:tabular-nums;text-align:center}
 
-/* dk-card: a paper card. Use with tx-host and a tx-paper first child. Add .list when it holds dk-row / dk-done rows */
+/* dk-card: a paper card, flat. Add .list when it holds dk-row / dk-done rows */
 .dk-card{background:var(--paper);border:1px solid var(--hairline);border-radius:18px;box-shadow:var(--card-shadow);padding:14px 16px;color:var(--charcoal)}
 .dk-card.list{padding:2px 6px 2px 14px}
-.dk-card>.tx-paper{--otto-o:.1}
-:root[data-theme="dark"] .dk-card>.tx-paper,.vibe-night-island .dk-card>.tx-paper{--otto-o:.07}
+/* Flat paper (polish 1, Nov 11; Franky wasn't sure about the grain on the boxes): the paper tooth is off on every
+   card that loads this file (desk, side panel, Stats, settings). The sky's layers and the panel's ribs keep theirs */
+.tx.tx-paper{display:none}
 
 /* dk-empty: a section with nothing in it. Otto's one lowercase line on plain paper */
 .dk-empty{padding:16px 18px}

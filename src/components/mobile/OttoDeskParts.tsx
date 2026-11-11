@@ -1,10 +1,10 @@
 "use client";
 
-import Link from "next/link";
 import { useLayoutEffect, useRef, useState } from "react";
 import { useAnimate } from "motion/react";
 
 import { DeskClubMark } from "@/components/otto/desk/DeskDraft";
+import { DeskLinkRow, DeskTitle } from "@/components/otto/desk/DeskName";
 import { DeskIcon } from "@/components/otto/desk/DeskRow";
 import type { DeskClub, DeskItem } from "@/lib/otto/desk";
 import { SPRING_SNAPPY } from "@/lib/motion/springs";
@@ -167,16 +167,18 @@ export function SawRow({ item }: { item: DeskItem }) {
         <DeskIcon name={item.kind} />
       </span>
       <span className="dk-row-tx">
-        <b>{item.title}</b>
+        <b>
+          <DeskTitle item={item} />
+        </b>
         {item.detail ? <span>{item.detail}</span> : null}
       </span>
       {item.whenLabel ? <span className="dk-row-day">{item.whenLabel}</span> : null}
     </>
   );
   return item.href ? (
-    <Link className="dk-row" href={item.href}>
+    <DeskLinkRow item={item} href={item.href} className="dk-row">
       {body}
-    </Link>
+    </DeskLinkRow>
   ) : (
     <div className="dk-row">{body}</div>
   );

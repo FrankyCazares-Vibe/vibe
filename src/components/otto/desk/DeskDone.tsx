@@ -3,10 +3,9 @@
 import "../kit/sky.css";
 import "../kit/desk.css";
 
-import Link from "next/link";
-
 import type { DeskItem } from "@/lib/otto/desk";
 
+import { DeskLinkRow, DeskTitle } from "./DeskName";
 import { DeskIcon, deskLine } from "./DeskRow";
 
 /**
@@ -45,16 +44,18 @@ export function DeskDone({ item, dayRight = false }: DeskDoneProps) {
         </span>
       )}
       <span className="dk-row-tx">
-        <b>{item.title}</b>
+        <b>
+          <DeskTitle item={item} />
+        </b>
         {line ? <span>{line}</span> : null}
       </span>
       {dayRight && item.whenLabel ? <span className="dk-row-day">{item.whenLabel}</span> : null}
     </>
   );
   return item.href ? (
-    <Link className="dk-done" href={item.href}>
+    <DeskLinkRow item={item} href={item.href} className="dk-done">
       {body}
-    </Link>
+    </DeskLinkRow>
   ) : (
     <div className="dk-done">{body}</div>
   );

@@ -580,17 +580,61 @@
     /* The frame's one coral fill: the top Ready item's verb (plus his moon). */
     #ottoPanel.op-desk .op-btn.primary { flex: 1; background: #FF5C35; border-color: #FF5C35; color: var(--on-coral, #160A06); font-weight: 700; }
 
-    /* Otto saw: quiet rows, tell only. */
+    /* Otto saw: quiet rows, tell only. Each row: its own link stretched under it, the person's name lifted above
+       as their profile link (ink, never coral), and a quiet × that clears it (polish 1; OttoSidePanel.tsx SawRow). */
     #ottoPanel.op-desk .op-saw-card { padding: 2px 6px 2px 14px; }
     #ottoPanel.op-desk .op-saw {
-      display: flex; align-items: flex-start; gap: 10px; margin: 0; padding: 11px 8px 11px 0;
+      position: relative; display: flex; align-items: flex-start; gap: 10px; margin: 0; padding: 11px 0;
       font-size: 14px; line-height: 1.35; color: var(--charcoal, #1C1C1E); text-decoration: none;
     }
     #ottoPanel.op-desk .op-saw + .op-saw { border-top: 1px solid var(--hairline, rgba(28,28,30,.08)); }
     #ottoPanel.op-desk .op-saw > .op-ico { width: 18px; height: 18px; margin-top: 1px; color: var(--ink-muted, #6C6761); }
-    #ottoPanel.op-desk a.op-saw:hover .op-saw-tx > span:first-child { text-decoration: underline; text-underline-offset: 2px; }
-    #ottoPanel.op-desk .op-saw-tx { min-width: 0; display: flex; flex-direction: column; gap: 2px; overflow-wrap: anywhere; }
+    #ottoPanel.op-desk .op-cover { position: absolute; inset: 0; z-index: 0; border-radius: 8px; }
+    #ottoPanel.op-desk .op-cover:hover ~ .op-saw-tx .op-saw-t { text-decoration: underline; text-underline-offset: 2px; }
+    #ottoPanel.op-desk .op-saw-tx { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; overflow-wrap: anywhere; }
     #ottoPanel.op-desk .op-saw-sub { font-size: 13px; color: var(--ink-2, #5C5853); font-variant-numeric: tabular-nums; }
+    #ottoPanel.op-desk .op-name {
+      position: relative; z-index: 1; color: inherit; text-decoration: none; border-radius: 4px; padding: 0 2px; margin: 0 -2px;
+      transition: background-color .15s ease, color .15s ease;
+    }
+    #ottoPanel.op-desk .op-name:hover, #ottoPanel.op-desk .op-name:focus-visible {
+      color: var(--charcoal, #1C1C1E); text-decoration: underline; text-decoration-thickness: 1.5px; text-underline-offset: 3px;
+      background: color-mix(in srgb, var(--charcoal, #1C1C1E) 9%, transparent);
+    }
+    #ottoPanel.op-desk .op-saw-x {
+      position: relative; z-index: 1; flex: none; width: 44px; height: 44px; margin: -11px -2px -11px 0; padding: 0; border: 0;
+      background: none; color: var(--ink-muted, #6C6761); display: flex; align-items: center; justify-content: center;
+      opacity: 0; transition: opacity .15s, color .15s;
+    }
+    #ottoPanel.op-desk .op-saw-x::before { content: ""; position: absolute; left: 8px; top: 8px; width: 28px; height: 28px; border-radius: 50%; transition: background-color .15s; }
+    #ottoPanel.op-desk .op-saw-x svg { position: relative; width: 16px; height: 16px; }
+    #ottoPanel.op-desk .op-saw:hover .op-saw-x, #ottoPanel.op-desk .op-saw:focus-within .op-saw-x { opacity: 1; }
+    #ottoPanel.op-desk .op-saw-x:hover { color: var(--charcoal, #1C1C1E); }
+    #ottoPanel.op-desk .op-saw-x:hover::before { background: var(--op-raise); }
+    #ottoPanel.op-desk .op-saw-x:focus-visible { outline: none; }
+    #ottoPanel.op-desk .op-saw-x:focus-visible::before { outline: 2px solid var(--charcoal, #1C1C1E); outline-offset: 1px; }
+    @media (hover: none) { #ottoPanel.op-desk .op-saw-x { opacity: 1; } }
+    #ottoPanel.op-desk .op-saw-foot { display: flex; justify-content: flex-end; border-top: 1px solid var(--hairline, rgba(28,28,30,.08)); margin-right: -6px; }
+    #ottoPanel.op-desk .op-saw-all {
+      min-height: 44px; padding: 0 12px; border: 0; border-radius: 12px; background: none;
+      color: var(--ink-2, #5C5853); font-size: 13px; font-weight: 600;
+    }
+    #ottoPanel.op-desk .op-saw-all:hover { color: var(--charcoal, #1C1C1E); background: var(--op-raise); }
+    /* "Cleared. Undo" in the panel, above the way on (the desk's dk-toast, by hand); empty, it takes no room. */
+    #ottoPanel.op-desk .op-toast-slot { flex: none; display: flex; }
+    #ottoPanel.op-desk .op-toast-slot:empty { margin-top: -10px; }
+    #ottoPanel.op-desk .op-toast {
+      flex: 1; display: flex; align-items: center; justify-content: space-between; gap: 14px; min-height: 48px; box-sizing: border-box;
+      padding: 2px 6px 2px 18px; border-radius: 999px; background: var(--charcoal, #1C1C1E); color: var(--cream, #FAF7F2);
+      font-size: 15px; font-weight: 500; line-height: 1.3; box-shadow: 0 10px 30px rgba(0,0,0,.22);
+    }
+    #ottoPanel.op-desk .op-toast > span { padding: 12px 12px 12px 0; }
+    #ottoPanel.op-desk .op-toast-undo {
+      min-height: 44px; padding: 0 14px; border: 0; border-radius: 999px; background: none; color: var(--cream, #FAF7F2);
+      font-size: 15px; font-weight: 700; line-height: 1; text-decoration: underline; text-underline-offset: 3px;
+    }
+    #ottoPanel.op-desk .op-toast-undo:hover { background: color-mix(in srgb, var(--cream, #FAF7F2) 14%, transparent); }
+    #ottoPanel.op-desk .op-toast-undo:focus-visible { outline: 2px solid var(--cream, #FAF7F2); outline-offset: -3px; }
     #ottoPanel.op-desk .op-note { margin: 0; padding: 10px 14px; font-size: 13px; line-height: 1.4; color: var(--ink-2, #5C5853); }
     #ottoPanel.op-desk .op-fail {
       display: flex; flex-direction: column; gap: 10px;
@@ -630,18 +674,28 @@
     #ottoPanel.op-desk .vmm-tab .vmm-tab-ic { display: block; width: 18px; height: 18px; }
     #ottoPanel.op-desk .vmm-tab-n { min-width: 20px; height: 20px; padding: 0 6px; font-size: 12px; font-weight: 700; background: var(--op-raise); color: var(--ink-2, #5C5853); font-variant-numeric: tabular-nums; }
     #ottoPanel.op-desk .vmm-tab[aria-selected="true"] .vmm-tab-n { background: var(--paper, #FFFFFF); }
+    /* The frame's two controls: small quiet icons (visually 32px), each a 44px target (polish 1). */
     #ottoPanel.op-desk .vmm-tab-new, #ottoPanel.op-desk .vmm-tab-open {
-      height: 44px; flex: none; border: 0; border-radius: 999px; background: none; color: var(--ink-2, #5C5853);
+      width: 44px; height: 44px; flex: none; position: relative; margin: 0; padding: 0; border: 0; border-radius: 0;
+      background: none; color: var(--ink-muted, #6C6761); display: flex; align-items: center; justify-content: center;
     }
-    #ottoPanel.op-desk .vmm-tab-new { width: 44px; }
-    #ottoPanel.op-desk .vmm-tab-open { padding: 0 12px; font-size: 13px; font-weight: 600; }
-    #ottoPanel.op-desk .vmm-tab-new svg { width: 17px; height: 17px; }
-    #ottoPanel.op-desk :is(.vmm-tab-new, .vmm-tab-open):hover { color: var(--charcoal, #1C1C1E); background: var(--op-raise); }
+    #ottoPanel.op-desk .vmm-tab-new { margin-left: -2px; }
+    #ottoPanel.op-desk .vmm-tab-open { margin-right: -4px; }
+    #ottoPanel.op-desk :is(.vmm-tab-new, .vmm-tab-open)::before {
+      content: ""; position: absolute; left: 6px; top: 6px; width: 32px; height: 32px; border-radius: 50%; background: transparent; transition: background-color .15s;
+    }
+    #ottoPanel.op-desk :is(.vmm-tab-new, .vmm-tab-open) svg { position: relative; width: 16px; height: 16px; }
+    #ottoPanel.op-desk .vmm-open-ic { display: block; }
+    #ottoPanel.op-desk .vmm-open-tx { display: none; }
+    #ottoPanel.op-desk :is(.vmm-tab-new, .vmm-tab-open):hover { color: var(--charcoal, #1C1C1E); }
+    #ottoPanel.op-desk :is(.vmm-tab-new, .vmm-tab-open):hover::before { background: var(--op-raise); }
+    #ottoPanel.op-desk :is(.vmm-tab-new, .vmm-tab-open):focus-visible { outline: none; }
+    #ottoPanel.op-desk :is(.vmm-tab-new, .vmm-tab-open):focus-visible::before { outline: 2px solid var(--charcoal, #1C1C1E); outline-offset: 1px; }
     #ottoPanel.op-desk .vmm-frame { flex: 1; border-radius: 16px; border: 1px solid var(--hairline, rgba(28,28,30,.08)); background: var(--cream, #FAF7F2); }
 
     @media (prefers-reduced-motion: reduce) {
       #ottoPanel.op-desk, #ottoCorner.otto-pop .otto-shell { animation: none; }
-      #ottoPanel.op-desk .op-btn { transition: none; }
+      #ottoPanel.op-desk .op-btn, #ottoPanel.op-desk .op-name, #ottoPanel.op-desk .op-saw-x, #ottoPanel.op-desk .op-saw-x::before { transition: none; }
     }
   `;
   document.head.appendChild(deskStyle);
@@ -774,6 +828,7 @@
         </button>
       </div>
       <div class="otto-panel-body"></div>
+      <div class="op-toast-slot" role="status" aria-live="polite"></div>
       <div class="otto-panel-footer op-paper" role="navigation" aria-label="Otto's desk">
         <a class="op-link" data-op-link="desk" href="/otto" target="_top"><span>Open your desk →</span><span class="op-link-sub" id="ottoDeskMore"></span></a>
         <a class="op-link" data-op-link="stats" href="/otto?tab=stats" target="_top"><span>Full breakdown →</span></a>
@@ -1144,13 +1199,132 @@
     return `<article class="op-draft" aria-label="${_ottoEsc(item.title)}">${tag}${pre}${what}${go}${foot}</article>`;
   }
 
+  // The title with the person's name as their profile link (DeskTitle in
+  // src/components/otto/desk/DeskName.tsx): the first time the name shows.
+  function _ottoTitleHTML(item) {
+    const a = item.actor;
+    const href = a && typeof a.name === 'string' && a.name ? _ottoHref(a.href) : null;
+    const at = href ? String(item.title).indexOf(a.name) : -1;
+    if (at < 0) return _ottoEsc(item.title);
+    const t = String(item.title);
+    return _ottoEsc(t.slice(0, at))
+      + `<a class="op-name" href="${_ottoEsc(href)}" target="_top" aria-label="${_ottoEsc(a.name)}'s profile">${_ottoEsc(a.name)}</a>`
+      + _ottoEsc(t.slice(at + a.name.length));
+  }
+
+  // One Otto saw row (SawRow in OttoSidePanel.tsx): the row's own link
+  // stretched under it, the name lifted above it, and a quiet × that clears it.
   function _ottoSawHTML(item) {
     const href = _ottoHref(item.href);
     const sub = [item.detail, item.whenLabel].filter(Boolean).map(_ottoEsc).join(' · ');
-    const body = `${_ottoIco(item.kind)}<span class="op-saw-tx"><span>${_ottoEsc(item.title)}</span>${sub ? `<span class="op-saw-sub">${sub}</span>` : ''}</span>`;
-    return href
-      ? `<a class="op-saw" href="${_ottoEsc(href)}" target="_top">${body}</a>`
-      : `<p class="op-saw">${body}</p>`;
+    const cover = href ? `<a class="op-cover" href="${_ottoEsc(href)}" target="_top" aria-label="${_ottoEsc(item.title)}"></a>` : '';
+    const x = `<button type="button" class="op-saw-x" data-op-clear="${_ottoEsc(item.id)}" aria-label="Clear: ${_ottoEsc(item.title)}" title="Clear"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true" focusable="false"><path d="M7 7l10 10M17 7L7 17"/></svg></button>`;
+    return `<div class="op-saw">${cover}${_ottoIco(item.kind)}<span class="op-saw-tx"><span class="op-saw-t">${_ottoTitleHTML(item)}</span>${sub ? `<span class="op-saw-sub">${sub}</span>` : ''}</span>${x}</div>`;
+  }
+
+  // Clear with Undo (polish 1): the rows go at once and "Cleared. Undo" shows
+  // in the panel for 5 s; only then are they deleted (DELETE
+  // /api/me/notifications, the person's own rows only). One batch, as
+  // createUndoClear in src/lib/otto/clear-notifications.ts: each clear joins
+  // it and restarts the window, the line counts ("Cleared 2."), and Undo puts
+  // back the whole batch (review, Nov 11: one hold per × lost its Undo).
+  // Clear all sends { all, before: the newest row loaded }, never a row that
+  // came after the panel loaded. Undo or a failed delete puts them back.
+  // Leaving the page inside the window deletes them then.
+  const OTTO_UNDO_MS = 5000;
+  const _ottoHidden = new Set();      // desk ids cleared here
+  let _ottoBatch = null;              // { rows, picked, before, timer }
+  let _ottoOwedFail = false;          // a delete failed while a newer batch waited
+  let _ottoToastT = 0;
+  function _ottoNewestISO(items) {
+    let best = -Infinity, out = null;
+    (items || []).forEach(it => {
+      const at = it && it.whenISO ? Date.parse(it.whenISO) : NaN;
+      if (Number.isFinite(at) && at > best) { best = at; out = new Date(at).toISOString(); }
+    });
+    return out;
+  }
+  function _ottoToast(kind) {
+    const slot = panel && panel.querySelector('.op-toast-slot');
+    clearTimeout(_ottoToastT);
+    if (kind === 'failed') _ottoOwedFail = false;
+    if (!slot) return;
+    if (!kind) { slot.innerHTML = ''; return; }
+    if (kind === 'failed') {
+      slot.innerHTML = '<div class="op-toast"><span>That didn’t clear. It’s back on your list.</span></div>';
+      _ottoToastT = setTimeout(() => { slot.innerHTML = ''; }, OTTO_UNDO_MS);
+      return;
+    }
+    const b = _ottoBatch;
+    const n = b ? b.rows.size : 0;
+    const line = b && b.before ? 'Cleared all.' : n > 1 ? 'Cleared ' + n.toLocaleString('en-US') + '.' : 'Cleared.';
+    slot.innerHTML = `<div class="op-toast"><span>${line}</span><button type="button" class="op-toast-undo">Undo</button></div>`;
+    const undo = slot.querySelector('.op-toast-undo');
+    undo.addEventListener('click', _ottoUndo);
+    bindCursorOn(slot);
+    // The × pressed went away with its row: Undo is the next stop.
+    requestAnimationFrame(() => {
+      const at = document.activeElement;
+      if (undo.isConnected && (!at || at === document.body || !at.isConnected)) undo.focus({ preventScroll: true });
+    });
+  }
+  function _ottoCloseCleared() { _ottoToast(_ottoOwedFail ? 'failed' : null); }
+  function _ottoSend(body, leaving) {
+    if (leaving) {
+      try {
+        fetch('/api/me/notifications', { method: 'DELETE', credentials: 'same-origin', keepalive: true,
+          headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+      } catch (_) { /* the page is going */ }
+      return Promise.resolve(true);
+    }
+    return window.vibeRequest('/api/me/notifications', { method: 'DELETE', json: body, quiet: true, failure: "Couldn't clear that." })
+      .then(r => !!(r && r.ok));
+  }
+  function _ottoCommit(leaving) {
+    const b = _ottoBatch;
+    _ottoBatch = null;
+    if (!b) return;
+    clearTimeout(b.timer);
+    _ottoCloseCleared();
+    const bodies = [];
+    if (b.before) bodies.push({ all: true, before: b.before });
+    if (b.picked.size) bodies.push({ ids: [...b.picked] });
+    Promise.all(bodies.map(x => _ottoSend(x, leaving))).then(oks => {
+      if (oks.every(Boolean)) return;
+      b.rows.forEach(id => _ottoHidden.delete(id));
+      _ottoRenderDesk();
+      if (_ottoBatch) _ottoOwedFail = true; else _ottoToast('failed');
+    });
+  }
+  // rows = the desk ids to hide now; before = a Clear all's cutoff (else they are cleared one by one).
+  function _ottoClearHold(rows, before) {
+    const fresh = rows.filter(id => !_ottoHidden.has(id));
+    if (!fresh.length && !before) return;
+    const b = _ottoBatch || (_ottoBatch = { rows: new Set(), picked: new Set(), before: null, timer: 0 });
+    fresh.forEach(id => {
+      b.rows.add(id);
+      _ottoHidden.add(id);
+      if (!before && String(id).startsWith('notification:')) b.picked.add(_ottoNoticeId(id));
+    });
+    if (before && !(b.before && Date.parse(b.before) > Date.parse(before))) b.before = before;
+    _ottoRenderDesk();
+    clearTimeout(b.timer);
+    b.timer = setTimeout(() => _ottoCommit(false), OTTO_UNDO_MS);
+    _ottoToast('cleared');
+  }
+  function _ottoUndo() {
+    const b = _ottoBatch;
+    _ottoBatch = null;
+    if (b) {
+      clearTimeout(b.timer);
+      b.rows.forEach(id => _ottoHidden.delete(id));
+      _ottoRenderDesk();
+    }
+    _ottoCloseCleared();
+  }
+  window.addEventListener('pagehide', () => _ottoCommit(true));
+  function _ottoNoticeId(id) {
+    return String(id).startsWith('notification:') ? String(id).slice('notification:'.length) : String(id);
   }
 
   // A section: its label on a paper tab, then the pile.
@@ -1200,7 +1374,7 @@
     }
     const empty = d.empty || {};
     const ready = Array.isArray(d.ready) ? d.ready : [];
-    const saw = Array.isArray(d.saw) ? d.saw : [];
+    const saw = (Array.isArray(d.saw) ? d.saw : []).filter(it => !_ottoHidden.has(it.id));
     const missing = new Set(_ottoDeskMissing);
     const readyPartial = d.role === 'student' && (missing.has('asking') || missing.has('dms'));
     const sawFailed = missing.has('activity');
@@ -1209,7 +1383,7 @@
       : readyPartial ? '' : _ottoEmptyHTML(empty.ready || 'nothing needs you right now.'))
       + (readyPartial ? _ottoNoteHTML(OTTO_PART_FAILED) : '');
     const shownSaw = saw.slice(0, OTTO_PANEL_SAW);
-    const sawHTML = (shownSaw.length ? `<div class="op-paper op-saw-card">${shownSaw.map(_ottoSawHTML).join('')}</div>`
+    const sawHTML = (shownSaw.length ? `<div class="op-paper op-saw-card">${shownSaw.map(_ottoSawHTML).join('')}<div class="op-saw-foot"><button type="button" class="op-saw-all" data-op-clear-all>Clear all</button></div></div>`
       : sawFailed ? '' : _ottoEmptyHTML(empty.saw || 'quiet so far.'))
       + (sawFailed ? _ottoNoteHTML(shownSaw.length ? OTTO_PART_FAILED : "What Otto saw didn't load. Try again in a bit.") : '');
     body.innerHTML = _ottoSecHTML('opReadyH', 'Ready for you', ready.length, readyHTML)
@@ -1220,6 +1394,23 @@
     });
     body.querySelectorAll('[data-op-done]').forEach(btn => {
       btn.addEventListener('click', () => _ottoReminderDone(btn.getAttribute('data-op-done')));
+    });
+    body.querySelectorAll('[data-op-clear]').forEach((btn, i) => {
+      btn.addEventListener('click', (e) => {
+        const id = btn.getAttribute('data-op-clear');
+        _ottoClearHold([id], null);
+        // From the keyboard, focus moves on to the row now in its place (or the panel), not to the page.
+        if (e.detail === 0) {
+          const xs = panel.querySelectorAll('.op-saw-x');
+          (xs[Math.min(i, xs.length - 1)] || panel).focus({ preventScroll: true });
+        }
+      });
+    });
+    const all = body.querySelector('[data-op-clear-all]');
+    if (all) all.addEventListener('click', () => {
+      // Everything up to the newest row loaded; with no times, just the rows shown, one by one.
+      const before = _ottoNewestISO(d.saw);
+      _ottoClearHold(saw.map(it => it.id), before);
     });
   }
 

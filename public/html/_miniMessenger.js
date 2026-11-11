@@ -276,10 +276,11 @@
     .vmm-tab-n{min-width:18px;height:18px;box-sizing:border-box;padding:0 5px;border-radius:999px;background:#FF5C35;color:#140806;font-size:11.5px;font-weight:800;line-height:1;display:inline-flex;align-items:center;justify-content:center;}
     .vmm-tab-new{width:30px;height:30px;border-radius:999px;border:1px solid rgba(255,255,255,.10);background:rgba(255,255,255,.06);color:rgba(255,255,255,.8);display:inline-flex;align-items:center;justify-content:center;cursor:none;padding:0;}
     .vmm-tab-open{height:30px;padding:0 10px;border-radius:999px;border:none;background:transparent;color:#FF8A66;font-family:inherit;font-size:12px;font-weight:700;cursor:none;}
+    /* the old panel says "Open"; Otto's desk panel shows the icon alone (_otto.js, polish 1) */
+    .vmm-open-ic{display:none;width:16px;height:16px;flex:none;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;}
     #ottoPanel.vmm-on-messages .otto-panel-body,#ottoPanel.vmm-on-messages .otto-panel-footer{display:none;}
-    /* The pointer is inside the frame, which draws its own cursor: the
-       page's dot and ring would sit frozen on the frame's edge. */
-    html.vmm-over-frame #cursor,html.vmm-over-frame #cursorRing{opacity:0 !important;}
+    /* the pointer left the window from the frame: the dot doesn't sit frozen at its edge */
+    html.vmm-cursor-out #cursor,html.vmm-cursor-out #cursorRing{opacity:0 !important;}
     .vmm-loading{padding:24px;text-align:center;color:var(--ink-muted, #6C6761);font-size:12px;}
   `;
   document.head.appendChild(style);
@@ -549,7 +550,6 @@
   function removeFrame() {
     const f = document.getElementById("vmmFrame");
     if (f) f.remove();
-    document.documentElement.classList.remove("vmm-over-frame");
   }
   // "Open": the chat on screen in the panel, in Messages itself.
   function openInMessages() {
@@ -561,6 +561,38 @@
     } catch (_) { /* the plain address */ }
     location.assign(url);
   }
+  // One cursor over the frame (polish 1, Nov 11): the framed page draws none
+  // and forwards its pointer here (CustomCursor.tsx, "vibe-cursor"), and this
+  // page's own dot and ring follow it across. A move is handed to the page's
+  // cursor as a mousemove at the same spot, so its ring keeps its own follow.
+  // The frame says "leave" when the pointer goes out of it: out of the window
+  // (the dot hides until the next move), unless it just crossed onto this page.
+  let vmmHostMoveAt = 0;
+  document.addEventListener("mousemove", (e) => {
+    if (!e.isTrusted) return;
+    vmmHostMoveAt = performance.now();
+    document.documentElement.classList.remove("vmm-cursor-out");
+  }, { passive: true });
+  window.addEventListener("message", (e) => {
+    const d = e.data;
+    if (!d || d.source !== "vibe-cursor" || e.origin !== location.origin) return;
+    const f = document.getElementById("vmmFrame");
+    if (!f || e.source !== f.contentWindow) return;
+    const cur = document.getElementById("cursor");
+    const ring = document.getElementById("cursorRing");
+    if (d.type === "leave") {
+      if (performance.now() - vmmHostMoveAt > 120) document.documentElement.classList.add("vmm-cursor-out");
+    } else if (d.type === "move" && typeof d.x === "number" && typeof d.y === "number") {
+      document.documentElement.classList.remove("vmm-cursor-out");
+      const r = f.getBoundingClientRect();
+      document.dispatchEvent(new MouseEvent("mousemove", { clientX: r.left + d.x, clientY: r.top + d.y }));
+    } else if (d.type === "down" || d.type === "up") {
+      if (cur) cur.classList.toggle("clicking", d.type === "down");
+    } else if (d.type === "hover-on" || d.type === "hover-off") {
+      if (cur) cur.classList.toggle("hover", d.type === "hover-on");
+      if (ring) ring.classList.toggle("hover", d.type === "hover-on");
+    }
+  });
   function makeFrame(ottoPanel) {
     const frame = document.createElement("iframe");
     frame.id = "vmmFrame";
@@ -583,8 +615,6 @@
         if (at.pathname !== MINI_PATH && at.href !== "about:blank") location.assign(at.href);
       } catch (_) { /* another origin: leave it */ }
     });
-    frame.addEventListener("mouseenter", () => document.documentElement.classList.add("vmm-over-frame"));
-    frame.addEventListener("mouseleave", () => document.documentElement.classList.remove("vmm-over-frame"));
     ottoPanel.insertBefore(frame, ottoPanel.querySelector(".otto-panel-body"));
   }
   function paintOttoTabs() {
@@ -604,7 +634,7 @@
         <button type="button" class="vmm-tab-new" id="vmmNew" aria-label="New message" title="New message">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h8"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7.5 18.5 3 20l1.5-4.5z"/></svg>
         </button>
-        <button type="button" class="vmm-tab-open" id="vmmOpen">Open</button>
+        <button type="button" class="vmm-tab-open" id="vmmOpen" aria-label="Open in Messages" title="Open in Messages"><svg class="vmm-open-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M14 4h6v6"/><path d="M20 4l-8.5 8.5"/><path d="M18 14v4.5A1.5 1.5 0 0 1 16.5 20h-11A1.5 1.5 0 0 1 4 18.5v-11A1.5 1.5 0 0 1 5.5 6H10"/></svg><span class="vmm-open-tx">Open</span></button>
       `;
       const header = ottoPanel.querySelector(".otto-panel-header");
       header.insertAdjacentElement("afterend", row);

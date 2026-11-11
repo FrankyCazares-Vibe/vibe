@@ -218,8 +218,11 @@ test("both side panels keep the page's Escape, solid glass, the pinned way on an
   assert.match(css, /background: var\(--cream, #FAF7F2\);/);
   assert.match(pcss, /\.otp-glass>\.tx-flute\{[^}]*background:var\(--cream\)\}/);
   // The way on is pinned at the foot in both, outside the scrolling body.
-  assert.match(fnText(js, "buildDeskPanel"), /<div class="otto-panel-body"><\/div>\s*<div class="otto-panel-footer op-paper" role="navigation"/);
-  assert.match(tsx, /<\/div>\s*\{\/\*[^*]*\*\/\}\s*<DeskLinks desk=\{desk\} \/>/);
+  assert.match(
+    fnText(js, "buildDeskPanel"),
+    /<div class="otto-panel-body"><\/div>\s*(?:<div class="op-toast-slot" role="status" aria-live="polite"><\/div>\s*)?<div class="otto-panel-footer op-paper" role="navigation"/,
+  );
+  assert.match(tsx, /<\/div>\s*(?:\{\/\*[^*]*\*\/\}\s*<DeskClearToast [^>]*\/>\s*)?\{\/\*[^*]*\*\/\}\s*<DeskLinks desk=\{desk\} \/>/);
   // The same parts: section labels on paper tabs, the top item on blueprint, icons in Otto saw.
   assert.match(css, /#ottoPanel\.op-desk \.op-sec \{[^}]*border-radius: 999px; background: var\(--paper/);
   assert.match(pcss, /\.otp \.dk-sec\{[^}]*border-radius:999px;background:var\(--paper\)/);
@@ -233,4 +236,67 @@ test("both side panels keep the page's Escape, solid glass, the pinned way on an
   assert.match(read("public/html/_miniMessenger.js"), /class="vmm-tab-new" id="vmmNew" aria-label="New message"/);
   // A same-site link guard that also refuses "/\host".
   assert.match(fnText(js, "_ottoHref"), /h\[1\] !== '\/' && h\[1\] !== '\\\\'/);
+});
+
+test("both side panels after Franky's walk (polish 1): small icons, flat paper, clear with Undo, names, one cursor", () => {
+  const js = read("public/html/_otto.js");
+  const mini = read("public/html/_miniMessenger.js");
+  const tsx = read("src/components/network/OttoSidePanel.tsx");
+  const pcss = read("src/components/network/otto-panel.css");
+  const css = js.slice(js.indexOf("deskStyle.textContent = `"), js.indexOf("document.head.appendChild(deskStyle);"));
+  // The pencil and Open: small quiet icons (32px look, 44px target), Open named for what it does.
+  assert.match(tsx, /className="otp-tab-open"[\s\S]*?aria-label="Open in Messages"/);
+  assert.match(mini, /id="vmmOpen" aria-label="Open in Messages"/);
+  assert.match(pcss, /\.otp-tab-new,\.otp-tab-open\{width:44px;height:44px;/);
+  assert.match(pcss, /\.otp-tab-new::before,\.otp-tab-open::before\{[^}]*width:32px;height:32px/);
+  assert.match(css, /#ottoPanel\.op-desk \.vmm-open-tx \{ display: none; \}/);
+  assert.match(css, /:is\(\.vmm-tab-new, \.vmm-tab-open\)::before \{[^}]*width: 32px; height: 32px;/);
+  // Flat paper: no grain layer on the panel's cards (the ribs keep theirs).
+  assert.doesNotMatch(tsx, /tx-paper/);
+  assert.match(tsx, /<i className="tx tx-flute" aria-hidden="true" \/>/);
+  assert.doesNotMatch(css, /tx-paper|otto-n-fine/);
+  // Otto saw: × on each row and Clear all, held 5 s for Undo, in both.
+  assert.match(tsx, /className="otp-saw-x" aria-label=\{`Clear: \$\{item\.title\}`\}/);
+  assert.match(tsx, />\s*Clear all\s*</);
+  assert.match(tsx, /useUndoClear\(\)/);
+  assert.match(fnText(js, "_ottoSawHTML"), /class="op-saw-x" data-op-clear=/);
+  assert.match(js, /data-op-clear-all>Clear all</);
+  const undoMs = read("src/lib/otto/clear-notifications.ts").match(/UNDO_MS = (\d+)/)?.[1];
+  assert.ok(undoMs, "clear-notifications.ts has UNDO_MS");
+  assert.match(js, new RegExp(`OTTO_UNDO_MS = ${undoMs};`));
+  assert.match(js, /'\/api\/me\/notifications', \{ method: 'DELETE'/);
+  // A row can't be one link around the name link and the ×: its own link is a cover under them.
+  assert.doesNotMatch(tsx, /<Link[^>]*className="otp-saw"/);
+  assert.doesNotMatch(fnText(js, "_ottoSawHTML"), /<a class="op-saw"/);
+  // Names: the first time the actor's name shows, as their profile link (ink, never coral).
+  assert.match(tsx, /<DeskTitle item=\{item\} \/>/);
+  assert.match(fnText(js, "_ottoTitleHTML"), /<a class="op-name" href=/);
+  assert.doesNotMatch(css.slice(css.indexOf(".op-name {"), css.indexOf(".op-saw-x {")), /#FF5C35|coral/i);
+  // One cursor over the Messages frame: the framed page forwards, the page around follows.
+  assert.match(read("src/components/CustomCursor.tsx"), /if \(host\) \{[\s\S]*?return forwardCursor\(host\);/);
+  assert.doesNotMatch(read("src/components/desktop/messages/MiniMessenger.tsx"), /dispatchEvent\(new MouseEvent\("mouseleave"\)\)/);
+  assert.match(mini, /d\.source !== "vibe-cursor"/);
+  assert.doesNotMatch(mini, /vmm-over-frame/);
+  // Review repair (Nov 11): the pointer leaving the frame hides the dot, in both hosts.
+  assert.match(read("src/components/CustomCursor.tsx"), /post\("leave"\)/);
+  assert.match(read("src/components/CustomCursor.tsx"), /case "leave":/);
+  assert.match(mini, /d\.type === "leave"/);
+});
+
+test("clear with Undo after the review (Nov 11): one batch, the panel's own ink toast, Clear all up to the newest row", () => {
+  const js = read("public/html/_otto.js");
+  const tsx = read("src/components/network/OttoSidePanel.tsx");
+  // Not the app's toast (coral Undo at the page's foot, and it drops a repeat of the same line).
+  assert.doesNotMatch(tsx, /from "@\/lib\/feedback\/toast"/);
+  assert.match(tsx, /<DeskClearToast toast=\{clear\.toast\} onUndo=\{clear\.undo\} slotClass="otp-toast-slot" \/>/);
+  assert.doesNotMatch(js, /vibeToast\('Cleared/);
+  assert.match(js, /<div class="op-toast-slot" role="status" aria-live="polite"><\/div>/);
+  // One batch in the static twin: each clear joins it and restarts the window; Undo puts the whole batch back.
+  assert.match(fnText(js, "_ottoClearHold"), /_ottoBatch \|\| \(_ottoBatch = /);
+  assert.match(fnText(js, "_ottoClearHold"), /clearTimeout\(b\.timer\);\s*b\.timer = setTimeout/);
+  // Clear all never sends a bare { all: true }: always the newest loaded row's time.
+  assert.doesNotMatch(js.slice(js.indexOf("const OTTO_UNDO_MS"), js.indexOf("  function _ottoNoticeId(")), /\{ all: true \}/);
+  assert.doesNotMatch(fnText(js, "_ottoRenderDesk"), /\{ all: true \}/);
+  assert.match(js, /bodies\.push\(\{ all: true, before: b\.before \}\)/);
+  assert.match(tsx, /clear\(clearAllArg\(loaded, ids\), ids\)/);
 });

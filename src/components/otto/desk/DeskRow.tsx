@@ -8,6 +8,8 @@ import type { ReactNode } from "react";
 
 import type { DeskItem, DeskKind, DeskVerb } from "@/lib/otto/desk";
 
+import { DeskLinkRow, DeskTitle } from "./DeskName";
+
 /**
  * One desk row (Nov 10, 2026, the Otto build's Wave 2A; board D1 "dk-row"):
  * an icon square, the title and one quiet line (detail · when), then the
@@ -140,7 +142,10 @@ export type DeskRowProps = {
   busy?: boolean;
 };
 
-/** A row: its verb (quiet), else the whole row opens `href` with a chevron, else it just reads. */
+/**
+ * A row: its verb (quiet), else the whole row opens `href` with a chevron, else
+ * it just reads. A person's name in the title links to their profile.
+ */
 export function DeskRow({ item, onVerb, busy }: DeskRowProps) {
   const body = (
     <>
@@ -148,7 +153,9 @@ export function DeskRow({ item, onVerb, busy }: DeskRowProps) {
         <DeskIcon name={item.kind} />
       </span>
       <span className="dk-row-tx">
-        <b>{item.title}</b>
+        <b>
+          <DeskTitle item={item} />
+        </b>
         {deskLine(item) ? <span>{deskLine(item)}</span> : null}
       </span>
     </>
@@ -163,12 +170,12 @@ export function DeskRow({ item, onVerb, busy }: DeskRowProps) {
   }
   if (item.href) {
     return (
-      <Link className="dk-row" href={item.href}>
+      <DeskLinkRow item={item} href={item.href} className="dk-row">
         {body}
         <span className="dk-row-go" aria-hidden="true">
           <DeskIcon name="chevron" />
         </span>
-      </Link>
+      </DeskLinkRow>
     );
   }
   return <div className="dk-row">{body}</div>;

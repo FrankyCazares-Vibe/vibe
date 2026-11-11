@@ -1,0 +1,19 @@
+/*
+ * People's names on the desk link to their profile (polish 1, Nov 11).
+ * Quiet until pointed at or focused: then underline, ink and a soft ink
+ * wash, never coral (the frame's one coral is ready[0]'s button).
+ *
+ * A row that is a link as a whole can't hold another link, so it becomes a
+ * dk-cover-host: a positioned box whose dk-cover link (the row's own place)
+ * stretches over it, with the name lifted above the cover.
+ */
+.dk-name{position:relative;z-index:1;color:inherit;font:inherit;text-decoration:none;border-radius:4px;padding:0 2px;margin:0 -2px;transition:background-color .15s ease,color .15s ease}
+.dk-name:hover,.dk-name:focus-visible{color:var(--charcoal);text-decoration:underline;text-decoration-thickness:1.5px;text-underline-offset:3px;background:color-mix(in srgb,var(--charcoal) 9%,transparent)}
+.dk-name:focus-visible{outline:2px solid var(--charcoal);outline-offset:1px}
+.dk-cover-host{position:relative}
+.dk-cover{position:absolute;inset:0;z-index:0;border-radius:inherit;color:inherit;text-decoration:none}
+.dk-cover:focus-visible{outline:2px solid var(--charcoal);outline-offset:2px}
+.dk-cover-host .dk-row-go,.dk-cover-host .dk-row-day{pointer-events:none}
+/* Any other control in a covered row (a clear ×, a button) stays above the cover. */
+.dk-cover-host :is(button,.dk-btn,a:not(.dk-cover)){position:relative;z-index:1}
+@media (prefers-reduced-motion:reduce){.dk-name{transition:none}}

@@ -1,0 +1,64 @@
+/* The desk's lists (polish 1, Nov 11, 2026; Franky's walk): a section heading that folds, "Show all", the small
+   "This week / 30 days / All" picker, the × that clears an Otto saw row, "Clear all" and the "Cleared. Undo" toast.
+   Loads after kit/sky.css and kit/desk.css (the --otto- tokens). Nothing here is coral: the chosen step is ink and
+   bold, the toast is ink. 44px targets everywhere; the picker and the × draw smaller and take taps over 44px.
+   Light is the plain rule; every colour is a token, so Night follows. Markup: DeskSection.tsx, DeskTimeFilter.tsx,
+   OttoDeskColumns.tsx (computer) and OttoDeskPanes.tsx (phone). */
+
+/* the fold: the heading is one button holding the title, the count and a chevron */
+.dk-sec-fold{padding-top:4px}
+.dk-sec-fold :is(h2,h3){display:flex;min-width:0}
+.dk-fold{display:inline-flex;align-items:center;gap:8px;min-height:44px;margin:0 -8px;padding:0 8px;border:0;border-radius:12px;background:none;color:inherit;font:inherit;cursor:pointer;text-align:left}
+.dk-fold>span{min-width:0}
+.dk-fold:hover{background:var(--otto-raise)}
+.dk-fold:focus-visible{outline:2px solid var(--charcoal);outline-offset:0}
+.dk-fold-chev{width:16px;height:16px;color:var(--ink-2);transition:transform .2s ease}
+.dk-fold[aria-expanded="false"] .dk-fold-chev{transform:rotate(-90deg)}
+.dk-sec-tools{margin-left:auto;display:flex;align-items:center;gap:6px;min-width:0}
+.dk-pile[hidden]{display:none}
+
+/* the pile's foot: Show all N / Show fewer on the left, Clear all on the right */
+.dk-pile-foot{display:flex;align-items:center;gap:8px;margin-top:-4px}
+.dk-pile-foot>:last-child:not(.dk-more),.dk-pile-foot>.dk-clear-all{margin-left:auto}
+.dk-more{min-height:44px;margin:0 0 0 -2px;padding:0 10px;border:0;border-radius:12px;background:none;color:var(--ink-2);font:600 14px/1 var(--font-body);cursor:pointer}
+.dk-more:hover{color:var(--charcoal);background:var(--otto-raise)}
+.dk-more:focus-visible{outline:2px solid var(--charcoal);outline-offset:0}
+
+/* the time picker: three small segments; the chosen one is ink */
+.dk-range{display:flex;gap:2px;padding:2px;border-radius:999px;background:var(--otto-raise)}
+.dk-range button{position:relative;height:28px;padding:0 10px;border:0;border-radius:999px;background:none;color:var(--ink-2);font:500 12px/1 var(--font-body);white-space:nowrap;cursor:pointer}
+.dk-range button::after{content:"";position:absolute;left:0;right:0;top:50%;height:44px;transform:translateY(-50%)}
+.dk-range button[aria-checked="true"]{background:var(--charcoal);color:var(--cream);font-weight:700}
+.dk-range button:focus-visible{outline:2px solid var(--charcoal);outline-offset:2px}
+
+/* Clear all: quiet ink text */
+.dk-clear-all{min-height:44px;padding:0 6px;border:0;border-radius:10px;background:none;color:var(--ink-2);font:600 13px/1 var(--font-body);white-space:nowrap;cursor:pointer}
+.dk-clear-all:hover{color:var(--charcoal);text-decoration:underline;text-underline-offset:3px}
+.dk-clear-all:focus-visible{outline:2px solid var(--charcoal);outline-offset:0}
+
+/* a clearable row: the row, then a small × (44px target, ~28px drawn) */
+.dk-clear-li{display:flex;align-items:center;gap:2px}
+.dk-clear-li>:first-child{flex:1;min-width:0}
+.dk-clear-li+.dk-clear-li{border-top:1px solid var(--hairline)}
+.dk-clear{position:relative;width:44px;height:44px;flex:none;padding:0;border:0;border-radius:50%;background:none;color:var(--ink-muted);display:flex;align-items:center;justify-content:center;cursor:pointer}
+.dk-clear::before{content:"";position:absolute;inset:8px;border-radius:50%}
+.dk-clear svg{position:relative;width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round}
+.dk-clear:hover{color:var(--charcoal)}
+.dk-clear:hover::before{background:var(--otto-raise)}
+.dk-clear:focus-visible{outline:2px solid var(--charcoal);outline-offset:-4px}
+/* on a computer the × waits for the row to be pointed at or focused; a phone always shows it */
+@media (hover:hover) and (pointer:fine){
+  .dk-clear{opacity:0}
+  .dk-clear-li:hover .dk-clear,.dk-clear-li:focus-within .dk-clear{opacity:1}
+}
+
+/* Cleared. Undo: an ink bar near the bottom, above the phone's ask bar and tabs */
+.dk-toast-slot{position:fixed;left:0;right:0;bottom:calc(env(safe-area-inset-bottom,0px) + 148px);z-index:60;display:flex;justify-content:center;padding:0 16px;pointer-events:none}
+.dk-toast{pointer-events:auto;display:flex;align-items:center;gap:14px;max-width:420px;min-height:48px;box-sizing:border-box;padding:2px 6px 2px 18px;border-radius:999px;background:var(--charcoal);color:var(--cream);font:500 15px/1.3 var(--font-body);box-shadow:0 10px 30px rgba(0,0,0,.22)}
+.dk-toast>span{padding:12px 12px 12px 0}
+.dk-toast-undo{min-height:44px;padding:0 14px;border:0;border-radius:999px;background:none;color:var(--cream);font:700 15px/1 var(--font-body);text-decoration:underline;text-underline-offset:3px;cursor:pointer}
+.dk-toast-undo:hover{background:color-mix(in srgb,var(--cream) 14%,transparent)}
+.dk-toast-undo:focus-visible{outline:2px solid var(--cream);outline-offset:-3px}
+@media (min-width:768px){.dk-toast-slot{bottom:104px}}
+
+@media (prefers-reduced-motion:reduce){.dk-fold-chev{transition:none}}

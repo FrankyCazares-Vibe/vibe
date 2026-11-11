@@ -8,6 +8,7 @@ import Link from "next/link";
 import type { DeskClub, DeskItem, DeskKind } from "@/lib/otto/desk";
 import { CAMPUS_TIME_ZONE } from "@/lib/push/event-notice";
 
+import { DeskTitle } from "./DeskName";
 import { DeskIcon, DeskVerbButton, deskLine } from "./DeskRow";
 
 /**
@@ -107,7 +108,9 @@ export function DeskDraft({ item, open = true, onVerb, busy, foot }: DeskDraftPr
             <DeskIcon name={item.kind} />
           </span>
           <span className="dk-row-tx">
-            <b>{item.title}</b>
+            <b>
+              <DeskTitle item={item} />
+            </b>
             {deskLine(item) ? <span>{deskLine(item)}</span> : null}
           </span>
           {item.verb ? (
@@ -151,7 +154,9 @@ export function DeskDraft({ item, open = true, onVerb, busy, foot }: DeskDraftPr
           </span>
         )}
         <div>
-          <h3>{item.title}</h3>
+          <h3>
+            <DeskTitle item={item} />
+          </h3>
           {detail || item.whenLabel ? (
             <p>
               {item.whenLabel}

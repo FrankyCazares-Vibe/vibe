@@ -37,6 +37,16 @@ export function CustomCursor() {
     if (typeof window === "undefined") return;
     if (!window.matchMedia("(pointer: fine)").matches) return;
 
+    // This page is a frame inside one of ours (the small Messages window in
+    // Otto's panel, `/messages?mini=1`): the page around it draws the one
+    // cursor, so this one forwards instead (polish 1, Nov 11).
+    const host = framingPage();
+    if (host) {
+      dotRef.current?.classList.add("vibe-cursor-hidden");
+      ringRef.current?.classList.add("vibe-cursor-hidden");
+      return forwardCursor(host);
+    }
+
     const dot = dotRef.current;
     const ring = ringRef.current;
     if (!dot || !ring) return;
@@ -92,7 +102,11 @@ export function CustomCursor() {
       kick();
     }
 
+    // When this page last saw the pointer itself: a frame's "leave" that
+    // lands just after the pointer crossed onto this page is not an exit.
+    let hostMoveAt = 0;
     function onMove(e: MouseEvent) {
+      hostMoveAt = performance.now();
       applyPosition(e.clientX, e.clientY);
     }
     function onDown() {
@@ -173,6 +187,11 @@ export function CustomCursor() {
         case "hover-off":
           setHover(false);
           break;
+        // The pointer left the frame: out of the window (hide, as this page's
+        // own mouseleave does), unless it crossed onto this page just now.
+        case "leave":
+          if (performance.now() - hostMoveAt > 120) hideCursor();
+          break;
       }
     }
     window.addEventListener("message", onMessage);
@@ -208,4 +227,93 @@ export function CustomCursor() {
       <div ref={ringRef} className="vibe-cursor vibe-cursor--ring" aria-hidden />
     </>
   );
+}
+
+/** The `source` of the cursor messages a frame sends the page around it (public/html/messages.html sends the same). */
+export const CURSOR_SOURCE = "vibe-cursor";
+/** On a forwarding frame's <html> while the page around it draws the dot: the native arrow goes. */
+const FORWARD_CLASS = "vibe-cursor-forward";
+const FORWARD_HOVER_SEL =
+  "a, button, input, select, textarea, label, [role='button'], [role='tab'], [data-cursor-hover]";
+
+/** The page framing this one, when it is ours (same origin); null when this page is the whole tab. */
+function framingPage(): Window | null {
+  try {
+    if (window.self === window.top) return null;
+    const host = window.parent;
+    // Reading another origin's address throws: that page is not ours.
+    return host.location.origin === window.location.origin ? host : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Does the page around draw a dot right now? CustomCursor's (`.vibe-cursor--dot`)
+ * or a static page's own (`#cursor`, public/html/profile.html), unless its
+ * CSS hides it (a narrow window, a coarse pointer).
+ */
+function hostDraws(host: Window): boolean {
+  try {
+    const dot = host.document.querySelector(".vibe-cursor--dot, #cursor");
+    return !!dot && host.getComputedStyle(dot).display !== "none";
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Forward this frame's pointer to the page around it, which moves its own
+ * dot and ring over the frame (CustomCursor's "message" listener, and
+ * public/html/_miniMessenger.js on the static profile). The native arrow is
+ * hidden only while that page draws a dot: otherwise there'd be no pointer.
+ */
+function forwardCursor(host: Window): () => void {
+  const root = document.documentElement;
+  const post = (type: string, extra?: { x: number; y: number }) => {
+    try {
+      host.postMessage({ source: CURSOR_SOURCE, type, ...extra }, window.location.origin);
+    } catch {
+      // The page around went away.
+    }
+  };
+  const style = document.createElement("style");
+  style.textContent = `@media (pointer: fine){html.${FORWARD_CLASS},html.${FORWARD_CLASS} *{cursor:none !important}}`;
+  document.head.appendChild(style);
+  const sync = () => root.classList.toggle(FORWARD_CLASS, hostDraws(host));
+  sync();
+
+  let entered = false;
+  const onMove = (e: MouseEvent) => {
+    if (!entered) {
+      entered = true;
+      sync();
+    }
+    post("move", { x: e.clientX, y: e.clientY });
+  };
+  const onLeave = () => {
+    entered = false;
+    // The page around hides its dot unless the pointer crossed onto it (review, Nov 11: it froze at the frame's edge).
+    post("leave");
+  };
+  const onDown = () => post("down");
+  const onUp = () => post("up");
+  const onOver = (e: MouseEvent) => {
+    const t = e.target as Element | null;
+    post(t?.closest?.(FORWARD_HOVER_SEL) ? "hover-on" : "hover-off");
+  };
+  document.addEventListener("mousemove", onMove, { passive: true });
+  document.addEventListener("mousedown", onDown);
+  document.addEventListener("mouseup", onUp);
+  document.addEventListener("mouseover", onOver, true);
+  root.addEventListener("mouseleave", onLeave);
+  return () => {
+    document.removeEventListener("mousemove", onMove);
+    document.removeEventListener("mousedown", onDown);
+    document.removeEventListener("mouseup", onUp);
+    document.removeEventListener("mouseover", onOver, true);
+    root.removeEventListener("mouseleave", onLeave);
+    root.classList.remove(FORWARD_CLASS);
+    style.remove();
+  };
 }

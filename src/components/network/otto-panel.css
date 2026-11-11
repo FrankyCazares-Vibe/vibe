@@ -3,7 +3,7 @@
    NEVER DIMMED: no backdrop, the page stays readable and clickable; the glass carries its own deeper shadow.
    The glass is the kit's tx-flute (sky.css) WITHOUT its backdrop blur (a full-height blur costs too much): ribs over
    the page colour, fully solid (the page's words must not ghost through ribs with no blur). Every word sits on a paper piece (dk-card, the tabs, the section labels), never on the
-   ribs. Light is the plain rule, Night under the app's dark selectors. The static twin is #ottoPanel in
+   ribs. The paper is flat (polish 1, Nov 11: no grain on the cards); the ribs keep theirs. Light is the plain rule, Night under the app's dark selectors. The static twin is #ottoPanel in
    public/html/_otto.js; keep the two in step. Load after sky.css and desk.css. */
 
 .otp{--otto-raise:#F2EFE9;--otto-line-2:rgba(28,28,30,.15);--otto-ok-bg:rgba(20,122,69,.1);--otp-drop:rgba(28,28,30,.2);
@@ -40,12 +40,15 @@ animation:otp-in .34s var(--vibe-spring-soft) both}
 .otp-tab .dk-ico{width:18px;height:18px}
 .otp-count{min-width:20px;height:20px;box-sizing:border-box;padding:0 6px;border-radius:999px;background:var(--otto-raise);color:var(--ink-2);font:700 12px/20px var(--font-body);font-variant-numeric:tabular-nums;text-align:center}
 .otp-tab.on .otp-count{background:var(--paper)}
-/* on the Messages tab, the frame's two controls sit in the row (as today, and as the static twin) */
-.otp-tab-new,.otp-tab-open{height:44px;flex:none;border:0;border-radius:999px;background:none;color:var(--ink-2);display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0}
-.otp-tab-new{width:44px}
-.otp-tab-new .dk-ico{width:17px;height:17px}
-.otp-tab-open{padding:0 12px;font:600 13px/1 var(--font-body)}
-:is(.otp-tab-new,.otp-tab-open):hover{color:var(--charcoal);background:var(--otto-raise)}
+/* on the Messages tab, the frame's two controls: small quiet icons (visually 32px) at the row's end, each still a
+   44px target; no word, no pill, so they stop reading as tabs (polish 1) */
+.otp-tab-new,.otp-tab-open{width:44px;height:44px;flex:none;margin:0;position:relative;border:0;background:none;color:var(--ink-muted);display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0}
+.otp-tab-new{margin-left:-2px}
+.otp-tab-open{margin-right:-4px}
+.otp-tab-new::before,.otp-tab-open::before{content:"";position:absolute;left:6px;top:6px;width:32px;height:32px;border-radius:50%;background:transparent;transition:background-color .15s}
+:is(.otp-tab-new,.otp-tab-open) .dk-ico{position:relative;width:16px;height:16px}
+:is(.otp-tab-new,.otp-tab-open):hover{color:var(--charcoal)}
+:is(.otp-tab-new,.otp-tab-open):hover::before{background:var(--otto-raise)}
 
 /* the Otto tab: the mini desk, scrolling inside the glass */
 .otp-body{flex:1 1 auto;min-height:0;overflow-y:auto;overscroll-behavior:contain;display:flex;flex-direction:column;gap:10px;margin:0 -4px;padding:0 4px 2px;scrollbar-width:thin}
@@ -59,13 +62,32 @@ animation:otp-in .34s var(--vibe-spring-soft) both}
 .otp .otp-loading{padding:16px 18px}
 .otp-loading p{margin:0;font-size:16px;line-height:1.4;color:var(--ink-2)}
 
-/* Otto saw: quiet rows, tell only */
+/* Otto saw: quiet rows, tell only. Each row is a box: its own link stretched under it (dk-cover, desk-names.css), the
+   person's name lifted above as their profile link, and a quiet × that clears the row (polish 1) */
 .otp .otp-saw-card{padding:2px 6px 2px 14px}
-.otp-saw{display:flex;align-items:flex-start;gap:10px;margin:0;padding:11px 8px 11px 0;font-size:14px;line-height:1.35;color:var(--charcoal);text-decoration:none}
+.otp-saw{display:flex;align-items:flex-start;gap:10px;margin:0;padding:11px 0;font-size:14px;line-height:1.35;color:var(--charcoal);text-decoration:none}
 .otp-saw+.otp-saw{border-top:1px solid var(--hairline)}
 .otp-saw>.dk-ico{width:18px;height:18px;margin-top:1px;color:var(--ink-muted)}
-.otp-saw-tx{min-width:0;display:flex;flex-direction:column;gap:2px;overflow-wrap:anywhere}
+.otp-saw-tx{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px;overflow-wrap:anywhere}
 .otp-saw-tx time,.otp-saw-sub{font-size:13px;color:var(--ink-2);font-variant-numeric:tabular-nums}
+.otp-saw .dk-cover:hover~.otp-saw-tx .otp-saw-t{text-decoration:underline;text-underline-offset:2px}
+/* the ×: quiet, shown on the row's hover or focus (always on a touch screen), a 44px target over a 28px look */
+.otp-saw-x{position:relative;z-index:1;flex:none;width:44px;height:44px;margin:-11px -2px -11px 0;padding:0;border:0;background:none;color:var(--ink-muted);display:flex;align-items:center;justify-content:center;cursor:pointer;opacity:0;transition:opacity .15s,color .15s}
+.otp-saw-x::before{content:"";position:absolute;left:8px;top:8px;width:28px;height:28px;border-radius:50%;transition:background-color .15s}
+.otp-saw-x .dk-ico{position:relative;width:16px;height:16px}
+.otp-saw:hover .otp-saw-x,.otp-saw:focus-within .otp-saw-x{opacity:1}
+.otp-saw-x:hover{color:var(--charcoal)}
+.otp-saw-x:hover::before{background:var(--otto-raise)}
+@media (hover:none){.otp-saw-x{opacity:1}}
+/* Clear all: a quiet line under the rows */
+/* "Cleared. Undo" (DeskClearToast, the desk's ink toast) sits in the column above the way on, by the rows it
+   cleared (review, Nov 11: not the app's coral toast at the page's foot). Empty, it takes no room. */
+.otp-toast-slot{display:flex;justify-content:center}
+.otp-toast-slot:empty{margin-top:-10px}
+.otp-toast-slot .dk-toast{width:100%;max-width:none;justify-content:space-between}
+.otp-saw-foot{display:flex;justify-content:flex-end;border-top:1px solid var(--hairline);margin-right:-6px}
+.otp-saw-all{min-height:44px;padding:0 12px;border:0;background:none;color:var(--ink-2);font:600 13px/1 var(--font-body);cursor:pointer;border-radius:12px}
+.otp-saw-all:hover{color:var(--charcoal);background:var(--otto-raise)}
 
 /* the way on, pinned at the panel's foot: the whole desk (and how much more is on it), and its Stats */
 .otp .otp-links{display:flex;gap:4px;padding:4px;border-radius:16px}
@@ -76,9 +98,11 @@ animation:otp-in .34s var(--vibe-spring-soft) both}
 /* the Messages tab: the framed page itself */
 .otp>.otp-frame{flex:1 1 auto;min-height:0;display:flex;flex-direction:column;border-radius:16px;overflow:hidden;border:1px solid var(--hairline);box-shadow:var(--card-shadow)}
 
-.otp :is(.otp-x,.otp-tab,.otp-tab-new,.otp-tab-open,.otp-link,.otp-saw):focus-visible{outline:2px solid var(--charcoal);outline-offset:2px}
+.otp :is(.otp-x,.otp-tab,.otp-link,.otp-saw-all):focus-visible{outline:2px solid var(--charcoal);outline-offset:2px}
+.otp :is(.otp-tab-new,.otp-tab-open,.otp-saw-x):focus-visible{outline:none}
+.otp :is(.otp-tab-new,.otp-tab-open,.otp-saw-x):focus-visible::before{outline:2px solid var(--charcoal);outline-offset:1px}
 .otp:focus{outline:none}
 .otp:focus-visible{outline:2px solid var(--charcoal);outline-offset:3px}
 
 /* reduced motion: no slide, the panel just appears */
-@media (prefers-reduced-motion:reduce){.otp{animation:none}}
+@media (prefers-reduced-motion:reduce){.otp{animation:none}.otp-saw-x,.otp-saw-x::before{transition:none}}

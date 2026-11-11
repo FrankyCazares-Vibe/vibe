@@ -151,9 +151,8 @@ export const MiniMessagesFrame = forwardRef<
           // Another origin: leave it.
         }
       }}
-      // The frame draws its own cursor: this page's would sit frozen on the
-      // frame's edge. Its own "the pointer left the page" handler hides it.
-      onMouseEnter={() => document.documentElement.dispatchEvent(new MouseEvent("mouseleave"))}
+      // No cursor of its own: the framed page forwards its pointer here
+      // (CustomCursor.tsx), and this page's dot and ring follow it over the frame.
       style={{ flex: 1, minHeight: 0, width: "100%", border: "none", display: "block", background: followTheme ? "var(--cream)" : "#141416", colorScheme: "normal", ...style }}
     />
   );

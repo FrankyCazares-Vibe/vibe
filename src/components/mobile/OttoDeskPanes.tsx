@@ -3,9 +3,18 @@
 import { DeskDone } from "@/components/otto/desk/DeskDone";
 import { DeskDraft } from "@/components/otto/desk/DeskDraft";
 import { DeskRow } from "@/components/otto/desk/DeskRow";
-import { DeskList, DeskSection } from "@/components/otto/desk/DeskSection";
+import {
+  DeskClearButton,
+  DeskClearToast,
+  DeskList,
+  DeskSection,
+  useFew,
+} from "@/components/otto/desk/DeskSection";
+import { DeskTimeFilter, useDeskRange } from "@/components/otto/desk/DeskTimeFilter";
 import { PushAsk } from "@/components/push/PushAsk";
-import type { DeskItem } from "@/lib/otto/desk";
+import { clearAllArg, noticeIdOf, useUndoClear } from "@/lib/otto/clear-notifications";
+import type { DeskItem, DeskModel } from "@/lib/otto/desk";
+import { FEW } from "@/lib/otto/desk-lists";
 
 import { DeskLoadFail, paneId, ReminderRow, SawRow, tabId } from "./OttoDeskParts";
 import type { useOttoDesk } from "./use-otto-desk";
@@ -25,7 +34,7 @@ const PART_FAILED = "Part of this couldn't load, so it may be missing something.
  * empty pile always means empty.
  */
 export function OttoDeskPanes({ state }: { state: DeskState }) {
-  const { desk, failed, loading, busyId } = state;
+  const { desk, loading } = state;
   const deskFail = (
     <DeskLoadFail line="Your desk didn't load. Nothing was changed." onRetry={() => void state.retry()} busy={loading} />
   );
@@ -43,16 +52,45 @@ export function OttoDeskPanes({ state }: { state: DeskState }) {
     );
   }
 
+  return <Panes desk={desk} state={state} />;
+}
+
+/** The two panes once the desk is here (hooks live below the not-loaded early return). */
+function Panes({ desk, state }: { desk: DeskModel; state: DeskState }) {
+  const { failed, loading, busyId } = state;
   const student = desk.role === "student";
   const readyPartial = student && (failed.includes("asking") || failed.includes("dms"));
   const scheduledPartial = student && failed.includes("upcoming");
   const sawFailed = failed.includes("activity");
 
-  const reminders = desk.ready.filter((i) => i.kind === "reminder");
-  const others = desk.ready.filter((i) => i.kind !== "reminder");
+  // Ready: the drafts, then the reminders on plain paper; a few, then Show all.
+  const readyOrdered = [...desk.ready.filter((i) => i.kind !== "reminder"), ...desk.ready.filter((i) => i.kind === "reminder")];
+  const readyFew = useFew(readyOrdered, FEW.ready);
+  const others = readyFew.shown.filter((i) => i.kind !== "reminder");
+  const reminders = readyFew.shown.filter((i) => i.kind === "reminder");
+  const scheduledFew = useFew(desk.scheduled, FEW.list);
+  const doneFew = useFew(desk.done, FEW.list);
   const reminderRow = (item: DeskItem) => (
     <ReminderRow key={item.id} item={item} onDone={state.reminderDone} busy={busyId === item.id} />
   );
+
+  // Otto saw: × and Clear all hide at once and delete after the Undo; a time frame narrows it.
+  const undo = useUndoClear();
+  const sawLeft = desk.saw.filter((i) => !undo.isHidden(noticeIdOf(i.id) ?? ""));
+  const sawRange = useDeskRange(sawLeft);
+  const sawFew = useFew(sawRange.items, FEW.list);
+  const clearOne = (item: DeskItem) => {
+    const id = noticeIdOf(item.id);
+    if (id) undo.clear({ ids: [id] });
+  };
+  const clearAll = () => {
+    const ids = sawRange.items.map((i) => noticeIdOf(i.id)).filter((x): x is string => !!x);
+    // All on the picker: every notification up to the newest one loaded (also the ones past the list's end,
+    // never one that came after the desk loaded). Otherwise what the frame shows.
+    if (sawRange.range === "all") undo.clear(clearAllArg(desk.saw, ids), ids);
+    else undo.clear({ ids });
+  };
+  const sawClearable = sawRange.items.some((i) => noticeIdOf(i.id));
 
   return (
     <>
@@ -67,6 +105,8 @@ export function OttoDeskPanes({ state }: { state: DeskState }) {
           title="Ready for you"
           count={desk.ready.length}
           empty={readyPartial ? undefined : desk.empty.ready}
+          foldKey="ready"
+          more={readyFew.more}
         >
           {others.map((item, i) => (
             <DeskDraft
@@ -86,10 +126,12 @@ export function OttoDeskPanes({ state }: { state: DeskState }) {
           title="Scheduled"
           count={desk.scheduled.length}
           empty={scheduledPartial ? undefined : desk.empty.scheduled}
+          foldKey="scheduled"
+          more={scheduledFew.more}
         >
           {desk.scheduled.length > 0 ? (
             <DeskList>
-              {desk.scheduled.map((item) =>
+              {scheduledFew.shown.map((item) =>
                 item.kind === "reminder" ? reminderRow(item) : <DeskRow key={item.id} item={item} />,
               )}
             </DeskList>
@@ -97,9 +139,9 @@ export function OttoDeskPanes({ state }: { state: DeskState }) {
           {scheduledPartial ? <p className="odm-note">{PART_FAILED}</p> : null}
         </DeskSection>
 
-        <DeskSection title="Done this week" count={desk.done.length} empty={desk.empty.done}>
+        <DeskSection title="Done this week" count={desk.done.length} empty={desk.empty.done} foldKey="done" more={doneFew.more}>
           <DeskList>
-            {desk.done.map((item) => (
+            {doneFew.shown.map((item) => (
               <DeskDone key={item.id} item={item} />
             ))}
           </DeskList>
@@ -111,12 +153,33 @@ export function OttoDeskPanes({ state }: { state: DeskState }) {
       </section>
 
       <section id={paneId("saw")} role="tabpanel" aria-labelledby={tabId("saw")} className="odm-pane">
-        <DeskSection title="Otto saw" count={desk.saw.length} empty={sawFailed ? undefined : desk.empty.saw}>
-          {desk.saw.length > 0 ? (
+        <DeskSection
+          title="Otto saw"
+          count={sawRange.items.length}
+          empty={sawFailed ? undefined : sawLeft.length > 0 ? "nothing in this time frame." : desk.empty.saw}
+          foldKey="saw"
+          tools={
+            sawLeft.length > 0 ? (
+              <DeskTimeFilter value={sawRange.range} onChange={sawRange.setRange} label="Otto saw: time frame" />
+            ) : null
+          }
+          more={sawFew.more}
+          foot={
+            sawClearable ? (
+              <button type="button" className="dk-clear-all" onClick={clearAll}>
+                Clear all
+              </button>
+            ) : null
+          }
+        >
+          {sawRange.items.length > 0 ? (
             <div className="odm-saw">
               <DeskList>
-                {desk.saw.map((item) => (
-                  <SawRow key={item.id} item={item} />
+                {sawFew.shown.map((item) => (
+                  <div key={item.id} className="dk-clear-li">
+                    <SawRow item={item} />
+                    {noticeIdOf(item.id) ? <DeskClearButton item={item} onClear={clearOne} /> : null}
+                  </div>
                 ))}
               </DeskList>
             </div>
@@ -129,6 +192,7 @@ export function OttoDeskPanes({ state }: { state: DeskState }) {
             )
           ) : null}
         </DeskSection>
+        <DeskClearToast toast={undo.toast} onUndo={undo.undo} />
       </section>
     </>
   );

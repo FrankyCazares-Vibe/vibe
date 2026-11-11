@@ -63,7 +63,17 @@ export type DeskItem = {
   /** "What will happen" lines with real counts, only when true today. */
   willHappen?: string[];
   stamp?: "done";
+  /**
+   * The person the row is about, when the viewer may see them (polish 1,
+   * Nov 11): renderers link the first occurrence of `name` in `title` to
+   * `href` (their profile). Never set for someone blocked either way, muted
+   * out of Otto saw, restricted (their users row doesn't come back to the
+   * viewer) or without a handle.
+   */
+  actor?: DeskActor;
 };
+/** A person named in a row's title, and their profile. */
+export type DeskActor = { name: string; href: string };
 export type DeskModel = {
   role: DeskRole;
   /** Otto's lowercase sky line, built from counts. */
@@ -112,6 +122,8 @@ export type DeskNotice = {
   type: string;
   createdAt: string;
   actorName: string | null;
+  /** The actor's handle, read on the viewer's own client (so never a restricted account's). */
+  actorHandle?: string | null;
   orgName: string | null;
   orgHandle: string | null;
   postId: string | null;
@@ -124,7 +136,14 @@ export type DeskClubFacts = {
   /** Members now, every role; null when the count couldn't be read. */
   memberCount: number | null;
   /** Pending join requests, oldest first, block pairs already left out. */
-  requests: { id: string; person: DeskPerson; requestedAt: string; canAccept: boolean }[];
+  requests: {
+    id: string;
+    person: DeskPerson;
+    requestedAt: string;
+    canAccept: boolean;
+    /** The viewer's own client can read their profile (not restricted): only then is the name a link. */
+    linkable?: boolean;
+  }[];
   /** Null when the club has no setup list (or it couldn't be read). */
   setup: { id: string; done: boolean }[] | null;
   /** The officer's own drafts (author-only). */
@@ -272,6 +291,22 @@ function clubPath(handle: string): string {
   return `/orgs/${encodeURIComponent(handle)}`;
 }
 
+/** A person's profile page. */
+export function profilePath(handle: string): string {
+  return `/profile/${encodeURIComponent(handle)}`;
+}
+
+/**
+ * The row's `actor` when the title opens with `name` as a whole word ("Kendall
+ * followed you") and the person has a handle; otherwise nothing, so a title
+ * that doesn't name them ("Something new on your account") links nobody.
+ */
+export function deskActor(title: string, name: string, handle: string | null | undefined): { actor: DeskActor } | Record<string, never> {
+  const h = handle?.trim();
+  if (!h || !name || name === "Someone" || !title.startsWith(`${name} `)) return {};
+  return { actor: { name, href: profilePath(h) } };
+}
+
 function myEventHref(ev: DeskMyEvent): string {
   return ev.orgHandle
     ? clubEventPath(ev.orgHandle, ev.id)
@@ -288,10 +323,12 @@ function joinRequestItems(club: DeskClub, facts: DeskClubFacts, nowMs: number): 
     const at = ms(r.requestedAt);
     // True for whichever one is accepted next; the desk reloads after each.
     const n = facts.memberCount === null ? null : facts.memberCount + 1;
+    const title = `${who} asked to join ${club.name}`;
     const base: DeskItem = {
       id: `join_request:${r.id}`,
       kind: "join_request",
-      title: `${who} asked to join ${club.name}`,
+      title,
+      ...(r.linkable ? deskActor(title, who, r.person.handle) : {}),
       whenISO: r.requestedAt,
       whenLabel: Number.isFinite(at) ? pastDayLabel(at, nowMs) : undefined,
       href: tools,
@@ -405,11 +442,13 @@ function studentReady(input: DeskInput, nowMs: number): DeskItem[] {
   for (const f of input.followers) {
     const who = firstName(f);
     const at = ms(f.followedAt);
-    const href = f.handle ? `/profile/${encodeURIComponent(f.handle)}` : undefined;
+    const href = f.handle ? profilePath(f.handle) : undefined;
+    const title = `${who} followed you`;
     items.push({
       id: `follow_back:${f.id}`,
       kind: "follow_back",
-      title: `${who} followed you`,
+      title,
+      ...deskActor(title, who, f.handle),
       detail: "You don't follow them back yet.",
       whenISO: f.followedAt,
       whenLabel: Number.isFinite(at) ? pastDayLabel(at, nowMs) : undefined,
@@ -588,7 +627,7 @@ export function noticeTitle(n: DeskNotice): string {
   // "Cancelled", the club and the date are the row's detail (noticeDetail).
   // Walk fix, Nov 11.
   if (n.type === "event_cancelled") return eventTitleText(n.eventTitle);
-  const actor = n.actorName?.trim().split(/\s+/)[0] || "Someone";
+  const actor = noticeActorName(n);
   const club = n.orgName?.trim() || "a club";
   switch (n.type) {
     case "like": case "post_like": return `${actor} liked your post`;
@@ -605,6 +644,11 @@ export function noticeTitle(n: DeskNotice): string {
     case "org_join_request": return `${actor} asked to join ${n.orgName?.trim() || "your club"}`;
     default: return "Something new on your account";
   }
+}
+
+/** The name a notification's title opens with: the actor's first name, else "Someone". */
+export function noticeActorName(n: Pick<DeskNotice, "actorName">): string {
+  return n.actorName?.trim().split(/\s+/)[0] || "Someone";
 }
 
 /** A notification's second line: only a cancelled event has one ("Cancelled · Chess · Fri, Nov 13"). */
@@ -627,10 +671,15 @@ export function noticeHref(n: DeskNotice): string | undefined {
 function sawItems(notices: DeskNotice[], nowMs: number): DeskItem[] {
   return notices.slice(0, LIST_MAX.saw).map((n) => {
     const at = ms(n.createdAt);
+    const title = noticeTitle(n);
+    // A cancelled event is the club's notice: it names nobody (its actor is
+    // dropped before it reaches the desk), so nobody is linked.
+    const actor = n.type === "event_cancelled" ? {} : deskActor(title, noticeActorName(n), n.actorHandle);
     return {
       id: `notification:${n.id}`,
       kind: n.type === "event_cancelled" ? ("cancelled" as const) : ("notification" as const),
-      title: noticeTitle(n),
+      title,
+      ...actor,
       ...(noticeDetail(n) ? { detail: noticeDetail(n) } : {}),
       whenISO: n.createdAt,
       whenLabel: Number.isFinite(at) ? agoLabel(at, nowMs) : undefined,

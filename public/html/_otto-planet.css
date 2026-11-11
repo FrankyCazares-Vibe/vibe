@@ -1,9 +1,10 @@
 /* Otto as Planet (Nov 10, 2026, Franky's board round 3): the kit's mascot.css parts, m-planet.css and the ten skins.css
    colourways. Markup: OttoPlanet.tsx (PLANET_PARTS). Light is the plain rule, Night under the app's dark selectors.
    Transform and opacity only; reduced motion parks the moon. Held by kit-css.test.ts.
-   x1 = ring's far side + the moon behind (::after), x2 = near side, x3 = the moon in front. The ring is open at its low
-   left end; the coral moon parks in that gap and truly orbits: two copies on one path, each shown for its half (opacity).
-   m-live (hero, computer corner) = a 16 s lap; thinking 3.4 s violet; working 2.8 s; waiting = the ring's raised right end. */
+   x1 = ring's far side + the moon behind (::after), x2 = near side, x3 = the moon in front. The ring is a full loop (Nov 11);
+   the coral moon parks at its low left tip and truly orbits: two copies on one path. Behind him it is a touch smaller and
+   dimmer (depth); the bright copy fades out/in at the tips, away from his body, so the swap never pops.
+   m-live (hero, computer corner) = a 16 s lap; thinking 3.4 s violet; working 2.8 s; waiting = the ring's raised right tip. */
 
 .m-planet{position:relative;display:inline-block;flex:none;vertical-align:middle;container-type:size;
 --m-a:#FFDDB0;--m-b:#FF9E62;--m-c:#EE5A2E;--m-d:#A2331A;--m-eye:#2A120A;--m-glow:rgba(255,92,53,.42);--sk-gl:rgba(255,92,53,.26);
@@ -12,6 +13,8 @@
 --m-bang:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 5v8.5M12 18.4v.2' fill='none' stroke='%23000' stroke-width='3.6' stroke-linecap='round'/%3E%3C/svg%3E");
 --mp-tilt:-18deg;--mp-th:180deg;--mp-r:55.5cqw;--mp-moon:15cqw;
 --mp-coral:radial-gradient(circle at 34% 30%,#FFD2B8 0,#FF9A70 20%,#FF5C35 50%,#D8441E 78%,#A82E10 100%);
+--mp-dim:radial-gradient(circle at 34% 30%,#D9B39C 0,#D98360 20%,#D94E2D 50%,#B83A1A 78%,#8F270E 100%);
+--mp-a:rotate(var(--mp-tilt)) scaleY(.31);--mp-z:scaleY(3.2258) rotate(calc(-1*var(--mp-tilt)));
 --mp-band:color-mix(in srgb,var(--m-d) 34%,transparent);--mp-band-l:color-mix(in srgb,var(--m-a) 26%,transparent);
 --otto-glow:var(--sk-gl);
 --mp-ring:color-mix(in srgb,var(--m-d) 72%,#1A0A05);--mp-ring-b:color-mix(in srgb,var(--m-d) 62%,var(--m-b));--mp-rim:color-mix(in srgb,var(--m-eye) 82%,var(--m-d))}
@@ -77,30 +80,34 @@ background:linear-gradient(180deg,transparent 50%,var(--mp-band-l) 55%,var(--mp-
 .m-planet.wait .m-eye.r{transform:scale(1.04)}
 .m-planet.wait .m-mark{display:none}
 
-/* ring: one ellipse twice, thin far side, heavy near side, open at the low left end */
+/* ring: one ellipse twice, thin far side, heavy near side, a full loop split at its tips */
 .m-planet .m-x1,.m-planet .m-x2,.m-planet .m-x3{inset:-12%}
 .m-planet .m-x1::before,.m-planet .m-x2::before{content:"";position:absolute;left:3.23%;top:35.08%;width:93.55%;height:29.84%;border-radius:50%;border:solid var(--mp-ring);border-width:1.7cqw 5.4cqw 3.9cqw;transform:rotate(var(--mp-tilt))}
-.m-planet .m-x1::before{border-color:var(--mp-ring-b);clip-path:inset(0 0 49% 22%)}
-.m-planet .m-x2::before{clip-path:inset(49% 0 0 10%)}
+.m-planet .m-x1::before{border-color:var(--mp-ring-b);clip-path:inset(0 0 49%)}
+.m-planet .m-x2::before{clip-path:inset(49% 0 0)}
 
-/* the moon: out along the ring's ellipse (radius --mp-r, squash .31, tilt --mp-tilt) to angle --mp-th (180deg = the gap),
-   then the squash and tilt are undone so it stays round. x3::before is in front of the body, x1::after behind it */
-.m-planet .m-x1::after,.m-planet .m-x3::before{content:"";position:absolute;left:50%;top:50%;width:var(--mp-moon);height:var(--mp-moon);margin:calc(var(--mp-moon)*-.5) 0 0 calc(var(--mp-moon)*-.5);border-radius:50%;
-background:var(--mp-coral);box-shadow:0 0 0 max(1px,1.1cqw) var(--m-surface);
-transform:rotate(var(--mp-tilt)) scaleY(.31) rotate(var(--mp-th)) translateX(var(--mp-r)) rotate(calc(-1*var(--mp-th))) scaleY(3.2258) rotate(calc(-1*var(--mp-tilt)));
+/* the moon: out along the ring's ellipse (radius --mp-r, squash .31, tilt --mp-tilt) to angle --mp-th (180deg = left tip),
+   then the squash and tilt are undone so it stays round. x3::before is in front of the body, x1::after behind it (dim),
+   x3::after the dim veil that darkens the front copy near the tips, before it hands over to x1::after */
+.m-planet .m-x1::after,.m-planet .m-x3::before,.m-planet .m-x3::after{content:"";position:absolute;left:50%;top:50%;width:var(--mp-moon);height:var(--mp-moon);margin:calc(var(--mp-moon)*-.5) 0 0 calc(var(--mp-moon)*-.5);border-radius:50%;
+background:var(--mp-coral);box-shadow:0 0 0 max(1px,1.1cqw) var(--mp-ring);
+transform:var(--mp-a) rotate(var(--mp-th)) translateX(var(--mp-r)) rotate(calc(-1*var(--mp-th))) var(--mp-z);
 transition:transform .7s var(--vibe-spring-soft)}
-.m-planet .m-x1::after{opacity:0}
+.m-planet .m-x1::after,.m-planet .m-x3::after{opacity:0;background:var(--mp-dim)}
 
 /* m-live at rest: after 2.5 s a bob and blink every 6 s, a lap every 16 s (far side first, then near) */
 .m-planet.m-live:not(.think,.work,.done,.fail,.wait) .m-eye{animation:m-blink 6s linear 2.5s infinite}
 .m-planet.m-live:not(.think,.work,.done,.fail,.wait) :is(.m-body,.m-x1,.m-x2,.m-x3){animation:m-bob 6s var(--vibe-spring-soft) 2.5s infinite}
 .m-planet.m-live:not(.think,.work,.done,.fail,.wait) .m-x1::after{animation:m-planet-lap 16s linear 2.5s infinite,m-planet-back 16s linear 2.5s infinite}
 .m-planet.m-live:not(.think,.work,.done,.fail,.wait) .m-x3::before{animation:m-planet-lap 16s linear 2.5s infinite,m-planet-front 16s linear 2.5s infinite}
+.m-planet.m-live:not(.think,.work,.done,.fail,.wait) .m-x3::after{animation:m-planet-lap 16s linear 2.5s infinite,m-planet-dim 16s linear 2.5s infinite}
 /* thinking and working: the lap, faster, at every size */
 .m-planet:is(.think,.work) .m-x1::after{animation:m-planet-lap 3.4s linear infinite,m-planet-back 3.4s linear infinite}
 .m-planet:is(.think,.work) .m-x3::before{animation:m-planet-lap 3.4s linear infinite,m-planet-front 3.4s linear infinite}
-.m-planet.work .m-x1::after,.m-planet.work .m-x3::before{animation-duration:2.8s}
-.m-planet.think .m-x1::after,.m-planet.think .m-x3::before{background:var(--otto-think);box-shadow:0 0 0 max(1px,1.7cqw) var(--mp-rim)}
+.m-planet:is(.think,.work) .m-x3::after{animation:m-planet-lap 3.4s linear infinite,m-planet-dim 3.4s linear infinite}
+.m-planet.work .m-x1::after,.m-planet.work .m-x3::before,.m-planet.work .m-x3::after{animation-duration:2.8s}
+.m-planet.think .m-x1::after,.m-planet.think .m-x3::before,.m-planet.think .m-x3::after{background:var(--otto-think);box-shadow:0 0 0 max(1px,1.7cqw) var(--mp-rim)}
+.m-planet.think .m-x1::after,.m-planet.think .m-x3::after{background:color-mix(in srgb,var(--otto-think) 85%,#000)}
 /* done / didn't work: ring and moon move with the body; the moon drops off */
 .m-planet.done :is(.m-body,.m-x1,.m-x2,.m-x3){animation:m-pop 560ms var(--vibe-spring-pop) both}
 .m-planet.fail :is(.m-body,.m-x1,.m-x2,.m-x3){animation:m-shake 420ms var(--vibe-spring-soft) both}
@@ -125,11 +132,9 @@ transition:transform .7s var(--vibe-spring-soft)}
 .m-planet.wait .m-body,.m-planet.wait .m-eye.r{transform:none}
 .m-planet.wait .m-eye.l{transform:none;top:4px;left:3px;width:6px;height:8px}
 .m-planet .m-x1::before,.m-planet .m-x2::before{border-width:max(1.5px,5.5cqw) max(2px,9cqw) max(2px,9cqw);top:33.47%;height:33.06%}
-.m-planet .m-x1::before{clip-path:inset(0 0 49% 26%)}
-.m-planet .m-x2::before{clip-path:inset(49% 0 0 19%)}
 .m-planet .m-x1,.m-planet .m-x3{--mp-moon:6px;--mp-r:54.5cqw}
-.m-planet .m-x1::after,.m-planet .m-x3::before{box-shadow:0 0 0 1px var(--m-surface)}
-.m-planet.think .m-x1::after,.m-planet.think .m-x3::before{box-shadow:0 0 0 1px var(--mp-rim)}
+.m-planet .m-x1::after,.m-planet .m-x3::before,.m-planet .m-x3::after{box-shadow:0 0 0 1px var(--mp-ring)}
+.m-planet.think .m-x1::after,.m-planet.think .m-x3::before,.m-planet.think .m-x3::after{box-shadow:0 0 0 1px var(--mp-rim)}
 .m-planet.fail .m-x3::before{transform:translate(-35cqw,42cqw)}
 }
 /* 24px: one pixel smaller, 4x6 eyes, no glint */
@@ -154,6 +159,10 @@ transition:transform .7s var(--vibe-spring-soft)}
 @keyframes m-shake{0%,100%{transform:none}25%{transform:translateX(-3cqw)}60%{transform:translateX(2.4cqw)}85%{transform:translateX(-1cqw)}}
 @keyframes m-bob{0%,58%,100%{transform:none}74%{transform:translateY(-3cqw)}}
 @keyframes m-blink{0%,90%,100%{transform:none}94%{transform:scaleY(.1)}}
-@keyframes m-planet-lap{from{transform:rotate(var(--mp-tilt)) scaleY(.31) rotate(180deg) translateX(var(--mp-r)) rotate(-180deg) scaleY(3.2258) rotate(calc(-1*var(--mp-tilt)))}to{transform:rotate(var(--mp-tilt)) scaleY(.31) rotate(540deg) translateX(var(--mp-r)) rotate(-540deg) scaleY(3.2258) rotate(calc(-1*var(--mp-tilt)))}}
-@keyframes m-planet-back{0%,50%{opacity:1}50.05%,100%{opacity:0}}
-@keyframes m-planet-front{0%,49.95%{opacity:0}50%,100%{opacity:1}}
+/* the lap: 45deg steps; behind him (180-360) a touch smaller, in front a touch bigger */
+@keyframes m-planet-lap{0%{transform:var(--mp-a) rotate(180deg) translateX(var(--mp-r)) rotate(-180deg) var(--mp-z) scale(1)}12.5%{transform:var(--mp-a) rotate(225deg) translateX(var(--mp-r)) rotate(-225deg) var(--mp-z) scale(0.9)}25%{transform:var(--mp-a) rotate(270deg) translateX(var(--mp-r)) rotate(-270deg) var(--mp-z) scale(0.86)}37.5%{transform:var(--mp-a) rotate(315deg) translateX(var(--mp-r)) rotate(-315deg) var(--mp-z) scale(0.9)}50%{transform:var(--mp-a) rotate(360deg) translateX(var(--mp-r)) rotate(-360deg) var(--mp-z) scale(1)}62.5%{transform:var(--mp-a) rotate(405deg) translateX(var(--mp-r)) rotate(-405deg) var(--mp-z) scale(1.03)}75%{transform:var(--mp-a) rotate(450deg) translateX(var(--mp-r)) rotate(-450deg) var(--mp-z) scale(1.04)}87.5%{transform:var(--mp-a) rotate(495deg) translateX(var(--mp-r)) rotate(-495deg) var(--mp-z) scale(1.03)}100%{transform:var(--mp-a) rotate(540deg) translateX(var(--mp-r)) rotate(-540deg) var(--mp-z) scale(1)}}
+/* the hand-off: in front the veil dims the moon from the left tip (0-9%); at 9.5%, clear of the near ring and of his
+   body, the dim copy behind takes over; at 40.5% the front copy (veiled) takes back over and the veil lifts by the right tip */
+@keyframes m-planet-back{0%,9.45%{opacity:0}9.5%,40.5%{opacity:1}40.55%,100%{opacity:0}}
+@keyframes m-planet-front{0%,9.45%{opacity:1}9.5%,40.5%{opacity:0}40.55%,100%{opacity:1}}
+@keyframes m-planet-dim{0%{opacity:0}9%,9.45%{opacity:1}9.5%,40.5%{opacity:0}40.55%,41%{opacity:1}50%,100%{opacity:0}}

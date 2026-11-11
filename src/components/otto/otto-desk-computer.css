@@ -72,6 +72,8 @@ a.odc-saw:focus-visible{outline:2px solid var(--charcoal);outline-offset:-2px;bo
 .odc-ask-hint{margin:0;padding:0 18px;font-size:13px;line-height:1.35;color:var(--ink-2)}
 /* two columns: the box would sit over Done this week while it scrolls, so it stays in place at the end */
 @media (max-width:1279px){.dk-ask.odc-ask{position:static}}
+/* keyboard focus never lands under the held bar and its fade (review, Nov 11): the window scrolls it into sight */
+@media (min-width:1280px){html:has(.dk-ask.odc-ask){scroll-padding-bottom:128px}}
 
 /* Stats and Settings: one readable column under the band */
 .odc-wide{max-width:816px;margin-top:8px;padding-bottom:48px}

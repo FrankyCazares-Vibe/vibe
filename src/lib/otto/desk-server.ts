@@ -166,6 +166,25 @@ async function loadBlockedByClub(service: SupabaseClient, orgId: string, ownerId
 }
 
 /**
+ * Which of `ids` the person's own client can read in `users`: a restricted
+ * account's row doesn't come back (the moderation policy), so only these
+ * names may link to a profile on the desk (polish 1, Nov 11). Fails closed:
+ * on a read error nobody is linked; the row itself still shows.
+ */
+async function loadSeenByViewer(viewer: SupabaseClient, ids: string[]): Promise<Set<string>> {
+  const res = await viewer.from("users").select("id").in("id", ids);
+  if (res.error) {
+    console.error("[otto desk requests profiles]", { code: res.error.code });
+    return new Set();
+  }
+  return new Set(
+    ((res.data ?? []) as { id?: unknown }[])
+      .map((r) => (typeof r.id === "string" ? r.id.toLowerCase() : ""))
+      .filter(Boolean),
+  );
+}
+
+/**
  * Pending join requests as Club tools > Join requests lists them: block
  * pairs left out, and Accept offered only where the approve route would say
  * yes today (school email verified, the club's "Open to" allows them, no
@@ -174,6 +193,7 @@ async function loadBlockedByClub(service: SupabaseClient, orgId: string, ownerId
  */
 async function loadRequests(
   service: SupabaseClient,
+  viewer: SupabaseClient,
   club: RunClub,
   org: { audience: unknown; owner_id: unknown },
   blocked: ReadonlySet<string>,
@@ -191,10 +211,11 @@ async function loadRequests(
   if (rows.length === 0) return { ok: true, value: [] };
 
   const ids = [...new Set(rows.map((r) => r.user_id))];
-  const [systemsRes, removedRes, blockedByClub] = await Promise.all([
+  const [systemsRes, removedRes, blockedByClub, linkable] = await Promise.all([
     service.from("users").select("id, school_system").in("id", ids),
     loadRemoved(service, club.orgId, ids),
     loadBlockedByClub(service, club.orgId, org.owner_id, ids),
+    loadSeenByViewer(viewer, ids),
   ]);
   if (systemsRes.error) return fail("requests systems", systemsRes.error);
   if (!removedRes.ok) return removedRes;
@@ -212,6 +233,7 @@ async function loadRequests(
         id: r.id,
         person: { id: r.user_id, name: r.users?.name ?? null, handle: r.users?.handle ?? null },
         requestedAt: r.requested_at,
+        linkable: linkable.has(r.user_id.toLowerCase()),
         canAccept:
           system !== null &&
           audienceAllows(audience, system) &&
@@ -311,7 +333,7 @@ async function loadClubFacts(args: DeskLoadArgs, club: RunClub): Promise<Ok<Desk
       .gte("joined_at", since)
       .order("joined_at", { ascending: false })
       .limit(JOINS_MAX),
-    loadRequests(service, club, org, blocked),
+    loadRequests(service, supabase, club, org, blocked),
     loadClubEvents(supabase, club.orgId, nowMs),
     supabase
       .from("posts")
