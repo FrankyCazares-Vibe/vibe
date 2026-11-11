@@ -80,7 +80,7 @@ test("the code reads the same type the CHECK lets in", () => {
     "./dispatch.ts",
     "./payload.ts",
     "../orgs/notification-orgs.ts",
-    "../../components/network/OttoSidePanel.tsx",
+    "../../components/network/OttoSidePanelLegacy.tsx",
     "../../components/otto/OttoActivity.tsx",
   ]) {
     assert.ok(read(file).includes('"org_join_request"'), `${file} handles org_join_request`);

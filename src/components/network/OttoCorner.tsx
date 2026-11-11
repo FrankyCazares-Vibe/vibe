@@ -1,11 +1,11 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { useMiniMessages } from "@/components/desktop/messages/MiniMessenger";
 import { OttoPlanet } from "@/components/otto/planet/OttoPlanet";
 
-import { OttoSidePanel } from "./OttoSidePanel";
+import { OttoSidePanel, useOttoDeskFlag } from "./OttoSidePanel";
 import "./otto-corner.css";
 
 /**
@@ -15,8 +15,12 @@ import "./otto-corner.css";
  * in the same wave.
  *
  * Polls `/api/me/notifications/count` every 30s for the unread badge — same
- * cadence as `_otto.js`. Click opens the slide-out side panel; the panel
- * marks all notifications read so the count clears next poll.
+ * cadence as `_otto.js`. Click opens the side panel; the panel marks all
+ * notifications read so the count clears next poll. Since Wave 2B (Nov 11,
+ * 2026) the panel doesn't dim the page and stops above this button, so the
+ * same click closes it (aria-expanded); Escape or its Close hands focus back
+ * here. `otto_desk` (/api/me/features, asked on first hover, focus or click)
+ * picks the panel: off brings back today's (OttoSidePanelLegacy).
  *
  * Live mention pop-up: whenever the unread count increases between polls
  * we peek the newest notification. If it's a mention AND the actor is
@@ -49,9 +53,20 @@ type NotifLite = {
   } | null;
 };
 
+const OTTO_PANEL_ID = "otto-panel";
+
 export function OttoCorner() {
   const [unread, setUnread] = useState(0);
   const [open, setOpen] = useState(false);
+  const buttonRef = useRef<HTMLButtonElement | null>(null);
+  // The desk flag is asked once the person reaches for the corner.
+  const [armed, setArmed] = useState(false);
+  const deskOn = useOttoDeskFlag(armed);
+  const arm = useCallback(() => setArmed(true), []);
+  const close = useCallback((focusCorner?: boolean) => {
+    setOpen(false);
+    if (focusCorner) buttonRef.current?.focus({ preventScroll: true });
+  }, []);
   // Messages lives in the panel too (its second tab, laptops with the new
   // chat): the orb's number is Otto's news plus the unread chats.
   const chats = useMiniMessages(!open);
@@ -176,16 +191,30 @@ export function OttoCorner() {
   return (
     <>
     <button
+      ref={buttonRef}
       id="otto-corner"
       type="button"
       onClick={() => {
+        arm();
+        // The panel stops above this button: the same click closes it.
+        if (open) {
+          close(false);
+          return;
+        }
         setOpen(true);
         // Optimistic — the panel will mark-read server-side; clear the
         // badge now so it doesn't blink for the polling interval.
         if (unread > 0) setUnread(0);
       }}
+      onPointerEnter={arm}
+      onFocus={arm}
+      aria-expanded={open}
+      // Today's panel (OTTO_DESK=off) carries no id: nothing to point at.
+      aria-controls={open && deskOn !== false ? OTTO_PANEL_ID : undefined}
       aria-label={
-        unread + chats.unread > 0
+        open
+          ? "Close Otto"
+          : unread + chats.unread > 0
           ? `Open Otto · ${unread} new${chats.unread > 0 ? `, ${chats.unread} unread ${chats.unread === 1 ? "chat" : "chats"}` : ""}`
           : chats.available
             ? "Open Otto and Messages"
@@ -251,7 +280,7 @@ export function OttoCorner() {
         <OttoPlanet size={46} live state={waiting ? "wait" : "rest"} />
       </span>
     </button>
-    <OttoSidePanel open={open} onClose={() => setOpen(false)} messages={chats} />
+    <OttoSidePanel open={open} onClose={close} messages={chats} deskOn={deskOn} id={OTTO_PANEL_ID} />
     {toast ? (
       <div
         role="alert"

@@ -87,20 +87,21 @@
       position: fixed; bottom: 24px; right: 24px; z-index: 9990;
       cursor: none;
     }
-    /* Something unseen (Nov 10 2026): a small ink dot, still. His coral
-       moon at the ring's raised end is the one coral thing that says
-       something waits, so the dot is no longer coral. Hidden by default;
-       JS adds .has-unread when /api/me/notifications/count returns > 0. */
+    /* Something unseen (Nov 11 2026, Wave 2B): the count, ink on the page
+       colour, still, as the React corner's .otto-corner-count. His coral
+       moon at the ring's raised end (the wait pose) is the one coral thing
+       that says something waits. Hidden at 0; _ottoPaintCorner fills it
+       from the notifications count plus unread chats (_miniMessenger.js). */
     #ottoCorner .otto-notif {
-      position: absolute; top: -1px; right: -1px;
-      width: 12px; height: 12px; border-radius: 50%; box-sizing: border-box;
-      background: var(--charcoal, #1C1C1E); border: 2px solid var(--cream, #FAF7F2);
-      z-index: 2; display: none;
+      position: absolute; top: -5px; right: -5px; z-index: 2;
+      box-sizing: border-box; min-width: 20px; height: 20px; padding: 0 5px;
+      border-radius: 999px; border: 2px solid var(--cream, #FAF7F2);
+      background: var(--charcoal, #1C1C1E); color: var(--cream, #FAF7F2);
+      font: 800 10px/16px "DM Sans", sans-serif; letter-spacing: .02em;
+      align-items: center; justify-content: center; pointer-events: none;
+      display: none;
     }
-    #ottoCorner.has-unread .otto-notif { display: block; }
-    /* Unread chats light the same dot: Messages is a tab of this panel
-       (_miniMessenger.js adds .has-chats). */
-    #ottoCorner.has-chats .otto-notif { display: block; }
+    #ottoCorner.has-unread .otto-notif, #ottoCorner.has-chats .otto-notif { display: flex; }
     /* The computer's corner Otto: the board's 64px paper puck, the React
        corner's twin (src/components/network/otto-corner.css, OttoCorner.tsx).
        It follows the page's Light or Night, so Otto here wears the page's
@@ -397,23 +398,389 @@
   `;
   document.head.appendChild(style);
 
+  // ── The desk panel (Nov 11, 2026, the Otto build's Wave 2B) ─────────────
+  // The twin of src/components/network/OttoSidePanel.tsx: a column at the
+  // right that stops above the corner Otto. Nothing dims the page behind it
+  // (Franky's call): no backdrop, the page stays readable and clickable.
+  // Fluted glass (the kit's tx-flute) is the surface, ribs over a near-solid
+  // page colour with NO backdrop-filter; every word sits on a paper card.
+  // It follows the page's Light or Night through the page's own tokens.
+  // OTTO_DESK=off (otto_desk false from /api/me/features) keeps the old
+  // dark panel above, unchanged.
+  const deskStyle = document.createElement('style');
+  deskStyle.textContent = `
+    @keyframes ottoDeskIn { from { opacity: 0; transform: translateX(16px); } to { opacity: 1; transform: none; } }
+    @keyframes ottoCornerPop { 0% { transform: scale(1); } 40% { transform: scale(1.08); } 100% { transform: scale(1); } }
+    #ottoCorner.otto-pop .otto-shell { animation: ottoCornerPop 700ms var(--vibe-spring-pop, cubic-bezier(.34,1.56,.64,1)) 1; }
+    #ottoCorner:focus-visible { outline: none; }
+    #ottoCorner:focus-visible .otto-shell { outline: 2px solid var(--charcoal, #1C1C1E); outline-offset: 3px; }
+
+    #ottoPanel.op-desk {
+      top: 16px; right: 16px; bottom: 104px; width: 376px; max-width: calc(100vw - 32px);
+      box-sizing: border-box; padding: 12px; gap: 10px; isolation: isolate;
+      border-radius: 20px; border: 1px solid var(--hairline, rgba(28,28,30,.08));
+      /* solid: with no blur, the page's words must not ghost through the ribs */
+      background: var(--cream, #FAF7F2);
+      color: var(--charcoal, #1C1C1E);
+      box-shadow: var(--card-shadow, 0 4px 14px rgba(0,0,0,.08)), 0 18px 48px rgba(28,20,12,.18);
+      animation: ottoDeskIn .32s var(--vibe-spring-soft, cubic-bezier(.22,1,.36,1));
+      outline: none;
+    }
+    :root[data-theme="dark"] #ottoPanel.op-desk { box-shadow: var(--card-shadow), 0 18px 48px rgba(0,0,0,.55); }
+    #ottoPanel.op-desk > .tx-flute {
+      position: absolute; inset: 0; z-index: -1; display: block; pointer-events: none; border-radius: inherit;
+      background: repeating-linear-gradient(90deg, color-mix(in srgb, var(--charcoal, #1C1C1E) 10%, transparent) 0, transparent 4px, color-mix(in srgb, var(--charcoal, #1C1C1E) 5%, transparent) 11px, color-mix(in srgb, var(--charcoal, #1C1C1E) 10%, transparent) 12px);
+    }
+    :root[data-theme="dark"] #ottoPanel.op-desk > .tx-flute {
+      background: repeating-linear-gradient(90deg, rgba(255,255,255,.13) 0, rgba(255,255,255,.02) 4px, rgba(0,0,0,.1) 11px, rgba(255,255,255,.13) 12px);
+    }
+    #ottoPanel.op-desk .m-planet { --m-surface: var(--paper, #FFFFFF); }
+    #ottoPanel.op-desk a, #ottoPanel.op-desk button { cursor: none; font-family: 'DM Sans', sans-serif; }
+    #ottoPanel.op-desk :is(a, button):focus-visible { outline: 2px solid var(--charcoal, #1C1C1E); outline-offset: 2px; }
+
+    /* The React panel's parts (OttoSidePanel.tsx on the desk's dk- parts,
+       src/components/otto/kit/desk.css), by hand: keep the two in step. */
+    #ottoPanel.op-desk { --op-raise: #F2EFE9; --op-line-2: rgba(28,28,30,.15); }
+    :root[data-theme="dark"] #ottoPanel.op-desk { --op-raise: #1F1D1C; --op-line-2: rgba(255,255,255,.16); }
+
+    /* Paper: the header, each card, the section labels, the footer. */
+    #ottoPanel.op-desk .op-paper {
+      background: var(--paper, #FFFFFF); color: var(--charcoal, #1C1C1E);
+      border: 1px solid var(--hairline, rgba(28,28,30,.08)); border-radius: 18px;
+      box-shadow: var(--card-shadow, 0 4px 14px rgba(0,0,0,.08));
+    }
+    #ottoPanel.op-desk .otto-panel-header {
+      flex: none; overflow: visible; padding: 10px 6px 12px 12px; border-radius: 16px;
+      display: flex; align-items: flex-start; gap: 10px;
+    }
+    #ottoPanel.op-desk .op-mini { width: 28px; height: 28px; flex: none; display: flex; margin-top: 2px; }
+    #ottoPanel.op-desk .op-head-tx { flex: 1; min-width: 0; }
+    #ottoPanel.op-desk .otto-panel-name {
+      margin: 0; font-family: 'Fraunces', serif; font-size: 22px; font-weight: 900; letter-spacing: -.03em;
+      line-height: 1.1; color: var(--charcoal, #1C1C1E);
+    }
+    #ottoPanel.op-desk .op-say {
+      margin: 4px 0 0; font-family: 'Fraunces', serif; font-style: italic; font-weight: 400; letter-spacing: -.005em;
+      font-size: 15px; line-height: 1.35; color: var(--ink-2, #5C5853);
+    }
+    #ottoPanel.op-desk .otto-panel-close {
+      width: 44px; height: 44px; flex: none; margin-top: -6px; padding: 0; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center; color: var(--ink-2, #5C5853);
+    }
+    #ottoPanel.op-desk .otto-panel-close svg { width: 18px; height: 18px; }
+    #ottoPanel.op-desk .otto-panel-close:hover { color: var(--charcoal, #1C1C1E); background: var(--op-raise); }
+    #ottoPanel.op-desk .op-as { margin: 6px 0 0; font-size: 13px; line-height: 1.3; color: var(--ink-2, #5C5853); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    #ottoPanel.op-desk .op-as[hidden] { display: none; }
+    #ottoPanel.op-desk .op-as b { color: var(--charcoal, #1C1C1E); font-weight: 700; }
+
+    #ottoPanel.op-desk .otto-panel-body {
+      flex: 1; min-height: 0; padding: 0 4px 2px; margin: 0 -4px; display: flex; flex-direction: column; gap: 10px;
+      overscroll-behavior: contain;
+      scrollbar-color: color-mix(in srgb, var(--charcoal, #1C1C1E) 22%, transparent) transparent;
+    }
+    #ottoPanel.op-desk .otto-panel-body > * { flex: none; }
+    #ottoPanel.op-desk .otto-panel-body::-webkit-scrollbar-thumb { background: color-mix(in srgb, var(--charcoal, #1C1C1E) 22%, transparent); }
+    #ottoPanel.op-desk .op-card { padding: 14px 16px; }
+    /* A section's label is its own paper tab on the glass. */
+    #ottoPanel.op-desk .op-sec {
+      width: fit-content; max-width: 100%; box-sizing: border-box; display: flex; align-items: center; gap: 8px;
+      padding: 6px 8px 6px 12px; border-radius: 999px; background: var(--paper, #FFFFFF); border: 1px solid var(--hairline, rgba(28,28,30,.08));
+    }
+    #ottoPanel.op-desk .op-sec h3 { margin: 0; font-size: 14px; font-weight: 700; line-height: 1.2; letter-spacing: -.005em; color: var(--charcoal, #1C1C1E); }
+    #ottoPanel.op-desk .op-sec b {
+      min-width: 22px; height: 22px; box-sizing: border-box; padding: 0 7px; border-radius: 999px; background: var(--op-raise);
+      color: var(--ink-2, #5C5853); font-size: 12px; font-weight: 700; line-height: 22px; font-variant-numeric: tabular-nums; text-align: center;
+    }
+    #ottoPanel.op-desk .op-pile { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
+    #ottoPanel.op-desk .op-pile > * { flex: none; }
+    #ottoPanel.op-desk .op-empty { padding: 16px 18px; }
+    #ottoPanel.op-desk .op-empty p {
+      margin: 0; font-family: 'Fraunces', serif; font-style: italic; font-size: 17px; line-height: 1.4; color: var(--ink-2, #5C5853);
+    }
+    #ottoPanel.op-desk .op-loading { padding: 16px 18px; }
+    #ottoPanel.op-desk .op-loading p { margin: 0; font-size: 16px; line-height: 1.4; color: var(--ink-2, #5C5853); }
+    #ottoPanel.op-desk .op-ico { width: 20px; height: 20px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+    #ottoPanel.op-desk .op-ic {
+      width: 40px; height: 40px; flex: none; border-radius: 12px; background: var(--op-raise); color: var(--ink-2, #5C5853);
+      display: flex; align-items: center; justify-content: center;
+    }
+
+    /* Ready on blueprint (dk-draft): the top item opens (its tag, title,
+       "What will happen", its verb); the next folds to one row (.mini). */
+    #ottoPanel.op-desk .op-draft {
+      position: relative; isolation: isolate; overflow: hidden; background: var(--paper, #FFFFFF);
+      border: 1px dashed var(--op-line-2); border-radius: 18px; box-shadow: var(--card-shadow, none);
+      padding: 12px; display: flex; flex-direction: column; gap: 8px; color: var(--charcoal, #1C1C1E);
+    }
+    #ottoPanel.op-desk .op-draft::before, #ottoPanel.op-desk .op-draft::after {
+      content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none;
+      --op-grid: color-mix(in srgb, var(--charcoal, #1C1C1E) 9%, transparent);
+      background: linear-gradient(var(--op-grid) 1px, transparent 1px) 0 0/96px 96px, linear-gradient(90deg, var(--op-grid) 1px, transparent 1px) 0 0/96px 96px;
+    }
+    #ottoPanel.op-desk .op-draft::after {
+      inset: -24px; --op-grid: color-mix(in srgb, var(--charcoal, #1C1C1E) 4%, transparent);
+      background: linear-gradient(var(--op-grid) 1px, transparent 1px) 0 0/24px 24px, linear-gradient(90deg, var(--op-grid) 1px, transparent 1px) 0 0/24px 24px;
+    }
+    /* the grid stops above the button row */
+    #ottoPanel.op-desk .op-draft:not(.mini)::before, #ottoPanel.op-desk .op-draft:not(.mini)::after {
+      -webkit-mask-image: linear-gradient(#000 calc(100% - 168px), transparent calc(100% - 112px));
+      mask-image: linear-gradient(#000 calc(100% - 168px), transparent calc(100% - 112px));
+    }
+    #ottoPanel.op-desk .op-draft-as { display: flex; }
+    #ottoPanel.op-desk .op-draft-as em {
+      font-size: 12px; font-weight: 700; font-style: normal; line-height: 1; letter-spacing: .06em; text-transform: uppercase;
+      color: var(--ink-2, #5C5853); padding: 5px 8px; border: 1px dashed var(--op-line-2); border-radius: 999px; background: var(--paper, #FFFFFF);
+    }
+    #ottoPanel.op-desk .op-draft-pre { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 14px; background: var(--op-raise); }
+    #ottoPanel.op-desk .op-draft-pre > div { min-width: 0; }
+    #ottoPanel.op-desk .op-draft-pre h3 { margin: 0; font-size: 16px; font-weight: 700; line-height: 1.25; color: var(--charcoal, #1C1C1E); overflow-wrap: anywhere; }
+    #ottoPanel.op-desk .op-draft-pre p { margin: 2px 0 0; font-size: 14px; line-height: 1.4; color: var(--ink-2, #5C5853); }
+    #ottoPanel.op-desk .op-date {
+      width: 46px; height: 50px; flex: none; box-sizing: border-box; border-radius: 12px; background: var(--paper, #FFFFFF);
+      border: 1px solid var(--hairline, rgba(28,28,30,.08)); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+    }
+    #ottoPanel.op-desk .op-date i { font-size: 12px; font-weight: 700; font-style: normal; line-height: 1; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-2, #5C5853); }
+    #ottoPanel.op-desk .op-date b { font-size: 20px; font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; color: var(--charcoal, #1C1C1E); }
+    #ottoPanel.op-desk .op-what h4 { margin: 0 0 6px; font-size: 12px; font-weight: 700; line-height: 1; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-2, #5C5853); }
+    #ottoPanel.op-desk .op-what ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 3px; }
+    #ottoPanel.op-desk .op-what li { display: grid; grid-template-columns: 34px 1fr; gap: 8px; font-size: 15px; line-height: 1.35; color: var(--charcoal, #1C1C1E); }
+    #ottoPanel.op-desk .op-what li b { font-weight: 800; font-variant-numeric: tabular-nums; text-align: right; }
+    #ottoPanel.op-desk .op-what li.plain { grid-template-columns: 1fr; padding-left: 42px; }
+    #ottoPanel.op-desk .op-go { display: flex; gap: 8px; }
+    #ottoPanel.op-desk .op-foot { margin: 4px 0 0; font-size: 13px; line-height: 1.35; color: var(--ink-2, #5C5853); }
+    #ottoPanel.op-desk .op-draft.mini { padding: 2px 8px 2px 12px; }
+    #ottoPanel.op-desk .op-draft.mini .op-row { min-height: 60px; gap: 10px; }
+    #ottoPanel.op-desk .op-draft.mini .op-btn { padding: 0 14px; }
+
+    /* A row (dk-row): icon square, two lines, then a quiet button. */
+    #ottoPanel.op-desk .op-list { padding: 2px 6px 2px 14px; }
+    #ottoPanel.op-desk .op-row {
+      display: flex; align-items: center; gap: 12px; min-height: 64px; padding: 8px 0; box-sizing: border-box;
+      color: var(--charcoal, #1C1C1E); text-decoration: none;
+    }
+    #ottoPanel.op-desk .op-row + .op-row { border-top: 1px solid var(--hairline, rgba(28,28,30,.08)); }
+    #ottoPanel.op-desk .op-tx { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+    #ottoPanel.op-desk .op-tx b {
+      font-size: 16px; font-weight: 600; line-height: 1.25; color: var(--charcoal, #1C1C1E);
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    #ottoPanel.op-desk .op-tx span {
+      font-size: 14px; line-height: 1.3; color: var(--ink-2, #5C5853); font-variant-numeric: tabular-nums;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    #ottoPanel.op-desk .op-btn {
+      height: 44px; box-sizing: border-box; padding: 0 18px; border-radius: 999px;
+      border: 1px solid var(--op-line-2); background: transparent;
+      color: var(--charcoal, #1C1C1E); font-size: 14px; font-weight: 600; line-height: 1;
+      display: inline-flex; align-items: center; justify-content: center; gap: 6px; white-space: nowrap; text-decoration: none; flex: none;
+      transition: transform .32s var(--vibe-spring-soft, ease);
+    }
+    #ottoPanel.op-desk .op-btn:active { transform: scale(.97); }
+    #ottoPanel.op-desk .op-btn:disabled { opacity: .6; transform: none; }
+    /* The frame's one coral fill: the top Ready item's verb (plus his moon). */
+    #ottoPanel.op-desk .op-btn.primary { flex: 1; background: #FF5C35; border-color: #FF5C35; color: var(--on-coral, #160A06); font-weight: 700; }
+
+    /* Otto saw: quiet rows, tell only. */
+    #ottoPanel.op-desk .op-saw-card { padding: 2px 6px 2px 14px; }
+    #ottoPanel.op-desk .op-saw {
+      display: flex; align-items: flex-start; gap: 10px; margin: 0; padding: 11px 8px 11px 0;
+      font-size: 14px; line-height: 1.35; color: var(--charcoal, #1C1C1E); text-decoration: none;
+    }
+    #ottoPanel.op-desk .op-saw + .op-saw { border-top: 1px solid var(--hairline, rgba(28,28,30,.08)); }
+    #ottoPanel.op-desk .op-saw > .op-ico { width: 18px; height: 18px; margin-top: 1px; color: var(--ink-muted, #6C6761); }
+    #ottoPanel.op-desk a.op-saw:hover .op-saw-tx > span:first-child { text-decoration: underline; text-underline-offset: 2px; }
+    #ottoPanel.op-desk .op-saw-tx { min-width: 0; display: flex; flex-direction: column; gap: 2px; overflow-wrap: anywhere; }
+    #ottoPanel.op-desk .op-saw-sub { font-size: 13px; color: var(--ink-2, #5C5853); font-variant-numeric: tabular-nums; }
+    #ottoPanel.op-desk .op-note { margin: 0; padding: 10px 14px; font-size: 13px; line-height: 1.4; color: var(--ink-2, #5C5853); }
+    #ottoPanel.op-desk .op-fail {
+      display: flex; flex-direction: column; gap: 10px;
+      border-color: color-mix(in srgb, var(--error-ink, #C0392B) 46%, var(--hairline, rgba(28,28,30,.08)));
+    }
+    #ottoPanel.op-desk .op-fail p { margin: 0; font-size: 15px; line-height: 1.4; color: var(--ink-2, #5C5853); }
+    #ottoPanel.op-desk .op-fail b { color: var(--charcoal, #1C1C1E); font-weight: 700; }
+
+    /* The two ways on: the desk and its Stats. */
+    #ottoPanel.op-desk .otto-panel-footer { flex: none; padding: 4px; border-radius: 16px; display: flex; gap: 4px; }
+    #ottoPanel.op-desk .op-link-sub { font-size: 12px; font-weight: 500; color: var(--ink-2, #5C5853); }
+    #ottoPanel.op-desk .op-link-sub:empty { display: none; }
+    #ottoPanel.op-desk .op-link {
+      flex: 1; min-width: 0; min-height: 48px; border-radius: 12px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px;
+      font-size: 14px; font-weight: 600; color: var(--charcoal, #1C1C1E); text-decoration: none; text-align: center; padding: 0 8px;
+    }
+    #ottoPanel.op-desk .op-link:hover { background: var(--op-raise); }
+
+    /* Otto | Messages (the row _miniMessenger.js adds): the board's paper
+       pill, 44px tabs, the picked one raised with an ink underline, a quiet
+       count. The Messages tab's contents are the frame, as before. */
+    #ottoPanel.op-desk .vmm-tabs {
+      padding: 4px; gap: 4px; border-radius: 999px; border: 1px solid var(--hairline, rgba(28,28,30,.08));
+      background: var(--paper, #FFFFFF); box-shadow: var(--card-shadow, none);
+    }
+    #ottoPanel.op-desk .vmm-tabs > span { display: none; }
+    #ottoPanel.op-desk .vmm-tab {
+      flex: 1; height: 44px; position: relative; justify-content: center; border: 0; border-radius: 999px;
+      background: none; color: var(--ink-2, #5C5853); font-size: 14px; font-weight: 500;
+    }
+    #ottoPanel.op-desk .vmm-tab[aria-selected="true"] {
+      background: var(--op-raise); color: var(--charcoal, #1C1C1E); font-weight: 700;
+    }
+    #ottoPanel.op-desk .vmm-tab[aria-selected="true"]::after {
+      content: ""; position: absolute; left: 50%; bottom: 5px; width: 20px; height: 2px; margin-left: -10px; border-radius: 2px; background: var(--charcoal, #1C1C1E);
+    }
+    #ottoPanel.op-desk .vmm-tab .vmm-tab-ic { display: block; width: 18px; height: 18px; }
+    #ottoPanel.op-desk .vmm-tab-n { min-width: 20px; height: 20px; padding: 0 6px; font-size: 12px; font-weight: 700; background: var(--op-raise); color: var(--ink-2, #5C5853); font-variant-numeric: tabular-nums; }
+    #ottoPanel.op-desk .vmm-tab[aria-selected="true"] .vmm-tab-n { background: var(--paper, #FFFFFF); }
+    #ottoPanel.op-desk .vmm-tab-new, #ottoPanel.op-desk .vmm-tab-open {
+      height: 44px; flex: none; border: 0; border-radius: 999px; background: none; color: var(--ink-2, #5C5853);
+    }
+    #ottoPanel.op-desk .vmm-tab-new { width: 44px; }
+    #ottoPanel.op-desk .vmm-tab-open { padding: 0 12px; font-size: 13px; font-weight: 600; }
+    #ottoPanel.op-desk .vmm-tab-new svg { width: 17px; height: 17px; }
+    #ottoPanel.op-desk :is(.vmm-tab-new, .vmm-tab-open):hover { color: var(--charcoal, #1C1C1E); background: var(--op-raise); }
+    #ottoPanel.op-desk .vmm-frame { flex: 1; border-radius: 16px; border: 1px solid var(--hairline, rgba(28,28,30,.08)); }
+
+    @media (prefers-reduced-motion: reduce) {
+      #ottoPanel.op-desk, #ottoCorner.otto-pop .otto-shell { animation: none; }
+      #ottoPanel.op-desk .op-btn { transition: none; }
+    }
+  `;
+  document.head.appendChild(deskStyle);
+
   // ── Inject corner ring ─────────────────────────────────────────────────
   const corner = document.createElement('button');
   corner.id = 'ottoCorner';
+  corner.type = 'button';
   corner.setAttribute('aria-label', 'Open Otto');
+  corner.setAttribute('aria-expanded', 'false');
   corner.style.cssText = 'background:none;border:none;padding:0;';
   corner.innerHTML = `
-    <div class="otto-notif"></div>
+    <div class="otto-notif" aria-hidden="true"></div>
     <div class="otto-shell">${planetHTML(46, { live: true })}</div>
   `;
-  corner.onclick = openOttoPanel;
+  // The same button opens the panel and closes it (the panel stops above it).
+  corner.onclick = function () {
+    if (panel && panel.style.display !== 'none') closeOttoPanel();
+    else openOttoPanel();
+  };
   document.body.appendChild(corner);
+
+  // ── The corner's state (Wave 2B): the React corner's twin ───────────────
+  // Something unseen (Otto's news, from the 30 s count poll, plus unread
+  // chats, from _miniMessenger.js) shows the count in ink and puts Otto in
+  // his wait pose: his coral moon parked at the ring's raised end. The count
+  // ticking up pops the puck once (still under reduced motion).
+  let _ottoUnreadN = 0;
+  let _ottoChatsN = 0;
+  let _ottoShownN = 0;
+  let _ottoPublishWait = false;   // the post-publish ask bubble is up
+  const _ottoBornAt = Date.now();
+  function _ottoPaintCorner() {
+    const total = _ottoUnreadN + _ottoChatsN;
+    const open = !!(panel && panel.style.display !== 'none');
+    corner.classList.toggle('has-unread', _ottoUnreadN > 0);
+    corner.classList.toggle('has-chats', _ottoChatsN > 0);
+    const n = corner.querySelector('.otto-notif');
+    if (n) n.textContent = total > 9 ? '9+' : (total > 0 ? String(total) : '');
+    const planet = corner.querySelector('.m-planet');
+    if (planet) planet.classList.toggle('wait', total > 0 || _ottoPublishWait);
+    corner.setAttribute('aria-expanded', String(open));
+    corner.setAttribute('aria-label', open ? 'Close Otto'
+      : total > 0 ? 'Open Otto · ' + _ottoUnreadN + ' new' + (_ottoChatsN > 0 ? ', ' + _ottoChatsN + ' unread ' + (_ottoChatsN === 1 ? 'chat' : 'chats') : '')
+      : 'Open Otto');
+    // Not on the cold load (something already unseen when the page opens).
+    if (total > _ottoShownN && Date.now() - _ottoBornAt > 5000) {
+      corner.classList.remove('otto-pop');
+      void corner.offsetWidth;
+      corner.classList.add('otto-pop');
+      setTimeout(() => corner.classList.remove('otto-pop'), 720);
+    }
+    _ottoShownN = total;
+  }
+  // _miniMessenger.js tells the corner how many chats are unread (0 when
+  // Messages isn't a tab of this panel).
+  window.__ottoSetChats = function (n) {
+    _ottoChatsN = Math.max(0, Number(n) || 0);
+    _ottoPaintCorner();
+  };
 
   // ── Build panel HTML (lazy — only when first opened) ───────────────────
   let panel = null;
   let backdrop = null;
+  let _ottoDeskMode = false;     // the panel built is the desk panel (Wave 2B)
+
+  // The off switch (Wave 2B): OTTO_DESK=off answers otto_desk: false from
+  // /api/me/features, and the panel keeps the old dark layout. It's an off
+  // button, so the desk panel shows unless the answer says false (a failed
+  // read, or a route from before the field, is "on").
+  let _ottoDeskFlag = null;      // null until the answer is in
+  let _ottoDeskFlagAsk = null;
+  function _ottoLearnDeskFlag() {
+    if (_ottoDeskFlagAsk) return _ottoDeskFlagAsk;
+    const ask = fetch('/api/me/features', { credentials: 'include' })
+      .then(r => (r.ok ? r.json() : null))
+      .then(j => !(j && j.ok === true && j.otto_desk === false))
+      .catch(() => true);
+    // A hung read still counts as on: the panel never waits on it for long.
+    const wait = new Promise(res => setTimeout(() => res(true), 4000));
+    _ottoDeskFlagAsk = Promise.race([ask, wait])
+      .then(on => { _ottoDeskFlag = on; _ottoDropStalePanel(); return on; });
+    return _ottoDeskFlagAsk;
+  }
+  // A panel built before the answer came in, of the other kind, is dropped
+  // once it's closed: the next open builds the right one.
+  function _ottoDropStalePanel() {
+    if (!panel || _ottoDeskFlag === null || _ottoDeskMode === _ottoDeskFlag) return;
+    if (panel.style.display !== 'none') return;
+    panel.remove(); panel = null;
+    if (backdrop) { backdrop.remove(); backdrop = null; }
+  }
+  // Asked up front where the corner shows (not on /messages, where it's
+  // hidden and the panel never opens); an open before the answer waits for it.
+  if (_isAppShellUser() && getComputedStyle(corner).display !== 'none') _ottoLearnDeskFlag();
 
   function buildPanel() {
+    _ottoDeskMode = _ottoDeskFlag !== false;
+    if (_ottoDeskMode) buildDeskPanel();
+    else buildLegacyPanel();
+    corner.setAttribute('aria-controls', 'ottoPanel');
+  }
+
+  // The desk panel: header, then (from _miniMessenger.js) the Otto |
+  // Messages tabs, the mini desk, and the two ways on. Non-modal: no
+  // backdrop, no focus trap; Escape or the corner closes it.
+  function buildDeskPanel() {
+    backdrop = null;
+    panel = document.createElement('aside');
+    panel.id = 'ottoPanel';
+    panel.className = 'op-desk';
+    panel.setAttribute('aria-labelledby', 'ottoPanelName');
+    panel.tabIndex = -1;
+    panel.innerHTML = `
+      <i class="tx tx-flute" aria-hidden="true"></i>
+      <div class="otto-panel-header op-paper">
+        <span class="op-mini">${planetHTML(28)}</span>
+        <div class="op-head-tx">
+          <h2 class="otto-panel-name" id="ottoPanelName">otto</h2>
+          <p class="op-say" id="ottoSay"></p>
+          <p class="op-as" id="ottoAs" hidden></p>
+        </div>
+        <button type="button" class="otto-panel-close" aria-label="Close Otto">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true" focusable="false"><path d="M6 6l12 12M18 6L6 18"/></svg>
+        </button>
+      </div>
+      <div class="otto-panel-body"></div>
+      <nav class="otto-panel-footer op-paper" aria-label="Otto's desk">
+        <a class="op-link" data-op-link="desk" href="/otto" target="_top"><span>Open your desk →</span><span class="op-link-sub" id="ottoDeskMore"></span></a>
+        <a class="op-link" data-op-link="stats" href="/otto?tab=stats" target="_top"><span>Full breakdown →</span></a>
+      </nav>
+    `;
+    panel.querySelector('.otto-panel-close').onclick = closeOttoPanel;
+    document.body.appendChild(panel);
+    bindCursorOn(panel);
+  }
+
+  // Today's dark panel, unchanged: OTTO_DESK=off brings it back.
+  function buildLegacyPanel() {
     backdrop = document.createElement('div');
     backdrop.id = 'ottoBackdrop';
     backdrop.onclick = closeOttoPanel;
@@ -478,19 +845,38 @@
   // the panel without poking at file-internal closures.
   window.__ottoOpenPanel = openOttoPanel;
   function openOttoPanel() {
+    // The first open waits for the off switch's answer, so OTTO_DESK=off
+    // never flashes the desk panel (or its "didn't load") on its way out.
+    if (_ottoDeskFlag === null && !panel && _isAppShellUser()) {
+      _ottoLearnDeskFlag().then(() => { if (!panel || panel.style.display === 'none') openOttoPanel(); });
+      return;
+    }
     // An Otto open for the use totals (_usageTouch.js; rules in
     // src/lib/usage/touch.ts), unless the panel is opening on its Messages
     // tab (a "Message" button, or the tab it was left on: _miniMessenger.js).
     if (typeof window.__vibeCountOpen === 'function' && !(typeof window.__vibeOttoTab === 'function' && window.__vibeOttoTab() === 'messages')) window.__vibeCountOpen('otto');
     if (!panel) buildPanel();
     else {
-      backdrop.style.display = '';
+      if (backdrop) backdrop.style.display = '';
       panel.style.display = '';
     }
     renderPanelBody();
+    _ottoPaintCorner();
     // Messages is a tab of this panel on pages that load _miniMessenger.js:
     // it hears the panel open and close.
     document.dispatchEvent(new CustomEvent('vibe:otto-panel', { detail: { open: true } }));
+    if (_ottoDeskMode) {
+      // Non-modal: focus moves in (Escape or the corner brings it back),
+      // and the page behind stays usable.
+      try { panel.focus({ preventScroll: true }); } catch {}
+      if (_isAppShellUser()) {
+        // A desk that failed last time opens on "opening…" again, not on the old failure.
+        if (!_ottoDesk && _ottoDeskSettled) { _ottoDeskSettled = false; _ottoRenderDesk(); }
+        _ottoLoadDesk();
+        if (!_ottoLastCount) _ottoFetchUnreadCount().then(_ottoSetUnread).catch(() => {});
+      }
+      return;
+    }
     // Pull real notifications + mark them read after the user has seen
     // them. A failure says so in the activity section itself instead of
     // leaving "loading…" or claiming nothing has happened yet.
@@ -516,6 +902,7 @@
     if (!panel) return;
     const body = panel.querySelector('.otto-panel-body');
     if (!body) return;
+    if (_ottoDeskMode) { _ottoRenderDesk(); return; }
     body.innerHTML = `
       <div class="otto-briefing" id="ottoBriefing">"loading your activity…"</div>
       <div class="otto-stats-grid" id="ottoStatsGrid">
@@ -596,6 +983,271 @@
     if (total === 0)        return "quiet around here. go say hi to someone.";
     if (count.unread > 0)   return count.unread + ' new since you last looked.';
     return "all caught up — here's what's been happening.";
+  }
+
+  // ── The mini desk (Wave 2B) ─────────────────────────────────────────
+  // The twin of OttoSidePanel.tsx's MiniDesk and src/lib/otto/panel-desk.ts:
+  // the desk's model from /api/me/otto (`desk`, src/lib/otto/desk.ts), the
+  // top 2 Ready items (only ready[0]'s verb is the coral one, `primary`;
+  // reminders are plain rows with a quiet Done), a few "Otto saw" rows, then
+  // the whole desk and its Stats. Same honesty as the desk: every line is
+  // the model's, and nothing here says Otto did, sent or will send anything.
+  // It acts as the desk's own pick on this device (vibe.otto-desk-as.v1),
+  // else the club switch's (vibe.profile-as-club.v1); there's no switcher.
+  const OTTO_PANEL_READY = 2;
+  const OTTO_PANEL_SAW = 3;
+  const OTTO_PART_FAILED = "Part of this couldn't load, so it may be missing something.";
+  let _ottoDesk = null;          // the last desk model that loaded
+  let _ottoDeskMissing = [];     // the route's `failed` for that desk
+  let _ottoDeskSettled = false;  // a load has answered (desk or not)
+  let _ottoDeskSeq = 0;
+  let _ottoDeskBusy = null;      // the item id whose Accept or Done is in flight
+
+  function _ottoClubParam(raw) {
+    const v = typeof raw === 'string' ? raw.trim().toLowerCase() : '';
+    return /^[a-z0-9_.-]{1,64}$/.test(v) ? v : null;
+  }
+  function _ottoSavedClub() {
+    let deskAs = null, switched = null;
+    try { deskAs = localStorage.getItem('vibe.otto-desk-as.v1'); } catch {}
+    try {
+      const raw = JSON.parse(localStorage.getItem('vibe.profile-as-club.v1') || 'null');
+      switched = raw && typeof raw.handle === 'string' ? raw.handle : null;
+    } catch {}
+    return _ottoClubParam(deskAs) || _ottoClubParam(switched);
+  }
+
+  async function _ottoLoadDesk() {
+    const n = ++_ottoDeskSeq;
+    const club = _ottoSavedClub();
+    const r = await window.vibeRequest('/api/me/otto' + (club ? '?club=' + encodeURIComponent(club) : ''), {
+      failure: "Couldn't load your desk.", quiet: true,
+    });
+    if (n !== _ottoDeskSeq) return;
+    _ottoDeskSettled = true;
+    if (r.ok && r.data && r.data.ok && r.data.desk && typeof r.data.desk === 'object') {
+      _ottoDesk = r.data.desk;
+      _ottoDeskMissing = Array.isArray(r.data.failed) ? r.data.failed : [];
+      _ottoRenderDesk();
+      // "Otto saw" is the notifications: shown, so read (as the old panel).
+      if (_ottoUnreadN > 0 || (_ottoLastCount && _ottoLastCount.unread > 0)) _ottoMarkAllRead();
+      return;
+    }
+    // A failed refresh keeps the desk already on screen.
+    if (!_ottoDesk) _ottoRenderDesk();
+  }
+
+  function _ottoDeskLine(item) {
+    return [item.detail, item.whenLabel].filter(Boolean).join(' · ');
+  }
+  function _ottoHref(h) {
+    // Same-site paths only: "//host" and "/\host" both leave the site.
+    return typeof h === 'string' && h.startsWith('/') && h[1] !== '/' && h[1] !== '\\' ? h : null;
+  }
+  function _ottoTx(item) {
+    const line = _ottoDeskLine(item);
+    return `<span class="op-tx"><b>${_ottoEsc(item.title)}</b>${line ? `<span>${_ottoEsc(line)}</span>` : ''}</span>`;
+  }
+
+  // The verb as a button: a link, or Accept (the existing approve route).
+  // Coral only when the model marks it `primary` (ready[0]).
+  function _ottoVerbHTML(item, primary, short) {
+    const v = item.verb;
+    if (!v) return '';
+    const cls = 'op-btn' + (primary ? ' primary' : '');
+    const label = _ottoEsc(v.label + ': ' + item.title);
+    if (v.kind === 'link') {
+      const href = _ottoHref(v.href);
+      return href ? `<a class="${cls}" href="${_ottoEsc(href)}" target="_top" aria-label="${label}">${_ottoEsc(short ? 'Open' : v.label)}</a>` : '';
+    }
+    if (v.kind === 'join_request') {
+      const busy = _ottoDeskBusy === item.id;
+      return `<button type="button" class="${cls}" data-op-accept="${_ottoEsc(item.id)}" aria-label="${label}"${busy ? ' disabled aria-busy="true"' : ''}>${_ottoEsc(v.label)}</button>`;
+    }
+    return '';
+  }
+
+  // The desk's kind icons (DeskIcon in src/components/otto/desk/DeskRow.tsx), by hand.
+  const OTTO_ICONS = {
+    join_request: '<circle cx="10" cy="8" r="3.5"/><path d="M3.5 19.5c1.2-3.4 3.7-5 6.5-5s5.3 1.6 6.5 5M18.5 8v6M15.5 11h6"/>',
+    up_next: '<path d="M5 12h13M13 6l6 6-6 6"/>',
+    setup_step: '<rect x="4" y="4" width="16" height="16" rx="4"/><path d="M8.5 12.2l2.3 2.3 4.7-4.9"/>',
+    draft: '<path d="M4 10v4h3l7 4.5v-13L7 10zM17.5 9.5a3.5 3.5 0 0 1 0 5"/>',
+    follow_back: '<circle cx="12" cy="8" r="4"/><path d="M4.5 20.5c1.4-3.9 4.3-5.8 7.5-5.8s6.1 1.9 7.5 5.8"/>',
+    unread_dm: '<path d="M4.5 5.5h15v10.5H10l-5.5 4.5z"/>',
+    reminder: '<path d="M6 16v-5a6 6 0 0 1 12 0v5l1.5 2h-15zM10 20.5a2 2 0 0 0 4 0"/>',
+    event: '<rect x="3.5" y="5" width="17" height="15" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/>',
+    rsvp: '<rect x="3.5" y="5" width="17" height="15" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4M9 15l2 2 4-4"/>',
+    post: '<path d="M4 10v4h3l7 4.5v-13L7 10zM17.5 9.5a3.5 3.5 0 0 1 0 5"/>',
+    checkin: '<path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.4-6.5 11-6.5 11z"/><circle cx="12" cy="10" r="2.4"/>',
+    cancelled: '<circle cx="12" cy="12" r="8.5"/><path d="M9 9l6 6M15 9l-6 6"/>',
+    notification: '<path d="M2.5 12c2.4-4.2 5.6-6.3 9.5-6.3s7.1 2.1 9.5 6.3c-2.4 4.2-5.6 6.3-9.5 6.3S4.9 16.2 2.5 12z"/><circle cx="12" cy="12" r="2.8"/>',
+  };
+  function _ottoIco(kind) {
+    const paths = Object.prototype.hasOwnProperty.call(OTTO_ICONS, kind) ? OTTO_ICONS[kind] : OTTO_ICONS.notification;
+    return `<svg class="op-ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false">${paths}</svg>`;
+  }
+  // DeskDraft's small tag over the top item, and the kinds whose date is an event's date.
+  const OTTO_TAG = { join_request: 'Request', up_next: 'Up next', setup_step: 'Setup', draft: 'Draft', follow_back: 'Follower', unread_dm: 'Message', reminder: 'Reminder' };
+  const OTTO_EVENT_DATED = { up_next: 1, event: 1, rsvp: 1 };
+  function _ottoDateTile(iso) {
+    const ms = typeof iso === 'string' ? Date.parse(iso) : NaN;
+    if (!Number.isFinite(ms)) return '';
+    try {
+      const tz = 'America/Indiana/Indianapolis';
+      const month = new Intl.DateTimeFormat('en-US', { timeZone: tz, month: 'short' }).format(ms);
+      const day = new Intl.DateTimeFormat('en-US', { timeZone: tz, day: 'numeric' }).format(ms);
+      return `<span class="op-date" aria-hidden="true"><i>${_ottoEsc(month)}</i><b>${_ottoEsc(day)}</b></span>`;
+    } catch { return ''; }
+  }
+  function _ottoRowHTML(item, end) {
+    return `<div class="op-row"><span class="op-ic">${_ottoIco(item.kind)}</span>${_ottoTx(item)}${end || ''}</div>`;
+  }
+
+  // One Ready item, as the React panel draws it: the top one opens on
+  // blueprint (its tag, title, "What will happen", its verb); the next folds
+  // to one row on blueprint; a reminder is a plain row with a quiet Done
+  // (nothing delivers reminders yet).
+  function _ottoReadyHTML(item, i) {
+    if (item.kind === 'reminder') {
+      const busy = _ottoDeskBusy === item.id;
+      const done = `<button type="button" class="op-btn" data-op-done="${_ottoEsc(item.id)}" aria-label="${_ottoEsc('Done: ' + item.title)}"${busy ? ' disabled aria-busy="true"' : ''}>Done</button>`;
+      return `<div class="op-paper op-list">${_ottoRowHTML(item, done)}</div>`;
+    }
+    const href = _ottoHref(item.href);
+    const openLink = href && !(item.verb && item.verb.kind === 'link' && item.verb.href === item.href)
+      ? `<a class="op-btn" href="${_ottoEsc(href)}" target="_top" aria-label="${_ottoEsc('Open: ' + item.title)}">Open</a>` : '';
+    if (i > 0) {
+      const go = item.verb ? _ottoVerbHTML(item, false, true) : openLink;
+      return `<article class="op-draft mini" aria-label="${_ottoEsc(item.title)}">${_ottoRowHTML(item, go)}</article>`;
+    }
+    const tag = OTTO_TAG[item.kind] ? `<div class="op-draft-as"><em>${OTTO_TAG[item.kind]}</em></div>` : '';
+    const tile = OTTO_EVENT_DATED[item.kind] ? _ottoDateTile(item.whenISO) : '';
+    const lines = (Array.isArray(item.willHappen) ? item.willHappen : []).filter(l => typeof l === 'string' && l.trim());
+    // "What will happen" says it once: a request with lines drops its detail.
+    const detail = item.kind === 'join_request' && lines.length ? '' : (item.detail || '');
+    const sub = [item.whenLabel, detail].filter(Boolean).map(_ottoEsc).join('<br>');
+    const pre = `<div class="op-draft-pre">${tile || `<span class="op-ic">${_ottoIco(item.kind)}</span>`}<div><h3>${_ottoEsc(item.title)}</h3>${sub ? `<p>${sub}</p>` : ''}</div></div>`;
+    const what = lines.length
+      ? `<div class="op-what"><h4>What will happen</h4><ul>${lines.map(l => {
+          const m = /^(\d[\d,]*)\s+(.+)$/.exec(l.trim());
+          return m ? `<li><b>${_ottoEsc(m[1])}</b><span>${_ottoEsc(m[2])}</span></li>` : `<li class="plain"><span>${_ottoEsc(l)}</span></li>`;
+        }).join('')}</ul></div>` : '';
+    const verb = _ottoVerbHTML(item, item.primary === true, false);
+    const go = verb || openLink ? `<div class="op-go">${verb}${openLink}</div>` : '';
+    const foot = item.verb && item.verb.kind === 'join_request' ? '<p class="op-foot">Nothing changes until you tap Accept.</p>' : '';
+    return `<article class="op-draft" aria-label="${_ottoEsc(item.title)}">${tag}${pre}${what}${go}${foot}</article>`;
+  }
+
+  function _ottoSawHTML(item) {
+    const href = _ottoHref(item.href);
+    const sub = [item.detail, item.whenLabel].filter(Boolean).map(_ottoEsc).join(' · ');
+    const body = `${_ottoIco(item.kind)}<span class="op-saw-tx"><span>${_ottoEsc(item.title)}</span>${sub ? `<span class="op-saw-sub">${sub}</span>` : ''}</span>`;
+    return href
+      ? `<a class="op-saw" href="${_ottoEsc(href)}" target="_top">${body}</a>`
+      : `<p class="op-saw">${body}</p>`;
+  }
+
+  // A section: its label on a paper tab, then the pile.
+  function _ottoSecHTML(id, title, count, inner) {
+    return `<section aria-labelledby="${id}"><div class="op-sec"><h3 id="${id}">${title}</h3><b>${count}</b></div><div class="op-pile">${inner}</div></section>`;
+  }
+  function _ottoNoteHTML(text) { return `<p class="op-paper op-note">${_ottoEsc(text)}</p>`; }
+  function _ottoEmptyHTML(line) { return `<div class="op-paper op-empty"><p>${_ottoEsc(line)}</p></div>`; }
+
+  // The two ways on keep the club the panel shows (panelLinks).
+  function _ottoPaintLinks(d) {
+    if (!panel) return;
+    const club = d && d.actingAs ? _ottoClubParam(d.actingAs.handle)
+      : d && Array.isArray(d.clubs) && d.clubs.length > 0 ? 'me' : null;
+    const q = club ? 'club=' + encodeURIComponent(club) : '';
+    const deskA = panel.querySelector('[data-op-link="desk"]');
+    const statsA = panel.querySelector('[data-op-link="stats"]');
+    if (deskA) deskA.href = q ? '/otto?' + q : '/otto';
+    if (statsA) statsA.href = q ? '/otto?tab=stats&' + q : '/otto?tab=stats';
+    const more = panel.querySelector('#ottoDeskMore');
+    const n = d && Array.isArray(d.ready) ? Math.max(0, d.ready.length - OTTO_PANEL_READY) : 0;
+    if (more) more.textContent = n > 0 ? (n === 1 ? '1 more on your desk' : n.toLocaleString('en-US') + ' more on your desk') : '';
+  }
+
+  function _ottoRenderDesk() {
+    if (!panel || !_ottoDeskMode) return;
+    const body = panel.querySelector('.otto-panel-body');
+    if (!body) return;
+    const d = _ottoDesk;
+    const say = panel.querySelector('#ottoSay');
+    const as = panel.querySelector('#ottoAs');
+    if (say) say.textContent = d ? String(d.say || '') : _ottoDeskSettled ? "couldn't load your desk. try again in a sec." : 'opening your desk…';
+    if (as) {
+      as.innerHTML = d && d.actingAs && d.actingAs.name ? 'Acting as <b>' + _ottoEsc(d.actingAs.name) + '</b>' : '';
+      as.hidden = !as.innerHTML;
+    }
+    _ottoPaintLinks(d);
+    if (!d) {
+      body.innerHTML = _ottoDeskSettled
+        ? `<div class="op-paper op-card op-fail" role="alert"><p><b>Your desk didn’t load.</b> Everything on it is still where it was.</p>
+            <div class="op-go"><button type="button" class="op-btn" data-op-retry>Try again</button></div></div>`
+        : '<div class="op-paper op-loading"><p role="status">Opening your desk…</p></div>';
+      const retry = body.querySelector('[data-op-retry]');
+      if (retry) retry.addEventListener('click', () => { retry.disabled = true; _ottoLoadDesk(); });
+      bindCursorOn(body);
+      return;
+    }
+    const empty = d.empty || {};
+    const ready = Array.isArray(d.ready) ? d.ready : [];
+    const saw = Array.isArray(d.saw) ? d.saw : [];
+    const missing = new Set(_ottoDeskMissing);
+    const readyPartial = d.role === 'student' && (missing.has('asking') || missing.has('dms'));
+    const sawFailed = missing.has('activity');
+    const shown = ready.slice(0, OTTO_PANEL_READY);
+    const readyHTML = (shown.length ? shown.map(_ottoReadyHTML).join('')
+      : readyPartial ? '' : _ottoEmptyHTML(empty.ready || 'nothing needs you right now.'))
+      + (readyPartial ? _ottoNoteHTML(OTTO_PART_FAILED) : '');
+    const shownSaw = saw.slice(0, OTTO_PANEL_SAW);
+    const sawHTML = (shownSaw.length ? `<div class="op-paper op-saw-card">${shownSaw.map(_ottoSawHTML).join('')}</div>`
+      : sawFailed ? '' : _ottoEmptyHTML(empty.saw || 'quiet so far.'))
+      + (sawFailed ? _ottoNoteHTML(shownSaw.length ? OTTO_PART_FAILED : "What Otto saw didn't load. Try again in a bit.") : '');
+    body.innerHTML = _ottoSecHTML('opReadyH', 'Ready for you', ready.length, readyHTML)
+      + _ottoSecHTML('opSawH', 'Otto saw', saw.length, sawHTML);
+    bindCursorOn(body);
+    body.querySelectorAll('[data-op-accept]').forEach(btn => {
+      btn.addEventListener('click', () => _ottoAccept(btn.getAttribute('data-op-accept')));
+    });
+    body.querySelectorAll('[data-op-done]').forEach(btn => {
+      btn.addEventListener('click', () => _ottoReminderDone(btn.getAttribute('data-op-done')));
+    });
+  }
+
+  // Accept a join request through the route Club tools uses; the desk is
+  // read again afterwards, so "member N" stays the server's count.
+  async function _ottoAccept(id) {
+    const item = _ottoDesk && (_ottoDesk.ready || []).find(x => x.id === id);
+    const v = item && item.verb;
+    if (!v || v.kind !== 'join_request' || _ottoDeskBusy) return;
+    _ottoDeskBusy = id;
+    _ottoRenderDesk();
+    const r = await window.vibeRequest(
+      '/api/orgs/' + encodeURIComponent(v.orgSlug) + '/requests/' + encodeURIComponent(v.requestId),
+      { method: 'POST', json: { action: 'approve' }, failure: "Couldn't accept that request." },
+    );
+    _ottoDeskBusy = null;
+    if (r.ok) window.vibeToast("Accepted. They're a member now.");
+    _ottoRenderDesk();
+    _ottoLoadDesk();
+  }
+
+  // A reminder's Done: the route the desk uses, then the desk again.
+  async function _ottoReminderDone(id) {
+    const rid = typeof id === 'string' && id.startsWith('reminder:') ? id.slice('reminder:'.length) : null;
+    if (!rid || _ottoDeskBusy) return;
+    _ottoDeskBusy = id;
+    _ottoRenderDesk();
+    await window.vibeRequest('/api/me/otto/reminders/' + encodeURIComponent(rid) + '/act', {
+      method: 'POST', failure: "Couldn't mark that reminder done.",
+    });
+    _ottoDeskBusy = null;
+    _ottoRenderDesk();
+    _ottoLoadDesk();
   }
 
   // ── Notifications wiring (P1-021) ──────────────────────────────────
@@ -772,8 +1424,8 @@
 
   function _ottoSetUnread(n) {
     if (!corner) return;
-    if (n > 0) corner.classList.add('has-unread');
-    else corner.classList.remove('has-unread');
+    _ottoUnreadN = Math.max(0, Number(n) || 0);
+    _ottoPaintCorner();
   }
 
   function _ottoRelTime(iso) {
@@ -1025,15 +1677,25 @@
 
   function closeOttoPanel() {
     if (!panel) return;
-    backdrop.style.display = 'none';
+    const focusWasIn = panel.contains(document.activeElement) || document.activeElement === document.body;
+    if (backdrop) backdrop.style.display = 'none';
     panel.style.display = 'none';
+    _ottoPaintCorner();
     document.dispatchEvent(new CustomEvent('vibe:otto-panel', { detail: { open: false } }));
+    // Focus goes back to the corner that opened it.
+    if (_ottoDeskMode && focusWasIn) { try { corner.focus({ preventScroll: true }); } catch {} }
+    _ottoDropStalePanel();
   }
   window.__ottoClosePanel = closeOttoPanel;
 
-  // Esc closes the panel
+  // Esc closes the panel. The desk panel leaves the page usable, so only an
+  // Escape from the panel or the corner is its own (one meant for a sheet or
+  // a field on the page is not); the old panel's backdrop covered the page.
   document.addEventListener('keydown', e => {
-    if (e.key === 'Escape' && panel && panel.style.display !== 'none') closeOttoPanel();
+    if (e.key !== 'Escape' || e.defaultPrevented || !panel || panel.style.display === 'none') return;
+    const at = document.activeElement;
+    if (_ottoDeskMode && !(panel.contains(at) || at === corner)) return;
+    closeOttoPanel();
   });
 
   // Bind cursor hover for the corner ring at init time too (in case panel
@@ -1116,7 +1778,8 @@
   function showAskBubble(text) {
     if (!pubFlowActive) return;
     corner.classList.add('otto-glow');
-    corner.querySelector('.m-planet')?.classList.add('wait');
+    _ottoPublishWait = true;
+    _ottoPaintCorner();
     pubBubble = document.createElement('div');
     pubBubble.id = 'ottoAskBubble';
     pubBubble.innerHTML = `
@@ -1150,7 +1813,8 @@
 
   function closeBubble() {
     corner.classList.remove('otto-glow');
-    corner.querySelector('.m-planet')?.classList.remove('wait');
+    _ottoPublishWait = false;
+    _ottoPaintCorner();
     pubBubble?.remove();
     pubBubble = null;
   }

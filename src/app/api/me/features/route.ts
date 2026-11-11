@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { chatDesktopAnswer } from "@/lib/chat/flag";
 import { chatV2For } from "@/lib/chat/flag-server";
 import type { FeaturesResponse } from "@/lib/chat/types";
+import { ottoDeskOn } from "@/lib/otto/desk-flag";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 const NO_STORE = { "Cache-Control": "private, no-store" } as const;
@@ -12,7 +13,7 @@ const NO_STORE = { "Cache-Control": "private, no-store" } as const;
  * (handoffs/chat-redesign/wave-1-contracts.md section 2; `chat_desktop` is
  * handoffs/chat-redesign/wave-3-desktop/contract.md section 2).
  *
- * `{ ok: true, chat_v2: boolean, chat_desktop: boolean }`. How a screen
+ * `{ ok: true, chat_v2: boolean, chat_desktop: boolean, otto_desk: boolean }`. How a screen
  * learns `chat_v2`: the switches and their lists are server-only env values,
  * never NEXT_PUBLIC_. The two desktop pages also receive `chat_desktop` as a
  * server prop (`desktopChat`), so a laptop never waits for this route.
@@ -25,6 +26,10 @@ const NO_STORE = { "Cache-Control": "private, no-store" } as const;
  * Read-only, like /api/me/badge: no rate limit and no Terms or restriction
  * gate. The answer is per person and changes when a list changes or someone
  * joins a listed club, so it is never stored: `private, no-store`.
+ *
+ * `otto_desk` (Wave 2B, Nov 11, 2026) is `ottoDeskOn()` (env only, no read):
+ * false only when `OTTO_DESK=off`, and the computer's side panel then keeps
+ * today's layout. Clients treat a failed read as on.
  *
  * `chatV2For` fails closed (a read error is `false`), so this route has no
  * 500 of its own: a screen that cannot learn the flag shows the old chat.
@@ -40,6 +45,11 @@ export async function GET() {
   }
 
   const v2 = await chatV2For(user.id);
-  const body: FeaturesResponse = { ok: true, chat_v2: v2, chat_desktop: chatDesktopAnswer(user.id, v2) };
+  const body: FeaturesResponse = {
+    ok: true,
+    chat_v2: v2,
+    chat_desktop: chatDesktopAnswer(user.id, v2),
+    otto_desk: ottoDeskOn(),
+  };
   return NextResponse.json(body, { headers: NO_STORE });
 }

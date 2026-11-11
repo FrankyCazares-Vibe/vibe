@@ -50,7 +50,8 @@ function withoutItem(desk: DeskModel, id: string): DeskModel {
   return { ...desk, ready: withPrimary(drop(desk.ready)), scheduled: drop(desk.scheduled) };
 }
 
-export function useOttoDesk(initial: OttoPayload, initialClub: DeskClubParam) {
+/** `initial`: only its desk and failed reads are used (the side panel starts with neither, Wave 2B). */
+export function useOttoDesk(initial: Pick<OttoPayload, "desk" | "failed">, initialClub: DeskClubParam) {
   const [desk, setDesk] = useState<DeskModel | null>(initial.desk ?? null);
   // The route's reads that failed: a pile they feed says so, not "nothing here".
   const [failed, setFailed] = useState<OttoFailedSection[]>(initial.failed ?? []);
@@ -61,16 +62,18 @@ export function useOttoDesk(initial: OttoPayload, initialClub: DeskClubParam) {
   // not paint over the club you picked.
   const seq = useRef(0);
 
-  const load = useCallback(async (next: DeskClubParam): Promise<boolean> => {
+  /** `quiet`: no toast on a failure (the side panel shows its own failure card, Wave 2B). */
+  const load = useCallback(async (next: DeskClubParam, opts?: { quiet?: boolean }): Promise<boolean> => {
     const n = ++seq.current;
     setLoading(true);
-    const r = await vibeRequest<OttoPayload>(payloadUrl(next), { failure: COPY.loadFailed });
+    const quiet = opts?.quiet === true;
+    const r = await vibeRequest<OttoPayload>(payloadUrl(next), { failure: COPY.loadFailed, quiet });
     if (n !== seq.current) return false;
     setLoading(false);
     if (!r.ok) return false;
     setFailed(r.data.failed ?? []);
     if (!r.data.desk) {
-      toast({ message: COPY.loadFailed, tone: "error" });
+      if (!quiet) toast({ message: COPY.loadFailed, tone: "error" });
       return false;
     }
     setDesk(r.data.desk);

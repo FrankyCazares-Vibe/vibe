@@ -272,6 +272,7 @@
     .vmm-tabs{flex-shrink:0;display:flex;align-items:center;gap:6px;padding:10px 18px;border-bottom:0.5px solid rgba(255,255,255,.06);font-family:'DM Sans',system-ui,sans-serif;}
     .vmm-tab{height:30px;padding:0 14px;border-radius:999px;border:1px solid rgba(255,255,255,.12);background:transparent;color:rgba(255,255,255,.72);font-family:inherit;font-size:13px;font-weight:700;display:inline-flex;align-items:center;gap:6px;cursor:none;}
     .vmm-tab[aria-selected="true"]{border-color:transparent;background:#FAF7F2;color:#141416;}
+    .vmm-tab-ic{display:none;width:15px;height:15px;flex:none;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;}
     .vmm-tab-n{min-width:18px;height:18px;box-sizing:border-box;padding:0 5px;border-radius:999px;background:#FF5C35;color:#140806;font-size:11.5px;font-weight:800;line-height:1;display:inline-flex;align-items:center;justify-content:center;}
     .vmm-tab-new{width:30px;height:30px;border-radius:999px;border:1px solid rgba(255,255,255,.10);background:rgba(255,255,255,.06);color:rgba(255,255,255,.8);display:inline-flex;align-items:center;justify-content:center;cursor:none;padding:0;}
     .vmm-tab-open{height:30px;padding:0 10px;border-radius:999px;border:none;background:transparent;color:#FF8A66;font-family:inherit;font-size:12px;font-weight:700;cursor:none;}
@@ -430,8 +431,12 @@
     unreadChats = n;
     // Otto's ring carries unread chats too (Messages is a tab of its panel);
     // only set by the new-chat path, so the old panel never lights it.
-    const ring = document.getElementById("ottoCorner");
-    if (ring) ring.classList.toggle("has-chats", ottoTabs && n > 0);
+    // _otto.js paints the count and Otto's wait pose from it (Wave 2B).
+    if (typeof window.__ottoSetChats === "function") window.__ottoSetChats(ottoTabs ? n : 0);
+    else {
+      const ring = document.getElementById("ottoCorner");
+      if (ring) ring.classList.toggle("has-chats", ottoTabs && n > 0);
+    }
     const count = document.getElementById("vmmTabCount");
     if (count) { count.textContent = n > 99 ? "99+" : String(n); count.style.display = n > 0 ? "" : "none"; }
     const navBtns = document.querySelectorAll(".nav-msg-btn[data-messages-badge]");
@@ -584,8 +589,8 @@
       row.setAttribute("role", "tablist");
       row.setAttribute("aria-label", "Otto and Messages");
       row.innerHTML = `
-        <button type="button" role="tab" class="vmm-tab" data-tab="otto">Otto</button>
-        <button type="button" role="tab" class="vmm-tab" data-tab="messages">Messages<span class="vmm-tab-n" id="vmmTabCount" aria-hidden="true" style="display:none"></span></button>
+        <button type="button" role="tab" class="vmm-tab" id="vmmTabOtto" data-tab="otto">Otto</button>
+        <button type="button" role="tab" class="vmm-tab" id="vmmTabMessages" data-tab="messages"><svg class="vmm-tab-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4.5 5.5h15v10.5H10l-5.5 4.5z"/></svg>Messages<span class="vmm-tab-n" id="vmmTabCount" aria-hidden="true" style="display:none"></span></button>
         <span style="flex:1"></span>
         <button type="button" class="vmm-tab-new" id="vmmNew" aria-label="New message" title="New message">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h8"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7.5 18.5 3 20l1.5-4.5z"/></svg>
@@ -601,6 +606,20 @@
         // From Messages to Otto in the open panel: an Otto open (_usageTouch.js).
         if (ottoOpen && was !== "otto" && ottoTab === "otto" && typeof window.__vibeCountOpen === "function") window.__vibeCountOpen('otto');
       }));
+      // The tabs pattern (Wave 2B): one Tab stop, the arrows and Home/End
+      // move between the two tabs and pick them.
+      row.addEventListener("keydown", (e) => {
+        const tabs = Array.from(row.querySelectorAll(".vmm-tab"));
+        const i = tabs.indexOf(document.activeElement);
+        if (i < 0) return;
+        const to = e.key === "ArrowRight" ? (i + 1) % tabs.length
+          : e.key === "ArrowLeft" ? (i - 1 + tabs.length) % tabs.length
+          : e.key === "Home" ? 0 : e.key === "End" ? tabs.length - 1 : -1;
+        if (to < 0) return;
+        e.preventDefault();
+        tabs[to].click();
+        tabs[to].focus();
+      });
       // The pencil is out here, the compose sheet in the frame's page.
       row.querySelector("#vmmNew").addEventListener("click", () => {
         const f = document.getElementById("vmmFrame");
@@ -609,7 +628,20 @@
       row.querySelector("#vmmOpen").addEventListener("click", openInMessages);
     }
     const onMessages = ottoTab === "messages";
-    row.querySelectorAll(".vmm-tab").forEach((b) => b.setAttribute("aria-selected", String(b.dataset.tab === ottoTab)));
+    // The picked tab names the part it shows: the Otto body, or the frame.
+    const ottoBody = ottoPanel.querySelector(".otto-panel-body");
+    if (ottoBody) {
+      if (!ottoBody.id) ottoBody.id = "ottoPanelBody";
+      ottoBody.setAttribute("role", "tabpanel");
+      ottoBody.setAttribute("aria-labelledby", "vmmTabOtto");
+    }
+    row.querySelectorAll(".vmm-tab").forEach((b) => {
+      const on = b.dataset.tab === ottoTab;
+      b.setAttribute("aria-selected", String(on));
+      b.tabIndex = on ? 0 : -1;
+      if (on) b.setAttribute("aria-controls", b.dataset.tab === "otto" ? (ottoBody ? ottoBody.id : "") : "vmmFrame");
+      else b.removeAttribute("aria-controls");
+    });
     row.querySelector("#vmmNew").style.display = onMessages ? "" : "none";
     row.querySelector("#vmmOpen").style.display = onMessages ? "" : "none";
     ottoPanel.classList.toggle("vmm-on-messages", onMessages);

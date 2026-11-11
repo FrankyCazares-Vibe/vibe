@@ -154,3 +154,83 @@ test("the static corner is the React corner's 64px paper puck, with no coral mar
   assert.doesNotMatch(tsx, /otto-badge-(pulse|ripple)/, "no badge loops");
   assert.match(css, /prefers-reduced-motion: reduce\)\s*\{\s*#otto-corner \{ animation: none !important; \}/);
 });
+
+/** The text of one function in _otto.js, from its line to the next top-level function. */
+function fnText(js: string, name: string): string {
+  const from = js.indexOf(`  function ${name}(`);
+  assert.ok(from >= 0, `_otto.js has ${name}`);
+  const next = js.indexOf("\n  function ", from + 10);
+  return js.slice(from, next < 0 ? undefined : next);
+}
+
+test("the static side panel is the desk panel: no dim, fluted glass, the header 'otto' (Wave 2B)", () => {
+  const js = read("public/html/_otto.js");
+  const desk = fnText(js, "buildDeskPanel");
+  // Nothing dims the page: the desk panel makes no backdrop, and its styles blur nothing.
+  assert.doesNotMatch(desk, /createElement\('div'\)|ottoBackdrop|backdrop\.onclick/);
+  assert.match(desk, /backdrop = null;/);
+  const css = js.slice(js.indexOf("deskStyle.textContent = `"), js.indexOf("document.head.appendChild(deskStyle);"));
+  assert.ok(css.length > 0, "_otto.js has the desk panel's styles");
+  assert.doesNotMatch(css, /backdrop-filter|rgba\(20,\s*20,\s*22/, "no blur, no dim");
+  assert.match(css, /#ottoPanel\.op-desk > \.tx-flute \{/, "the flute is the surface");
+  assert.match(css, /bottom: 104px;/, "stops above the 64px corner");
+  assert.match(css, /prefers-reduced-motion: reduce\)\s*\{\s*#ottoPanel\.op-desk, #ottoCorner\.otto-pop \.otto-shell \{ animation: none; \}/);
+  // The header: a 28px still Otto and "otto"; no "your agent · online" (no model yet).
+  assert.match(desk, /<span class="op-mini">\$\{planetHTML\(28\)\}<\/span>/);
+  assert.match(desk, /<h2 class="otto-panel-name" id="ottoPanelName">otto<\/h2>/);
+  assert.doesNotMatch(desk, /your agent|online/);
+  const tsx = read("src/components/network/OttoSidePanel.tsx");
+  assert.match(tsx, />\s*otto\s*<\/h2>/, "the React panel's header says the same");
+  // A non-modal region: an aside, focus moves in, Escape and the corner close it.
+  assert.match(desk, /createElement\('aside'\)/);
+  assert.match(fnText(js, "openOttoPanel"), /panel\.focus\(\{ preventScroll: true \}\)/);
+  assert.match(fnText(js, "closeOttoPanel"), /corner\.focus\(/);
+  // The off switch: only otto_desk false brings back the old panel.
+  assert.match(js, /j\.otto_desk === false/);
+  // The two ways on, and the mini desk's sizes (panel-desk.ts).
+  assert.match(desk, /Open your desk →/);
+  assert.match(desk, /Full breakdown →/);
+  const pd = read("src/lib/otto/panel-desk.ts");
+  assert.match(js, new RegExp(`OTTO_PANEL_READY = ${pd.match(/PANEL_READY_MAX = (\d+)/)?.[1]};`));
+  assert.match(js, new RegExp(`OTTO_PANEL_SAW = ${pd.match(/PANEL_SAW_MAX = (\d+)/)?.[1]};`));
+});
+
+test("the static corner waits like the React one: an ink count and his moon at the ring's end", () => {
+  const js = read("public/html/_otto.js");
+  const paint = fnText(js, "_ottoPaintCorner");
+  assert.match(paint, /planet\.classList\.toggle\('wait', total > 0/);
+  assert.match(paint, /total > 9 \? '9\+'/);
+  assert.match(paint, /setAttribute\('aria-expanded'/);
+  const mini = read("public/html/_miniMessenger.js");
+  assert.match(mini, /window\.__ottoSetChats\(ottoTabs \? n : 0\)/, "unread chats reach the corner");
+  assert.match(mini, /e\.key === "ArrowRight"/, "the Otto | Messages tabs take the arrow keys");
+});
+
+test("both side panels keep the page's Escape, solid glass, the pinned way on and the same parts (Wave 2B repair)", () => {
+  const js = read("public/html/_otto.js");
+  const tsx = read("src/components/network/OttoSidePanel.tsx");
+  const pcss = read("src/components/network/otto-panel.css");
+  const css = js.slice(js.indexOf("deskStyle.textContent = `"), js.indexOf("document.head.appendChild(deskStyle);"));
+  // Escape is the panel's only from the panel or the corner: the page behind stays usable.
+  assert.match(js, /if \(_ottoDeskMode && !\(panel\.contains\(at\) \|\| at === corner\)\) return;/);
+  assert.match(tsx, /if \(inPanel \|\| at\?\.id === "otto-corner"\) onClose\(inPanel\);/);
+  // Solid glass: with no blur, a see-through base only lets the page's words ghost through.
+  assert.match(css, /background: var\(--cream, #FAF7F2\);/);
+  assert.match(pcss, /\.otp-glass>\.tx-flute\{[^}]*background:var\(--cream\)\}/);
+  // The way on is pinned at the foot in both, outside the scrolling body.
+  assert.match(fnText(js, "buildDeskPanel"), /<div class="otto-panel-body"><\/div>\s*<nav class="otto-panel-footer op-paper"/);
+  assert.match(tsx, /<\/div>\s*\{\/\*[^*]*\*\/\}\s*<DeskLinks desk=\{desk\} \/>/);
+  // The same parts: section labels on paper tabs, the top item on blueprint, icons in Otto saw.
+  assert.match(css, /#ottoPanel\.op-desk \.op-sec \{[^}]*border-radius: 999px; background: var\(--paper/);
+  assert.match(pcss, /\.otp \.dk-sec\{[^}]*border-radius:999px;background:var\(--paper\)/);
+  assert.match(fnText(js, "_ottoReadyHTML"), /<article class="op-draft"/);
+  assert.match(fnText(js, "_ottoSawHTML"), /_ottoIco\(item\.kind\)/);
+  // The header's sizes match (React: 22px name, 15px line).
+  assert.match(css, /font-size: 22px; font-weight: 900;/);
+  assert.match(pcss, /\.otp-name\{[^}]*font:900 22px/);
+  // The Messages tab keeps today's pencil and Open in the tab row, in both.
+  assert.match(tsx, /className="otp-tab-new"[\s\S]*?aria-label="New message"/);
+  assert.match(read("public/html/_miniMessenger.js"), /class="vmm-tab-new" id="vmmNew" aria-label="New message"/);
+  // A same-site link guard that also refuses "/\host".
+  assert.match(fnText(js, "_ottoHref"), /h\[1\] !== '\/' && h\[1\] !== '\\\\'/);
+});

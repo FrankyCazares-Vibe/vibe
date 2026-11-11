@@ -245,7 +245,17 @@ export type InvalidCardRefusal = Refusal<"invalid_card"> & { field: string };
  * `chat_desktop` (wave-3 contract 2.1) is never true without it; the two
  * desktop pages also receive it as a server prop.
  */
-export type FeaturesResponse = { ok: true; chat_v2: boolean; chat_desktop: boolean };
+export type FeaturesResponse = {
+  ok: true;
+  chat_v2: boolean;
+  chat_desktop: boolean;
+  /**
+   * Otto's desk (Wave 2B): false only when `OTTO_DESK=off`. The computer's
+   * side panel then keeps today's layout (OttoSidePanelLegacy). A client
+   * that can't read it treats it as on: it's an off button.
+   */
+  otto_desk: boolean;
+};
 
 // ── 5 Cards (wave 2; pinned now) ─────────────────────────────────────────────
 

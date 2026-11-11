@@ -1,0 +1,1259 @@
+"use client";
+
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+
+import { MiniMessagesFrame, type MiniMessagesHandle } from "@/components/desktop/messages/MiniMessenger";
+import { asLoadFailure, LoadFailed, type LoadFailure } from "@/components/feedback/LoadFailed";
+import { OttoPlanet } from "@/components/otto/planet/OttoPlanet";
+import { vibeRequest } from "@/lib/feedback/request";
+import {
+  clubInitials,
+  clubNameText,
+  eventTitleText,
+  eventWhenText,
+} from "@/lib/push/event-notice";
+import { countOpen } from "@/lib/usage/touch-client";
+
+type NotifType =
+  | "follow"
+  | "connection"
+  | "like"
+  | "comment"
+  | "mention"
+  | "org_invite"
+  | "org_request_approved"
+  | "event_cancelled"
+  | "org_join_request";
+
+type NotifActor = {
+  id: string;
+  name: string | null;
+  handle: string | null;
+  avatar_url: string | null;
+} | null;
+
+type NotifPost = {
+  id: string;
+  type: string | null;
+  content: string | null;
+  media_thumbnail_url: string | null;
+  // Author handle is pulled by the notifications GET join — used so
+  // mention clicks route to /profile/<authorHandle>?post=<id> instead
+  // of the viewer's own profile.
+  author?: { handle: string | null } | null;
+} | null;
+
+type NotifComment = {
+  id: string;
+  content: string | null;
+} | null;
+
+type NotifRow = {
+  id: string;
+  type: NotifType | string;
+  post_id: string | null;
+  comment_id: string | null;
+  message_id?: string | null;
+  read_at: string | null;
+  created_at: string;
+  actor: NotifActor;
+  post: NotifPost;
+  comment: NotifComment;
+  // The club behind an invite, an approval, a join request or a cancelled
+  // event. The notifications GET reads it with the service client; null when
+  // it couldn't, so the copy says "a club" ("your club" on a join request).
+  org_id?: string | null;
+  org?: { handle: string; name: string; logo_url: string | null } | null;
+  // A cancelled-event notice's copy of the event; null on other types. That
+  // row's `actor` is always null: it's from the club (event-notice.ts).
+  event_title?: string | null;
+  event_starts_at?: string | null;
+};
+
+type CountPayload = {
+  unread: number;
+  totals: {
+    follow?: number;
+    connection?: number;
+    like?: number;
+    comment?: number;
+    mention?: number;
+  };
+};
+
+type MetricsPayload = {
+  profile_views: { today: number; seven_days: number; thirty_days: number; all_time: number };
+  creator: { views: number; likes: number; comments: number; reposts: number };
+};
+
+type Filter = "all" | NotifType;
+
+/** One line per section, so a refused read says which part didn't load. */
+const COUNT_FAILURE = "Couldn't load your activity counts.";
+const LIST_FAILURE = "Couldn't load your activity.";
+const METRICS_FAILURE = "Couldn't load your metrics.";
+
+/**
+ * React port of the legacy `_otto.js` slide-out panel. Mounts when `open` is
+ * true; renders a dark backdrop + right-side dark panel with header, stats
+ * grid, notification list, and a footer link to the full Otto command center.
+ *
+ * Marks all notifications read on open (matches the legacy behaviour).
+ *
+ * TODAY'S SIDE PANEL, KEPT FOR THE OFF SWITCH (Wave 2B, Nov 11, 2026). Moved
+ * here unchanged from OttoSidePanel.tsx, which is now the fluted panel with
+ * the mini desk. OttoSidePanel draws this when `OTTO_DESK=off`
+ * (src/lib/otto/desk-flag.ts, read through /api/me/features `otto_desk`).
+ * Delete it about two weeks after it has gone unused.
+ */
+type PanelTab = "otto" | "messages";
+
+export function OttoSidePanelLegacy({
+  open,
+  onClose,
+  messages,
+}: {
+  open: boolean;
+  onClose: () => void;
+  /**
+   * Messages as the panel's second tab (`useMiniMessages`): laptops with the
+   * new chat. Absent or not available: the panel is Otto alone, as before.
+   */
+  messages?: { available: boolean; unread: number };
+}) {
+  // Kept while the panel is closed: it opens on the tab it was left on.
+  const [tab, setTab] = useState<PanelTab>("otto");
+  const frameRef = useRef<MiniMessagesHandle | null>(null);
+  const withMessages = messages?.available === true;
+  const showMessages = withMessages && tab === "messages";
+  const [count, setCount] = useState<CountPayload | null>(null);
+  const [list, setList] = useState<NotifRow[]>([]);
+  const [filter, setFilter] = useState<Filter>("all");
+  const [loading, setLoading] = useState(false);
+  const [metrics, setMetrics] = useState<MetricsPayload | null>(null);
+  const [countErr, setCountErr] = useState<LoadFailure | null>(null);
+  const [listErr, setListErr] = useState<LoadFailure | null>(null);
+  const [metricsErr, setMetricsErr] = useState<LoadFailure | null>(null);
+
+  // ESC closes.
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open, onClose]);
+
+  const markAllRead = useCallback(async () => {
+    await vibeRequest("/api/me/notifications/mark-read", {
+      method: "POST",
+      json: { all: true },
+      failure: "Couldn't mark your notifications read.",
+    });
+  }, []);
+
+  // One read per section: the counts, the list and the metrics each keep
+  // their own failure, so a refused read shows an inline line in that
+  // section's place instead of blanking the panel or reading as "no
+  // activity yet". Whatever already loaded stays — a reopen only ever
+  // replaces rows with rows. vibeRequest never throws, so an HTML error
+  // page is a failure instead of a crash in .json().
+  //
+  // Quiet only while there's nothing on screen to contradict. The first
+  // open renders the inline line, and Retry repaints the box that's
+  // already there; a reopen that keeps yesterday's rows lets vibeRequest
+  // toast instead, so stale numbers never pass for fresh ones.
+  const runRef = useRef(0);
+  const loadedRef = useRef(false);
+  const load = useCallback(async (mode: "open" | "retry" = "open") => {
+    const run = ++runRef.current;
+    const quiet = mode === "retry" || !loadedRef.current;
+    setLoading(true);
+    const [countRes, listRes, pvRes, csRes] = await Promise.all([
+      vibeRequest<{ unread?: number; totals?: CountPayload["totals"] }>(
+        "/api/me/notifications/count",
+        { cache: "no-store", quiet, failure: COUNT_FAILURE },
+      ),
+      vibeRequest<{ notifications?: NotifRow[] }>("/api/me/notifications?limit=30", {
+        cache: "no-store",
+        quiet,
+        failure: LIST_FAILURE,
+      }),
+      vibeRequest<{ counts?: MetricsPayload["profile_views"] }>("/api/me/profile-views", {
+        cache: "no-store",
+        quiet,
+        failure: METRICS_FAILURE,
+      }),
+      vibeRequest<{ totals?: MetricsPayload["creator"] }>("/api/me/creator-stats", {
+        cache: "no-store",
+        quiet,
+        failure: METRICS_FAILURE,
+      }),
+    ]);
+    if (runRef.current !== run) return;
+
+    if (countRes.ok && typeof countRes.data.unread === "number") {
+      setCount({ unread: countRes.data.unread, totals: countRes.data.totals ?? {} });
+      setCountErr(null);
+      loadedRef.current = true;
+    } else {
+      setCountErr(asLoadFailure(countRes, COUNT_FAILURE));
+    }
+
+    if (listRes.ok && Array.isArray(listRes.data.notifications)) {
+      const rows = listRes.data.notifications;
+      setList(rows);
+      setListErr(null);
+      loadedRef.current = true;
+      // The count can hold unread rows the list leaves out (an invite or an
+      // approval for a club hidden since), and mark-read {all} clears those
+      // too. Going by the list alone would leave the badge lit for good.
+      const countUnread = countRes.ok ? (countRes.data.unread ?? 0) : 0;
+      if (rows.some((n) => !n.read_at) || countUnread > 0) void markAllRead();
+    } else {
+      setListErr(asLoadFailure(listRes, LIST_FAILURE));
+    }
+
+    // Four tiles from two endpoints: a zero standing in for a refused read
+    // looks like a real number, so either one failing fails the block.
+    if (pvRes.ok && pvRes.data.counts && csRes.ok && csRes.data.totals) {
+      setMetrics({ profile_views: pvRes.data.counts, creator: csRes.data.totals });
+      setMetricsErr(null);
+      loadedRef.current = true;
+    } else {
+      const refused = !pvRes.ok || !pvRes.data.counts ? pvRes : csRes;
+      setMetricsErr(asLoadFailure(refused, METRICS_FAILURE));
+    }
+
+    setLoading(false);
+  }, [markAllRead]);
+
+  // Fetch + mark-read whenever the panel opens. The load runs in an async
+  // IIFE, the way every other list in the app does it, so the effect body
+  // itself stays synchronous.
+  useEffect(() => {
+    if (!open) return;
+    void (async () => {
+      await load();
+    })();
+    return () => {
+      // Drop an in-flight response once the panel closes.
+      runRef.current += 1;
+    };
+  }, [open, load]);
+
+  // An Otto open for the use totals (src/lib/usage/touch.ts): the panel
+  // opened on its Otto tab, or switched to it from Messages. The panel opens
+  // on the tab it was left on, so an open on Messages is not one.
+  useEffect(() => {
+    if (open && (!withMessages || tab === "otto")) countOpen("otto");
+  }, [open, tab, withMessages]);
+
+  const briefing = useMemo(() => {
+    // The counts are what this line is about, so a refused read says so
+    // instead of sitting on "loading…" for good.
+    if (!count) {
+      return countErr ? "couldn't check your activity just now." : "loading your activity…";
+    }
+    const total =
+      (count.totals.follow ?? 0) +
+      (count.totals.connection ?? 0) +
+      (count.totals.like ?? 0) +
+      (count.totals.comment ?? 0);
+    if (total === 0) return "quiet around here. go say hi to someone.";
+    if (count.unread > 0) return `${count.unread} new since you last looked.`;
+    return "all caught up — here's what's been happening.";
+  }, [count, countErr]);
+
+  const filtered = useMemo(() => {
+    if (filter === "all") return list;
+    return list.filter((n) => n.type === filter);
+  }, [list, filter]);
+
+  if (!open) return null;
+
+  return (
+    <>
+      <div
+        onClick={onClose}
+        aria-hidden
+        style={{
+          position: "fixed",
+          inset: 0,
+          zIndex: 9998,
+          background: "rgba(20,20,22,0.42)",
+          backdropFilter: "blur(2px)",
+          WebkitBackdropFilter: "blur(2px)",
+          animation: "otto-backdrop-in 0.22s ease-out",
+        }}
+      />
+      <aside
+        role="dialog"
+        aria-label="Otto"
+        style={{
+          position: "fixed",
+          top: 0,
+          right: 0,
+          bottom: 0,
+          zIndex: 9999,
+          width: 380,
+          maxWidth: "92vw",
+          background: "#141416",
+          color: "white",
+          borderLeft: "0.5px solid rgba(255,92,53,0.15)",
+          boxShadow: "-16px 0 48px rgba(0,0,0,0.4)",
+          display: "flex",
+          flexDirection: "column",
+          fontFamily: "DM Sans, sans-serif",
+          animation: "otto-panel-in 0.26s cubic-bezier(0.2,0.8,0.2,1)",
+        }}
+      >
+        <Header onClose={onClose} briefing={briefing} loading={loading} />
+        {withMessages ? (
+          <PanelTabs
+            tab={tab}
+            onTab={setTab}
+            unreadChats={messages?.unread ?? 0}
+            onCompose={() => frameRef.current?.compose()}
+            onOpenFull={() => frameRef.current?.openInMessages()}
+          />
+        ) : null}
+        {/* Mounted only while its tab shows: the frame's page keeps reading
+            the lists for as long as it exists. */}
+        {showMessages ? <MiniMessagesFrame ref={frameRef} /> : null}
+        <div
+          style={{
+            flex: 1,
+            overflowY: "auto",
+            padding: "0 18px 18px",
+            display: showMessages ? "none" : undefined,
+          }}
+        >
+          {/* Each section keeps whatever it already has: a failure only
+              takes the place of a section that never loaded. */}
+          <StatsGrid
+            count={count}
+            failure={count ? null : countErr}
+            onRetry={() => void load("retry")}
+            onPick={setFilter}
+            active={filter}
+          />
+          <div
+            aria-hidden
+            style={{
+              height: 1,
+              background: "rgba(255,255,255,0.06)",
+              margin: "16px 0",
+            }}
+          />
+          <SectionEyebrow>your metrics</SectionEyebrow>
+          <MetricsBlock
+            metrics={metrics}
+            loading={loading}
+            failure={metrics ? null : metricsErr}
+            onRetry={() => void load("retry")}
+          />
+          <div
+            aria-hidden
+            style={{
+              height: 1,
+              background: "rgba(255,255,255,0.06)",
+              margin: "16px 0",
+            }}
+          />
+          <SectionEyebrow>activity</SectionEyebrow>
+          <FilterPills value={filter} onChange={setFilter} />
+          {/* Only a failure with nothing loaded replaces the list — a
+              filter with no matches is a real empty. */}
+          <NotifList
+            loading={loading}
+            rows={filtered}
+            filter={filter}
+            onClose={onClose}
+            failure={list.length === 0 ? listErr : null}
+            onRetry={() => void load("retry")}
+          />
+        </div>
+        {showMessages ? null : <Footer />}
+      </aside>
+      <style jsx global>{`
+        @keyframes otto-backdrop-in {
+          from {
+            opacity: 0;
+          }
+          to {
+            opacity: 1;
+          }
+        }
+        @keyframes otto-panel-in {
+          from {
+            transform: translateX(100%);
+          }
+          to {
+            transform: translateX(0);
+          }
+        }
+      `}</style>
+    </>
+  );
+}
+
+function Header({
+  onClose,
+  briefing,
+  loading,
+}: {
+  onClose: () => void;
+  briefing: string;
+  loading: boolean;
+}) {
+  return (
+    <div
+      style={{
+        position: "relative",
+        padding: "22px 22px 18px",
+        borderBottom: "0.5px solid rgba(255,255,255,0.06)",
+        flexShrink: 0,
+        overflow: "hidden",
+      }}
+    >
+      <SynapseBackdrop />
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 12,
+          position: "relative",
+          marginBottom: 12,
+        }}
+      >
+        <MiniOrb />
+        <div style={{ flex: 1 }}>
+          <div
+            style={{
+              fontFamily: "Fraunces, serif",
+              fontWeight: 900,
+              fontSize: 22,
+              letterSpacing: "-0.01em",
+              lineHeight: 1,
+            }}
+          >
+            otto
+          </div>
+          <div
+            style={{
+              fontSize: 11,
+              fontWeight: 600,
+              letterSpacing: "0.14em",
+              textTransform: "uppercase",
+              color: "rgba(255,180,150,0.78)",
+              marginTop: 4,
+            }}
+          >
+            your agent · online
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Close"
+          style={{
+            background: "rgba(255,255,255,0.06)",
+            border: "1px solid rgba(255,255,255,0.10)",
+            color: "rgba(255,255,255,0.7)",
+            width: 30,
+            height: 30,
+            borderRadius: 999,
+            fontSize: 18,
+            lineHeight: 1,
+            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          ×
+        </button>
+      </div>
+      <div
+        style={{
+          fontFamily: "Fraunces, serif",
+          fontStyle: "italic",
+          fontSize: 14,
+          color: loading ? "rgba(255,255,255,0.4)" : "rgba(255,255,255,0.78)",
+          lineHeight: 1.5,
+          position: "relative",
+        }}
+      >
+        “{briefing}”
+      </div>
+    </div>
+  );
+}
+
+/**
+ * The panel's two tabs, under the header: Otto's briefing and Messages. On
+ * the Messages tab the row also carries the frame's two controls: the pencil
+ * (a new message) and `Open` (the chat on screen, in full Messages).
+ */
+function PanelTabs({
+  tab,
+  onTab,
+  unreadChats,
+  onCompose,
+  onOpenFull,
+}: {
+  tab: PanelTab;
+  onTab: (tab: PanelTab) => void;
+  unreadChats: number;
+  onCompose: () => void;
+  onOpenFull: () => void;
+}) {
+  const pill = (active: boolean): React.CSSProperties => ({
+    height: 30,
+    padding: "0 14px",
+    borderRadius: 999,
+    border: active ? "1px solid transparent" : "1px solid rgba(255,255,255,0.12)",
+    background: active ? "#FAF7F2" : "transparent",
+    color: active ? "#141416" : "rgba(255,255,255,0.72)",
+    fontFamily: "inherit",
+    fontSize: 13,
+    fontWeight: 700,
+    display: "inline-flex",
+    alignItems: "center",
+    gap: 6,
+    cursor: "pointer",
+  });
+  return (
+    <div
+      role="tablist"
+      aria-label="Otto and Messages"
+      style={{ flexShrink: 0, display: "flex", alignItems: "center", gap: 6, padding: "10px 18px", borderBottom: "0.5px solid rgba(255,255,255,0.06)" }}
+    >
+      <button type="button" role="tab" aria-selected={tab === "otto"} onClick={() => onTab("otto")} style={pill(tab === "otto")}>
+        Otto
+      </button>
+      <button
+        type="button"
+        role="tab"
+        aria-selected={tab === "messages"}
+        aria-label={unreadChats > 0 ? `Messages, ${unreadChats} unread` : undefined}
+        onClick={() => onTab("messages")}
+        style={pill(tab === "messages")}
+      >
+        Messages
+        {unreadChats > 0 ? (
+          <span aria-hidden style={{ minWidth: 18, height: 18, boxSizing: "border-box", padding: "0 5px", borderRadius: 999, background: "#FF5C35", color: "#140806", fontSize: 11.5, fontWeight: 800, lineHeight: 1, display: "inline-flex", alignItems: "center", justifyContent: "center" }}>
+            {unreadChats > 99 ? "99+" : unreadChats}
+          </span>
+        ) : null}
+      </button>
+      {tab === "messages" ? (
+        <>
+          <span style={{ flex: 1 }} />
+          <button
+            type="button"
+            onClick={onCompose}
+            aria-label="New message"
+            title="New message"
+            style={{ width: 30, height: 30, borderRadius: 999, border: "1px solid rgba(255,255,255,0.10)", background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.8)", display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: "pointer", padding: 0 }}
+          >
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.1" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M12 20h8" />
+              <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7.5 18.5 3 20l1.5-4.5z" />
+            </svg>
+          </button>
+          <button
+            type="button"
+            onClick={onOpenFull}
+            style={{ height: 30, padding: "0 10px", borderRadius: 999, border: "none", background: "transparent", color: "#FF8A66", fontFamily: "inherit", fontSize: 12, fontWeight: 700, cursor: "pointer" }}
+          >
+            Open
+          </button>
+        </>
+      ) : null}
+    </div>
+  );
+}
+
+/** The header's Otto (Nov 10, 2026, Otto build wave 1): Planet at 28px,
+ *  always still. The panel is dark in both looks, so a night island gives
+ *  him Night's light ring. The 36px slot keeps the header as it was until
+ *  the panel's own redesign (wave 2B). */
+function MiniOrb() {
+  return (
+    <span
+      className="vibe-night-island"
+      style={{
+        position: "relative",
+        width: 36,
+        height: 36,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        flexShrink: 0,
+      }}
+    >
+      <OttoPlanet size={28} />
+    </span>
+  );
+}
+
+function SynapseBackdrop() {
+  return (
+    <svg
+      aria-hidden
+      viewBox="0 0 220 110"
+      style={{
+        position: "absolute",
+        top: 0,
+        right: 0,
+        width: 220,
+        height: "100%",
+        opacity: 0.35,
+        pointerEvents: "none",
+      }}
+    >
+      <g stroke="#FF5C35" strokeWidth="0.5">
+        <line x1="22" y1="22" x2="88" y2="55" />
+        <line x1="88" y1="55" x2="176" y2="33" />
+        <line x1="88" y1="55" x2="198" y2="77" />
+        <line x1="22" y1="88" x2="88" y2="55" />
+        <line x1="176" y1="33" x2="198" y2="77" />
+      </g>
+      <g fill="#FF5C35">
+        <circle cx="22" cy="22" r="2" />
+        <circle cx="88" cy="55" r="3" />
+        <circle cx="176" cy="33" r="2" />
+        <circle cx="198" cy="77" r="2" />
+        <circle cx="22" cy="88" r="2" />
+      </g>
+    </svg>
+  );
+}
+
+function SectionEyebrow({ children }: { children: React.ReactNode }) {
+  return (
+    <div
+      style={{
+        fontSize: 10,
+        fontWeight: 700,
+        letterSpacing: "0.16em",
+        textTransform: "uppercase",
+        color: "rgba(255,255,255,0.45)",
+        marginBottom: 10,
+      }}
+    >
+      {children}
+    </div>
+  );
+}
+
+function StatsGrid({
+  count,
+  failure,
+  onRetry,
+  onPick,
+  active,
+}: {
+  count: CountPayload | null;
+  failure: LoadFailure | null;
+  onRetry: () => void;
+  onPick: (f: Filter) => void;
+  active: Filter;
+}) {
+  // Four tiles of 0 read as "nobody's been by", so a refused count says so.
+  if (failure) {
+    return (
+      <div style={{ marginTop: 16 }}>
+        <LoadFailed failure={failure} onRetry={onRetry} tone="dark" compact />
+      </div>
+    );
+  }
+  // Keyed by the count route's totals, not NotifType: club invites and
+  // approvals have no tile or total of their own.
+  const tiles: Array<{ key: keyof CountPayload["totals"]; label: string }> = [
+    { key: "follow", label: "Follows" },
+    { key: "connection", label: "Connections" },
+    { key: "like", label: "Likes" },
+    { key: "comment", label: "Comments" },
+  ];
+  return (
+    <div
+      style={{
+        marginTop: 16,
+        display: "grid",
+        gridTemplateColumns: "1fr 1fr",
+        gap: 8,
+      }}
+    >
+      {tiles.map((t) => {
+        const n = count?.totals?.[t.key] ?? 0;
+        const isActive = active === t.key;
+        return (
+          <button
+            key={t.key}
+            type="button"
+            onClick={() => onPick(t.key)}
+            style={{
+              padding: "12px 14px",
+              borderRadius: 12,
+              background: isActive
+                ? "rgba(255,92,53,0.14)"
+                : "rgba(255,255,255,0.04)",
+              border: isActive
+                ? "1px solid rgba(255,140,90,0.45)"
+                : "1px solid rgba(255,255,255,0.08)",
+              color: "white",
+              cursor: "pointer",
+              textAlign: "left",
+              fontFamily: "DM Sans, sans-serif",
+              transition: "background 120ms ease, border 120ms ease",
+            }}
+          >
+            <div
+              style={{
+                fontFamily: "Fraunces, serif",
+                fontSize: 22,
+                fontWeight: 800,
+                lineHeight: 1,
+                color: isActive ? "#FFB89C" : "white",
+              }}
+            >
+              {n}
+            </div>
+            <div
+              style={{
+                fontSize: 11,
+                color: "rgba(255,255,255,0.55)",
+                marginTop: 4,
+                letterSpacing: "0.04em",
+              }}
+            >
+              {t.label}
+            </div>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function MetricsBlock({
+  metrics,
+  loading,
+  failure,
+  onRetry,
+}: {
+  metrics: MetricsPayload | null;
+  loading: boolean;
+  failure: LoadFailure | null;
+  onRetry: () => void;
+}) {
+  // Four states: still fetching, refused, fetched but empty (migration not
+  // applied or no posts yet), or have data. Showing real text for each so a
+  // brand-new account or a half-migrated deploy doesn't get a permanent
+  // "loading…", and an outage doesn't read as "no numbers yet".
+  if (loading) {
+    return (
+      <div style={{ color: "rgba(255,255,255,0.4)", fontSize: 12, padding: "8px 0" }}>
+        loading metrics…
+      </div>
+    );
+  }
+  if (failure) {
+    return <LoadFailed failure={failure} onRetry={onRetry} tone="dark" compact />;
+  }
+  if (!metrics) {
+    return (
+      <div
+        style={{
+          color: "rgba(255,255,255,0.5)",
+          fontSize: 12,
+          padding: "8px 0",
+          fontStyle: "italic",
+          fontFamily: "Fraunces, serif",
+        }}
+      >
+        metrics not available yet — once posts + views land they&apos;ll show here.
+      </div>
+    );
+  }
+  const tiles: Array<{ n: number; label: string; accent?: boolean }> = [
+    { n: metrics.profile_views.thirty_days, label: "Profile views (30d)", accent: true },
+    { n: metrics.creator.views, label: "Post views" },
+    { n: metrics.creator.likes, label: "Likes" },
+    { n: metrics.creator.reposts, label: "Reposts" },
+  ];
+  return (
+    <a
+      href="/otto?tab=stats"
+      aria-label="Open full metrics in Otto's command center"
+      style={{
+        display: "block",
+        textDecoration: "none",
+        borderRadius: 12,
+        // Whole block deep-links to /otto's Stats tab so the side panel is
+        // the synced entry-point to the full metrics surface.
+      }}
+    >
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "1fr 1fr",
+          gap: 8,
+        }}
+      >
+        {tiles.map((t, i) => (
+          <div
+            key={i}
+            style={{
+              padding: "12px 14px",
+              borderRadius: 12,
+              background: t.accent ? "rgba(255,92,53,0.14)" : "rgba(255,255,255,0.04)",
+              border: t.accent
+                ? "1px solid rgba(255,140,90,0.45)"
+                : "1px solid rgba(255,255,255,0.08)",
+            }}
+          >
+            <div
+              style={{
+                fontFamily: "Fraunces, serif",
+                fontSize: 22,
+                fontWeight: 800,
+                lineHeight: 1,
+                color: t.accent ? "#FFB89C" : "white",
+                fontVariantNumeric: "tabular-nums",
+              }}
+            >
+              {formatMetric(t.n)}
+            </div>
+            <div
+              style={{
+                fontSize: 11,
+                color: "rgba(255,255,255,0.55)",
+                marginTop: 4,
+                letterSpacing: "0.04em",
+              }}
+            >
+              {t.label}
+            </div>
+          </div>
+        ))}
+      </div>
+      <div
+        style={{
+          marginTop: 8,
+          fontSize: 11,
+          color: "rgba(255,180,150,0.7)",
+          textAlign: "right",
+        }}
+      >
+        full breakdown in /otto →
+      </div>
+    </a>
+  );
+}
+
+function formatMetric(n: number): string {
+  if (n < 1000) return String(n);
+  if (n < 10000) return (n / 1000).toFixed(1).replace(/\.0$/, "") + "k";
+  return Math.round(n / 1000) + "k";
+}
+
+function FilterPills({
+  value,
+  onChange,
+}: {
+  value: Filter;
+  onChange: (v: Filter) => void;
+}) {
+  const opts: Array<{ id: Filter; label: string }> = [
+    { id: "all", label: "All" },
+    { id: "follow", label: "Follows" },
+    { id: "connection", label: "Connections" },
+    { id: "like", label: "Likes" },
+    { id: "comment", label: "Comments" },
+  ];
+  return (
+    <div
+      style={{
+        display: "flex",
+        gap: 6,
+        marginBottom: 12,
+        flexWrap: "wrap",
+      }}
+    >
+      {opts.map((o) => {
+        const active = value === o.id;
+        return (
+          <button
+            key={o.id}
+            type="button"
+            onClick={() => onChange(o.id)}
+            style={{
+              padding: "5px 10px",
+              borderRadius: 999,
+              border: active
+                ? "1px solid rgba(255,140,90,0.45)"
+                : "1px solid rgba(255,255,255,0.10)",
+              background: active
+                ? "rgba(255,92,53,0.14)"
+                : "rgba(255,255,255,0.04)",
+              color: active ? "#FFB89C" : "rgba(255,255,255,0.7)",
+              fontFamily: "DM Sans, sans-serif",
+              fontSize: 11,
+              fontWeight: 700,
+              cursor: "pointer",
+            }}
+          >
+            {o.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function NotifList({
+  loading,
+  rows,
+  filter,
+  onClose,
+  failure,
+  onRetry,
+}: {
+  loading: boolean;
+  rows: NotifRow[];
+  filter: Filter;
+  onClose: () => void;
+  failure: LoadFailure | null;
+  onRetry: () => void;
+}) {
+  if (loading && rows.length === 0) {
+    return (
+      <div style={{ color: "rgba(255,255,255,0.4)", fontSize: 13, padding: "12px 0" }}>
+        loading…
+      </div>
+    );
+  }
+  // A refused read is never "no activity yet — go say hi to someone."
+  if (failure) {
+    return <LoadFailed failure={failure} onRetry={onRetry} tone="dark" compact />;
+  }
+  if (rows.length === 0) {
+    const msg =
+      filter === "all"
+        ? "no activity yet — go say hi to someone."
+        : `no ${filter}s yet.`;
+    return (
+      <div style={{ color: "rgba(255,255,255,0.4)", fontSize: 13, padding: "12px 0" }}>
+        {msg}
+      </div>
+    );
+  }
+  return (
+    <div style={{ display: "flex", flexDirection: "column" }}>
+      {rows.map((n) => (
+        <NotifRowView key={n.id} n={n} onClose={onClose} />
+      ))}
+    </div>
+  );
+}
+
+function verbFor(n: NotifRow): string {
+  switch (n.type) {
+    case "follow":
+      return "started following you";
+    case "connection":
+      return "you're now connected";
+    case "like":
+      return "liked your post";
+    case "comment":
+      return "commented on your post";
+    case "mention":
+      return n.message_id ? "mentioned you in a chat" : "mentioned you";
+    case "org_invite":
+      return `invited you to join ${n.org?.name ?? "a club"}`;
+    case "org_request_approved":
+      return `approved your request to join ${n.org?.name ?? "a club"}`;
+    // To an owner or officer (Oct 22, 2026): the requester is the actor.
+    // Without the club (it couldn't be read) it's still one of theirs.
+    case "org_join_request":
+      return `asked to join ${n.org?.name ?? "your club"}`;
+    default:
+      // event_cancelled renders its own line (NotifRowView, fromClub).
+      return "";
+  }
+}
+
+function snippetFor(n: NotifRow): string {
+  if (n.type === "comment" && n.comment?.content) return n.comment.content;
+  if (
+    (n.type === "like" || n.type === "mention" || n.type === "comment") &&
+    n.post?.content
+  ) {
+    return n.post.content;
+  }
+  return "";
+}
+
+function relTime(iso: string): string {
+  const d = (Date.now() - new Date(iso).getTime()) / 1000;
+  if (d < 60) return "just now";
+  if (d < 3600) return `${Math.floor(d / 60)}m ago`;
+  if (d < 86400) return `${Math.floor(d / 3600)}h ago`;
+  if (d < 86400 * 7) return `${Math.floor(d / 86400)}d ago`;
+  return new Date(iso).toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+  });
+}
+
+function NotifRowView({ n, onClose }: { n: NotifRow; onClose: () => void }) {
+  const a = n.actor;
+  // A cancelled-event notice is from the club: its face, name and link are
+  // the club's, and the officer who cancelled is never shown (ruling 14).
+  const fromClub = n.type === "event_cancelled";
+  const clubHref = n.org ? `/orgs/${encodeURIComponent(n.org.handle)}` : "/campus?tab=orgs";
+  const initials = fromClub
+    ? clubInitials(n.org)
+    : (a?.name ?? a?.handle ?? "?")
+        .split(/\s+/)
+        .filter(Boolean)
+        .slice(0, 2)
+        .map((s) => s[0])
+        .join("")
+        .toUpperCase();
+  const display = fromClub
+    ? clubNameText(n.org)
+    : a?.name ?? (a?.handle ? `@${a.handle}` : "someone");
+  const picture = fromClub ? n.org?.logo_url ?? null : a?.avatar_url ?? null;
+  const canOpenFace = fromClub || Boolean(a?.handle);
+  const verb = verbFor(n);
+  const eventWhen = fromClub ? eventWhenText(n.event_starts_at) : null;
+  const snippet = snippetFor(n);
+
+  // Two click targets per row:
+  //   1. Avatar + actor name  → actor profile
+  //   2. Anywhere else on row → the post (for post-bound notifs) or
+  //      the actor's profile (for bare follow / connection rows).
+  //
+  // Post-bound notifs (like / comment / mention) route to
+  // /posts/<id> — the dedicated post page opens the viewer with
+  // comments already expanded, works for posts of any age (the old
+  // /campus?post= deep link silently failed for posts outside the
+  // 50-row feed window). Mention-in-chat still goes to /messages.
+  const openActor = () => {
+    if (fromClub) {
+      window.location.href = clubHref;
+      onClose();
+      return;
+    }
+    if (!a?.handle) return;
+    window.location.href = `/profile/${encodeURIComponent(a.handle)}`;
+    onClose();
+  };
+  const openRow = () => {
+    // A join request opens where it's answered: Club tools > Join requests
+    // (the requests page itself sends a non-officer back to the club).
+    if (n.type === "org_join_request") {
+      window.location.href = n.org
+        ? `/orgs/${encodeURIComponent(n.org.handle)}/tools/requests`
+        : "/campus?tab=orgs";
+      onClose();
+      return;
+    }
+    // Club rows open the club, not the officer who sent them. Without the
+    // club (it couldn't be read) the Orgs tab is the closest place.
+    if (n.type === "org_invite" || n.type === "org_request_approved" || fromClub) {
+      window.location.href = clubHref;
+      onClose();
+      return;
+    }
+    if (n.type === "mention" && n.message_id && !n.post) {
+      window.location.href = "/messages";
+      onClose();
+      return;
+    }
+    if (
+      (n.type === "like" || n.type === "comment" || n.type === "mention") &&
+      n.post?.id
+    ) {
+      window.location.href = `/posts/${encodeURIComponent(n.post.id)}`;
+      onClose();
+      return;
+    }
+    // Follow / connection rows: clicking the row itself goes to the
+    // actor's profile (there's no post to land on).
+    if (a?.handle) {
+      window.location.href = `/profile/${encodeURIComponent(a.handle)}`;
+      onClose();
+    }
+  };
+
+  return (
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={openRow}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          openRow();
+        }
+      }}
+      style={{
+        display: "flex",
+        gap: 10,
+        padding: "10px 8px",
+        background: n.read_at ? "transparent" : "rgba(255,92,53,0.06)",
+        border: "none",
+        borderRadius: 10,
+        color: "white",
+        cursor: "pointer",
+        textAlign: "left",
+        fontFamily: "DM Sans, sans-serif",
+        transition: "background 120ms ease",
+      }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.background = "rgba(255,255,255,0.05)";
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.background = n.read_at
+          ? "transparent"
+          : "rgba(255,92,53,0.06)";
+      }}
+    >
+      <button
+        type="button"
+        aria-label={fromClub ? `Open ${display}` : `Open ${display}'s profile`}
+        onClick={(e) => {
+          e.stopPropagation();
+          openActor();
+        }}
+        style={{
+          width: 32,
+          height: 32,
+          borderRadius: 999,
+          background: picture
+            ? `url(${JSON.stringify(picture)}) center/cover`
+            : "rgba(255,255,255,0.08)",
+          flexShrink: 0,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          color: "white",
+          fontFamily: "Fraunces, serif",
+          fontWeight: 700,
+          fontSize: 12,
+          padding: 0,
+          border: "none",
+          cursor: canOpenFace ? "pointer" : "default",
+        }}
+      >
+        {!picture ? initials : null}
+      </button>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 13, lineHeight: 1.3 }}>
+          {/* Actor name is its own click target — same /profile destination
+              as the avatar, with stopPropagation so the row's post-route
+              doesn't also fire. */}
+          {canOpenFace ? (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                openActor();
+              }}
+              style={{
+                background: "none",
+                border: "none",
+                padding: 0,
+                margin: 0,
+                color: "white",
+                fontWeight: 700,
+                fontFamily: "inherit",
+                fontSize: "inherit",
+                cursor: "pointer",
+              }}
+            >
+              {display}
+            </button>
+          ) : (
+            <span style={{ fontWeight: 700 }}>{display}</span>
+          )}{" "}
+          {fromClub ? (
+            <span style={{ color: "rgba(255,255,255,0.65)" }}>
+              cancelled{" "}
+              <span style={{ color: "white", fontWeight: 700 }}>
+                {eventTitleText(n.event_title)}
+              </span>
+              {eventWhen ? ` · ${eventWhen}` : null}
+            </span>
+          ) : (
+            <span style={{ color: "rgba(255,255,255,0.65)" }}>{verb}</span>
+          )}
+        </div>
+        {snippet ? (
+          <div
+            style={{
+              fontFamily: "Fraunces, serif",
+              fontStyle: "italic",
+              fontSize: 12,
+              color: "rgba(255,255,255,0.55)",
+              marginTop: 4,
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              display: "-webkit-box",
+              WebkitLineClamp: 2,
+              WebkitBoxOrient: "vertical",
+            }}
+          >
+            “{snippet.slice(0, 140)}”
+          </div>
+        ) : null}
+        <div
+          style={{
+            fontSize: 11,
+            color: "rgba(255,255,255,0.4)",
+            marginTop: 4,
+          }}
+        >
+          {relTime(n.created_at)}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Footer() {
+  return (
+    <div
+      style={{
+        padding: "14px 22px",
+        borderTop: "0.5px solid rgba(255,255,255,0.06)",
+        flexShrink: 0,
+      }}
+    >
+      <a
+        href="/otto"
+        style={{
+          display: "block",
+          textAlign: "center",
+          color: "#FFB89C",
+          fontSize: 13,
+          fontWeight: 700,
+          textDecoration: "none",
+          padding: "8px",
+          borderRadius: 999,
+          background: "rgba(255,255,255,0.04)",
+          border: "1px solid rgba(255,140,90,0.18)",
+        }}
+      >
+        Open Otto&apos;s command center →
+      </a>
+    </div>
+  );
+}
