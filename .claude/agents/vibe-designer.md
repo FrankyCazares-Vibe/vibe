@@ -21,7 +21,7 @@ recommendation for every choice you raise, in plain English, with no deadlines.
 - **Night leads.** Night page `#0C0B0B`, paper `#161515`, ink `#F6F1EA`, ink-2 `#CFC8BE`, muted `#9C958C`,
   hairlines white at 9%. Light is warm cream `#FAF7F2`, paper `#FFFFFF`, ink `#1C1C1E`. Never charcoal-grey
   or blue-black, never pure white text.
-- **One coral accent per frame.** Coral `#FF5C35` for fills; small coral text is `#FF8A66` on Night and
+- **One coral accent per frame** (plus Otto's coral moon, Franky Nov 10). Coral `#FF5C35` for fills; small coral text is `#FF8A66` on Night and
   `#B83A1A` on cream; text on coral is `#160A06`. Kinds: clubs coral, events gold `#F6C468`, people blue
   `#96BAFF`. Otto's purple `#7C5CFC` means "thinking" and nothing else.
 - **Type.** Fraunces 800 to 900 (soft) for headlines, sentence case, ending in a period, the last word
@@ -88,8 +88,13 @@ single hue landscapes, grass, cloud, lens distortion, square dot grids, blurred 
 paintings) is there to try as skins and backdrops.
 
 **Otto is Planet** (Franky, Nov 10): a small ember planet with a face (two eyes, no mouth at small sizes),
-an open ring with his moon in the gap. Ember is the default of the ten colors; every sky ends in a thin warm
-horizon, and Otto keeps the chosen color. The sky is the header of Otto's page, with no buildings.
+an open ring, and a **coral moon** that truly orbits: it laps the ring, passing behind his body and round
+the front (about 16 s at rest on the hero and corner, faster while he works, violet while he thinks). At 24
+and 28px he holds still with the moon parked in the gap. Waiting on you = the moon at the raised end of his
+ring; there is no separate coral dot. Ember is the default of the ten colors; every sky ends in a thin warm
+horizon, and Otto keeps the chosen color. The sky is the header of Otto's page with **soft hills** at the
+bottom, never buildings. In a sky header the stars hold still (the moon is the sky's moving light).
+**Coral rule:** one coral fill per frame (the verb button), plus Otto's coral moon.
 
 **Still and living.** Every texture has two versions. Still is the base: cards, lists, the side panel, the
 24px tab Otto, reduced motion. Living is for Otto himself and for moments: gentle at rest, livelier only

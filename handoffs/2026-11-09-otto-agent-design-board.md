@@ -36,7 +36,21 @@ Franky answered every call one by one (list below, under round 2). Canvas Versio
   thin warm horizon (kit); Colors lost Blueprint from the picker and shows "Your answers".
 - Made by a workflow (three board designers, an adversarial critic who repaired each new board, one fixes
   pass), then I looked at every board as a picture and at the live canvas.
-- **Still open for Franky:** which ground, and dot or no dot. Then his say to build.
+- **Answered later the same evening (canvas Version 19):** the ground is **soft hills**, now under every
+  sky header and sky band on every board (Space's old rooftop skylines too). On the dot, Franky went his own
+  way: "can we make the moon the dot instead and make it actually go behind and around but with the
+  signature coral color". So Planet's moon is now **coral** and truly orbits: it laps his ring, passes
+  behind his body and comes round the front (two copies on one path, transform and opacity only; about 16 s
+  at rest on the hero and corner, 3.4 s violet while thinking, 2.8 s while working; parked in the gap at
+  24/28px and under reduced motion). The sky ring's separate coral traveller is gone. **Waiting on you** is
+  now the moon at the raised right end of his ring (no separate coral dot). **The coral rule changed:** one
+  coral fill per frame (the verb button), plus Otto's coral moon. To keep three loops, **stars hold still
+  in a sky header** (kit rule in `desk.css`): bob, blink and the lap are the loops. The kit's iridescent
+  and thermal textures are warm now too. The Orbit board is rebuilt as "The moon is the dot" (six stops of
+  one lap, the waiting options, the new coral count); Planet's words are rewritten to match.
+- One new small call came up on Colors: a living texture skin would be a fourth loop on the hero. My pick:
+  the bob rests while a texture plays.
+- **Nothing left open on the look.** The next step is Franky's say to build (the new Otto page first).
 
 ## Round 2 (Nov 10): built on C, Otto's desk
 
@@ -264,6 +278,7 @@ club's members, and `OTTO_AI=off` puts back today's Otto.
 - Done (Nov 10, later still): Franky answered calls 3 to 14 and the smaller calls one by one (above).
 - Done (Nov 10, evening): round 3 on the canvas (Version 18): Ground, Orbit, Insights, and the answers carried
   onto the old boards.
-- Not done: no app code. Two picks wait on Franky: the ground under the sky header (my pick: soft hills)
-  and the orbit dot (my pick: without). Round 1's calls are all answered too. The spec needs: "no face"
+- Done (Nov 10, night): soft hills everywhere and the coral orbiting moon (Version 19).
+- Not done: no app code. Waiting on Franky's say to build. The spec needs: a face, the coral orbiting moon,
+  the 30-second undo, 30-day chat history (the spec's session owns it). Round 1's calls are all answered too. The spec needs: "no face"
   changed, the 30-second undo, and the 30-day chat history (the spec's session owns the spec).
