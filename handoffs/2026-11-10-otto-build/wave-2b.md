@@ -1,7 +1,7 @@
 # Otto Wave 2B: the corner and the side panel (ship record)
 
 - Branch `claude/otto-wave-2b` (worktree `.claude/worktrees/otto-wave-1`), from `main` cf1ff731 (Waves 1 and 2A live).
-- Commits a0f8a153 (the panel) and 5c284936 (walk fixes). NOT SHIPPED: waits for Franky's yes.
+- Commits a0f8a153 (the panel) and 5c284936 (walk fixes). **SHIPPED Nov 11** on Franky's "Ship Wave 2B": `main` fast-forwarded cf1ff731 → 8c6325fb, Vercel deploy succeeded.
 - Design: the board's D3 (computer: corner Otto and side panel). Decided: the page is not dimmed (call 12).
 
 ## What's built
@@ -52,3 +52,12 @@
   each on Franky's yes, with the Privacy Policy the same day.
 - About two weeks after shipping, if `OTTO_DESK=off` was never used: delete the `*Legacy` files and the old
   `.otto-room*` styles, and the flag.
+
+## Shipped (Nov 11)
+- Franky: "Ship Wave 2B". `main` was still cf1ff731, so the branch fast-forwarded to 8c6325fb and was pushed.
+- Vercel status for 8c6325fb: success (build `dpl_9zyZwZrnrNHSYzyrF3YeVkYapHBw` on /api/version).
+- Live checks, signed out: the live Content-Security-Policy on /auth/login and /messages carries the new
+  night-lock hash and not the old one; `/html/_otto.js`, `_miniMessenger.js` and `_otto-planet.css` match `main`
+  byte for byte. The panel itself needs a signed-in visit on a computer.
+- Not checked: Franky's walk on a computer (open the corner on /campus and /profile, the mini desk, Messages in
+  Light, Escape, the page behind still clickable).
