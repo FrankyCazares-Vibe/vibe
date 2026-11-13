@@ -1,7 +1,7 @@
 # Motion 1 + the old draft (ship record)
 
 - Branch `claude/otto-motion-1` (worktree `.claude/worktrees/otto-wave-1`), from `main` 29bf1bb2.
-- Commit eff4cf4d. NOT SHIPPED: waits for Franky's yes.
+- Commit eff4cf4d. **SHIPPED Nov 12** on Franky's "Ship motion 1": `main` fast-forwarded 29bf1bb2 → d753f404, Vercel deploy succeeded.
 
 ## What he said (Nov 12)
 "when clicking from settings/messages and the other tabs into otto it shows i have a draft? Also it is possible to
@@ -47,3 +47,9 @@ smoothens over to the next thing/tab/ whatever your clicking on, and same for wh
 - Known, left: Messages and Profile still load their content after they appear, so they slide in and then fill; the
   static profile fades in twice (the page's own fade-up after the cross-page fade); the panel shows "Opening your
   desk…" for a moment on first open; the static panel's pill isn't re-measured after a window resize.
+
+## Shipped (Nov 12)
+- Franky: "Ship motion 1". `main` fast-forwarded to d753f404; Vercel success (build `dpl_EtBrDLSoFpr3RHTUDGmxNNtTWEDT`).
+- Live checks, signed out: the site-wide CSS carries the view-transition styles; `/html/_otto.js` matches `main`.
+- Not checked: his walk on the live app (tab glides, moving into Otto, the panel opening and closing, Accept, a
+  reminder, clear + Undo, picking a look; and that the old draft is gone from his club desks).

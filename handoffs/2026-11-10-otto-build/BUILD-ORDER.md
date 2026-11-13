@@ -7,8 +7,8 @@
   done. Next: Franky's walks, the legacy cleanup about two weeks on, and Wave 3 piece by piece on his yes.
 - Nov 11: **Polish 1** (Franky's walk notes: closed ring, flat cards, fold + time filter, clear with Undo,
   name links, Messages buttons, cursor) SHIPPED (main 61d5ff0b; record `polish-1.md`).
-- Nov 12: **Motion 1** (app + Otto glides, panel open/close, happy feedback) and the old-draft fix BUILT on branch
-  `claude/otto-motion-1` (record `motion-1.md`); waits for his yes.
+- Nov 12: **Motion 1** (app + Otto glides, panel open/close, happy feedback) and the old-draft fix SHIPPED (main d753f404;
+  record `motion-1.md`).
 
 The idea behind the order: Otto's new look goes everywhere first (one small, look-only change), then the
 desk page on data the app already has, then the corner and side panel. Anything that needs a database
