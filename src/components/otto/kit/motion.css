@@ -1,0 +1,47 @@
+/* Happy feedback on Otto's desk (motion 1, Nov 12, 2026). src/lib/motion/feedback.ts puts these on and takes
+   them off; any desk piece may use them by class:
+   - dk-enter: rises in 8px (RISE_PX) and fades in, on SPRING_SOFT's twin.
+   - dk-leave: fades and slides out to the right, then the caller drops the row.
+   - dk-pop: a soft pop, 96% → 104% → 100% (a saved reminder's bar, a picked colour's Otto).
+   - dk-stamp lands (the halftone done stamp) when it, or the row around it, carries dk-land; a row with
+     dk-done-now gets the stamp laid over it (dk-done-mark) while its words dim.
+   - dk-say-stack: Otto's sky line crossfades (dk-say-in over dk-say-out).
+   Transform and opacity only; reduced motion turns every one of them off (the words carry the state). */
+
+@keyframes dk-enter{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+@keyframes dk-leave{from{opacity:1;transform:none}to{opacity:0;transform:translateX(24px)}}
+@keyframes dk-pop{0%{transform:scale(.96)}40%{transform:scale(1.04)}100%{transform:none}}
+@keyframes dk-stamp-land{0%{opacity:0;transform:rotate(-22deg) scale(1.6)}55%{opacity:1;transform:rotate(-6deg) scale(.94)}100%{opacity:1;transform:rotate(-8deg)}}
+@keyframes dk-dim{to{opacity:.28}}
+@keyframes dk-fade-in{from{opacity:0}to{opacity:1}}
+@keyframes dk-fade-out{from{opacity:1}to{opacity:0}}
+@keyframes dk-check-land{0%{opacity:0;transform:scale(.4)}60%{opacity:1;transform:scale(1.12)}100%{opacity:1;transform:none}}
+
+.dk-enter{animation:dk-enter 340ms var(--vibe-spring-soft) both}
+.dk-pop{animation:dk-pop 420ms var(--vibe-spring-soft)}
+.dk-land .dk-stamp,.dk-stamp.dk-land{animation:dk-stamp-land 520ms var(--vibe-spring-soft) both}
+.dk-check-land{animation:dk-check-land 360ms var(--vibe-spring-soft) both}
+
+/* The done moment: the row's words dim, the stamp lands on top (right side; centred on an open card). */
+.dk-done-mark{display:none}
+/* no taps on a row whose stamp is landing (the hooks free the other cards' buttons at once) */
+.dk-done-now{position:relative;pointer-events:none}
+.dk-done-now>:not(.dk-done-mark):not(.tx){animation:dk-dim 200ms ease-out forwards}
+.dk-done-now>.dk-done-mark{display:flex;position:absolute;inset:0;z-index:3;align-items:center;justify-content:flex-end;padding:0 16px;pointer-events:none}
+.dk-draft.dk-done-now:not(.mini)>.dk-done-mark{justify-content:center}
+.dk-done-now>.dk-done-mark>.dk-stamp{animation:dk-stamp-land 520ms var(--vibe-spring-soft) both;background:linear-gradient(var(--otto-ok-bg),var(--otto-ok-bg)),var(--otto-raise)}
+
+/* Last, so a leaving row leaves even mid-rise; the pile selectors beat a section's unfold (desk-fold-motion.css) on
+   the same row. */
+.dk-pile[data-fold]>.dk-enter{animation:dk-enter 340ms var(--vibe-spring-soft) both}
+.dk-leave,.dk-pile[data-fold]>.dk-leave{animation:dk-leave 220ms cubic-bezier(.4,0,1,1) forwards;pointer-events:none}
+
+.dk-say-stack{display:grid}
+.dk-say-stack>span{grid-area:1/1}
+.dk-say-in{animation:dk-fade-in 280ms ease-out both}
+.dk-say-out{animation:dk-fade-out 200ms ease-in forwards}
+
+@media (prefers-reduced-motion:reduce){
+  .dk-enter,.dk-pile[data-fold]>.dk-enter,.dk-pile[data-fold]>.dk-leave,.dk-pop,.dk-land .dk-stamp,.dk-stamp.dk-land,.dk-check-land,.dk-done-now>*,.dk-done-now>.dk-done-mark>.dk-stamp,.dk-leave,.dk-say-in,.dk-say-out{animation:none}
+  .dk-say-out{opacity:0}
+}

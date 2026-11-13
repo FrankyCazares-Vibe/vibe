@@ -5,7 +5,7 @@ import "./kit/desk.css";
 import "./otto-desk-computer.css";
 
 import { useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent } from "react";
 
 import type { OttoPayload } from "@/app/api/me/otto/route";
 import { DESK_AS_KEY } from "@/components/mobile/use-otto-desk";
@@ -20,6 +20,7 @@ import { OttoMetrics } from "./OttoMetrics";
 import { OttoPageLegacy } from "./OttoPageLegacy";
 import { OttoSettings } from "./OttoSettings";
 import { useOttoDesk } from "./use-otto-desk";
+import { arriveFrom, travel, usePillGlide } from "./otto-motion";
 
 /**
  * `/otto` on a computer: Otto's desk (Wave 2A, Nov 10, 2026; board D3).
@@ -42,6 +43,7 @@ const TABS: { id: Tab; label: string }[] = [
   { id: "settings", label: "Settings" },
 ];
 
+const TAB_ORDER: readonly Tab[] = TABS.map((t) => t.id);
 const tabId = (t: Tab) => `odc-tab-${t}`;
 const panelId = (t: Tab) => `odc-panel-${t}`;
 
@@ -102,6 +104,17 @@ function OttoDeskPage({ initial }: { initial: OttoPayload }) {
     [tab, setActiveTab],
   );
 
+  // Motion 1 (Nov 12): the ink pill glides to the tab picked, and the new
+  // tab's content fades in from the side it travels from (otto-motion.ts).
+  const pill = usePillGlide(tab);
+  const panelRef = useRef<HTMLDivElement | null>(null);
+  const shownTab = useRef(tab);
+  useLayoutEffect(() => {
+    const from = shownTab.current;
+    shownTab.current = tab;
+    if (from !== tab) arriveFrom(panelRef.current, travel(TAB_ORDER, from, tab));
+  }, [tab]);
+
   // No `?club=` in the link: the desk's own pick on this device (DESK_AS_KEY,
   // the phone's and the side panel's too), else the club this browser last
   // switched to (club-switch.ts), when it is "me" or a club you run. The side
@@ -149,7 +162,8 @@ function OttoDeskPage({ initial }: { initial: OttoPayload }) {
                 onClick={() => setActiveTab(t.id)}
                 onKeyDown={onTabKey}
               >
-                {t.label}
+                {tab === t.id ? <span ref={pill} className="odc-tab-pill" aria-hidden="true" /> : null}
+                <span className="odc-tab-tx">{t.label}</span>
               </button>
             ))}
           </div>
@@ -159,7 +173,7 @@ function OttoDeskPage({ initial }: { initial: OttoPayload }) {
           ) : null}
         </div>
 
-        <div id={panelId(tab)} role="tabpanel" aria-labelledby={tabId(tab)}>
+        <div ref={panelRef} id={panelId(tab)} role="tabpanel" aria-labelledby={tabId(tab)}>
         {tab === "stats" ? (
           <div className="odc-wide">
             <OttoMetrics club={desk?.actingAs ?? null} />

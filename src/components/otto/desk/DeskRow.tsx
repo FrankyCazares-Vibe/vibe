@@ -2,6 +2,7 @@
 
 import "../kit/sky.css";
 import "../kit/desk.css";
+import "../kit/motion.css";
 
 import Link from "next/link";
 import type { ReactNode } from "react";
@@ -162,7 +163,7 @@ export function DeskRow({ item, onVerb, busy }: DeskRowProps) {
   );
   if (item.verb) {
     return (
-      <div className="dk-row">
+      <div className="dk-row" data-dk-id={item.id}>
         {body}
         <DeskVerbButton item={item} verb={item.verb} onVerb={onVerb} busy={busy} />
       </div>
@@ -170,7 +171,7 @@ export function DeskRow({ item, onVerb, busy }: DeskRowProps) {
   }
   if (item.href) {
     return (
-      <DeskLinkRow item={item} href={item.href} className="dk-row">
+      <DeskLinkRow item={item} href={item.href} className="dk-row" dataId={item.id}>
         {body}
         <span className="dk-row-go" aria-hidden="true">
           <DeskIcon name="chevron" />
@@ -178,5 +179,9 @@ export function DeskRow({ item, onVerb, busy }: DeskRowProps) {
       </DeskLinkRow>
     );
   }
-  return <div className="dk-row">{body}</div>;
+  return (
+    <div className="dk-row" data-dk-id={item.id}>
+      {body}
+    </div>
+  );
 }

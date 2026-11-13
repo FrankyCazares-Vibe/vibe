@@ -13,12 +13,14 @@ import { ORG_REMOVALS_TABLE, isMissingRemovalsTable, removedIdSet } from "@/lib/
 
 import {
   DONE_DAYS,
+  DRAFT_MAX_DAYS,
   EARLIER_DAYS,
   buildDesk,
   chooseActingClub,
   type DeskClub,
   type DeskClubEvent,
   type DeskClubFacts,
+  type DeskDraft,
   type DeskInput,
   type DeskModel,
   type DeskMyEvent,
@@ -344,12 +346,16 @@ async function loadClubFacts(args: DeskLoadArgs, club: RunClub): Promise<Ok<Desk
       .gte("created_at", since)
       .order("created_at", { ascending: false })
       .limit(POSTS_MAX),
+    // This club's drafts only, from the last 30 days: a personal draft (no
+    // club) is the You desk's, and an old one is a leftover (Nov 12).
     supabase
       .from("posts")
       .select("id, content, created_at")
       .eq("user_id", userId)
       .eq("status", "draft")
-      .or(`org_id.is.null,org_id.eq.${club.orgId}`)
+      .eq("org_id", club.orgId)
+      .is("removed_at", null)
+      .gte("created_at", draftsSince(nowMs))
       .order("created_at", { ascending: false })
       .limit(DRAFTS_MAX),
     loadClubSetup(service, org),
@@ -378,6 +384,31 @@ async function loadClubFacts(args: DeskLoadArgs, club: RunClub): Promise<Ok<Desk
       joins: ((joinsRes.data ?? []) as { joined_at: string }[]).map((j) => j.joined_at),
     },
   };
+}
+
+/** The oldest a draft may be and still show (DRAFT_MAX_DAYS). */
+function draftsSince(nowMs: number): string {
+  return new Date(nowMs - DRAFT_MAX_DAYS * DAY_MS).toISOString();
+}
+
+/**
+ * The person's own personal drafts (no club) of the last 30 days, for the You
+ * desk. Their own client: posts' policies already keep a draft to its author.
+ */
+async function loadMyDrafts(args: DeskLoadArgs): Promise<Ok<DeskDraft[]> | Fail> {
+  const res = await args.supabase
+    .from("posts")
+    .select("id, content, created_at")
+    .eq("user_id", args.userId)
+    .eq("status", "draft")
+    .is("org_id", null)
+    .is("removed_at", null)
+    .gte("created_at", draftsSince(args.now.getTime()))
+    .order("created_at", { ascending: false })
+    .limit(DRAFTS_MAX);
+  if (res.error) return fail("my drafts", res.error);
+  type Row = { id: string; content: string | null; created_at: string };
+  return { ok: true, value: ((res.data ?? []) as Row[]).map((d) => ({ id: d.id, excerpt: d.content ?? "", createdAt: d.created_at })) };
 }
 
 type MyFacts = Pick<DeskInput, "going" | "checkedIn" | "rsvpsMade">;
@@ -491,16 +522,21 @@ export async function loadDesk(args: DeskLoadArgs): Promise<{ ok: true; desk: De
   const empty: MyFacts = { going: [], checkedIn: [], rsvpsMade: [] };
   let club: DeskClubFacts | null = null;
   let mine = empty;
+  // Personal drafts are read on both desks: the You desk shows them, and a
+  // club desk counts them as waiting "on your own desk".
+  let drafts: DeskDraft[] = [];
   if (acting) {
-    const facts = await loadClubFacts(args, acting);
-    if (!facts.ok) return { ok: false };
+    const [facts, myDrafts] = await Promise.all([loadClubFacts(args, acting), loadMyDrafts(args)]);
+    if (!facts.ok || !myDrafts.ok) return { ok: false };
     club = facts.value;
+    drafts = myDrafts.value;
   } else {
-    const facts = await loadMyFacts(args);
-    if (!facts.ok) return { ok: false };
+    const [facts, myDrafts] = await Promise.all([loadMyFacts(args), loadMyDrafts(args)]);
+    if (!facts.ok || !myDrafts.ok) return { ok: false };
     mine = facts.value;
+    drafts = myDrafts.value;
   }
 
-  const input: DeskInput = { clubs, actingAs: chosen, club, ...args.route, ...mine };
+  const input: DeskInput = { clubs, actingAs: chosen, club, ...args.route, ...mine, drafts };
   return { ok: true, desk: buildDesk(input, args.now) };
 }

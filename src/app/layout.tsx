@@ -1,5 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
+// Page moves: the view-transition snapshots' CSS (src/lib/motion/page-transition.tsx).
+import "@/lib/motion/view-transitions.css";
 import { headers } from "next/headers";
 
 import { BuildRefresh } from "@/components/build/BuildRefresh";

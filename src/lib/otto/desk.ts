@@ -89,7 +89,8 @@ export type DeskModel = {
   empty: { ready: string; scheduled: string; done: string; saw: string };
   /**
    * While acting as a club: how many things wait on the person's own desk
-   * (You: unread messages, follow-backs, undated reminders), from reads the
+   * (You: unread messages, follow-backs, undated reminders, their own
+   * personal drafts), from reads the
    * route already made. 0 on the You desk itself, where they are the Ready
    * pile (walk fix, Nov 11).
    */
@@ -113,6 +114,9 @@ export type DeskMyEvent = {
   orgHandle?: string | null;
   visibility?: string | null;
 };
+
+/** A post saved as a draft by the person, never published. */
+export type DeskDraft = { id: string; excerpt: string; createdAt: string };
 
 export type DeskReminder = { id: string; title: string; remindAt: string | null; createdAt?: string | null };
 
@@ -146,8 +150,11 @@ export type DeskClubFacts = {
   }[];
   /** Null when the club has no setup list (or it couldn't be read). */
   setup: { id: string; done: boolean }[] | null;
-  /** The officer's own drafts (author-only). */
-  drafts: { id: string; excerpt: string; createdAt: string }[];
+  /**
+   * The officer's own drafts for THIS club (author-only). Personal drafts
+   * (no club) belong on the You desk, never on a club's (draft fix, Nov 12).
+   */
+  drafts: DeskDraft[];
   /** Upcoming (not ended) and recent past events, for Up next, Scheduled and Done. */
   events: DeskClubEvent[];
   /** The club's newest post (Up next's thank-you); null none, undefined unknown. */
@@ -172,6 +179,12 @@ export type DeskInput = {
   rsvpsMade: (DeskMyEvent & { rsvpAt: string; status: "going" | "maybe" })[];
   notifications: DeskNotice[];
   /**
+   * The person's own personal drafts (posts with no club), for the You desk's
+   * Ready; read for officers too, so "on your own desk" counts them. Absent =
+   * none (draft fix, Nov 12).
+   */
+  drafts?: DeskDraft[];
+  /**
    * The route's own reads that failed (its `failed[]`: "dms", "asking",
    * "upcoming", "activity"). A student desk missing them must never say
    * "all clear" (Wave 2A review M1).
@@ -185,6 +198,12 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 /** Done this week: the last 7 days. Earlier: 8 to 30 days ago. */
 export const DONE_DAYS = 7;
 export const EARLIER_DAYS = 30;
+/**
+ * A draft saved more than this many days ago is a leftover, not something
+ * waiting on the person: it never shows (draft fix, Nov 12; the composer
+ * stopped making drafts and one old one sat on every club's Ready).
+ */
+export const DRAFT_MAX_DAYS = 30;
 /** Another person's count shows to a non-officer only from this many up. */
 export const COUNT_FLOOR = 5;
 
@@ -399,8 +418,20 @@ function setupItem(club: DeskClub, facts: DeskClubFacts): DeskItem | null {
   };
 }
 
-function draftItems(facts: DeskClubFacts, nowMs: number): DeskItem[] {
-  return facts.drafts.map((d) => {
+/** Drafts saved in the last 30 days, newest first; none with an unreadable date, or one more than a day ahead
+ *  (a day of clock skew between the server and the database is let through). */
+export function freshDrafts(drafts: readonly DeskDraft[] | undefined, nowMs: number): DeskDraft[] {
+  const oldest = nowMs - DRAFT_MAX_DAYS * DAY_MS;
+  return (drafts ?? [])
+    .filter((d) => {
+      const at = ms(d.createdAt);
+      return Number.isFinite(at) && at >= oldest && at <= nowMs + DAY_MS;
+    })
+    .sort((a, b) => ms(b.createdAt) - ms(a.createdAt));
+}
+
+function draftItems(drafts: readonly DeskDraft[] | undefined, nowMs: number): DeskItem[] {
+  return freshDrafts(drafts, nowMs).map((d) => {
     const at = ms(d.createdAt);
     const href = `/posts/${encodeURIComponent(d.id)}`;
     return {
@@ -423,7 +454,7 @@ function officerReady(club: DeskClub, facts: DeskClubFacts, nowMs: number): Desk
     ...joinRequestItems(club, facts, nowMs),
     ...(upNext ? [upNext] : []),
     ...(setup ? [setup] : []),
-    ...draftItems(facts, nowMs),
+    ...draftItems(facts.drafts, nowMs),
   ];
 }
 
@@ -466,6 +497,8 @@ function studentReady(input: DeskInput, nowMs: number): DeskItem[] {
       whenLabel: reminderLabel(null, nowMs),
     });
   }
+  // Personal drafts (no club) wait here, on the You desk only (Nov 12).
+  items.push(...draftItems(input.drafts, nowMs));
   return items;
 }
 

@@ -20,4 +20,6 @@
 /* Every loop and pop stops under reduced motion (the inline pop included). */
 @media (prefers-reduced-motion: reduce) {
   #otto-corner { animation: none !important; }
+  /* The press shrink (and the wait's 94%) lands at once, no 160 ms ease. */
+  #otto-corner, #otto-corner * { transition: none !important; }
 }

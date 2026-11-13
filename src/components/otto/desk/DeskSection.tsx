@@ -3,9 +3,11 @@
 import "../kit/sky.css";
 import "../kit/desk.css";
 import "./desk-lists.css";
+import "./desk-fold-motion.css";
 
 import { useEffect, useId, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 
+import { prefersReducedMotion } from "@/components/otto/otto-motion";
 import { fewOf, readFolds, writeFold } from "@/lib/otto/desk-lists";
 import type { UndoToast } from "@/lib/otto/clear-notifications";
 import type { DeskItem } from "@/lib/otto/desk";
@@ -93,6 +95,11 @@ export type DeskSectionProps = {
   children?: ReactNode;
 };
 
+/** How long folding rows take to fade out before the pile closes (desk-fold-motion.css dk-fold-out). */
+const FOLD_OUT_MS = 140;
+/** The unfold's rise with its stagger, after which the pile drops data-fold. */
+const FOLD_IN_MS = 520;
+
 const Chevron = () => (
   <svg className="dk-ico dk-fold-chev" viewBox="0 0 24 24" aria-hidden="true">
     <path d="M6 9l6 6 6-6" />
@@ -105,6 +112,33 @@ export function DeskSection({ title, count, empty, level = 2, className, id, fol
   const [folded, setFolded] = useDeskFold(foldKey);
   const H = level === 3 ? "h3" : "h2";
   const showEmpty = count === 0 && empty;
+
+  // Motion 1 (Nov 12): unfolding, the rows fade and rise in a beat after one
+  // another; folding, they fade up and out quickly, then the pile closes.
+  // No height moves (desk-fold-motion.css). Reduce motion: it just opens and closes.
+  const [fold, setFold] = useState<"in" | "out" | null>(null);
+  const foldTimer = useRef<number | undefined>(undefined);
+  useEffect(() => () => window.clearTimeout(foldTimer.current), []);
+  const toggleFold = () => {
+    window.clearTimeout(foldTimer.current);
+    if (folded) {
+      setFold("in");
+      setFolded(false);
+      // Then the rows are just rows again (a row leaving after Accept plays its own motion).
+      foldTimer.current = window.setTimeout(() => setFold(null), FOLD_IN_MS);
+    } else if (fold === "out") {
+      setFold(null);
+    } else if (prefersReducedMotion()) {
+      setFold(null);
+      setFolded(true);
+    } else {
+      setFold("out");
+      foldTimer.current = window.setTimeout(() => {
+        setFold(null);
+        setFolded(true);
+      }, FOLD_OUT_MS);
+    }
+  };
   return (
     <section id={id} className={className} aria-labelledby={headingId}>
       <div className={foldKey ? "dk-sec dk-sec-fold" : "dk-sec"}>
@@ -113,9 +147,9 @@ export function DeskSection({ title, count, empty, level = 2, className, id, fol
             <button
               type="button"
               className="dk-fold"
-              aria-expanded={!folded}
+              aria-expanded={!folded && fold !== "out"}
               aria-controls={pileId}
-              onClick={() => setFolded(!folded)}
+              onClick={toggleFold}
             >
               <span>{title}</span>
               <b>{count}</b>
@@ -130,7 +164,7 @@ export function DeskSection({ title, count, empty, level = 2, className, id, fol
         )}
         {tools && !folded ? <div className="dk-sec-tools">{tools}</div> : null}
       </div>
-      <div id={pileId} className="dk-pile" hidden={folded}>
+      <div id={pileId} className="dk-pile" hidden={folded} data-fold={fold ?? undefined}>
         {showEmpty ? <DeskEmpty line={empty} /> : children}
         {(more || foot) && !showEmpty ? (
           <div className="dk-pile-foot">

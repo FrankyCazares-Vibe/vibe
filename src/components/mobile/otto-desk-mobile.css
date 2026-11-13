@@ -46,8 +46,10 @@
 /* the strip: four tabs in a raised well, the open one in ink (never coral). Sticks under the folded bar */
 .odm-strip{position:sticky;top:calc(60px + env(safe-area-inset-top,0px));z-index:30;background:var(--cream);padding:10px 16px 6px}
 .odm-seg{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:4px;padding:4px;border-radius:16px;background:var(--otto-raise);isolation:isolate}
-.odm-seg button{position:relative;height:44px;border:0;border-radius:12px;background:none;color:var(--ink-2);font:600 14px/1 var(--font-body);padding:0;cursor:pointer;-webkit-tap-highlight-color:transparent}
-.odm-seg button[aria-selected="true"]{color:var(--cream);font-weight:700;z-index:1}
+.odm-seg button{position:relative;height:44px;border:0;border-radius:12px;background:none;color:var(--ink-2);font:600 14px/1 var(--font-body);padding:0;cursor:pointer;-webkit-tap-highlight-color:transparent;transition:color .26s ease}
+/* no z-index on the open tab: the pill stays in the strip's one layer, under every label (z 2), so its glide never
+   covers the tab it leaves; the words change colour over the glide (motion 1 repair) */
+.odm-seg button[aria-selected="true"]{color:var(--cream);font-weight:700}
 .odm-seg button:focus-visible{outline:2px solid var(--charcoal);outline-offset:2px}
 .odm-seg-pill{position:absolute;inset:0;border-radius:12px;background:var(--charcoal);transform-origin:0 50%;pointer-events:none}
 .odm-seg-tx{position:relative;z-index:2}
@@ -55,7 +57,7 @@
 /* the panes: side by side under the one page scroll, swiped or tapped */
 .odm-panes{display:flex;overflow-x:auto;overflow-y:hidden;scroll-snap-type:x mandatory;scrollbar-width:none;width:100%}
 .odm-panes::-webkit-scrollbar{display:none}
-.odm-pane{position:relative;flex:0 0 100%;min-width:0;scroll-snap-align:start;box-sizing:border-box;padding:0 16px 24px;display:flex;flex-direction:column;gap:6px}
+.odm-pane{position:relative;flex:0 0 100%;min-width:0;scroll-snap-align:start;scroll-snap-stop:always;box-sizing:border-box;padding:0 16px 24px;display:flex;flex-direction:column;gap:6px}
 .odm-pane>*{flex:none}
 .odm-pane .dk-sec{padding-top:14px}
 /* Stats and Settings bring their own 16px column; the pane already gives it, so they line up with the desk cards */
@@ -78,7 +80,7 @@
 .odm-ask-hint b{color:var(--charcoal);font-weight:600}
 
 @media (prefers-reduced-motion:reduce){
-  .odm-fold,.odm-as{transition:none}
+  .odm-fold,.odm-as,.odm-seg button{transition:none}
   .odm-fold{transform:none}
   .odm-as:active{transform:none}
 }

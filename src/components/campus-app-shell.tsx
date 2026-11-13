@@ -6,6 +6,7 @@ import type { ReactNode } from "react";
 import LeftNav from "@/components/LeftNav";
 import { MobileTabBar } from "@/components/mobile/MobileTabBar";
 import { OttoCorner } from "@/components/network/OttoCorner";
+import { PageTransition, StayPut } from "@/lib/motion/page-transition";
 
 type Props = {
   children: ReactNode;
@@ -41,6 +42,10 @@ type Props = {
  * hide via CSS — see globals.css `.vibe-app-shell` rules. Note: as we
  * fork individual routes to use the new MobileShell + dedicated
  * mobile components, this legacy path will be retired per-route.
+ *
+ * Page moves (Nov 12, 2026): the page content and the right rail glide in on
+ * a tab change (PageTransition); the left menu, the tab bar and the Otto
+ * corner stay put (StayPut; the menu and the bar name themselves).
  */
 export function CampusAppShell({ children, sidebar, pageTabBar = false, campusHref }: Props) {
   const pathname = usePathname();
@@ -57,15 +62,21 @@ export function CampusAppShell({ children, sidebar, pageTabBar = false, campusHr
         .join(" ")}
     >
       <LeftNav campusHref={campusHref} />
-      {children}
-      {sidebar ? <div className="vibe-right-rail">{sidebar}</div> : null}
+      <PageTransition>
+        {children}
+        {sidebar ? <div className="vibe-right-rail">{sidebar}</div> : null}
+      </PageTransition>
       {pageTabBar ? null : <MobileTabBar />}
       {/* `display: contents`, so the orb, its panel and its toast are still
           the shell's own fixed layers; the class lets a club page stand them
           down under its dialogs (globals.css). */}
       {showOttoCorner ? (
         <div className="vibe-shell-otto">
-          <OttoCorner />
+          {/* Inside the wrapper: it is display: contents, so the name goes
+              on the corner's own fixed parts, which have boxes. */}
+          <StayPut name="vibe-otto-corner">
+            <OttoCorner />
+          </StayPut>
         </div>
       ) : null}
     </div>

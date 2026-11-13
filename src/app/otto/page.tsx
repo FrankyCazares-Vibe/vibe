@@ -1,4 +1,3 @@
-import { Suspense } from "react";
 import { redirect } from "next/navigation";
 
 import { enforceCampusAccess } from "@/lib/auth/campus-access";
@@ -58,17 +57,18 @@ export default async function OttoPage({
 
   const payload = await res.json();
 
-  // Suspense boundary: OttoPageClient reads useSearchParams (for the ?tab=
-  // tab state and the desk's ?club=), which Next 16 requires to be inside a
-  // Suspense — otherwise any URL with searchParams forces the whole route
-  // into client-render.
+  // No Suspense boundary here (motion 1 repair, Nov 12, 2026). OttoPageClient
+  // reads useSearchParams, which needs one only on a statically prerendered
+  // route; this one is dynamic (it reads headers and searchParams above), so
+  // the hook simply works. A boundary here broke the move into Otto: its
+  // `next/dynamic` screens suspend inside it while their code arrives, and a
+  // fresh boundary shows its fallback (nothing: the whole screen, menu and
+  // tab bar included, went blank for ~300 ms) instead of holding the page
+  // you came from, and the page move never ran. Without it the router keeps
+  // the old page up until Otto is ready, then glides over.
   //
   // `firstGuessPhone` is the server's guess at the screen this device needs
   // (src/lib/device-hint.ts), from the headers already read above. OttoSwitch
   // builds that screen here and the browser fetches only that one.
-  return (
-    <Suspense fallback={null}>
-      <OttoSwitch initial={payload} firstGuessPhone={isPhoneRequest(h)} desk={desk} />
-    </Suspense>
-  );
+  return <OttoSwitch initial={payload} firstGuessPhone={isPhoneRequest(h)} desk={desk} />;
 }

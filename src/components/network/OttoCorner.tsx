@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { useMiniMessages } from "@/components/desktop/messages/MiniMessenger";
+import { scaleFrom } from "@/components/otto/otto-motion";
 import { OttoPlanet } from "@/components/otto/planet/OttoPlanet";
 
 import { OttoSidePanel, useOttoDeskFlag } from "./OttoSidePanel";
@@ -185,6 +186,18 @@ export function OttoCorner() {
     prevUnreadRef.current = unread;
   }, [unread]);
 
+  // Motion 1 (Nov 12): opening the panel, Planet gives one small happy
+  // bounce (from a touch small, on SPRING_POP); closing, he settles back
+  // (SPRING_SOFT). Not on the first paint; nothing under reduce motion.
+  const planetRef = useRef<HTMLSpanElement | null>(null);
+  const wasOpen = useRef(open);
+  useEffect(() => {
+    if (wasOpen.current === open) return;
+    wasOpen.current = open;
+    if (open) scaleFrom(planetRef.current, 0.84);
+    else scaleFrom(planetRef.current, 1.06, "soft");
+  }, [open]);
+
   // Opened while the desk flag is still out: the panel shows once it answers.
   const flagWait = open && deskOn === null;
   // While it waits, no panel is drawn to hear Escape: the corner hears it,
@@ -291,6 +304,7 @@ export function OttoCorner() {
           eye bigger and his coral moon at the ring's raised right end, no
           separate dot. Reduced motion holds him still, the moon parked. */}
       <span
+        ref={planetRef}
         style={{
           position: "absolute",
           inset: 0,

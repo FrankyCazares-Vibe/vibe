@@ -3,6 +3,7 @@
 import type { ReactNode } from "react";
 
 import { MobileTabBar } from "@/components/mobile/MobileTabBar";
+import { PageTransition } from "@/lib/motion/page-transition";
 
 type Props = {
   children: ReactNode;
@@ -21,6 +22,9 @@ type Props = {
  * Pages using this shell are the ones that have been forked into the
  * `src/components/mobile/*` tree. The legacy CampusAppShell still
  * handles the routes that haven't been forked yet.
+ *
+ * The page glides in on a tab change (PageTransition, Nov 12, 2026); the
+ * tab bar stays put (it is its own StayPut, in MobileTabBar).
  */
 export function MobileShell({ children }: Props) {
   return (
@@ -35,7 +39,7 @@ export function MobileShell({ children }: Props) {
         paddingBottom: "calc(64px + env(safe-area-inset-bottom, 0px))",
       }}
     >
-      {children}
+      <PageTransition>{children}</PageTransition>
       <MobileTabBar />
     </div>
   );

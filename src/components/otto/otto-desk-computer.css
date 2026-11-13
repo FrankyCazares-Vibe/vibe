@@ -2,8 +2,9 @@
    part (sky, sections, cards, drafts, rows, stamps, the ask bar) comes from kit/sky.css and kit/desk.css. A plain
    page (--cream, no glow, nothing dims it), the sky band, then three columns sized like the board at 1440 wide
    (456 | 336 | 352, 24 apart, in the 1240px the left menu leaves). Narrower windows fold Done + Earlier under
-   Scheduled. Light is the plain rule, Night under the app's dark selectors. Still: no keyframes; the one
-   transition is the menu chevron, off under reduced motion. Markup: OttoPageClient.tsx and OttoDesk*.tsx. */
+   Scheduled. Light is the plain rule, Night under the app's dark selectors. No keyframes here; the tab pill's glide and
+   the content's arrival are script (otto-motion.ts, nothing under reduced motion); the transitions are the tab words' colour and the menu
+   chevron, off under reduced motion. Markup: OttoPageClient.tsx and OttoDesk*.tsx. */
 
 .odc-page{--otto-raise:#F2EFE9;--otto-line-2:rgba(28,28,30,.15);min-height:100vh;min-width:0;background:var(--cream);color:var(--charcoal);font-family:var(--font-body)}
 :root[data-theme="dark"] .odc-page,.vibe-night-island .odc-page{--otto-raise:#1F1D1C;--otto-line-2:rgba(255,255,255,.16)}
@@ -12,10 +13,17 @@
 
 /* the row under the band: tabs on the left, Acting as on the right */
 .odc-bar{display:flex;align-items:center;justify-content:space-between;gap:16px;margin:16px 0 4px}
-.odc-tabs{display:flex;padding:3px;border-radius:999px;background:var(--otto-raise)}
+.odc-tabs{display:flex;padding:3px;border-radius:999px;background:var(--otto-raise);isolation:isolate}
 /* 44px targets; the open tab in ink (never coral), as on the phone strip and D4's segment, so it reads in Night too */
 .odc-tab{height:44px;padding:0 20px;border:0;border-radius:999px;background:none;color:var(--ink-2);font:500 14px/1 var(--font-body);cursor:pointer}
-.odc-tab.on{background:var(--charcoal);color:var(--cream);font-weight:700}
+/* the words change colour over the pill's glide (not at once), so neither label vanishes mid-glide; the pill sits in
+   the strip's one layer (isolation on .odc-tabs), under every label (motion 1 repair) */
+.odc-tab{position:relative;transition:color .26s ease}
+.odc-tab.on{color:var(--cream);font-weight:700}
+/* the open tab's ink is one pill inside it that glides from the tab left (otto-motion.ts, motion 1, Nov 12):
+   transform only, from the left edge; the words sit above it */
+.odc-tab-pill{position:absolute;inset:0;z-index:-1;border-radius:999px;background:var(--charcoal);transform-origin:0 50%;pointer-events:none}
+.odc-tab-tx{position:relative}
 .odc-tab:focus-visible{outline:2px solid var(--charcoal);outline-offset:2px}
 
 /* Acting as: the chip and its small menu */
@@ -82,4 +90,4 @@ a.odc-saw:focus-visible{outline:2px solid var(--charcoal);outline-offset:-2px;bo
 /* a quiet note under a pile that only partly loaded */
 .odc-note{margin:6px 4px 0;font-size:13px;line-height:1.4;color:var(--ink-2)}
 
-@media (prefers-reduced-motion:reduce){.odc-as-chev{transition:none}}
+@media (prefers-reduced-motion:reduce){.odc-as-chev,.odc-tab{transition:none}}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 
 /**
  * Clear with Undo (Otto polish, Nov 11, 2026; Franky: "maybe people also want
@@ -228,6 +228,22 @@ export function createUndoClear(deps: UndoClearDeps = {}): UndoClear {
 
 // ── The hook ────────────────────────────────────────────────────────────────
 
+/**
+ * How cleared rows move (motion 1, Nov 12): src/lib/motion/feedback.ts sets
+ * this when it loads (the desk hooks load it), so this file stays plain under
+ * node --test. Unset, a clear is instant. `leave` slides the rows of these
+ * desk ids out (or the one clicked), then calls `then` with their list;
+ * `restored` makes Undo's rows rise back into that list.
+ */
+export type ClearMotion = {
+  leave: (deskIds: string[], all: boolean, then: (root: Element | null) => void) => void;
+  restored: (root: Element | null) => void;
+};
+let clearMotion: ClearMotion | null = null;
+export function setClearMotion(m: ClearMotion | null): void {
+  clearMotion = m;
+}
+
 const SERVER_SNAPSHOT: UndoSnapshot = { hidden: new Set(), toast: null };
 
 /**
@@ -250,12 +266,31 @@ export function useUndoClear(opts: { onCommitted?: (arg: ClearArg) => void; dela
       store.flush(true);
     };
   }, [store]);
+  // Motion 1 (Nov 12): cleared rows fade and slide out before they hide, and
+  // Undo's rows rise back in, when the page has the motion (ClearMotion).
+  const listRoot = useRef<Element | null>(null);
+  const clear = useCallback(
+    (arg: ClearArg, shown?: readonly string[]) => {
+      if (!clearMotion) return store.clear(arg, shown);
+      const all = "all" in arg && arg.all === true;
+      const ids = (all ? (shown ?? []) : (arg as { ids: string[] }).ids).map((id) => `${NOTICE_PREFIX}${id}`);
+      clearMotion.leave(ids, all, (root) => {
+        if (root) listRoot.current = root;
+        store.clear(arg, shown);
+      });
+    },
+    [store],
+  );
+  const undo = useCallback(() => {
+    clearMotion?.restored(listRoot.current);
+    store.undo();
+  }, [store]);
   return {
     hidden: snap.hidden,
     toast: snap.toast,
     isHidden: (id: string) => snap.hidden.has(id),
-    clear: store.clear,
-    undo: store.undo,
+    clear,
+    undo,
     dismiss: store.dismiss,
   };
 }

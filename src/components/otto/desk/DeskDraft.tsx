@@ -2,6 +2,7 @@
 
 import "../kit/sky.css";
 import "../kit/desk.css";
+import "../kit/motion.css";
 
 import Link from "next/link";
 
@@ -101,7 +102,7 @@ export function DeskDraft({ item, open = true, onVerb, busy, foot }: DeskDraftPr
 
   if (!open) {
     return (
-      <article className="tx-host dk-draft mini" aria-label={item.title}>
+      <article className="tx-host dk-draft mini" aria-label={item.title} data-dk-id={item.id}>
         <i className="tx tx-blueprint" aria-hidden="true" />
         <div className="dk-row">
           <span className="dk-row-ic">
@@ -135,7 +136,7 @@ export function DeskDraft({ item, open = true, onVerb, busy, foot }: DeskDraftPr
   const detail = item.kind === "join_request" && lines.length > 0 ? undefined : item.detail;
 
   return (
-    <article className="tx-host dk-draft" aria-label={item.title}>
+    <article className="tx-host dk-draft" aria-label={item.title} data-dk-id={item.id}>
       <i className="tx tx-blueprint" aria-hidden="true" />
       {tag ? (
         <div className="dk-draft-as">

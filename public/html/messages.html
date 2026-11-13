@@ -33,6 +33,23 @@
   }
 }
 </style>
+<style>
+/* Page moves (motion 1, Nov 12, 2026): a full load between this page and the
+   app's pages crossfades, the browser's own cross-document view transition
+   (the app carries the same rule, src/lib/motion/view-transitions.css). CSS
+   only, opacity only; with reduce motion on, the page simply changes. */
+@media (prefers-reduced-motion: no-preference) {
+  @view-transition { navigation: auto; }
+}
+::view-transition-old(root) { animation: 140ms ease-in both vibe-vt-fade-out; }
+::view-transition-new(root) { animation: 220ms ease-out both vibe-vt-fade-in; }
+@keyframes vibe-vt-fade-out { to { opacity: 0; } }
+@keyframes vibe-vt-fade-in { from { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*), ::view-transition-new(*) { animation: none !important; }
+  ::view-transition-old(*) { animation: none !important; opacity: 0; }
+}
+</style>
 <script src="/html/_persistence.js"></script>
 <!-- Shown in the React Messages page's frame, this only defines
      __vibeCountOpen: that page checks in for the tab. Before _otto.js,

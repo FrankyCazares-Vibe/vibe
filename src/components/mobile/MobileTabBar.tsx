@@ -3,13 +3,15 @@
 import { motion } from "motion/react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState, type CSSProperties } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
 
 import { activeMobileTab, isClubPath, type MobileTabHref } from "@/components/mobile/mobile-tab-active";
 import { ClubSwitcherSheet } from "@/components/orgs/ClubSwitcherSheet";
 import { OttoPlanet } from "@/components/otto/planet/OttoPlanet";
 import { ClubLogo } from "@/components/profile/ClubFlair";
 import { useLongPress } from "@/lib/hooks/use-long-press";
+import { glideMarker } from "@/lib/motion/nav-glide";
+import { navTransitionTypes, StayPut } from "@/lib/motion/page-transition";
 import { SPRING_SNAPPY } from "@/lib/motion/springs";
 import { sameHandle, setSwitchedClub, useClubsYouRun, useSwitchedClub } from "@/lib/orgs/club-switch";
 
@@ -136,7 +138,30 @@ let lastLitHref: MobileTabHref | null | undefined;
 export function MobileTabBar() {
   const pathname = usePathname() ?? "";
   const switched = useSwitchedClub();
-  const activeHref = activeMobileTab(pathname, switched?.handle);
+  const litHref = activeMobileTab(pathname, switched?.handle);
+  // A plain tap lights the tapped tab at once (Nov 12, 2026, motion 1), so
+  // the coral mark sets off on the tap, not when the next page arrives; that
+  // page's bar carries the glide on (nav-glide.ts). If no page arrives, the
+  // mark goes back.
+  const [pendingHref, setPendingHref] = useState<MobileTabHref | null>(null);
+  useEffect(() => {
+    if (!pendingHref) return;
+    const t = window.setTimeout(() => setPendingHref(null), 5_000);
+    return () => window.clearTimeout(t);
+  }, [pendingHref]);
+  const activeHref = pendingHref ?? litHref;
+  const litIndex = MOBILE_TABS.findIndex((t) => t.href === litHref);
+  // The mark is the lit tab's ::before (globals.css); it glides from the tab
+  // it left, a transform on the pseudo-element only.
+  const navRef = useRef<HTMLElement | null>(null);
+  useLayoutEffect(() => {
+    const slot = navRef.current?.querySelector<HTMLElement>(".vibe-mobile-tab--active") ?? null;
+    glideMarker(
+      "tab-bar",
+      "x",
+      slot ? { slot, mark: slot, pseudoElement: "::before", rest: "translateX(-50%)" } : null,
+    );
+  }, [activeHref]);
   const settle = lastLitHref !== undefined && activeHref !== lastLitHref;
   useEffect(() => {
     lastLitHref = activeHref;
@@ -156,8 +181,10 @@ export function MobileTabBar() {
 
   return (
     <>
-    <nav className="vibe-mobile-tabbar" aria-label="Primary">
-      {MOBILE_TABS.map((item) => {
+    {/* Stays put while the page glides (page-transition.tsx). */}
+    <StayPut name="vibe-tab-bar">
+    <nav ref={navRef} className="vibe-mobile-tabbar" aria-label="Primary">
+      {MOBILE_TABS.map((item, i) => {
         const active = item.href === activeHref;
         const isProfile = item.href === "/profile";
         const asClub = isProfile ? switched : null;
@@ -176,7 +203,13 @@ export function MobileTabBar() {
             key={item.href}
             id={id}
             href={href}
+            // The page slides in from this tab's side (page-transition.tsx).
+            transitionTypes={navTransitionTypes(litIndex, i)}
             {...(isProfile ? hold : {})}
+            onClick={(e) => {
+              if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+              if (item.href !== litHref) setPendingHref(item.href);
+            }}
             className={
               active
                 ? "vibe-mobile-tab vibe-mobile-tab--active vibe-press"
@@ -185,7 +218,7 @@ export function MobileTabBar() {
             // A club page sits inside Campus, and /profile/<handle> inside
             // Profile, without being that page, so there the lit tab is
             // just "true".
-            aria-current={active ? (onOwnPage ? "page" : "true") : undefined}
+            aria-current={item.href === litHref ? (onOwnPage ? "page" : "true") : undefined}
           >
             {/* The lit tab's icon settles in from 0.9 (Oct 18, 2026, motion
                 pass). Keyed on the state, so it plays when a tab lights in
@@ -211,6 +244,7 @@ export function MobileTabBar() {
         );
       })}
     </nav>
+    </StayPut>
     <ClubSwitcherSheet open={switcherOpen} onClose={() => setSwitcherOpen(false)} />
     </>
   );

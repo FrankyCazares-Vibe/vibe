@@ -1,8 +1,11 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import "./kit/motion.css";
+
+import { useRef, useState, type FormEvent } from "react";
 
 import { vibeRequest } from "@/lib/feedback/request";
+import { pop, riseNew } from "@/lib/motion/feedback";
 import { parseReminder } from "@/lib/otto/parse-reminder";
 import { CAMPUS_TIME_ZONE } from "@/lib/push/event-notice";
 
@@ -13,6 +16,9 @@ import { CAMPUS_TIME_ZONE } from "@/lib/push/event-notice";
  * POST /api/me/otto/reminders. It never says "ask otto": there is no model
  * to ask yet, and nothing delivers a reminder, so the line under the field
  * says only what gets saved and when it is for.
+ *
+ * Motion 1 (Nov 12): once saved, the bar gives a soft pop and the new row
+ * rises into the desk when it reloads (feedback.ts; still under reduced motion).
  */
 
 const WHEN = new Intl.DateTimeFormat("en-US", {
@@ -27,6 +33,7 @@ const WHEN = new Intl.DateTimeFormat("en-US", {
 export function OttoDeskAsk({ onSaved, className }: { onSaved: () => void; className?: string }) {
   const [value, setValue] = useState("");
   const [busy, setBusy] = useState(false);
+  const form = useRef<HTMLFormElement>(null);
   const text = value.trim();
   const parsed = text ? parseReminder(text) : null;
 
@@ -43,6 +50,8 @@ export function OttoDeskAsk({ onSaved, className }: { onSaved: () => void; class
     setBusy(false);
     if (!r.ok) return;
     setValue("");
+    pop(form.current);
+    riseNew(form.current?.closest("main") ?? document.body);
     onSaved();
   }
 
@@ -54,7 +63,7 @@ export function OttoDeskAsk({ onSaved, className }: { onSaved: () => void; class
       : `Saves ${title ? `“${title}”` : "a reminder"} with no date.`;
 
   return (
-    <form className={["dk-ask", className].filter(Boolean).join(" ")} onSubmit={submit}>
+    <form ref={form} className={["dk-ask", className].filter(Boolean).join(" ")} onSubmit={submit}>
       <div className="odc-ask-row">
         <input
           type="text"

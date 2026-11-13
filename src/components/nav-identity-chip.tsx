@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import { YourClubsMenu } from "@/components/orgs/YourClubsMenu";
 import { campusRowById } from "@/lib/iu/campuses";
@@ -114,8 +114,18 @@ function SchoolStrip({ paint }: { paint: string | null }) {
 /**
  * Sidebar “you” card: banner preview + avatar + name (from profile-bootstrap).
  */
+/** The last card in this tab. Every page draws its own menu, so a new card
+ *  starts from it (and re-reads) instead of flashing its loading skeleton on
+ *  every page move (motion 1 repair, Nov 12, 2026). Null in each new
+ *  document, so the first paint matches the server's. */
+let lastChip: ChipState | null = null;
+
 export function NavIdentityChip() {
-  const [chip, setChip] = useState<ChipState>({ status: "loading" });
+  const [chip, setChipState] = useState<ChipState>(() => lastChip ?? { status: "loading" });
+  const setChip = useCallback((next: ChipState) => {
+    lastChip = next;
+    setChipState(next);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -166,7 +176,7 @@ export function NavIdentityChip() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [setChip]);
 
   // One frame in every state (Oct 21, 2026): "Your clubs" sits inside the
   // card under my name, and a link can't hold a button, so the card is a

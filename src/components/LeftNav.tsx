@@ -3,7 +3,7 @@
 import { motion, useMotionTemplate, useMotionValue, useSpring } from "framer-motion";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
 import {
@@ -32,6 +32,8 @@ import {
 } from "@/lib/calendar/calendar-sync";
 import { CAL_MIN_DAY_HEIGHT, chipsThatFit, monthRowCount, rowHeightFor } from "@/lib/calendar/month-layout";
 import { downloadFile, vibeRequest } from "@/lib/feedback/request";
+import { glideMarker } from "@/lib/motion/nav-glide";
+import { navTransitionTypes, StayPut } from "@/lib/motion/page-transition";
 
 /** Site-wide "the calendar changed" (Oct 19, 2026: it now also reaches the
  *  Otto-corner window and the viewer's other tabs, calendar-sync.ts). Kept
@@ -181,9 +183,15 @@ export const VIBE_NAV_ITEMS: VibeNavItem[] = navItems;
  * included), the job their own "Return to Organizations" did before they
  * moved into this frame.
  */
+/** The last admin answer in this tab. Every page draws its own menu, so a
+ *  new one starts from it instead of hiding the Admin row until its own read
+ *  answers (the row blinked on each page move, motion 1 repair). Starts
+ *  false in each document, so the first paint matches the server's. */
+let lastIsPlatformAdmin = false;
+
 export default function LeftNav({ campusHref }: { campusHref?: string } = {}) {
   const pathname = usePathname();
-  const [isPlatformAdmin, setIsPlatformAdmin] = useState(false);
+  const [isPlatformAdmin, setIsPlatformAdmin] = useState(() => lastIsPlatformAdmin);
 
   // Cursor-tracking glow inside the sidebar. mouseX/mouseY hold the raw
   // pointer position relative to the aside; the spring versions smooth
@@ -235,8 +243,9 @@ export default function LeftNav({ campusHref }: { campusHref?: string } = {}) {
         });
         const data = await res.json();
         if (cancelled) return;
-        if (data?.ok && data.isPlatformAdmin === true) {
-          setIsPlatformAdmin(true);
+        if (data?.ok) {
+          lastIsPlatformAdmin = data.isPlatformAdmin === true;
+          setIsPlatformAdmin(lastIsPlatformAdmin);
         }
       } catch {
         /* unauthenticated / network — silently leave admin link hidden */
@@ -247,7 +256,35 @@ export default function LeftNav({ campusHref }: { campusHref?: string } = {}) {
     };
   }, []);
 
+  // Which item is lit (Nov 12, 2026, motion 1). A club's pages (/orgs/…)
+  // sit under Campus, as on the phone's tab bar (mobile-tab-active.ts): the
+  // left menu is their frame too since Oct 21, 2026. A plain click lights
+  // the clicked item at once (`pendingHref`), so the pill sets off on the
+  // click, not when the next page arrives; that page's menu carries the
+  // glide on (nav-glide.ts). If no page arrives, the pill goes back.
+  const litIndex = navItems.findIndex(
+    (item) =>
+      pathname === item.href ||
+      (item.href !== "/" && pathname.startsWith(`${item.href}/`)) ||
+      (item.href === "/campus" && (pathname === "/orgs" || pathname.startsWith("/orgs/"))),
+  );
+  const [pendingHref, setPendingHref] = useState<string | null>(null);
+  useEffect(() => {
+    if (!pendingHref) return;
+    const t = window.setTimeout(() => setPendingHref(null), 5_000);
+    return () => window.clearTimeout(t);
+  }, [pendingHref]);
+  const pendingIndex = pendingHref ? navItems.findIndex((item) => item.href === pendingHref) : -1;
+  const activeIndex = pendingIndex >= 0 ? pendingIndex : litIndex;
+  const pillRef = useRef<HTMLSpanElement | null>(null);
+  useLayoutEffect(() => {
+    const mark = pillRef.current;
+    const slot = mark?.parentElement;
+    glideMarker("left-nav", "y", mark && slot ? { slot, mark } : null);
+  }, [activeIndex]);
+
   return (
+    <StayPut name="vibe-left-nav">
     <aside
       ref={navRef}
       className="vibe-left-nav-aside"
@@ -309,21 +346,23 @@ export default function LeftNav({ campusHref }: { campusHref?: string } = {}) {
         vibe<span style={{ color: "#FF5C35" }}>.</span>
       </Link>
 
-      <nav style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
-        {visibleNavItems.map((item) => {
-          // A club's pages (/orgs/…) sit under Campus, as on the phone's tab
-          // bar (mobile-tab-active.ts): the left menu is their frame too
-          // since Oct 21, 2026.
-          const isActive =
-            pathname === item.href ||
-            (item.href !== "/" &&
-              pathname.startsWith(`${item.href}/`)) ||
-            (item.href === "/campus" &&
-              (pathname === "/orgs" || pathname.startsWith("/orgs/")));
+      {/* `isolation`: the pill (z-index -1, drawn in the lit item) sits in
+          this one layer, under every item's words, so a glide never covers
+          the label of the item it is leaving (motion 1 repair). */}
+      <nav style={{ display: "flex", flexDirection: "column", gap: "2px", position: "relative", isolation: "isolate" }}>
+        {visibleNavItems.map((item, i) => {
+          const isActive = i === activeIndex;
           return (
             <Link
               key={item.href}
               href={item.href === "/campus" && campusHref ? campusHref : item.href}
+              // The page slides in from this item's side (page-transition.tsx).
+              transitionTypes={navTransitionTypes(litIndex, i)}
+              aria-current={i === litIndex ? (pathname === item.href ? "page" : "true") : undefined}
+              onClick={(e) => {
+                if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+                if (i !== litIndex) setPendingHref(item.href);
+              }}
               style={{
                 display: "flex",
                 alignItems: "center",
@@ -334,11 +373,28 @@ export default function LeftNav({ campusHref }: { campusHref?: string } = {}) {
                 fontWeight: isActive ? "600" : "500",
                 color: isActive ? "var(--charcoal)" : "var(--ink-muted)",
                 textDecoration: "none",
-                background: isActive ? "var(--paper)" : "none",
-                boxShadow: isActive ? "0 4px 24px rgba(0,0,0,0.06)" : "none",
-                transition: "all 0.15s",
+                // The lit background is the one pill below, not the item's.
+                position: "relative",
+                transition: "color 0.15s",
               }}
             >
+              {isActive ? (
+                // One pill for the menu, drawn in the lit item and gliding
+                // from the one it left (transform only, nav-glide.ts).
+                <span
+                  ref={pillRef}
+                  aria-hidden
+                  style={{
+                    position: "absolute",
+                    inset: 0,
+                    zIndex: -1,
+                    borderRadius: "12px",
+                    background: "var(--paper)",
+                    boxShadow: "0 4px 24px rgba(0,0,0,0.06)",
+                    pointerEvents: "none",
+                  }}
+                />
+              ) : null}
               {item.icon}
               {item.label}
             </Link>
@@ -411,6 +467,7 @@ export default function LeftNav({ campusHref }: { campusHref?: string } = {}) {
 
       <CalendarWidget />
     </aside>
+    </StayPut>
   );
 }
 
@@ -475,8 +532,18 @@ function buildMonthCells(year: number, month: number): Array<{
   return cells;
 }
 
+/** The last calendar read in this tab: a page's new menu draws it at once
+ *  (and re-reads), so the calendar doesn't fall back to its empty height and
+ *  jump on every page move (motion 1 repair). Null in each new document, so
+ *  the first paint matches the server's. */
+let lastCalEntries: CalEntry[] | null = null;
+
 export function CalendarWidget() {
-  const [entries, setEntries] = useState<CalEntry[] | null>(null);
+  const [entries, setEntriesState] = useState<CalEntry[] | null>(() => lastCalEntries);
+  const setEntries = useCallback((next: CalEntry[]) => {
+    lastCalEntries = next;
+    setEntriesState(next);
+  }, []);
   // First-load failure only. A failed reload keeps the entries already on
   // screen, so the count badge doesn't vanish on a hiccup.
   const [loadErr, setLoadErr] = useState<LoadFailure | null>(null);
@@ -519,7 +586,7 @@ export function CalendarWidget() {
       // yet, so say so (and offer Retry) instead of loading forever.
       setLoadErr(asLoadFailure(r, "Couldn't load your calendar."));
     }
-  }, []);
+  },[setEntries]);
 
   // Shared by the widget's inline failure and the modal's, so a retry from
   // either place re-runs the first load.
@@ -549,7 +616,7 @@ export function CalendarWidget() {
     return () => {
       cancelled = true;
     };
-  }, [loadKey]);
+  }, [loadKey, setEntries]);
 
   // Listen for RSVP / personal-event changes from anywhere in the app so
   // the calendar mirror stays in sync without remounting.

@@ -5,13 +5,15 @@ import "@/components/otto/kit/desk.css";
 import "./otto-desk-mobile.css";
 
 import { useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import type { OttoPayload } from "@/app/api/me/otto/route";
 import { useTabScrollMemory } from "@/components/mobile/use-tab-scroll-memory";
 import { OttoMetrics } from "@/components/otto/OttoMetrics";
 import { OttoSettings } from "@/components/otto/OttoSettings";
 import { OttoSky } from "@/components/otto/desk/OttoSky";
+import { arriveFrom, moveFrom, prefersReducedMotion } from "@/components/otto/otto-motion";
+import { RISE_PX } from "@/lib/motion/springs";
 import { ClubSwitcherSheet } from "@/components/orgs/ClubSwitcherSheet";
 import { DeskClubMark } from "@/components/otto/desk/DeskDraft";
 import { deskFoldNote } from "@/lib/otto/desk";
@@ -33,6 +35,14 @@ export function OttoMobile({ initial, desk }: { initial: OttoPayload; desk?: boo
   const on = desk ?? (initial.desk !== undefined || (initial.failed ?? []).includes("desk"));
   return on ? <OttoDeskMobile initial={initial} /> : <OttoMobileLegacy initial={initial} />;
 }
+
+/** The parts under the sky that move when it comes or goes. */
+const GLIDERS = ":scope > .odm-as-row, :scope > .odm-strip, :scope > .odm-panes";
+/** The tall sky drops this far as it fades back in. */
+const RISE_SKY = 8;
+/** Where the parts under the sky fade up from when it comes or goes: never from nothing, so the screen never dips to
+ *  an empty frame (from 0 it read as a blink, repair walk). */
+const SETTLE_FROM = 0.35;
 
 const ASK_FOOT = "Otto's desk shows what this club needs. Your Profile tab doesn't change.";
 
@@ -61,7 +71,19 @@ function OttoDeskMobile({ initial }: { initial: OttoPayload }) {
   const { desk } = state;
   const [sheet, setSheet] = useState(false);
 
+  // Motion 1 (Nov 12): only Desk has the tall sky, so moving to or from it
+  // moves the chip, the strip and the panes up or down. Their places are
+  // read before the change and they glide there (a FLIP) instead of jumping.
+  const mainRef = useRef<HTMLElement | null>(null);
+  const before = useRef<Map<Element, number> | null>(null);
+  const tabNow = useRef(tab);
   const setActiveTab = useCallback((next: DeskTab) => {
+    if ((next === "desk") !== (tabNow.current === "desk") && mainRef.current) {
+      before.current = new Map(
+        [...mainRef.current.querySelectorAll(GLIDERS)].map((el) => [el, el.getBoundingClientRect().top]),
+      );
+    }
+    tabNow.current = next;
     setTab(next);
     try {
       const url = new URL(window.location.href);
@@ -98,6 +120,30 @@ function OttoDeskMobile({ initial }: { initial: OttoPayload }) {
   }, [tall]);
   const barOn = folded || !tall;
 
+  // After the scroll memory has put the new tab at its place (its layout
+  // effects run first). The sky comes or goes in one frame (no height is
+  // animated), so the parts under it don't travel the whole way from their
+  // old place (that read as an empty band, then a drift, in the repair
+  // review): they fade in and settle the last 8px (RISE_PX) in the
+  // direction they moved, the page re-composing like a page move. Coming
+  // back to Desk, the tall sky fades down into place.
+  const skyRef = useRef<HTMLDivElement | null>(null);
+  const glidedTab = useRef(tab);
+  useLayoutEffect(() => {
+    const from = glidedTab.current;
+    glidedTab.current = tab;
+    const was = before.current;
+    before.current = null;
+    if (from === tab) return;
+    if (tab === "desk" && from !== "desk" && skyRef.current) moveFrom(skyRef.current, { y: -RISE_SKY, opacity: 0 });
+    if (!was) return;
+    for (const [el, top] of was) {
+      if (!el.isConnected || !(el instanceof HTMLElement)) continue;
+      const dy = top - el.getBoundingClientRect().top;
+      if (Math.abs(dy) >= 1) moveFrom(el, { y: Math.sign(dy) * RISE_PX, opacity: SETTLE_FROM });
+    }
+  }, [tab]);
+
   // Swipe between panes; a tap scrolls the strip there (legacy behaviour).
   const panesRef = useRef<HTMLDivElement | null>(null);
   const programmatic = useRef(false);
@@ -107,7 +153,21 @@ function OttoDeskMobile({ initial }: { initial: OttoPayload }) {
     const target = el.clientWidth * DESK_TABS.indexOf(tab);
     if (Math.abs(el.scrollLeft - target) < 4) return;
     programmatic.current = true;
-    el.scrollTo({ left: target, behavior: "smooth" });
+    // A tap to the next tab slides the strip over (the panes glide in the
+    // direction of travel). A longer jump, or one in or out of Desk (where
+    // the sky comes or goes and the panes re-compose anyway), lands at once
+    // and the new pane arrives from its side: smooth-scrolling through two
+    // or three panes read as a blur of text over text (repair review).
+    // Reduce motion jumps straight there.
+    const from = Math.round(el.scrollLeft / Math.max(1, el.clientWidth));
+    const to = DESK_TABS.indexOf(tab);
+    // A swipe already past halfway (from === to) just finishes as it was.
+    const swiped = from === to;
+    const glide = !prefersReducedMotion() && (swiped || (Math.abs(to - from) === 1 && from !== 0 && to !== 0));
+    // With reduce motion a swipe is left to the strip's own snap (an instant
+    // jump mid-fling flung it a tab too far).
+    if (glide || !swiped) el.scrollTo({ left: target, behavior: glide ? "smooth" : "auto" });
+    if (!glide && !swiped && from !== 0 && to !== 0) arriveFrom(document.getElementById(paneId(tab)), to > from ? 1 : -1);
     const t = window.setTimeout(() => {
       programmatic.current = false;
     }, 420);
@@ -120,9 +180,9 @@ function OttoDeskMobile({ initial }: { initial: OttoPayload }) {
   const youWaiting = desk?.actingAs ? (desk.youWaiting ?? 0) : 0;
 
   return (
-    <main className="odm">
+    <main ref={mainRef} className="odm">
       {tall ? (
-        <div className="odm-top">
+        <div ref={skyRef} className="odm-top">
           <OttoSky variant="tall" say={say} />
           <span ref={markRef} className="odm-mark" aria-hidden="true" />
         </div>

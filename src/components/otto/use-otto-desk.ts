@@ -7,6 +7,7 @@ import { DESK_AS_KEY } from "@/components/mobile/use-otto-desk";
 import { requestRefusal } from "@/components/orgs/tools/member-rules";
 import { vibeRequest } from "@/lib/feedback/request";
 import { toast } from "@/lib/feedback/toast";
+import { deskFx } from "@/lib/motion/feedback";
 import type { DeskItem, DeskModel } from "@/lib/otto/desk";
 
 /**
@@ -129,22 +130,35 @@ export function useOttoDesk(initial: Pick<OttoPayload, "desk" | "failed">, initi
     [load],
   );
 
+  // Cards whose stamp is landing (motion 1 repair): the server has said yes,
+  // so the others' buttons are free again at once, while this one's own
+  // clicks are ignored until it has left (its row takes no pointer while the
+  // stamp lands, motion.css).
+  const leaving = useRef(new Set<string>());
+
   const accept = useCallback(
     async (item: DeskItem) => {
       const verb = item.verb;
-      if (verb?.kind !== "join_request" || busyId) return;
+      if (verb?.kind !== "join_request" || busyId || leaving.current.has(item.id)) return;
       setBusyId(item.id);
+      // Found now, in the click: the card the stamp lands on (motion 1).
+      const fx = deskFx(item.id);
       const r = await vibeRequest(
         `/api/orgs/${encodeURIComponent(verb.orgSlug)}/requests/${encodeURIComponent(verb.requestId)}`,
         { method: "POST", json: { action: "approve" }, quiet: true, failure: COPY.acceptFailed },
       );
-      setBusyId(null);
       if (r.ok) {
-        setDesk((d) => (d ? withoutItem(d, item.id) : d));
         toast({ message: COPY.accepted, tone: "info" });
+        leaving.current.add(item.id);
+        setBusyId(null);
+        // The stamp lands and the card leaves (instant under reduced motion).
+        await fx.done();
+        leaving.current.delete(item.id);
+        setDesk((d) => (d ? withoutItem(d, item.id) : d));
         void load(club);
         return;
       }
+      setBusyId(null);
       // Club tools' words for each refusal; anything the club or the student
       // changed under the card reads the desk again (review L2).
       const { line, then } = requestRefusal(r.status, r.code, r.message);
@@ -159,14 +173,18 @@ export function useOttoDesk(initial: Pick<OttoPayload, "desk" | "failed">, initi
   const reminderDone = useCallback(
     async (item: DeskItem) => {
       const id = item.id.startsWith("reminder:") ? item.id.slice("reminder:".length) : null;
-      if (!id || busyId) return;
+      if (!id || busyId || leaving.current.has(item.id)) return;
       setBusyId(item.id);
+      const fx = deskFx(item.id);
       const r = await vibeRequest(`/api/me/otto/reminders/${encodeURIComponent(id)}/act`, {
         method: "POST",
         failure: COPY.doneFailed,
       });
       setBusyId(null);
       if (r.ok) {
+        leaving.current.add(item.id);
+        await fx.done();
+        leaving.current.delete(item.id);
         setDesk((d) => (d ? withoutItem(d, item.id) : d));
         void load(club);
       }

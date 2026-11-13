@@ -202,6 +202,51 @@ test("an officer desk leaves the student's own rows out", () => {
   assert.ok(!allItems(m).some((i) => i.kind === "unread_dm" || i.kind === "follow_back" || i.kind === "rsvp"));
 });
 
+// ── Drafts (fix, Nov 12): a personal draft is the You desk's; old ones never show ──
+
+test("drafts: a personal draft (no club) shows on the You desk, never on a club desk", () => {
+  const mine = [{ id: "p-mine", excerpt: "Notes for Friday", createdAt: at(-2 * DAY) }];
+  const you = D.buildDesk(studentInput({ drafts: mine }), NOW);
+  const draft = you.ready.find((i) => i.kind === "draft");
+  assert.equal(draft?.id, "draft:p-mine");
+  assert.equal(draft?.href, "/posts/p-mine");
+  assert.equal(draft?.detail, "Your draft. Only you can see it.");
+  // Acting as a club: the club's Ready holds only that club's drafts; the
+  // personal one counts as waiting on the person's own desk.
+  const club = D.buildDesk(officerInput({}, { drafts: mine }), NOW);
+  assert.ok(!club.ready.some((i) => i.kind === "draft"), "a personal draft is not the club's");
+  assert.equal(club.youWaiting, 1);
+  assert.match(club.say, /one thing waits on your own desk/);
+});
+
+test("drafts: older than 30 days never show, on either desk", () => {
+  const old = { id: "p-may", excerpt: "From May", createdAt: "2026-05-14T15:00:00Z" };
+  const edge = { id: "p-31", excerpt: "A month and a day", createdAt: at(-31 * DAY) };
+  const fresh = { id: "p-29", excerpt: "Last month", createdAt: at(-29 * DAY) };
+  const you = D.buildDesk(studentInput({ drafts: [old, edge, fresh] }), NOW);
+  assert.deepEqual(you.ready.filter((i) => i.kind === "draft").map((i) => i.id), ["draft:p-29"]);
+  const club = D.buildDesk(officerInput({ drafts: [old, edge] }), NOW);
+  assert.ok(!club.ready.some((i) => i.kind === "draft"));
+  assert.equal(club.youWaiting, 0);
+  assert.match(D.buildDesk(studentInput({ drafts: [old] }), NOW).say, /^all clear/);
+});
+
+test("drafts: freshDrafts keeps the last 30 days, newest first, and drops unreadable dates", () => {
+  const kept = D.freshDrafts(
+    [
+      { id: "a", excerpt: "", createdAt: at(-5 * DAY) },
+      { id: "b", excerpt: "", createdAt: "not a date" },
+      { id: "c", excerpt: "", createdAt: at(-H) },
+      { id: "d", excerpt: "", createdAt: at(-30 * DAY) },
+      { id: "e", excerpt: "", createdAt: at(-30 * DAY - 1) },
+    ],
+    NOW.getTime(),
+  );
+  assert.deepEqual(kept.map((d) => d.id), ["c", "a", "d"]);
+  assert.deepEqual(D.freshDrafts(undefined, NOW.getTime()), []);
+  assert.equal(D.DRAFT_MAX_DAYS, 30);
+});
+
 test("more than five requests fold into one row to Club tools", () => {
   const reqs = Array.from({ length: 8 }, (_, i) => request(`r${i}`, `Person${i}`));
   const m = D.buildDesk(officerInput({ requests: reqs }), NOW);

@@ -1,8 +1,11 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import "@/components/otto/kit/motion.css";
+
+import { useRef, useState, type FormEvent } from "react";
 
 import { vibeRequest } from "@/lib/feedback/request";
+import { pop, riseNew } from "@/lib/motion/feedback";
 import { parseReminder } from "@/lib/otto/parse-reminder";
 
 export type SavedReminder = {
@@ -32,10 +35,14 @@ const WHEN = new Intl.DateTimeFormat("en-US", {
  * Fixed above the tab bar on every tab and scroll position
  * (otto-desk-mobile.css). The send button is quiet until there is text, and
  * never coral.
+ *
+ * Motion 1 (Nov 12): once saved, the bar gives a soft pop and the new row
+ * rises into the desk (feedback.ts; nothing moves under reduced motion).
  */
 export function ReminderBar({ onSaved }: { onSaved: (r: SavedReminder) => void }) {
   const [value, setValue] = useState("");
   const [busy, setBusy] = useState(false);
+  const bar = useRef<HTMLDivElement>(null);
   const text = value.trim();
   const parsed = text ? parseReminder(value) : null;
 
@@ -52,12 +59,14 @@ export function ReminderBar({ onSaved }: { onSaved: (r: SavedReminder) => void }
     setBusy(false);
     if (!r.ok || !r.data.reminder) return;
     setValue("");
+    pop(bar.current);
+    riseNew(bar.current?.closest("main") ?? document.body);
     onSaved(r.data.reminder);
   }
 
   return (
     <form className="odm-ask" onSubmit={submit}>
-      <div className="dk-ask">
+      <div ref={bar} className="dk-ask">
         <input
           className="dk-ask-in"
           type="text"

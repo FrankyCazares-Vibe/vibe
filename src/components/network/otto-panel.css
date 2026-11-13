@@ -9,12 +9,27 @@
 .otp{--otto-raise:#F2EFE9;--otto-line-2:rgba(28,28,30,.15);--otto-ok-bg:rgba(20,122,69,.1);--otp-drop:rgba(28,28,30,.2);
 position:fixed;right:16px;top:16px;bottom:104px;z-index:9989;width:376px;max-width:calc(100vw - 32px);box-sizing:border-box;
 padding:12px;display:flex;flex-direction:column;gap:10px;color:var(--charcoal);font-family:var(--font-body);
-animation:otp-in .34s var(--vibe-spring-soft) both}
+transform-origin:100% 100%;animation:otp-in .36s var(--vibe-spring-soft) both}
 :root[data-theme="dark"] .otp,.vibe-night-island .otp{--otto-raise:#1F1D1C;--otto-line-2:rgba(255,255,255,.16);--otto-ok-bg:rgba(79,208,138,.12);--otp-drop:rgba(0,0,0,.55)}
 .otp>*{flex:none}
 /* beats tx-host's position:relative, whatever order the two files load in */
 .otp.tx-host{position:fixed}
-@keyframes otp-in{from{opacity:0;transform:translateX(14px)}to{opacity:1;transform:none}}
+/* Motion 1 (Nov 12): it springs in from the right, a touch small, growing from the corner's side (bottom right, where
+   Otto sits); its parts rise in a beat after one another. Closing (otp-out, OttoSidePanel.tsx keeps it a moment) is
+   the same, backwards and quicker. A tab's contents come in from the side the tab is on. Transform and opacity only;
+   the fill is "backwards" on the parts, so none keeps a transform. */
+@keyframes otp-in{from{opacity:0;transform:translateX(24px) scale(.96)}to{opacity:1;transform:none}}
+@keyframes otp-out{from{opacity:1;transform:none}to{opacity:0;transform:translateX(16px) scale(.97)}}
+@keyframes otp-rise{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+@keyframes otp-from-left{from{opacity:0;transform:translateX(-8px)}to{opacity:1;transform:none}}
+@keyframes otp-from-right{from{opacity:0;transform:translateX(8px)}to{opacity:1;transform:none}}
+.otp.otp-out{animation:otp-out .18s cubic-bezier(.4,0,1,1) both;pointer-events:none}
+.otp>.otp-head{animation:otp-rise .32s var(--vibe-spring-soft) 40ms backwards}
+.otp>.otp-tabs{animation:otp-rise .32s var(--vibe-spring-soft) 70ms backwards}
+.otp>:is(.otp-body,.otp-frame):not([data-enter]){animation:otp-rise .32s var(--vibe-spring-soft) 100ms backwards}
+.otp>.otp-links{animation:otp-rise .32s var(--vibe-spring-soft) 130ms backwards}
+.otp>[data-enter="left"]{animation:otp-from-left .28s var(--vibe-spring-soft) backwards}
+.otp>[data-enter="right"]{animation:otp-from-right .28s var(--vibe-spring-soft) backwards}
 
 /* the glass */
 .otp-glass{border-radius:20px;border:1px solid var(--otto-line-2);box-shadow:var(--card-shadow),0 18px 48px var(--otp-drop)}
@@ -33,10 +48,13 @@ animation:otp-in .34s var(--vibe-spring-soft) both}
 .otp-x .dk-ico{width:18px;height:18px}
 
 /* the tabs: Otto | Messages, a paper pill (a real tablist) */
-.otp-tabs{display:flex;padding:4px;border-radius:999px;background:var(--paper);border:1px solid var(--hairline)}
-.otp-tab{flex:1;min-width:0;height:44px;position:relative;border:0;border-radius:999px;background:none;color:var(--ink-2);font:500 14px/1 var(--font-body);display:flex;align-items:center;justify-content:center;gap:8px;cursor:pointer;padding:0}
-.otp-tab.on{background:var(--otto-raise);color:var(--charcoal);font-weight:700}
-.otp-tab.on::after{content:"";position:absolute;left:50%;bottom:5px;width:20px;height:2px;margin-left:-10px;border-radius:2px;background:var(--charcoal)}
+.otp-tabs{display:flex;padding:4px;border-radius:999px;background:var(--paper);border:1px solid var(--hairline);isolation:isolate}
+.otp-tab{flex:1;min-width:0;height:44px;position:relative;transition:color .26s ease;border:0;border-radius:999px;background:none;color:var(--ink-2);font:500 14px/1 var(--font-body);display:flex;align-items:center;justify-content:center;gap:8px;cursor:pointer;padding:0}
+.otp-tab.on{color:var(--charcoal);font-weight:700}
+/* the picked tab's raised pill and ink underline: one piece inside it that glides from the tab left (otto-motion.ts);
+   it sits in the row's one layer (isolation on .otp-tabs), under both labels, so neither is covered mid-glide */
+.otp-tab-pill{position:absolute;inset:0;z-index:-1;border-radius:999px;background:var(--otto-raise);transform-origin:0 50%;pointer-events:none}
+.otp-tab-pill::after{content:"";position:absolute;left:50%;bottom:5px;width:20px;height:2px;margin-left:-10px;border-radius:2px;background:var(--charcoal)}
 .otp-tab .dk-ico{width:18px;height:18px}
 .otp-count{min-width:20px;height:20px;box-sizing:border-box;padding:0 6px;border-radius:999px;background:var(--otto-raise);color:var(--ink-2);font:700 12px/20px var(--font-body);font-variant-numeric:tabular-nums;text-align:center}
 .otp-tab.on .otp-count{background:var(--paper)}
@@ -104,5 +122,5 @@ animation:otp-in .34s var(--vibe-spring-soft) both}
 .otp:focus{outline:none}
 .otp:focus-visible{outline:2px solid var(--charcoal);outline-offset:3px}
 
-/* reduced motion: no slide, the panel just appears */
-@media (prefers-reduced-motion:reduce){.otp{animation:none}.otp-saw-x,.otp-saw-x::before{transition:none}}
+/* reduced motion: no slide, no rise, the panel just appears and goes */
+@media (prefers-reduced-motion:reduce){.otp,.otp.otp-out,.otp>*,.otp>*:is(.otp-head,.otp-tabs,.otp-links,[data-enter]),.otp>:is(.otp-body,.otp-frame):not([data-enter]){animation:none}.otp-tab,.otp-saw-x,.otp-saw-x::before{transition:none}}

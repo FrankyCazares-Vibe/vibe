@@ -409,7 +409,37 @@
   // dark panel above, unchanged.
   const deskStyle = document.createElement('style');
   deskStyle.textContent = `
-    @keyframes ottoDeskIn { from { opacity: 0; transform: translateX(16px); } to { opacity: 1; transform: none; } }
+    /* Motion 1 (Nov 12), the React panel's twin (otto-panel.css): in from the right, a touch small, growing from
+       the corner's side; its parts rise a beat after one another; closing is the same backwards, quicker
+       (closeOttoPanel keeps it a moment); a tab's contents come from its side; the tab's pill glides
+       (_ottoGlidePill); Planet in the corner bounces once on open and settles on close. Transform and opacity
+       only; nothing moves under reduced motion. */
+    @keyframes ottoDeskIn { from { opacity: 0; transform: translateX(24px) scale(.96); } to { opacity: 1; transform: none; } }
+    @keyframes ottoDeskOut { from { opacity: 1; transform: none; } to { opacity: 0; transform: translateX(16px) scale(.97); } }
+    @keyframes ottoDeskRise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+    @keyframes ottoCornerHop { from { transform: scale(.84); } to { transform: none; } }
+    @keyframes ottoCornerSettle { from { transform: scale(1.06); } to { transform: none; } }
+    #ottoPanel.op-desk.op-out { animation: ottoDeskOut .18s cubic-bezier(.4,0,1,1) both; pointer-events: none; }
+    #ottoPanel.op-desk > .otto-panel-header { animation: ottoDeskRise .32s var(--vibe-spring-soft, cubic-bezier(.22,1,.36,1)) 40ms backwards; }
+    #ottoPanel.op-desk > .vmm-tabs { animation: ottoDeskRise .32s var(--vibe-spring-soft, cubic-bezier(.22,1,.36,1)) 70ms backwards; }
+    #ottoPanel.op-desk > .otto-panel-body, #ottoPanel.op-desk > .vmm-frame { animation: ottoDeskRise .32s var(--vibe-spring-soft, cubic-bezier(.22,1,.36,1)) 100ms backwards; }
+    #ottoPanel.op-desk > .otto-panel-footer { animation: ottoDeskRise .32s var(--vibe-spring-soft, cubic-bezier(.22,1,.36,1)) 130ms backwards; }
+    #ottoCorner.otto-hop .m-planet { animation: ottoCornerHop 600ms var(--vibe-spring-pop, cubic-bezier(.34,1.56,.64,1)) 1; }
+    #ottoCorner.otto-settle .m-planet { animation: ottoCornerSettle 420ms var(--vibe-spring-soft, cubic-bezier(.22,1,.36,1)) 1; }
+    @keyframes ottoDeskFromLeft { from { opacity: 0; transform: translateX(-8px); } to { opacity: 1; transform: none; } }
+    @keyframes ottoDeskFromRight { from { opacity: 0; transform: translateX(8px); } to { opacity: 1; transform: none; } }
+    #ottoPanel.op-desk.op-from-left > :is(.otto-panel-body, .otto-panel-footer) { animation: ottoDeskFromLeft .28s var(--vibe-spring-soft, cubic-bezier(.22,1,.36,1)) backwards; }
+    #ottoPanel.op-desk.op-from-right > .vmm-frame { animation: ottoDeskFromRight .28s var(--vibe-spring-soft, cubic-bezier(.22,1,.36,1)) backwards; }
+    #ottoPanel.op-desk .vmm-tabs { position: relative; isolation: isolate; }
+    #ottoPanel.op-desk .op-tab-pill {
+      position: absolute; left: 0; top: 0; z-index: -1; display: block; border-radius: 999px; background: var(--op-raise);
+      transform-origin: 0 50%; pointer-events: none;
+    }
+    #ottoPanel.op-desk .op-tab-pill::after {
+      content: ""; position: absolute; left: 50%; bottom: 5px; width: 20px; height: 2px; margin-left: -10px; border-radius: 2px; background: var(--charcoal, #1C1C1E);
+    }
+    #ottoPanel.op-desk .vmm-tabs.op-has-pill .vmm-tab[aria-selected="true"] { background: none; }
+    #ottoPanel.op-desk .vmm-tabs.op-has-pill .vmm-tab[aria-selected="true"]::after { content: none; }
     @keyframes ottoCornerPop { 0% { transform: scale(1); } 40% { transform: scale(1.08); } 100% { transform: scale(1); } }
     #ottoCorner.otto-pop .otto-shell { animation: ottoCornerPop 700ms var(--vibe-spring-pop, cubic-bezier(.34,1.56,.64,1)) 1; }
     #ottoCorner:focus-visible { outline: none; }
@@ -423,7 +453,8 @@
       background: var(--cream, #FAF7F2);
       color: var(--charcoal, #1C1C1E);
       box-shadow: var(--card-shadow, 0 4px 14px rgba(0,0,0,.08)), 0 18px 48px rgba(28,20,12,.18);
-      animation: ottoDeskIn .32s var(--vibe-spring-soft, cubic-bezier(.22,1,.36,1));
+      transform-origin: 100% 100%;
+      animation: ottoDeskIn .36s var(--vibe-spring-soft, cubic-bezier(.22,1,.36,1)) both;
       outline: none;
     }
     :root[data-theme="dark"] #ottoPanel.op-desk { box-shadow: var(--card-shadow), 0 18px 48px rgba(0,0,0,.55); }
@@ -695,6 +726,7 @@
 
     @media (prefers-reduced-motion: reduce) {
       #ottoPanel.op-desk, #ottoCorner.otto-pop .otto-shell { animation: none; }
+      #ottoPanel.op-desk.op-out, #ottoPanel.op-desk > :is(.otto-panel-header, .vmm-tabs, .otto-panel-body, .vmm-frame, .otto-panel-footer), #ottoCorner:is(.otto-hop, .otto-settle) .m-planet { animation: none; }
       #ottoPanel.op-desk .op-btn, #ottoPanel.op-desk .op-name, #ottoPanel.op-desk .op-saw-x, #ottoPanel.op-desk .op-saw-x::before { transition: none; }
     }
   `;
@@ -713,7 +745,7 @@
   `;
   // The same button opens the panel and closes it (the panel stops above it).
   corner.onclick = function () {
-    if (panel && panel.style.display !== 'none') closeOttoPanel();
+    if (_ottoPanelOpen()) closeOttoPanel();
     else openOttoPanel();
   };
   document.body.appendChild(corner);
@@ -730,7 +762,7 @@
   const _ottoBornAt = Date.now();
   function _ottoPaintCorner() {
     const total = _ottoUnreadN + _ottoChatsN;
-    const open = !!(panel && panel.style.display !== 'none');
+    const open = _ottoPanelOpen();
     corner.classList.toggle('has-unread', _ottoUnreadN > 0);
     corner.classList.toggle('has-chats', _ottoChatsN > 0);
     const n = corner.querySelector('.otto-notif');
@@ -763,6 +795,8 @@
   // ── Build panel HTML (lazy — only when first opened) ───────────────────
   let panel = null;
   let backdrop = null;
+  let _ottoLeaving = 0;          // the timer while the desk panel plays its close (motion 1)
+  let _ottoPillAt = null;        // where the Otto | Messages pill was last drawn (motion 1)
   let _ottoDeskMode = false;     // the panel built is the desk panel (Wave 2B)
 
   // The off switch (Wave 2B): OTTO_DESK=off answers otto_desk: false from
@@ -901,6 +935,67 @@
     }
   }
 
+  // ── Motion 1 (Nov 12): the desk panel's open, close and tab moves ──────
+  // Closing plays the open backwards (op-out, 180 ms) and only then hides
+  // the panel; while it leaves it is inert and no longer counts as open.
+  // Reduced motion: it simply appears and goes, and nothing glides.
+  const OTTO_LEAVE_MS = 200;
+  function _ottoPanelOpen() {
+    return !!(panel && panel.style.display !== 'none' && !_ottoLeaving);
+  }
+  function _ottoReduced() {
+    try { return window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch { return false; }
+  }
+  // Planet in the corner: one small happy bounce on open, a settle on close.
+  function _ottoHop(cls) {
+    if (_ottoReduced()) return;
+    corner.classList.remove('otto-hop', 'otto-settle');
+    void corner.offsetWidth;
+    corner.classList.add(cls);
+    setTimeout(() => corner.classList.remove(cls), 640);
+  }
+  // The Otto | Messages pill (the row _miniMessenger.js draws) glides from
+  // the tab it left, and the tab's contents come in from its side. One pill
+  // in the row, placed on the picked tab, then moved there with a transform
+  // (SPRING_SNAPPY's curve, as the React panel's usePillGlide).
+  const OTTO_SNAPPY = 'linear(0, 0.029 3%, 0.097 6%, 0.218 10%, 0.346 14%, 0.495 19%, 0.62 24%, 0.738 30%, 0.834 37%, 0.904 45%, 0.953 55%, 0.981 67%, 0.994 82%, 1)';
+  function _ottoGlidePill() {
+    if (!panel || !_ottoDeskMode || panel.style.display === 'none') return;
+    const row = panel.querySelector('.vmm-tabs');
+    const tab = row && row.querySelector('.vmm-tab[aria-selected="true"]');
+    if (!row || !tab || !tab.offsetWidth) return;
+    let pill = row.querySelector('.op-tab-pill');
+    if (!pill) {
+      pill = document.createElement('i');
+      pill.className = 'op-tab-pill';
+      pill.setAttribute('aria-hidden', 'true');
+      row.prepend(pill);
+      row.classList.add('op-has-pill');
+    }
+    const now = { tab: tab.dataset.tab, left: tab.offsetLeft, top: tab.offsetTop, width: tab.offsetWidth, height: tab.offsetHeight };
+    pill.style.left = now.left + 'px';
+    pill.style.top = now.top + 'px';
+    pill.style.width = now.width + 'px';
+    pill.style.height = now.height + 'px';
+    const was = _ottoPillAt;
+    _ottoPillAt = now;
+    if (!was || was.tab === now.tab || _ottoReduced()) return;
+    panel.classList.remove('op-from-left', 'op-from-right');
+    panel.classList.add(now.tab === 'messages' ? 'op-from-right' : 'op-from-left');
+    if (typeof pill.animate !== 'function') return;
+    let ease = OTTO_SNAPPY;
+    try { if (!CSS.supports('animation-timing-function', 'linear(0, 1)')) ease = 'cubic-bezier(.22,1,.36,1)'; } catch { ease = 'cubic-bezier(.22,1,.36,1)'; }
+    pill.animate(
+      [{ transform: 'translateX(' + (was.left - now.left) + 'px) scaleX(' + (was.width / now.width) + ')' }, { transform: 'none' }],
+      { duration: 300, easing: ease },
+    );
+  }
+  // _miniMessenger.js marks the picked tab with aria-selected: the pill follows.
+  const _ottoTabWatch = typeof MutationObserver === 'function' ? new MutationObserver(_ottoGlidePill) : null;
+  function _ottoWatchTabs() {
+    if (_ottoTabWatch && panel && _ottoDeskMode) _ottoTabWatch.observe(panel, { subtree: true, attributes: true, attributeFilter: ['aria-selected'] });
+  }
+
   // Exposed on window so other surfaces (profile hero, etc.) can open
   // the panel without poking at file-internal closures.
   window.__ottoOpenPanel = openOttoPanel;
@@ -908,18 +1003,26 @@
     // The first open waits for the off switch's answer, so OTTO_DESK=off
     // never flashes the desk panel (or its "didn't load") on its way out.
     if (_ottoDeskFlag === null && !panel && _isAppShellUser()) {
-      _ottoLearnDeskFlag().then(() => { if (!panel || panel.style.display === 'none') openOttoPanel(); });
+      _ottoLearnDeskFlag().then(() => { if (!_ottoPanelOpen()) openOttoPanel(); });
       return;
     }
     // An Otto open for the use totals (_usageTouch.js; rules in
     // src/lib/usage/touch.ts), unless the panel is opening on its Messages
     // tab (a "Message" button, or the tab it was left on: _miniMessenger.js).
     if (typeof window.__vibeCountOpen === 'function' && !(typeof window.__vibeOttoTab === 'function' && window.__vibeOttoTab() === 'messages')) window.__vibeCountOpen('otto');
-    if (!panel) buildPanel();
+    // Opened again while it was still closing: it turns round and comes back.
+    if (_ottoLeaving) {
+      clearTimeout(_ottoLeaving);
+      _ottoLeaving = 0;
+      if (panel) { panel.classList.remove('op-out'); panel.inert = false; panel.removeAttribute('aria-hidden'); }
+    }
+    if (!panel) { buildPanel(); _ottoPillAt = null; _ottoWatchTabs(); }
     else {
       if (backdrop) backdrop.style.display = '';
       panel.style.display = '';
     }
+    if (panel) panel.classList.remove('op-from-left', 'op-from-right');
+    if (_ottoDeskMode) _ottoHop('otto-hop');
     renderPanelBody();
     _ottoPaintCorner();
     // Messages is a tab of this panel on pages that load _miniMessenger.js:
@@ -929,6 +1032,8 @@
       // Non-modal: focus moves in (Escape or the corner brings it back),
       // and the page behind stays usable.
       try { panel.focus({ preventScroll: true }); } catch {}
+      // The pill is in place from the first open (it used to appear only after the first tab switch).
+      _ottoGlidePill();
       if (_isAppShellUser()) {
         // A desk that failed last time opens on "opening…" again, not on the old failure.
         if (!_ottoDesk && _ottoDeskSettled) { _ottoDeskSettled = false; _ottoRenderDesk(); }
@@ -1872,15 +1977,33 @@
   }
 
   function closeOttoPanel() {
-    if (!panel) return;
+    if (!panel || !_ottoPanelOpen()) return;
     const focusWasIn = panel.contains(document.activeElement) || document.activeElement === document.body;
     if (backdrop) backdrop.style.display = 'none';
-    panel.style.display = 'none';
+    // The panel goes once its close has played (motion 1); the frame and
+    // the old panel hear it then.
+    const gone = () => {
+      _ottoLeaving = 0;
+      if (!panel) return;
+      panel.classList.remove('op-out');
+      panel.inert = false;
+      panel.removeAttribute('aria-hidden');
+      panel.style.display = 'none';
+      document.dispatchEvent(new CustomEvent('vibe:otto-panel', { detail: { open: false } }));
+      _ottoDropStalePanel();
+    };
+    if (_ottoDeskMode && !_ottoReduced()) {
+      panel.classList.add('op-out');
+      panel.inert = true;
+      panel.setAttribute('aria-hidden', 'true');
+      _ottoLeaving = setTimeout(gone, OTTO_LEAVE_MS);
+      _ottoHop('otto-settle');
+    } else {
+      gone();
+    }
     _ottoPaintCorner();
-    document.dispatchEvent(new CustomEvent('vibe:otto-panel', { detail: { open: false } }));
     // Focus goes back to the corner that opened it.
     if (_ottoDeskMode && focusWasIn) { try { corner.focus({ preventScroll: true }); } catch {} }
-    _ottoDropStalePanel();
   }
   window.__ottoClosePanel = closeOttoPanel;
 
@@ -1888,7 +2011,7 @@
   // Escape from the panel or the corner is its own (one meant for a sheet or
   // a field on the page is not); the old panel's backdrop covered the page.
   document.addEventListener('keydown', e => {
-    if (e.key !== 'Escape' || e.defaultPrevented || !panel || panel.style.display === 'none') return;
+    if (e.key !== 'Escape' || e.defaultPrevented || !_ottoPanelOpen()) return;
     const at = document.activeElement;
     if (_ottoDeskMode && !(panel.contains(at) || at === corner)) return;
     closeOttoPanel();

@@ -54,6 +54,8 @@ export type DeskLinkRowProps = {
   href: string;
   /** The row's class ("dk-row", "dk-done", or a renderer's own). */
   className: string;
+  /** The desk item's id as `data-dk-id`, so happy feedback can find the row (src/lib/motion/feedback.ts). */
+  dataId?: string;
   children: ReactNode;
 };
 
@@ -61,16 +63,16 @@ export type DeskLinkRowProps = {
  * A row that opens `href`: one <a> when the title names nobody, else a box
  * with a stretched link (named by the title) under the name link.
  */
-export function DeskLinkRow({ item, href, className, children }: DeskLinkRowProps) {
+export function DeskLinkRow({ item, href, className, dataId, children }: DeskLinkRowProps) {
   if (!hasNameLink(item)) {
     return (
-      <Link className={className} href={href}>
+      <Link className={className} href={href} data-dk-id={dataId}>
         {children}
       </Link>
     );
   }
   return (
-    <div className={`${className} dk-cover-host`}>
+    <div className={`${className} dk-cover-host`} data-dk-id={dataId}>
       <Link className="dk-cover" href={href} aria-label={item.title} />
       {children}
     </div>

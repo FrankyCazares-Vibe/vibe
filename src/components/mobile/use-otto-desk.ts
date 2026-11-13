@@ -6,6 +6,7 @@ import type { OttoFailedSection, OttoPayload } from "@/app/api/me/otto/route";
 import { requestRefusal } from "@/components/orgs/tools/member-rules";
 import { vibeRequest } from "@/lib/feedback/request";
 import { toast } from "@/lib/feedback/toast";
+import { deskFx } from "@/lib/motion/feedback";
 import { readSwitchedClub, sameHandle } from "@/lib/orgs/club-switch";
 import type { DeskItem, DeskModel } from "@/lib/otto/desk";
 
@@ -134,11 +135,19 @@ export function useOttoDesk(initial: OttoPayload) {
     return () => window.clearTimeout(t);
   }, [initial.desk, load]);
 
+  // Cards whose stamp is landing (motion 1 repair): the server has said yes,
+  // so the others' buttons are free again at once, while this one's own taps
+  // are ignored until it has left (its row takes no pointer while the stamp
+  // lands, motion.css).
+  const leaving = useRef(new Set<string>());
+
   const accept = useCallback(
     async (item: DeskItem) => {
       const v = item.verb;
-      if (!v || v.kind !== "join_request" || busyId) return;
+      if (!v || v.kind !== "join_request" || busyId || leaving.current.has(item.id)) return;
       setBusyId(item.id);
+      // Found now, in the tap: the card the stamp lands on (motion 1).
+      const fx = deskFx(item.id);
       const url = `/api/orgs/${encodeURIComponent(v.orgSlug)}/requests/${encodeURIComponent(v.requestId)}`;
       const r = await vibeRequest(url, {
         method: "POST",
@@ -146,14 +155,19 @@ export function useOttoDesk(initial: OttoPayload) {
         quiet: true,
         failure: "Couldn't accept this request.",
       });
-      setBusyId(null);
       if (r.ok) {
-        setDesk((d) => without(d, item.id));
         const club = desk?.actingAs?.name;
         toast({ message: club ? `Accepted. They're a member of ${club} now.` : "Accepted.", tone: "info" });
+        leaving.current.add(item.id);
+        setBusyId(null);
+        // The stamp lands and the card leaves (instant under reduced motion).
+        await fx.done();
+        leaving.current.delete(item.id);
+        setDesk((d) => without(d, item.id));
         void refresh();
         return;
       }
+      setBusyId(null);
       const { line, then } = requestRefusal(r.status, r.code, r.message);
       toast({ message: r.action ? r.message : line, tone: "error", action: r.action });
       if (then === "drop") setDesk((d) => without(d, item.id));
@@ -164,20 +178,29 @@ export function useOttoDesk(initial: OttoPayload) {
 
   const reminderDone = useCallback(
     async (item: DeskItem) => {
-      if (busyId) return;
+      if (busyId || leaving.current.has(item.id)) return;
       const id = item.id.replace(/^reminder:/, "");
       setBusyId(item.id);
-      const before = desk;
-      setDesk((d) => without(d, item.id));
+      // Found now, in the tap (motion 1). The stamp lands only once the
+      // server has said yes, as on the computer (repair: it used to play
+      // while the request ran, then the row came back on a failure).
+      const fx = deskFx(item.id);
       const r = await vibeRequest(`/api/me/otto/reminders/${encodeURIComponent(id)}/act`, {
         method: "POST",
         failure: "Couldn't mark that reminder done.",
       });
-      setBusyId(null);
-      if (!r.ok && before) setDesk(before);
+      if (r.ok) {
+        leaving.current.add(item.id);
+        setBusyId(null);
+        await fx.done();
+        leaving.current.delete(item.id);
+        setDesk((d) => without(d, item.id));
+      } else {
+        setBusyId(null);
+      }
       void refresh();
     },
-    [busyId, desk, refresh],
+    [busyId, refresh],
   );
 
   const reminderSaved = useCallback(

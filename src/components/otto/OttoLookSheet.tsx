@@ -15,6 +15,9 @@
  *
  * Ink, not coral, for every control: the only coral in the frame is Otto's
  * own moon (the board's one-coral rule).
+ *
+ * Motion 1 (Nov 12): picking a colour gives the preview Otto a soft pop and
+ * the check lands on the new swatch (kit/motion.css; still under reduced motion).
  */
 import { motion } from "motion/react";
 import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
@@ -23,12 +26,14 @@ import { Drawer } from "vaul";
 
 import { vaulContentStyle, vaulHandleStyle, vaulOverlayStyle } from "@/components/mobile/messages/sheet-styles";
 import { vibeRequest } from "@/lib/feedback/request";
+import { pop } from "@/lib/motion/feedback";
 import { SPRING_SOFT } from "@/lib/motion/springs";
 import { OTTO_COLOURS, parseLook, type OttoColour, type OttoLook, type OttoMotion } from "@/lib/otto/look";
 import { setOttoLook, useOttoLook } from "@/lib/otto/use-otto-look";
 import { useIsMobile } from "@/lib/use-is-mobile";
 
 import "./kit/planet.css";
+import "./kit/motion.css";
 import { OttoPlanet } from "./planet/OttoPlanet";
 
 /** The names people see, in the club backdrops' order (look.ts). */
@@ -250,12 +255,24 @@ function LookBody({ onPick, onDone }: { onPick: (look: OttoLook) => void; onDone
   const colourLabel = useId();
   const motionLabel = useId();
   const helpId = useId();
+  const preview = useRef<HTMLSpanElement>(null);
+  // A check placed by a tap lands; the one there when the sheet opens just sits.
+  const [picked, setPicked] = useState(false);
+  const pickColour = (c: OttoColour) => {
+    if (c !== look.colour) {
+      pop(preview.current);
+      setPicked(true);
+    }
+    onPick({ ...look, colour: c });
+  };
 
   return (
     <>
       <div style={previewStyle}>
         {/* The preview follows the device's look, so it moves only when Living. */}
-        <OttoPlanet size={72} live />
+        <span ref={preview} style={{ display: "inline-flex" }}>
+          <OttoPlanet size={72} live />
+        </span>
       </div>
 
       <p id={colourLabel} style={labelStyle}>
@@ -269,12 +286,12 @@ function LookBody({ onPick, onDone }: { onPick: (look: OttoLook) => void; onDone
               key={c}
               type="button"
               aria-pressed={on}
-              onClick={() => onPick({ ...look, colour: c })}
+              onClick={() => pickColour(c)}
               style={swatchButtonStyle}
             >
               <span style={{ ...swatchRingStyle, boxShadow: on ? "0 0 0 2px var(--charcoal)" : "none" }}>
                 <span className={`sk-dot sk-${c}`} style={{ width: 36, height: 36 }} aria-hidden />
-                {on ? <CheckBadge /> : null}
+                {on ? <CheckBadge land={picked} /> : null}
               </span>
               <span style={{ ...swatchNameStyle, fontWeight: on ? 700 : 500 }}>{OTTO_COLOUR_NAMES[c]}</span>
             </button>
@@ -317,9 +334,9 @@ function LookBody({ onPick, onDone }: { onPick: (look: OttoLook) => void; onDone
 }
 
 /** The chosen swatch's check: ink on the page colour, so it reads on every dot. */
-function CheckBadge() {
+function CheckBadge({ land = false }: { land?: boolean }) {
   return (
-    <span aria-hidden style={checkBadgeStyle}>
+    <span aria-hidden className={land ? "dk-check-land" : undefined} style={checkBadgeStyle}>
       <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
         <path d="M2 5.2 4.1 7.3 8 2.9" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
       </svg>

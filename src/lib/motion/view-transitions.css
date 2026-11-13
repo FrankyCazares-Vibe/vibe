@@ -1,0 +1,121 @@
+/* Page moves (motion 1, Nov 12, 2026). The CSS half of
+   src/lib/motion/page-transition.tsx: what the browser's view-transition
+   snapshots do while a page changes. Transform and opacity only; the
+   curves are the springs' CSS twins from globals.css. Reduce motion: no
+   movement at all (the last block), the page simply changes. Imported once,
+   from src/app/layout.tsx. */
+
+/* Clicks go through to the live page while a move plays. */
+::view-transition {
+  pointer-events: none;
+}
+
+/* The frame stays put (StayPut: left menu, tab bar, Otto corner): drawn
+   above the moving pages, not animated, the old copy hidden so there is
+   never a double. Its new copy is live, so the tab marker's glide shows. */
+::view-transition-group(.vibe-vt-stay) {
+  animation: none;
+  z-index: 100;
+}
+::view-transition-old(.vibe-vt-stay) {
+  display: none;
+}
+::view-transition-new(.vibe-vt-stay) {
+  animation: none;
+}
+
+/* A tab to the right: the old page leaves a little to the left as it fades,
+   the new one glides in from the right. A tab to the left: the mirror. The
+   old page is gone in 100 ms and the new one starts showing only at 60 ms,
+   so two dense pages never ghost over each other at half strength (the
+   repair review saw a dissolve); the new one travels 40px on SPRING_SOFT's
+   curve (320 ms), so the glide is what you see. */
+/* The page's box doesn't travel or resize between the two pages (that would
+   swoop from the old scroll position and animate a size): the pictures
+   inside move instead. */
+::view-transition-group(.vibe-vt-forward),
+::view-transition-group(.vibe-vt-back),
+::view-transition-group(.vibe-vt-fade) {
+  animation: none;
+}
+::view-transition-old(.vibe-vt-forward) {
+  --vibe-vt-dx: -20px;
+}
+::view-transition-new(.vibe-vt-forward) {
+  --vibe-vt-dx: 40px;
+}
+::view-transition-old(.vibe-vt-back) {
+  --vibe-vt-dx: 20px;
+}
+::view-transition-new(.vibe-vt-back) {
+  --vibe-vt-dx: -40px;
+}
+::view-transition-old(.vibe-vt-forward),
+::view-transition-old(.vibe-vt-back) {
+  animation:
+    100ms ease-in both vibe-vt-fade-out,
+    100ms ease-in both vibe-vt-slide-out;
+}
+::view-transition-new(.vibe-vt-forward),
+::view-transition-new(.vibe-vt-back) {
+  animation:
+    200ms ease-out 60ms both vibe-vt-fade-in,
+    320ms var(--vibe-spring-soft) both vibe-vt-slide-in;
+}
+
+/* Any other move (a link in the page, Back): a short fade, the new page
+   rising 8px (RISE_PX). */
+::view-transition-old(.vibe-vt-fade) {
+  animation: 100ms ease-in both vibe-vt-fade-out;
+}
+::view-transition-new(.vibe-vt-fade) {
+  animation:
+    200ms ease-out 60ms both vibe-vt-fade-in,
+    280ms var(--vibe-spring-soft) both vibe-vt-rise-in;
+}
+
+@keyframes vibe-vt-fade-out {
+  to { opacity: 0; }
+}
+@keyframes vibe-vt-fade-in {
+  from { opacity: 0; }
+}
+@keyframes vibe-vt-slide-out {
+  to { transform: translateX(var(--vibe-vt-dx)); }
+}
+@keyframes vibe-vt-slide-in {
+  from { transform: translateX(var(--vibe-vt-dx)); }
+}
+@keyframes vibe-vt-rise-in {
+  from { transform: translateY(8px); }
+}
+
+/* Full page loads inside Vibe (a Next page to the static profile or
+   Messages page and back, which carry the same rule): the browser's own
+   cross-document transition, a plain crossfade of the whole page. Only
+   without reduce motion: with it on, a full load just changes the page. */
+@media (prefers-reduced-motion: no-preference) {
+  @view-transition {
+    navigation: auto;
+  }
+}
+::view-transition-old(root) {
+  animation: 140ms ease-in both vibe-vt-fade-out;
+}
+::view-transition-new(root) {
+  animation: 220ms ease-out both vibe-vt-fade-in;
+}
+
+/* Reduce motion: everything instant. No slide, no fade, no glide; the old
+   picture is hidden so it never sits over the new page for a frame. */
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*),
+  ::view-transition-image-pair(*),
+  ::view-transition-new(*) {
+    animation: none !important;
+  }
+  ::view-transition-old(*) {
+    animation: none !important;
+    opacity: 0;
+  }
+}

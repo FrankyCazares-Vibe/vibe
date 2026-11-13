@@ -14,6 +14,7 @@ import { DeskDraft } from "@/components/otto/desk/DeskDraft";
 import { DeskTitle } from "@/components/otto/desk/DeskName";
 import { DeskIcon, deskLine } from "@/components/otto/desk/DeskRow";
 import { DeskClearToast, DeskList, DeskSection } from "@/components/otto/desk/DeskSection";
+import { prefersReducedMotion, usePillGlide } from "@/components/otto/otto-motion";
 import { OttoPlanet } from "@/components/otto/planet/OttoPlanet";
 import { DESK_AS_EVENT, useOttoDesk } from "@/components/otto/use-otto-desk";
 import { vibeRequest } from "@/lib/feedback/request";
@@ -74,6 +75,9 @@ export function OttoSidePanel({ deskOn = true, ...props }: OttoSidePanelProps) {
   if (deskOn === null) return null;
   return <OttoDeskPanel {...props} flagKnown />;
 }
+
+/** Closing plays the opening backwards, quicker (otto-panel.css otp-out); the panel goes when it ends. */
+const LEAVE_MS = 200;
 
 /** The flag's answer comes in well before this; a hung read still counts as on. */
 const FLAG_WAIT_MS = 4000;
@@ -154,6 +158,35 @@ function OttoDeskPanel({ open, onClose, messages, id, flagKnown }: Omit<OttoSide
   const baseId = useId();
   const clear = usePanelClear();
 
+  // Motion 1 (Nov 12, Franky: "same for when opening and closing otto"):
+  // the panel springs in from the corner's side (otto-panel.css), its parts
+  // rising a beat after one another; closing plays it backwards, quicker,
+  // and only then is the panel gone. While it leaves it is inert. Reduce
+  // motion: it simply appears and goes.
+  const [shown, setShown] = useState(open);
+  // Which side a tab's contents come in from: Otto is left, Messages right.
+  // Null on each open, so the open's own rise plays instead.
+  const [enter, setEnter] = useState<"left" | "right" | null>(null);
+  if (open && !shown) {
+    setShown(true);
+    setEnter(null);
+  }
+  const leaving = shown && !open;
+  useEffect(() => {
+    if (!leaving) return;
+    const t = window.setTimeout(() => setShown(false), prefersReducedMotion() ? 0 : LEAVE_MS);
+    return () => window.clearTimeout(t);
+  }, [leaving]);
+  const pickTab = useCallback(
+    (next: PanelTab) => {
+      if (next !== tab) setEnter(next === "messages" ? "right" : "left");
+      setTab(next);
+    },
+    [tab],
+  );
+  // The tab's pill glides from the tab it left (otto-motion.ts).
+  const pill = usePillGlide(tab);
+
   // Escape closes, and focus goes back to the corner. Only from the panel
   // or the corner: the page stays usable, so an Escape meant for a sheet or
   // a field out there is not the panel's (review 2B, finding 1).
@@ -228,10 +261,10 @@ function OttoDeskPanel({ open, onClose, messages, id, flagKnown }: Omit<OttoSide
       if (to < 0) return;
       e.preventDefault();
       const next = TABS[to].id;
-      setTab(next);
+      pickTab(next);
       tabRefs.current[next]?.focus();
     },
-    [tab],
+    [tab, pickTab],
   );
 
   // A link inside opens its page: the panel steps aside for it.
@@ -243,7 +276,7 @@ function OttoDeskPanel({ open, onClose, messages, id, flagKnown }: Omit<OttoSide
     [onClose],
   );
 
-  if (!open) return null;
+  if (!shown) return null;
 
   const tabId = (t: PanelTab) => `${baseId}-tab-${t}`;
   const tabPanelId = (t: PanelTab) => `${baseId}-panel-${t}`;
@@ -254,11 +287,16 @@ function OttoDeskPanel({ open, onClose, messages, id, flagKnown }: Omit<OttoSide
     <aside
       ref={panelRef}
       id={id}
-      className="otp tx-host otp-glass"
+      className={leaving ? "otp tx-host otp-glass otp-out" : "otp tx-host otp-glass"}
       aria-labelledby={titleId}
       aria-busy={d.loading || undefined}
+      aria-hidden={leaving || undefined}
+      inert={leaving}
       tabIndex={-1}
       onClick={onPanelClick}
+      onAnimationEnd={(e) => {
+        if (leaving && e.target === e.currentTarget && e.animationName === "otp-out") setShown(false);
+      }}
     >
       <i className="tx tx-flute" aria-hidden="true" />
       <div className="tx-host dk-card otp-head">
@@ -299,11 +337,12 @@ function OttoDeskPanel({ open, onClose, messages, id, flagKnown }: Omit<OttoSide
                 aria-label={unread > 0 ? `Messages, ${unread} unread` : undefined}
                 tabIndex={tab === t.id ? 0 : -1}
                 className={tab === t.id ? "otp-tab on" : "otp-tab"}
-                onClick={() => setTab(t.id)}
+                onClick={() => pickTab(t.id)}
                 onKeyDown={onTabKey}
               >
+                {tab === t.id ? <span ref={pill} className="otp-tab-pill" aria-hidden="true" /> : null}
                 {t.id === "messages" ? <DeskIcon name="unread_dm" /> : null}
-                {t.label}
+                <span className="otp-tab-tx">{t.label}</span>
                 {unread > 0 ? (
                   <span className="otp-count" aria-hidden="true">
                     {unread > 99 ? "99+" : unread}
@@ -348,13 +387,20 @@ function OttoDeskPanel({ open, onClose, messages, id, flagKnown }: Omit<OttoSide
       {/* Mounted only while its tab shows: the frame's page keeps reading
           the lists for as long as it exists. */}
       {showMessages ? (
-        <div id={tabPanelId("messages")} role="tabpanel" aria-labelledby={tabId("messages")} className="otp-frame">
+        <div
+          id={tabPanelId("messages")}
+          role="tabpanel"
+          aria-labelledby={tabId("messages")}
+          className="otp-frame"
+          data-enter={enter ?? undefined}
+        >
           <MiniMessagesFrame ref={frameRef} followTheme />
         </div>
       ) : (
         <>
           <div
             className="otp-body"
+            data-enter={enter ?? undefined}
             {...(withMessages ? { id: tabPanelId("otto"), role: "tabpanel", "aria-labelledby": tabId("otto") } : {})}
           >
             <MiniDesk d={d} settled={settled} clear={clear} onRetry={() => void load(paramRef.current, { quiet: true })} />

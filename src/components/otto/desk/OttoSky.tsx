@@ -1,9 +1,11 @@
 "use client";
 
 import "../kit/sky.css";
+import "../kit/motion.css";
 
 import { useEffect, useRef, useState, type RefObject } from "react";
 
+import { reducedMotion, useDeskDone } from "@/lib/motion/feedback";
 import { DEFAULT_LOOK, isOttoColour, type OttoColour } from "@/lib/otto/look";
 import { useOttoLook } from "@/lib/otto/use-otto-look";
 
@@ -24,6 +26,10 @@ import { OttoPlanet } from "../planet/OttoPlanet";
  * it scrolls away, so a folded-away sky costs nothing. The 28px Otto never
  * moves. Reduced motion stops all of it (planet.css). Decorative except for
  * his line, which is plain text.
+ *
+ * Motion 1 (Nov 12): after a success on the desk (feedback.ts) Otto goes
+ * "done" for ~1.2 s, then back to rest; when his line changes it crossfades
+ * (the old line fades under the new one; instant under reduced motion).
  */
 
 export type OttoSkyProps = {
@@ -57,6 +63,19 @@ function useOnScreen(ref: RefObject<HTMLElement | null>, enabled: boolean, rootM
   return onScreen;
 }
 
+/** The line now, and the one fading out under it for a moment after a change. */
+function useCrossfade(say: string): { now: string; was: string | null; n: number } {
+  const [state, setState] = useState<{ now: string; was: string | null; n: number }>({ now: say, was: null, n: 0 });
+  if (state.now !== say) setState({ now: say, was: reducedMotion() ? null : state.now, n: state.n + 1 });
+  const { was, n } = state;
+  useEffect(() => {
+    if (was === null) return;
+    const t = window.setTimeout(() => setState((s) => (s.n === n ? { ...s, was: null } : s)), 320);
+    return () => window.clearTimeout(t);
+  }, [was, n]);
+  return state;
+}
+
 export function OttoSky({ variant, say, note, colour, className, id }: OttoSkyProps) {
   const look = useOttoLook();
   const skin = isOttoColour(colour) ? colour : isOttoColour(look.colour) ? look.colour : DEFAULT_LOOK.colour;
@@ -64,6 +83,8 @@ export function OttoSky({ variant, say, note, colour, className, id }: OttoSkyPr
   // The phone's tall sky counts as gone once it is under the folded bar
   // (60px plus a little top inset), so Otto stops when the bar covers him.
   const onScreen = useOnScreen(ref, variant !== "short", variant === "tall" ? "-72px 0px 0px 0px" : undefined);
+  const done = useDeskDone();
+  const line = useCrossfade(say);
 
   const classes = ["tx-host", "dk-sky", `sky-${skin}`];
   if (variant !== "tall") classes.push(variant);
@@ -75,7 +96,7 @@ export function OttoSky({ variant, say, note, colour, className, id }: OttoSkyPr
         <i className="tx tx-sky" aria-hidden="true" />
         <i className="tx tx-grain" aria-hidden="true" />
         <i className="tx tx-stars" aria-hidden="true" />
-        <OttoPlanet size={28} colour={skin} />
+        <OttoPlanet size={28} colour={skin} state={done ? "done" : "rest"} />
         <span className="dk-sky-name">
           otto<i>.</i>
         </span>
@@ -93,9 +114,18 @@ export function OttoSky({ variant, say, note, colour, className, id }: OttoSkyPr
       <i className="tx tx-stars" aria-hidden="true" />
       <div className="tx-host dk-sky-orbit" aria-hidden="true">
         <i className="tx tx-orbit" />
-        <OttoPlanet size={96} colour={skin} live={onScreen} />
+        <OttoPlanet size={96} colour={skin} live={onScreen} state={done ? "done" : "rest"} />
       </div>
-      <p className="dk-sky-say">{say}</p>
+      <p className="dk-sky-say dk-say-stack">
+        {line.was !== null ? (
+          <span className="dk-say-out" aria-hidden="true">
+            {line.was}
+          </span>
+        ) : null}
+        <span key={line.n} className={line.n > 0 ? "dk-say-in" : undefined}>
+          {line.now}
+        </span>
+      </p>
       <i className="gr gr-hills" aria-hidden="true" />
     </header>
   );
