@@ -57,17 +57,18 @@ export function gateRefusalCopy(reason: GateRefusal): string {
   return REFUSAL_COPY[reason] ?? REFUSAL_COPY.access_code_required;
 }
 
-/** Where a landing button sits: the door 05 button says more when sign-up is open. */
+/** Where a landing button sits: the students door button (06) says more when sign-up is open. */
 export type LandingSpot = "button" | "door";
 
 /**
  * The landing's sign-up buttons. Closed (the pilot): "Join the waitlist",
  * tagged `src=landing` so the founders can see which channel worked. Open
- * (launch): today's labels and `/auth/signup`.
+ * (since Nov 9, 2026): "Sign up free" (the marketing call to action since
+ * Nov 14) and `/auth/signup`; door 06 says "Create your account".
  */
 export function landingCta(open: boolean, spot: LandingSpot = "button"): { label: string; href: string } {
   if (!open) return { label: "Join the waitlist", href: `${WAITLIST_HREF}?src=landing` };
-  return { label: spot === "door" ? "Create your account" : "Sign up", href: SIGNUP_HREF };
+  return { label: spot === "door" ? "Create your account" : "Sign up free", href: SIGNUP_HREF };
 }
 
 /** Door 06's officer line, for the closed state. */
