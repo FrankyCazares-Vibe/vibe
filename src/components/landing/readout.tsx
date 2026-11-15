@@ -7,11 +7,11 @@ import { useLayoutEffect, useRef } from "react";
  * (S72 design 2, after sibaldesign.com): a hairline window with corner ticks
  * in the kind's colour and a mono caption strip, "Fig. 0X · Name".
  *
- * The stills live in public/landing/ and are committed: each is cropped below
- * the app's crimson campus bar and has no photo of anyone in it (the Orgs crop
- * stops above SAE, whose picture is a photo; the DM crop starts below the
- * header and its photo). scripts/demo-video/stills.sh cuts them from the
- * master film again: frame times and crops are there.
+ * The stills live in public/landing/ and are committed: each has no photo of
+ * anyone in it and no school mark (the Nov 14, 2026 take of today's app hides
+ * the crimson campus bar on camera; invented clubs only). scripts/demo-video/
+ * stills.sh cuts them from the master film again: frame times and crops are
+ * there.
  */
 export type Still = {
   /** File stem in public/landing/: <stem>-480/960.avif|webp and <stem>-720.jpg. */

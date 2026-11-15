@@ -41,11 +41,11 @@ type Kind = "clubs" | "events" | "people";
 const KINDS: Record<Kind, { eyebrow: string; title: string; body: string; rgb: string; still: Still; moment: MomentId }> = {
   clubs: {
     eyebrow: "Clubs", title: "Find your clubs.", body: "Follow the ones you’re curious about, join the ones you love, and keep up with their posts and chats in one place.", rgb: "255,92,53", moment: "evening",
-    still: { stem: "still-orgs", fig: "Orgs", alt: "The Orgs tab in Vibe: North Hall, Tower Floor 3 and Finance Club, each with a Following, Join or Request button." },
+    still: { stem: "still-orgs", fig: "Orgs", alt: "The Orgs tab in Vibe: Outdoors Club, joined, then Music Collective and Film Society, each with a Following button and a Join or Request button." },
   },
   events: {
     eyebrow: "Events", title: "See what’s on.", body: "What your clubs have on this week, in one place. RSVP in a tap so you never miss it.", rgb: "246,196,104", moment: "afternoon",
-    still: { stem: "still-events", fig: "Events", fade: true, alt: "The Events tab in Vibe: Blitz Night by Chess Club, Friday from 7 to 10 pm in the Campus Center, marked Going, with Resume Review Night below it." },
+    still: { stem: "still-events", fig: "Events", fade: true, alt: "The Events tab in Vibe: Blitz Night by Chess Club, Saturday from 7 to 10 pm in the Campus Center, marked Going, with Resume Review Night by Finance Club below it." },
   },
   people: {
     eyebrow: "Each other", title: "Find each other.", body: "Meet people from your major and your clubs, message them, and make your profile look like you.", rgb: "150,186,255", moment: "night",
