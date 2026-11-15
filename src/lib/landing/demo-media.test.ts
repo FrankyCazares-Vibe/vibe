@@ -23,7 +23,7 @@ test("unset: the Vercel Blob store, in every environment", () => {
 
 test("the default passes the same checks as a value would", () => {
   assert.equal(demoMediaBase(DEFAULT_DEMO_MEDIA_BASE), DEFAULT_DEMO_MEDIA_BASE);
-  assert.equal(new URL(DEMO_FILM_FILES.large, DEFAULT_DEMO_MEDIA_BASE).href, "https://npzptkkzqxthhsnu.public.blob.vercel-storage.com/vibe-demo-780.mp4");
+  assert.equal(new URL(DEMO_FILM_FILES.large, DEFAULT_DEMO_MEDIA_BASE).href, "https://npzptkkzqxthhsnu.public.blob.vercel-storage.com/vibe-demo-780-v2.mp4");
 });
 
 test("the local copy: set it to /landing-media/", () => {
@@ -56,5 +56,5 @@ test("anything else means no film, never a guess (\"off\" switches it off)", () 
 });
 
 test("the two encodes keep the names the hosting step uploads", () => {
-  assert.deepEqual(DEMO_FILM_FILES, { large: "vibe-demo-780.mp4", small: "vibe-demo-390.mp4" });
+  assert.deepEqual(DEMO_FILM_FILES, { large: "vibe-demo-780-v2.mp4", small: "vibe-demo-390-v2.mp4" });
 });

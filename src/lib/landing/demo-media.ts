@@ -3,7 +3,7 @@
  *
  * The film shows the founders' own photos with real people in them, and this
  * repo is public, so the film is never committed. It lives on Vercel Blob
- * (DEFAULT_DEMO_MEDIA_BASE), as vibe-demo-780.mp4 and vibe-demo-390.mp4 under
+ * (DEFAULT_DEMO_MEDIA_BASE), as vibe-demo-780-v2.mp4 and vibe-demo-390-v2.mp4 under
  * exactly those names, and every build reads it from there, `next dev`
  * included, with no env var to set.
  *
@@ -22,7 +22,9 @@
  * (demo-media.test.ts) and the client component can use it.
  */
 
-export const DEMO_FILM_FILES = { large: "vibe-demo-780.mp4", small: "vibe-demo-390.mp4" } as const;
+// Browsers keep the Blob files 30 days, so a re-cut ships under a new name:
+// -v2 is the Nov 14, 2026 take of today's app (the Oct 2 take had no suffix).
+export const DEMO_FILM_FILES = { large: "vibe-demo-780-v2.mp4", small: "vibe-demo-390-v2.mp4" } as const;
 
 /** The Vercel Blob store the founders uploaded the film to (S72). Public on purpose: the page fetches it. */
 export const DEFAULT_DEMO_MEDIA_BASE = "https://npzptkkzqxthhsnu.public.blob.vercel-storage.com/";
