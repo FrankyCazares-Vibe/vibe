@@ -34,15 +34,17 @@
 // moves a post. The summary ends with a list of every off-cast row that
 // would reach the lead's screens, on CAMPUS and on the other candidates.
 //
-// PHOTOS. Nine posts carry one of Franky's own pictures, SAE's banner and
-// logo are cut from one of them and Franky's cover photo from another. The
+// PHOTOS. Eight posts carry one of Franky's own pictures and Franky's cover
+// photo is cut from another (SAE's banner and logo were, until Nov 14). The
 // files are read at run time from PHOTOS_DIR (~/vibe-demo-photos/web, or the
 // DEMO_PHOTOS_DIR env var) and are NEVER copied into this repository, which
 // is public; the cuts are made with ffmpeg in a temp folder outside it. With
 // the folder or a file missing the post stays a text post and the run says
 // so. How a picture is stored on the local stack is at POST PHOTOS below.
 //
-// SAE. local-seed.mjs owns a club with the handle `sae` ("SAE (local copy)",
+// SAE (until Nov 14, 2026; now RETIRED, see there: Outdoors Club holds its
+// place, and the run takes back what earlier runs wrote into `sae`; the rest
+// of this paragraph is the record). local-seed.mjs owns a club with the handle `sae` ("SAE (local copy)",
 // owned by Avery Owner, on indianapolis). Handles are unique, so the demo
 // reuses that row instead of making a second SAE: it sets the name, the
 // description, the campus, the backdrop, the banner and the logo, and leaves
@@ -315,10 +317,10 @@ const ACCOUNTS = [
     bio: "Mechanical engineering. Finance Club officer." },
   { key: "amara", email: "amara@example.test", handle: "amaradiallo", name: "Amara Diallo",
     system: "iu", year: 3, major: "Nursing", gradient: "orchid",
-    bio: "Nursing junior. RA on Tower Floor 3, my door is open." },
+    bio: "Nursing junior. I run Film Society, movie nights most Fridays." },
   { key: "lucas", email: "lucas@example.test", handle: "lucasferreira", name: "Lucas Ferreira",
     system: "iu", year: 2, major: "Music Technology", gradient: "deep-sea",
-    bio: "Music technology. Usually in a practice room in North Hall." },
+    bio: "Music technology. Usually in a practice room." },
   { key: "hana", email: "hana@example.test", handle: "hanasato", name: "Hana Sato",
     system: "iu", year: 4, major: "Computer Graphics", gradient: "ember-night",
     bio: "Computer graphics senior. Always has a camera." },
@@ -330,11 +332,11 @@ const ACCOUNTS = [
     bio: "Biology sophomore. Learning chess the hard way." },
   { key: "eli", email: "eli@example.test", handle: "elicarter", name: "Eli Carter",
     system: "iu", year: 1, major: "Computer Science", gradient: "deep-sea",
-    bio: "CS freshman. Tower Floor 3." },
+    bio: "CS freshman. Film Society." },
   // The founders, as themselves.
   { key: "franky", email: "franky@example.test", handle: "franky", name: "Franky Cazares",
     system: "iu", year: 3, major: "Marketing", tagline: "vibin",
-    bio: "Marketing junior at IU. SAE. Building Vibe with James and Rylan.",
+    bio: "Marketing junior. Building Vibe with James and Rylan.",
     cover: { file: "dunes.jpg", cut: "crop=1600:800:0:150" } },
   // A cover theme is a look, not a fact about them: Rylan's is the profile
   // the video visits, and it would open on the pale default.
@@ -470,23 +472,25 @@ async function ensureAccount(spec) {
 // `holder`, an officer of the club (see PROFILE AND CLUB PICTURES).
 // ---------------------------------------------------------------------------
 const CLUBS = [
-  { handle: "sae", name: "SAE", owner: "james", join_policy: "invite", shared: true,
+  // Outdoors Club took SAE's place on Nov 14, 2026 (no real club's name on
+  // camera): see RETIRED at the top of main(). No picture: initials.
+  { handle: "outdoors_club", name: "Outdoors Club", owner: "james", join_policy: "invite",
     backdrop: "midnight",
-    art: { file: "sae-letters.jpg", holder: "james",
-      banner: "crop=1279:426:0:505", logo: "crop=500:500:0:500,scale=512:512" },
-    description: "Sigma Alpha Epsilon. Brotherhood, service and a good cookout." },
+    description: "Hikes, cookouts and yard games. Everyone is welcome on the trips." },
   { handle: "chess_club", name: "Chess Club", owner: "priya", join_policy: "open",
     backdrop: "forest",
     description: "Weekly games in the Campus Center. Beginners welcome, we will teach you." },
   { handle: "finance_club", name: "Finance Club", owner: "jonah", join_policy: "open",
     backdrop: "deep-violet",
     description: "Markets, careers and resume nights. Every major is welcome." },
-  { handle: "tower_floor_3", name: "Tower Floor 3", owner: "amara", join_policy: "request",
+  // Film Society and Music Collective were "Tower Floor 3" and "North Hall"
+  // until Nov 14, 2026 (names of real buildings): RENAMED_CLUBS moves the rows.
+  { handle: "film_society", name: "Film Society", owner: "amara", join_policy: "request",
     backdrop: "ember",
-    description: "Everyone who lives on the third floor of the Tower. Ask your RA to let you in." },
-  { handle: "north_hall", name: "North Hall", owner: "lucas", join_policy: "open",
+    description: "A movie every Friday and a vote on the next one. Ask to join and we will add you." },
+  { handle: "music_collective", name: "Music Collective", owner: "lucas", join_policy: "open",
     backdrop: "sand-purple",
-    description: "News, study nights and events for the people who live in North Hall." },
+    description: "Open jams, study nights and small shows. Every instrument is welcome." },
 ];
 
 /** Returns the club's id. `owners[handle]` is filled with who owns the row. */
@@ -551,6 +555,94 @@ async function ensureClub(spec, users, systems, owners) {
   return orgId;
 }
 
+// ---------------------------------------------------------------------------
+// RETIRED (Nov 14, 2026). No real club's name and no real building's name
+// goes on camera, so:
+//   - SAE is no longer the cast's club. Outdoors Club (CLUBS) holds what it
+//     held: James as its officer, Franky as a member, the cookout. An earlier
+//     run moved local-seed's `sae` row onto CAMPUS and wrote into it; this
+//     takes back what THIS script wrote there (the cast's memberships,
+//     follows, posts, messages and the cookout) and puts the row's name,
+//     campus, description and pictures back as local-seed.mjs has them.
+//     Avery's rows are not touched.
+//   - "Tower Floor 3" and "North Hall" (real residence halls) are renamed in
+//     place (RENAMED_CLUBS): the same rows, members and posts, new handle.
+//   - Two lines that named SAE or its chapter are reworded in place, so the
+//     thread keeps its order (RETIRED_LINES).
+// Safe to run again: each step finds nothing left to do.
+// ---------------------------------------------------------------------------
+const RENAMED_CLUBS = [
+  { from: "tower_floor_3", to: "film_society", events: [["Floor Movie Night", "Movie Night"]] },
+  { from: "north_hall", to: "music_collective", events: [] },
+];
+const RETIRED_LINES = [
+  { author: "james", from: "are you coming to chapter on Thursday?", to: "are you coming to the meeting on Thursday?" },
+  { author: "theo", from: "is the cookout only for SAE?", to: "is the cookout only for members?" },
+];
+const SAE_AS_LOCAL_SEED_HAS_IT = {
+  name: "SAE (local copy)", campus_id: "indianapolis", description: "Production's SAE, copied in shape only.",
+};
+
+async function retireOldNames(users) {
+  for (const r of RENAMED_CLUBS) {
+    const old = must(await admin.from("orgs").select("id").eq("handle", r.from).maybeSingle(), `look up ${r.from}`);
+    if (!old) continue;
+    const taken = must(await admin.from("orgs").select("id").eq("handle", r.to).maybeSingle(), `look up ${r.to}`);
+    if (taken) {
+      console.log(`  NOT renamed: ${r.from} (${r.to} already exists). Hide or remove ${r.from} by hand.`);
+      continue;
+    }
+    must(await admin.from("orgs").update({ handle: r.to }).eq("id", old.id), `rename ${r.from}`);
+    for (const [from, to] of r.events) {
+      must(await admin.from("events").update({ title: to }).eq("org_id", old.id).eq("title", from), `rename event ${from}`);
+    }
+    console.log(`  renamed: @${r.from} is now @${r.to}`);
+  }
+
+  for (const l of RETIRED_LINES) {
+    const found = must(
+      await admin.from("messages").select("id").eq("user_id", users[l.author]).eq("content", l.from),
+      `look up "${l.from}"`,
+    );
+    for (const m of found) {
+      if (psqlPastTriggers("update public.messages set content = :'to' where id = :'id'::uuid", { id: m.id, to: l.to })) {
+        console.log(`  reworded line: "${l.from}" -> "${l.to}"`);
+      } else {
+        must(await admin.from("messages").delete().eq("id", m.id), `delete "${l.from}"`);
+        console.log(`  deleted line: "${l.from}"`);
+      }
+    }
+  }
+
+  const sae = must(await admin.from("orgs").select("id, banner_url, logo_url").eq("handle", "sae").maybeSingle(), "look up sae");
+  if (!sae) return;
+  const cast = ["james", "franky", "maya", "theo", "hana"].map((k) => users[k]);
+  const did = [];
+  const gone = async (what, q) => {
+    const rows = must(await q.select("*"), `take back ${what} in sae`);
+    if (rows.length) did.push(`${rows.length} ${what}`);
+  };
+  await gone("posts", admin.from("posts").delete().eq("org_id", sae.id).in("user_id", cast));
+  await gone("events", admin.from("events").delete().eq("org_id", sae.id).in("creator_id", cast));
+  const rooms = must(await admin.from("channels").select("id").eq("org_id", sae.id), "sae's rooms").map((c) => c.id);
+  if (rooms.length) {
+    await gone("messages", admin.from("messages").delete().in("channel_id", rooms).in("user_id", cast));
+    await gone("room memberships", admin.from("channel_members").delete().in("channel_id", rooms).in("user_id", cast));
+  }
+  await gone("memberships", admin.from("org_members").delete().eq("org_id", sae.id).in("user_id", cast).neq("role", "owner"));
+  await gone("follows", admin.from("org_followers").delete().eq("org_id", sae.id).in("user_id", cast));
+  // The banner and logo an earlier run cut from Franky's picture of the letters (local storage only).
+  if ([sae.banner_url, sae.logo_url].some((u) => u && u.startsWith(API_URL))) {
+    if (psqlPastTriggers("update public.orgs set banner_url = null, logo_url = null where id = :'id'::uuid", { id: sae.id })) did.push("its banner and logo");
+  }
+  const back = must(await admin.from("orgs").select("name, campus_id, description").eq("id", sae.id).single(), "read sae");
+  if (Object.keys(SAE_AS_LOCAL_SEED_HAS_IT).some((k) => back[k] !== SAE_AS_LOCAL_SEED_HAS_IT[k])) {
+    must(await admin.from("orgs").update(SAE_AS_LOCAL_SEED_HAS_IT).eq("id", sae.id), "put sae back");
+    did.push("its name and campus");
+  }
+  if (did.length) console.log(`  sae is not the cast's club any more. Taken back: ${did.join(", ")}.`);
+}
+
 // How many clubs the run agrees to hide (see HIDDEN FOR THE SHOOT at the top).
 const HIDE_AT_MOST = 3;
 
@@ -587,8 +679,8 @@ async function hideStrayClubs(clubs) {
 //   club in Messages, and the video opens Chess Club's chat as Franky; Theo
 //   and Maya speak and vote there. Franky follows the other three clubs.
 const MEMBERS = [
-  { club: "sae", user: "james", role: "admin" },
-  { club: "sae", user: "franky", role: "member" },
+  { club: "outdoors_club", user: "james", role: "admin" },
+  { club: "outdoors_club", user: "franky", role: "member" },
   { club: "chess_club", user: "noor", role: "member" },
   { club: "chess_club", user: "eli", role: "member" },
   { club: "chess_club", user: "lucas", role: "member" },
@@ -597,10 +689,10 @@ const MEMBERS = [
   { club: "chess_club", user: "maya", role: "member" },
   { club: "finance_club", user: "devon", role: "member" },
   { club: "finance_club", user: "noor", role: "member" },
-  { club: "tower_floor_3", user: "eli", role: "member" },
-  { club: "tower_floor_3", user: "theo", role: "member" },
-  { club: "north_hall", user: "hana", role: "member" },
-  { club: "north_hall", user: "noor", role: "member" },
+  { club: "film_society", user: "eli", role: "member" },
+  { club: "film_society", user: "theo", role: "member" },
+  { club: "music_collective", user: "hana", role: "member" },
+  { club: "music_collective", user: "noor", role: "member" },
 ];
 
 /**
@@ -641,25 +733,25 @@ async function ensureMember(orgId, userId, role, ownerId) {
 const ORG_FOLLOWS = [
   { club: "chess_club", user: "franky", source: "discover" },
   { club: "finance_club", user: "franky", source: "discover" },
-  { club: "tower_floor_3", user: "franky", source: "discover" },
-  { club: "north_hall", user: "franky", source: "discover" },
-  { club: "sae", user: "maya", source: "profile" },
+  { club: "film_society", user: "franky", source: "discover" },
+  { club: "music_collective", user: "franky", source: "discover" },
+  { club: "outdoors_club", user: "maya", source: "profile" },
   { club: "chess_club", user: "maya", source: "discover" },
   { club: "finance_club", user: "maya", source: "discover" },
-  { club: "tower_floor_3", user: "maya", source: "discover" },
-  { club: "north_hall", user: "maya", source: "discover" },
-  { club: "sae", user: "theo", source: "discover" },
-  { club: "sae", user: "hana", source: "discover" },
+  { club: "film_society", user: "maya", source: "discover" },
+  { club: "music_collective", user: "maya", source: "discover" },
+  { club: "outdoors_club", user: "theo", source: "discover" },
+  { club: "outdoors_club", user: "hana", source: "discover" },
   { club: "chess_club", user: "theo", source: "discover" },
   { club: "chess_club", user: "hana", source: "discover" },
   { club: "chess_club", user: "amara", source: "discover" },
   { club: "finance_club", user: "priya", source: "discover" },
   { club: "finance_club", user: "james", source: "discover" },
   { club: "finance_club", user: "hana", source: "discover" },
-  { club: "tower_floor_3", user: "noor", source: "discover" },
-  { club: "north_hall", user: "theo", source: "discover" },
-  { club: "north_hall", user: "amara", source: "discover" },
-  { club: "north_hall", user: "devon", source: "discover" },
+  { club: "film_society", user: "noor", source: "discover" },
+  { club: "music_collective", user: "theo", source: "discover" },
+  { club: "music_collective", user: "amara", source: "discover" },
+  { club: "music_collective", user: "devon", source: "discover" },
 ];
 
 /** A deliberate follow (not membership). first_followed_at is left to the trigger. */
@@ -732,10 +824,11 @@ const POSTS = [
     content: "Resume Review Night is this week. Bring a draft, even a rough one. Rough is what we are there for." },
   { author: "theo", hoursAgo: 26, tags: [], image: null, likes: 3,
     content: "Does anyone know where the good study spots are? Asking as a freshman who has sat in the same chair for three days." },
-  { author: "lucas", club: "north_hall", hoursAgo: 29, tags: [], image: null, likes: 2,
+  { author: "lucas", club: "music_collective", hoursAgo: 29, tags: [], image: null, likes: 2,
     content: "The first floor lounge has new whiteboards. Midterm Study Jam is this week if you want company while you study." },
-  { author: "amara", club: "tower_floor_3", hoursAgo: 30, tags: [], image: null, likes: 2,
-    content: "Floor 3, movie night is coming up. Put your picks in the chat and I will bring the popcorn." },
+  { author: "amara", club: "film_society", hoursAgo: 30, tags: [], image: null, likes: 2,
+    was: ["Floor 3, movie night is coming up. Put your picks in the chat and I will bring the popcorn."],
+    content: "Movie night is coming up. Put your picks in the chat and I will bring the popcorn." },
   // A text post again: lawn-event.jpg shows a vendor's banner with a phone
   // number on it. A day before Rylan's line to Franky about it (DM_MESSAGES).
   { author: "rylan", hoursAgo: 31, tags: [], image: null, likes: 3,
@@ -744,16 +837,17 @@ const POSTS = [
     content: "Intramural sign ups close Friday. We need two more for flag football, no experience needed." },
   // James posts for SAE: he is its officer (MEMBERS). First seeded under Franky.
   // "Next Tuesday": the cookout is four days after the shoot (EVENTS), a Tuesday when the shoot is on a Friday.
-  { author: "james", club: "sae", hoursAgo: 38, tags: [], image: "sae-letters.jpg", wasBy: ["franky"], likes: 6,
+  { author: "james", club: "outdoors_club", hoursAgo: 38, tags: [], image: null, likes: 6,
     comments: [["devon", 90, "I'll be there. Save me a burger."]],
-    was: ["Letters are up on the lawn. Cookout is this week: burgers, veggie burgers and yard games. Everyone is welcome, bring a friend."],
-    content: "Letters are up on the lawn. Cookout is next Tuesday: burgers, veggie burgers and yard games. Everyone is welcome, bring a friend." },
+    was: ["Cookout on the lawn next Tuesday: burgers, veggie burgers and yard games. Everyone is welcome, bring a friend."],
+    content: "Cookout on the lawn is on the calendar: burgers, veggie burgers and yard games. Everyone is welcome, bring a friend." },
   { author: "noor", hoursAgo: 44, tags: [], image: null, likes: 3,
     content: "Lost three games in a row at Chess Club and still had a great night. See you at the next one." },
   { author: "eli", hoursAgo: 50, tags: [], image: null, likes: 2,
     content: "Floor dinner was a good idea. Whoever suggested it, thank you." },
   { author: "james", hoursAgo: 56, tags: [], image: null, likes: 4,
-    content: "Good chapter meeting tonight. Proud of this group." },
+    was: ["Good chapter meeting tonight. Proud of this group."],
+    content: "Good meeting tonight. Proud of this group." },
   // Franky's pictures of real people go on the post of the founder who is
   // in them (Franky, Oct 2: the kitchen and the gorilla statue are Rylan,
   // the kitten is James, the sand dunes are Franky), never on an invented
@@ -1119,14 +1213,14 @@ const EVENTS = [
   { club: "finance_club", creator: "jonah", title: "Resume Review Night", inDays: 2, hour: 18, hours: 2,
     location: "Campus Center, Room 305",
     description: "Bring a printed resume or a laptop. Juniors and seniors will read it with you and mark it up." },
-  { club: "tower_floor_3", creator: "amara", title: "Floor Movie Night", inDays: 3, hour: 20, hours: 2,
-    location: "Tower, third floor lounge",
+  { club: "film_society", creator: "amara", title: "Movie Night", inDays: 3, hour: 20, hours: 2,
+    location: "Campus Center, Room 210",
     description: "We vote on the movie in the floor chat. Popcorn is covered." },
-  { club: "sae", creator: "james", title: "Cookout on the Lawn", inDays: 4, hour: 17, hours: 2,
+  { club: "outdoors_club", creator: "james", title: "Cookout on the Lawn", inDays: 4, hour: 17, hours: 2,
     location: "The lawn behind the Campus Center",
     description: "Burgers, veggie burgers and yard games. Open to everyone, bring a friend." },
-  { club: "north_hall", creator: "lucas", title: "Midterm Study Jam", inDays: 5, hour: 14, hours: 3,
-    location: "North Hall, first floor lounge",
+  { club: "music_collective", creator: "lucas", title: "Midterm Study Jam", inDays: 5, hour: 14, hours: 3,
+    location: "Campus Center, first floor lounge",
     description: "Quiet tables, whiteboards and coffee. Come for an hour or stay all afternoon." },
 ];
 
@@ -1167,8 +1261,8 @@ const RSVPS = [
   { title: "Blitz Night", user: "hana", status: "maybe" },
   { title: "Resume Review Night", user: "devon", status: "going" },
   { title: "Resume Review Night", user: "noor", status: "maybe" },
-  { title: "Floor Movie Night", user: "theo", status: "going" },
-  { title: "Floor Movie Night", user: "eli", status: "going" },
+  { title: "Movie Night", user: "theo", status: "going" },
+  { title: "Movie Night", user: "eli", status: "going" },
   { title: "Cookout on the Lawn", user: "james", status: "going" },
   { title: "Cookout on the Lawn", user: "devon", status: "going" },
   { title: "Midterm Study Jam", user: "hana", status: "going" },
@@ -1284,7 +1378,7 @@ const DM_MESSAGES = [
   { dm: "franky_james", author: "james", hoursAgo: 44.2,
     content: "survived. barely" },
   { dm: "franky_james", author: "james", hoursAgo: 44,
-    content: "are you coming to chapter on Thursday?" },
+    content: "are you coming to the meeting on Thursday?" },
   { dm: "franky_james", author: "franky", hoursAgo: 43.9,
     content: "yeah I'll be there" },
   { dm: "franky_james", author: "james", hoursAgo: 43.8,
@@ -1312,7 +1406,7 @@ const DM_MESSAGES = [
   { dm: "franky_maya", author: "maya", hoursAgo: 40.3,
     content: "I'll come by, thank you" },
   { dm: "franky_theo", author: "theo", hoursAgo: 47,
-    content: "is the cookout only for SAE?" },
+    content: "is the cookout only for members?" },
   { dm: "franky_theo", author: "franky", hoursAgo: 46.5,
     content: "open to everyone, bring a friend" },
   { dm: "maya_theo", author: "theo", hoursAgo: 22,
@@ -1324,13 +1418,13 @@ const DM_MESSAGES = [
 ];
 
 const CLUB_MESSAGES = [
-  { club: "sae", author: "james", lastNight: 0,
+  { club: "outdoors_club", author: "james", lastNight: 0,
     content: "Who has the grill for the cookout?" },
-  { club: "sae", author: "franky", lastNight: 6,
+  { club: "outdoors_club", author: "franky", lastNight: 6,
     content: "I've got it. Need two people to help set up at 4." },
-  { club: "sae", author: "james", lastNight: 12,
+  { club: "outdoors_club", author: "james", lastNight: 12,
     content: "I'm in." },
-  { club: "sae", author: "franky", hoursAgo: 30, room: { kind: "room", name: "events" },
+  { club: "outdoors_club", author: "franky", hoursAgo: 30, room: { kind: "room", name: "events" },
     content: "Cookout on the Lawn is on the calendar. RSVP so we know how much food to get." },
 ];
 
@@ -2037,6 +2131,8 @@ async function main() {
     users[spec.key] = await ensureAccount(spec);
     systems[spec.key] = spec.system;
   }
+
+  await retireOldNames(users);
 
   const clubs = {};
   const owners = {};

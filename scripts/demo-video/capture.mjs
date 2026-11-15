@@ -195,7 +195,7 @@ async function openSession(take, { who = null, allow = [] } = {}) {
   await send("Animation.setPlaybackRate", { playbackRate: 0 });
   await send("Emulation.setVirtualTimePolicy", { policy: "pause" });
 
-  let recording = false, address = null, n = 0, trial = null, moving = false;
+  let recording = false, address = null, n = 0, trial = null, moving = false, urlMay = null;
 
   /** Move the page's clock on by ms. It stands still while fetches are pending; a stall past the limit fails the take. */
   async function advance(ms) {
@@ -210,7 +210,11 @@ async function openSession(take, { who = null, allow = [] } = {}) {
     await send("Runtime.evaluate", { expression: "window.__vt ? window.__vt.frame() : -1", returnByValue: true }).catch((e) => { if (e instanceof TakeError) throw e; });
     take.steps++;
     if (!recording) return;
-    if (page.url() !== address) throw new TakeError(`a frame was about to be filmed while the address was changing (${address} -> ${page.url()}) during: ${take.now}`);
+    if (page.url() !== address) {
+      // A page that only rewrites its own query (the campus chips put the open pane in `?tab=`) is the same screen.
+      if (urlMay && urlMay(address, page.url())) address = page.url();
+      else throw new TakeError(`a frame was about to be filmed while the address was changing (${address} -> ${page.url()}) during: ${take.now}`);
+    }
     const t = Date.now();
     const { data } = await send("Page.captureScreenshot", { format: "png", optimizeForSpeed: true });
     take.shotMs += Date.now() - t;
@@ -255,9 +259,12 @@ async function openSession(take, { who = null, allow = [] } = {}) {
    * Call it off the record.
    * `screen` is the positive test for the screen you mean to film (its real rows, not its loading shapes).
    */
-  async function settle(what, screen = null, { quiet = 12, max = 900 } = {}) {
+  async function settle(what, screen = null, { quiet = 12, max = 900, finish = true } = {}) {
     take.now = `settling: ${what}`;
-    const look = () => {
+    const look = (finish) => {
+      // finish: an animation whose start lies ahead on the frozen clock (motion 1's rows rising in, staggered, on
+      // a page come back to) would never start: it is played to its end. Settling is off camera; finish: false to keep them.
+      if (finish) for (const a of document.getAnimations()) if (a.playState === "running" && a.effect?.getComputedTiming().endTime !== Infinity && a.currentTime < 0) a.finish();
       const pictures = [...document.images].every((im) => { const r = im.getBoundingClientRect(); return r.bottom < 0 || r.top > innerHeight || r.right < 0 || r.left > innerWidth || r.width === 0 || (im.complete && im.naturalWidth > 0); });
       // A drawer still sliding in, a pane still fading: any animation that ends is still running. (Ones that loop for ever do not count.)
       const still = document.getAnimations().every((a) => a.playState !== "running" || a.effect?.getComputedTiming().endTime === Infinity);
@@ -266,7 +273,7 @@ async function openSession(take, { who = null, allow = [] } = {}) {
     const t = Date.now();
     let run = 0, words = -2;
     for (let i = 0; i <= max; i++) {
-      const now = pending.size === 0 ? await page.evaluate(look).catch(() => -1) : -1;
+      const now = pending.size === 0 ? await page.evaluate(look, finish).catch(() => -1) : -1;
       const ok = now >= 0 && now === words && (!screen || (await screen().catch(() => false)));
       words = now;
       run = ok ? run + 1 : 0;
@@ -274,7 +281,14 @@ async function openSession(take, { who = null, allow = [] } = {}) {
       if (Date.now() - t > LIMIT.wait) break;
       await step();
     }
-    throw new TakeError(`the screen never settled: ${what} (${page.url()}); still loading: ${[...pending.values()].slice(0, 4).join(", ") || "nothing"}`);
+    // What was still moving, for the sentence.
+    const busy = await page.evaluate(() => ({
+      ready: document.readyState, fonts: document.fonts.status, scrolling: window.__vt.scrolling(),
+      pictures: [...document.images].filter((im) => { const r = im.getBoundingClientRect(); return !(r.bottom < 0 || r.top > innerHeight || r.right < 0 || r.left > innerWidth || r.width === 0 || (im.complete && im.naturalWidth > 0)); }).map((im) => im.src.slice(-60)).slice(0, 3),
+      moving: document.getAnimations().filter((a) => a.playState === "running" && a.effect?.getComputedTiming().endTime !== Infinity)
+        .map((a) => `${a.animationName || a.transitionProperty || a.id || "animation"} on ${a.effect?.target?.tagName ?? "?"}.${a.effect?.target?.className?.toString?.().slice(0, 40) ?? ""}${a.effect?.pseudoElement ?? ""} at ${Math.round(a.currentTime)} of ${a.effect?.getComputedTiming().endTime}`).slice(0, 6),
+    })).catch(() => null);
+    throw new TakeError(`the screen never settled: ${what} (${page.url()}); still loading: ${[...pending.values()].slice(0, 4).join(", ") || "nothing"}; ${JSON.stringify(busy)}`);
   }
 
   /** Open a URL with a full page load. until "paint" returns at the first paint (to film a page from its first frame). */
@@ -297,6 +311,8 @@ async function openSession(take, { who = null, allow = [] } = {}) {
     get recording() { return recording; },
     /** The address changed on purpose without leaving the screen (a chip that rewrites the URL): accept it. */
     sameScreen() { if (recording) address = page.url(); },
+    /** While set, an address change that ok(from, to) accepts is filmed through (the same screen). null: none is. */
+    urlMay(ok) { urlMay = ok; },
     /**
      * While on, a frame that shows the same picture as the one before it is not kept. For a scroll: its eased
      * first and last steps move less than a third of a pixel, and on film that reads as a stutter.
