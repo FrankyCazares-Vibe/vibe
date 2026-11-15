@@ -35,7 +35,7 @@ const REPO = real(fileURLToPath(new URL("../../", import.meta.url)));
 const OUT = real(process.env.DEMO_OUT ?? join(homedir(), "vibe-demo-video"));
 const DIR = join(OUT, "take"), NEW = join(OUT, "take.new"), PREV = join(OUT, "take.prev");
 const FADE = FADE_MS / 1000; // seconds, at each of the two joins (cut.sh reads it from take.json)
-const WHOLE_TAKE_MS = 15 * 60 * 1000;
+const WHOLE_TAKE_MS = (Number(process.env.DEMO_WATCHDOG_MIN) || 15) * 60 * 1000; // DEMO_WATCHDOG_MIN: more minutes on a busy Mac
 const say = (...a) => console.log(new Date().toTimeString().slice(0, 8), ...a);
 // The films show Franky's own pictures and the repo is public: the output folder must be outside it, also
 // when DEMO_OUT is a relative path, a symlink, or the repo's path in other letter case (this Mac's disk does
@@ -64,7 +64,7 @@ if (problems.length) { console.error("Not ready to film:\n- " + problems.join("\
 // Not a stop, a note: once Blitz Night has started (the Messages part is filmed about three minutes in), the
 // Messages home and the Lounge say "Live now" where they said "7 PM", while the posts and the chat still say
 // "tonight at 7". Film before about 6:55 pm for the "7 PM" version.
-if (rows(`select 1 from public.events where title = 'Blitz Night' and now() + interval '4 minutes' >= starts_at`).length) {
+if (rows(`select 1 from public.events e join public.orgs o on o.id = e.org_id where o.handle = 'chess_club' and e.title = 'Blitz Night' and now() + interval '4 minutes' >= e.starts_at`).length) {
   console.error('note: Blitz Night will have started when Messages is filmed, so the Messages home and the Lounge will say "Live now" instead of "7 PM". Film before about 6:55 pm (Indianapolis) for the "7 PM" version.');
 }
 
@@ -84,7 +84,7 @@ async function warm() {
     await guardWrites(context, refused, []);
     const page = await context.newPage();
     const visits = who
-      ? [["/campus", "Blitz Night is tonight"], ["/profile/rylanconaway", "Rylan Conaway"], ["/orgs/sae", "Return to Organizations"], ["/messages", "Your week"],
+      ? [["/campus", "Blitz Night is tonight"], ["/profile/rylanconaway", "Rylan Conaway"], ["/orgs/chess_club", "Return to Organizations"], ["/messages", "Your week"],
         [`/messages?channel=${chats.lounge}`, "See you all at 7"], [`/messages?channel=${chats.dm}`, "nice, let's get food"], ["/profile", "Franky Cazares"]]
       : [["/", "vibe"]];
     for (const [path, words] of visits) {

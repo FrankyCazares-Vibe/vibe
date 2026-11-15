@@ -15,6 +15,15 @@
 //      (ease-in-out, duration = min(sqrt(distance), 42) / 60 s).
 export function pageShim() {
   if (window.__vt) return;
+  // Motion 1 (Nov 12) slides a page in with the browser's View Transitions on every route change. The film never
+  // shows a route change (each is a hard cut, settled off camera), and while a transition holds the page's
+  // rendering a screenshot can wait for ever (seen Nov 14: "Page.captureScreenshot did not answer" on a tab tap).
+  // Without the API the app just changes the page, as it does in a browser that has none.
+  // Not on the landing page (reels a and c): with the API gone its sky never reached the film's first frame.
+  if (location.pathname !== "/") {
+    try { delete Document.prototype.startViewTransition; } catch {}
+    if (document.startViewTransition) try { Object.defineProperty(document, "startViewTransition", { value: undefined, configurable: true }); } catch {}
+  }
   const queue = new Map();
   let nextId = 0;
   const nativeRaf = window.requestAnimationFrame.bind(window);
@@ -49,6 +58,10 @@ export function pageShim() {
       if (a.playState !== "running" || a.timeline !== document.timeline) continue;
       const cur = a.currentTime;
       if (cur === null) continue;
+      // Motion 1's rows rise in staggered (the Orgs list, a feed come back to): on the frozen clock their start
+      // lies ahead for ever and the rows stay invisible on camera (seen Nov 14: an empty Orgs pane). Such an
+      // animation is played to its end at once: the rows appear, as with reduced motion.
+      if (Number(cur) < 0 && a.effect?.getComputedTiming().endTime !== Infinity) { try { a.finish(); } catch {} continue; }
       const st = seen.get(a);
       // New, or the page itself seeked it since our last write: start counting from here.
       if (!st || Math.abs(Number(cur) - st.last) > 0.01) { seen.set(a, { t: now, c: Number(cur), last: Number(cur) }); n++; continue; }
@@ -170,16 +183,24 @@ export function pageShim() {
  * DRESSING. Rules that exist ONLY in the film. Each one covers a flaw the app still has on a 390 px phone in
  * Night (or, for rules 1 and 6, numbers that undersell it); the app itself is not changed, so each is also a thing
  * to look at in the app (the README lists them). The app styles these elements inline and without class names, so
- * the rules go by structure. 1 to 5 and 7 to 9 are style rules; 6 changes text, so it is an observer.
+ * the rules go by structure. 1 to 5, 7 to 11 are style rules; 6, 12 and 13 change the page, so they are an observer.
  */
 export function pageDot() {
   const night = "rgb(12,11,11)"; // the Night page colour
   const css = document.createElement("style");
   css.textContent = [
     "nextjs-portal{display:none!important}",
-    // 1. Campus header: the count line under the campus name ("13 at IU Bloomington"; " · N active now" only from 5 up) is left out.
-    //    On screen for nine seconds it told a new student the app is nearly empty. The name stays.
-    "header.vibe-campus-banner>div:nth-of-type(2)>div:nth-child(2){display:none!important}",
+    // 1. Campus header: the crimson campus bar ("IU Bloomington", its monogram tile and its count line) is left out
+    //    (Nov 14, 2026: no school name, colour or mark on camera until IU answers; gate G11). The chips move up
+    //    into its place, with a little room above them.
+    ".vibe-campus-banner{display:none!important}",
+    "#otto-mobile-tour-tabs{top:0!important;padding-top:14px!important}",
+    // 10. "What's the vibe tonight?" (the Feed's card) and the Events pane's "Tonight" section are left out: no
+    //     public post shows a Tonight screen until IU answers (gate G11). The demo server also runs with
+    //     SCHOOL_EVENTS_OFF=true, so no school calendar is ever read. Blitz Night still shows under "Coming up".
+    ".tonight-card,.tonight-ev{display:none!important}",
+    // 11. An org's page: the FOLLOWERS / MEMBERS numbers beside the logo (counts that read as "nearly empty", rule 6).
+    ".vibe-club-counts{visibility:hidden!important}",
     // 2. The chip row (Feed / Events / Orgs / Map) is see-through: post text slid behind the chips while the feed scrolled.
     `#otto-mobile-tour-tabs{background:${night}!important}`,
     // 3. The tab bar is 96% opaque: lines under it ghosted through the tab labels.
@@ -201,6 +222,9 @@ export function pageDot() {
     // 9. The DM and the Lounge: the round "⋯" (Message actions) beside every bubble. Hidden, its room kept, so no
     //    bubble moves.
     'button[aria-label="Message actions"]{visibility:hidden!important}',
+    // 14. The landing page (reels a and c): the cookie note ("Vibe only uses the cookies that keep you signed in"
+    //     with "Got it") sat on the closing wordmark. Nobody can tap it in a video.
+    ".vibe-cookie-notice{display:none!important}",
     ".demo-dot{position:fixed;z-index:2147483646;width:46px;height:46px;margin:-23px 0 0 -23px;border-radius:50%;pointer-events:none;",
     "background:rgba(255,255,255,.24);border:1px solid rgba(255,255,255,.5);box-shadow:0 0 18px rgba(255,255,255,.16);",
     "animation:demo-dot-in .14s ease-out both}",
@@ -243,7 +267,37 @@ export function pageDot() {
       }
     }
   };
-  new MutationObserver(counts).observe(document, { childList: true, subtree: true, characterData: true });
+  // 12. Profiles: the school badge ("🎓 IU Bloomington", in the school's crimson) and the chips that only repeat the
+  //     campus name ("📍IU Bloomington", and "📚IU Bloomington" where no major is seeded) are left out (gate G11: no
+  //     school name on camera). A chip row left empty goes with them.
+  // 13. Messages home, "Your week": a card for an event of a club that is not the cast's is left out. On the local
+  //     database Franky's test account also holds RSVPs to a real club's events (written by another session for
+  //     its own tests); no real club's name goes on camera.
+  const CAST_CLUBS = ["Chess Club", "Outdoors Club", "Finance Club", "Film Society", "Music Collective"];
+  const school = () => {
+    let campus = null;
+    for (const el of document.querySelectorAll("span")) {
+      const t = el.textContent.trim();
+      if (!/^🎓/.test(t) || !el.querySelector("strong") || t.length > 60) continue;
+      campus = el.querySelector("strong").textContent.trim();
+      if (el.style.display !== "none") el.style.display = "none";
+    }
+    if (campus) {
+      for (const el of document.querySelectorAll("span")) {
+        if (el.children.length !== 0) continue;
+        const t = el.textContent.trim();
+        if ((t === `📍${campus}` || t === `📚${campus}`) && el.style.display !== "none") {
+          el.style.display = "none";
+          const row = el.parentElement;
+          if (row && [...row.children].every((c) => c.style.display === "none") && row.style.display !== "none") row.style.display = "none";
+        }
+      }
+    }
+    for (const card of document.querySelectorAll('[role="group"][aria-label^="Event rooms"]>*')) {
+      if (!CAST_CLUBS.some((c) => card.textContent.includes(c)) && card.style.display !== "none") card.style.display = "none";
+    }
+  };
+  new MutationObserver(() => { counts(); school(); }).observe(document, { childList: true, subtree: true, characterData: true });
   window.__demoCounts = counts;
   window.__demoDot = (x, y) => {
     add();

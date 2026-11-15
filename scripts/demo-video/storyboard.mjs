@@ -24,10 +24,10 @@ export const FADE_MS = 250;
 export const T = {
   openAt: 950, // the sky's own clock when the film starts (shim.mjs): two lights coming up, four to follow
   open: 1850, // the hero; the last label is lit 1500 ms in, before the dip to black into the feed
-  feed: { hold: 800, scroll: 1900, rest: 390 },
+  feed: { hold: 800, scroll: 1900, rest: 390, nameAt: 96 },
   visit: { hold: 1250, scroll: 1300, rest: 290 }, // Rylan's profile
   events: { before: 290, hold: 2000 },
-  orgs: { list: 1490, page: 690, scroll: 900, rest: 450 }, // a beat on SAE's page after its scroll
+  orgs: { list: 700, down: 600, low: 190, page: 690, scroll: 900, rest: 450 }, // the list, down to Chess Club, a beat on its page
   // homeAgain and homeAfter: with the tap's 330 ms they are on screen about 0.7 and 0.9 s, long enough to read
   // James's row coming to the top with the line just sent.
   messages: { home: 1080, lounge: 860, scroll: 900, poll: 580, homeAgain: 350, dm: 240, typed: 90, sent: 940, homeAfter: 550 },
@@ -147,18 +147,22 @@ export async function campus(take, ids) {
     }).map((el) => el.textContent.trim()));
     if (left.length) throw new TakeError(`a count is still on screen on ${where} (${left.join(" | ")}): shim.mjs, dressing rule 6`);
   };
-  // The feed is up, all three panes hold their rows, the chips are the four of the new app (no "Chat"), the
-  // header's count line is out of the picture (shim.mjs, dressing rule 1), and we are at the top.
-  // The count line is looked for by its own shape ("13 at IU Bloomington", "40 on Vibe", with " · N active now"
-  // only from 5 up), not by "active now": under 5 the line has no "active now" to find, shown or not.
-  const campusReady = () => p.evaluate(() => {
+  // The feed is up, the Feed and Events panes hold their rows, the chips are Feed, Events, Orgs and Map, the
+  // crimson campus bar and the Tonight card are out of the picture (shim.mjs, dressing rules 1 and 10), and we
+  // are at the top.
+  // Back from a profile, the app puts the feed back where it was: off camera, it is sent to the top first.
+  let campusWas = null;
+  const campusReady = async () => (campusWas = await p.evaluate(() => {
+    if (scrollY !== 0) { window.scrollTo({ top: 0, behavior: "instant" }); return { scrolled: scrollY }; }
     const has = (t) => document.body.innerText.includes(t);
-    const chips = [...document.querySelectorAll("#otto-mobile-tour-tabs button")].map((b) => b.innerText.trim()).join();
-    const countLine = [...document.querySelectorAll("header.vibe-campus-banner *")].some((el) =>
-      el.children.length === 0 && el.getClientRects().length > 0 &&
-      /^[\d,]+ (at .+|on Vibe)( · [\d,]+ active now)?$/.test(el.textContent.trim()));
-    return chips === "Feed,Events,Orgs,Map" && has("Blitz Night is tonight") && has("Resume Review Night") && !!document.querySelector('a[href="/orgs/sae"]') && !countLine && scrollY === 0;
-  });
+    const chips = [...document.querySelectorAll("#otto-mobile-tour-tabs button")].map((b) => b.innerText.trim().split("\n")[0]).join(); // each chip draws its label twice (one aria-hidden, for the glide)
+    const shown = (q) => [...document.querySelectorAll(q)].some((el) => el.getClientRects().length > 0);
+    const why = { chips, post: has("Blitz Night is tonight"), events: has("Resume Review Night"), bar: shown(".vibe-campus-banner"), tonight: shown(".tonight-card") };
+    return chips === "Feed,Events,Orgs,Map" && why.post && why.events && !why.bar && !why.tonight ? true : why;
+  })) === true;
+  // Back from a page, the feed's rows rise in one after another (motion 1), with start times the frozen clock
+  // never reaches: settle plays them to their end (off camera).
+  const settleCampus = (what) => s.settle(what, campusReady, { finish: true }).catch((e) => { throw new TakeError(`${e.message}; last look: ${JSON.stringify(campusWas)}`); });
   // Film-only, on /campus:
   //  - the "Report event" buttons on the event cards are hidden (beside "Add to calendar" they keep their room;
   //    alone in a row, the row goes);
@@ -195,14 +199,17 @@ export async function campus(take, ids) {
     fix();
   });
 
+  // The chips write the open pane into the address (?tab=events): that is the same screen, filmed through.
+  s.urlMay((from, to) => new URL(from).pathname === "/campus" && new URL(to).pathname === "/campus");
+
   // 1. The feed: settled, then one scroll past Hana's picture to Rylan's.
   await s.goto("/campus");
-  await s.settle("the feed", campusReady);
+  await settleCampus("the feed");
   await dressCampus();
   const name = p.locator('a[href="/profile/rylanconaway"]:not([aria-hidden])').first();
-  // His name ends up 144 px from the top, just under the chips, his picture under it. There the round "+" button
-  // sits on the next post's picture; 60 px less and it covers the end of that post's first line.
-  const dy = Math.round((await name.boundingBox()).y - 144);
+  // His name ends up just under the chips (they are at the top now that the campus bar is left out), his
+  // picture under it.
+  const dy = Math.round((await name.boundingBox()).y - T.feed.nameAt);
   await m.preload(dy + 500);
   await take.reel("b-app");
   s.record(true);
@@ -210,17 +217,11 @@ export async function campus(take, ids) {
   await s.hold(T.feed.hold);
   await m.glide(dy, T.feed.scroll);
   await s.hold(T.feed.rest);
-  await m.tap(() => m.onScreen(name, [120, 760]), { what: "Rylan's name on his post", cut: true, expect: async () => p.url().endsWith("/profile/rylanconaway") });
+  await m.tap(() => m.onScreen(name, [T.feed.nameAt - 30, 760]), { what: "Rylan's name on his post", cut: true, expect: async () => p.url().endsWith("/profile/rylanconaway") });
 
   // 2. Rylan's profile: the header, then down to his posts. Back by the Campus tab.
-  await s.settle("Rylan's profile", async () => (await p.locator("h1", { hasText: "Rylan Conaway" }).isVisible()) && (await p.getByText("Family dinner at the house.").count()) > 0);
-  // Film-only: Rylan is seeded without a major (he is a real person and nobody has given his), and the app then
-  // fills the study chip with the campus name, so "IU Bloomington" stood three times in one header. The chip
-  // that only repeats the school badge is left out. Give him a major in demo-seed.mjs and this does nothing.
-  await p.evaluate(() => {
-    const school = [...document.querySelectorAll("span > strong")].find((el) => el.parentElement.textContent.startsWith("🎓"))?.textContent.trim();
-    for (const chip of document.querySelectorAll("span")) if (school && chip.children.length === 0 && chip.textContent === `📚${school}`) chip.style.display = "none";
-  });
+  // (The school badge and the chips that repeat the campus name are left out: shim.mjs, dressing rule 12.)
+  await s.settle("Rylan's profile", async () => (await p.locator("h1", { hasText: "Rylan Conaway" }).isVisible()) && (await p.getByText("Family dinner at the house.").count()) > 0 && !(await p.getByText("IU Bloomington").first().isVisible().catch(() => false)));
   await newPost(p, false);
   await visiting(p, true);
   if (await p.evaluate(() => { const t = document.querySelector('nav[aria-label="Primary"] a[href="/profile"]'); return t.classList.contains("vibe-mobile-tab--active") && getComputedStyle(t, "::before").display !== "none"; })) throw new TakeError("the Profile tab is still lit on Rylan's profile (storyboard.mjs, visiting)");
@@ -233,7 +234,7 @@ export async function campus(take, ids) {
   await m.tap(tab("/campus"), { what: "the Campus tab", cut: true, expect: async () => p.url().endsWith("/campus") });
 
   // 3. Events: from the top of the feed (the panes share one scroll position), the Events chip, Blitz Night marked Going.
-  await s.settle("the feed again", campusReady);
+  await settleCampus("the feed again");
   await newPost(p, true);
   await visiting(p, false);
   await dressCampus();
@@ -242,10 +243,10 @@ export async function campus(take, ids) {
   await s.hold(T.events.before);
   await m.tap(() => chip("Events"), { what: "the Events chip", expect: slid(0) });
   await s.hold(T.events.hold);
-  if (!(await shows("Blitz Night", [110, 500])) || !(await shows("Going", [110, 600]))) throw new TakeError('the Events pane did not end on "Blitz Night" marked Going');
+  if (!(await shows("Blitz Night", [60, 500])) || !(await shows("Going", [60, 600]))) throw new TakeError('the Events pane did not end on "Blitz Night" marked Going');
   await noCounts("the Events pane");
 
-  // 4. Orgs: the list, then SAE's page.
+  // 4. Orgs: the list, down to Chess Club (last of the clubs he follows), then its page.
   take.mark("4 orgs");
   await m.tap(() => chip("Orgs"), { what: "the Orgs chip", expect: slid(390) });
   await s.hold(T.orgs.list);
@@ -254,9 +255,15 @@ export async function campus(take, ids) {
     .flatMap((a) => [a.children[1].children[0]?.children[0], a.children[1].children[1]]).filter((el) => el && el.scrollWidth > el.clientWidth + 1).map((el) => el.textContent));
   if (clipped.length) throw new TakeError(`cut-off text in the Orgs list (${clipped.join(" | ")}): shim.mjs, dressing rule 4`);
   await noCounts("the Orgs list");
-  await m.tap(() => m.onScreen(p.locator('a[href="/orgs/sae"]'), [130, 780]), { what: "SAE in the list", cut: true, expect: async () => p.url().endsWith("/orgs/sae") });
-  await s.settle("SAE's page", async () => (await p.getByText("Return to Organizations").first().isVisible()) && (await p.getByText("Letters are up on the lawn").count()) > 0);
-  await noCounts("SAE's page");
+  const chessLink = p.locator('a[href="/orgs/chess_club"]').filter({ hasText: "@chess_club" });
+  const chessDy = Math.round((await chessLink.boundingBox()).y - 560);
+  if (chessDy > 0) {
+    await m.glide(chessDy, T.orgs.down);
+    await s.hold(T.orgs.low);
+  }
+  await m.tap(() => m.onScreen(chessLink, [100, 780]), { what: "Chess Club in the list", cut: true, expect: async () => p.url().endsWith("/orgs/chess_club") });
+  await s.settle("Chess Club's page", async () => (await p.getByText("Return to Organizations").first().isVisible()) && (await p.getByText("Blitz Night is tonight").count()) > 0);
+  await noCounts("Chess Club's page");
   await m.preload(700);
   s.record(true);
   await s.hold(T.orgs.page);
