@@ -135,7 +135,9 @@ its rules 1 to 9), the rest are in `storyboard.mjs`.
 7. The close: the "Bring your club." card and the footer around the wordmark are left out, and so are the
    "Sign up" button and the "Log in" line (nobody can tap a video). The wordmark, the tagline and "IU · PURDUE" stay.
 8. Chess Club's Lounge: a few px of room under the last line, so the top row under the Board bar is whole.
-9. The hero: "Tap a light to see what's out there." is hidden (it keeps its room).
+9. The hero: "Tap a light to see what's out there." is hidden (it keeps its room). Since Nov 14 the landing is
+   opened as `/?signup=open` (dev-only override, src/app/page.tsx): sign-up is open live since Nov 9 and every
+   button reads "Sign up free"; the local database keeps sign-up closed. The take fails if "Join the waitlist" shows.
 10. The hero: the six labels are put on the sky's clock (see Known limits), so they light the same way every take.
 11. Events: the "Report event" buttons are hidden (beside "Add to calendar" they keep their room; alone in a
     row, the row is taken out).

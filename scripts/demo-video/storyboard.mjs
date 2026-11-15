@@ -42,12 +42,19 @@ export const allow = (ids) => [
   /^POST \/api\/me\/threads\/[0-9a-f-]{36}\/read$/, // the app's read markers (put back after the take)
 ];
 
+/**
+ * The landing page as it is live since Nov 9: sign-up open ("Sign up free"). The local database keeps sign-up
+ * closed, so the page is opened with the dev-only `?signup=open` override (src/app/page.tsx), which every
+ * button on the page follows.
+ */
+const LANDING = "/?signup=open";
+
 /** Reel a: the landing page from its first frame. */
 export async function open(take) {
   const s = await take.session();
-  await s.goto("/"); // once off camera, so the fonts are in the browser's cache
+  await s.goto(LANDING); // once off camera, so the fonts are in the browser's cache
   await s.settle("the landing page (warming its fonts)", () => s.page.locator("canvas.vln-sky").isVisible());
-  await s.goto("/", { until: "paint" });
+  await s.goto(LANDING, { until: "paint" });
   if (!(await s.page.evaluate(() => document.fonts.status === "loaded"))) throw new TakeError("the landing page painted before its fonts were in: the headline would jump");
   // The film starts on the sky's own clock, not a fixed time after the first paint: how long the page takes to
   // hydrate after it paints varies from run to run, and the lights are lit on the clock that starts there.
@@ -60,6 +67,7 @@ export async function open(take) {
     // Film-only: "Tap a light to see what's out there." asks for a tap nobody watching a video can make.
     document.querySelector(".vln-hint").style.visibility = "hidden";
   });
+  if (await s.page.evaluate(() => /join the waitlist/i.test(document.body.innerText))) throw new TakeError('the landing page says "Join the waitlist": open it with ?signup=open (sign-up is open live since Nov 9)');
   await take.reel("a-open");
   s.record(true);
   take.mark("0 open: the landing page");
@@ -75,7 +83,7 @@ export async function open(take) {
 /** Reel c: the landing page's closing wordmark, its orbits turning. */
 export async function close(take) {
   const s = await take.session();
-  await s.goto("/");
+  await s.goto(LANDING);
   await s.settle("the landing page", () => s.page.locator(".vln-close .vln-tagline").count().then((n) => n === 1));
   // Film-only: the wordmark's section alone. On the page the end of the "Bring your club." card sits above it and
   // the legal footer under it, and the film would end on "the bottom of a web page". The card is hidden (it keeps

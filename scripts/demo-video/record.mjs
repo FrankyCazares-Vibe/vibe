@@ -86,7 +86,7 @@ async function warm() {
     const visits = who
       ? [["/campus", "Blitz Night is tonight"], ["/profile/rylanconaway", "Rylan Conaway"], ["/orgs/chess_club", "Return to Organizations"], ["/messages", "Your week"],
         [`/messages?channel=${chats.lounge}`, "See you all at 7"], [`/messages?channel=${chats.dm}`, "nice, let's get food"], ["/profile", "Franky Cazares"]]
-      : [["/", "vibe"]];
+      : [["/?signup=open", "vibe"]];
     for (const [path, words] of visits) {
       const t = Date.now();
       await page.goto(BASE + path, { waitUntil: "load", timeout: 120000 });
