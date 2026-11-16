@@ -6,6 +6,12 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Drawer } from "vaul";
 
 import { asLoadFailure, LoadFailed, type LoadFailure } from "@/components/feedback/LoadFailed";
+import {
+  CommentEditBox,
+  deleteOwnComment,
+  OwnCommentActions,
+  saveOwnCommentEdit,
+} from "@/components/comments/OwnComment";
 import { EditPostSheet } from "@/components/mobile/EditPostSheet";
 import { PostAudienceSheet } from "@/components/mobile/PostAudienceSheet";
 import { SharePostSheet } from "@/components/mobile/SharePostSheet";
@@ -126,6 +132,10 @@ type Comment = {
   user_id: string;
   content: string;
   created_at: string;
+  /** A reply's top-level comment; null or absent on a top-level one. */
+  parent_comment_id?: string | null;
+  /** The server's answer to "did the reader write this?" (GET and POST). */
+  viewer_is_author?: boolean;
   /** Same story as the post above: the comments route doesn't select these. */
   removed_at?: string | null;
   removed_reason?: string | null;
@@ -565,6 +575,30 @@ export function PostViewerMobile({
       setDraft("");
     }
     setPosting(false);
+  };
+
+  // Your own comment (Nov 16, 2026; OwnComment.tsx): Delete any time, Edit
+  // for 3 minutes. The list is flat here, so a deleted comment's replies are
+  // the rows that name it as their parent.
+  const removeOwnComment = async (c: Comment) => {
+    const hasReplies = (comments ?? []).some((x) => x.parent_comment_id === c.id);
+    const removed = await deleteOwnComment(c.id, hasReplies);
+    if (removed === null) return;
+    setComments((prev) =>
+      prev ? prev.filter((x) => x.id !== c.id && x.parent_comment_id !== c.id) : prev,
+    );
+    patchEngagement(postId, "comment", eng, (cur) => ({
+      commentCount: Math.max(0, cur.commentCount - removed),
+    }));
+  };
+  const saveOwnComment = async (c: Comment, text: string): Promise<boolean> => {
+    const r = await saveOwnCommentEdit(c.id, text);
+    if (r.kind === "saved") {
+      setComments((prev) =>
+        prev ? prev.map((x) => (x.id === c.id ? { ...x, content: r.content } : x)) : prev,
+      );
+    }
+    return r.kind !== "failed";
   };
 
   const author = post?.author ?? null;
@@ -1221,7 +1255,9 @@ export function PostViewerMobile({
                         <CommentRow
                           key={c.id}
                           c={c}
-                          isMine={!!me && c.user_id === me}
+                          isMine={c.viewer_is_author === true || (!!me && c.user_id === me)}
+                          onDelete={() => void removeOwnComment(c)}
+                          onSaveEdit={(text) => saveOwnComment(c, text)}
                           // Hidden while we don't know who is reading: the
                           // route answers a report on your own comment with a
                           // 400 the student never sees as a sentence.
@@ -1510,16 +1546,22 @@ function CommentRow({
   c,
   isMine = false,
   onReport,
+  onDelete,
+  onSaveEdit,
 }: {
   c: Comment;
   /** The viewer wrote it — the only person the row is served to once it has
    *  been removed, and the one person who is never offered Report. */
   isMine?: boolean;
+  /** Your own comment's Delete and Edit (OwnComment.tsx); used when isMine. */
+  onDelete?: () => void;
+  onSaveEdit?: (text: string) => Promise<boolean>;
   /** Absent when reporting doesn't apply (their own comment, or we can't
    *  tell who is reading): no ⋯ is drawn at all. */
   onReport?: () => void;
 }) {
   const a = c.author;
+  const [editing, setEditing] = useState(false);
   // Unreachable today: `/api/posts/[id]/comments` selects an explicit column
   // list with neither `removed_at` nor `removed_reason`.
   if (isMine && c.removed_at) {
@@ -1559,10 +1601,34 @@ function CommentRow({
           <span style={{ fontWeight: 700 }}>
             {a?.name ?? (a?.handle ? `@${a.handle}` : "someone")}
           </span>{" "}
-          <span style={{ color: "var(--ink-2)" }}>{c.content}</span>
+          {editing ? null : <span style={{ color: "var(--ink-2)" }}>{c.content}</span>}
         </div>
-        <div style={{ fontSize: 10, color: "var(--ink-muted)", marginTop: 2 }}>
-          {relTime(c.created_at)}
+        {editing && onSaveEdit ? (
+          <CommentEditBox
+            initial={c.content}
+            fontSize={16}
+            onCancel={() => setEditing(false)}
+            onSave={onSaveEdit}
+          />
+        ) : null}
+        <div
+          style={{
+            fontSize: 10,
+            color: "var(--ink-muted)",
+            marginTop: 2,
+            display: "flex",
+            gap: 12,
+            alignItems: "center",
+          }}
+        >
+          <span>{relTime(c.created_at)}</span>
+          {isMine && onDelete && !editing ? (
+            <OwnCommentActions
+              createdAt={c.created_at}
+              onEdit={() => setEditing(true)}
+              onDelete={onDelete}
+            />
+          ) : null}
         </div>
       </div>
       {onReport ? (

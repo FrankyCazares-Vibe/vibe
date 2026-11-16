@@ -213,6 +213,23 @@
   .vpv-cact svg { display: block; }
   .vpv-cact.on { color: #FF5C35; }
   .vpv-cact.on svg { fill: #FF5C35; stroke: #FF5C35; }
+  .vpv-cedit textarea {
+    width: 100%; box-sizing: border-box; resize: vertical; min-height: 44px;
+    font: inherit; font-size: 13px; line-height: 1.45;
+    color: var(--charcoal, #1C1C1E); background: var(--paper, white);
+    border: 1px solid rgba(var(--scrim-rgb, 28,28,30), .18); border-radius: 10px;
+    padding: 8px 10px; outline: none;
+  }
+  .vpv-cedit textarea:focus { border-color: rgba(var(--scrim-rgb, 28,28,30), .35); }
+  .vpv-cedit-row { display: flex; justify-content: flex-end; gap: 6px; margin-top: 6px; }
+  .vpv-cedit-btn {
+    font: inherit; font-size: 12px; font-weight: 600; cursor: none;
+    padding: 5px 12px; border-radius: 999px;
+    border: 1px solid rgba(var(--scrim-rgb, 28,28,30), .18);
+    background: transparent; color: var(--charcoal, #1C1C1E);
+  }
+  .vpv-cedit-btn.primary { background: var(--charcoal, #1C1C1E); color: var(--on-ink, white); border-color: transparent; }
+  .vpv-cedit-btn:disabled { opacity: .5; }
   .vpv-creply-form {
     display: flex; gap: 6px; margin-top: 8px;
   }
@@ -1293,10 +1310,26 @@
     // a wrong hide would take Report off someone else's comment, and the
     // sheet now says the refusal in words if you do press it on your own.
     const me = confirmedViewerId();
-    const mine = !!me && ((c.user_id && c.user_id === me) || (a.id && a.id === me));
+    // The server's viewer_is_author (GET and POST comments) is the proof
+    // anywhere; the post owner's id is the older proof on their own post.
+    const mine = c.viewer_is_author === true ||
+      (!!me && ((c.user_id && c.user_id === me) || (a.id && a.id === me)));
     const reportBtn = (mine || !c.id)
       ? ""
       : `<button class="vpv-cact" onclick="window.__vpvReport('comment',${safeCommentId})">Report</button>`;
+    // Your own comment (Nov 16, 2026): Delete any time, Edit for 3 minutes
+    // after sending. Never on one a moderator removed. Wired by data-vpv-c
+    // in the comments' click listener, not inline handlers.
+    let ownBtns = "";
+    if (c.viewer_is_author === true && c.id && !c.removed_at) {
+      commentText.set(String(c.id), String(c.content || ""));
+      const left = commentEditMsLeft(c.created_at);
+      if (left > 0) {
+        ownBtns += `<button type="button" class="vpv-cact" data-vpv-c="edit" data-id="${esc(c.id)}">Edit</button>`;
+        scheduleEditExpiry(String(c.id), left);
+      }
+      ownBtns += `<button type="button" class="vpv-cact" data-vpv-c="delete" data-id="${esc(c.id)}">Delete</button>`;
+    }
     // Optional, and absent today — GET /api/posts/[id]/comments selects an
     // explicit column list without removed_at. Only the comment's own author
     // can load a removed comment, so this is their notice and nobody else's.
@@ -1305,13 +1338,13 @@
       ${av}
       <div class="vpv-cw">
         <div class="vpv-cn">${esc(a.name || a.handle || "Unknown")}${handle}</div>
-        <div class="vpv-ct">${esc(c.content)}</div>
+        <div class="vpv-ct" id="vpv-ct-${esc(c.id)}">${esc(c.content)}</div>
         <div class="vpv-cmeta">
           <button class="vpv-cact${liked ? " on" : ""}" id="vpv-like-${esc(c.id)}" onclick="__vpvToggleCommentLike('${esc(c.id)}')" aria-label="Like comment">
             ${heartSvg}<span class="vpv-clikec">${likeCount > 0 ? likeCount : ""}</span>
           </button>
           <button class="vpv-cact" onclick="__vpvOpenReply('${esc(c.id)}', '${esc(a.handle || "")}')">Reply</button>
-          ${reportBtn}
+          ${reportBtn}${ownBtns}
           <span style="margin-left:auto;color:var(--ink-muted, #6C6761)">${esc(relTime(c.created_at))}</span>
         </div>
         ${removedHtml}
@@ -1323,6 +1356,128 @@
       </div>
     </div>`;
   }
+
+  // ── Your own comment: delete, and edit for 3 minutes (Nov 16, 2026) ──
+  // The window is src/lib/comments/edit-window.ts's COMMENT_EDIT_WINDOW_MS;
+  // edit-window.test.ts holds this copy equal. The server has the last word
+  // (PATCH /api/comments/[id] answers 409 once it has shut).
+  const VPV_COMMENT_EDIT_WINDOW_MS = 3 * 60 * 1000;
+  const commentText = new Map();   // comment id -> its text, for the editor
+  const editExpiry = new Map();    // comment id -> timer that hides Edit
+  function commentEditMsLeft(createdAt) {
+    const t = typeof createdAt === "string" ? Date.parse(createdAt) : NaN;
+    if (Number.isNaN(t)) return 0;
+    return Math.max(0, VPV_COMMENT_EDIT_WINDOW_MS - (Date.now() - t));
+  }
+  function scheduleEditExpiry(id, left) {
+    clearTimeout(editExpiry.get(id));
+    editExpiry.set(id, setTimeout(() => {
+      editExpiry.delete(id);
+      // An editor already open stays: its Save gets the server's answer.
+      document.querySelectorAll(`[data-vpv-c="edit"][data-id="${cssEsc(id)}"]`)
+        .forEach((b) => b.remove());
+    }, left));
+  }
+  function cssEsc(v) {
+    return (window.CSS && CSS.escape) ? CSS.escape(v) : String(v).replace(/["\\]/g, "\\$&");
+  }
+  function commentRow(id) {
+    return document.querySelector(`.vpv-comment[data-comment-id="${cssEsc(id)}"]`);
+  }
+
+  function openCommentEditor(id) {
+    const ct = document.getElementById("vpv-ct-" + id);
+    if (!ct || ct.querySelector(".vpv-cedit")) return;
+    const before = commentText.has(id) ? commentText.get(id) : ct.textContent;
+    ct.textContent = "";
+    const box = document.createElement("div");
+    box.className = "vpv-cedit";
+    const ta = document.createElement("textarea");
+    ta.maxLength = 1000;
+    ta.rows = 2;
+    ta.value = before;
+    ta.setAttribute("aria-label", "Edit your comment");
+    const row = document.createElement("div");
+    row.className = "vpv-cedit-row";
+    const cancel = document.createElement("button");
+    cancel.type = "button"; cancel.className = "vpv-cedit-btn"; cancel.textContent = "Cancel";
+    const save = document.createElement("button");
+    save.type = "button"; save.className = "vpv-cedit-btn primary"; save.textContent = "Save";
+    row.append(cancel, save);
+    box.append(ta, row);
+    ct.appendChild(box);
+    const close = (text) => { ct.textContent = text; };
+    cancel.addEventListener("click", () => close(before));
+    ta.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); close(before); }
+      else if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); save.click(); }
+    });
+    save.addEventListener("click", async () => {
+      const value = ta.value.trim();
+      if (!value) { toast("A comment can't be empty. Delete it instead."); return; }
+      if (value === before.trim()) { close(before); return; }
+      save.disabled = true;
+      const r = await window.vibeRequest("/api/comments/" + encodeURIComponent(id), {
+        method: "PATCH", json: { content: value }, failure: "Couldn't save your comment.",
+      });
+      save.disabled = false;
+      if (!r.ok) {
+        // The window shut: the editor goes, and so does Edit.
+        if (r.status === 409) {
+          close(before);
+          document.querySelectorAll(`[data-vpv-c="edit"][data-id="${cssEsc(id)}"]`)
+            .forEach((b) => b.remove());
+        }
+        return; // vibeRequest already said why
+      }
+      const text = (r.data && r.data.comment && typeof r.data.comment.content === "string")
+        ? r.data.comment.content : value;
+      commentText.set(id, text);
+      close(text);
+    });
+    ta.focus();
+    ta.setSelectionRange(ta.value.length, ta.value.length);
+  }
+
+  async function deleteComment(id, btn) {
+    const row = commentRow(id);
+    const replies = row ? row.querySelectorAll(".vpv-creplies .vpv-comment").length : 0;
+    const ask = replies > 0
+      ? "Delete this comment and its replies? This can't be undone."
+      : "Delete this comment? This can't be undone.";
+    if (!window.confirm(ask)) return;
+    if (btn) btn.disabled = true;
+    const r = await window.vibeRequest("/api/comments/" + encodeURIComponent(id), {
+      method: "DELETE", failure: "Couldn't delete your comment.",
+    });
+    if (btn) btn.disabled = false;
+    if (!r.ok) return; // vibeRequest already said why
+    const removed = Math.max(1, Number(r.data && r.data.removed) || 1);
+    clearTimeout(editExpiry.get(id));
+    editExpiry.delete(id);
+    commentText.delete(id);
+    if (row) row.remove();
+    state.comments = Math.max(0, (Number(state.comments) || 0) - removed);
+    const countEl = document.getElementById("vpvCommentCount");
+    if (countEl) countEl.textContent = String(state.comments);
+    const wrap = document.getElementById("vpvComments");
+    if (wrap && !wrap.querySelector(".vpv-comment")) {
+      wrap.innerHTML = `<div class="vpv-comments-empty">No comments yet — be the first.</div>`;
+    }
+    toast("Comment deleted");
+  }
+
+  // One listener for both buttons on every comment row (no inline handlers:
+  // the React feed frames this file, and new code shouldn't add any).
+  document.addEventListener("click", (e) => {
+    const b = e.target && e.target.closest ? e.target.closest("[data-vpv-c]") : null;
+    if (!b || !b.closest("#vpvComments")) return;
+    const id = b.getAttribute("data-id");
+    if (!id) return;
+    e.preventDefault();
+    if (b.getAttribute("data-vpv-c") === "edit") openCommentEditor(id);
+    else if (b.getAttribute("data-vpv-c") === "delete") void deleteComment(id, b);
+  });
 
   // ── Action handlers ───────────────────────────────────────────────────
   window.__vpvToggleLike = async function () {

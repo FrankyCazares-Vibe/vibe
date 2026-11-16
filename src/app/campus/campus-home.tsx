@@ -208,6 +208,12 @@ import {
 } from "@/lib/posts/engagement-store";
 import { feedClubOf, muteClubRowLabel, type FeedClub, withoutClubPosts } from "@/lib/posts/feed-actions";
 import {
+  CommentEditBox,
+  deleteOwnComment,
+  OwnCommentActions,
+  saveOwnCommentEdit,
+} from "@/components/comments/OwnComment";
+import {
   PostViewerFrameProvider,
   usePostViewerFrame,
   type PostViewerCounts,
@@ -9090,6 +9096,11 @@ function FeedRow({
             onCommentAdded={() =>
               patchEngagement(post.id, "comment", engFallback, (c) => ({ commentCount: c.commentCount + 1 }))
             }
+            onCommentsRemoved={(n) =>
+              patchEngagement(post.id, "comment", engFallback, (c) => ({
+                commentCount: Math.max(0, c.commentCount - n),
+              }))
+            }
           />
         ) : null}
       </div>
@@ -9486,6 +9497,8 @@ type FeedComment = {
   created_at: string;
   like_count: number;
   viewer_liked: boolean;
+  /** The server's answer to "did the reader write this?" (GET and POST). */
+  viewer_is_author?: boolean;
   replies?: FeedComment[];
   /** Same story as FeedPost above: `/api/posts/[id]/comments` sends these on
    *  the author's own removed comment (optional on a deploy without the
@@ -9504,6 +9517,7 @@ function CommentsDrawer({
   postId,
   viewerId,
   onCommentAdded,
+  onCommentsRemoved,
 }: {
   postId: string;
   /** Who is reading, so a comment's ⋯ menu never offers "Report" on their own
@@ -9511,6 +9525,8 @@ function CommentsDrawer({
    *  sentence. Null (the feed hasn't answered yet) hides the menu entirely. */
   viewerId: string | null;
   onCommentAdded: () => void;
+  /** Your own comment was deleted: `n` is it plus its replies. */
+  onCommentsRemoved: (n: number) => void;
 }) {
   const [comments, setComments] = useState<FeedComment[] | null>(null);
   const [loadErr, setLoadErr] = useState<LoadFailure | null>(null);
@@ -9555,6 +9571,36 @@ function CommentsDrawer({
     });
     onCommentAdded();
   }, [onCommentAdded]);
+
+  // Your own comment (Nov 16, 2026): an edit swaps its words, a delete
+  // takes it and its replies out of the thread and the card's count.
+  const handleEdited = useCallback((id: string, content: string) => {
+    setComments((prev) =>
+      prev
+        ? prev.map((root) =>
+            root.id === id
+              ? { ...root, content }
+              : {
+                  ...root,
+                  replies: (root.replies ?? []).map((r) => (r.id === id ? { ...r, content } : r)),
+                },
+          )
+        : prev,
+    );
+  }, []);
+  const handleDeleted = useCallback(
+    (id: string, removed: number) => {
+      setComments((prev) =>
+        prev
+          ? prev
+              .filter((root) => root.id !== id)
+              .map((root) => ({ ...root, replies: (root.replies ?? []).filter((r) => r.id !== id) }))
+          : prev,
+      );
+      onCommentsRemoved(removed);
+    },
+    [onCommentsRemoved],
+  );
 
   const submit = useCallback(async () => {
     const text = draft.trim();
@@ -9617,6 +9663,8 @@ function CommentsDrawer({
                 postId={postId}
                 viewerId={viewerId}
                 onReplyAdded={handleNewComment}
+                onEdited={handleEdited}
+                onDeleted={handleDeleted}
               />
             ))
           )}
@@ -9672,12 +9720,16 @@ function CommentRow({
   postId,
   viewerId,
   onReplyAdded,
+  onEdited,
+  onDeleted,
   isReply = false,
 }: {
   comment: FeedComment;
   postId: string;
   viewerId: string | null;
   onReplyAdded: (c: FeedComment) => void;
+  onEdited: (id: string, content: string) => void;
+  onDeleted: (id: string, removed: number) => void;
   isReply?: boolean;
 }) {
   const [liked, setLiked] = useState(comment.viewer_liked);
@@ -9693,6 +9745,18 @@ function CommentRow({
   const [menuOpen, setMenuOpen] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
   const canReport = !!viewerId && comment.user_id !== viewerId;
+  // Your own comment: Delete any time, Edit for 3 minutes (OwnComment.tsx).
+  const isOwn =
+    comment.viewer_is_author === true || (!!viewerId && comment.user_id === viewerId);
+  const [editing, setEditing] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const removeOwn = useCallback(async () => {
+    if (deleting) return;
+    setDeleting(true);
+    const removed = await deleteOwnComment(comment.id, (comment.replies?.length ?? 0) > 0);
+    setDeleting(false);
+    if (removed !== null) onDeleted(comment.id, removed);
+  }, [comment.id, comment.replies, deleting, onDeleted]);
 
   const name = comment.author?.name || comment.author?.handle || "Member";
   const initials = name
@@ -9809,6 +9873,8 @@ function CommentRow({
             postId={postId}
             viewerId={viewerId}
             onReplyAdded={onReplyAdded}
+            onEdited={onEdited}
+            onDeleted={onDeleted}
             isReply
           />
         ))}
@@ -9870,17 +9936,30 @@ function CommentRow({
             {relativeTime(comment.created_at)}
           </span>
         </div>
-        <p
-          style={{
-            margin: "2px 0 4px 0",
-            fontSize: isReply ? 12.5 : 13,
-            color: COLORS.text,
-            whiteSpace: "pre-wrap",
-            lineHeight: 1.4,
-          }}
-        >
-          {comment.content}
-        </p>
+        {editing ? (
+          <CommentEditBox
+            initial={comment.content}
+            onCancel={() => setEditing(false)}
+            onSave={async (text) => {
+              const r = await saveOwnCommentEdit(comment.id, text);
+              if (r.kind === "saved") onEdited(comment.id, r.content);
+              // Saved, or the window shut (the toast said so): close either way.
+              return r.kind !== "failed";
+            }}
+          />
+        ) : (
+          <p
+            style={{
+              margin: "2px 0 4px 0",
+              fontSize: isReply ? 12.5 : 13,
+              color: COLORS.text,
+              whiteSpace: "pre-wrap",
+              lineHeight: 1.4,
+            }}
+          >
+            {comment.content}
+          </p>
+        )}
         <div
           style={{
             display: "flex",
@@ -9928,6 +10007,14 @@ function CommentRow({
           >
             Reply
           </button>
+          {isOwn && !comment.removed_at && !editing ? (
+            <OwnCommentActions
+              createdAt={comment.created_at}
+              busy={deleting}
+              onEdit={() => setEditing(true)}
+              onDelete={() => void removeOwn()}
+            />
+          ) : null}
           {canReport ? (
             <span style={{ position: "relative", marginLeft: "auto" }}>
               <button
