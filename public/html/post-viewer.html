@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<script>(function(){try{var k="vibe_theme",p=null;try{p=localStorage.getItem(k)}catch(e){}if(p!=="light"&&p!=="dark"&&p!=="system")p="system";if(p==="system")p=window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light";document.documentElement.dataset.theme=p}catch(e){}})();</script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#FAF7F2">
+<title>Vibe — Post</title>
+<!--
+  The profile's post popup (_postViewer.js), alone, for the React campus feed
+  on a computer (Nov 16, 2026): clicking a photo there opens exactly the
+  popup a profile opens. The feed shows this page in a full-window frame
+  (src/components/campus/PostViewerFrame.tsx) because the popup's buttons
+  are inline onclick handlers, which the React pages' browser code rule
+  refuses and the static pages' rule allows (src/lib/security/csp.ts).
+
+  Talks to the frame's parent only, same origin, with postMessage
+  { source: "vibe-post-viewer", v: 1, type, ... }:
+    parent → here: open { id, prefill }
+    here → parent: ready | closed { id, counts } | deleted { id } |
+                   edited { id, content, tags, edited_at }
+  The names are written by hand in both files; a change is a change there.
+-->
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,300..800;1,400&family=Fraunces:ital,wght,SOFT@0,400..900,100;1,400,100&display=swap" rel="stylesheet">
+<style>
+/* The theme tokens the popup and its sheets read: a copy of messages.html's
+   two blocks (light, then Night). Keep them in step with that page. */
+:root{--cream:#FAF7F2;--charcoal:#1C1C1E;--soft:#2D2D2D;--muted:#6C6761;--ink-muted:#6C6761;--accent:#FF5C35;--green:#2ECC71;--border:rgba(28,28,30,.08);--shadow:0 4px 24px rgba(0,0,0,.06);--shadow-lg:0 12px 48px rgba(0,0,0,.1);--paper:#FFFFFF;--on-ink:#FFFFFF;--on-coral:#160A06;--tag-ink:#B83A1A;
+  --scrim-rgb:28,28,30;--t-hover:#FAFAF8;--coral-wash:#FFF8F6;--coral-wash-2:#FFF5F2;--note-wash:#FFF8F2;--danger-wash:#FDF4F2;--error-ink:#C0392B;--error-ink-hover:#9C2D1F;}
+:root[data-theme="dark"]{color-scheme:dark;--cream:#0C0B0B;--charcoal:#F6F1EA;--soft:#CFC8BE;--muted:#9C958C;--ink-muted:#9C958C;--border:rgba(255,255,255,.09);--shadow:0 4px 24px rgba(0,0,0,.45);--shadow-lg:0 12px 48px rgba(0,0,0,.45);--paper:#161515;--on-ink:#0C0B0B;--on-coral:#160A06;--tag-ink:#FF8A66;
+  --scrim-rgb:255,255,255;--t-hover:#1F1D1C;--coral-wash:rgba(255,92,53,0.10);--coral-wash-2:rgba(255,92,53,0.14);--note-wash:rgba(255,92,53,0.10);--danger-wash:rgba(192,57,43,0.16);--error-ink:#FF7A6B;--error-ink-hover:#FF9A8C;}
+/* The frame stays see-through only while its color-scheme matches the feed
+   page's (globals.css: light, and dark under data-theme="dark"). */
+:root:not([data-theme="dark"]){color-scheme:light;}
+*{margin:0;padding:0;box-sizing:border-box;}
+/* See-through: the feed stays under the popup's dimmed backdrop. */
+html,body{height:100%;overflow:hidden;background:transparent;}
+body{font-family:'DM Sans',sans-serif;font-synthesis-weight:none;color:var(--charcoal);}
+button,input,select,textarea{font-family:inherit;}
+/* The feed draws the one coral cursor over this frame too (pointer events
+   are posted up below, as messages.html does), exactly where the feed draws
+   it at all (globals.css: a fine pointer, 900px and wider). Elsewhere the
+   native one stays. */
+@media (pointer: fine) and (min-width: 900px) {
+  *,*::before,*::after{cursor:none!important;}
+  input,textarea,[contenteditable="true"]{cursor:text!important;}
+}
+/* The popup's sheets set cursor:none on their own buttons (profile.html
+   always draws its cursor); without the feed's cursor that hides the pointer. */
+@media (pointer: coarse), (max-width: 899px) {
+  a, button, [onclick], [role="button"] { cursor: pointer !important; }
+}
+/* The popup drops its dim inside a frame (the Messages pane is beside the
+   app's own menu). This frame covers the whole window, so keep the dim. */
+/* !important: the popup injects its own frame rule after this sheet. */
+html.vpv-iframe .vpv-overlay { background: rgba(28,28,30,.72) !important; backdrop-filter: blur(8px) !important; }
+html.vpv-iframe .vpv-card { box-shadow: 0 20px 60px rgba(0,0,0,.35) !important; }
+</style>
+<script src="/html/_persistence.js"></script>
+<script src="/html/_postViewer.js" defer></script>
+<script src="/html/_sharePicker.js" defer></script>
+<script src="/html/_safetyActions.js" defer></script>
+<script src="/html/_mentionPicker.js" defer></script>
+</head>
+<body>
+<script>
+(function () {
+  var SOURCE = 'vibe-post-viewer';
+  var parentWin = null;
+  try { if (window.parent && window.parent !== window) parentWin = window.parent; } catch (e) {}
+  function say(type, extra) {
+    if (!parentWin) return;
+    try {
+      parentWin.postMessage(Object.assign({ source: SOURCE, v: 1, type: type }, extra || {}), location.origin);
+    } catch (e) {}
+  }
+
+  // One coral cursor across the frame edge: the same forwarding as
+  // messages.html (CustomCursor.tsx listens for "vibe-cursor").
+  if (parentWin) {
+    var HS = 'a,button,[role="button"],[onclick]';
+    var post = function (type, extra) {
+      try { parentWin.postMessage(Object.assign({ source: 'vibe-cursor', type: type }, extra || {}), location.origin); } catch (e) {}
+    };
+    document.addEventListener('mousemove', function (e) { post('move', { x: e.clientX, y: e.clientY }); }, { passive: true });
+    document.addEventListener('mousedown', function () { post('down'); });
+    document.addEventListener('mouseup', function () { post('up'); });
+    document.addEventListener('mouseover', function (e) { if (e.target.closest && e.target.closest(HS)) post('hover-on'); });
+    document.addEventListener('mouseout', function (e) { if (e.target.closest && e.target.closest(HS)) post('hover-off'); });
+    document.documentElement.addEventListener('mouseleave', function () { post('leave'); });
+  }
+
+  // The popup's own events, passed up so the feed's card catches up.
+  window.addEventListener('vibe:post-deleted', function (e) {
+    // The feed removes its card itself (the popup must not pull a node
+    // React owns out of the page).
+    e.preventDefault();
+    say('deleted', { id: e.detail && e.detail.id });
+  });
+  window.addEventListener('vibe:post-edited', function (e) {
+    var d = e.detail || {};
+    say('edited', { id: d.id, content: d.content, tags: d.tags, edited_at: d.edited_at });
+  });
+  window.addEventListener('vibe:post-viewer-closed', function (e) {
+    var d = e.detail || {};
+    say('closed', { id: d.id, counts: d.counts || null });
+  });
+
+  // The popup reads "signed in" from the vibe_user_v1 copy the profile page
+  // keeps; someone who has never opened their profile on this device has
+  // none yet, so fetch it the way /profile does (profile-html-bridge.tsx).
+  function ensureSignedInCopy() {
+    var u = (typeof vibeLoad === 'function') ? vibeLoad('vibe_user_v1') : null;
+    if (u && u._appShell) return Promise.resolve();
+    return fetch('/api/me/profile-bootstrap', { credentials: 'include' })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (d) {
+        if (d && d.ok && d.vibeUser) {
+          try { localStorage.setItem('vibe_user_v1', JSON.stringify(d.vibeUser)); } catch (e) {}
+        }
+      })
+      .catch(function () {});
+  }
+
+  window.addEventListener('message', function (e) {
+    if (e.origin !== location.origin || e.source !== parentWin) return;
+    var d = e.data;
+    if (!d || d.source !== SOURCE || d.v !== 1 || d.type !== 'open') return;
+    if (typeof d.id !== 'string' || !d.id || typeof window.openPostViewer !== 'function') return;
+    window.focus();
+    window.openPostViewer(d.id, d.prefill && typeof d.prefill === 'object' ? d.prefill : undefined);
+  });
+
+  // Deferred scripts have run by DOMContentLoaded.
+  document.addEventListener('DOMContentLoaded', function () {
+    ensureSignedInCopy().then(function () { say('ready'); });
+  });
+})();
+</script>
+</body>
+</html>

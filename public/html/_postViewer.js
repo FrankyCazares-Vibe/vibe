@@ -530,6 +530,7 @@
   // ── State ─────────────────────────────────────────────────────────────
   const state = {
     openId: null,           // post id of currently open modal
+    loadedId: null,         // openId once GET /api/posts/[id] answered for it
     authorId: null,         // post.user_id — drives the "..." menu visibility
     authorName: "",         // post author display name (for share preview)
     type:     "post",
@@ -677,6 +678,7 @@
     const inp = document.getElementById("vpvCommentInput");
     if (inp && window.vibeBindMentionPicker) window.vibeBindMentionPicker(inp);
     state.openId = String(postId);
+    state.loadedId = null;
     const overlay = document.getElementById("vpvOverlay");
     overlay.classList.add("show");
     document.documentElement.style.overflow = "hidden";
@@ -749,6 +751,7 @@
       // link stuck on "Loading…" for ever.
       if (String(pr.data.post.id).toLowerCase() !== String(state.openId).toLowerCase()) return;
       renderFromServer(pr.data);
+      state.loadedId = state.openId; // the server answered for this post
     } else if (pr.ok) {
       // A 2xx with no post: no copy rule maps a 2xx, so say it here.
       window.vibeToast(postLine + " Try again.", { tone: "error" });
@@ -784,6 +787,24 @@
   function closeViewer(viaPopstate) {
     // Never leave the audience sheet floating over a closed post.
     if (aud.open) closeAudience();
+    // Closed, with the counts the student leaves with, for a page whose card
+    // under the modal keeps its own (the React campus feed through
+    // post-viewer.html, Nov 16, 2026). Counts only once the server answered
+    // for this post, so a prefill's guess never repaints a card. Profile and
+    // Messages don't listen.
+    if (state.openId) {
+      const loaded = state.loadedId === state.openId && !state.removed;
+      window.dispatchEvent(new CustomEvent("vibe:post-viewer-closed", {
+        detail: {
+          id: state.openId,
+          counts: loaded ? {
+            liked: !!state.liked, likes: Number(state.likes) || 0,
+            saved: !!state.saved, comments: Number(state.comments) || 0,
+          } : null,
+        },
+      }));
+    }
+    state.loadedId = null;
     state.openId = null;
     state.editing = false;
     // Same reason as the reset in openPostViewer: a stalled PATCH must not
@@ -1729,6 +1750,12 @@
   // Cheap and dumb: walk the DOM by data attributes the surfaces stamp.
   function _vpvScrubPostFromPage(postId) {
     const id = String(postId);
+    // A page that draws its own cards (the React campus feed on a computer,
+    // Nov 16, 2026) takes the event and removes the card itself: pulling a
+    // node React owns out of the DOM breaks React's next render.
+    const handled = !window.dispatchEvent(new CustomEvent("vibe:post-deleted",
+      { detail: { id }, cancelable: true }));
+    if (handled) return;
     const selectors = [
       `[data-post-id="${id}"]`,           // .profile-post-card, campus .post
       `[data-source-post-id="${id}"]`,    // .post-thumb-cell in All grid

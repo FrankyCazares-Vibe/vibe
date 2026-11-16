@@ -207,6 +207,11 @@ import {
   usePostEngagement,
 } from "@/lib/posts/engagement-store";
 import { feedClubOf, muteClubRowLabel, type FeedClub, withoutClubPosts } from "@/lib/posts/feed-actions";
+import {
+  PostViewerFrameProvider,
+  usePostViewerFrame,
+  type PostViewerCounts,
+} from "@/components/campus/PostViewerFrame";
 import { CLUB_TITLE_MAX, clubFlairLabel, normalizeClubTitle } from "@/lib/profile/club-flair";
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser";
 import {
@@ -7205,6 +7210,19 @@ function FeedTabBody({
     [],
   );
 
+  // The profile's post popup, opened from a photo (PostViewerFrame.tsx): on
+  // close, the like, save and comment numbers it ended on reach every row
+  // showing that post. Only a post the feed already seeded; one it never saw
+  // keeps its own fields until the next refresh.
+  const applyViewerCounts = useCallback((postId: string, counts: PostViewerCounts | null) => {
+    if (!counts) return;
+    const base = readEngagement(postId);
+    if (!base) return;
+    patchEngagement(postId, "like", base, () => ({ liked: counts.liked, likeCount: counts.likes }));
+    patchEngagement(postId, "save", base, () => ({ saved: counts.saved }));
+    patchEngagement(postId, "comment", base, () => ({ commentCount: counts.comments }));
+  }, []);
+
   // After a post or a row change. The student started it, so a refusal
   // toasts (vibeRequest's, or ours for a bad body) and the feed stays put.
   const refresh = useCallback(async () => {
@@ -7315,9 +7333,14 @@ function FeedTabBody({
   }, [entries]);
 
   return (
-    // One centered reading column, 720px like the phone held sideways
-    // (Option A, Franky 2026-09-26): cream margins either side, one card
-    // per post below. Events and Map keep their own wider caps.
+    <PostViewerFrameProvider
+      onDeleted={dropDeletedPost}
+      onEdited={applyPostEdit}
+      onClosed={applyViewerCounts}
+    >
+    {/* One centered reading column, 720px like the phone held sideways
+        (Option A, Franky 2026-09-26): cream margins either side, one card
+        per post below. Events and Map keep their own wider caps. */}
     <section
       id="campus-feed"
       style={{
@@ -7484,6 +7507,7 @@ function FeedTabBody({
         </div>
       )}
     </section>
+    </PostViewerFrameProvider>
   );
 }
 
@@ -8131,6 +8155,29 @@ function FeedRow({
   const [likeBurst, setLikeBurst] = useState(0);
   const [viewCount, setViewCount] = useState(post.view_count);
   const [showComments, setShowComments] = useState(false);
+  // A photo opens the profile's post popup (PostViewerFrame.tsx).
+  const postViewer = usePostViewerFrame();
+  const openPhoto = useCallback(() => {
+    if (!postViewer) {
+      setShowComments(true);
+      return;
+    }
+    postViewer.open({
+      id: post.id,
+      type: post.type,
+      content: post.content ?? "",
+      tags: post.tags ?? [],
+      media_url: post.media_url ?? "",
+      media_thumbnail_url: post.media_thumbnail_url ?? "",
+      media_kind: post.media_kind,
+      created_at: post.created_at,
+      edited_at: post.edited_at ?? null,
+      author: post.author
+        ? { name: post.author.name, handle: post.author.handle, avatar_url: post.author.avatar_url }
+        : null,
+      org: post.org ? { name: post.org.name } : null,
+    });
+  }, [postViewer, post]);
   const [showRepostMenu, setShowRepostMenu] = useState(false);
   // Owner-only "more" menu — Delete is the only entry for now. Anchored
   // on the row's top-right via a small kebab. Click-outside closes it.
@@ -8900,12 +8947,20 @@ function FeedRow({
         ) : null}
         {post.media_url && post.type === "post" && post.media_kind === "image" ? (
           <div
-            onClick={() => {
-              if (!showComments) setShowComments(true);
+            // Opens the post the way a profile does: the profile's own popup,
+            // whole photo, likes and comments (Franky, Nov 16, 2026;
+            // PostViewerFrame.tsx). Outside that provider, the old unfold.
+            onPointerEnter={() => postViewer?.warm()}
+            onClick={openPhoto}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                openPhoto();
+              }
             }}
             role="button"
             tabIndex={0}
-            aria-label={`Photo posted by ${displayName}, open comments`}
+            aria-label={`Photo posted by ${displayName}, open post`}
             // Keeps the name in the label out of Sentry's speed reports: it
             // writes "PostPhoto" for this element and never reads the label.
             data-sentry-element="PostPhoto"

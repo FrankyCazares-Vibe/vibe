@@ -63,6 +63,9 @@ const HTML_TO_CLEAN: Record<string, string> = {
   "/html/profile.html": "/profile",
   "/html/messages.html": "/messages",
   "/html/onboarding.html": "/onboarding",
+  // The profile's post popup alone, framed by the campus feed on a computer
+  // (Nov 16, 2026; public/html/post-viewer.html).
+  "/html/post-viewer.html": "/campus",
   // Retired prototypes (deleted in S55). Old links still land somewhere sane.
   "/html/feed.html": "/feed",
   "/html/campus.html": "/campus",
@@ -73,7 +76,7 @@ const HTML_TO_CLEAN: Record<string, string> = {
 };
 
 /** Static pages that ARE the signed-in desktop app when loaded with `?app=1`. */
-const APP_HTML = new Set(["/html/profile.html", "/html/messages.html"]);
+const APP_HTML = new Set(["/html/profile.html", "/html/messages.html", "/html/post-viewer.html"]);
 
 /** The one page a restricted student sees, and the only page they land on. */
 const SUSPENDED_PAGE = "/account/suspended";

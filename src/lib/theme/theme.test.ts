@@ -261,6 +261,7 @@ const STATIC_HEADS = [
   "public/html/profile.html",
   "public/html/messages.html",
   "public/html/onboarding.html",
+  "public/html/post-viewer.html",
   "public/offline.html",
 ];
 
