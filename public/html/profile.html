@@ -6868,10 +6868,34 @@ function _isAppShell() {
 
 // Holds the URL of the (already-uploaded) image for the next post submission.
 let _composerPendingImageUrl = '';
+// The photo upload still in flight: { seq, promise } (the promise never
+// rejects; it settles to { url } or { error }), or null. Publish waits for it.
+// Bug fixed Nov 16, 2026: the preview shows the moment a photo is picked, but
+// the upload takes a few seconds (the server re-encodes it), and a Publish
+// clicked in that window sent the caption with no photo. A photo-only post
+// never showed it, because Publish quietly did nothing until the URL was set.
+let _composerUpload = null;
+// Bumped whenever the attached photo is removed, replaced or posted, so an
+// upload that finishes after that never attaches itself to a later post.
+let _composerUploadSeq = 0;
 
 function composerChooseImage() {
   const inp = document.getElementById('composerPostImage');
   if (inp) inp.click();
+}
+
+async function _composerUploadPhoto(file) {
+  try {
+    const fd = new FormData();
+    fd.append('file', file);
+    fd.append('kind', 'post');
+    const r = await fetch('/api/me/profile-upload', { method: 'POST', credentials: 'include', body: fd });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || !j.ok || !j.url) return { error: (j && j.error) || 'Upload failed' };
+    return { url: j.url };
+  } catch (e) {
+    return { error: e && e.message ? e.message : 'Could not upload photo' };
+  }
 }
 
 async function composerOnImagePicked(input) {
@@ -6882,27 +6906,29 @@ async function composerOnImagePicked(input) {
     showToast('Sign in to attach photos');
     return;
   }
+  // A new pick replaces the old photo, and any upload of it still running.
+  composerClearImage();
+  const seq = _composerUploadSeq;
   const preview = document.getElementById('composerPostImagePreview');
   const img = document.getElementById('composerPostImageImg');
   if (img) img.src = URL.createObjectURL(file);
   if (preview) preview.style.display = 'block';
-  try {
-    const fd = new FormData();
-    fd.append('file', file);
-    fd.append('kind', 'post');
-    const r = await fetch('/api/me/profile-upload', { method: 'POST', credentials: 'include', body: fd });
-    const j = await r.json().catch(() => ({}));
-    if (!r.ok || !j.ok || !j.url) {
-      throw new Error((j && j.error) || 'Upload failed');
-    }
-    _composerPendingImageUrl = j.url;
-  } catch (e) {
+  const promise = _composerUploadPhoto(file);
+  _composerUpload = { seq, promise };
+  const res = await promise;
+  if (seq !== _composerUploadSeq) return; // removed, replaced or posted meanwhile
+  _composerUpload = null;
+  if (res.url) {
+    _composerPendingImageUrl = res.url;
+  } else {
     composerClearImage();
-    showToast(e && e.message ? e.message : 'Could not upload photo');
+    showToast(res.error || 'Could not upload photo');
   }
 }
 
 function composerClearImage() {
+  _composerUploadSeq++;
+  _composerUpload = null;
   _composerPendingImageUrl = '';
   const preview = document.getElementById('composerPostImagePreview');
   const img = document.getElementById('composerPostImageImg');
@@ -6912,8 +6938,8 @@ function composerClearImage() {
 
 async function publishProfilePost() {
   const input = document.getElementById('profilePostInput');
-  const text = (input && input.value || '').trim();
-  if (!text && !_composerPendingImageUrl) return;
+  let text = (input && input.value || '').trim();
+  if (!text && !_composerPendingImageUrl && !_composerUpload) return;
 
   // Sessions without an app shell stay on the local-only path.
   if (!_isAppShell()) {
@@ -6922,6 +6948,28 @@ async function publishProfilePost() {
   }
 
   const btn = document.querySelector('.profile-composer.owner-only .composer-publish');
+  if (btn && btn.disabled) return; // already publishing
+  // A photo still uploading: wait for it, so the caption never goes out
+  // without the photo the student can see attached.
+  const job = _composerUpload;
+  if (job) {
+    if (btn) { btn.disabled = true; btn.textContent = 'Adding photo…'; }
+    const res = await job.promise;
+    if (btn) { btn.disabled = false; btn.textContent = 'Publish'; }
+    // Failed: composerOnImagePicked says so and removes the preview. Stop
+    // here (checked first: that removal also bumps the seq); the caption
+    // stays in the box for another try.
+    if (!res.url) return;
+    if (job.seq !== _composerUploadSeq) {
+      // Removed or replaced while we waited: publish what is attached now
+      // (a replacement is waited for the same way).
+      return publishProfilePost();
+    }
+    _composerPendingImageUrl = res.url;
+    _composerUpload = null;
+    text = (input && input.value || '').trim();
+  }
+
   if (btn) { btn.disabled = true; btn.textContent = 'Publishing…'; }
   try {
     const r = await fetch('/api/me/publish-post', {
