@@ -1,10 +1,12 @@
 import type { Metadata, Viewport } from "next";
 import { redirect } from "next/navigation";
+import { preload } from "react-dom";
 
 import { HomeLanding } from "@/components/landing/home-landing";
 import { CookieNotice } from "@/components/legal/CookieNotice";
 import { OpenBeacon } from "@/components/tally/OpenBeacon";
 import { appShellFromRequest } from "@/lib/native/server";
+import { WORDMARK_FONT_PATH } from "@/lib/theme/fonts";
 import { isSignupOpen } from "@/lib/waitlist/signup-open";
 import { parseSignupOverride } from "@/lib/waitlist/types";
 
@@ -53,6 +55,10 @@ export default async function Home({
   // dev-only `?signup=open|closed` previews either state locally.
   const raw = (await searchParams).signup;
   const override = parseSignupOverride(Array.isArray(raw) ? raw[0] : raw, process.env.NODE_ENV);
+  // Nov 18, 2026: both logos here moved to the wordmark face, which is
+  // font-display block. Asked for up front, as on the sign-in page, so the
+  // top bar's letters don't land while still invisible. 1.4 KB, same origin.
+  preload(WORDMARK_FONT_PATH, { as: "font", type: "font/woff2" });
   return (
     <>
       <HomeLanding signupOpen={await isSignupOpen(override)} />

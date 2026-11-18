@@ -22,10 +22,20 @@
    theme as well: the overscroll, the iPhone bars and the page edges would
    otherwise show the app's cream around it. */
 :root:has(.vln-root), :root:has(.vln-root) body { background: #0C0B0B; color-scheme: dark; }
-.vln-root h1, .vln-root h2, .vln-wordmark, .vln-pop strong {
+.vln-root h1, .vln-root h2, .vln-pop strong {
   font-family: var(--font-soft), "Fraunces", serif;
   font-variation-settings: "SOFT" 100, "opsz" 144;
   letter-spacing: -0.03em;
+  margin: 0;
+}
+/* The logo has its own rule since Nov 18, 2026: the wordmark face (v2, which
+   carries the logo's spacing) and the logo's spacing, not the headlines'
+   -0.03em, which ran the v into the i. The soft face stands in, the same
+   shape at the old fit, if the wordmark file ever fails to load. */
+.vln-wordmark {
+  font-family: "Vibe Wordmark", var(--font-soft, "Fraunces"), "Fraunces", serif;
+  font-variation-settings: "SOFT" 100, "opsz" 144;
+  letter-spacing: var(--wordmark-letter-spacing);
   margin: 0;
 }
 

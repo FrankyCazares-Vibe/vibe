@@ -276,12 +276,14 @@ const topBarStyle: CSSProperties = {
 };
 
 // Oct 19, 2026: the dedicated wordmark face (globals.css "Vibe Wordmark"),
-// so the header logo matches the landing's soft "vibe." exactly.
+// so the header logo matches the landing's soft "vibe." exactly. Nov 18,
+// 2026: and the logo's own spacing (.vibe-wordmark), not -0.03em.
 const logoStyle: CSSProperties = {
   fontFamily: "var(--font-wordmark)",
   fontSize: 18,
   fontWeight: 900,
-  letterSpacing: "-0.03em",
+  fontVariationSettings: '"SOFT" 100, "opsz" 144',
+  letterSpacing: "var(--wordmark-letter-spacing)",
   color: "white",
 };
 

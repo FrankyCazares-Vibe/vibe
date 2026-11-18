@@ -143,7 +143,7 @@ html,body{height:100%;overflow:hidden;}
 /* The "vibe." logo face: Fraunces cut to the landing's exact shape (opsz
    144, SOFT 100, 900), only its five letters, 1.4 KB, same origin. The twin
    of the @font-face in src/app/globals.css (Oct 19, 2026). */
-@font-face{font-family:"Vibe Wordmark";src:url("/fonts/vibe-wordmark-v1.woff2") format("woff2");font-weight:900;font-style:normal;font-display:block;unicode-range:U+2E, U+62, U+65, U+69, U+76;}
+@font-face{font-family:"Vibe Wordmark";src:url("/fonts/vibe-wordmark-v2.woff2") format("woff2"), url("/fonts/vibe-wordmark-v2.woff") format("woff");font-weight:900;font-style:normal;font-display:block;unicode-range:U+2E, U+62, U+65, U+69, U+76;}
 /* font-synthesis-weight: no browser-faked bold, a weight the font lacks
    draws as the real face (Oct 19, 2026). */
 body{font-family:'DM Sans',sans-serif;font-synthesis-weight:none;background:var(--cream);color:var(--charcoal);cursor:none;}
@@ -160,7 +160,10 @@ button,input,select,textarea{font-family:inherit;}
 .shell{display:grid;grid-template-columns:200px 300px 1fr;height:100vh;}
 .left-nav{padding:20px 14px;border-right:1px solid var(--border);display:flex;flex-direction:column;overflow-y:auto;scrollbar-width:none;}
 .left-nav::-webkit-scrollbar{display:none;}
-.nav-logo{font-family:"Vibe Wordmark",'Fraunces',serif;font-size:22px;font-weight:900;color:var(--charcoal);letter-spacing:-0.03em;display:block;margin-bottom:24px;text-decoration:none;}
+/* The logo: the spacing is in the v2 font; this only opens it a little at
+   small sizes, and the thinner smoothing keeps the v off the i (Nov 18, 2026,
+   was -0.03em). The twin of .vibe-wordmark in src/app/globals.css. */
+.nav-logo{font-family:"Vibe Wordmark",'Fraunces',serif;font-size:22px;font-weight:900;font-variation-settings:"SOFT" 100, "opsz" 144;color:var(--charcoal);letter-spacing:clamp(0px, calc((60px - 1em) * 0.017), 0.04em);-webkit-font-smoothing:antialiased;display:block;margin-bottom:24px;text-decoration:none;}
 .nav-logo span{color:var(--accent);}
 .nav-item{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:12px;font-size:14px;font-weight:500;color:var(--muted);cursor:none;text-decoration:none;transition:all .15s;border:none;background:none;width:100%;text-align:left;margin-bottom:2px;}
 .nav-item:hover{background:var(--paper);color:var(--charcoal);}

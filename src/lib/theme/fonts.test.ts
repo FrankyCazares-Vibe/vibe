@@ -19,7 +19,9 @@ import { test } from "node:test";
 import type * as FontsModule from "./fonts";
 
 const specifier = "./fonts.ts";
-const { GOOGLE_FONTS_HREF, WORDMARK_FONT_PATH } = (await import(specifier)) as typeof FontsModule;
+const { GOOGLE_FONTS_HREF, WORDMARK_FONT_PATH, WORDMARK_WOFF_PATH, WORDMARK_LETTER_SPACING } = (await import(
+  specifier
+)) as typeof FontsModule;
 
 const REPO_ROOT = new URL("../../../", import.meta.url);
 const STATIC_PAGES = [
@@ -155,10 +157,55 @@ for (const file of STATIC_PAGES) {
         `${file}: ${logo} uses ${r.decls["font-family"]}; it must start with "Vibe Wordmark".`,
       );
       assert.equal(r.decls["font-weight"], "900", `${file}: ${logo} must be font-weight 900.`);
-      assert.equal(r.decls["letter-spacing"], "-0.03em", `${file}: ${logo} must use letter-spacing -0.03em.`);
+      // Nov 18, 2026: the logo's own spacing (the v2 font carries the fit),
+      // not the headlines' -0.03em, which ran the v into the i.
+      assert.equal(
+        r.decls["letter-spacing"],
+        normValue(WORDMARK_LETTER_SPACING),
+        `${file}: ${logo} must use letter-spacing ${WORDMARK_LETTER_SPACING} (WORDMARK_LETTER_SPACING in fonts.ts).`,
+      );
+      // These pages don't set the app's thinner smoothing on <body>; without
+      // it the v and the i can still meet at 42 to 72 px.
+      assert.equal(
+        r.decls["-webkit-font-smoothing"],
+        "antialiased",
+        `${file}: ${logo} must set -webkit-font-smoothing: antialiased.`,
+      );
     }
   });
 }
+
+test("drift: every logo rule in React uses the logo's spacing, not -0.03em", async () => {
+  const globals = cssRules(await readFile(new URL("src/app/globals.css", REPO_ROOT), "utf8"));
+  const roots = globals.filter((r) => r.decls["--wordmark-letter-spacing"]);
+  assert.equal(roots.length, 1, "src/app/globals.css: expected one rule declaring --wordmark-letter-spacing.");
+  assert.equal(roots[0].selector, ":root", "--wordmark-letter-spacing belongs on :root.");
+  assert.equal(
+    roots[0].decls["--wordmark-letter-spacing"],
+    normValue(WORDMARK_LETTER_SPACING),
+    "src/app/globals.css: --wordmark-letter-spacing differs from WORDMARK_LETTER_SPACING in fonts.ts.",
+  );
+  const landing = cssRules(await readFile(new URL("src/components/landing/landing.css", REPO_ROOT), "utf8"));
+  const logos: [string, { selector: string; decls: Record<string, string> }[]][] = [
+    ["src/app/globals.css", globals.filter((r) => r.selector === ".vibe-wordmark" || r.selector === ".vibe-auth-brand")],
+    ["src/components/landing/landing.css", landing.filter((r) => r.selector === ".vln-wordmark" && r.decls["font-family"])],
+  ];
+  for (const [file, rules] of logos) {
+    assert.ok(rules.length > 0, `${file}: its logo rule is missing.`);
+    for (const r of rules) {
+      assert.equal(
+        r.decls["letter-spacing"],
+        "var(--wordmark-letter-spacing)",
+        `${file}: ${r.selector} must use letter-spacing var(--wordmark-letter-spacing).`,
+      );
+      const family = r.decls["font-family"];
+      assert.ok(
+        family === "var(--font-wordmark)" || family.startsWith('"Vibe Wordmark",'),
+        `${file}: ${r.selector} uses ${family}; it must draw in the wordmark face.`,
+      );
+    }
+  }
+});
 
 test("drift: the root layout takes the link from fonts.ts, not a literal", async () => {
   const tsx = await readFile(new URL("src/app/layout.tsx", REPO_ROOT), "utf8");
@@ -176,8 +223,8 @@ test("drift: globals.css declares the wordmark face at WORDMARK_FONT_PATH", asyn
   const face = faces[0];
   assert.equal(
     face.src,
-    `url("${WORDMARK_FONT_PATH}") format("woff2")`,
-    `src/app/globals.css: the "Vibe Wordmark" @font-face must load ${WORDMARK_FONT_PATH}.`,
+    `url("${WORDMARK_FONT_PATH}") format("woff2"),url("${WORDMARK_WOFF_PATH}") format("woff")`,
+    `src/app/globals.css: the "Vibe Wordmark" @font-face must load ${WORDMARK_FONT_PATH}, then ${WORDMARK_WOFF_PATH}.`,
   );
   assert.equal(face["font-weight"], "900");
   assert.equal(face["font-style"], "normal");
@@ -192,4 +239,22 @@ test("the wordmark file exists, is a woff2 and stays tiny", async () => {
   assert.ok(size < 4096, `public${WORDMARK_FONT_PATH}: ${size} B, expected under 4,096 B (five glyphs).`);
   const head = (await readFile(url)).subarray(0, 4).toString("latin1");
   assert.equal(head, "wOF2", `public${WORDMARK_FONT_PATH}: not a woff2 file.`);
+});
+
+test("the wordmark .woff exists, is a woff and stays tiny", async () => {
+  const url = new URL(`public${WORDMARK_WOFF_PATH}`, REPO_ROOT);
+  const { size } = await stat(url);
+  assert.ok(size < 4096, `public${WORDMARK_WOFF_PATH}: ${size} B, expected under 4,096 B (five glyphs).`);
+  const head = (await readFile(url)).subarray(0, 4).toString("latin1");
+  assert.equal(head, "wOFF", `public${WORDMARK_WOFF_PATH}: not a woff file.`);
+});
+
+test("drift: the cards read the .woff at WORDMARK_WOFF_PATH", async () => {
+  // share-card.tsx writes the path out (so the build's file tracing ships the
+  // file with the club card); it must be the same file.
+  const tsx = await readFile(new URL("src/lib/og/share-card.tsx", REPO_ROOT), "utf8");
+  assert.ok(
+    tsx.includes(`"public${WORDMARK_WOFF_PATH}"`),
+    `src/lib/og/share-card.tsx: loadWordmarkFont must read "public${WORDMARK_WOFF_PATH}".`,
+  );
 });
