@@ -9,7 +9,8 @@ import {
 // that doesn't set its own openGraph.images, so the root layout's metadata
 // must not list an image of its own (that would win over this file).
 // Caption: "THE SOCIAL APP FOR YOUR CAMPUS" (S72). Tagline: "self" in coral
-// after a cream "Your" (S74). The image URL carries this file's hash, not the
+// after a cream "Your" (S74). Logo: Vibe Wordmark v2, the per-pair fit, the
+// v clear of the i (Nov 18, 2026). The image URL carries this file's hash, not the
 // card's, so a change to the card needs an edit here too, or link previews
 // keep the old picture from their caches.
 export const alt = SHARE_CARD_ALT;

@@ -52,22 +52,26 @@
    shape (opsz 144, SOFT 100, weight 900) and to the five letters it draws, so
    it is 1.4 KB and the browser fetches it only where a logo is on screen.
    `block`, not `swap`: a logo that flashes in Georgia first looks broken.
-   The static pages declare the same face; WORDMARK_FONT_PATH in
-   src/lib/theme/fonts.ts. */
+   v2 (Nov 18, 2026) carries the logo's spacing in its letter widths, so the
+   v no longer runs into the i, nor the b into the e (WORDMARK_FONT_PATH in
+   src/lib/theme/fonts.ts says how). The static pages declare the same face. */
 @font-face {
   font-family: "Vibe Wordmark";
-  src: url("/fonts/vibe-wordmark-v1.woff2") format("woff2");
+  src: url("/fonts/vibe-wordmark-v2.woff2") format("woff2"), url("/fonts/vibe-wordmark-v2.woff") format("woff");
   font-weight: 900;
   font-style: normal;
   font-display: block;
   unicode-range: U+2E, U+62, U+65, U+69, U+76;
 }
-/* Every "vibe." logo in React. -0.03em is the brand guide's spacing; the
-   narrower opsz-144 letters look cramped at the old -1px. */
+/* Every "vibe." logo in React. Not the headlines' -0.03em: the font carries
+   the logo's spacing, and --wordmark-letter-spacing only opens it a little
+   below 60 px (Nov 18, 2026). The variation settings shape the Fraunces
+   stand-in like the logo if the wordmark file ever fails to load. */
 .vibe-wordmark {
   font-family: var(--font-wordmark);
   font-weight: 900;
-  letter-spacing: -0.03em;
+  font-variation-settings: "SOFT" 100, "opsz" 144;
+  letter-spacing: var(--wordmark-letter-spacing);
 }
 
 /* Vibe's own colour tokens (S67, contracts C0): the light values. Unlayered on
@@ -86,6 +90,10 @@
   --font-body: "DM Sans", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   --font-display: "Fraunces", Georgia, "Times New Roman", serif;
   --font-wordmark: "Vibe Wordmark", "Fraunces", Georgia, serif;
+  /* The logo's letter spacing (WORDMARK_LETTER_SPACING in fonts.ts): 0 from
+     60 px up, +0.04em at 18 px. Unregistered, so its 1em is the font size of
+     the logo that uses it, not of :root. */
+  --wordmark-letter-spacing: clamp(0px, calc((60px - 1em) * 0.017), 0.04em);
   --font-code: ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
   --cream: #FAF7F2;
   --charcoal: #1C1C1E;
@@ -608,12 +616,14 @@ body > .vibe-auth-page {
 .vibe-auth-brand {
   display: inline-block;
   /* The wordmark face at 900, like every other logo (Oct 19, 2026; was
-     Fraunces 800, harder and lighter than the landing's). */
+     Fraunces 800, harder and lighter than the landing's), and its spacing
+     (.vibe-wordmark above; Nov 18, 2026, was -0.03em). */
   font-family: var(--font-wordmark);
   font-size: 18px;
   font-weight: 900;
+  font-variation-settings: "SOFT" 100, "opsz" 144;
   color: var(--charcoal);
-  letter-spacing: -0.03em;
+  letter-spacing: var(--wordmark-letter-spacing);
   margin-bottom: 22px;
   padding: 4px 10px;
   background: rgba(var(--scrim-rgb), 0.04);

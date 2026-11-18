@@ -7,7 +7,13 @@ import { ORG_ASSET_KEY_PREFIX, signOrgAssetGetUrl } from "@/lib/r2";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 
 import { clubCardContent, type ClubCardContent, type ClubCardRow } from "./club-card-content";
-import { SHARE_CARD_CONTENT_TYPE, SHARE_CARD_SIZE, renderShareCard } from "./share-card";
+import {
+  SHARE_CARD_CONTENT_TYPE,
+  SHARE_CARD_SIZE,
+  WORDMARK_FAMILY,
+  loadWordmarkFont,
+  renderShareCard,
+} from "./share-card";
 
 /**
  * A club's link picture (the club's view, wave 3, B2, Oct 23, 2026): the
@@ -32,7 +38,8 @@ import { SHARE_CARD_CONTENT_TYPE, SHARE_CARD_SIZE, renderShareCard } from "./sha
  *
  * Fonts: share-card.tsx's recipe (Google Fonts, static instances, subset to
  * the card's own words, `force-cache` so they are fetched once per set of
- * words), and next/og's Geist when Google is unreachable.
+ * words), and next/og's Geist when Google is unreachable. The "vibe." is the
+ * app's logo face from public/, like the site's card (Nov 18, 2026).
  */
 
 export const CLUB_CARD_ALT = "The club's name, campus and handle, and how to follow it on vibe.";
@@ -131,16 +138,18 @@ async function loadGoogleFont(family: string, text: string): Promise<ArrayBuffer
   return fontRes.arrayBuffer();
 }
 
-/** Fraunces 900 for the name, the tile and the wordmark; DM Sans 400 and 600 for the rest. */
+/** Fraunces 900 for the name and the tile, the logo face for "vibe.", DM Sans 400 and 600 for the rest. */
 async function loadCardFonts(c: ClubCardContent): Promise<FontSpec> {
   try {
-    const [display, body, caps] = await Promise.all([
-      loadGoogleFont("Fraunces:opsz,wght,SOFT,WONK@144,900,100,0", `${c.name}${c.initials}vibe.`),
+    const [display, wordmark, body, caps] = await Promise.all([
+      loadGoogleFont("Fraunces:opsz,wght,SOFT,WONK@144,900,100,0", `${c.name}${c.initials}`),
+      loadWordmarkFont(),
       loadGoogleFont("DM Sans:wght@400", `Follow us on @${c.handle}${c.bio ?? ""}`),
       loadGoogleFont("DM Sans:wght@600", c.eyebrow),
     ]);
     return [
       { name: "Fraunces", data: display, weight: 900, style: "normal" },
+      { name: WORDMARK_FAMILY, data: wordmark, weight: 900, style: "normal" },
       { name: "DM Sans", data: body, weight: 400, style: "normal" },
       { name: "DM Sans", data: caps, weight: 600, style: "normal" },
     ];
@@ -264,11 +273,12 @@ function ClubCard({ c, logo }: { c: ClubCardContent; logo: string | null }) {
               display: "flex",
               alignItems: "baseline",
               marginTop: 2,
-              fontFamily: "Fraunces",
+              fontFamily: WORDMARK_FAMILY,
               fontWeight: 900,
               fontSize: 68,
               lineHeight: 1,
-              letterSpacing: -2,
+              // The font carries the logo's spacing (Nov 18, 2026; was -2).
+              letterSpacing: 0,
             }}
           >
             <span>vibe</span>

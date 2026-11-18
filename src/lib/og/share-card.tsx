@@ -1,3 +1,6 @@
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
+
 import { ImageResponse } from "next/og";
 
 /**
@@ -6,15 +9,18 @@ import { ImageResponse } from "next/og";
  * src/app/opengraph-image.tsx and src/app/twitter-image.tsx both render it,
  * so the two can never drift apart.
  *
- * Fonts are FETCHED from Google Fonts, the recipe in the Next docs for
- * ImageResponse custom fonts. Satori can't read font-variation-settings, so
- * each face is asked for as a static instance: Fraunces pinned at wght 900,
- * SOFT 100, opsz 144 (the wordmark), Fraunces italic 400 (the tagline) and
- * DM Sans 600 (the caption), each subset to the characters on the card. The
- * route has no request-time input, so `next build` renders it once and the
- * PNG is served from then on; the fetches run at build time, not per visitor.
- * If Google is unreachable the card still renders, in next/og's built-in
- * Geist, and the build log says so, rather than one outage failing a deploy.
+ * The wordmark is the app's own logo face, read from public/ (Nov 18, 2026:
+ * Vibe Wordmark v2, which carries the logo's spacing in its letter widths,
+ * so it is set at letter spacing 0, not the old -8 that ran the v into the
+ * i). The other fonts are FETCHED from Google Fonts, the recipe in the Next
+ * docs for ImageResponse custom fonts. Satori can't read
+ * font-variation-settings, so each is asked for as a static instance:
+ * Fraunces italic 400 (the tagline) and DM Sans 600 (the caption), each
+ * subset to the characters on the card. The route has no request-time input,
+ * so `next build` renders it once and the PNG is served from then on; the
+ * fetches run at build time, not per visitor. If a font can't be had the card
+ * still renders, in next/og's built-in Geist, and the build log says so,
+ * rather than one outage failing a deploy.
  */
 
 export const SHARE_CARD_ALT = "vibe. Your campus. Your people. Yourself.";
@@ -25,7 +31,6 @@ const INK = "#0C0B0B";
 const CREAM = "#F6F1EA";
 const CORAL = "#FF5C35";
 
-const WORDMARK = "vibe.";
 const TAGLINE = "Your campus. Your people. Yourself.";
 const CAPTION = "THE SOCIAL APP FOR YOUR CAMPUS";
 
@@ -49,15 +54,29 @@ async function loadGoogleFont(family: string, text: string): Promise<ArrayBuffer
   return fontRes.arrayBuffer();
 }
 
+/** The family name the cards give the logo face. */
+export const WORDMARK_FAMILY = "Vibe Wordmark";
+
+/**
+ * The logo face as Satori takes it: the .woff (WORDMARK_WOFF_PATH in
+ * src/lib/theme/fonts.ts; Satori can't read woff2), read from public/. The
+ * path is written out, not built from that constant, so the build's file
+ * tracing sees it and ships the file with the club card's function, which
+ * draws at request time; fonts.test.ts checks the two agree.
+ */
+export function loadWordmarkFont(): Promise<Buffer> {
+  return readFile(join(process.cwd(), "public/fonts/vibe-wordmark-v2.woff"));
+}
+
 async function loadFonts(): Promise<FontSpec> {
   try {
     const [wordmark, tagline, caption] = await Promise.all([
-      loadGoogleFont("Fraunces:opsz,wght,SOFT,WONK@144,900,100,0", WORDMARK),
+      loadWordmarkFont(),
       loadGoogleFont("Fraunces:ital,opsz,wght@1,72,400", TAGLINE),
       loadGoogleFont("DM Sans:wght@600", CAPTION),
     ]);
     return [
-      { name: "Fraunces", data: wordmark, weight: 900, style: "normal" },
+      { name: WORDMARK_FAMILY, data: wordmark, weight: 900, style: "normal" },
       { name: "Fraunces", data: tagline, weight: 400, style: "italic" },
       { name: "DM Sans", data: caption, weight: 600, style: "normal" },
     ];
@@ -125,11 +144,12 @@ export async function renderShareCard(): Promise<ImageResponse> {
           style={{
             display: "flex",
             alignItems: "baseline",
-            fontFamily: "Fraunces",
+            fontFamily: WORDMARK_FAMILY,
             fontWeight: 900,
             fontSize: 236,
             lineHeight: 1,
-            letterSpacing: -8,
+            // The font carries the logo's spacing (Nov 18, 2026; was -8).
+            letterSpacing: 0,
           }}
         >
           <span>vibe</span>

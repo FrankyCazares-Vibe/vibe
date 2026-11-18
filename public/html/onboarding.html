@@ -77,7 +77,7 @@ html, body { height: 100%; }
 /* The "vibe." logo face: Fraunces cut to the landing's exact shape (opsz
    144, SOFT 100, 900), only its five letters, 1.4 KB, same origin. The twin
    of the @font-face in src/app/globals.css (Oct 19, 2026). */
-@font-face { font-family: "Vibe Wordmark"; src: url("/fonts/vibe-wordmark-v1.woff2") format("woff2"); font-weight: 900; font-style: normal; font-display: block; unicode-range: U+2E, U+62, U+65, U+69, U+76; }
+@font-face { font-family: "Vibe Wordmark"; src: url("/fonts/vibe-wordmark-v2.woff2") format("woff2"), url("/fonts/vibe-wordmark-v2.woff") format("woff"); font-weight: 900; font-style: normal; font-display: block; unicode-range: U+2E, U+62, U+65, U+69, U+76; }
 body {
   font-family: 'DM Sans', sans-serif;
   /* No browser-faked bold: a weight the font lacks draws as the real face
@@ -122,7 +122,10 @@ input, textarea, [contenteditable="true"] { cursor:text!important; }
 }
 .onb-back:hover:not(:disabled) { background: rgba(255,255,255,.12); }
 .onb-back:disabled { opacity: .4; }
-.onb-logo { font-family: "Vibe Wordmark", 'Fraunces', serif; font-size: 22px; font-weight: 900; color: white; letter-spacing: -0.03em; text-decoration: none; }
+/* The logo: the spacing is in the v2 font; this only opens it a little at
+   small sizes, and the thinner smoothing keeps the v off the i (Nov 18, 2026,
+   was -0.03em). The twin of .vibe-wordmark in src/app/globals.css. */
+.onb-logo { font-family: "Vibe Wordmark", 'Fraunces', serif; font-size: 22px; font-weight: 900; font-variation-settings: "SOFT" 100, "opsz" 144; color: white; letter-spacing: clamp(0px, calc((60px - 1em) * 0.017), 0.04em); -webkit-font-smoothing: antialiased; text-decoration: none; }
 .onb-logo span { color: var(--accent); }
 .onb-skip {
   justify-self: end; min-height: 44px; min-width: 44px;

@@ -9,6 +9,7 @@ import {
 // 2026). Its own file (not a re-export) so Next reads alt/size/contentType
 // straight off it. The page names the site's picture on X too for a hidden
 // or missing club, and this route draws the site's card for them anyway.
+// "vibe." in the logo face, Vibe Wordmark v2 (Nov 18, 2026).
 // As in opengraph-image.tsx, the image URL carries this file's hash, so a
 // redrawn card needs an edit here.
 export const dynamic = "force-dynamic";

@@ -12,6 +12,7 @@ import {
 // outright, and this route draws the site's card for them anyway, never
 // their name (club-card-content.ts holds both rules, with tests).
 // Read fresh on every ask, so a club hidden or renamed shows as it is now.
+// "vibe." in the logo face, Vibe Wordmark v2 (Nov 18, 2026).
 // As in src/app/opengraph-image.tsx, the image URL carries this file's hash,
 // so a redrawn card needs an edit here, or link previews keep the old one.
 export const dynamic = "force-dynamic";
