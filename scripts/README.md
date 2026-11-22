@@ -13,7 +13,7 @@ Each file starts with a long comment that is the real manual: read it before run
 | `demo-seed.mjs` | Seeds the invented cast used for landing screenshots and the demo film. Sits next to `local-seed.mjs` | Yes | Local only |
 | `seed-review-accounts.mjs` | Creates or repairs the two accounts the app-store reviewers sign in with. Dry run unless `--apply` | With `--apply` | Local stack by default. Production needs two extra flags and a founder's say-so; read its header first |
 | `check-pwa.mjs` | Pass/fail list for the installable app: service worker, offline page, manifest, and that the proxy matcher still works. Anonymous GETs only | No | Local or the live site |
-| `gen-pwa-icons.mjs` | Renders the app icons in `public/icons/` from the vector logo | Files in the repo | Local |
+| `gen-pwa-icons.mjs` | Checks every app icon file (Home Screen, installable app, tabs, Google, the notification badge) against the masters in `icon-source/`. `--write` redraws the five drawn from them | With `--write` | Local |
 | `stripe-setup.mjs` | Creates the Vibe+ product, prices and portal settings in a Stripe sandbox. `--check` only reads. A live key needs `--live --yes` | In Stripe | Sandbox by default |
 | `waitlist-gate-e2e.mjs` | Runs the sign-up gate end to end through the local Supabase Auth | Yes | Local only |
 | `email-send-lookup.mjs` | Turns one email address (typed on stdin, never an argument) into the hash used by the email send log, and prints read-only queries. Connects to nothing | No | Anywhere |
@@ -27,6 +27,7 @@ Each file starts with a long comment that is the real manual: read it before run
 |---|---|
 | `sql/` | SQL checks for specific migrations (chat rooms, cards, pins, the waitlist gate, event check-in, the "Message deleted" note) and two read-only counts. Most are local only, write and roll back test rows, and refuse a non-local connection. Each file's first lines say which kind it is and give the exact command |
 | `pwa/` | `sw-killswitch.js`: the emergency replacement for `public/sw.js`. It is not served from here. The drill is in its header |
+| `icon-source/` | The app icon's two vector masters (the "vibe." word on cream, and its maskable twin). Kept out of `src/app/`, where Next would serve them as tab icons. `gen-pwa-icons.mjs` explains |
 | `demo-video/` | The recorder for the landing page's demo film. Local only. See `demo-video/README.md` |
 
 ### The two newest SQL checks (October 19, 2026)
