@@ -1,22 +1,28 @@
 /**
- * Where the landing's demo film lives ("A day on Vibe", S72).
+ * Where the landing's demo film lives ("A day on Vibe", S72), and why there
+ * is none today.
  *
- * The film shows the founders' own photos with real people in them, and this
- * repo is public, so the film is never committed. It lives on Vercel Blob
- * (DEFAULT_DEMO_MEDIA_BASE), as vibe-demo-780.mp4 and vibe-demo-390.mp4 under
- * exactly those names, and every build reads it from there, `next dev`
- * included, with no env var to set.
+ * Since Nov 22, 2026 the landing shows no film. The Oct 2 take showed the
+ * app's crimson "IU Bloomington" bar, the SAE page, real people's photos and
+ * real names. A screen recording of the app also isn't the look Franky wants
+ * for Vibe's content. With no film, "A day on Vibe" shows its poster as a
+ * labelled still, with no Play button. That poster is the Chess Club chat:
+ * invented names, no photos and no school mark. The three panels also drop
+ * their links to the film.
  *
- * NEXT_PUBLIC_DEMO_MEDIA_BASE overrides that folder:
+ * A film never goes in this repo, which is public. NEXT_PUBLIC_DEMO_MEDIA_BASE
+ * brings one back by naming the FOLDER that holds the two files under the
+ * names in DEMO_FILM_FILES:
+ * - unset or empty: no film (the default since Nov 22, 2026);
  * - "/landing-media/" reads the local copy in public/landing-media/, which
  *   .gitignore and .vercelignore keep out of every commit and deploy;
  * - any other https folder, or path on this site ("/…"), is read instead;
- * - anything else ("off", a typo) means no film (null): the section shows
- *   its poster as a still and no Play button, and a typo never points the
- *   page at a stranger's host over plain http. A backslash anywhere is
- *   refused too: browsers read "/\x" as "//x", another host.
- * NEXT_PUBLIC_* values are inlined when the app is BUILT, so a change on
- * Vercel needs a redeploy (.env.example).
+ * - anything else ("off", a typo) also means no film, so a typo never points
+ *   the page at a stranger's host over plain http. A backslash anywhere is
+ *   refused: browsers read "/\x" as "//x", another host.
+ * Browsers keep a film file for 30 days, so a new film ships under new file
+ * names. NEXT_PUBLIC_* values are inlined when the app is BUILT, so a change
+ * on Vercel needs a redeploy (.env.example).
  *
  * Pure: no React, no value imports, so `node --test` can load it
  * (demo-media.test.ts) and the client component can use it.
@@ -24,13 +30,10 @@
 
 export const DEMO_FILM_FILES = { large: "vibe-demo-780.mp4", small: "vibe-demo-390.mp4" } as const;
 
-/** The Vercel Blob store the founders uploaded the film to (S72). Public on purpose: the page fetches it. */
-export const DEFAULT_DEMO_MEDIA_BASE = "https://npzptkkzqxthhsnu.public.blob.vercel-storage.com/";
-
 /** The folder the film is read from, always ending in "/", or null for no film. */
 export function demoMediaBase(raw: string | undefined): string | null {
   const value = (raw ?? "").trim();
-  if (!value) return DEFAULT_DEMO_MEDIA_BASE;
+  if (!value) return null;
   if (value.includes("\\")) return null;
   const slash = (s: string) => (s.endsWith("/") ? s : `${s}/`);
   if (value.startsWith("/")) return value.startsWith("//") ? null : slash(value);
@@ -47,8 +50,9 @@ export function demoMediaBase(raw: string | undefined): string | null {
 export const DEMO_MEDIA_BASE: string | null = demoMediaBase(process.env.NEXT_PUBLIC_DEMO_MEDIA_BASE);
 
 /**
- * This build has a film. False (only when the env var turns it off): the
- * panels' captions carry no "watch it" link (it would scroll to a still and
- * play nothing), and "A day on Vibe" shows its poster as a labelled still.
+ * This build has a film: false unless the env var names a folder. While it's
+ * false, the panels' captions carry no "watch it" link (it would scroll to a
+ * still and play nothing), and "A day on Vibe" shows its poster as a
+ * labelled still.
  */
 export const HAS_DEMO_FILM: boolean = DEMO_MEDIA_BASE !== null;
