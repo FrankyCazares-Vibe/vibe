@@ -54,7 +54,7 @@ const EXPECTED_MANIFEST = {
   id: "/",
   name: "Vibe",
   short_name: "Vibe",
-  description: "Your campus, your career, one profile.",
+  description: "Your campus. Your people. Yourself.",
   start_url: "/campus",
   scope: "/",
   display: "standalone",
@@ -355,7 +355,7 @@ async function checkIcon(src, size, { opaque = false, transparent = false } = {}
   if (opaque) {
     // A launcher crops a maskable icon to a circle, squircle or square. A
     // see-through pixel shows the wallpaper through the logo's background.
-    check(`${src} has no see-through pixels`, stats.isOpaque, "some pixels are transparent; plan R2 wants full-bleed white");
+    check(`${src} has no see-through pixels`, stats.isOpaque, "some pixels are transparent; plan R2 wants a full-bleed tile");
   }
   if (transparent) {
     // Android paints a notification badge from its alpha alone, so an opaque

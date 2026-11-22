@@ -27,7 +27,8 @@ import type { MetadataRoute } from "next";
  * launches the app, instead of stacking a second one. Chromium and Samsung
  * Internet honour it; Safari and Firefox ignore it.
  *
- * The icons come from src/app/icon.svg via scripts/gen-pwa-icons.mjs. Chrome
+ * The icons are the app icon ("vibe." on cream since Nov 21, 2026), drawn
+ * from scripts/icon-source/ and checked by scripts/gen-pwa-icons.mjs. Chrome
  * won't offer Install without the 512. `any` and `maskable` are separate
  * entries on purpose (web.dev: never one "any maskable" file), and
  * scripts/check-pwa.mjs expects exactly these four. iOS ignores them and uses

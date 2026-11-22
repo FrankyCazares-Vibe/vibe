@@ -20,6 +20,13 @@ import { ThemeSync } from "@/lib/theme/ThemeSync";
 const SITE_TITLE = "Vibe · Your campus. Your people. Yourself.";
 const SITE_TAGLINE = "Your campus. Your people. Yourself.";
 
+// Change it with every new icon, and only then. Browsers keep tab and Home
+// Screen icons by their address, so a new address makes them fetch the new
+// picture. The static pages in public/html carry the same string. (Nov 21,
+// 2026: the app icon became the whole "vibe." word on cream; the files and
+// their check are in scripts/gen-pwa-icons.mjs.)
+const ICON_VERSION = "?v=2026-11-21";
+
 export const metadata: Metadata = {
   // The canonical host (the apex 301s to www), so preview image URLs are
   // absolute and never go through that redirect.
@@ -43,13 +50,14 @@ export const metadata: Metadata = {
   icons: {
     icon: [
       // Google Search does not use SVG. It wants a square ICO/PNG >48px
-      // on a stable URL, linked from the homepage.
-      { url: "/icon.png", type: "image/png", sizes: "192x192" },
-      { url: "/favicon-48.png", type: "image/png", sizes: "48x48" },
-      { url: "/favicon.ico", sizes: "48x48" },
-      { url: "/vibe-icon.svg", type: "image/svg+xml" },
+      // on a stable URL, linked from the homepage. (The version above
+      // changes only with a new icon.)
+      { url: `/icon.png${ICON_VERSION}`, type: "image/png", sizes: "192x192" },
+      { url: `/favicon-48.png${ICON_VERSION}`, type: "image/png", sizes: "48x48" },
+      { url: `/favicon.ico${ICON_VERSION}`, sizes: "48x48" },
+      { url: `/vibe-icon.svg${ICON_VERSION}`, type: "image/svg+xml" },
     ],
-    apple: "/apple-icon.png",
+    apple: `/apple-icon.png${ICON_VERSION}`,
   },
   // Home Screen app on iPhone. The manifest link isn't set here on purpose:
   // src/app/manifest.ts adds it by existing. "default" keeps the status bar
