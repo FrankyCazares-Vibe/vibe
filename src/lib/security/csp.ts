@@ -42,7 +42,7 @@ export type CspEnv = {
   r2AccountId?: string;
   /** NEXT_PUBLIC_SENTRY_DSN: the ingest host the browser SDK posts errors to. */
   sentryDsn?: string;
-  /** The landing film's folder: NEXT_PUBLIC_DEMO_MEDIA_BASE, else DEFAULT_DEMO_MEDIA_BASE (demo-media.ts). */
+  /** The landing film's folder: NEXT_PUBLIC_DEMO_MEDIA_BASE, or none (no film since Nov 22, 2026; demo-media.ts). */
   demoMediaBase?: string;
   /**
    * NEXT_PUBLIC_TURNSTILE_SITE_KEY: the switch for the "are you a person" box
@@ -109,9 +109,9 @@ export function cspEnvFromProcess(env: NodeJS.ProcessEnv = literalProcessEnv()):
     supabaseUrl: env.NEXT_PUBLIC_SUPABASE_URL,
     r2AccountId: env.R2_ACCOUNT_ID,
     sentryDsn: env.NEXT_PUBLIC_SENTRY_DSN,
-    // The SAME resolver the landing uses: unset → the Vercel Blob default,
-    // "/landing-media/" → this site ('self' already covers it), "off" or a
-    // typo → no film, so no host.
+    // The SAME resolver the landing uses: unset, "off" or a typo → no film,
+    // so no host; "/landing-media/" → this site ('self' already covers it);
+    // an https folder → that host.
     demoMediaBase: demoMediaBase(env.NEXT_PUBLIC_DEMO_MEDIA_BASE) ?? undefined,
     turnstileSiteKey: env.NEXT_PUBLIC_TURNSTILE_SITE_KEY,
   };

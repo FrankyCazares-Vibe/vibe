@@ -12,18 +12,20 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 const specifier = "./demo-media.ts";
-const { demoMediaBase, DEFAULT_DEMO_MEDIA_BASE, DEMO_FILM_FILES } = (await import(specifier)) as typeof import("./demo-media");
+const demoMedia = (await import(specifier)) as typeof import("./demo-media");
+const { demoMediaBase, DEMO_FILM_FILES } = demoMedia;
 
-test("unset: the Vercel Blob store, in every environment", () => {
-  assert.equal(DEFAULT_DEMO_MEDIA_BASE, "https://npzptkkzqxthhsnu.public.blob.vercel-storage.com/");
-  assert.equal(demoMediaBase(undefined), DEFAULT_DEMO_MEDIA_BASE);
-  assert.equal(demoMediaBase(""), DEFAULT_DEMO_MEDIA_BASE);
-  assert.equal(demoMediaBase("   "), DEFAULT_DEMO_MEDIA_BASE);
+test("unset: no film, in every environment (since Nov 22, 2026)", () => {
+  assert.equal(demoMediaBase(undefined), null);
+  assert.equal(demoMediaBase(""), null);
+  assert.equal(demoMediaBase("   "), null);
+  // The old film's store is no longer named in the code at all.
+  assert.equal("DEFAULT_DEMO_MEDIA_BASE" in demoMedia, false);
 });
 
-test("the default passes the same checks as a value would", () => {
-  assert.equal(demoMediaBase(DEFAULT_DEMO_MEDIA_BASE), DEFAULT_DEMO_MEDIA_BASE);
-  assert.equal(new URL(DEMO_FILM_FILES.large, DEFAULT_DEMO_MEDIA_BASE).href, "https://npzptkkzqxthhsnu.public.blob.vercel-storage.com/vibe-demo-780.mp4");
+test("a film folder, if one is set, yields the files' full addresses", () => {
+  const folder = demoMediaBase("https://abc123.public.blob.vercel-storage.com/landing");
+  assert.equal(new URL(DEMO_FILM_FILES.large, folder ?? undefined).href, "https://abc123.public.blob.vercel-storage.com/landing/vibe-demo-780.mp4");
 });
 
 test("the local copy: set it to /landing-media/", () => {

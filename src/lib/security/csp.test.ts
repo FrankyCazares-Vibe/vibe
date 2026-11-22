@@ -50,7 +50,6 @@ const csp = await import("./csp");
 const { buildCsp, cspEnvFromProcess, cspFlavor, makeNonce, NIGHT_LOCK_SCRIPT_HASH, CSP_HEADER, NONCE_HEADER } = csp;
 type CspEnv = import("./csp").CspEnv;
 const { NIGHT_LOCK_SCRIPT } = await import("@/lib/theme/theme");
-const { DEFAULT_DEMO_MEDIA_BASE } = await import("@/lib/landing/demo-media");
 
 /** Next's own nonce parser (app-render), so the header shape is checked against the real reader. */
 const { getScriptNonceFromHeader } = createRequire(import.meta.url)(
@@ -61,12 +60,11 @@ const PROD_ENV: CspEnv = {
   supabaseUrl: "https://rqopjkimxbjkwdkpkbfq.supabase.co",
   r2AccountId: "0123456789abcdef0123456789abcdef",
   sentryDsn: "https://abc123publickey@o4511312043704320.ingest.us.sentry.io/4511312043704321",
-  demoMediaBase: DEFAULT_DEMO_MEDIA_BASE,
+  // No landing film since Nov 22, 2026 (demo-media.ts), so no film host.
 };
 const SUPABASE = "https://rqopjkimxbjkwdkpkbfq.supabase.co";
 const R2 = "https://0123456789abcdef0123456789abcdef.r2.cloudflarestorage.com";
 const SENTRY = "https://o4511312043704320.ingest.us.sentry.io";
-const DEMO = "https://npzptkkzqxthhsnu.public.blob.vercel-storage.com";
 const NONCE = "AAECAwQFBgcICQoLDA0ODw==";
 /** Cloudflare's "are you a person" host, and PROD_ENV with the box switched on (their published test site key). */
 const HUMAN_CHECK = "https://challenges.cloudflare.com";
@@ -179,8 +177,9 @@ test("directive order is the plan's, one line, no empty or trailing directive", 
 
 test("the env's hosts land where the browser uses them, as origins only", () => {
   const h = app(false);
-  assert.deepEqual(src(h, "img-src"), ["'self'", "data:", "blob:", SUPABASE, R2, DEMO]);
-  assert.deepEqual(src(h, "media-src"), ["'self'", "blob:", SUPABASE, R2, DEMO]);
+  assert.deepEqual(src(h, "img-src"), ["'self'", "data:", "blob:", SUPABASE, R2]);
+  assert.deepEqual(src(h, "media-src"), ["'self'", "blob:", SUPABASE, R2]);
+  assert.ok(!h.includes("blob.vercel-storage.com"));
   assert.deepEqual(src(h, "connect-src"), [
     "'self'", SUPABASE, "wss://rqopjkimxbjkwdkpkbfq.supabase.co", R2, SENTRY,
   ]);
@@ -330,7 +329,7 @@ test("makeNonce: 16 random bytes as 24 characters of standard base64, fresh ever
   assert.notEqual(makeNonce(), makeNonce());
 });
 
-test("cspEnvFromProcess: maps the five variables; the film host defaults to the Blob store and 'off' drops it", () => {
+test("cspEnvFromProcess: maps the five variables; no film host unless the film variable names one", () => {
   const base = { NODE_ENV: "test" } as NodeJS.ProcessEnv;
   assert.deepEqual(
     cspEnvFromProcess({
@@ -344,7 +343,7 @@ test("cspEnvFromProcess: maps the five variables; the film host defaults to the 
       supabaseUrl: SUPABASE,
       r2AccountId: "0123456789abcdef0123456789abcdef",
       sentryDsn: PROD_ENV.sentryDsn,
-      demoMediaBase: DEFAULT_DEMO_MEDIA_BASE,
+      demoMediaBase: undefined,
       turnstileSiteKey: TURNSTILE_TEST_KEY,
     },
   );
@@ -357,7 +356,7 @@ test("cspEnvFromProcess: maps the five variables; the film host defaults to the 
   const boxOn = cspEnvFromProcess({ ...base, NEXT_PUBLIC_TURNSTILE_SITE_KEY: TURNSTILE_TEST_KEY });
   assert.deepEqual(src(app(false, boxOn), "frame-src"), ["'self'", HUMAN_CHECK]);
   assert.deepEqual(src(app(false, bare), "frame-src"), ["'self'"]);
-  assert.equal(bare.demoMediaBase, DEFAULT_DEMO_MEDIA_BASE);
+  assert.equal(bare.demoMediaBase, undefined);
   assert.equal(cspEnvFromProcess({ ...base, NEXT_PUBLIC_DEMO_MEDIA_BASE: "off" }).demoMediaBase, undefined);
   const other = cspEnvFromProcess({ ...base, NEXT_PUBLIC_DEMO_MEDIA_BASE: "https://cdn.example.com/film" });
   assert.equal(other.demoMediaBase, "https://cdn.example.com/film/");
