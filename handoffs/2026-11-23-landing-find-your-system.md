@@ -83,6 +83,11 @@ First draft of the record. Franky can change any of it.
   - A faint film grain covers the page (`grain-film.png`). Turning it off is one rule: `.fys-root::after`.
 - **The coral full stop** now falls into the next screen's full stop ("made of your people."), tied to the scroll, and lands with the sign-in bounce. At rest it hops every few seconds in "yourself.". The close's sun stays where it is.
 
+## Round 8 (Nov 23, Franky: "way way way too grainy")
+- The page-wide film grain is gone (and `grain-film.png` with it).
+- The headlines are solid nearly all the way down, with a fine grain only at their very foot.
+- The hero's dots are only slightly uneven now.
+
 ## Rollback
 `LANDING=classic` in Vercel's environment brings back the Oct-Nov landing (the night sky with six lights) with no code deploy. Keep it for about a week, then delete `home-landing.tsx` and its parts if nobody misses it.
 

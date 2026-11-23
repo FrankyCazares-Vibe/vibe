@@ -137,9 +137,9 @@ function build(box: DOMRect, img: HTMLImageElement, grid: Grid): Scene | null {
       // round 7, grain (Franky's refs: the dithered hands): where the photo breaks up, each dot drifts off the grid and
       // its size wanders, so the edge reads as dithered grain; the solid photo keeps its even grid
       const jit = smooth(0.15, 0.55, t), j1 = rnd() - 0.5, j2 = rnd() - 0.5, j3 = rnd();
-      const r = (g * 0.75 * kk + g * 0.48 * Math.pow(v, 1.25) * (1 - kk)) * (1 + jit * (j3 - 0.5) * 0.9);
-      if (r < 0.32 || (jit > 0.5 && j3 < 0.12 * jit)) continue;
-      const dx = jit * j1 * g * 0.8, dy = jit * j2 * g * 0.8;
+      const r = (g * 0.75 * kk + g * 0.48 * Math.pow(v, 1.25) * (1 - kk)) * (1 + jit * (j3 - 0.5) * 0.3);
+      if (r < 0.32) continue;
+      const dx = jit * j1 * g * 0.3, dy = jit * j2 * g * 0.3;   // round 8: "way too grainy", so only a slight unevenness
       const op = 1 - t * (0.6 - 0.45 * v);
       // how much this dot flows: none in the solid photo, most where it breaks up, a little out in the cream
       const w = smooth(0.08, 0.38, t) * (1 - 0.55 * c);

@@ -26,8 +26,6 @@
 .fys-root *, .fys-root *::before, .fys-root *::after { box-sizing: border-box; }
 /* Night behind the page too (overscroll, the iPhone bars), in the app's Light theme as well. */
 :root:has(.fys-root), :root:has(.fys-root) body { background: #0C0B0B; color-scheme: dark; }
-/* A faint film grain over the whole page (round 7). One rule: remove it to turn the grain off. */
-.fys-root::after { content: ""; position: fixed; inset: 0; z-index: 70; background: url("/landing/system/grain-film.png") 0 0 / 192px 192px; opacity: 0.6; pointer-events: none; }
 /* The soft coral bloom from one corner. */
 .fys-root::before { content: ""; position: absolute; left: -520px; top: -560px; width: 1400px; height: 1400px; background: radial-gradient(closest-side, rgba(255, 92, 53, 0.15), rgba(255, 92, 53, 0.05) 55%, rgba(255, 92, 53, 0)); pointer-events: none; }
 .fys-root main, .fys-root footer, .fys-bar { position: relative; }
@@ -38,8 +36,8 @@
 .fys-hl { position: relative; z-index: 5; margin: 0; font-family: var(--font-soft), "Fraunces", serif; font-weight: 900; font-variation-settings: "SOFT" 100, "opsz" 144; letter-spacing: -0.035em; word-spacing: 0.06em; line-height: 0.88; font-size: calc(64 * var(--P)); color: var(--ink); }
 .fys-hl span { display: block; white-space: nowrap; }
 .fys-hl i, .fys-big i { font-style: normal; color: var(--coral); }
-/* Texture (rounds 6 and 7, Franky: "it looks so plain", "don't be afraid to try the grainy"): the letters are solid at
-   the top and melt into dithered grain toward their foot, the hero's photo-into-dots in type. The coral full stop stays
+/* Texture (rounds 6 to 8, Franky: "it looks so plain", then "way too grainy"): the letters are solid nearly all the
+   way down and take a light grain only at their very foot, the hero's photo-into-dots in type. The coral full stop stays
    solid. Each line's box is padded past its letters (the y's and p's tails, the f's hook), because background-clip: text
    only paints inside the box: unpadded, those parts were cut off. Where background-clip: text isn't supported, the
    letters are plain cream. */
@@ -50,7 +48,7 @@
     margin: -0.16em -0.1em -0.3em;
     color: transparent;
     background:
-      linear-gradient(180deg, var(--ink) 0%, var(--ink) 54%, rgba(246, 241, 234, 0.45) 70%, rgba(246, 241, 234, 0) 88%),
+      linear-gradient(180deg, var(--ink) 0%, var(--ink) 66%, rgba(246, 241, 234, 0.7) 80%, rgba(246, 241, 234, 0.35) 94%),
       url("/landing/system/grain-dither.png") 0 0 / 192px 192px;
     -webkit-background-clip: text;
     background-clip: text;
