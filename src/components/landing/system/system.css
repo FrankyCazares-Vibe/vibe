@@ -30,16 +30,30 @@
 .fys-root::before { content: ""; position: absolute; left: -520px; top: -560px; width: 1400px; height: 1400px; background: radial-gradient(closest-side, rgba(255, 92, 53, 0.15), rgba(255, 92, 53, 0.05) 55%, rgba(255, 92, 53, 0)); pointer-events: none; }
 .fys-root main, .fys-root footer, .fys-bar { position: relative; }
 
-/* ---- the family: kicker, headline with one coral full stop, scene slug, body ---- */
+/* ---- the family: kicker, headline with one coral full stop, body ---- */
 .fys-k { margin: 0 0 16px; font: 500 11px/1 var(--font-jetbrains), monospace; letter-spacing: 0.2em; text-transform: uppercase; color: var(--muted); white-space: nowrap; }
-.fys-k b, .fys-slug b { font-weight: 500; color: var(--coral); padding: 0 0.35em; }
+.fys-k b { font-weight: 500; color: var(--coral); padding: 0 0.35em; }
 .fys-hl { position: relative; z-index: 5; margin: 0; font-family: var(--font-soft), "Fraunces", serif; font-weight: 900; font-variation-settings: "SOFT" 100, "opsz" 144; letter-spacing: -0.035em; word-spacing: 0.06em; line-height: 0.88; font-size: calc(64 * var(--P)); color: var(--ink); }
 .fys-hl span { display: block; white-space: nowrap; }
 .fys-hl i, .fys-big i { font-style: normal; color: var(--coral); }
+/* Texture (round 6, Franky: "it looks so plain"): the letters are solid at the top and break into dots toward their
+   foot, the hero's photo-into-dots in type. The coral full stop stays solid. Where background-clip: text isn't
+   supported, they're plain cream. */
+@supports ((-webkit-background-clip: text) or (background-clip: text)) {
+  /* per line (each line is a span), so every line melts at its own foot */
+  .fys-hl span {
+    color: transparent;
+    background:
+      linear-gradient(180deg, var(--ink) 0%, var(--ink) 54%, rgba(246, 241, 234, 0.55) 74%, rgba(246, 241, 234, 0) 93%),
+      radial-gradient(circle at 50% 50%, var(--ink) 0 1.05px, transparent 1.35px) 0 0 / 3.4px 3.4px;
+    -webkit-background-clip: text;
+    background-clip: text;
+  }
+}
 .fys-hl.fys-md { font-size: calc(46 * var(--P)); }
 /* The hero's three lines (the tagline, since Nov 23): smaller, so "your people." fits a phone. */
-.fys-hl.fys-hero-hl { font-size: calc(46 * var(--P)); }
-.fys-slug { margin: 30px 0 0; font: 500 9.5px/1 var(--font-jetbrains), monospace; letter-spacing: 0.18em; text-transform: uppercase; color: #8C857C; white-space: nowrap; }
+.fys-hl.fys-hero-hl { font-size: calc(46 * var(--P)); line-height: 1; letter-spacing: -0.025em; }
+.fys-hero-copy .fys-body { margin-top: 22px; }
 .fys-body { margin: 16px 0 0; max-width: 31em; font-size: 15.5px; line-height: 1.55; color: var(--ink2); }
 .fys-body strong { color: var(--ink); font-weight: 600; }
 
@@ -78,8 +92,6 @@
 .fys-sun::before { content: ""; position: absolute; left: 50%; top: 50%; width: 700%; height: 700%; translate: -50% -50%; border-radius: 50%; background: radial-gradient(closest-side, rgba(255, 92, 53, 0.42), rgba(255, 92, 53, 0.147) 45%, rgba(255, 92, 53, 0)); }
 .fys-sun::after { content: ""; position: absolute; inset: 0; border-radius: 50%; background: var(--coral); }
 .fys-hero-copy { position: relative; z-index: 5; max-width: 608px; margin: 0 auto; padding: 0 24px; }
-.fys-hero .fys-slug { position: relative; z-index: 5; max-width: 608px; margin: 30px auto 0; padding: 0 24px; }
-
 /* ---- made of your people ---- */
 .fys-people, .fys-club, .fys-eyes, .fys-open { position: relative; display: flex; flex-direction: column; max-width: 608px; margin: 0 auto; padding: 90px 24px 70px; }
 .fys-col { display: contents; }
@@ -94,8 +106,6 @@
 .fys-pp { order: 3; position: relative; width: calc(390 * var(--P)); aspect-ratio: 390 / 380; margin: 0 calc(50% - 195 * var(--P)); }
 .fys-pp-clip { position: absolute; inset: 0; overflow: hidden; }
 .fys-planet { position: absolute; inset: 0; width: 100%; height: 100%; }
-.fys-people .fys-slug { order: 5; }
-
 /* ---- bring your club ---- */
 .fys-club .fys-k { order: 1; }
 .fys-club .fys-hl { order: 2; }
@@ -106,24 +116,22 @@
 .fys-list strong { color: var(--ink); font-weight: 600; }
 .fys-n { flex: none; width: 2.2em; font: 500 13px/1 var(--font-jetbrains), monospace; letter-spacing: 0.12em; color: var(--coral); }
 .fys-club .fys-row { order: 6; margin-top: 30px; }
-.fys-club .fys-slug { order: 7; }
-/* Two desktop screens of the sample club, overlapping: its page, then its chat. */
 .fys-screen { position: absolute; display: block; }
 .fys-screen img { display: block; width: 100%; height: auto; border-radius: 12px; box-shadow: 0 30px 60px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(246, 241, 234, 0.1); }
 .fys-s1 { left: 0; top: 0; width: 92%; rotate: -1.5deg; }
 .fys-s2 { left: 16%; top: 44%; width: 80%; rotate: 1.5deg; }
-/* Under the screens: it's a made-up club (no label on the pictures themselves). */
-.fys-caption { position: absolute; left: 0; top: calc(100% + 14px); margin: 0; font-size: 12px; line-height: 1.4; color: var(--muted); }
 
 /* ---- everything looks different ---- */
-.fys-print { position: relative; width: 100%; aspect-ratio: 4 / 5; margin-top: 30px; border-radius: 4px; box-shadow: 0 30px 60px rgba(0, 0, 0, 0.55); }
-.fys-print > picture img { display: block; width: 100%; height: 100%; object-fit: cover; border-radius: 4px; }
+/* Smaller than the screen (round 6), and no hard edge: the photo breaks into dots toward its edges (dot-photo.tsx). */
+.fys-print { position: relative; width: 82%; aspect-ratio: 4 / 5; margin: 30px auto 0; }
+.fys-dotphoto { position: absolute; inset: 0; }
+.fys-dotphoto img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.fys-dotphoto canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+.fys-dotphoto[data-dotted] img { opacity: 0; }
 /* Otto, in the night band across the eyes: clipped to the band's outline (the band and its frayed, dotted edge are the eyes-window drawing under him). */
 .fys-window { position: absolute; inset: 0; z-index: 4; pointer-events: none; }
 .fys-window picture { position: absolute; display: block; filter: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.5)); }
 .fys-window img { display: block; width: 100%; height: auto; }
-.fys-eyes .fys-slug { text-align: right; margin-top: 16px; }
-
 /* ---- one campus at a time ---- */
 .fys-line { position: relative; width: 100%; aspect-ratio: 342 / 240; margin-top: 30px; }
 
@@ -136,6 +144,21 @@
 .fys-big i { color: transparent; }
 .fys-big .fys-close-back { z-index: -1; }
 .fys-big .fys-close-front { z-index: 1; }
+/* The sun of the close: over the letters, under the rings' front halves. Where the travelling dot lands. */
+.fys-orb { position: absolute; z-index: 0; left: calc(var(--pox) - var(--por)); top: calc(var(--poy) - var(--por)); width: calc(var(--por) * 2); aspect-ratio: 1; border-radius: 50%; background: var(--coral); transform-origin: 50% 100%; }
+
+/* ---- the coral full stop's journey (coral-drop.tsx; nothing here moves without JavaScript or with reduced motion) ---- */
+.fys-hl .fys-drop-start { display: inline-block; transform-origin: 50% 85%; }
+.fys-root[data-drop]:not([data-drop="home"]) .fys-drop-start { visibility: hidden; }
+.fys-root[data-drop]:not([data-drop="landed"]) .fys-orb { opacity: 0; }
+.fys-drop { position: absolute; left: 0; top: 0; z-index: 40; border-radius: 50%; background: var(--coral); box-shadow: 0 0 16px rgba(255, 92, 53, 0.45); pointer-events: none; opacity: 0; will-change: transform; }
+@media (prefers-reduced-motion: no-preference) {
+  .fys-drop-start.is-bouncing { animation: fys-hop 1100ms cubic-bezier(0.3, 0.7, 0.3, 1) both; }
+  .fys-orb.is-bouncing { animation: fys-land 950ms cubic-bezier(0.3, 0.7, 0.3, 1) both; }
+}
+/* The sign-in dot's bounce (globals.css vibe-kinetic-dot), from where it sits: a hop, a squashed landing, two smaller hops. */
+@keyframes fys-hop { 0% { transform: none; } 22% { transform: translateY(-0.55em); } 44% { transform: translateY(0) scaleY(0.75); } 60% { transform: translateY(-0.18em) scaleY(1.06); } 76% { transform: translateY(0) scaleY(0.9); } 88% { transform: translateY(-0.05em); } 100% { transform: none; } }
+@keyframes fys-land { 0% { transform: scale(1.15, 0.72); } 28% { transform: translateY(-95%) scale(0.96, 1.05); } 52% { transform: translateY(0) scale(1.08, 0.84); } 68% { transform: translateY(-32%); } 84% { transform: translateY(0) scale(1.03, 0.95); } 100% { transform: none; } }
 .fys-close .fys-row { flex-direction: column; align-items: stretch; width: 100%; max-width: 420px; margin-top: 34px; }
 .fys-fine { margin: 14px 0 0; font-size: 14px; line-height: 1.5; color: var(--muted); }
 .fys-fine a { display: inline-flex; align-items: center; min-height: 44px; color: var(--ink2); }
@@ -156,7 +179,7 @@
   .fys-hl { font-size: calc(100 * var(--U)); }
   .fys-hl.fys-md { font-size: calc(80 * var(--U)); }
   .fys-hl.fys-hero-hl { font-size: calc(78 * var(--U)); }
-  .fys-slug { margin: 0; font-size: 11px; }
+  .fys-hero-copy .fys-body { margin-top: 30px; }
   .fys-body { margin-top: 24px; font-size: clamp(15px, calc(17 * var(--U)), 18px); }
   .fys-btn { height: 54px; padding: 0 28px; }
   .fys-row { margin-top: 34px; }
@@ -171,8 +194,6 @@
   /* The board's column: 560 wide from the left margin, running over the picture's empty left side. */
   .fys-hero-copy { width: calc(680 * var(--U)); max-width: none; margin: 0; padding: calc(130 * var(--U)) 0 60px calc(120 * var(--U)); }
   .fys-hero .fys-row { margin-top: 36px; }
-  .fys-hero .fys-slug { position: absolute; right: calc(48 * var(--U)); bottom: calc(26 * var(--U)); max-width: none; margin: 0; padding: 0; }
-
   .fys-people, .fys-club, .fys-eyes, .fys-open { display: grid; max-width: 1600px; column-gap: calc(40 * var(--U)); }
   .fys-col { display: block; }
   .fys-pp, .fys-fan { order: 0; }
@@ -180,25 +201,20 @@
   .fys-pp { width: auto; aspect-ratio: 1; margin: 0; }
   .fys-three { gap: 22px; margin-top: 44px; }
   .fys-three p { font-size: clamp(15px, calc(15.5 * var(--U)), 16.5px); }
-  .fys-people .fys-slug { position: absolute; right: calc(48 * var(--U)); bottom: calc(40 * var(--U)); }
-
   .fys-club { grid-template-columns: minmax(0, 1fr) calc(520 * var(--U)); align-items: center; padding: calc(120 * var(--U)); }
   .fys-fan { aspect-ratio: 640 / 700; margin: 0; }
   .fys-screen img { border-radius: calc(16 * var(--U)); }
   .fys-s1 { left: 0; top: 6%; width: 82%; }
   .fys-s2 { left: 28%; top: 44%; width: 70%; }
   .fys-list li { gap: 18px; font-size: clamp(15px, calc(16 * var(--U)), 17px); }
-  .fys-club .fys-slug { position: absolute; right: calc(120 * var(--U)); bottom: calc(60 * var(--U)); }
-
-  .fys-eyes { grid-template-columns: minmax(0, 1fr) calc(540 * var(--U)); column-gap: calc(60 * var(--U)); align-items: center; padding: calc(120 * var(--U)); }
-  .fys-print { margin: 0; }
-  .fys-eyes .fys-slug { position: absolute; right: calc(120 * var(--U)); bottom: calc(80 * var(--U)); margin: 0; }
-
+  .fys-eyes { grid-template-columns: minmax(0, 1fr) calc(420 * var(--U)); column-gap: calc(80 * var(--U)); align-items: center; padding: calc(110 * var(--U)) calc(160 * var(--U)) calc(110 * var(--U)) calc(120 * var(--U)); }
+  .fys-print { width: 100%; margin: 0; }
   .fys-open { grid-template-columns: calc(560 * var(--U)) minmax(0, 1fr); align-items: center; padding: calc(110 * var(--U)) calc(120 * var(--U)) calc(130 * var(--U)); }
   .fys-line { aspect-ratio: 600 / 360; margin: 0; }
 
   .fys-close { padding: calc(80 * var(--U)) calc(120 * var(--U)) calc(110 * var(--U)); }
   .fys-big { margin: calc(40 * var(--U)) 0 calc(60 * var(--U)); font-size: calc(170 * var(--U)); translate: none; }
+  .fys-orb { left: calc(var(--ox) - var(--or)); top: calc(var(--oy) - var(--or)); width: calc(var(--or) * 2); }
   .fys-close .fys-row { flex-direction: row; justify-content: center; width: auto; max-width: none; }
 
   .fys-footer { flex-direction: row; flex-wrap: wrap; align-items: center; justify-content: space-between; padding: 32px 48px 40px; }
@@ -219,8 +235,6 @@
 @keyframes fys-breathe { from { opacity: 0.78; } to { opacity: 1; } }
 
 /* Leaving for sign-up: the page lets go while the dust streaks. */
-.fys-root.is-warping :is(.fys-bar, .fys-hero-copy, .fys-hero-art, .fys-hero .fys-slug, main > section:not(.fys-hero), .fys-footer) { opacity: 0; transition: opacity 0.4s ease; }
 @media (prefers-reduced-motion: reduce) {
   .fys-btn { transition: none; }
-  .fys-root.is-warping :is(.fys-bar, .fys-hero-copy, .fys-hero-art, .fys-hero .fys-slug, main > section:not(.fys-hero), .fys-footer) { transition: none; }
 }

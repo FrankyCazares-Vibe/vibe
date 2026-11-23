@@ -13,15 +13,14 @@ import { ART_EXTRA } from "./art-data";
  * 2026-11-landing-revamp/board), in the same design px as the drawn notes
  * (ART_EXTRA.hero, written by the board's export), so they line up.
  *
- * It's alive in one way: every second or so a few small patches of dots
- * flutter into the real photo and back, fast, like wings (Franky, Nov 23),
- * and under a mouse the dots near the pointer turn into the photo (a tap
- * sets off a flutter on a phone). The patches stay small, so it never
- * flashes a big area. The dots themselves are drawn once
- * per size; a frame only redraws while a flicker or the pointer is on. With
- * reduced motion nothing flickers by itself. Paused off screen. Device pixel
- * ratio capped at 2. The photo comes from the hidden <picture>, so the
- * browser picks AVIF or WebP and the width for the screen.
+ * It flows (round 6, Franky's reference: a pixel figure whose edges shimmer):
+ * the dots where the photo breaks up breathe, swelling and shrinking in slow
+ * waves that drift across them, and a few coral dots glow in and out. Nothing
+ * flickers at random. Under a mouse the dots near the pointer turn into the
+ * photo. With reduced motion it is still. Redrawn at most 30 times a second,
+ * only while on screen; device pixel ratio capped at 2. Every edge fades out,
+ * so the dots never stop at a line. The photo comes from the hidden
+ * <picture>, so the browser picks AVIF or WebP and the width for the screen.
  */
 
 type Layout = (typeof ART_EXTRA.hero)["desktop" | "phone"];
@@ -29,7 +28,7 @@ type Layout = (typeof ART_EXTRA.hero)["desktop" | "phone"];
 export const SYSTEM_WIDE_QUERY = "(min-width: 900px)";
 
 const PHOTO_W = 2000, PHOTO_H = 1334, CELL = 8, GW = 250, GH = 167;
-const CREAM = "#F6F1EA";
+const CREAM = "#F6F1EA", CORAL = "#FF5C35";
 const TAU = Math.PI * 2;
 const smooth = (a: number, b: number, v: number) => { const t = Math.max(0, Math.min(1, (v - a) / (b - a))); return t * t * (3 - 2 * t); };
 
@@ -52,40 +51,50 @@ function readGrid(photo: HTMLImageElement, outline: HTMLImageElement): Grid | nu
   return { lum, me };
 }
 
-/** Circles grouped by their alpha (two decimals, as the board wrote them), so each group is one fill. */
+/** Dots grouped by their alpha (two decimals), so each group is one fill. Each dot: x, y, r, how much it flows. */
 class Batch {
   groups = new Map<number, number[]>();
-  add(a: number, x: number, y: number, r: number) {
+  add(a: number, x: number, y: number, r: number, w = 0) {
     const k = Math.round(a * 100);
     if (k <= 0) return;
     let g = this.groups.get(k);
     if (!g) this.groups.set(k, (g = []));
-    g.push(x, y, r);
+    g.push(x, y, r, w);
   }
-  fill(ctx: CanvasRenderingContext2D, color: string) {
+  /** Fill every dot; `flow` (when given) says how much each one swells or shrinks right now. */
+  fill(ctx: CanvasRenderingContext2D, color: string, flow?: (x: number, y: number) => number) {
     ctx.fillStyle = color;
     for (const [k, g] of this.groups) {
       ctx.globalAlpha = Math.min(1, k / 100);
       ctx.beginPath();
-      for (let i = 0; i < g.length; i += 3) { ctx.moveTo(g[i] + g[i + 2], g[i + 1]); ctx.arc(g[i], g[i + 1], g[i + 2], 0, TAU); }
+      for (let i = 0; i < g.length; i += 4) {
+        const r = flow ? g[i + 2] * Math.max(0, 1 + 0.5 * g[i + 3] * flow(g[i], g[i + 1])) : g[i + 2];
+        if (r < 0.25) continue;
+        ctx.moveTo(g[i] + r, g[i + 1]);
+        ctx.arc(g[i], g[i + 1], r, 0, TAU);
+      }
       ctx.fill();
     }
     ctx.globalAlpha = 1;
   }
 }
 
-/** One drawn size: the dots (base), the plain photo in the same place, and where a flicker may land. */
-type Scene = { L: Layout; k: number; base: HTMLCanvasElement; photo: HTMLCanvasElement; spots: number[] };
+/** One drawn size: the photo in place, the dots that hold still and the ones that flow, and a few coral glows. */
+type Scene = {
+  L: Layout; k: number; w2: number; h2: number;
+  photo: HTMLCanvasElement; still: HTMLCanvasElement; stillCream: HTMLCanvasElement;
+  holes: Batch; cream: Batch; glows: number[];
+};
 
 function canvas(w: number, h: number) { const c = document.createElement("canvas"); c.width = w; c.height = h; return c; }
 
 function build(box: DOMRect, img: HTMLImageElement, grid: Grid): Scene | null {
   const L: Layout = window.matchMedia(SYSTEM_WIDE_QUERY).matches ? ART_EXTRA.hero.desktop : ART_EXTRA.hero.phone;
   const dpr = Math.min(window.devicePixelRatio || 1, 2), k = (box.width / L.w) * dpr;
-  const W2 = Math.round(box.width * dpr), H2 = Math.round(box.height * dpr);
-  const base = canvas(W2, H2), mask = canvas(W2, H2), photo = canvas(W2, H2);
-  const ctx = base.getContext("2d"), m = mask.getContext("2d"), pc = photo.getContext("2d");
-  if (!ctx || !m || !pc) return null;
+  const w2 = Math.round(box.width * dpr), h2 = Math.round(box.height * dpr);
+  const photo = canvas(w2, h2), still = canvas(w2, h2), stillCream = canvas(w2, h2);
+  const pc = photo.getContext("2d"), sc = still.getContext("2d"), cc = stillCream.getContext("2d");
+  if (!pc || !sc || !cc) return null;
 
   // The photo's px -> design px: his middle (715, 830) sits at a fixed spot in the box.
   const { w: W, h: H, s } = L, ax = W * L.ax, ay = H * L.ay;
@@ -107,7 +116,7 @@ function build(box: DOMRect, img: HTMLImageElement, grid: Grid): Scene | null {
   // Solid photo (t = 0) to fully broken into dots (t = 1); c is how far a dot has cooled to cream.
   const ecx = X(720), ecy = Y(890), ed = (x: number, y: number) => Math.hypot((x - ecx) / L.rx, (y - ecy) / L.ry);
 
-  const holes = new Batch(), cream = new Batch(), spots: number[] = [];
+  const stillHoles = new Batch(), stillCreamB = new Batch(), holes = new Batch(), cream = new Batch(), glows: number[] = [];
   let n = 0;
   for (let y = g / 2; y < H; y += g) {
     for (let x = g / 2 + ((Math.round(y / g) % 2) * g) / 2; x < W; x += g) {
@@ -117,47 +126,36 @@ function build(box: DOMRect, img: HTMLImageElement, grid: Grid): Scene | null {
       let v = me ? 0.42 + 0.58 * smooth(15, 190, l) : smooth(70, 236, l) * 0.62;   // him: brighter, denser dots
       if (!me && oy < 420 && l > 226) v *= 0.16 + 0.2 * smooth(120, 420, oy);       // the white sky becomes night
       v *= smooth(0, 160, oy);                                                        // no hard line at the photo's top
-      v *= Math.pow(smooth(0, W * 0.28, x), 1.2) * smooth(0, W * 0.08, W - x) * smooth(0, H * 0.1, H - y) * smooth(0, H * 0.1, y);
+      v *= smooth(0, 220, ox) * smooth(0, 220, PHOTO_W - ox) * smooth(0, 200, PHOTO_H - oy);   // nor at its sides and foot
+      v *= Math.pow(smooth(0, W * 0.28, x), 1.2) * smooth(0, W * 0.08, W - x) * smooth(0, H * 0.12, H - y) * smooth(0, H * 0.1, y);
       const d = ed(x, y), t = Math.max(me ? 0 : smooth(0.42, 1.3, d), smooth(PHOTO_H - 300, PHOTO_H - 30, oy)), c = smooth(1.05, 2.1, d);
       const kk = Math.pow(1 - t, 1.4), r = g * 0.75 * kk + g * 0.48 * Math.pow(v, 1.25) * (1 - kk);
       if (r < 0.32) continue;
       const op = 1 - t * (0.6 - 0.45 * v);
-      if (c < 0.98) holes.add((1 - c) * op, x, y, r);
-      if (c > 0.02) cream.add(c * (0.35 + 0.4 * v), x, y, r);
-      // where a flicker may land: the dotted sand and dunes round him (not the white sky, not the faded edges)
-      if (t > 0.3 && c < 0.85 && oy > 470 && oy < PHOTO_H - 120 && v > 0.2 && n++ % 23 === 0) spots.push(x, y);
+      // how much this dot flows: none in the solid photo, most where it breaks up, a little out in the cream
+      const w = smooth(0.08, 0.38, t) * (1 - 0.55 * c);
+      if (c < 0.98) (w > 0.02 ? holes : stillHoles).add((1 - c) * op, x, y, r, w);
+      if (c > 0.02) (w > 0.02 ? cream : stillCreamB).add(c * (0.35 + 0.4 * v), x, y, r, w);
+      // a few coral dots, out where the photo breaks up, glowing in and out like the odd coloured pixel
+      if (t > 0.45 && t < 0.95 && c < 0.7 && v > 0.25 && !me && oy > 460 && n++ % 61 === 0) glows.push(x, y, r, (n * 2.399) % TAU);
     }
   }
 
-  const draw = (cx: CanvasRenderingContext2D) => { cx.imageSmoothingQuality = "high"; cx.drawImage(img, X(0), Y(0), PHOTO_W * s, PHOTO_H * s); };
   pc.setTransform(k, 0, 0, k, 0, 0);
-  draw(pc);
-  m.setTransform(k, 0, 0, k, 0, 0);
-  holes.fill(m, "#fff");
-  ctx.setTransform(k, 0, 0, k, 0, 0);
-  draw(ctx);
-  ctx.globalCompositeOperation = "destination-in";
-  ctx.setTransform(1, 0, 0, 1, 0, 0);
-  ctx.drawImage(mask, 0, 0);
-  ctx.globalCompositeOperation = "source-over";
-  ctx.setTransform(k, 0, 0, k, 0, 0);
-  cream.fill(ctx, CREAM);
-  return { L, k, base, photo, spots };
+  pc.imageSmoothingQuality = "high";
+  pc.drawImage(img, X(0), Y(0), PHOTO_W * s, PHOTO_H * s);
+  sc.setTransform(k, 0, 0, k, 0, 0);
+  stillHoles.fill(sc, "#fff");
+  cc.setTransform(k, 0, 0, k, 0, 0);
+  stillCreamB.fill(cc, CREAM);
+  return { L, k, w2, h2, photo, still, stillCream, holes, cream, glows };
 }
-
-/**
- * A flutter (Nov 23, Franky: "like bees, or wings when they flicker"): two or three small patches near
- * (x, y), each beating in and out of the photo many times a second, out of step with each other like a
- * pair of wings, quick to start and dying away. Where (design px), when (ms), how fast (beats a second).
- */
-type Wing = { dx: number; dy: number; r: number; ph: number };
-type Flicker = { x: number; y: number; t0: number; dur: number; hz: number; wings: Wing[] };
-/** A near-square beat, 0 to 1: the wing is either there or not, with a soft edge. */
-const beat = (ms: number, hz: number, ph: number) => 0.5 + 0.5 * Math.tanh(3.2 * Math.sin((ms / 1000) * hz * Math.PI * 2 + ph));
 
 const SRC = "/landing/system";
 /** How wide the photo is drawn: 1.2 x the art box on a desktop, 1.54 x on a phone (system.css sizes the boxes). */
 const SIZES = "(min-width: 900px) calc(min(100vw, 1600px) * 0.833), calc(min(100vw, 560px) * 1.54)";
+/** At most 30 frames a second: the waves are slow, and a phone draws thousands of dots a frame. */
+const FRAME_MS = 32;
 
 export function HeroDots({ onDrawn }: { onDrawn?: () => void }) {
   const ref = useRef<HTMLCanvasElement>(null);
@@ -170,20 +168,20 @@ export function HeroDots({ onDrawn }: { onDrawn?: () => void }) {
     const ctx = c?.getContext("2d");
     if (!c || !img || !ctx) return;
     const still = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    let gone = false, grid: Grid | null = null, scene: Scene | null = null, raf = 0, told = false, onScreen = true, timer = 0;
-    const flickers: Flicker[] = [];
+    let gone = false, grid: Grid | null = null, scene: Scene | null = null, raf = 0, told = false, onScreen = true, last = -Infinity;
+    const t0 = performance.now();
+    const mask = document.createElement("canvas"), mctx = mask.getContext("2d");
     // the pointer's lens: where it is (design px), where it eases to, and how strong it is
     const lens = { x: 0, y: 0, tx: 0, ty: 0, a: 0, on: false };
     const patch = document.createElement("canvas"), pctx = patch.getContext("2d");
 
-    // a flutter's strength over its life: on almost at once, then dying away
-    const env = (u: number) => (u < 0.08 ? u / 0.08 : Math.pow(1 - (u - 0.08) / 0.92, 1.3));
+    // the flow: two slow waves crossing, -1 to 1, drifting over the dots (design px, seconds)
+    const wave = (time: number) => (x: number, y: number) => 0.62 * Math.sin(x * 0.043 + y * 0.017 - time * 1.5) + 0.38 * Math.sin(x * -0.019 + y * 0.052 + time * 1.05);
 
-    // one round patch of the photo, soft at the edge, laid over the dots at strength a
+    // one round patch of the photo, soft at the edge, laid over the dots at strength a (the pointer's lens)
     const reveal = (S: Scene, x: number, y: number, r: number, a: number) => {
       if (!pctx || a <= 0.002) return;
       const R = Math.ceil(r * S.k), size = R * 2, sx = Math.round(x * S.k) - R, sy = Math.round(y * S.k) - R;
-      // one scratch canvas, grown only when a patch needs more room (a resize every frame would clear it each time)
       if (patch.width < size) { patch.width = size; patch.height = size; }
       pctx.clearRect(0, 0, size, size);
       pctx.globalCompositeOperation = "source-over";
@@ -201,55 +199,51 @@ export function HeroDots({ onDrawn }: { onDrawn?: () => void }) {
       ctx.globalAlpha = 1;
     };
 
+    // everything, at a moment: the photo through the dots (still ones and flowing ones), the cream dots, the coral glows
+    const paint = (S: Scene, time: number, moving: boolean) => {
+      if (!mctx) return;
+      if (mask.width !== S.w2 || mask.height !== S.h2) { mask.width = S.w2; mask.height = S.h2; }
+      const flow = moving ? wave(time) : undefined;
+      mctx.setTransform(1, 0, 0, 1, 0, 0);
+      mctx.globalCompositeOperation = "copy";
+      mctx.drawImage(S.still, 0, 0);
+      mctx.globalCompositeOperation = "source-over";
+      mctx.setTransform(S.k, 0, 0, S.k, 0, 0);
+      S.holes.fill(mctx, "#fff", flow);
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.globalCompositeOperation = "copy";
+      ctx.drawImage(S.photo, 0, 0);
+      ctx.globalCompositeOperation = "destination-in";
+      ctx.drawImage(mask, 0, 0);
+      ctx.globalCompositeOperation = "source-over";
+      ctx.drawImage(S.stillCream, 0, 0);
+      ctx.setTransform(S.k, 0, 0, S.k, 0, 0);
+      S.cream.fill(ctx, CREAM, flow);
+      ctx.fillStyle = CORAL;
+      for (let i = 0; i < S.glows.length; i += 4) {
+        const a = moving ? 0.12 + 0.7 * Math.pow(0.5 + 0.5 * Math.sin(time * 0.8 + S.glows[i + 3]), 3) : 0.45;
+        ctx.globalAlpha = a; ctx.beginPath(); ctx.arc(S.glows[i], S.glows[i + 1], S.glows[i + 2] * 0.95, 0, TAU); ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+    };
+
     const frame = (now: number) => {
       raf = 0;
       const S = scene;
       if (gone || !S) return;
-      lens.x += (lens.tx - lens.x) * 0.22;
-      lens.y += (lens.ty - lens.y) * 0.22;
-      lens.a += ((lens.on ? 1 : 0) - lens.a) * 0.14;
-      ctx.setTransform(1, 0, 0, 1, 0, 0);
-      ctx.clearRect(0, 0, c.width, c.height);
-      ctx.drawImage(S.base, 0, 0);
-      for (let i = flickers.length - 1; i >= 0; i--) {
-        const f = flickers[i], ms = now - f.t0, u = ms / f.dur;
-        if (u >= 1) { flickers.splice(i, 1); continue; }
-        if (u < 0) continue;
-        const e = env(u);
-        for (const w of f.wings) reveal(S, f.x + w.dx, f.y + w.dy, w.r, e * (0.08 + 0.92 * beat(ms, f.hz, w.ph)));
+      const live = onScreen && !document.hidden && (!still || lens.on || lens.a > 0.01);
+      if (now - last >= FRAME_MS || !live) {
+        last = now;
+        lens.x += (lens.tx - lens.x) * 0.3;
+        lens.y += (lens.ty - lens.y) * 0.3;
+        lens.a += ((lens.on ? 1 : 0) - lens.a) * 0.2;
+        paint(S, (now - t0) / 1000, !still);
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        reveal(S, lens.x, lens.y, S.L.w > 500 ? 95 : 48, lens.a);
       }
-      reveal(S, lens.x, lens.y, S.L.w > 500 ? 95 : 48, lens.a);
-      if (onScreen && (flickers.length || lens.on || lens.a > 0.01)) raf = requestAnimationFrame(frame);
+      if (live) raf = requestAnimationFrame(frame);
     };
     const wake = () => { if (!raf && scene && onScreen && !document.hidden) raf = requestAnimationFrame(frame); };
-
-    const flick = (x?: number, y?: number) => {
-      const S = scene;
-      if (!S || !S.spots.length) return;
-      if (x == null || y == null) { const i = Math.floor(Math.random() * (S.spots.length / 2)) * 2; x = S.spots[i]; y = S.spots[i + 1]; }
-      const big = S.L.w > 500, r0 = (big ? 24 : 13) + Math.random() * (big ? 16 : 8), side = Math.random() < 0.5 ? -1 : 1;
-      // two wings side by side, beating against each other, and now and then a third
-      const wings: Wing[] = [
-        { dx: 0, dy: 0, r: r0, ph: 0 },
-        { dx: side * r0 * (0.9 + Math.random() * 0.4), dy: -r0 * (0.2 + Math.random() * 0.4), r: r0 * (0.7 + Math.random() * 0.25), ph: Math.PI },
-      ];
-      if (Math.random() < 0.45) wings.push({ dx: -side * r0 * 0.8, dy: r0 * (0.5 + Math.random() * 0.5), r: r0 * 0.6, ph: Math.PI * (0.4 + Math.random() * 0.6) });
-      flickers.push({ x, y, t0: performance.now(), dur: 550 + Math.random() * 450, hz: 13 + Math.random() * 7, wings });
-      wake();
-    };
-    // the flutters on their own, like bees round the photo: one every 0.45 to 1.3 s while the hero is on
-    // screen, sometimes two close together; never with reduced motion
-    const plan = () => {
-      window.clearTimeout(timer);
-      if (still || gone) return;
-      timer = window.setTimeout(() => {
-        if (onScreen && !document.hidden && flickers.length < 3) {
-          flick();
-          if (Math.random() < 0.3) window.setTimeout(() => { if (!gone && flickers.length < 3) flick(); }, 90 + Math.random() * 160);
-        }
-        plan();
-      }, 450 + Math.random() * 850);
-    };
 
     const layout = () => {
       if (gone || !grid) return;
@@ -258,34 +252,26 @@ export function HeroDots({ onDrawn }: { onDrawn?: () => void }) {
       const S = build(box, img, grid);
       if (!S) return;
       scene = S;
-      c.width = S.base.width; c.height = S.base.height;
-      ctx.setTransform(1, 0, 0, 1, 0, 0);
-      ctx.drawImage(S.base, 0, 0);
+      c.width = S.w2; c.height = S.h2;
+      paint(S, (performance.now() - t0) / 1000, !still);
       wake();
-      if (!told) { told = true; drawn.current?.(); plan(); }
+      if (!told) { told = true; drawn.current?.(); }
     };
     let sizeRaf = 0;
     const sized = new ResizeObserver(() => { cancelAnimationFrame(sizeRaf); sizeRaf = requestAnimationFrame(layout); });
     const seen = new IntersectionObserver(([e]) => { onScreen = e.isIntersecting; wake(); });
 
-    // The pointer, in design px of the box: a mouse carries the lens; a tap or a pen press sets off one flicker.
-    const toDesign = (e: PointerEvent): [number, number] | null => {
-      const S = scene; if (!S) return null;
-      const b = c.getBoundingClientRect();
-      return [((e.clientX - b.left) / b.width) * S.L.w, ((e.clientY - b.top) / b.height) * S.L.h];
-    };
+    // The pointer, in design px of the box: a mouse carries the lens.
     const host = c.parentElement;
     const move = (e: PointerEvent) => {
-      if (e.pointerType !== "mouse") return;
-      const p = toDesign(e); if (!p) return;
+      if (e.pointerType !== "mouse" || !scene) return;
+      const b = c.getBoundingClientRect(), p = [((e.clientX - b.left) / b.width) * scene.L.w, ((e.clientY - b.top) / b.height) * scene.L.h];
       if (!lens.on && lens.a < 0.02) { lens.x = p[0]; lens.y = p[1]; }
       lens.tx = p[0]; lens.ty = p[1]; lens.on = true; wake();
     };
     const leave = () => { lens.on = false; wake(); };
-    const down = (e: PointerEvent) => { if (e.pointerType === "mouse") return; const p = toDesign(e); if (p) flick(p[0], p[1]); };
     host?.addEventListener("pointermove", move);
     host?.addEventListener("pointerleave", leave);
-    host?.addEventListener("pointerdown", down);
 
     const outline = new Image();
     outline.src = `${SRC}/dunes-outline.png`;
@@ -296,11 +282,10 @@ export function HeroDots({ onDrawn }: { onDrawn?: () => void }) {
     document.addEventListener("visibilitychange", wake);
     return () => {
       gone = true;
-      cancelAnimationFrame(raf); cancelAnimationFrame(sizeRaf); window.clearTimeout(timer);
+      cancelAnimationFrame(raf); cancelAnimationFrame(sizeRaf);
       sized.disconnect(); seen.disconnect();
       host?.removeEventListener("pointermove", move);
       host?.removeEventListener("pointerleave", leave);
-      host?.removeEventListener("pointerdown", down);
       document.removeEventListener("visibilitychange", wake);
     };
   }, []);

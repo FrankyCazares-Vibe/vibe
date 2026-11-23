@@ -60,6 +60,20 @@ First draft of the record. Franky can change any of it.
   - No SAMPLE pills on the pictures (Franky: they spoil them). Instead, one small line under the screens: "A made-up club, to show how a page looks.", so nobody reads Coffee & Chess as a real club on Vibe (zero clubs are signed).
   - The cafe-ceiling cover is replaced by a coffee-and-chess scene drawn in code (`board/club-banner.html`; no photo, no AI), and the screens were retaken the same way and the practice data put back.
 
+## Round 6 (Nov 23, Franky's notes)
+- **Flow, no random flicker.** Franky's reference: a pixel figure whose edges shimmer (Pinterest pin "R&D for Polsia"). Its page needs a sign-in, so it was read from its preview frame.
+  - Hero: the dots where the photo breaks up now breathe in slow waves (two crossing sine waves, at most 30 frames a second, only on screen), and a few coral dots glow in and out.
+  - The random flutters (hero and planet) are gone. Hover still turns dots into the photo.
+  - The spotlight is smaller (desktop 285 x 335, phone 132 x 158), so there are more small dots.
+  - The photo's sides and foot fade out, so the dots never stop at a line.
+- **Headlines:** more room between lines (hero line height 1) and under the hero headline. The letters melt into dots toward their foot, per line (background-clip text over a dot grid).
+- **The coral full stop's journey** (`coral-drop.tsx`):
+  - It bounces once in "yourself." with the sign-in dot's bounce, and a moment later (or on the first scroll) drops to the bottom left.
+  - It rides down the left margin as the page scrolls, then lands in "vibe." as its sun and bounces. Scrolling up takes it back out.
+  - Without JavaScript, or with reduced motion, both full stops just sit still. The close's sun is a page element now (`.fys-orb`), placed from the export.
+- **See you there:** smaller (420 wide on a desktop). The photo melts into dots in a soft oval (`dot-photo.tsx`), and Otto pops up out of the band over the forehead.
+- **Removed:** the scene slugs in every section's corner, and the "made-up club" line (Franky's call; the alt text still says it's made up).
+
 ## Rollback
 `LANDING=classic` in Vercel's environment brings back the Oct-Nov landing (the night sky with six lights) with no code deploy. Keep it for about a week, then delete `home-landing.tsx` and its parts if nobody misses it.
 

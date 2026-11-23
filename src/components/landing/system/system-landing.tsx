@@ -16,6 +16,8 @@ import { NightSky } from "../night-sky";
 import { frauncesSoft, landingMono } from "../soft-font";
 import { Art } from "./art";
 import { ART_EXTRA } from "./art-data";
+import { CoralDrop } from "./coral-drop";
+import { DotPhoto } from "./dot-photo";
 import { HeroDots } from "./hero-dots";
 import { Planet } from "./planet";
 import "./system.css";
@@ -54,8 +56,8 @@ const FOOTER_LINKS = [
 
 /**
  * "bring your club.": two desktop screens of a sample club, Coffee & Chess (the practice copy, Nov 23, 2026;
- * invented, its cover drawn in code), cropped to the club itself. No SAMPLE pill on the pictures (Franky, Nov 23:
- * it spoils them); the line under them says it's a made-up club instead, so no one reads it as a real one.
+ * invented, its cover drawn in code), cropped to the club itself. No SAMPLE pill and no "made-up club" line
+ * (Franky, Nov 23: they spoil the pictures); the alt text still says it's a made-up club.
  */
 const SCREENS = [
   { stem: "club-page", dims: [2184, 1584], alt: "A made-up club's page on Vibe, on a computer: Coffee & Chess, its cover a chessboard and a cup of coffee, its followers and members, and Blitz Night up next." },
@@ -69,9 +71,16 @@ const SUN_STYLE = {
   "--psx": `${HP.sun[0] * 100}%`, "--psy": `${HP.sun[1] * 100}%`, "--psr": `${((HP.sun[2] * 2) / HP.w) * 100}%`,
 } as CSSProperties;
 
+/** The close's coral sun (the dot that drops from the hero lands here), in em of the wordmark, per layout. */
+const ORB_STYLE = {
+  "--ox": `${ART_EXTRA.close.desktop.orb[0]}em`, "--oy": `${ART_EXTRA.close.desktop.orb[1]}em`, "--or": `${ART_EXTRA.close.desktop.orb[2]}em`,
+  "--pox": `${ART_EXTRA.close.phone.orb[0]}em`, "--poy": `${ART_EXTRA.close.phone.orb[1]}em`, "--por": `${ART_EXTRA.close.phone.orb[2]}em`,
+} as CSSProperties;
+
 /** "see you there.": the night band across his eyes (its outline, fractions of the photo), and Otto in it. */
 const W = ART_EXTRA.window;
-const BAND_CLIP = { clipPath: `polygon(${W.poly.map(([x, y]) => `${(x * 100).toFixed(2)}% ${(y * 100).toFixed(2)}%`).join(", ")})` } as CSSProperties;
+// Otto pokes out of the band (round 6): he is hidden only below its lower edge.
+const BAND_CLIP = { clipPath: `polygon(${W.pop.map(([x, y]) => `${(x * 100).toFixed(2)}% ${(y * 100).toFixed(2)}%`).join(", ")})` } as CSSProperties;
 const OTTO_STYLE = { left: `${W.otto[0] * 100}%`, top: `${W.otto[1] * 100}%`, width: `${W.otto[2] * 100}%` } as CSSProperties;
 
 export function SystemLanding({ signupOpen }: { signupOpen: boolean }) {
@@ -127,14 +136,13 @@ export function SystemLanding({ signupOpen }: { signupOpen: boolean }) {
           </div>
           <div className="fys-hero-copy">
             <p className="fys-k">Open now<b>/</b>IU + Purdue</p>
-            <h1 id="fys-title" className="fys-hl fys-hero-hl"><span>your campus.</span> <span>your people.</span> <span>yourself<i>.</i></span></h1>
+            <h1 id="fys-title" className="fys-hl fys-hero-hl"><span>your campus.</span> <span>your people.</span> <span>yourself<i className="fys-drop-start">.</i></span></h1>
             <p className="fys-body">Vibe is the social app for your campus, built around clubs. Find your clubs, your events, and each other. <strong>Free with your school email.</strong></p>
             <div className="fys-row">
               <a href={cta.href} data-warp-trigger className="fys-btn">{cta.label}</a>
               <a href="#fys-club" className="fys-btn fys-ghost">Bring your club</a>
             </div>
           </div>
-          <p className="fys-slug" aria-hidden="true">ext. the dunes<b>·</b>7:40 pm</p>
         </section>
 
         <section className="fys-people" aria-labelledby="fys-people-title">
@@ -151,7 +159,6 @@ export function SystemLanding({ signupOpen }: { signupOpen: boolean }) {
             <div className="fys-pp-clip"><Planet /></div>
             <Art name="people" />
           </div>
-          <p className="fys-slug" aria-hidden="true">ext. the night sky<b>·</b>11:58 pm</p>
         </section>
 
         <section id="fys-club" className="fys-club" aria-labelledby="fys-club-title">
@@ -164,7 +171,6 @@ export function SystemLanding({ signupOpen }: { signupOpen: boolean }) {
                 </picture>
               </div>
             ))}
-            <p className="fys-caption">A made-up club, to show how a page looks.</p>
           </div>
           <div className="fys-col">
             <p className="fys-k">Clubs<b>/</b>02</p>
@@ -177,7 +183,6 @@ export function SystemLanding({ signupOpen }: { signupOpen: boolean }) {
             </ol>
             <div className="fys-row"><a href={CLUB_HREF} className="fys-btn">Bring your club</a></div>
           </div>
-          <p className="fys-slug" aria-hidden="true">int. the club room<b>·</b>7 pm</p>
         </section>
 
         <section className="fys-eyes" aria-labelledby="fys-eyes-title">
@@ -186,11 +191,13 @@ export function SystemLanding({ signupOpen }: { signupOpen: boolean }) {
             <h2 id="fys-eyes-title" className="fys-hl fys-md"><span>see you there<i>.</i></span></h2>
             <p className="fys-body">Find what’s on this week, tap Going, and show up. The best part happens off your phone.</p>
           </div>
-          <div className="fys-print" role="img" aria-label="Franky leaning out of a car window on a long road, laughing. A band of night sky across his eyes, its edges breaking into dots, with Otto in it, who says: it's nicer in here, honestly.">
-            <picture>
-              <source type="image/avif" srcSet={`${SRC}/eyes-540.avif 540w, ${SRC}/eyes-1080.avif 1080w`} sizes="(min-width: 900px) 38vw, 92vw" />
-              <img src={`${SRC}/eyes-1080.webp`} srcSet={`${SRC}/eyes-540.webp 540w, ${SRC}/eyes-1080.webp 1080w`} sizes="(min-width: 900px) 38vw, 92vw" width={1080} height={1350} alt="" loading="lazy" decoding="async" />
-            </picture>
+          <div className="fys-print" role="img" aria-label="Franky leaning out of a car window on a long road, laughing, the photo's edges breaking into dots. A band of night sky across his eyes, with Otto popping out of it, who says: it's nicer in here, honestly.">
+            <DotPhoto>
+              <picture>
+                <source type="image/avif" srcSet={`${SRC}/eyes-540.avif 540w, ${SRC}/eyes-1080.avif 1080w`} sizes="(min-width: 900px) 38vw, 92vw" />
+                <img src={`${SRC}/eyes-1080.webp`} srcSet={`${SRC}/eyes-540.webp 540w, ${SRC}/eyes-1080.webp 1080w`} sizes="(min-width: 900px) 38vw, 92vw" width={1080} height={1350} alt="" loading="lazy" decoding="async" />
+              </picture>
+            </DotPhoto>
             <Art name="eyes-window" />
             <div className="fys-window" style={BAND_CLIP}>
               <picture style={OTTO_STYLE}>
@@ -200,7 +207,6 @@ export function SystemLanding({ signupOpen }: { signupOpen: boolean }) {
             </div>
             <Art name="eyes-note" />
           </div>
-          <p className="fys-slug" aria-hidden="true">ext. the long road<b>·</b>6:40 pm</p>
         </section>
 
         <section className="fys-open" aria-labelledby="fys-open-title">
@@ -216,7 +222,7 @@ export function SystemLanding({ signupOpen }: { signupOpen: boolean }) {
 
         <section className="fys-close" aria-label="Sign up">
           {/* The full stop is the sun: drawn by the art (close-front), with its rings behind it and the letters. */}
-          <span className="fys-big" aria-hidden="true"><Art name="close-back" unit="em" className="fys-close-back" />vibe<i>.</i><Art name="close-front" unit="em" className="fys-close-front" /></span>
+          <span className="fys-big" aria-hidden="true"><Art name="close-back" unit="em" className="fys-close-back" />vibe<i>.</i><span className="fys-orb" style={ORB_STYLE} /><Art name="close-front" unit="em" className="fys-close-front" /></span>
           <div className="fys-row">
             <a href={cta.href} data-warp-trigger className="fys-btn">{cta.label}</a>
             <a href={CLUB_HREF} className="fys-btn fys-ghost">Bring your club</a>
@@ -227,6 +233,8 @@ export function SystemLanding({ signupOpen }: { signupOpen: boolean }) {
       </main>
 
       {/* No data-warp-trigger in the footer: the warp would hijack these links. */}
+      {/* the coral full stop: bounces in the headline, drops, rides down the page and lands in "vibe." */}
+      <CoralDrop />
       <footer className="fys-footer">
         <span>© CONNECTVIBE. LLC</span>
         <nav aria-label="Legal and support">

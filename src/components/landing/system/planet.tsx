@@ -11,9 +11,9 @@ import { SYSTEM_WIDE_QUERY } from "./hero-dots";
  * (you), with room round you so you never sit on top of anyone. The recipe
  * is the "find your system" post's (vibe-marketing/campaigns/2026-11-
  * instagram/find-your-system/make-art.mjs), drawn here on a canvas so it can
- * live: people flutter alight now and then, fast, like wings, and under a mouse the people near
- * the pointer light up (a tap does it on a phone). With reduced motion no
- * one lights up by themselves. Paused off screen; device pixel ratio capped
+ * live: under a mouse the people near
+ * the pointer light up (a tap does it on a phone). Nobody lights up at random
+ * (Franky, Nov 23: the random flicker was annoying). Paused off screen; device pixel ratio capped
  * at 2. In the post's own px: 1080 x 1350, placed in the box by
  * ART_EXTRA.planet so the drawn notes land on it.
  */
@@ -95,11 +95,10 @@ export function Planet() {
   useEffect(() => {
     const c = ref.current, ctx = c?.getContext("2d");
     if (!c || !ctx) return;
-    const still = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     const youA = ART_EXTRA.planet.youA, [yx, yy] = ringPt(youA), crowd = people(youA);
     const lit = [...crowd.planet, ...crowd.front];
     const base = document.createElement("canvas"), bctx = base.getContext("2d");
-    let m = [1, 0, 0], raf = 0, onScreen = false, gone = false, nextAt = 0;
+    let m = [1, 0, 0], raf = 0, onScreen = false, gone = false;
     const sparks: Spark[] = [];
     const lens = { x: 0, y: 0, a: 0, on: false };
 
@@ -158,12 +157,8 @@ export function Planet() {
     const loop = (now: number) => {
       raf = 0;
       if (gone) return;
-      if (!still && now > nextAt && sparks.length < 7) {
-        sparks.push({ i: Math.floor(Math.random() * lit.length), t0: now, dur: 600 + Math.random() * 500, coral: Math.random() < 0.1, hz: 12 + Math.random() * 8, ph: Math.random() * Math.PI * 2 });
-        nextAt = now + 160 + Math.random() * 380;
-      }
       draw(now);
-      if (onScreen && !document.hidden && (!still || sparks.length || lens.on || lens.a > 0.01)) raf = requestAnimationFrame(loop);
+      if (onScreen && !document.hidden && (sparks.length || lens.on || lens.a > 0.01)) raf = requestAnimationFrame(loop);
     };
     const wake = () => { if (!raf && onScreen && !document.hidden) raf = requestAnimationFrame(loop); };
 
