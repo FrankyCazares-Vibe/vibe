@@ -30,14 +30,34 @@ const ease = (u: number) => (u <= 0 ? 0 : u >= 1 ? 1 : 1 - Math.pow(1 - u, 3));
  * The landing hero's sky, drawn on one canvas: drifting dust, the lights
  * (each its own colour, with an orbit and a moon), the thin lines between
  * them, sparks that travel the lines and a shooting star now and then.
- * `warping` streaks the dust outward on the way to sign-up. With reduced
+ * `warping` streaks the dust outward on the way to sign-up. With no lights
+ * it is just the dust (the "find your system" landing's hero). With reduced
  * motion it draws one still frame and stops. Every other frame on 120 Hz screens.
  * The two slow clouds of colour behind it are CSS (.vln-clouds in
  * landing.css): full-screen gradients redrawn every frame were most of the
  * frame when a phone draws canvas on the CPU.
  * Decorative only: the lights' buttons and labels are real DOM in home-landing.
  */
-export function NightSky({ lights, links, activeId, warping }: { lights: SkyLight[]; links: [number, number][]; activeId: string | null; warping: boolean }) {
+export function NightSky({
+  lights,
+  links,
+  activeId,
+  warping,
+  tints = DUST_TINTS,
+  shootingStars = true,
+  pinnedWarp = false,
+}: {
+  lights: SkyLight[];
+  links: [number, number][];
+  activeId: string | null;
+  warping: boolean;
+  /** The dust's colours ("r,g,b"); the first is the common one. The "find your system" landing passes cream only. */
+  tints?: readonly string[];
+  /** A shooting star now and then. */
+  shootingStars?: boolean;
+  /** The page pins this canvas over the whole screen while warping ("find your system", system.css), so the dust stops following the scroll then. */
+  pinnedWarp?: boolean;
+}) {
   const ref = useRef<HTMLCanvasElement>(null);
   const live = useRef({ activeId, warping, warpAt: 0 });
 
@@ -53,7 +73,7 @@ export function NightSky({ lights, links, activeId, warping }: { lights: SkyLigh
     if (!canvas || !ctx) return;
     const still = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     const rand = seeded(7);
-    const dust = Array.from({ length: 560 }, () => ({ x: rand(), y: rand(), z: 0.15 + rand() * 0.85, r: 0.35 + rand() * 0.9, ph: rand() * 6.28, sp: 0.4 + rand() * 1.3, tint: rand() < 0.12 ? 1 : rand() < 0.12 ? 2 : 0 }));
+    const dust = Array.from({ length: 560 }, () => ({ x: rand(), y: rand(), z: 0.15 + rand() * 0.85, r: 0.35 + rand() * 0.9, ph: rand() * 6.28, sp: 0.4 + rand() * 1.3, tint: Math.min(tints.length - 1, rand() < 0.12 ? 1 : rand() < 0.12 ? 2 : 0) }));
     const sparks: { link: number; at: number; flip: boolean }[] = [];
     const t0 = performance.now();
     let w = 0, h = 0, dpr = 1, raf = 0, onScreen = true, nextSpark = 2200, lastDraw = -Infinity;
@@ -86,7 +106,7 @@ export function NightSky({ lights, links, activeId, warping }: { lights: SkyLigh
       ctx.globalCompositeOperation = "source-over";
 
       const count = Math.min(dust.length, Math.round((w * h) / 2300));
-      const cx = w / 2, cy = h * 0.42, lift = window.scrollY;
+      const cx = w / 2, cy = h * 0.42, lift = pinnedWarp && live.current.warping ? 0 : window.scrollY;
       for (let i = 0; i < count; i++) {
         const p = dust[i];
         const x = (((p.x * w + (still ? 0 : t * 0.0035 * p.z)) % w) + w) % w + px * p.z * 22;
@@ -94,14 +114,14 @@ export function NightSky({ lights, links, activeId, warping }: { lights: SkyLigh
         ctx.globalAlpha = (0.16 + 0.5 * p.z) * (still ? 0.8 : 0.62 + 0.38 * Math.sin((t / 1000) * p.sp + p.ph));
         if (warp > 0) {
           const k1 = 1 + warp * warp * 8 * p.z, k0 = 1 + Math.pow(Math.max(0, warp - 0.14), 2) * 8 * p.z;
-          ctx.strokeStyle = `rgb(${DUST_TINTS[p.tint]})`;
+          ctx.strokeStyle = `rgb(${tints[p.tint]})`;
           ctx.lineWidth = p.r;
           ctx.beginPath();
           ctx.moveTo(cx + (x - cx) * k0, cy + (y - cy) * k0);
           ctx.lineTo(cx + (x - cx) * k1, cy + (y - cy) * k1);
           ctx.stroke();
         } else {
-          ctx.fillStyle = `rgb(${DUST_TINTS[p.tint]})`;
+          ctx.fillStyle = `rgb(${tints[p.tint]})`;
           ctx.beginPath();
           ctx.arc(x, y, p.r * (0.5 + p.z * 0.6), 0, 6.2832);
           ctx.fill();
@@ -111,7 +131,7 @@ export function NightSky({ lights, links, activeId, warping }: { lights: SkyLigh
       ctx.globalCompositeOperation = "lighter";
 
       // A shooting star now and then, across the top of the sky.
-      if (!still && !shot && t > nextShot) shot = { at: t, x: w * (0.15 + rand() * 0.7), y: h * (0.04 + rand() * 0.26), dir: rand() < 0.5 ? 1 : -1 };
+      if (shootingStars && !still && !shot && t > nextShot) shot = { at: t, x: w * (0.15 + rand() * 0.7), y: h * (0.04 + rand() * 0.26), dir: rand() < 0.5 ? 1 : -1 };
       if (shot) {
         const u = (t - shot.at) / 850;
         if (u >= 1) { shot = null; nextShot = t + 4200 + rand() * 5200; }
@@ -236,7 +256,7 @@ export function NightSky({ lights, links, activeId, warping }: { lights: SkyLigh
       window.removeEventListener("pointermove", onMove);
       document.removeEventListener("visibilitychange", wake);
     };
-  }, [lights, links]);
+  }, [lights, links, tints, shootingStars, pinnedWarp]);
 
   return <canvas ref={ref} className="vln-sky" aria-hidden="true" />;
 }

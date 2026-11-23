@@ -100,7 +100,7 @@ test("gateRefusalCopy: a sentence for every reason, none naming the hook", () =>
 test("landingCta: closed is the waitlist, tagged; open is today's sign-up", () => {
   assert.deepEqual(landingCta(false), { label: "Join the waitlist", href: "/waitlist?src=landing" });
   assert.deepEqual(landingCta(false, "door"), { label: "Join the waitlist", href: "/waitlist?src=landing" });
-  assert.deepEqual(landingCta(true), { label: "Sign up", href: "/auth/signup" });
+  assert.deepEqual(landingCta(true), { label: "Sign up free", href: "/auth/signup" });
   assert.deepEqual(landingCta(true, "door"), { label: "Create your account", href: "/auth/signup" });
   assert.equal(CLUB_WAITLIST_HREF, "/waitlist?officer=1&src=club");
 });

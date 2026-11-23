@@ -63,11 +63,12 @@ export type LandingSpot = "button" | "door";
 /**
  * The landing's sign-up buttons. Closed (the pilot): "Join the waitlist",
  * tagged `src=landing` so the founders can see which channel worked. Open
- * (launch): today's labels and `/auth/signup`.
+ * (launch): "Sign up free" (the marketing ask since the Nov 23 landing; it
+ * was "Sign up") and `/auth/signup`.
  */
 export function landingCta(open: boolean, spot: LandingSpot = "button"): { label: string; href: string } {
   if (!open) return { label: "Join the waitlist", href: `${WAITLIST_HREF}?src=landing` };
-  return { label: spot === "door" ? "Create your account" : "Sign up", href: SIGNUP_HREF };
+  return { label: spot === "door" ? "Create your account" : "Sign up free", href: SIGNUP_HREF };
 }
 
 /** Door 06's officer line, for the closed state. */
