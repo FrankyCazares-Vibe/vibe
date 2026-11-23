@@ -36,11 +36,11 @@
 .fys-hl { position: relative; z-index: 5; margin: 0; font-family: var(--font-soft), "Fraunces", serif; font-weight: 900; font-variation-settings: "SOFT" 100, "opsz" 144; letter-spacing: -0.035em; word-spacing: 0.06em; line-height: 0.88; font-size: calc(64 * var(--P)); color: var(--ink); }
 .fys-hl span { display: block; white-space: nowrap; }
 .fys-hl i, .fys-big i { font-style: normal; color: var(--coral); }
-.fys-hl.fys-md { font-size: calc(56 * var(--P)); }
+.fys-hl.fys-md { font-size: calc(46 * var(--P)); }
 /* The hero's three lines (the tagline, since Nov 23): smaller, so "your people." fits a phone. */
-.fys-hl.fys-hero-hl { font-size: calc(54 * var(--P)); }
+.fys-hl.fys-hero-hl { font-size: calc(46 * var(--P)); }
 .fys-slug { margin: 30px 0 0; font: 500 9.5px/1 var(--font-jetbrains), monospace; letter-spacing: 0.18em; text-transform: uppercase; color: #8C857C; white-space: nowrap; }
-.fys-body { margin: 18px 0 0; max-width: 31em; font-size: 16.5px; line-height: 1.55; color: var(--ink2); }
+.fys-body { margin: 16px 0 0; max-width: 31em; font-size: 15.5px; line-height: 1.55; color: var(--ink2); }
 .fys-body strong { color: var(--ink); font-weight: 600; }
 
 /* ---- buttons: pills, 52px (44px in the top bar) ---- */
@@ -69,7 +69,7 @@
 /* Short phones keep the headline and the button in the first screen: the picture gives way. */
 /* The picture runs 40px under the first lines of text (its bottom is only fading dots there). */
 /* Its height leaves room for the words under it: about 250px plus the three-line headline, which grows with --P. */
-.fys-hero-art { --ah: clamp(240px, calc(100svh - 252px - 143 * var(--P)), calc(430 * var(--P))); position: relative; width: calc(var(--ah) * 390 / 430); height: var(--ah); margin: 0 auto -40px; }
+.fys-hero-art { --ah: clamp(240px, calc(100svh - 245px - 124 * var(--P)), calc(430 * var(--P))); position: relative; width: calc(var(--ah) * 390 / 430); height: var(--ah); margin: 0 auto -40px; }
 .fys-dots { position: absolute; inset: 0; width: 100%; height: 100%; }
 .fys-dunes-src { position: absolute; left: 0; top: 0; width: 1px; height: 1px; overflow: hidden; opacity: 0; pointer-events: none; }
 .fys-dunes-src img { width: 1px; height: 1px; }
@@ -87,7 +87,7 @@
 .fys-three li { border-top: 1px solid var(--hair); padding-top: 18px; }
 .fys-lab { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; font: 500 12px/1 var(--font-jetbrains), monospace; letter-spacing: 0.18em; text-transform: uppercase; color: var(--muted); }
 .fys-lab::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--ink); opacity: 0.85; }
-.fys-three p { margin: 0; font-size: 16px; line-height: 1.5; color: var(--ink2); }
+.fys-three p { margin: 0; font-size: 15px; line-height: 1.5; color: var(--ink2); }
 .fys-three strong { color: var(--ink); font-weight: 600; }
 .fys-people .fys-k { order: 1; }
 .fys-people .fys-hl { order: 2; }
@@ -101,8 +101,8 @@
 .fys-club .fys-hl { order: 2; }
 .fys-club .fys-body { order: 3; }
 .fys-fan { order: 4; position: relative; width: 100%; aspect-ratio: 342 / 470; margin-top: 30px; }
-.fys-list { order: 5; display: grid; gap: 16px; margin: 30px 0 0; padding: 0; list-style: none; }
-.fys-list li { display: flex; align-items: center; gap: 14px; font-size: 16px; line-height: 1.5; color: var(--ink2); }
+.fys-list { order: 5; display: grid; gap: 16px; margin: 56px 0 0; padding: 0; list-style: none; }
+.fys-list li { display: flex; align-items: center; gap: 14px; font-size: 15px; line-height: 1.5; color: var(--ink2); }
 .fys-list strong { color: var(--ink); font-weight: 600; }
 .fys-n { flex: none; width: 2.2em; font: 500 13px/1 var(--font-jetbrains), monospace; letter-spacing: 0.12em; color: var(--coral); }
 .fys-club .fys-row { order: 6; margin-top: 30px; }
@@ -112,16 +112,14 @@
 .fys-screen img { display: block; width: 100%; height: auto; border-radius: 12px; box-shadow: 0 30px 60px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(246, 241, 234, 0.1); }
 .fys-s1 { left: 0; top: 0; width: 92%; rotate: -1.5deg; }
 .fys-s2 { left: 16%; top: 44%; width: 80%; rotate: 1.5deg; }
-/* The SAMPLE label every app picture carries (G7), on the screen's corner. */
-/* On the chat it sits in the empty corner under the events, clear of the club's name. */
-.fys-s2 .fys-sample { left: auto; top: auto; right: 12px; bottom: 10px; }
-.fys-sample { position: absolute; left: 12px; top: 10px; padding: 3px 8px 2px; border: 1px solid rgba(255, 92, 53, 0.7); border-radius: 999px; background: rgba(12, 11, 11, 0.82); font: 600 9.5px/1.2 var(--font-jetbrains), monospace; letter-spacing: 0.14em; text-transform: uppercase; color: #FF8A66; }
+/* Under the screens: it's a made-up club (no label on the pictures themselves). */
+.fys-caption { position: absolute; left: 0; top: calc(100% + 14px); margin: 0; font-size: 12px; line-height: 1.4; color: var(--muted); }
 
 /* ---- everything looks different ---- */
 .fys-print { position: relative; width: 100%; aspect-ratio: 4 / 5; margin-top: 30px; border-radius: 4px; box-shadow: 0 30px 60px rgba(0, 0, 0, 0.55); }
 .fys-print > picture img { display: block; width: 100%; height: 100%; object-fit: cover; border-radius: 4px; }
-/* Otto's round night window, up in the sky (its dark disc and dotted rim are the eyes-window drawing under it). */
-.fys-window { position: absolute; z-index: 4; aspect-ratio: 1; border-radius: 50%; overflow: hidden; pointer-events: none; }
+/* Otto, in the night band across the eyes: clipped to the band's outline (the band and its frayed, dotted edge are the eyes-window drawing under him). */
+.fys-window { position: absolute; inset: 0; z-index: 4; pointer-events: none; }
 .fys-window picture { position: absolute; display: block; filter: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.5)); }
 .fys-window img { display: block; width: 100%; height: auto; }
 .fys-eyes .fys-slug { text-align: right; margin-top: 16px; }
@@ -131,7 +129,7 @@
 
 /* ---- the close: the full stop is the sun, with its own small system ---- */
 .fys-close { position: relative; display: flex; flex-direction: column; align-items: center; max-width: 1600px; margin: 0 auto; padding: 110px 24px 80px; text-align: center; }
-.fys-big { position: relative; display: inline-block; margin: 30px 0 70px; font-family: "Vibe Wordmark", var(--font-soft, "Fraunces"), serif; font-weight: 900; font-variation-settings: "SOFT" 100, "opsz" 144; font-size: calc(100 * var(--P)); line-height: 1; letter-spacing: 0; color: var(--ink); translate: -0.34em 0; margin-bottom: 40px; }
+.fys-big { position: relative; display: inline-block; margin: 30px 0 70px; font-family: "Vibe Wordmark", var(--font-soft, "Fraunces"), serif; font-weight: 900; font-variation-settings: "SOFT" 100, "opsz" 144; font-size: calc(84 * var(--P)); line-height: 1; letter-spacing: 0; color: var(--ink); translate: -0.34em 0; margin-bottom: 40px; }
 /* Its own layer: the rings' back halves sit behind the letters, the sun and the front halves over them.
    The real full stop is kept for its space and its meaning, and drawn by the art. */
 .fys-big { isolation: isolate; }
@@ -154,12 +152,12 @@
 /* ---- desktop ---- */
 @media (min-width: 900px) {
   .fys-art { left: var(--x); top: var(--y); width: var(--w); height: var(--h); }
-  .fys-k { margin-bottom: 26px; font-size: 13px; }
-  .fys-hl { font-size: calc(128 * var(--U)); }
-  .fys-hl.fys-md { font-size: calc(104 * var(--U)); }
-  .fys-hl.fys-hero-hl { font-size: calc(98 * var(--U)); }
+  .fys-k { margin-bottom: 22px; font-size: 12px; }
+  .fys-hl { font-size: calc(100 * var(--U)); }
+  .fys-hl.fys-md { font-size: calc(80 * var(--U)); }
+  .fys-hl.fys-hero-hl { font-size: calc(78 * var(--U)); }
   .fys-slug { margin: 0; font-size: 11px; }
-  .fys-body { margin-top: 28px; font-size: clamp(16px, calc(19 * var(--U)), 20px); }
+  .fys-body { margin-top: 24px; font-size: clamp(15px, calc(17 * var(--U)), 18px); }
   .fys-btn { height: 54px; padding: 0 28px; }
   .fys-row { margin-top: 34px; }
 
@@ -181,7 +179,7 @@
   .fys-people { grid-template-columns: calc(520 * var(--U)) minmax(0, 1fr); padding: calc(90 * var(--U)) calc(120 * var(--U)); }
   .fys-pp { width: auto; aspect-ratio: 1; margin: 0; }
   .fys-three { gap: 22px; margin-top: 44px; }
-  .fys-three p { font-size: clamp(16px, calc(17 * var(--U)), 18px); }
+  .fys-three p { font-size: clamp(15px, calc(15.5 * var(--U)), 16.5px); }
   .fys-people .fys-slug { position: absolute; right: calc(48 * var(--U)); bottom: calc(40 * var(--U)); }
 
   .fys-club { grid-template-columns: minmax(0, 1fr) calc(520 * var(--U)); align-items: center; padding: calc(120 * var(--U)); }
@@ -189,9 +187,7 @@
   .fys-screen img { border-radius: calc(16 * var(--U)); }
   .fys-s1 { left: 0; top: 6%; width: 82%; }
   .fys-s2 { left: 28%; top: 44%; width: 70%; }
-  .fys-sample { left: 16px; top: 14px; font-size: 10.5px; }
-  .fys-s2 .fys-sample { left: auto; top: auto; right: 16px; bottom: 14px; }
-  .fys-list li { gap: 18px; font-size: clamp(16px, calc(18 * var(--U)), 19px); }
+  .fys-list li { gap: 18px; font-size: clamp(15px, calc(16 * var(--U)), 17px); }
   .fys-club .fys-slug { position: absolute; right: calc(120 * var(--U)); bottom: calc(60 * var(--U)); }
 
   .fys-eyes { grid-template-columns: minmax(0, 1fr) calc(540 * var(--U)); column-gap: calc(60 * var(--U)); align-items: center; padding: calc(120 * var(--U)); }
@@ -202,7 +198,7 @@
   .fys-line { aspect-ratio: 600 / 360; margin: 0; }
 
   .fys-close { padding: calc(80 * var(--U)) calc(120 * var(--U)) calc(110 * var(--U)); }
-  .fys-big { margin: calc(40 * var(--U)) 0 calc(70 * var(--U)); font-size: calc(220 * var(--U)); translate: none; }
+  .fys-big { margin: calc(40 * var(--U)) 0 calc(60 * var(--U)); font-size: calc(170 * var(--U)); translate: none; }
   .fys-close .fys-row { flex-direction: row; justify-content: center; width: auto; max-width: none; }
 
   .fys-footer { flex-direction: row; flex-wrap: wrap; align-items: center; justify-content: space-between; padding: 32px 48px 40px; }

@@ -54,11 +54,12 @@ const FOOTER_LINKS = [
 
 /**
  * "bring your club.": two desktop screens of a sample club, Coffee & Chess (the practice copy, Nov 23, 2026;
- * invented, with Franky's own cafe photo as its cover), cropped to the club itself. Each carries a SAMPLE label (G7).
+ * invented, its cover drawn in code), cropped to the club itself. No SAMPLE pill on the pictures (Franky, Nov 23:
+ * it spoils them); the line under them says it's a made-up club instead, so no one reads it as a real one.
  */
 const SCREENS = [
-  { stem: "club-page", dims: [2184, 1584], alt: "A sample club's page on Vibe, on a computer: Coffee & Chess, with a cafe photo as its cover, its followers and members, and Blitz Night up next." },
-  { stem: "club-chat", dims: [1944, 1642], alt: "A sample club's chat on Vibe, on a computer: members vote on what to play next week and tap Going for Blitz Night, with the club's events and Announcement Board beside it." },
+  { stem: "club-page", dims: [2184, 1584], alt: "A made-up club's page on Vibe, on a computer: Coffee & Chess, its cover a chessboard and a cup of coffee, its followers and members, and Blitz Night up next." },
+  { stem: "club-chat", dims: [1944, 1642], alt: "A made-up club's chat on Vibe, on a computer: members vote on what to play next week and tap Going for Blitz Night, with the club's events and Announcement Board beside it." },
 ] as const;
 
 /** The hero's sun: where it sits and how big, per layout (the board's export, art-data.ts). */
@@ -68,10 +69,10 @@ const SUN_STYLE = {
   "--psx": `${HP.sun[0] * 100}%`, "--psy": `${HP.sun[1] * 100}%`, "--psr": `${((HP.sun[2] * 2) / HP.w) * 100}%`,
 } as CSSProperties;
 
-/** "see you there.": the round night window in the sky, and Otto in it (fractions of the photo). */
+/** "see you there.": the night band across his eyes (its outline, fractions of the photo), and Otto in it. */
 const W = ART_EXTRA.window;
-const WINDOW_STYLE = { left: `${(W.cx - W.r) * 100}%`, top: `${((W.cy * 1350) / 1080 - W.r) * (1080 / 1350) * 100}%`, width: `${W.r * 2 * 100}%` } as CSSProperties;
-const OTTO_STYLE = { left: `${((W.otto[0] - (W.cx - W.r)) / (W.r * 2)) * 100}%`, top: `${((W.otto[1] * 1350) / 1080 - (W.cy * 1350) / 1080 + W.r) / (W.r * 2) * 100}%`, width: `${(W.otto[2] / (W.r * 2)) * 100}%` } as CSSProperties;
+const BAND_CLIP = { clipPath: `polygon(${W.poly.map(([x, y]) => `${(x * 100).toFixed(2)}% ${(y * 100).toFixed(2)}%`).join(", ")})` } as CSSProperties;
+const OTTO_STYLE = { left: `${W.otto[0] * 100}%`, top: `${W.otto[1] * 100}%`, width: `${W.otto[2] * 100}%` } as CSSProperties;
 
 export function SystemLanding({ signupOpen }: { signupOpen: boolean }) {
   const router = useRouter();
@@ -161,9 +162,9 @@ export function SystemLanding({ signupOpen }: { signupOpen: boolean }) {
                   <source type="image/avif" srcSet={`${SRC}/${s.stem}-640.avif 640w, ${SRC}/${s.stem}-1120.avif 1120w`} sizes="(min-width: 900px) 34vw, 88vw" />
                   <img src={`${SRC}/${s.stem}-1120.webp`} srcSet={`${SRC}/${s.stem}-640.webp 640w, ${SRC}/${s.stem}-1120.webp 1120w`} sizes="(min-width: 900px) 34vw, 88vw" width={s.dims[0]} height={s.dims[1]} alt={s.alt} loading="lazy" decoding="async" />
                 </picture>
-                <span className="fys-sample" aria-hidden="true">Sample</span>
               </div>
             ))}
+            <p className="fys-caption">A made-up club, to show how a page looks.</p>
           </div>
           <div className="fys-col">
             <p className="fys-k">Clubs<b>/</b>02</p>
@@ -185,13 +186,13 @@ export function SystemLanding({ signupOpen }: { signupOpen: boolean }) {
             <h2 id="fys-eyes-title" className="fys-hl fys-md"><span>see you there<i>.</i></span></h2>
             <p className="fys-body">Find what’s on this week, tap Going, and show up. The best part happens off your phone.</p>
           </div>
-          <div className="fys-print" role="img" aria-label="Franky leaning out of a car window on a long road, laughing. Up in the daytime sky, a round window of night with Otto in it, who says: it's nicer in here, honestly.">
+          <div className="fys-print" role="img" aria-label="Franky leaning out of a car window on a long road, laughing. A band of night sky across his eyes, its edges breaking into dots, with Otto in it, who says: it's nicer in here, honestly.">
             <picture>
               <source type="image/avif" srcSet={`${SRC}/eyes-540.avif 540w, ${SRC}/eyes-1080.avif 1080w`} sizes="(min-width: 900px) 38vw, 92vw" />
               <img src={`${SRC}/eyes-1080.webp`} srcSet={`${SRC}/eyes-540.webp 540w, ${SRC}/eyes-1080.webp 1080w`} sizes="(min-width: 900px) 38vw, 92vw" width={1080} height={1350} alt="" loading="lazy" decoding="async" />
             </picture>
             <Art name="eyes-window" />
-            <div className="fys-window" style={WINDOW_STYLE}>
+            <div className="fys-window" style={BAND_CLIP}>
               <picture style={OTTO_STYLE}>
                 <source type="image/avif" srcSet={`${SRC}/otto-260.avif 260w, ${SRC}/otto-520.avif 520w`} sizes="(min-width: 900px) 10vw, 24vw" />
                 <img src={`${SRC}/otto-520.webp`} srcSet={`${SRC}/otto-260.webp 260w, ${SRC}/otto-520.webp 520w`} sizes="(min-width: 900px) 10vw, 24vw" width={520} height={317} alt="" loading="lazy" decoding="async" />

@@ -53,6 +53,13 @@ First draft of the record. Franky can change any of it.
 - **One campus at a time:** Indianapolis and Bloomington are lit, and "your campus next?" has no arrow. The body says "Open now for IU and Purdue students."
 - **The close:** the coral full stop is drawn by the art now, so the rings are centred on it. They pass behind it and behind the letters at the back, and in front of it below the letters.
 
+## Round 5 (Nov 23, Franky's notes on the preview)
+- **Smaller everywhere:** headlines about 20% down (desktop hero 78, sections 80, close wordmark 170 at 1440), body 17, and the handwritten notes about 13% smaller.
+- **See you there:** Otto's window is back across his eyes, as on the first board. It's a rounded band whose edges fray into dark dots (the hero's texture), not a hard rectangle, with only Otto's line.
+- **Bring your club:**
+  - No SAMPLE pills on the pictures (Franky: they spoil them). Instead, one small line under the screens: "A made-up club, to show how a page looks.", so nobody reads Coffee & Chess as a real club on Vibe (zero clubs are signed).
+  - The cafe-ceiling cover is replaced by a coffee-and-chess scene drawn in code (`board/club-banner.html`; no photo, no AI), and the screens were retaken the same way and the practice data put back.
+
 ## Rollback
 `LANDING=classic` in Vercel's environment brings back the Oct-Nov landing (the night sky with six lights) with no code deploy. Keep it for about a week, then delete `home-landing.tsx` and its parts if nobody misses it.
 
