@@ -88,6 +88,12 @@ First draft of the record. Franky can change any of it.
 - The headlines are solid nearly all the way down, with a fine grain only at their very foot.
 - The hero's dots are only slightly uneven now.
 
+## Round 9 (Nov 23, Franky: "make sure the period keeps dropping")
+- There is one coral full stop, and it travels. As the page scrolls it drops from headline to headline: "yourself." → "made of your people." → "bring your club." → "see you there." → "one campus at a time." → the sun of "vibe.".
+- At each headline it lands with the sign-in bounce and rests for about a third of a screen of scrolling as that headline's full stop. Scrolling up runs it back.
+- Every headline full stop is a `.fys-stop` (in page order), and the close's sun is `.fys-orb`. Only the one it rests in shows.
+- Without JavaScript, or with reduced motion, every full stop sits in its place.
+
 ## Rollback
 `LANDING=classic` in Vercel's environment brings back the Oct-Nov landing (the night sky with six lights) with no code deploy. Keep it for about a week, then delete `home-landing.tsx` and its parts if nobody misses it.
 

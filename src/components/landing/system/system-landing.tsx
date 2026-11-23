@@ -136,7 +136,7 @@ export function SystemLanding({ signupOpen }: { signupOpen: boolean }) {
           </div>
           <div className="fys-hero-copy">
             <p className="fys-k">Open now<b>/</b>IU + Purdue</p>
-            <h1 id="fys-title" className="fys-hl fys-hero-hl"><span>your campus.</span> <span>your people.</span> <span>yourself<i className="fys-drop-start">.</i></span></h1>
+            <h1 id="fys-title" className="fys-hl fys-hero-hl"><span>your campus.</span> <span>your people.</span> <span>yourself<i className="fys-stop">.</i></span></h1>
             <p className="fys-body">Vibe is the social app for your campus, built around clubs. Find your clubs, your events, and each other. <strong>Free with your school email.</strong></p>
             <div className="fys-row">
               <a href={cta.href} data-warp-trigger className="fys-btn">{cta.label}</a>
@@ -148,7 +148,7 @@ export function SystemLanding({ signupOpen }: { signupOpen: boolean }) {
         <section className="fys-people" aria-labelledby="fys-people-title">
           <div className="fys-col">
             <p className="fys-k">Your people<b>/</b>01</p>
-            <h2 id="fys-people-title" className="fys-hl fys-md"><span>made of</span> <span>your people<i className="fys-drop-end">.</i></span></h2>
+            <h2 id="fys-people-title" className="fys-hl fys-md"><span>made of</span> <span>your people<i className="fys-stop">.</i></span></h2>
             <ul className="fys-three">
               <li><span className="fys-lab">Clubs</span><p><strong>Follow any club</strong> to see its events. Join it to talk in its chats.</p></li>
               <li><span className="fys-lab">Events</span><p><strong>See what’s on</strong> this week, and check in at the door with a code.</p></li>
@@ -174,7 +174,7 @@ export function SystemLanding({ signupOpen }: { signupOpen: boolean }) {
           </div>
           <div className="fys-col">
             <p className="fys-k">Clubs<b>/</b>02</p>
-            <h2 id="fys-club-title" className="fys-hl fys-md"><span>bring your</span> <span>club<i>.</i></span></h2>
+            <h2 id="fys-club-title" className="fys-hl fys-md"><span>bring your</span> <span>club<i className="fys-stop">.</i></span></h2>
             <p className="fys-body">Run a club? Give it a home on Vibe. We’ll set up its page with you, in person. Free.</p>
             <ol className="fys-list">
               <li><span className="fys-n">01</span><span><strong>The page.</strong> Anyone can follow it to see your events.</span></li>
@@ -188,7 +188,7 @@ export function SystemLanding({ signupOpen }: { signupOpen: boolean }) {
         <section className="fys-eyes" aria-labelledby="fys-eyes-title">
           <div className="fys-col">
             <p className="fys-k">In person<b>/</b>03</p>
-            <h2 id="fys-eyes-title" className="fys-hl fys-md"><span>see you there<i>.</i></span></h2>
+            <h2 id="fys-eyes-title" className="fys-hl fys-md"><span>see you there<i className="fys-stop">.</i></span></h2>
             <p className="fys-body">Find what’s on this week, tap Going, and show up. The best part happens off your phone.</p>
           </div>
           <div className="fys-print" role="img" aria-label="Franky leaning out of a car window on a long road, laughing, the photo's edges breaking into dots. A band of night sky across his eyes, with Otto popping out of it, who says: it's nicer in here, honestly.">
@@ -212,7 +212,7 @@ export function SystemLanding({ signupOpen }: { signupOpen: boolean }) {
         <section className="fys-open" aria-labelledby="fys-open-title">
           <div className="fys-col">
             <p className="fys-k">Where it’s open<b>/</b>04</p>
-            <h2 id="fys-open-title" className="fys-hl fys-md"><span>one campus</span> <span>at a time<i>.</i></span></h2>
+            <h2 id="fys-open-title" className="fys-hl fys-md"><span>one campus</span> <span>at a time<i className="fys-stop">.</i></span></h2>
             <p className="fys-body">Open now for {SCHOOLS} students. {signupOpen ? "Sign up free" : "Join the waitlist"} with your school email.</p>
           </div>
           <div className="fys-line" role="img" aria-label="A line of campuses: Indianapolis and Bloomington lit up, the next ones question marks.">
@@ -233,7 +233,7 @@ export function SystemLanding({ signupOpen }: { signupOpen: boolean }) {
       </main>
 
       {/* No data-warp-trigger in the footer: the warp would hijack these links. */}
-      {/* the coral full stop: bounces in "yourself." and falls into "made of your people." as the page scrolls */}
+      {/* the coral full stop: one dot that drops from headline to headline as the page scrolls, down into "vibe." */}
       <CoralDrop />
       <footer className="fys-footer">
         <span>© CONNECTVIBE. LLC</span>
