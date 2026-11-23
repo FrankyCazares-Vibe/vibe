@@ -157,3 +157,8 @@ Franky tried the third-party taste skill on the landing (the trial and its notes
 - **Checked:**
   - `npm test` passes (4230) and the typecheck is clean.
   - In the browser at 1440 and 375, the new section has no sideways scroll.
+- **The close's sun and its rings** (Franky: "the ring at the bottom of the orange dot should go over it, and it should be above the ring at the top").
+  - The inner ring is the only one that crosses the sun: its half-height is 0.108 of the font size, under the sun's radius of 0.116.
+  - `close-front` is that same hand-drawn stroke, copied rather than redrawn, by `board/export-front.mjs`. It has no dark outline (over coral the outline read as a smudge).
+  - The page shows it only over the sun's lower half: a half disc cut along the rings' -10° tilt (`FRONT_STYLE`). So the ring's near side runs in front of the sun and its far side behind.
+  - `export.mjs` doesn't know this piece. Re-export it with `node campaigns/2026-11-landing-revamp/board/export-front.mjs <app root>`.

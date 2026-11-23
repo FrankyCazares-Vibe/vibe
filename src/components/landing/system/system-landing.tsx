@@ -96,6 +96,23 @@ const SUN_STYLE = {
 } as CSSProperties;
 
 /** The close's coral sun, in em of the wordmark, per layout (the board's export measured it). */
+/**
+ * The near side of the sun's inner ring runs in front of it (Franky, Nov 23, after ship: "the ring at the bottom of
+ * the orange dot should go over it, and it should be above the ring at the top"). close-front is the inner ring's own
+ * stroke again (the board's export-front.mjs), shown only over the sun's lower half: a half disc cut along the rings'
+ * tilt (-10 degrees, export.html), a little wider than the sun so the two strokes meet cleanly at its edge.
+ */
+const RING_TILT = -10;
+function frontClip([cx, cy, r]: readonly number[]): string {
+  const R = r * 1.08, pts: string[] = [];
+  for (let i = 0; i <= 12; i++) {
+    const a = ((RING_TILT + (i / 12) * 180) * Math.PI) / 180;
+    pts.push(`${(cx + R * Math.cos(a)).toFixed(4)}em ${(cy + R * Math.sin(a)).toFixed(4)}em`);
+  }
+  return `polygon(${pts.join(", ")})`;
+}
+const FRONT_STYLE = { "--fclip": frontClip(ART_EXTRA.close.desktop.orb), "--pfclip": frontClip(ART_EXTRA.close.phone.orb) } as CSSProperties;
+
 const ORB_STYLE = {
   "--ox": `${ART_EXTRA.close.desktop.orb[0]}em`, "--oy": `${ART_EXTRA.close.desktop.orb[1]}em`, "--or": `${ART_EXTRA.close.desktop.orb[2]}em`,
   "--pox": `${ART_EXTRA.close.phone.orb[0]}em`, "--poy": `${ART_EXTRA.close.phone.orb[1]}em`, "--por": `${ART_EXTRA.close.phone.orb[2]}em`,
@@ -261,8 +278,8 @@ export function SystemLanding({ signupOpen }: { signupOpen: boolean }) {
         </section>
 
         <section className="fys-close" aria-label="Sign up">
-          {/* The full stop is the sun (.fys-orb), with its rings behind it and the letters (close-back). */}
-          <span className="fys-big" aria-hidden="true"><Art name="close-back" unit="em" className="fys-close-back" />vibe<i>.</i><span className="fys-orb" style={ORB_STYLE} /></span>
+          {/* The full stop is the sun (.fys-orb), with its rings behind it and the letters (close-back), and the inner ring's near side over it (close-front). */}
+          <span className="fys-big" aria-hidden="true"><Art name="close-back" unit="em" className="fys-close-back" />vibe<i>.</i><span className="fys-orb" style={ORB_STYLE} /><span className="fys-front" style={FRONT_STYLE}><Art name="close-front" unit="em" className="fys-close-front" /></span></span>
           <div className="fys-row">
             <a href={cta.href} data-warp-trigger className="fys-btn">{cta.label}</a>
             <a href={CLUB_HREF} className="fys-btn fys-ghost">Bring your club</a>

@@ -162,6 +162,8 @@ body.vibe-cursor-active:has(.fys-root), body.vibe-cursor-active:has(.fys-root) *
 .fys-big { isolation: isolate; }
 .fys-big i { color: transparent; }
 .fys-big .fys-close-back { z-index: -1; }
+/* the inner ring's near side, over the sun's lower half only (FRONT_STYLE in system-landing.tsx) */
+.fys-front { position: absolute; inset: 0; z-index: 1; pointer-events: none; clip-path: var(--pfclip); }
 /* The sun of the close: over the rings and the letters, sitting clean. */
 .fys-orb { position: absolute; z-index: 0; left: calc(var(--pox) - var(--por)); top: calc(var(--poy) - var(--por)); width: calc(var(--por) * 2); aspect-ratio: 1; border-radius: 50%; background: var(--coral); transform-origin: 50% 100%; }
 
@@ -242,6 +244,7 @@ body.vibe-cursor-active:has(.fys-root), body.vibe-cursor-active:has(.fys-root) *
   .fys-close { padding: calc(80 * var(--U)) calc(120 * var(--U)) calc(110 * var(--U)); }
   .fys-big { margin: calc(40 * var(--U)) 0 calc(60 * var(--U)); font-size: calc(170 * var(--U)); translate: none; }
   .fys-orb { left: calc(var(--ox) - var(--or)); top: calc(var(--oy) - var(--or)); width: calc(var(--or) * 2); }
+  .fys-front { clip-path: var(--fclip); }
   .fys-close .fys-row { flex-direction: row; justify-content: center; width: auto; max-width: none; }
 
   .fys-footer { flex-direction: row; flex-wrap: wrap; align-items: center; justify-content: space-between; padding: 32px 48px 40px; }
