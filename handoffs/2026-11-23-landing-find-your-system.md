@@ -40,7 +40,8 @@ First draft of the record. Franky can change any of it.
   - The headline is the tagline, "your campus. your people. yourself." (Franky's call; it was a sign-off only, decision 10), and the close drops it.
   - The kicker says "Open now / IU + Purdue".
   - The picture is bigger (desktop box 1000 x 900, photo 1.2x), and "trivia, thursdays." is now "astronomy callout.".
-  - It's alive: now and then a patch of dots flickers into the real photo and back, and under a mouse the dots near the pointer turn into the photo (a tap does it on a phone). With reduced motion nothing flickers by itself.
+  - It's alive: every second or so a few small patches flutter into the real photo and back, fast, like wings (Franky: "like bees, or wings when they flicker"). Each flutter is two or three patches beating against each other at 13-20 beats a second, then dying away within a second. Under a mouse the dots near the pointer turn into the photo smoothly, and a tap sets off a flutter on a phone. The patches stay small, so it never flashes a big area, and with reduced motion nothing flutters by itself.
+  - The planet's people flutter alight the same way.
 - **Made of your people:** the planet is drawn live (`planet.tsx`, the post's recipe), with room round the coral you. People light up now and then (about one in ten coral), and the people under the pointer light up.
 - **Bring your club:** no hand notes or hand numbers; the list numbers are mono "01 02 03".
   - Two desktop screens of a sample club, **Coffee & Chess**: its page and its chat. A SAMPLE label sits on each.

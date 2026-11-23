@@ -13,9 +13,11 @@ import { ART_EXTRA } from "./art-data";
  * 2026-11-landing-revamp/board), in the same design px as the drawn notes
  * (ART_EXTRA.hero, written by the board's export), so they line up.
  *
- * It's alive in one way: now and then a patch of dots flickers into the real
- * photo and back, and under a mouse the dots near the pointer turn into the
- * photo too (a tap does it on a phone). The dots themselves are drawn once
+ * It's alive in one way: every second or so a few small patches of dots
+ * flutter into the real photo and back, fast, like wings (Franky, Nov 23),
+ * and under a mouse the dots near the pointer turn into the photo (a tap
+ * sets off a flutter on a phone). The patches stay small, so it never
+ * flashes a big area. The dots themselves are drawn once
  * per size; a frame only redraws while a flicker or the pointer is on. With
  * reduced motion nothing flickers by itself. Paused off screen. Device pixel
  * ratio capped at 2. The photo comes from the hidden <picture>, so the
@@ -143,8 +145,15 @@ function build(box: DOMRect, img: HTMLImageElement, grid: Grid): Scene | null {
   return { L, k, base, photo, spots };
 }
 
-/** A patch of photo: where (design px), how big, when it started and how long it lasts (ms). */
-type Flicker = { x: number; y: number; r: number; t0: number; dur: number };
+/**
+ * A flutter (Nov 23, Franky: "like bees, or wings when they flicker"): two or three small patches near
+ * (x, y), each beating in and out of the photo many times a second, out of step with each other like a
+ * pair of wings, quick to start and dying away. Where (design px), when (ms), how fast (beats a second).
+ */
+type Wing = { dx: number; dy: number; r: number; ph: number };
+type Flicker = { x: number; y: number; t0: number; dur: number; hz: number; wings: Wing[] };
+/** A near-square beat, 0 to 1: the wing is either there or not, with a soft edge. */
+const beat = (ms: number, hz: number, ph: number) => 0.5 + 0.5 * Math.tanh(3.2 * Math.sin((ms / 1000) * hz * Math.PI * 2 + ph));
 
 const SRC = "/landing/system";
 /** How wide the photo is drawn: 1.2 x the art box on a desktop, 1.54 x on a phone (system.css sizes the boxes). */
@@ -167,14 +176,17 @@ export function HeroDots({ onDrawn }: { onDrawn?: () => void }) {
     const lens = { x: 0, y: 0, tx: 0, ty: 0, a: 0, on: false };
     const patch = document.createElement("canvas"), pctx = patch.getContext("2d");
 
-    const env = (u: number) => (u < 0.3 ? smooth(0, 0.3, u) : u > 0.62 ? 1 - smooth(0.62, 1, u) : 1);
+    // a flutter's strength over its life: on almost at once, then dying away
+    const env = (u: number) => (u < 0.08 ? u / 0.08 : Math.pow(1 - (u - 0.08) / 0.92, 1.3));
 
     // one round patch of the photo, soft at the edge, laid over the dots at strength a
     const reveal = (S: Scene, x: number, y: number, r: number, a: number) => {
       if (!pctx || a <= 0.002) return;
       const R = Math.ceil(r * S.k), size = R * 2, sx = Math.round(x * S.k) - R, sy = Math.round(y * S.k) - R;
-      if (patch.width !== size) { patch.width = size; patch.height = size; }
-      pctx.globalCompositeOperation = "copy";
+      // one scratch canvas, grown only when a patch needs more room (a resize every frame would clear it each time)
+      if (patch.width < size) { patch.width = size; patch.height = size; }
+      pctx.clearRect(0, 0, size, size);
+      pctx.globalCompositeOperation = "source-over";
       pctx.drawImage(S.photo, sx, sy, size, size, 0, 0, size, size);
       pctx.globalCompositeOperation = "destination-in";
       const fade = pctx.createRadialGradient(R, R, 0, R, R, R);
@@ -183,8 +195,9 @@ export function HeroDots({ onDrawn }: { onDrawn?: () => void }) {
       fade.addColorStop(1, "rgba(0,0,0,0)");
       pctx.fillStyle = fade;
       pctx.fillRect(0, 0, size, size);
+      pctx.globalCompositeOperation = "source-over";
       ctx.globalAlpha = a;
-      ctx.drawImage(patch, sx, sy);
+      ctx.drawImage(patch, 0, 0, size, size, sx, sy, size, size);
       ctx.globalAlpha = 1;
     };
 
@@ -199,9 +212,11 @@ export function HeroDots({ onDrawn }: { onDrawn?: () => void }) {
       ctx.clearRect(0, 0, c.width, c.height);
       ctx.drawImage(S.base, 0, 0);
       for (let i = flickers.length - 1; i >= 0; i--) {
-        const f = flickers[i], u = (now - f.t0) / f.dur;
+        const f = flickers[i], ms = now - f.t0, u = ms / f.dur;
         if (u >= 1) { flickers.splice(i, 1); continue; }
-        reveal(S, f.x, f.y, f.r, env(Math.max(0, u)));
+        if (u < 0) continue;
+        const e = env(u);
+        for (const w of f.wings) reveal(S, f.x + w.dx, f.y + w.dy, w.r, e * (0.08 + 0.92 * beat(ms, f.hz, w.ph)));
       }
       reveal(S, lens.x, lens.y, S.L.w > 500 ? 95 : 48, lens.a);
       if (onScreen && (flickers.length || lens.on || lens.a > 0.01)) raf = requestAnimationFrame(frame);
@@ -212,15 +227,28 @@ export function HeroDots({ onDrawn }: { onDrawn?: () => void }) {
       const S = scene;
       if (!S || !S.spots.length) return;
       if (x == null || y == null) { const i = Math.floor(Math.random() * (S.spots.length / 2)) * 2; x = S.spots[i]; y = S.spots[i + 1]; }
-      const big = S.L.w > 500;
-      flickers.push({ x, y, r: (big ? 60 : 30) + Math.random() * (big ? 40 : 20), t0: performance.now(), dur: 1500 + Math.random() * 900 });
+      const big = S.L.w > 500, r0 = (big ? 24 : 13) + Math.random() * (big ? 16 : 8), side = Math.random() < 0.5 ? -1 : 1;
+      // two wings side by side, beating against each other, and now and then a third
+      const wings: Wing[] = [
+        { dx: 0, dy: 0, r: r0, ph: 0 },
+        { dx: side * r0 * (0.9 + Math.random() * 0.4), dy: -r0 * (0.2 + Math.random() * 0.4), r: r0 * (0.7 + Math.random() * 0.25), ph: Math.PI },
+      ];
+      if (Math.random() < 0.45) wings.push({ dx: -side * r0 * 0.8, dy: r0 * (0.5 + Math.random() * 0.5), r: r0 * 0.6, ph: Math.PI * (0.4 + Math.random() * 0.6) });
+      flickers.push({ x, y, t0: performance.now(), dur: 550 + Math.random() * 450, hz: 13 + Math.random() * 7, wings });
       wake();
     };
-    // the flickers on their own: one every 1.6 to 3.6 s while the hero is on screen, never with reduced motion
+    // the flutters on their own, like bees round the photo: one every 0.45 to 1.3 s while the hero is on
+    // screen, sometimes two close together; never with reduced motion
     const plan = () => {
       window.clearTimeout(timer);
       if (still || gone) return;
-      timer = window.setTimeout(() => { if (onScreen && !document.hidden && flickers.length < 2) flick(); plan(); }, 1600 + Math.random() * 2000);
+      timer = window.setTimeout(() => {
+        if (onScreen && !document.hidden && flickers.length < 3) {
+          flick();
+          if (Math.random() < 0.3) window.setTimeout(() => { if (!gone && flickers.length < 3) flick(); }, 90 + Math.random() * 160);
+        }
+        plan();
+      }, 450 + Math.random() * 850);
     };
 
     const layout = () => {

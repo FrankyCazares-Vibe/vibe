@@ -11,7 +11,7 @@ import { SYSTEM_WIDE_QUERY } from "./hero-dots";
  * (you), with room round you so you never sit on top of anyone. The recipe
  * is the "find your system" post's (vibe-marketing/campaigns/2026-11-
  * instagram/find-your-system/make-art.mjs), drawn here on a canvas so it can
- * live: now and then someone lights up, and under a mouse the people near
+ * live: people flutter alight now and then, fast, like wings, and under a mouse the people near
  * the pointer light up (a tap does it on a phone). With reduced motion no
  * one lights up by themselves. Paused off screen; device pixel ratio capped
  * at 2. In the post's own px: 1080 x 1350, placed in the box by
@@ -85,7 +85,9 @@ function glow(c: CanvasRenderingContext2D, x: number, y: number, r: number, rgb:
   c.fillStyle = g; c.beginPath(); c.arc(x, y, r, 0, Math.PI * 2); c.fill();
 }
 
-type Spark = { i: number; t0: number; dur: number; coral: boolean };
+/** Someone lighting up: who, when, for how long, and how fast they flutter (beats a second, like a wing). */
+type Spark = { i: number; t0: number; dur: number; coral: boolean; hz: number; ph: number };
+const beat = (ms: number, hz: number, ph: number) => 0.5 + 0.5 * Math.tanh(3.2 * Math.sin((ms / 1000) * hz * Math.PI * 2 + ph));
 
 export function Planet() {
   const ref = useRef<HTMLCanvasElement>(null);
@@ -125,7 +127,8 @@ export function Planet() {
       draw(performance.now());
     };
 
-    const env = (u: number) => (u < 0.35 ? u / 0.35 : 1 - (u - 0.35) / 0.65) ** 1.6;
+    // on almost at once, fluttering, then dying away (the hero's flutter, smaller)
+    const env = (u: number) => (u < 0.08 ? u / 0.08 : Math.pow(1 - (u - 0.08) / 0.92, 1.3));
     const draw = (now: number) => {
       ctx.setTransform(1, 0, 0, 1, 0, 0);
       ctx.clearRect(0, 0, c.width, c.height);
@@ -135,7 +138,8 @@ export function Planet() {
       for (let j = sparks.length - 1; j >= 0; j--) {
         const s = sparks[j], u = (now - s.t0) / s.dur;
         if (u >= 1) { sparks.splice(j, 1); continue; }
-        const p = lit[s.i], e = env(Math.max(0, u));
+        if (u < 0) continue;
+        const p = lit[s.i], e = env(u) * (0.1 + 0.9 * beat(now - s.t0, s.hz, s.ph));
         glow(ctx, p.x, p.y - 1, 11, s.coral ? "255,92,53" : "246,241,234", 0.55 * e);
         ctx.globalAlpha = e; ctx.fillStyle = s.coral ? CORAL : CREAM; ctx.beginPath(); person(ctx, p.x, p.y, p.s * 1.08); ctx.fill(); ctx.globalAlpha = 1;
       }
@@ -155,7 +159,7 @@ export function Planet() {
       raf = 0;
       if (gone) return;
       if (!still && now > nextAt && sparks.length < 7) {
-        sparks.push({ i: Math.floor(Math.random() * lit.length), t0: now, dur: 1400 + Math.random() * 900, coral: Math.random() < 0.1 });
+        sparks.push({ i: Math.floor(Math.random() * lit.length), t0: now, dur: 600 + Math.random() * 500, coral: Math.random() < 0.1, hz: 12 + Math.random() * 8, ph: Math.random() * Math.PI * 2 });
         nextAt = now + 160 + Math.random() * 380;
       }
       draw(now);
@@ -175,7 +179,7 @@ export function Planet() {
       if (e.pointerType === "mouse") return;
       const [x, y] = toPost(e), now = performance.now();
       lit.map((p, i) => [Math.hypot(p.x - x, p.y - y), i]).sort((a, b) => a[0] - b[0]).slice(0, 8)
-        .forEach(([, i], n) => sparks.push({ i, t0: now + n * 70, dur: 1300, coral: false }));
+        .forEach(([, i], n) => sparks.push({ i, t0: now + n * 60, dur: 800, coral: false, hz: 14 + Math.random() * 6, ph: Math.random() * Math.PI * 2 }));
       wake();
     };
     host.addEventListener("pointermove", move);
