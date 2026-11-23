@@ -17,7 +17,9 @@ import { ART_EXTRA } from "./art-data";
  * the dots where the photo breaks up breathe, swelling and shrinking in slow
  * waves that drift across them, and a few coral dots glow in and out. Nothing
  * flickers at random. Under a mouse the dots near the pointer turn into the
- * photo. With reduced motion it is still. Redrawn at most 30 times a second,
+ * photo (a small spotlight). Where the photo breaks up the dots are dithered:
+ * scattered off the grid and uneven in size, so the edge reads as grain.
+ * With reduced motion it is still. Redrawn at most 30 times a second,
  * only while on screen; device pixel ratio capped at 2. Every edge fades out,
  * so the dots never stop at a line. The photo comes from the hidden
  * <picture>, so the browser picks AVIF or WebP and the width for the screen.
@@ -117,7 +119,9 @@ function build(box: DOMRect, img: HTMLImageElement, grid: Grid): Scene | null {
   const ecx = X(720), ecy = Y(890), ed = (x: number, y: number) => Math.hypot((x - ecx) / L.rx, (y - ecy) / L.ry);
 
   const stillHoles = new Batch(), stillCreamB = new Batch(), holes = new Batch(), cream = new Batch(), glows: number[] = [];
-  let n = 0;
+  let n = 0, seed = 97;
+  // a fixed random (the same grain every time), for the dither
+  const rnd = () => { seed = (seed + 0x6d2b79f5) | 0; let q = Math.imul(seed ^ (seed >>> 15), 1 | seed); q = (q + Math.imul(q ^ (q >>> 7), 61 | q)) ^ q; return ((q ^ (q >>> 14)) >>> 0) / 4294967296; };
   for (let y = g / 2; y < H; y += g) {
     for (let x = g / 2 + ((Math.round(y / g) % 2) * g) / 2; x < W; x += g) {
       const ox = OX(x), oy = OY(y), l = lum(ox, oy);
@@ -129,13 +133,18 @@ function build(box: DOMRect, img: HTMLImageElement, grid: Grid): Scene | null {
       v *= smooth(0, 220, ox) * smooth(0, 220, PHOTO_W - ox) * smooth(0, 200, PHOTO_H - oy);   // nor at its sides and foot
       v *= Math.pow(smooth(0, W * 0.28, x), 1.2) * smooth(0, W * 0.08, W - x) * smooth(0, H * 0.12, H - y) * smooth(0, H * 0.1, y);
       const d = ed(x, y), t = Math.max(me ? 0 : smooth(0.42, 1.3, d), smooth(PHOTO_H - 300, PHOTO_H - 30, oy)), c = smooth(1.05, 2.1, d);
-      const kk = Math.pow(1 - t, 1.4), r = g * 0.75 * kk + g * 0.48 * Math.pow(v, 1.25) * (1 - kk);
-      if (r < 0.32) continue;
+      const kk = Math.pow(1 - t, 1.4);
+      // round 7, grain (Franky's refs: the dithered hands): where the photo breaks up, each dot drifts off the grid and
+      // its size wanders, so the edge reads as dithered grain; the solid photo keeps its even grid
+      const jit = smooth(0.15, 0.55, t), j1 = rnd() - 0.5, j2 = rnd() - 0.5, j3 = rnd();
+      const r = (g * 0.75 * kk + g * 0.48 * Math.pow(v, 1.25) * (1 - kk)) * (1 + jit * (j3 - 0.5) * 0.9);
+      if (r < 0.32 || (jit > 0.5 && j3 < 0.12 * jit)) continue;
+      const dx = jit * j1 * g * 0.8, dy = jit * j2 * g * 0.8;
       const op = 1 - t * (0.6 - 0.45 * v);
       // how much this dot flows: none in the solid photo, most where it breaks up, a little out in the cream
       const w = smooth(0.08, 0.38, t) * (1 - 0.55 * c);
-      if (c < 0.98) (w > 0.02 ? holes : stillHoles).add((1 - c) * op, x, y, r, w);
-      if (c > 0.02) (w > 0.02 ? cream : stillCreamB).add(c * (0.35 + 0.4 * v), x, y, r, w);
+      if (c < 0.98) (w > 0.02 ? holes : stillHoles).add((1 - c) * op, x + dx, y + dy, r, w);
+      if (c > 0.02) (w > 0.02 ? cream : stillCreamB).add(c * (0.35 + 0.4 * v), x + dx, y + dy, r, w);
       // a few coral dots, out where the photo breaks up, glowing in and out like the odd coloured pixel
       if (t > 0.45 && t < 0.95 && c < 0.7 && v > 0.25 && !me && oy > 460 && n++ % 61 === 0) glows.push(x, y, r, (n * 2.399) % TAU);
     }
@@ -239,7 +248,7 @@ export function HeroDots({ onDrawn }: { onDrawn?: () => void }) {
         lens.a += ((lens.on ? 1 : 0) - lens.a) * 0.2;
         paint(S, (now - t0) / 1000, !still);
         ctx.setTransform(1, 0, 0, 1, 0, 0);
-        reveal(S, lens.x, lens.y, S.L.w > 500 ? 95 : 48, lens.a);
+        reveal(S, lens.x, lens.y, S.L.w > 500 ? 30 : 16, lens.a);   // round 7: a small spotlight, a third of before
       }
       if (live) raf = requestAnimationFrame(frame);
     };

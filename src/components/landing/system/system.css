@@ -26,6 +26,8 @@
 .fys-root *, .fys-root *::before, .fys-root *::after { box-sizing: border-box; }
 /* Night behind the page too (overscroll, the iPhone bars), in the app's Light theme as well. */
 :root:has(.fys-root), :root:has(.fys-root) body { background: #0C0B0B; color-scheme: dark; }
+/* A faint film grain over the whole page (round 7). One rule: remove it to turn the grain off. */
+.fys-root::after { content: ""; position: fixed; inset: 0; z-index: 70; background: url("/landing/system/grain-film.png") 0 0 / 192px 192px; opacity: 0.6; pointer-events: none; }
 /* The soft coral bloom from one corner. */
 .fys-root::before { content: ""; position: absolute; left: -520px; top: -560px; width: 1400px; height: 1400px; background: radial-gradient(closest-side, rgba(255, 92, 53, 0.15), rgba(255, 92, 53, 0.05) 55%, rgba(255, 92, 53, 0)); pointer-events: none; }
 .fys-root main, .fys-root footer, .fys-bar { position: relative; }
@@ -36,16 +38,20 @@
 .fys-hl { position: relative; z-index: 5; margin: 0; font-family: var(--font-soft), "Fraunces", serif; font-weight: 900; font-variation-settings: "SOFT" 100, "opsz" 144; letter-spacing: -0.035em; word-spacing: 0.06em; line-height: 0.88; font-size: calc(64 * var(--P)); color: var(--ink); }
 .fys-hl span { display: block; white-space: nowrap; }
 .fys-hl i, .fys-big i { font-style: normal; color: var(--coral); }
-/* Texture (round 6, Franky: "it looks so plain"): the letters are solid at the top and break into dots toward their
-   foot, the hero's photo-into-dots in type. The coral full stop stays solid. Where background-clip: text isn't
-   supported, they're plain cream. */
+/* Texture (rounds 6 and 7, Franky: "it looks so plain", "don't be afraid to try the grainy"): the letters are solid at
+   the top and melt into dithered grain toward their foot, the hero's photo-into-dots in type. The coral full stop stays
+   solid. Each line's box is padded past its letters (the y's and p's tails, the f's hook), because background-clip: text
+   only paints inside the box: unpadded, those parts were cut off. Where background-clip: text isn't supported, the
+   letters are plain cream. */
 @supports ((-webkit-background-clip: text) or (background-clip: text)) {
   /* per line (each line is a span), so every line melts at its own foot */
   .fys-hl span {
+    padding: 0.16em 0.1em 0.3em;
+    margin: -0.16em -0.1em -0.3em;
     color: transparent;
     background:
-      linear-gradient(180deg, var(--ink) 0%, var(--ink) 54%, rgba(246, 241, 234, 0.55) 74%, rgba(246, 241, 234, 0) 93%),
-      radial-gradient(circle at 50% 50%, var(--ink) 0 1.05px, transparent 1.35px) 0 0 / 3.4px 3.4px;
+      linear-gradient(180deg, var(--ink) 0%, var(--ink) 54%, rgba(246, 241, 234, 0.45) 70%, rgba(246, 241, 234, 0) 88%),
+      url("/landing/system/grain-dither.png") 0 0 / 192px 192px;
     -webkit-background-clip: text;
     background-clip: text;
   }
@@ -83,7 +89,7 @@
 /* Short phones keep the headline and the button in the first screen: the picture gives way. */
 /* The picture runs 40px under the first lines of text (its bottom is only fading dots there). */
 /* Its height leaves room for the words under it: about 250px plus the three-line headline, which grows with --P. */
-.fys-hero-art { --ah: clamp(240px, calc(100svh - 245px - 124 * var(--P)), calc(430 * var(--P))); position: relative; width: calc(var(--ah) * 390 / 430); height: var(--ah); margin: 0 auto -40px; }
+.fys-hero-art { --ah: clamp(240px, calc(100svh - 262px - 140 * var(--P)), calc(430 * var(--P))); position: relative; width: calc(var(--ah) * 390 / 430); height: var(--ah); margin: 0 auto -40px; }
 .fys-dots { position: absolute; inset: 0; width: 100%; height: 100%; }
 .fys-dunes-src { position: absolute; left: 0; top: 0; width: 1px; height: 1px; overflow: hidden; opacity: 0; pointer-events: none; }
 .fys-dunes-src img { width: 1px; height: 1px; }
@@ -144,17 +150,16 @@
 .fys-big i { color: transparent; }
 .fys-big .fys-close-back { z-index: -1; }
 .fys-big .fys-close-front { z-index: 1; }
-/* The sun of the close: over the letters, under the rings' front halves. Where the travelling dot lands. */
+/* The sun of the close: over the letters, under the rings' front halves. */
 .fys-orb { position: absolute; z-index: 0; left: calc(var(--pox) - var(--por)); top: calc(var(--poy) - var(--por)); width: calc(var(--por) * 2); aspect-ratio: 1; border-radius: 50%; background: var(--coral); transform-origin: 50% 100%; }
 
-/* ---- the coral full stop's journey (coral-drop.tsx; nothing here moves without JavaScript or with reduced motion) ---- */
-.fys-hl .fys-drop-start { display: inline-block; transform-origin: 50% 85%; }
-.fys-root[data-drop]:not([data-drop="home"]) .fys-drop-start { visibility: hidden; }
-.fys-root[data-drop]:not([data-drop="landed"]) .fys-orb { opacity: 0; }
+/* ---- the coral full stop's drop (coral-drop.tsx; nothing here moves without JavaScript or with reduced motion) ---- */
+.fys-hl :is(.fys-drop-start, .fys-drop-end) { display: inline-block; transform-origin: 50% 85%; }
+.fys-root[data-drop]:not([data-drop="home"]) .fys-drop-start, .fys-root[data-drop]:not([data-drop="landed"]) .fys-drop-end { visibility: hidden; }
 .fys-drop { position: absolute; left: 0; top: 0; z-index: 40; border-radius: 50%; background: var(--coral); box-shadow: 0 0 16px rgba(255, 92, 53, 0.45); pointer-events: none; opacity: 0; will-change: transform; }
 @media (prefers-reduced-motion: no-preference) {
   .fys-drop-start.is-bouncing { animation: fys-hop 1100ms cubic-bezier(0.3, 0.7, 0.3, 1) both; }
-  .fys-orb.is-bouncing { animation: fys-land 950ms cubic-bezier(0.3, 0.7, 0.3, 1) both; }
+  .fys-drop-end.is-bouncing { animation: fys-land 950ms cubic-bezier(0.3, 0.7, 0.3, 1) both; }
 }
 /* The sign-in dot's bounce (globals.css vibe-kinetic-dot), from where it sits: a hop, a squashed landing, two smaller hops. */
 @keyframes fys-hop { 0% { transform: none; } 22% { transform: translateY(-0.55em); } 44% { transform: translateY(0) scaleY(0.75); } 60% { transform: translateY(-0.18em) scaleY(1.06); } 76% { transform: translateY(0) scaleY(0.9); } 88% { transform: translateY(-0.05em); } 100% { transform: none; } }

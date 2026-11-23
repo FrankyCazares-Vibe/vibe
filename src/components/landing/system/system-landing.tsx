@@ -71,7 +71,7 @@ const SUN_STYLE = {
   "--psx": `${HP.sun[0] * 100}%`, "--psy": `${HP.sun[1] * 100}%`, "--psr": `${((HP.sun[2] * 2) / HP.w) * 100}%`,
 } as CSSProperties;
 
-/** The close's coral sun (the dot that drops from the hero lands here), in em of the wordmark, per layout. */
+/** The close's coral sun, in em of the wordmark, per layout (the board's export measured it). */
 const ORB_STYLE = {
   "--ox": `${ART_EXTRA.close.desktop.orb[0]}em`, "--oy": `${ART_EXTRA.close.desktop.orb[1]}em`, "--or": `${ART_EXTRA.close.desktop.orb[2]}em`,
   "--pox": `${ART_EXTRA.close.phone.orb[0]}em`, "--poy": `${ART_EXTRA.close.phone.orb[1]}em`, "--por": `${ART_EXTRA.close.phone.orb[2]}em`,
@@ -148,7 +148,7 @@ export function SystemLanding({ signupOpen }: { signupOpen: boolean }) {
         <section className="fys-people" aria-labelledby="fys-people-title">
           <div className="fys-col">
             <p className="fys-k">Your people<b>/</b>01</p>
-            <h2 id="fys-people-title" className="fys-hl fys-md"><span>made of</span> <span>your people<i>.</i></span></h2>
+            <h2 id="fys-people-title" className="fys-hl fys-md"><span>made of</span> <span>your people<i className="fys-drop-end">.</i></span></h2>
             <ul className="fys-three">
               <li><span className="fys-lab">Clubs</span><p><strong>Follow any club</strong> to see its events. Join it to talk in its chats.</p></li>
               <li><span className="fys-lab">Events</span><p><strong>See what’s on</strong> this week, and check in at the door with a code.</p></li>
@@ -233,7 +233,7 @@ export function SystemLanding({ signupOpen }: { signupOpen: boolean }) {
       </main>
 
       {/* No data-warp-trigger in the footer: the warp would hijack these links. */}
-      {/* the coral full stop: bounces in the headline, drops, rides down the page and lands in "vibe." */}
+      {/* the coral full stop: bounces in "yourself." and falls into "made of your people." as the page scrolls */}
       <CoralDrop />
       <footer className="fys-footer">
         <span>© CONNECTVIBE. LLC</span>

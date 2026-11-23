@@ -74,6 +74,15 @@ First draft of the record. Franky can change any of it.
 - **See you there:** smaller (420 wide on a desktop). The photo melts into dots in a soft oval (`dot-photo.tsx`), and Otto pops up out of the band over the forehead.
 - **Removed:** the scene slugs in every section's corner, and the "made-up club" line (Franky's call; the alt text still says it's made up).
 
+## Round 7 (Nov 23, Franky's notes)
+- **The cursor spotlight** is a third of its size (30 design px on a desktop).
+- **Cut-off letters fixed:** each headline line is padded past its letters, because background-clip: text only paints inside the box.
+- **Grain** (Franky: "don't be afraid to try the grainy"; refs: the dithered hands and the glitch-window portrait in `vibe-marketing/brand/learnings/refs-2026-11-22`). This reverses the brand guide's "no grain", so check it on a phone.
+  - The headlines melt into dithered grain (`grain-dither.png`).
+  - The hero's dots where the photo breaks up are dithered: scattered off the grid and uneven in size.
+  - A faint film grain covers the page (`grain-film.png`). Turning it off is one rule: `.fys-root::after`.
+- **The coral full stop** now falls into the next screen's full stop ("made of your people."), tied to the scroll, and lands with the sign-in bounce. At rest it hops every few seconds in "yourself.". The close's sun stays where it is.
+
 ## Rollback
 `LANDING=classic` in Vercel's environment brings back the Oct-Nov landing (the night sky with six lights) with no code deploy. Keep it for about a week, then delete `home-landing.tsx` and its parts if nobody misses it.
 
