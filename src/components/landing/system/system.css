@@ -1,0 +1,219 @@
+/* The landing, "find your system" (Nov 23, 2026; system-landing.tsx).
+   Always Night. Built from the board Franky picked: every size below is the
+   board's, in design px. On a desktop (900px and up) one design px is
+   --U (1px at 1440, capped at 1600 wide); on a phone it is --P (1px at 390,
+   capped at 560 wide). Text sizes have floors so they never get small.
+   900px is SYSTEM_WIDE_QUERY in hero-dots.tsx and the art's phone/desktop
+   switch in art.tsx: keep the three equal. */
+.fys-root {
+  --page: #0C0B0B;
+  --ink: #F6F1EA;
+  --ink2: #CFC8BE;
+  --muted: #9C958C;
+  --coral: #FF5C35;
+  --hair: rgba(246, 241, 234, 0.09);
+  --U: calc(min(100vw, 1600px) / 1440);
+  --P: calc(min(100vw, 560px) / 390);
+  position: relative;
+  min-height: 100vh;
+  overflow-x: clip;
+  color: var(--ink);
+  font-family: "DM Sans", system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  /* Starry dust behind every section: two tiles of different sizes, so the repeat doesn't show. */
+  background: url("/landing/system/dust-613.svg") 0 0 / 613px 613px, url("/landing/system/dust-877.svg") 211px 97px / 877px 877px, var(--page);
+}
+.fys-root *, .fys-root *::before, .fys-root *::after { box-sizing: border-box; }
+/* Night behind the page too (overscroll, the iPhone bars), in the app's Light theme as well. */
+:root:has(.fys-root), :root:has(.fys-root) body { background: #0C0B0B; color-scheme: dark; }
+/* The soft coral bloom from one corner. */
+.fys-root::before { content: ""; position: absolute; left: -520px; top: -560px; width: 1400px; height: 1400px; background: radial-gradient(closest-side, rgba(255, 92, 53, 0.15), rgba(255, 92, 53, 0.05) 55%, rgba(255, 92, 53, 0)); pointer-events: none; }
+.fys-root main, .fys-root footer, .fys-bar { position: relative; }
+
+/* ---- the family: kicker, headline with one coral full stop, scene slug, body ---- */
+.fys-k { margin: 0 0 16px; font: 500 11px/1 var(--font-jetbrains), monospace; letter-spacing: 0.2em; text-transform: uppercase; color: var(--muted); white-space: nowrap; }
+.fys-k b, .fys-slug b { font-weight: 500; color: var(--coral); padding: 0 0.35em; }
+.fys-hl { position: relative; z-index: 5; margin: 0; font-family: var(--font-soft), "Fraunces", serif; font-weight: 900; font-variation-settings: "SOFT" 100, "opsz" 144; letter-spacing: -0.035em; word-spacing: 0.06em; line-height: 0.88; font-size: calc(64 * var(--P)); color: var(--ink); }
+.fys-hl span { display: block; white-space: nowrap; }
+.fys-hl i, .fys-big i { font-style: normal; color: var(--coral); }
+.fys-hl.fys-md { font-size: calc(56 * var(--P)); }
+.fys-slug { margin: 30px 0 0; font: 500 9.5px/1 var(--font-jetbrains), monospace; letter-spacing: 0.18em; text-transform: uppercase; color: #8C857C; white-space: nowrap; }
+.fys-body { margin: 18px 0 0; max-width: 31em; font-size: 16.5px; line-height: 1.55; color: var(--ink2); }
+.fys-body strong { color: var(--ink); font-weight: 600; }
+
+/* ---- buttons: pills, 52px (44px in the top bar) ---- */
+.fys-row { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-top: 22px; }
+.fys-btn { display: inline-flex; align-items: center; justify-content: center; height: 52px; padding: 0 22px; border-radius: 999px; background: var(--coral); color: #160A06; font: 700 16px/1 "DM Sans", sans-serif; text-decoration: none; white-space: nowrap; transition: transform 0.2s var(--vibe-spring-soft, ease), box-shadow 0.2s ease; }
+.fys-btn:hover { transform: translateY(-1px); box-shadow: 0 10px 30px rgba(255, 92, 53, 0.35); }
+.fys-btn-sm { height: 44px; padding: 0 18px; font-size: 15px; }
+.fys-ghost { background: transparent; color: var(--ink); box-shadow: inset 0 0 0 1.5px rgba(246, 241, 234, 0.3); }
+.fys-ghost:hover { box-shadow: inset 0 0 0 1.5px rgba(246, 241, 234, 0.55); background: rgba(246, 241, 234, 0.04); }
+.fys-tl { display: inline-flex; align-items: center; min-height: 44px; padding: 0 8px; color: var(--ink); font: 600 15px/1 "DM Sans", sans-serif; text-decoration: none; }
+.fys-root a:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; }
+
+/* ---- top bar ---- */
+.fys-bar { z-index: 6; display: flex; align-items: center; justify-content: space-between; height: 64px; max-width: 1600px; margin: 0 auto; padding: 0 max(20px, env(safe-area-inset-left)); padding-top: env(safe-area-inset-top); }
+.fys-bar nav { display: flex; align-items: center; gap: 8px; }
+.fys-wm { font-family: "Vibe Wordmark", var(--font-soft, "Fraunces"), "Fraunces", serif; font-variation-settings: "SOFT" 100, "opsz" 144; font-weight: 900; font-size: 27px; line-height: 1; letter-spacing: var(--wordmark-letter-spacing); color: var(--ink); }
+.fys-wm-dot { color: var(--coral); }
+
+/* ---- the art: each drawing over its box, placed by its own viewBox (art.tsx) ---- */
+.fys-art { position: absolute; z-index: 4; display: block; left: var(--px); top: var(--py); width: var(--pw); height: var(--ph); pointer-events: none; }
+.fys-art img { display: block; width: 100%; height: 100%; }
+
+/* ---- hero: the dunes photo fading into dots, the sun, the orbit ---- */
+.fys-hero { position: relative; max-width: 1600px; margin: 0 auto; padding: 0 0 34px; }
+.fys-hero .vln-sky { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+/* Short phones keep the headline and the button in the first screen: the picture gives way. */
+.fys-hero-art { --ah: clamp(230px, calc(100svh - 440px), calc(380 * var(--P))); position: relative; width: calc(var(--ah) * 390 / 380); height: var(--ah); margin: 0 auto; }
+.fys-dots { position: absolute; inset: 0; width: 100%; height: 100%; }
+.fys-dunes-src { position: absolute; left: 0; top: 0; width: 1px; height: 1px; overflow: hidden; opacity: 0; pointer-events: none; }
+.fys-dunes-src img { width: 1px; height: 1px; }
+.fys-sun { position: absolute; z-index: 3; left: var(--psx); top: var(--psy); width: var(--psr); aspect-ratio: 1; translate: -50% -50%; pointer-events: none; }
+/* The light (it breathes, below), then the coral sun itself. */
+.fys-sun::before { content: ""; position: absolute; left: 50%; top: 50%; width: 700%; height: 700%; translate: -50% -50%; border-radius: 50%; background: radial-gradient(closest-side, rgba(255, 92, 53, 0.42), rgba(255, 92, 53, 0.147) 45%, rgba(255, 92, 53, 0)); }
+.fys-sun::after { content: ""; position: absolute; inset: 0; border-radius: 50%; background: var(--coral); }
+.fys-hero-copy { position: relative; z-index: 5; max-width: 608px; margin: 0 auto; padding: 0 24px; }
+.fys-hero .fys-slug { position: relative; z-index: 5; max-width: 608px; margin: 30px auto 0; padding: 0 24px; }
+
+/* ---- made of your people ---- */
+.fys-people, .fys-club, .fys-eyes, .fys-open { position: relative; display: flex; flex-direction: column; max-width: 608px; margin: 0 auto; padding: 90px 24px 70px; }
+.fys-col { display: contents; }
+.fys-three { display: grid; gap: 22px; margin: 10px 0 0; padding: 0; list-style: none; order: 4; }
+.fys-three li { border-top: 1px solid var(--hair); padding-top: 18px; }
+.fys-lab { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; font: 500 12px/1 var(--font-jetbrains), monospace; letter-spacing: 0.18em; text-transform: uppercase; color: var(--muted); }
+.fys-lab::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--ink); opacity: 0.85; }
+.fys-three p { margin: 0; font-size: 16px; line-height: 1.5; color: var(--ink2); }
+.fys-three strong { color: var(--ink); font-weight: 600; }
+.fys-people .fys-k { order: 1; }
+.fys-people .fys-hl { order: 2; }
+.fys-pp { order: 3; position: relative; width: calc(390 * var(--P)); aspect-ratio: 390 / 380; margin: 0 calc(50% - 195 * var(--P)); }
+.fys-pp-clip { position: absolute; inset: 0; overflow: hidden; }
+.fys-pp-clip img { position: absolute; display: block; left: -1.54%; top: -15.79%; width: 107.69%; height: auto; }
+.fys-people .fys-slug { order: 5; }
+
+/* ---- bring your club ---- */
+.fys-club .fys-k { order: 1; }
+.fys-club .fys-hl { order: 2; }
+.fys-club .fys-body { order: 3; }
+.fys-fan { order: 4; position: relative; width: 100%; aspect-ratio: 342 / 470; margin-top: 30px; }
+.fys-list { order: 5; display: grid; gap: 16px; margin: 30px 0 0; padding: 0; list-style: none; }
+.fys-list li { display: flex; align-items: center; gap: 14px; font-size: 16px; line-height: 1.5; color: var(--ink2); }
+.fys-list strong { color: var(--ink); font-weight: 600; }
+.fys-n { position: relative; flex: none; width: 34px; height: 34px; }
+.fys-club .fys-row { order: 6; margin-top: 30px; }
+.fys-club .fys-slug { order: 7; }
+.fys-screen { position: absolute; display: block; }
+.fys-screen img { display: block; width: 100%; height: auto; border-radius: 16px; box-shadow: 0 30px 60px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(246, 241, 234, 0.08); }
+.fys-s1 { left: 2.924%; top: 8.511%; width: 49.708%; rotate: -3deg; }
+.fys-s2 { left: 52.632%; top: 0; width: 46.784%; rotate: 2.5deg; }
+.fys-s3 { left: 54.386%; top: 42.553%; width: 46.784%; rotate: -1.5deg; }
+
+/* ---- everything looks different ---- */
+.fys-print { position: relative; width: 100%; aspect-ratio: 4 / 5; margin-top: 30px; border-radius: 4px; box-shadow: 0 30px 60px rgba(0, 0, 0, 0.55); }
+.fys-print > picture img { display: block; width: 100%; height: 100%; object-fit: cover; border-radius: 4px; }
+.fys-band { position: absolute; inset: 0; z-index: 4; pointer-events: none; }
+.fys-band picture { position: absolute; display: block; filter: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.5)); }
+.fys-band img { display: block; width: 100%; height: auto; }
+.fys-eyes .fys-slug { text-align: right; margin-top: 16px; }
+
+/* ---- one campus at a time ---- */
+.fys-line { position: relative; width: 100%; aspect-ratio: 342 / 240; margin-top: 30px; }
+
+/* ---- the close: the full stop is the sun, with its own small system ---- */
+.fys-close { position: relative; display: flex; flex-direction: column; align-items: center; max-width: 1600px; margin: 0 auto; padding: 110px 24px 80px; text-align: center; }
+.fys-big { position: relative; display: inline-block; margin: 30px 0 70px; font-family: "Vibe Wordmark", var(--font-soft, "Fraunces"), serif; font-weight: 900; font-variation-settings: "SOFT" 100, "opsz" 144; font-size: calc(100 * var(--P)); line-height: 1; letter-spacing: 0; color: var(--ink); translate: -0.34em 0; }
+/* Its own layer, so the system sits behind the letters and over the page. */
+.fys-big { isolation: isolate; }
+.fys-big .fys-art { z-index: -1; }
+.fys-tag { margin: 0; font-family: "Fraunces", serif; font-style: italic; font-weight: 400; font-variation-settings: "SOFT" 100; font-size: 22px; color: var(--ink); }
+.fys-close .fys-row { flex-direction: column; align-items: stretch; width: 100%; max-width: 420px; margin-top: 34px; }
+.fys-fine { margin: 14px 0 0; font-size: 14px; line-height: 1.5; color: var(--muted); }
+.fys-fine a { display: inline-flex; align-items: center; min-height: 44px; color: var(--ink2); }
+.fys-stores { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px 24px; margin-top: 8px; }
+.fys-stores a { color: rgba(246, 241, 234, 0.8); font-size: 13px; font-weight: 600; text-decoration: none; }
+.fys-stores b { color: var(--coral); }
+
+/* ---- footer ---- */
+.fys-footer { display: flex; flex-direction: column; align-items: flex-start; gap: 8px 28px; max-width: 1600px; margin: 0 auto; padding: 26px 24px max(34px, env(safe-area-inset-bottom)); border-top: 1px solid var(--hair); font-size: 14px; line-height: 1.5; color: var(--muted); }
+.fys-footer nav { display: flex; flex-wrap: wrap; gap: 0 22px; }
+.fys-footer a { display: inline-flex; align-items: center; min-height: 44px; color: var(--ink2); text-decoration: none; }
+.fys-footer p { margin: 0; }
+
+/* ---- desktop ---- */
+@media (min-width: 900px) {
+  .fys-art { left: var(--x); top: var(--y); width: var(--w); height: var(--h); }
+  .fys-k { margin-bottom: 26px; font-size: 13px; }
+  .fys-hl { font-size: calc(128 * var(--U)); }
+  .fys-hl.fys-md { font-size: calc(104 * var(--U)); }
+  .fys-slug { margin: 0; font-size: 11px; }
+  .fys-body { margin-top: 28px; font-size: clamp(16px, calc(19 * var(--U)), 20px); }
+  .fys-btn { height: 54px; padding: 0 28px; }
+  .fys-row { margin-top: 34px; }
+
+  .fys-bar { height: 76px; padding: 0 calc(48 * var(--U)); }
+  .fys-wm { font-size: 32px; }
+  .fys-bar nav { gap: 14px; }
+
+  .fys-hero { min-height: calc(800 * var(--U)); padding: 0; }
+  .fys-hero-art { position: absolute; left: calc(560 * var(--U)); top: 0; width: calc(880 * var(--U)); height: calc(800 * var(--U)); margin: 0; }
+  .fys-sun { left: var(--sx); top: var(--sy); width: var(--sr); }
+  /* The board's column: 560 wide from the left margin, running over the picture's empty left side. */
+  .fys-hero-copy { width: calc(680 * var(--U)); max-width: none; margin: 0; padding: calc(130 * var(--U)) 0 60px calc(120 * var(--U)); }
+  .fys-hero .fys-row { margin-top: 36px; }
+  .fys-hero .fys-slug { position: absolute; right: calc(48 * var(--U)); bottom: calc(26 * var(--U)); max-width: none; margin: 0; padding: 0; }
+
+  .fys-people, .fys-club, .fys-eyes, .fys-open { display: grid; max-width: 1600px; column-gap: calc(40 * var(--U)); }
+  .fys-col { display: block; }
+  .fys-pp, .fys-fan { order: 0; }
+  .fys-people { grid-template-columns: calc(520 * var(--U)) minmax(0, 1fr); padding: calc(90 * var(--U)) calc(120 * var(--U)); }
+  .fys-pp { width: auto; aspect-ratio: 1; margin: 0; }
+  .fys-pp-clip img { left: 3.125%; top: -17.1875%; width: 100%; }
+  .fys-three { gap: 22px; margin-top: 44px; }
+  .fys-three p { font-size: clamp(16px, calc(17 * var(--U)), 18px); }
+  .fys-people .fys-slug { position: absolute; right: calc(48 * var(--U)); bottom: calc(40 * var(--U)); }
+
+  .fys-club { grid-template-columns: minmax(0, 1fr) calc(520 * var(--U)); align-items: center; padding: calc(120 * var(--U)); }
+  .fys-fan { aspect-ratio: 640 / 700; margin: 0; }
+  .fys-screen img { border-radius: calc(22 * var(--U)); }
+  .fys-s1 { left: 3.125%; top: 10%; width: 42.188%; }
+  .fys-s2 { left: 51.563%; top: 2.857%; width: 39.063%; }
+  .fys-s3 { left: 53.906%; top: 47.143%; width: 39.063%; }
+  .fys-list li { gap: 18px; font-size: clamp(16px, calc(18 * var(--U)), 19px); }
+  .fys-club .fys-slug { position: absolute; right: calc(120 * var(--U)); bottom: calc(60 * var(--U)); }
+
+  .fys-eyes { grid-template-columns: minmax(0, 1fr) calc(540 * var(--U)); column-gap: calc(60 * var(--U)); align-items: center; padding: calc(120 * var(--U)); }
+  .fys-print { margin: 0; }
+  .fys-eyes .fys-slug { position: absolute; right: calc(120 * var(--U)); bottom: calc(80 * var(--U)); margin: 0; }
+
+  .fys-open { grid-template-columns: calc(560 * var(--U)) minmax(0, 1fr); align-items: center; padding: calc(110 * var(--U)) calc(120 * var(--U)) calc(130 * var(--U)); }
+  .fys-line { aspect-ratio: 600 / 360; margin: 0; }
+
+  .fys-close { padding: calc(80 * var(--U)) calc(120 * var(--U)) calc(110 * var(--U)); }
+  .fys-big { margin: calc(40 * var(--U)) 0 calc(110 * var(--U)); font-size: calc(220 * var(--U)); translate: none; }
+  .fys-tag { font-size: 30px; }
+  .fys-close .fys-row { flex-direction: row; justify-content: center; width: auto; max-width: none; }
+
+  .fys-footer { flex-direction: row; flex-wrap: wrap; align-items: center; justify-content: space-between; padding: 32px 48px 40px; }
+  .fys-footer p { flex-basis: 100%; }
+}
+
+/* ---- motion: the hero's one moment, then calm. Springs (globals.css --vibe-spring-soft), transform and opacity only. ---- */
+@media (prefers-reduced-motion: no-preference) {
+  .fys-dots { transition: opacity 1.1s var(--vibe-spring-soft, ease-out), transform 1.4s var(--vibe-spring-soft, ease-out); }
+  .fys-hero-ink, .fys-sun { transition: opacity 0.9s var(--vibe-spring-soft, ease-out) 0.25s; }
+  /* Until the dots are drawn (system-landing.tsx clears data-wait), the picture waits; after 3s it shows anyway. */
+  .fys-hero[data-wait] .fys-dots { opacity: 0; transform: scale(1.02); }
+  .fys-hero[data-wait] .fys-hero-ink, .fys-hero[data-wait] .fys-sun { opacity: 0; animation: fys-show 0.01s linear 3s forwards; }
+  /* The sun's light breathes, slowly. */
+  .fys-sun::before { animation: fys-breathe 6s ease-in-out infinite alternate; }
+}
+@keyframes fys-show { to { opacity: 1; } }
+@keyframes fys-breathe { from { opacity: 0.78; } to { opacity: 1; } }
+
+/* Leaving for sign-up: the page lets go while the dust streaks. */
+.fys-root.is-warping :is(.fys-bar, .fys-hero-copy, .fys-hero-art, .fys-hero .fys-slug, main > section:not(.fys-hero), .fys-footer) { opacity: 0; transition: opacity 0.4s ease; }
+@media (prefers-reduced-motion: reduce) {
+  .fys-btn { transition: none; }
+  .fys-root.is-warping :is(.fys-bar, .fys-hero-copy, .fys-hero-art, .fys-hero .fys-slug, main > section:not(.fys-hero), .fys-footer) { transition: none; }
+}

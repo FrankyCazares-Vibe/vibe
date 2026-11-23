@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { preload } from "react-dom";
 
 import { HomeLanding } from "@/components/landing/home-landing";
+import { SystemLanding } from "@/components/landing/system/system-landing";
 import { CookieNotice } from "@/components/legal/CookieNotice";
 import { OpenBeacon } from "@/components/tally/OpenBeacon";
 import { appShellFromRequest } from "@/lib/native/server";
@@ -14,7 +15,7 @@ export const dynamic = "force-dynamic";
 
 const TITLE = "Vibe: the social app for your campus";
 const DESCRIPTION =
-  "Vibe is the social app for college students. Find your clubs, see what they have on this week, and meet people from your major. Free with your school email.";
+  "Vibe is the social app for your campus, built around clubs. Find your clubs, your events, and each other. Free with your school email.";
 
 // Search results and link previews for the landing. openGraph and twitter
 // replace the layout's objects whole (metadata merges shallowly), so they
@@ -59,9 +60,15 @@ export default async function Home({
   // font-display block. Asked for up front, as on the sign-in page, so the
   // top bar's letters don't land while still invisible. 1.4 KB, same origin.
   preload(WORDMARK_FONT_PATH, { as: "font", type: "font/woff2" });
+  const signupOpen = await isSignupOpen(override);
+  // Nov 23, 2026: "find your system" (system-landing.tsx) is the landing.
+  // LANDING=classic in Vercel's env brings back the Oct-Nov landing (the
+  // night sky with six lights) with no deploy of code: the rollback, kept
+  // for a week or so. Read per request (the page is force-dynamic).
+  const classic = process.env.LANDING === "classic";
   return (
     <>
-      <HomeLanding signupOpen={await isSignupOpen(override)} />
+      {classic ? <HomeLanding signupOpen={signupOpen} /> : <SystemLanding signupOpen={signupOpen} />}
       {/* Counts this open in Vibe's own day totals (a number, nothing about the visitor). */}
       <OpenBeacon page="home" />
       {/* The one-time cookie notice of the signed-out pages (a notice, nothing to accept). */}
