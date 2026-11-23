@@ -139,3 +139,21 @@ First draft of the record. Franky can change any of it.
 - **The dots drifting in and settling into the photo on load** (offered on the board, not built). Recommendation: only if the static fade feels flat on his phone.
 
 Franky ships on his yes. Don't merge without it.
+
+## After ship: "before you sign up." (Nov 23)
+
+Franky tried the third-party taste skill on the landing (the trial and its notes: `vibe-marketing/campaigns/2026-11-landing-revamp/taste-trial/`). He wasn't a fan, and kept three things from it: an FAQ, telling people how to add Vibe to their home screen, and the skill's checker.
+
+- **New section, before the close:** "Questions / 05", "before you sign up.", with four answers always open (no accordion):
+  - **Is there an app to download?** No download needed: Vibe runs in the browser. Then the home-screen steps, in the app's own words (`settings/notifications-card-view.ts`). Once a store listing is set, the answer points to it instead.
+  - **What does it cost?** Free for students, and so is setting up a club's page.
+  - **Who sees that I went to an event?** The club's officers. Everyone else sees only how many checked in, from 5 up (`checkinCountLine`).
+  - **How does my club get on Vibe?** Email us, and we set up the page in person.
+- **The coral full stop** now also lands in "sign up." on its way down to "vibe.".
+- **The checker, for landing previews:** run `node ~/.claude/skills/design-taste-frontend/scripts/consistency.mjs <preview url> --widths 1440,390 --profile <a temp folder>`.
+  - Read only cut text, overflow (`off-viewport`), `overlap-text` and `tap-size`. On this page all four pass.
+  - Ignore the rest. Its `spill` and `off-grid` findings on every headline come from the halftone padding (round 7), and its one-section, row-lines and scroll-motion rules are its own taste.
+  - `collide` flags only the cookie notice, a fixed banner.
+- **Checked:**
+  - `npm test` passes (4230) and the typecheck is clean.
+  - In the browser at 1440 and 375, the new section has no sideways scroll.

@@ -132,6 +132,14 @@ body.vibe-cursor-active:has(.fys-root), body.vibe-cursor-active:has(.fys-root) *
 .fys-s1 { left: 0; top: 0; width: 92%; rotate: -1.5deg; }
 .fys-s2 { left: 16%; top: 44%; width: 80%; rotate: 1.5deg; }
 
+/* ---- before you sign up (the questions, Nov 23): every answer open, no accordion ---- */
+.fys-faq { position: relative; display: flex; flex-direction: column; max-width: 608px; margin: 0 auto; padding: 90px 24px 70px; }
+.fys-faq-list { display: grid; gap: 22px; margin: 34px 0 0; }
+.fys-faq-list > div { border-top: 1px solid var(--hair); padding-top: 18px; }
+.fys-faq-list dt { margin: 0 0 8px; font-size: 16px; line-height: 1.35; font-weight: 600; color: var(--ink); }
+.fys-faq-list dd { margin: 0; font-size: 15px; line-height: 1.55; color: var(--ink2); }
+.fys-faq-list a { color: var(--ink); text-decoration: underline; text-underline-offset: 3px; }
+
 /* ---- everything looks different ---- */
 /* Smaller than the screen (round 6), and no hard edge: the photo breaks into dots toward its edges (dot-photo.tsx). */
 .fys-print { position: relative; width: 82%; aspect-ratio: 4 / 5; margin: 30px auto 0; }
@@ -225,6 +233,11 @@ body.vibe-cursor-active:has(.fys-root), body.vibe-cursor-active:has(.fys-root) *
   .fys-print { width: 100%; margin: 0; }
   .fys-open { grid-template-columns: calc(560 * var(--U)) minmax(0, 1fr); align-items: center; padding: calc(110 * var(--U)) calc(120 * var(--U)) calc(130 * var(--U)); }
   .fys-line { aspect-ratio: 600 / 360; margin: 0; }
+
+  .fys-faq { display: grid; max-width: 1600px; grid-template-columns: calc(520 * var(--U)) minmax(0, 1fr); column-gap: calc(40 * var(--U)); align-items: start; padding: calc(110 * var(--U)) calc(120 * var(--U)); }
+  .fys-faq-list { grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: calc(48 * var(--U)); row-gap: calc(36 * var(--U)); margin: 0; padding-top: calc(38 * var(--U)); }
+  .fys-faq-list dt { font-size: clamp(16px, calc(17 * var(--U)), 18px); }
+  .fys-faq-list dd { font-size: clamp(15px, calc(15.5 * var(--U)), 16.5px); }
 
   .fys-close { padding: calc(80 * var(--U)) calc(120 * var(--U)) calc(110 * var(--U)); }
   .fys-big { margin: calc(40 * var(--U)) 0 calc(60 * var(--U)); font-size: calc(170 * var(--U)); translate: none; }

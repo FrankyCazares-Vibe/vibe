@@ -3,7 +3,7 @@
 import { KineticWordmark } from "@/components/brand/KineticWordmark";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useState, type CSSProperties } from "react";
+import { useCallback, useEffect, useState, type CSSProperties, type ReactNode } from "react";
 
 import { enabledSchoolSystems } from "@/lib/auth/school-email-domains";
 import { SYSTEM_LABEL } from "@/lib/iu/campuses";
@@ -27,7 +27,8 @@ import "./system.css";
  * landing board (vibe-marketing/campaigns/2026-11-landing-revamp/board,
  * hero 3): his dunes photo fading into dots, a coral sun, his people on a
  * hand-drawn orbit; then made of your people, bring your club, everything
- * looks different (Otto, once), one campus at a time, and the close.
+ * looks different (Otto, once), one campus at a time, before you sign up
+ * (the questions, Nov 23), and the close.
  *
  * The drawn art is static SVG from the board's export (art.tsx); the photo
  * in dots is a canvas (hero-dots.tsx); the dust and the warp into sign-up
@@ -63,6 +64,29 @@ const SCREENS = [
   { stem: "club-page", dims: [2184, 1584], alt: "A made-up club's page on Vibe, on a computer: Coffee & Chess, its cover a chessboard and a cup of coffee, its followers and members, and Blitz Night up next." },
   { stem: "club-chat", dims: [1944, 1642], alt: "A made-up club's chat on Vibe, on a computer: members vote on what to play next week and tap Going for Blitz Night, with the club's events and Announcement Board beside it." },
 ] as const;
+
+/**
+ * "before you sign up.": the questions a student asks first, every answer open (no accordion). Franky kept this
+ * from the taste-skill trial (Nov 23, 2026: vibe-marketing/campaigns/2026-11-landing-revamp/taste-trial), with
+ * how to keep Vibe on a home screen, since there is nothing to download yet. The steps are the app's own
+ * (settings/notifications-card-view.ts). Once a store listing is live, the first answer points to it instead.
+ * Check-in: officers see who came; everyone else sees the count from 5 up (checkinCountLine).
+ */
+const HAS_STORE = Boolean(APP_STORE_URL || PLAY_STORE_URL);
+const FAQ: readonly { q: string; a: ReactNode }[] = [
+  {
+    q: "Is there an app to download?",
+    a: HAS_STORE
+      ? "Yes. Get it from the store link at the bottom of this page, or keep using Vibe in your browser."
+      : "No download needed: Vibe runs in your browser. To keep it on your home screen on iPhone, tap Share in Safari, then Add to Home Screen. On Android, open Chrome’s menu, then Add to Home screen.",
+  },
+  { q: "What does it cost?", a: "Nothing. Vibe is free for students, and so is setting up your club’s page with us." },
+  { q: "Who sees that I went to an event?", a: "The club’s officers. Everyone else only sees how many checked in, once five or more have." },
+  {
+    q: "How does my club get on Vibe?",
+    a: <><a href={CLUB_HREF}>Email us</a>. We’ll meet your officers in person and set up the page together.</>,
+  },
+];
 
 /** The hero's sun: where it sits and how big, per layout (the board's export, art-data.ts). */
 const { desktop: HD, phone: HP } = ART_EXTRA.hero;
@@ -219,6 +243,21 @@ export function SystemLanding({ signupOpen }: { signupOpen: boolean }) {
           <div className="fys-line" role="img" aria-label="A line of campuses: Indianapolis and Bloomington lit up, the next ones question marks.">
             <Art name="open" />
           </div>
+        </section>
+
+        <section className="fys-faq" aria-labelledby="fys-faq-title">
+          <div className="fys-col">
+            <p className="fys-k">Questions<b>/</b>05</p>
+            <h2 id="fys-faq-title" className="fys-hl fys-md"><span>before you</span> <span>sign up<i className="fys-stop">.</i></span></h2>
+          </div>
+          <dl className="fys-faq-list">
+            {FAQ.map((f) => (
+              <div key={f.q}>
+                <dt>{f.q}</dt>
+                <dd>{f.a}</dd>
+              </div>
+            ))}
+          </dl>
         </section>
 
         <section className="fys-close" aria-label="Sign up">
