@@ -35,6 +35,18 @@ First draft of the record. Franky can change any of it.
   - Every word is real text and shows on the first frame.
 - **Weight:** hero photo 44 KB on a phone and 93 KB on a desktop (AVIF; WebP where AVIF isn't supported), plus his outline (343 bytes); each SVG is 1-15 KB gzipped.
 
+## Round 4 (Nov 23, Franky's notes on the preview)
+- **Hero:**
+  - The headline is the tagline, "your campus. your people. yourself." (Franky's call; it was a sign-off only, decision 10), and the close drops it.
+  - The kicker says "Open now / IU + Purdue".
+  - The picture is bigger (desktop box 1000 x 900, photo 1.2x), and "trivia, thursdays." is now "astronomy callout.".
+  - It's alive: now and then a patch of dots flickers into the real photo and back, and under a mouse the dots near the pointer turn into the photo (a tap does it on a phone). With reduced motion nothing flickers by itself.
+- **Made of your people:** the planet is drawn live (`planet.tsx`, the post's recipe), with room round the coral you. People light up now and then (about one in ten coral), and the people under the pointer light up.
+- **Bring your club:** no hand notes or hand numbers. The list numbers are mono "01 02 03". The screens are still the three phone SAMPLE screens; desktop screens of an invented SAMPLE club with a cover photo are next. The SAE cover can't be used even renamed: it is the chapter's own letters.
+- **See you there** replaces "everything looks different." Otto is in a round night window up in the sky, its rim breaking into dots, with one line ("it's nicer in here, honestly."). The band across the eyes and the other two notes are gone.
+- **One campus at a time:** Indianapolis and Bloomington are lit, and "your campus next?" has no arrow. The body says "Open now for IU and Purdue students."
+- **The close:** the coral full stop is drawn by the art now, so the rings are centred on it. They pass behind it and behind the letters at the back, and in front of it below the letters.
+
 ## Rollback
 `LANDING=classic` in Vercel's environment brings back the Oct-Nov landing (the night sky with six lights) with no code deploy. Keep it for about a week, then delete `home-landing.tsx` and its parts if nobody misses it.
 

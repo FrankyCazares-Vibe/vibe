@@ -17,6 +17,7 @@ import { frauncesSoft, landingMono } from "../soft-font";
 import { Art } from "./art";
 import { ART_EXTRA } from "./art-data";
 import { HeroDots } from "./hero-dots";
+import { Planet } from "./planet";
 import "./system.css";
 
 /**
@@ -58,15 +59,17 @@ const SCREENS = [
   { stem: "screen-chat", w: [320, 500], dims: [700, 1316], alt: "A sample club chat on Vibe: members plan Blitz Night and say who's going." },
 ] as const;
 
-const sun = (v: "desktop" | "phone") => ART_EXTRA.sun[v];
+/** The hero's sun: where it sits and how big, per layout (the board's export, art-data.ts). */
+const { desktop: HD, phone: HP } = ART_EXTRA.hero;
 const SUN_STYLE = {
-  "--sx": `${sun("desktop")[0] * 100}%`, "--sy": `${sun("desktop")[1] * 100}%`, "--sr": `${((sun("desktop")[2] * 2) / 880) * 100}%`,
-  "--psx": `${sun("phone")[0] * 100}%`, "--psy": `${sun("phone")[1] * 100}%`, "--psr": `${((sun("phone")[2] * 2) / 390) * 100}%`,
+  "--sx": `${HD.sun[0] * 100}%`, "--sy": `${HD.sun[1] * 100}%`, "--sr": `${((HD.sun[2] * 2) / HD.w) * 100}%`,
+  "--psx": `${HP.sun[0] * 100}%`, "--psy": `${HP.sun[1] * 100}%`, "--psr": `${((HP.sun[2] * 2) / HP.w) * 100}%`,
 } as CSSProperties;
 
-const band = ART_EXTRA.band;
-const BAND_CLIP = { clipPath: `polygon(${band.corners.map(([x, y]) => `${(x * 100).toFixed(2)}% ${(y * 100).toFixed(2)}%`).join(", ")})` } as CSSProperties;
-const OTTO_STYLE = { left: `${band.otto[0] * 100}%`, top: `${band.otto[1] * 100}%`, width: `${band.otto[2] * 100}%` } as CSSProperties;
+/** "see you there.": the round night window in the sky, and Otto in it (fractions of the photo). */
+const W = ART_EXTRA.window;
+const WINDOW_STYLE = { left: `${(W.cx - W.r) * 100}%`, top: `${((W.cy * 1350) / 1080 - W.r) * (1080 / 1350) * 100}%`, width: `${W.r * 2 * 100}%` } as CSSProperties;
+const OTTO_STYLE = { left: `${((W.otto[0] - (W.cx - W.r)) / (W.r * 2)) * 100}%`, top: `${((W.otto[1] * 1350) / 1080 - (W.cy * 1350) / 1080 + W.r) / (W.r * 2) * 100}%`, width: `${(W.otto[2] / (W.r * 2)) * 100}%` } as CSSProperties;
 
 export function SystemLanding({ signupOpen }: { signupOpen: boolean }) {
   const router = useRouter();
@@ -114,14 +117,14 @@ export function SystemLanding({ signupOpen }: { signupOpen: boolean }) {
       <main>
         <section ref={hero} className="fys-hero" data-wait={drawn ? undefined : ""} aria-labelledby="fys-title">
           <NightSky lights={[]} links={[]} activeId={null} warping={warping} tints={CREAM_DUST} shootingStars={false} />
-          <div className="fys-hero-art" role="img" aria-label="Franky at the dunes in the evening light, his photo fading out into dots, looking up at a coral sun. His people are drawn on an orbit around him: the run club, trivia on Thursdays, the group chat.">
+          <div className="fys-hero-art" role="img" aria-label="Franky at the dunes in the evening light, his photo fading out into dots that flicker back into the photo, looking up at a coral sun. His people are drawn on an orbit around him: the run club, an astronomy callout, the group chat.">
             <HeroDots onDrawn={onDrawn} />
             <span className="fys-sun" style={SUN_STYLE} />
             <Art name="hero" className="fys-hero-ink" eager />
           </div>
           <div className="fys-hero-copy">
-            <p className="fys-k">Open now<b>/</b>Indianapolis</p>
-            <h1 id="fys-title" className="fys-hl"><span>find your</span> <span>system<i>.</i></span></h1>
+            <p className="fys-k">Open now<b>/</b>IU + Purdue</p>
+            <h1 id="fys-title" className="fys-hl fys-hero-hl"><span>your campus.</span> <span>your people.</span> <span>yourself<i>.</i></span></h1>
             <p className="fys-body">Vibe is the social app for your campus, built around clubs. Find your clubs, your events, and each other. <strong>Free with your school email.</strong></p>
             <div className="fys-row">
               <a href={cta.href} data-warp-trigger className="fys-btn">{cta.label}</a>
@@ -141,11 +144,8 @@ export function SystemLanding({ signupOpen }: { signupOpen: boolean }) {
               <li><span className="fys-lab">Each other</span><p><strong>Post, follow and message</strong> the people you meet. Make your profile yours.</p></li>
             </ul>
           </div>
-          <div className="fys-pp">
-            <div className="fys-pp-clip">
-              {/* eslint-disable-next-line @next/next/no-img-element -- a static drawing, served as is */}
-              <img src={`${SRC}/people-planet.svg`} width={1080} height={1350} alt="A planet made of tiny people, each one a dot, with one coral person on its ring." loading="lazy" decoding="async" />
-            </div>
+          <div className="fys-pp" role="img" aria-label="A planet made of tiny people, each one a dot, with one coral person on its ring: you. Now and then someone lights up.">
+            <div className="fys-pp-clip"><Planet /></div>
             <Art name="people" />
           </div>
           <p className="fys-slug" aria-hidden="true">ext. the night sky<b>·</b>11:58 pm</p>
@@ -159,16 +159,15 @@ export function SystemLanding({ signupOpen }: { signupOpen: boolean }) {
                 <img src={`${SRC}/${s.stem}-${s.w[1]}.webp`} srcSet={`${SRC}/${s.stem}-${s.w[0]}.webp ${s.w[0]}w, ${SRC}/${s.stem}-${s.w[1]}.webp ${s.w[1]}w`} sizes="(min-width: 900px) 19vw, 48vw" width={s.dims[0]} height={s.dims[1]} alt={s.alt} loading="lazy" decoding="async" />
               </picture>
             ))}
-            <Art name="club" />
           </div>
           <div className="fys-col">
             <p className="fys-k">Clubs<b>/</b>02</p>
             <h2 id="fys-club-title" className="fys-hl fys-md"><span>bring your</span> <span>club<i>.</i></span></h2>
             <p className="fys-body">Run a club? Give it a home on Vibe. We’ll set up its page with you, in person. Free.</p>
             <ol className="fys-list">
-              <li><span className="fys-n"><Art name="num1" /></span><span><strong>The page.</strong> Anyone can follow it to see your events.</span></li>
-              <li><span className="fys-n"><Art name="num2" /></span><span><strong>The board.</strong> Officers post the news.</span></li>
-              <li><span className="fys-n"><Art name="num3" /></span><span><strong>The chat.</strong> Members talk, plan and say who’s going.</span></li>
+              <li><span className="fys-n">01</span><span><strong>The page.</strong> Anyone can follow it to see your events.</span></li>
+              <li><span className="fys-n">02</span><span><strong>The board.</strong> Officers post the news.</span></li>
+              <li><span className="fys-n">03</span><span><strong>The chat.</strong> Members talk, plan and say who’s going.</span></li>
             </ol>
             <div className="fys-row"><a href={CLUB_HREF} className="fys-btn">Bring your club</a></div>
           </div>
@@ -177,23 +176,23 @@ export function SystemLanding({ signupOpen }: { signupOpen: boolean }) {
 
         <section className="fys-eyes" aria-labelledby="fys-eyes-title">
           <div className="fys-col">
-            <p className="fys-k">Through your eyes<b>/</b>03</p>
-            <h2 id="fys-eyes-title" className="fys-hl fys-md"><span>everything</span> <span>looks different<i>.</i></span></h2>
-            <p className="fys-body">Same campus, same walk to class. Once you find your people, it all looks different.</p>
+            <p className="fys-k">In person<b>/</b>03</p>
+            <h2 id="fys-eyes-title" className="fys-hl fys-md"><span>see you there<i>.</i></span></h2>
+            <p className="fys-body">Find what’s on this week, tap Going, and show up. The best part happens off your phone.</p>
           </div>
-          <div className="fys-print" role="img" aria-label="Franky leaning out of a car window, smiling. A window across his eyes shows a night sky with Otto in it, who says: it's nicer in here, honestly.">
+          <div className="fys-print" role="img" aria-label="Franky leaning out of a car window on a long road, laughing. Up in the daytime sky, a round window of night with Otto in it, who says: it's nicer in here, honestly.">
             <picture>
               <source type="image/avif" srcSet={`${SRC}/eyes-540.avif 540w, ${SRC}/eyes-1080.avif 1080w`} sizes="(min-width: 900px) 38vw, 92vw" />
               <img src={`${SRC}/eyes-1080.webp`} srcSet={`${SRC}/eyes-540.webp 540w, ${SRC}/eyes-1080.webp 1080w`} sizes="(min-width: 900px) 38vw, 92vw" width={1080} height={1350} alt="" loading="lazy" decoding="async" />
             </picture>
-            <Art name="eyes-band" />
-            <div className="fys-band" style={BAND_CLIP}>
+            <Art name="eyes-window" />
+            <div className="fys-window" style={WINDOW_STYLE}>
               <picture style={OTTO_STYLE}>
                 <source type="image/avif" srcSet={`${SRC}/otto-260.avif 260w, ${SRC}/otto-520.avif 520w`} sizes="(min-width: 900px) 10vw, 24vw" />
                 <img src={`${SRC}/otto-520.webp`} srcSet={`${SRC}/otto-260.webp 260w, ${SRC}/otto-520.webp 520w`} sizes="(min-width: 900px) 10vw, 24vw" width={520} height={317} alt="" loading="lazy" decoding="async" />
               </picture>
             </div>
-            <Art name="eyes-ink" />
+            <Art name="eyes-note" />
           </div>
           <p className="fys-slug" aria-hidden="true">ext. the long road<b>·</b>6:40 pm</p>
         </section>
@@ -202,16 +201,16 @@ export function SystemLanding({ signupOpen }: { signupOpen: boolean }) {
           <div className="fys-col">
             <p className="fys-k">Where it’s open<b>/</b>04</p>
             <h2 id="fys-open-title" className="fys-hl fys-md"><span>one campus</span> <span>at a time<i>.</i></span></h2>
-            <p className="fys-body">Open now for {SCHOOLS} students in Indianapolis. {signupOpen ? "Sign up free" : "Join the waitlist"} with your school email.</p>
+            <p className="fys-body">Open now for {SCHOOLS} students. {signupOpen ? "Sign up free" : "Join the waitlist"} with your school email.</p>
           </div>
-          <div className="fys-line" role="img" aria-label="A line of campuses: Indianapolis lit up and open now, the next ones question marks.">
+          <div className="fys-line" role="img" aria-label="A line of campuses: Indianapolis and Bloomington lit up, the next ones question marks.">
             <Art name="open" />
           </div>
         </section>
 
         <section className="fys-close" aria-label="Sign up">
-          <span className="fys-big" aria-hidden="true">vibe<i>.</i><Art name="close" unit="em" /></span>
-          <p className="fys-tag">Your campus. Your people. Yourself.</p>
+          {/* The full stop is the sun: drawn by the art (close-front), with its rings behind it and the letters. */}
+          <span className="fys-big" aria-hidden="true"><Art name="close-back" unit="em" className="fys-close-back" />vibe<i>.</i><Art name="close-front" unit="em" className="fys-close-front" /></span>
           <div className="fys-row">
             <a href={cta.href} data-warp-trigger className="fys-btn">{cta.label}</a>
             <a href={CLUB_HREF} className="fys-btn fys-ghost">Bring your club</a>

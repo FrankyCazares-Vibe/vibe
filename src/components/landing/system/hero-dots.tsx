@@ -2,27 +2,28 @@
 
 import { useEffect, useRef } from "react";
 
+import { ART_EXTRA } from "./art-data";
+
 /**
- * The hero's picture (Nov 23, 2026, "find your system", hero 3 on the board
- * Franky picked): his dunes photo, seen through a grid of dots. Near him the
- * dots overlap into the whole photo; further out they shrink into a halftone
- * of the same photo, then cool to cream. His outline (an on-device subject
- * mask, 250 x 167, 1 bit) keeps him whole. The sums are the board's
- * (vibe-marketing/campaigns/2026-11-landing-revamp/board/d.html#fade), in
- * the same design px, so the drawn notes in hero-*.svg land where they did.
+ * The hero's picture ("find your system" landing, Nov 23, 2026): Franky's
+ * dunes photo, seen through a grid of dots. Near him the dots overlap into
+ * the whole photo; further out they shrink into dots of the same photo, then
+ * cool to cream. His outline (an on-device subject mask, 250 x 167, 1 bit)
+ * keeps him whole. The sums are the board's (vibe-marketing/campaigns/
+ * 2026-11-landing-revamp/board), in the same design px as the drawn notes
+ * (ART_EXTRA.hero, written by the board's export), so they line up.
  *
- * Drawn once per size on a canvas (about 22,000 dots on a desktop, 10,000 on
- * a phone), never animated: the page fades it in. Device pixel ratio capped
- * at 2. The photo comes from the hidden <picture> beside it, so the browser
- * picks AVIF or WebP and the width for the screen.
+ * It's alive in one way: now and then a patch of dots flickers into the real
+ * photo and back, and under a mouse the dots near the pointer turn into the
+ * photo too (a tap does it on a phone). The dots themselves are drawn once
+ * per size; a frame only redraws while a flicker or the pointer is on. With
+ * reduced motion nothing flickers by itself. Paused off screen. Device pixel
+ * ratio capped at 2. The photo comes from the hidden <picture>, so the
+ * browser picks AVIF or WebP and the width for the screen.
  */
 
-/** The two layouts' design boxes (px) and where the photo sits in them. */
-const LAYOUT = {
-  wide: { w: 880, h: 800, s: 0.5, ax: 0.42, ay: 0.58, g: 5.6, rx: 280, ry: 330 },
-  phone: { w: 390, h: 380, s: 0.27, ax: 0.4, ay: 0.56, g: 3.9, rx: 140, ry: 165 },
-} as const;
-/** The desktop layout starts here (system.css uses the same number). */
+type Layout = (typeof ART_EXTRA.hero)["desktop" | "phone"];
+/** The desktop layout starts here (system.css and art.tsx use the same number). */
 export const SYSTEM_WIDE_QUERY = "(min-width: 900px)";
 
 const PHOTO_W = 2000, PHOTO_H = 1334, CELL = 8, GW = 250, GH = 167;
@@ -71,21 +72,23 @@ class Batch {
   }
 }
 
-function draw(canvas: HTMLCanvasElement, photo: HTMLImageElement, grid: Grid): boolean {
-  const box = canvas.getBoundingClientRect();
-  if (box.width < 2 || box.height < 2) return false;
-  const L = window.matchMedia(SYSTEM_WIDE_QUERY).matches ? LAYOUT.wide : LAYOUT.phone;
+/** One drawn size: the dots (base), the plain photo in the same place, and where a flicker may land. */
+type Scene = { L: Layout; k: number; base: HTMLCanvasElement; photo: HTMLCanvasElement; spots: number[] };
+
+function canvas(w: number, h: number) { const c = document.createElement("canvas"); c.width = w; c.height = h; return c; }
+
+function build(box: DOMRect, img: HTMLImageElement, grid: Grid): Scene | null {
+  const L: Layout = window.matchMedia(SYSTEM_WIDE_QUERY).matches ? ART_EXTRA.hero.desktop : ART_EXTRA.hero.phone;
   const dpr = Math.min(window.devicePixelRatio || 1, 2), k = (box.width / L.w) * dpr;
-  canvas.width = Math.round(box.width * dpr);
-  canvas.height = Math.round(box.height * dpr);
-  const ctx = canvas.getContext("2d");
-  const mask = document.createElement("canvas");
-  mask.width = canvas.width; mask.height = canvas.height;
-  const m = mask.getContext("2d");
-  if (!ctx || !m) return false;
+  const W2 = Math.round(box.width * dpr), H2 = Math.round(box.height * dpr);
+  const base = canvas(W2, H2), mask = canvas(W2, H2), photo = canvas(W2, H2);
+  const ctx = base.getContext("2d"), m = mask.getContext("2d"), pc = photo.getContext("2d");
+  if (!ctx || !m || !pc) return null;
 
   // The photo's px -> design px: his middle (715, 830) sits at a fixed spot in the box.
-  const { w: W, h: H, s, g } = L, ax = W * L.ax, ay = H * L.ay;
+  const { w: W, h: H, s } = L, ax = W * L.ax, ay = H * L.ay;
+  // The dots keep their size on screen when the box is drawn bigger than its design (more dots, not bigger ones).
+  const g = L.g / Math.max(1, box.width / L.w);
   const X = (v: number) => ax + (v - 715) * s, Y = (v: number) => ay + (v - 830) * s;
   const OX = (x: number) => 715 + (x - ax) / s, OY = (y: number) => 830 + (y - ay) / s;
   const lum = (ox: number, oy: number) => {
@@ -102,7 +105,8 @@ function draw(canvas: HTMLCanvasElement, photo: HTMLImageElement, grid: Grid): b
   // Solid photo (t = 0) to fully broken into dots (t = 1); c is how far a dot has cooled to cream.
   const ecx = X(720), ecy = Y(890), ed = (x: number, y: number) => Math.hypot((x - ecx) / L.rx, (y - ecy) / L.ry);
 
-  const holes = new Batch(), cream = new Batch();
+  const holes = new Batch(), cream = new Batch(), spots: number[] = [];
+  let n = 0;
   for (let y = g / 2; y < H; y += g) {
     for (let x = g / 2 + ((Math.round(y / g) % 2) * g) / 2; x < W; x += g) {
       const ox = OX(x), oy = OY(y), l = lum(ox, oy);
@@ -118,59 +122,164 @@ function draw(canvas: HTMLCanvasElement, photo: HTMLImageElement, grid: Grid): b
       const op = 1 - t * (0.6 - 0.45 * v);
       if (c < 0.98) holes.add((1 - c) * op, x, y, r);
       if (c > 0.02) cream.add(c * (0.35 + 0.4 * v), x, y, r);
+      // where a flicker may land: the dotted sand and dunes round him (not the white sky, not the faded edges)
+      if (t > 0.3 && c < 0.85 && oy > 470 && oy < PHOTO_H - 120 && v > 0.2 && n++ % 23 === 0) spots.push(x, y);
     }
   }
 
+  const draw = (cx: CanvasRenderingContext2D) => { cx.imageSmoothingQuality = "high"; cx.drawImage(img, X(0), Y(0), PHOTO_W * s, PHOTO_H * s); };
+  pc.setTransform(k, 0, 0, k, 0, 0);
+  draw(pc);
   m.setTransform(k, 0, 0, k, 0, 0);
   holes.fill(m, "#fff");
   ctx.setTransform(k, 0, 0, k, 0, 0);
-  ctx.clearRect(0, 0, W, H);
-  ctx.imageSmoothingQuality = "high";
-  ctx.drawImage(photo, X(0), Y(0), PHOTO_W * s, PHOTO_H * s);
+  draw(ctx);
   ctx.globalCompositeOperation = "destination-in";
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.drawImage(mask, 0, 0);
   ctx.globalCompositeOperation = "source-over";
   ctx.setTransform(k, 0, 0, k, 0, 0);
   cream.fill(ctx, CREAM);
-  return true;
+  return { L, k, base, photo, spots };
 }
 
+/** A patch of photo: where (design px), how big, when it started and how long it lasts (ms). */
+type Flicker = { x: number; y: number; r: number; t0: number; dur: number };
+
 const SRC = "/landing/system";
-/** How wide the photo is drawn: 1.136 x the art box on a desktop, 1.385 x on a phone (system.css sizes the boxes). */
-const SIZES = "(min-width: 900px) calc(min(100vw, 1600px) * 0.694), calc(min(100vw, 560px) * 1.385)";
+/** How wide the photo is drawn: 1.2 x the art box on a desktop, 1.54 x on a phone (system.css sizes the boxes). */
+const SIZES = "(min-width: 900px) calc(min(100vw, 1600px) * 0.833), calc(min(100vw, 560px) * 1.54)";
 
 export function HeroDots({ onDrawn }: { onDrawn?: () => void }) {
-  const canvas = useRef<HTMLCanvasElement>(null);
+  const ref = useRef<HTMLCanvasElement>(null);
   const photo = useRef<HTMLImageElement>(null);
   const drawn = useRef(onDrawn);
   useEffect(() => { drawn.current = onDrawn; }, [onDrawn]);
 
   useEffect(() => {
-    const c = canvas.current, img = photo.current;
-    if (!c || !img) return;
-    let gone = false, grid: Grid | null = null, raf = 0, told = false;
+    const c = ref.current, img = photo.current;
+    const ctx = c?.getContext("2d");
+    if (!c || !img || !ctx) return;
+    const still = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    let gone = false, grid: Grid | null = null, scene: Scene | null = null, raf = 0, told = false, onScreen = true, timer = 0;
+    const flickers: Flicker[] = [];
+    // the pointer's lens: where it is (design px), where it eases to, and how strong it is
+    const lens = { x: 0, y: 0, tx: 0, ty: 0, a: 0, on: false };
+    const patch = document.createElement("canvas"), pctx = patch.getContext("2d");
+
+    const env = (u: number) => (u < 0.3 ? smooth(0, 0.3, u) : u > 0.62 ? 1 - smooth(0.62, 1, u) : 1);
+
+    // one round patch of the photo, soft at the edge, laid over the dots at strength a
+    const reveal = (S: Scene, x: number, y: number, r: number, a: number) => {
+      if (!pctx || a <= 0.002) return;
+      const R = Math.ceil(r * S.k), size = R * 2, sx = Math.round(x * S.k) - R, sy = Math.round(y * S.k) - R;
+      if (patch.width !== size) { patch.width = size; patch.height = size; }
+      pctx.globalCompositeOperation = "copy";
+      pctx.drawImage(S.photo, sx, sy, size, size, 0, 0, size, size);
+      pctx.globalCompositeOperation = "destination-in";
+      const fade = pctx.createRadialGradient(R, R, 0, R, R, R);
+      fade.addColorStop(0, "rgba(0,0,0,1)");
+      fade.addColorStop(0.5, "rgba(0,0,0,0.92)");
+      fade.addColorStop(1, "rgba(0,0,0,0)");
+      pctx.fillStyle = fade;
+      pctx.fillRect(0, 0, size, size);
+      ctx.globalAlpha = a;
+      ctx.drawImage(patch, sx, sy);
+      ctx.globalAlpha = 1;
+    };
+
+    const frame = (now: number) => {
+      raf = 0;
+      const S = scene;
+      if (gone || !S) return;
+      lens.x += (lens.tx - lens.x) * 0.22;
+      lens.y += (lens.ty - lens.y) * 0.22;
+      lens.a += ((lens.on ? 1 : 0) - lens.a) * 0.14;
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.clearRect(0, 0, c.width, c.height);
+      ctx.drawImage(S.base, 0, 0);
+      for (let i = flickers.length - 1; i >= 0; i--) {
+        const f = flickers[i], u = (now - f.t0) / f.dur;
+        if (u >= 1) { flickers.splice(i, 1); continue; }
+        reveal(S, f.x, f.y, f.r, env(Math.max(0, u)));
+      }
+      reveal(S, lens.x, lens.y, S.L.w > 500 ? 95 : 48, lens.a);
+      if (onScreen && (flickers.length || lens.on || lens.a > 0.01)) raf = requestAnimationFrame(frame);
+    };
+    const wake = () => { if (!raf && scene && onScreen && !document.hidden) raf = requestAnimationFrame(frame); };
+
+    const flick = (x?: number, y?: number) => {
+      const S = scene;
+      if (!S || !S.spots.length) return;
+      if (x == null || y == null) { const i = Math.floor(Math.random() * (S.spots.length / 2)) * 2; x = S.spots[i]; y = S.spots[i + 1]; }
+      const big = S.L.w > 500;
+      flickers.push({ x, y, r: (big ? 60 : 30) + Math.random() * (big ? 40 : 20), t0: performance.now(), dur: 1500 + Math.random() * 900 });
+      wake();
+    };
+    // the flickers on their own: one every 1.6 to 3.6 s while the hero is on screen, never with reduced motion
+    const plan = () => {
+      window.clearTimeout(timer);
+      if (still || gone) return;
+      timer = window.setTimeout(() => { if (onScreen && !document.hidden && flickers.length < 2) flick(); plan(); }, 1600 + Math.random() * 2000);
+    };
+
+    const layout = () => {
+      if (gone || !grid) return;
+      const box = c.getBoundingClientRect();
+      if (box.width < 2 || box.height < 2) return;
+      const S = build(box, img, grid);
+      if (!S) return;
+      scene = S;
+      c.width = S.base.width; c.height = S.base.height;
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.drawImage(S.base, 0, 0);
+      wake();
+      if (!told) { told = true; drawn.current?.(); plan(); }
+    };
+    let sizeRaf = 0;
+    const sized = new ResizeObserver(() => { cancelAnimationFrame(sizeRaf); sizeRaf = requestAnimationFrame(layout); });
+    const seen = new IntersectionObserver(([e]) => { onScreen = e.isIntersecting; wake(); });
+
+    // The pointer, in design px of the box: a mouse carries the lens; a tap or a pen press sets off one flicker.
+    const toDesign = (e: PointerEvent): [number, number] | null => {
+      const S = scene; if (!S) return null;
+      const b = c.getBoundingClientRect();
+      return [((e.clientX - b.left) / b.width) * S.L.w, ((e.clientY - b.top) / b.height) * S.L.h];
+    };
+    const host = c.parentElement;
+    const move = (e: PointerEvent) => {
+      if (e.pointerType !== "mouse") return;
+      const p = toDesign(e); if (!p) return;
+      if (!lens.on && lens.a < 0.02) { lens.x = p[0]; lens.y = p[1]; }
+      lens.tx = p[0]; lens.ty = p[1]; lens.on = true; wake();
+    };
+    const leave = () => { lens.on = false; wake(); };
+    const down = (e: PointerEvent) => { if (e.pointerType === "mouse") return; const p = toDesign(e); if (p) flick(p[0], p[1]); };
+    host?.addEventListener("pointermove", move);
+    host?.addEventListener("pointerleave", leave);
+    host?.addEventListener("pointerdown", down);
+
     const outline = new Image();
     outline.src = `${SRC}/dunes-outline.png`;
-    const redraw = () => {
-      raf = 0;
-      if (gone || !grid || !draw(c, img, grid) || told) return;
-      told = true;
-      drawn.current?.();
-    };
-    const ask = () => { if (!raf) raf = requestAnimationFrame(redraw); };
     Promise.all([img.decode(), outline.decode()])
-      .then(() => { if (gone) return; grid = readGrid(img, outline); ask(); })
+      .then(() => { if (gone) return; grid = readGrid(img, outline); layout(); sized.observe(c); seen.observe(c); })
       // A photo that never loads leaves the notes on the night sky; the page still reads.
       .catch(() => { if (!gone) drawn.current?.(); });
-    const sized = new ResizeObserver(ask);
-    sized.observe(c);
-    return () => { gone = true; cancelAnimationFrame(raf); sized.disconnect(); };
+    document.addEventListener("visibilitychange", wake);
+    return () => {
+      gone = true;
+      cancelAnimationFrame(raf); cancelAnimationFrame(sizeRaf); window.clearTimeout(timer);
+      sized.disconnect(); seen.disconnect();
+      host?.removeEventListener("pointermove", move);
+      host?.removeEventListener("pointerleave", leave);
+      host?.removeEventListener("pointerdown", down);
+      document.removeEventListener("visibilitychange", wake);
+    };
   }, []);
 
   return (
     <>
-      <canvas ref={canvas} className="fys-dots" aria-hidden="true" />
+      <canvas ref={ref} className="fys-dots" aria-hidden="true" />
       <picture className="fys-dunes-src">
         <source type="image/avif" srcSet={`${SRC}/dunes-1080.avif 1080w, ${SRC}/dunes-1800.avif 1800w`} sizes={SIZES} />
         <img ref={photo} src={`${SRC}/dunes-1800.webp`} srcSet={`${SRC}/dunes-1080.webp 1080w, ${SRC}/dunes-1800.webp 1800w`} sizes={SIZES} width={2000} height={1334} alt="" fetchPriority="high" decoding="async" />

@@ -37,6 +37,8 @@
 .fys-hl span { display: block; white-space: nowrap; }
 .fys-hl i, .fys-big i { font-style: normal; color: var(--coral); }
 .fys-hl.fys-md { font-size: calc(56 * var(--P)); }
+/* The hero's three lines (the tagline, since Nov 23): smaller, so "your people." fits a phone. */
+.fys-hl.fys-hero-hl { font-size: calc(54 * var(--P)); }
 .fys-slug { margin: 30px 0 0; font: 500 9.5px/1 var(--font-jetbrains), monospace; letter-spacing: 0.18em; text-transform: uppercase; color: #8C857C; white-space: nowrap; }
 .fys-body { margin: 18px 0 0; max-width: 31em; font-size: 16.5px; line-height: 1.55; color: var(--ink2); }
 .fys-body strong { color: var(--ink); font-weight: 600; }
@@ -65,7 +67,9 @@
 .fys-hero { position: relative; max-width: 1600px; margin: 0 auto; padding: 0 0 34px; }
 .fys-hero .vln-sky { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
 /* Short phones keep the headline and the button in the first screen: the picture gives way. */
-.fys-hero-art { --ah: clamp(230px, calc(100svh - 440px), calc(380 * var(--P))); position: relative; width: calc(var(--ah) * 390 / 380); height: var(--ah); margin: 0 auto; }
+/* The picture runs 40px under the first lines of text (its bottom is only fading dots there). */
+/* Its height leaves room for the words under it: about 250px plus the three-line headline, which grows with --P. */
+.fys-hero-art { --ah: clamp(240px, calc(100svh - 252px - 143 * var(--P)), calc(430 * var(--P))); position: relative; width: calc(var(--ah) * 390 / 430); height: var(--ah); margin: 0 auto -40px; }
 .fys-dots { position: absolute; inset: 0; width: 100%; height: 100%; }
 .fys-dunes-src { position: absolute; left: 0; top: 0; width: 1px; height: 1px; overflow: hidden; opacity: 0; pointer-events: none; }
 .fys-dunes-src img { width: 1px; height: 1px; }
@@ -89,7 +93,7 @@
 .fys-people .fys-hl { order: 2; }
 .fys-pp { order: 3; position: relative; width: calc(390 * var(--P)); aspect-ratio: 390 / 380; margin: 0 calc(50% - 195 * var(--P)); }
 .fys-pp-clip { position: absolute; inset: 0; overflow: hidden; }
-.fys-pp-clip img { position: absolute; display: block; left: -1.54%; top: -15.79%; width: 107.69%; height: auto; }
+.fys-planet { position: absolute; inset: 0; width: 100%; height: 100%; }
 .fys-people .fys-slug { order: 5; }
 
 /* ---- bring your club ---- */
@@ -100,7 +104,7 @@
 .fys-list { order: 5; display: grid; gap: 16px; margin: 30px 0 0; padding: 0; list-style: none; }
 .fys-list li { display: flex; align-items: center; gap: 14px; font-size: 16px; line-height: 1.5; color: var(--ink2); }
 .fys-list strong { color: var(--ink); font-weight: 600; }
-.fys-n { position: relative; flex: none; width: 34px; height: 34px; }
+.fys-n { flex: none; width: 2.2em; font: 500 13px/1 var(--font-jetbrains), monospace; letter-spacing: 0.12em; color: var(--coral); }
 .fys-club .fys-row { order: 6; margin-top: 30px; }
 .fys-club .fys-slug { order: 7; }
 .fys-screen { position: absolute; display: block; }
@@ -112,9 +116,10 @@
 /* ---- everything looks different ---- */
 .fys-print { position: relative; width: 100%; aspect-ratio: 4 / 5; margin-top: 30px; border-radius: 4px; box-shadow: 0 30px 60px rgba(0, 0, 0, 0.55); }
 .fys-print > picture img { display: block; width: 100%; height: 100%; object-fit: cover; border-radius: 4px; }
-.fys-band { position: absolute; inset: 0; z-index: 4; pointer-events: none; }
-.fys-band picture { position: absolute; display: block; filter: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.5)); }
-.fys-band img { display: block; width: 100%; height: auto; }
+/* Otto's round night window, up in the sky (its dark disc and dotted rim are the eyes-window drawing under it). */
+.fys-window { position: absolute; z-index: 4; aspect-ratio: 1; border-radius: 50%; overflow: hidden; pointer-events: none; }
+.fys-window picture { position: absolute; display: block; filter: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.5)); }
+.fys-window img { display: block; width: 100%; height: auto; }
 .fys-eyes .fys-slug { text-align: right; margin-top: 16px; }
 
 /* ---- one campus at a time ---- */
@@ -122,11 +127,13 @@
 
 /* ---- the close: the full stop is the sun, with its own small system ---- */
 .fys-close { position: relative; display: flex; flex-direction: column; align-items: center; max-width: 1600px; margin: 0 auto; padding: 110px 24px 80px; text-align: center; }
-.fys-big { position: relative; display: inline-block; margin: 30px 0 70px; font-family: "Vibe Wordmark", var(--font-soft, "Fraunces"), serif; font-weight: 900; font-variation-settings: "SOFT" 100, "opsz" 144; font-size: calc(100 * var(--P)); line-height: 1; letter-spacing: 0; color: var(--ink); translate: -0.34em 0; }
-/* Its own layer, so the system sits behind the letters and over the page. */
+.fys-big { position: relative; display: inline-block; margin: 30px 0 70px; font-family: "Vibe Wordmark", var(--font-soft, "Fraunces"), serif; font-weight: 900; font-variation-settings: "SOFT" 100, "opsz" 144; font-size: calc(100 * var(--P)); line-height: 1; letter-spacing: 0; color: var(--ink); translate: -0.34em 0; margin-bottom: 40px; }
+/* Its own layer: the rings' back halves sit behind the letters, the sun and the front halves over them.
+   The real full stop is kept for its space and its meaning, and drawn by the art. */
 .fys-big { isolation: isolate; }
-.fys-big .fys-art { z-index: -1; }
-.fys-tag { margin: 0; font-family: "Fraunces", serif; font-style: italic; font-weight: 400; font-variation-settings: "SOFT" 100; font-size: 22px; color: var(--ink); }
+.fys-big i { color: transparent; }
+.fys-big .fys-close-back { z-index: -1; }
+.fys-big .fys-close-front { z-index: 1; }
 .fys-close .fys-row { flex-direction: column; align-items: stretch; width: 100%; max-width: 420px; margin-top: 34px; }
 .fys-fine { margin: 14px 0 0; font-size: 14px; line-height: 1.5; color: var(--muted); }
 .fys-fine a { display: inline-flex; align-items: center; min-height: 44px; color: var(--ink2); }
@@ -146,6 +153,7 @@
   .fys-k { margin-bottom: 26px; font-size: 13px; }
   .fys-hl { font-size: calc(128 * var(--U)); }
   .fys-hl.fys-md { font-size: calc(104 * var(--U)); }
+  .fys-hl.fys-hero-hl { font-size: calc(98 * var(--U)); }
   .fys-slug { margin: 0; font-size: 11px; }
   .fys-body { margin-top: 28px; font-size: clamp(16px, calc(19 * var(--U)), 20px); }
   .fys-btn { height: 54px; padding: 0 28px; }
@@ -155,8 +163,8 @@
   .fys-wm { font-size: 32px; }
   .fys-bar nav { gap: 14px; }
 
-  .fys-hero { min-height: calc(800 * var(--U)); padding: 0; }
-  .fys-hero-art { position: absolute; left: calc(560 * var(--U)); top: 0; width: calc(880 * var(--U)); height: calc(800 * var(--U)); margin: 0; }
+  .fys-hero { min-height: calc(900 * var(--U)); padding: 0; }
+  .fys-hero-art { position: absolute; left: calc(440 * var(--U)); top: 0; width: calc(1000 * var(--U)); height: calc(900 * var(--U)); margin: 0; }
   .fys-sun { left: var(--sx); top: var(--sy); width: var(--sr); }
   /* The board's column: 560 wide from the left margin, running over the picture's empty left side. */
   .fys-hero-copy { width: calc(680 * var(--U)); max-width: none; margin: 0; padding: calc(130 * var(--U)) 0 60px calc(120 * var(--U)); }
@@ -168,7 +176,6 @@
   .fys-pp, .fys-fan { order: 0; }
   .fys-people { grid-template-columns: calc(520 * var(--U)) minmax(0, 1fr); padding: calc(90 * var(--U)) calc(120 * var(--U)); }
   .fys-pp { width: auto; aspect-ratio: 1; margin: 0; }
-  .fys-pp-clip img { left: 3.125%; top: -17.1875%; width: 100%; }
   .fys-three { gap: 22px; margin-top: 44px; }
   .fys-three p { font-size: clamp(16px, calc(17 * var(--U)), 18px); }
   .fys-people .fys-slug { position: absolute; right: calc(48 * var(--U)); bottom: calc(40 * var(--U)); }
@@ -190,8 +197,7 @@
   .fys-line { aspect-ratio: 600 / 360; margin: 0; }
 
   .fys-close { padding: calc(80 * var(--U)) calc(120 * var(--U)) calc(110 * var(--U)); }
-  .fys-big { margin: calc(40 * var(--U)) 0 calc(110 * var(--U)); font-size: calc(220 * var(--U)); translate: none; }
-  .fys-tag { font-size: 30px; }
+  .fys-big { margin: calc(40 * var(--U)) 0 calc(70 * var(--U)); font-size: calc(220 * var(--U)); translate: none; }
   .fys-close .fys-row { flex-direction: row; justify-content: center; width: auto; max-width: none; }
 
   .fys-footer { flex-direction: row; flex-wrap: wrap; align-items: center; justify-content: space-between; padding: 32px 48px 40px; }
