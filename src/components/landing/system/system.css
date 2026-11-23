@@ -107,11 +107,15 @@
 .fys-n { flex: none; width: 2.2em; font: 500 13px/1 var(--font-jetbrains), monospace; letter-spacing: 0.12em; color: var(--coral); }
 .fys-club .fys-row { order: 6; margin-top: 30px; }
 .fys-club .fys-slug { order: 7; }
+/* Two desktop screens of the sample club, overlapping: its page, then its chat. */
 .fys-screen { position: absolute; display: block; }
-.fys-screen img { display: block; width: 100%; height: auto; border-radius: 16px; box-shadow: 0 30px 60px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(246, 241, 234, 0.08); }
-.fys-s1 { left: 2.924%; top: 8.511%; width: 49.708%; rotate: -3deg; }
-.fys-s2 { left: 52.632%; top: 0; width: 46.784%; rotate: 2.5deg; }
-.fys-s3 { left: 54.386%; top: 42.553%; width: 46.784%; rotate: -1.5deg; }
+.fys-screen img { display: block; width: 100%; height: auto; border-radius: 12px; box-shadow: 0 30px 60px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(246, 241, 234, 0.1); }
+.fys-s1 { left: 0; top: 0; width: 92%; rotate: -1.5deg; }
+.fys-s2 { left: 16%; top: 44%; width: 80%; rotate: 1.5deg; }
+/* The SAMPLE label every app picture carries (G7), on the screen's corner. */
+/* On the chat it sits in the empty corner under the events, clear of the club's name. */
+.fys-s2 .fys-sample { left: auto; top: auto; right: 12px; bottom: 10px; }
+.fys-sample { position: absolute; left: 12px; top: 10px; padding: 3px 8px 2px; border: 1px solid rgba(255, 92, 53, 0.7); border-radius: 999px; background: rgba(12, 11, 11, 0.82); font: 600 9.5px/1.2 var(--font-jetbrains), monospace; letter-spacing: 0.14em; text-transform: uppercase; color: #FF8A66; }
 
 /* ---- everything looks different ---- */
 .fys-print { position: relative; width: 100%; aspect-ratio: 4 / 5; margin-top: 30px; border-radius: 4px; box-shadow: 0 30px 60px rgba(0, 0, 0, 0.55); }
@@ -182,10 +186,11 @@
 
   .fys-club { grid-template-columns: minmax(0, 1fr) calc(520 * var(--U)); align-items: center; padding: calc(120 * var(--U)); }
   .fys-fan { aspect-ratio: 640 / 700; margin: 0; }
-  .fys-screen img { border-radius: calc(22 * var(--U)); }
-  .fys-s1 { left: 3.125%; top: 10%; width: 42.188%; }
-  .fys-s2 { left: 51.563%; top: 2.857%; width: 39.063%; }
-  .fys-s3 { left: 53.906%; top: 47.143%; width: 39.063%; }
+  .fys-screen img { border-radius: calc(16 * var(--U)); }
+  .fys-s1 { left: 0; top: 6%; width: 82%; }
+  .fys-s2 { left: 28%; top: 44%; width: 70%; }
+  .fys-sample { left: 16px; top: 14px; font-size: 10.5px; }
+  .fys-s2 .fys-sample { left: auto; top: auto; right: 16px; bottom: 14px; }
   .fys-list li { gap: 18px; font-size: clamp(16px, calc(18 * var(--U)), 19px); }
   .fys-club .fys-slug { position: absolute; right: calc(120 * var(--U)); bottom: calc(60 * var(--U)); }
 

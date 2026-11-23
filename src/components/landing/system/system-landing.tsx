@@ -52,11 +52,13 @@ const FOOTER_LINKS = [
   { href: "/support", label: "Support" },
 ] as const;
 
-/** Each SAMPLE screen in "bring your club.": its file and widths, and what it shows. */
+/**
+ * "bring your club.": two desktop screens of a sample club, Coffee & Chess (the practice copy, Nov 23, 2026;
+ * invented, with Franky's own cafe photo as its cover), cropped to the club itself. Each carries a SAMPLE label (G7).
+ */
 const SCREENS = [
-  { stem: "screen-page", w: [340, 540], dims: [700, 1316], alt: "A sample club page on Vibe, Sixty-Four Chess, with its Following and Joined buttons and its announcement board." },
-  { stem: "screen-board", w: [320, 500], dims: [700, 778], alt: "A sample club's board on Vibe: an officer's post about Blitz Night, Tonight at 7 in the Lantern Room." },
-  { stem: "screen-chat", w: [320, 500], dims: [700, 1316], alt: "A sample club chat on Vibe: members plan Blitz Night and say who's going." },
+  { stem: "club-page", dims: [2184, 1584], alt: "A sample club's page on Vibe, on a computer: Coffee & Chess, with a cafe photo as its cover, its followers and members, and Blitz Night up next." },
+  { stem: "club-chat", dims: [1944, 1642], alt: "A sample club's chat on Vibe, on a computer: members vote on what to play next week and tap Going for Blitz Night, with the club's events and Announcement Board beside it." },
 ] as const;
 
 /** The hero's sun: where it sits and how big, per layout (the board's export, art-data.ts). */
@@ -154,10 +156,13 @@ export function SystemLanding({ signupOpen }: { signupOpen: boolean }) {
         <section id="fys-club" className="fys-club" aria-labelledby="fys-club-title">
           <div className="fys-fan">
             {SCREENS.map((s, i) => (
-              <picture key={s.stem} className={`fys-screen fys-s${i + 1}`}>
-                <source type="image/avif" srcSet={`${SRC}/${s.stem}-${s.w[0]}.avif ${s.w[0]}w, ${SRC}/${s.stem}-${s.w[1]}.avif ${s.w[1]}w`} sizes="(min-width: 900px) 19vw, 48vw" />
-                <img src={`${SRC}/${s.stem}-${s.w[1]}.webp`} srcSet={`${SRC}/${s.stem}-${s.w[0]}.webp ${s.w[0]}w, ${SRC}/${s.stem}-${s.w[1]}.webp ${s.w[1]}w`} sizes="(min-width: 900px) 19vw, 48vw" width={s.dims[0]} height={s.dims[1]} alt={s.alt} loading="lazy" decoding="async" />
-              </picture>
+              <div key={s.stem} className={`fys-screen fys-s${i + 1}`}>
+                <picture>
+                  <source type="image/avif" srcSet={`${SRC}/${s.stem}-640.avif 640w, ${SRC}/${s.stem}-1120.avif 1120w`} sizes="(min-width: 900px) 34vw, 88vw" />
+                  <img src={`${SRC}/${s.stem}-1120.webp`} srcSet={`${SRC}/${s.stem}-640.webp 640w, ${SRC}/${s.stem}-1120.webp 1120w`} sizes="(min-width: 900px) 34vw, 88vw" width={s.dims[0]} height={s.dims[1]} alt={s.alt} loading="lazy" decoding="async" />
+                </picture>
+                <span className="fys-sample" aria-hidden="true">Sample</span>
+              </div>
             ))}
           </div>
           <div className="fys-col">

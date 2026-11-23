@@ -233,4 +233,4 @@ export const ART_EXTRA = {
 } as const;
 
 /** Source sizes (px) of the photos and screens. */
-export const ART_DIMS = {"screenPage":[700,1316],"screenBoard":[700,778],"screenChat":[700,1316],"otto":[520,317],"eyes":[1080,1350]} as const;
+export const ART_DIMS = {"otto":[520,317],"eyes":[1080,1350]} as const;

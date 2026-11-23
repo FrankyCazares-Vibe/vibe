@@ -42,7 +42,12 @@ First draft of the record. Franky can change any of it.
   - The picture is bigger (desktop box 1000 x 900, photo 1.2x), and "trivia, thursdays." is now "astronomy callout.".
   - It's alive: now and then a patch of dots flickers into the real photo and back, and under a mouse the dots near the pointer turn into the photo (a tap does it on a phone). With reduced motion nothing flickers by itself.
 - **Made of your people:** the planet is drawn live (`planet.tsx`, the post's recipe), with room round the coral you. People light up now and then (about one in ten coral), and the people under the pointer light up.
-- **Bring your club:** no hand notes or hand numbers. The list numbers are mono "01 02 03". The screens are still the three phone SAMPLE screens; desktop screens of an invented SAMPLE club with a cover photo are next. The SAE cover can't be used even renamed: it is the chapter's own letters.
+- **Bring your club:** no hand notes or hand numbers; the list numbers are mono "01 02 03".
+  - Two desktop screens of a sample club, **Coffee & Chess**: its page and its chat. A SAMPLE label sits on each.
+  - The club is Sixty-Four Chess renamed, so its chess posts and Blitz Night still make sense. Its cover is the top of Franky's cafe photo (no people, no screens).
+  - They were taken on the local practice copy (`tools/indy-shoot.py` and `capture-app.mjs`, which has a new desktop "org-page" shot), and the data was put back afterwards.
+  - The screens are cropped to the club itself: no side rail (Franky's profile picture shows faces), no school header, no chat list (SAE).
+  - Full shots: `vibe-marketing/campaigns/2026-11-landing-revamp/board/assets/desktop-club-*-coffee.png`. The SAE cover can't be used even renamed, because it is the chapter's own letters.
 - **See you there** replaces "everything looks different." Otto is in a round night window up in the sky, its rim breaking into dots, with one line ("it's nicer in here, honestly."). The band across the eyes and the other two notes are gone.
 - **One campus at a time:** Indianapolis and Bloomington are lit, and "your campus next?" has no arrow. The body says "Open now for IU and Purdue students."
 - **The close:** the coral full stop is drawn by the art now, so the rings are centred on it. They pass behind it and behind the letters at the back, and in front of it below the letters.
