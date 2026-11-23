@@ -45,6 +45,7 @@ export function NightSky({
   warping,
   tints = DUST_TINTS,
   shootingStars = true,
+  pinnedWarp = false,
 }: {
   lights: SkyLight[];
   links: [number, number][];
@@ -54,6 +55,8 @@ export function NightSky({
   tints?: readonly string[];
   /** A shooting star now and then. */
   shootingStars?: boolean;
+  /** The page pins this canvas over the whole screen while warping ("find your system", system.css), so the dust stops following the scroll then. */
+  pinnedWarp?: boolean;
 }) {
   const ref = useRef<HTMLCanvasElement>(null);
   const live = useRef({ activeId, warping, warpAt: 0 });
@@ -103,7 +106,7 @@ export function NightSky({
       ctx.globalCompositeOperation = "source-over";
 
       const count = Math.min(dust.length, Math.round((w * h) / 2300));
-      const cx = w / 2, cy = h * 0.42, lift = window.scrollY;
+      const cx = w / 2, cy = h * 0.42, lift = pinnedWarp && live.current.warping ? 0 : window.scrollY;
       for (let i = 0; i < count; i++) {
         const p = dust[i];
         const x = (((p.x * w + (still ? 0 : t * 0.0035 * p.z)) % w) + w) % w + px * p.z * 22;
@@ -253,7 +256,7 @@ export function NightSky({
       window.removeEventListener("pointermove", onMove);
       document.removeEventListener("visibilitychange", wake);
     };
-  }, [lights, links, tints, shootingStars]);
+  }, [lights, links, tints, shootingStars, pinnedWarp]);
 
   return <canvas ref={ref} className="vln-sky" aria-hidden="true" />;
 }

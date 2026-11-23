@@ -94,6 +94,19 @@ First draft of the record. Franky can change any of it.
 - Every headline full stop is a `.fys-stop` (in page order), and the close's sun is `.fys-orb`. Only the one it rests in shows.
 - Without JavaScript, or with reduced motion, every full stop sits in its place.
 
+## Round 10 (Nov 23, Franky's notes; investigated with a 6-agent workflow)
+- **The Log in "hyperdrive" (the warp) was broken.** The round-6 clean-up had deleted its fade rule, its dust sat under the hero picture, and buttons lower down skipped it.
+  - Night now falls over the whole page while the hero's dust, pinned over the screen, streaks outward (`.fys-root.is-warping::after`, and `.vln-sky` fixed).
+  - It plays from every Log in and Sign up button, including at the bottom. While pinned, the dust stops drifting with the scroll (NightSky `pinnedWarp`, opt-in, so the classic page is unchanged).
+  - The two places it goes are prefetched when the page loads.
+- **The circled "stray dot" was the app's own coral mouse pointer** (CustomCursor.tsx, a dot in a ring). On this page it reads as a planet, so here the pointer is the system's own. It comes back on every other page, through a `:has()` rule.
+- **Drop hardening:**
+  - The last landing, into the close's sun, now happens 8% of a screen before the very end, so it never hangs over the sun.
+  - Positions are measured without the bounce's transform.
+- **Headline texture:** "halftone fall". Every letter is solid to about the middle of its lowercase, then opens into a fine hex halftone that shrinks toward its foot, so it's no longer only p's and y's.
+  - Chosen by three judges from five tried on the live page (fine screen, halftone fall, riso shadow, ember screen, dot halo), with one judge's tweak: start lower, fade faster, wider dots.
+  - The investigation's files are in the session scratchpad (`wf/`).
+
 ## Rollback
 `LANDING=classic` in Vercel's environment brings back the Oct-Nov landing (the night sky with six lights) with no code deploy. Keep it for about a week, then delete `home-landing.tsx` and its parts if nobody misses it.
 

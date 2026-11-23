@@ -25,6 +25,9 @@ const FIRST_HOP = 1600, HOP_EVERY = 5200;
 const LAND_AT = 0.42;
 /** and rests there for this share of a screen of scrolling before it falls on. */
 const REST = 0.34;
+/** The last one, into the close's sun, lands at least this share of a screen before the page's very end (a scroll that
+ *  stops a little short, a phone's toolbar coming back), so it never hangs over the sun. */
+const END = 0.08;
 
 type Pt = { x: number; y: number; r: number };
 
@@ -43,8 +46,15 @@ export function CoralDrop() {
 
     // a full stop's ink, in the page root's own px: a headline's from the font's own measures (its <i> box is wider
     // than the dot), the close's sun from its own box
+    // a box without its own transform (the landing bounce), so a measure taken mid-bounce is still right
+    const rect = (el: HTMLElement) => {
+      const p = el.offsetParent as HTMLElement | null;
+      if (!p) return el.getBoundingClientRect();
+      const pb = p.getBoundingClientRect();
+      return { left: pb.left + p.clientLeft + el.offsetLeft, top: pb.top + p.clientTop + el.offsetTop, width: el.offsetWidth, height: el.offsetHeight };
+    };
     const ink = (el: HTMLElement): Pt => {
-      const h = host.getBoundingClientRect(), b = el.getBoundingClientRect(), x0 = b.left - h.left, y0 = b.top - h.top;
+      const h = host.getBoundingClientRect(), b = rect(el), x0 = b.left - h.left, y0 = b.top - h.top;
       if (el.classList.contains("fys-orb")) return { x: x0 + b.width / 2, y: y0 + b.height / 2, r: b.width / 2 };
       const cs = getComputedStyle(el), ctx = document.createElement("canvas").getContext("2d");
       if (!ctx) return { x: x0 + b.width / 2, y: y0 + b.height * 0.7, r: b.width * 0.35 };
@@ -59,7 +69,7 @@ export function CoralDrop() {
     const measure = () => {
       P = stops.map(ink);
       const hostY = host.getBoundingClientRect().top + window.scrollY, vh = window.innerHeight;
-      const maxScroll = Math.max(0, document.documentElement.scrollHeight - vh - 2);
+      const maxScroll = Math.max(0, document.documentElement.scrollHeight - vh - vh * END);
       L = P.map((p, i) => (i === 0 ? 0 : Math.min(maxScroll, Math.max(0, p.y + hostY - vh * LAND_AT))));
       for (let i = 1; i < L.length; i++) L[i] = Math.max(L[i], L[i - 1] + 1);
       rest = vh * REST;

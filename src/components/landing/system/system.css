@@ -26,6 +26,11 @@
 .fys-root *, .fys-root *::before, .fys-root *::after { box-sizing: border-box; }
 /* Night behind the page too (overscroll, the iPhone bars), in the app's Light theme as well. */
 :root:has(.fys-root), :root:has(.fys-root) body { background: #0C0B0B; color-scheme: dark; }
+/* The app's own pointer (CustomCursor.tsx: a coral dot in a thin ring) reads as one more full stop or planet on this
+   page, where every coral dot means something (Franky, Nov 23: "fix this"). Here the pointer is the system's own; the
+   custom one comes back on every other page by itself (it's a :has() rule). */
+:root:has(.fys-root) .vibe-cursor { display: none !important; }
+body.vibe-cursor-active:has(.fys-root), body.vibe-cursor-active:has(.fys-root) * { cursor: revert !important; }
 /* The soft coral bloom from one corner. */
 .fys-root::before { content: ""; position: absolute; left: -520px; top: -560px; width: 1400px; height: 1400px; background: radial-gradient(closest-side, rgba(255, 92, 53, 0.15), rgba(255, 92, 53, 0.05) 55%, rgba(255, 92, 53, 0)); pointer-events: none; }
 .fys-root main, .fys-root footer, .fys-bar { position: relative; }
@@ -36,23 +41,25 @@
 .fys-hl { position: relative; z-index: 5; margin: 0; font-family: var(--font-soft), "Fraunces", serif; font-weight: 900; font-variation-settings: "SOFT" 100, "opsz" 144; letter-spacing: -0.035em; word-spacing: 0.06em; line-height: 0.88; font-size: calc(64 * var(--P)); color: var(--ink); }
 .fys-hl span { display: block; white-space: nowrap; }
 .fys-hl i, .fys-big i { font-style: normal; color: var(--coral); }
-/* Texture (rounds 6 to 8, Franky: "it looks so plain", then "way too grainy"): the letters are solid nearly all the
-   way down and take a light grain only at their very foot, the hero's photo-into-dots in type. The coral full stop stays
-   solid. Each line's box is padded past its letters (the y's and p's tails, the f's hook), because background-clip: text
-   only paints inside the box: unpadded, those parts were cut off. Where background-clip: text isn't supported, the
+/* Texture (rounds 6 to 9, Franky: "plain", "way too grainy", then "only p's and y's get the dotted effect"): the
+   hero photo's photo-into-dots, in type. Every line is solid down to about the middle of its lowercase, then opens
+   into a fine hex halftone whose dots shrink toward the baseline and the tails, so every letter breaks into dots at
+   its foot while its top stays crisp. The tile is 0.045em x 1.5em (one unit = 0.01em, so the dots stay round);
+   --fys-bl, the baseline from the line's padded top, keeps it on the letters at both line heights. Each line's box is
+   padded past its letters, because background-clip: text only paints inside the box. The coral full stop stays solid.
+   Picked by a judge panel from five effects (vibe-marketing board notes, Nov 23). Without background-clip: text the
    letters are plain cream. */
 @supports ((-webkit-background-clip: text) or (background-clip: text)) {
-  /* per line (each line is a span), so every line melts at its own foot */
   .fys-hl span {
     padding: 0.16em 0.1em 0.3em;
     margin: -0.16em -0.1em -0.3em;
+    --fys-bl: 0.96em;
     color: transparent;
-    background:
-      linear-gradient(180deg, var(--ink) 0%, var(--ink) 66%, rgba(246, 241, 234, 0.7) 80%, rgba(246, 241, 234, 0.35) 94%),
-      url("/landing/system/grain-dither.png") 0 0 / 192px 192px;
+    background: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 4.5 150' preserveAspectRatio='none'><path fill='%23F6F1EA' d='M0 0V70H4.5V0ZM-2.75 70a2.75 2.75 0 1 0 5.5 0a2.75 2.75 0 1 0 -5.5 0ZM1.75 70a2.75 2.75 0 1 0 5.5 0a2.75 2.75 0 1 0 -5.5 0ZM-0.325 73.9a2.575 2.575 0 1 0 5.15 0a2.575 2.575 0 1 0 -5.15 0ZM-2.4 77.8a2.4 2.4 0 1 0 4.8 0a2.4 2.4 0 1 0 -4.8 0ZM2.1 77.8a2.4 2.4 0 1 0 4.8 0a2.4 2.4 0 1 0 -4.8 0ZM0.043 81.7a2.207 2.207 0 1 0 4.414 0a2.207 2.207 0 1 0 -4.414 0ZM-2.014 85.6a2.014 2.014 0 1 0 4.029 0a2.014 2.014 0 1 0 -4.029 0ZM2.486 85.6a2.014 2.014 0 1 0 4.029 0a2.014 2.014 0 1 0 -4.029 0ZM0.429 89.5a1.821 1.821 0 1 0 3.643 0a1.821 1.821 0 1 0 -3.643 0ZM-1.629 93.4a1.629 1.629 0 1 0 3.257 0a1.629 1.629 0 1 0 -3.257 0ZM2.871 93.4a1.629 1.629 0 1 0 3.257 0a1.629 1.629 0 1 0 -3.257 0ZM0.795 97.3a1.455 1.455 0 1 0 2.911 0a1.455 1.455 0 1 0 -2.911 0ZM-1.321 101.2a1.321 1.321 0 1 0 2.642 0a1.321 1.321 0 1 0 -2.642 0ZM3.179 101.2a1.321 1.321 0 1 0 2.642 0a1.321 1.321 0 1 0 -2.642 0ZM1.063 105.1a1.187 1.187 0 1 0 2.374 0a1.187 1.187 0 1 0 -2.374 0ZM-1.053 109a1.053 1.053 0 1 0 2.106 0a1.053 1.053 0 1 0 -2.106 0ZM3.447 109a1.053 1.053 0 1 0 2.106 0a1.053 1.053 0 1 0 -2.106 0ZM1.35 112.9a0.9 0.9 0 1 0 1.8 0a0.9 0.9 0 1 0 -1.8 0ZM-0.9 116.8a0.9 0.9 0 1 0 1.8 0a0.9 0.9 0 1 0 -1.8 0ZM3.6 116.8a0.9 0.9 0 1 0 1.8 0a0.9 0.9 0 1 0 -1.8 0ZM1.35 120.7a0.9 0.9 0 1 0 1.8 0a0.9 0.9 0 1 0 -1.8 0ZM-0.9 124.6a0.9 0.9 0 1 0 1.8 0a0.9 0.9 0 1 0 -1.8 0ZM3.6 124.6a0.9 0.9 0 1 0 1.8 0a0.9 0.9 0 1 0 -1.8 0ZM1.35 128.5a0.9 0.9 0 1 0 1.8 0a0.9 0.9 0 1 0 -1.8 0ZM-0.9 132.4a0.9 0.9 0 1 0 1.8 0a0.9 0.9 0 1 0 -1.8 0ZM3.6 132.4a0.9 0.9 0 1 0 1.8 0a0.9 0.9 0 1 0 -1.8 0ZM1.35 136.3a0.9 0.9 0 1 0 1.8 0a0.9 0.9 0 1 0 -1.8 0ZM-0.9 140.2a0.9 0.9 0 1 0 1.8 0a0.9 0.9 0 1 0 -1.8 0ZM3.6 140.2a0.9 0.9 0 1 0 1.8 0a0.9 0.9 0 1 0 -1.8 0ZM1.35 144.1a0.9 0.9 0 1 0 1.8 0a0.9 0.9 0 1 0 -1.8 0ZM-0.9 148a0.9 0.9 0 1 0 1.8 0a0.9 0.9 0 1 0 -1.8 0ZM3.6 148a0.9 0.9 0 1 0 1.8 0a0.9 0.9 0 1 0 -1.8 0ZM1.35 151.9a0.9 0.9 0 1 0 1.8 0a0.9 0.9 0 1 0 -1.8 0Z'/></svg>") 0 calc(var(--fys-bl) - 0.96em) / 0.045em 1.5em repeat-x;
     -webkit-background-clip: text;
     background-clip: text;
   }
+  .fys-hl.fys-hero-hl span { --fys-bl: 1.02em; }
 }
 .fys-hl.fys-md { font-size: calc(46 * var(--P)); }
 /* The hero's three lines (the tagline, since Nov 23): smaller, so "your people." fits a phone. */
@@ -242,7 +249,14 @@
 @keyframes fys-show { to { opacity: 1; } }
 @keyframes fys-breathe { from { opacity: 0.78; } to { opacity: 1; } }
 
-/* Leaving for sign-up: the page lets go while the dust streaks. */
+/* Leaving for log in or sign-up (system-landing.tsx): night falls over the whole page (the picture, the notes, the
+   travelling dot, the static dust) while the hero's dust, pinned over the screen above it, streaks outward
+   (night-sky.tsx). Pinned, it plays from the close's buttons too. The curtain also takes any second click. */
+.fys-root.is-warping::after { content: ""; position: fixed; inset: 0; z-index: 41; background: var(--page); animation: fys-night 0.4s ease both; }
+.fys-root.is-warping .fys-hero .vln-sky { position: fixed; inset: 0; z-index: 42; }
+:root:has(.fys-root.is-warping) .vibe-cookie-notice { opacity: 0; transition: opacity 0.3s ease; }
+@keyframes fys-night { from { opacity: 0; } }
 @media (prefers-reduced-motion: reduce) {
   .fys-btn { transition: none; }
+  .fys-root.is-warping::after { animation: none; }
 }

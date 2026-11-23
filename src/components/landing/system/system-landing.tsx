@@ -3,7 +3,7 @@
 import { KineticWordmark } from "@/components/brand/KineticWordmark";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
+import { useCallback, useEffect, useState, type CSSProperties } from "react";
 
 import { enabledSchoolSystems } from "@/lib/auth/school-email-domains";
 import { SYSTEM_LABEL } from "@/lib/iu/campuses";
@@ -90,13 +90,15 @@ export function SystemLanding({ signupOpen }: { signupOpen: boolean }) {
   // The hero's picture and its notes fade in together once the dots are drawn (system.css).
   const [drawn, setDrawn] = useState(false);
   const onDrawn = useCallback(() => setDrawn(true), []);
-  const hero = useRef<HTMLElement>(null);
+
+  // Where the warp goes, fetched ahead so the jump lands at once.
+  useEffect(() => { router.prefetch(LOGIN_HREF); if (cta.href.startsWith("/")) router.prefetch(cta.href); }, [router, cta.href]);
 
   // The warp (kept from the classic landing): any element marked
   // data-warp-trigger streaks the dust outward, then goes to its own href.
   // Capture phase so it beats Next's Link; modifier clicks still open a new
-  // tab. It goes at once with reduced motion, and when the hero is mostly
-  // off screen (the streak would play out of sight).
+  // tab. The sky is pinned over the whole screen while it plays (system.css),
+  // so it plays from the close's buttons too. It goes at once with reduced motion.
   useEffect(() => {
     function onClick(e: MouseEvent) {
       if (warping || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
@@ -107,10 +109,9 @@ export function SystemLanding({ signupOpen }: { signupOpen: boolean }) {
       const href = trigger.getAttribute("href");
       const dest = href && href.startsWith("/") ? href : LOGIN_HREF;
       const still = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-      const skyInView = (hero.current?.getBoundingClientRect().bottom ?? 0) > window.innerHeight * 0.4;
       setWarping(true);
       router.prefetch(dest);
-      window.setTimeout(() => router.push(dest), still || !skyInView ? 0 : WARP_DURATION_MS);
+      window.setTimeout(() => router.push(dest), still ? 0 : WARP_DURATION_MS);
     }
     document.addEventListener("click", onClick, true);
     return () => document.removeEventListener("click", onClick, true);
@@ -127,8 +128,8 @@ export function SystemLanding({ signupOpen }: { signupOpen: boolean }) {
       </header>
 
       <main>
-        <section ref={hero} className="fys-hero" data-wait={drawn ? undefined : ""} aria-labelledby="fys-title">
-          <NightSky lights={[]} links={[]} activeId={null} warping={warping} tints={CREAM_DUST} shootingStars={false} />
+        <section className="fys-hero" data-wait={drawn ? undefined : ""} aria-labelledby="fys-title">
+          <NightSky lights={[]} links={[]} activeId={null} warping={warping} tints={CREAM_DUST} shootingStars={false} pinnedWarp />
           <div className="fys-hero-art" role="img" aria-label="Franky at the dunes in the evening light, his photo fading out into dots that flicker back into the photo, looking up at a coral sun. His people are drawn on an orbit around him: the run club, an astronomy callout, the group chat.">
             <HeroDots onDrawn={onDrawn} />
             <span className="fys-sun" style={SUN_STYLE} />
