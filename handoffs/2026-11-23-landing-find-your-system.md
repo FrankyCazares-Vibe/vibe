@@ -107,6 +107,13 @@ First draft of the record. Franky can change any of it.
   - Chosen by three judges from five tried on the live page (fine screen, halftone fall, riso shadow, ember screen, dot halo), with one judge's tweak: start lower, fade faster, wider dots.
   - The investigation's files are in the session scratchpad (`wf/`).
 
+## Round 11 (Nov 23)
+- The hero's hover spotlight is removed (Franky). Nothing on the page follows the mouse now; the hero only breathes.
+- **The close, cleaner** (Franky: "fix the cropping, let the orange dot sit cleanly"):
+  - The rings were cut off on a desktop, for two reasons. The hand library's halo filter only reaches 120px past its drawing's box, and the rings were drawn in pieces whose ends fade, so their tips looked cropped.
+  - Each ring is now one unbroken loop, in a wider box, behind the letters and the sun. The front-layer drawing (close-front) is gone.
+  - The sun sits a hair right of the full stop (0.035em), so it never touches the "e", and on top of the rings.
+
 ## Rollback
 `LANDING=classic` in Vercel's environment brings back the Oct-Nov landing (the night sky with six lights) with no code deploy. Keep it for about a week, then delete `home-landing.tsx` and its parts if nobody misses it.
 

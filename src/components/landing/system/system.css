@@ -154,8 +154,7 @@ body.vibe-cursor-active:has(.fys-root), body.vibe-cursor-active:has(.fys-root) *
 .fys-big { isolation: isolate; }
 .fys-big i { color: transparent; }
 .fys-big .fys-close-back { z-index: -1; }
-.fys-big .fys-close-front { z-index: 1; }
-/* The sun of the close: over the letters, under the rings' front halves. */
+/* The sun of the close: over the rings and the letters, sitting clean. */
 .fys-orb { position: absolute; z-index: 0; left: calc(var(--pox) - var(--por)); top: calc(var(--poy) - var(--por)); width: calc(var(--por) * 2); aspect-ratio: 1; border-radius: 50%; background: var(--coral); transform-origin: 50% 100%; }
 
 /* ---- the coral full stop's fall (coral-drop.tsx; nothing here moves without JavaScript or with reduced motion) ----

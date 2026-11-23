@@ -16,8 +16,8 @@ import { ART_EXTRA } from "./art-data";
  * It flows (round 6, Franky's reference: a pixel figure whose edges shimmer):
  * the dots where the photo breaks up breathe, swelling and shrinking in slow
  * waves that drift across them, and a few coral dots glow in and out. Nothing
- * flickers at random. Under a mouse the dots near the pointer turn into the
- * photo (a small spotlight). Where the photo breaks up the dots are dithered:
+ * flickers at random, and nothing follows the mouse (round 11: the hover
+ * spotlight is gone). Where the photo breaks up the dots are dithered:
  * scattered off the grid and uneven in size, so the edge reads as grain.
  * With reduced motion it is still. Redrawn at most 30 times a second,
  * only while on screen; device pixel ratio capped at 2. Every edge fades out,
@@ -180,33 +180,10 @@ export function HeroDots({ onDrawn }: { onDrawn?: () => void }) {
     let gone = false, grid: Grid | null = null, scene: Scene | null = null, raf = 0, told = false, onScreen = true, last = -Infinity;
     const t0 = performance.now();
     const mask = document.createElement("canvas"), mctx = mask.getContext("2d");
-    // the pointer's lens: where it is (design px), where it eases to, and how strong it is
-    const lens = { x: 0, y: 0, tx: 0, ty: 0, a: 0, on: false };
-    const patch = document.createElement("canvas"), pctx = patch.getContext("2d");
 
     // the flow: two slow waves crossing, -1 to 1, drifting over the dots (design px, seconds)
     const wave = (time: number) => (x: number, y: number) => 0.62 * Math.sin(x * 0.043 + y * 0.017 - time * 1.5) + 0.38 * Math.sin(x * -0.019 + y * 0.052 + time * 1.05);
 
-    // one round patch of the photo, soft at the edge, laid over the dots at strength a (the pointer's lens)
-    const reveal = (S: Scene, x: number, y: number, r: number, a: number) => {
-      if (!pctx || a <= 0.002) return;
-      const R = Math.ceil(r * S.k), size = R * 2, sx = Math.round(x * S.k) - R, sy = Math.round(y * S.k) - R;
-      if (patch.width < size) { patch.width = size; patch.height = size; }
-      pctx.clearRect(0, 0, size, size);
-      pctx.globalCompositeOperation = "source-over";
-      pctx.drawImage(S.photo, sx, sy, size, size, 0, 0, size, size);
-      pctx.globalCompositeOperation = "destination-in";
-      const fade = pctx.createRadialGradient(R, R, 0, R, R, R);
-      fade.addColorStop(0, "rgba(0,0,0,1)");
-      fade.addColorStop(0.5, "rgba(0,0,0,0.92)");
-      fade.addColorStop(1, "rgba(0,0,0,0)");
-      pctx.fillStyle = fade;
-      pctx.fillRect(0, 0, size, size);
-      pctx.globalCompositeOperation = "source-over";
-      ctx.globalAlpha = a;
-      ctx.drawImage(patch, 0, 0, size, size, sx, sy, size, size);
-      ctx.globalAlpha = 1;
-    };
 
     // everything, at a moment: the photo through the dots (still ones and flowing ones), the cream dots, the coral glows
     const paint = (S: Scene, time: number, moving: boolean) => {
@@ -240,15 +217,10 @@ export function HeroDots({ onDrawn }: { onDrawn?: () => void }) {
       raf = 0;
       const S = scene;
       if (gone || !S) return;
-      const live = onScreen && !document.hidden && (!still || lens.on || lens.a > 0.01);
+      const live = onScreen && !document.hidden && !still;
       if (now - last >= FRAME_MS || !live) {
         last = now;
-        lens.x += (lens.tx - lens.x) * 0.3;
-        lens.y += (lens.ty - lens.y) * 0.3;
-        lens.a += ((lens.on ? 1 : 0) - lens.a) * 0.2;
         paint(S, (now - t0) / 1000, !still);
-        ctx.setTransform(1, 0, 0, 1, 0, 0);
-        reveal(S, lens.x, lens.y, S.L.w > 500 ? 30 : 16, lens.a);   // round 7: a small spotlight, a third of before
       }
       if (live) raf = requestAnimationFrame(frame);
     };
@@ -270,17 +242,6 @@ export function HeroDots({ onDrawn }: { onDrawn?: () => void }) {
     const sized = new ResizeObserver(() => { cancelAnimationFrame(sizeRaf); sizeRaf = requestAnimationFrame(layout); });
     const seen = new IntersectionObserver(([e]) => { onScreen = e.isIntersecting; wake(); });
 
-    // The pointer, in design px of the box: a mouse carries the lens.
-    const host = c.parentElement;
-    const move = (e: PointerEvent) => {
-      if (e.pointerType !== "mouse" || !scene) return;
-      const b = c.getBoundingClientRect(), p = [((e.clientX - b.left) / b.width) * scene.L.w, ((e.clientY - b.top) / b.height) * scene.L.h];
-      if (!lens.on && lens.a < 0.02) { lens.x = p[0]; lens.y = p[1]; }
-      lens.tx = p[0]; lens.ty = p[1]; lens.on = true; wake();
-    };
-    const leave = () => { lens.on = false; wake(); };
-    host?.addEventListener("pointermove", move);
-    host?.addEventListener("pointerleave", leave);
 
     const outline = new Image();
     outline.src = `${SRC}/dunes-outline.png`;
@@ -293,8 +254,6 @@ export function HeroDots({ onDrawn }: { onDrawn?: () => void }) {
       gone = true;
       cancelAnimationFrame(raf); cancelAnimationFrame(sizeRaf);
       sized.disconnect(); seen.disconnect();
-      host?.removeEventListener("pointermove", move);
-      host?.removeEventListener("pointerleave", leave);
       document.removeEventListener("visibilitychange", wake);
     };
   }, []);

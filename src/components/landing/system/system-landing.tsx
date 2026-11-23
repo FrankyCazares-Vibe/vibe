@@ -130,7 +130,7 @@ export function SystemLanding({ signupOpen }: { signupOpen: boolean }) {
       <main>
         <section className="fys-hero" data-wait={drawn ? undefined : ""} aria-labelledby="fys-title">
           <NightSky lights={[]} links={[]} activeId={null} warping={warping} tints={CREAM_DUST} shootingStars={false} pinnedWarp />
-          <div className="fys-hero-art" role="img" aria-label="Franky at the dunes in the evening light, his photo fading out into dots that flicker back into the photo, looking up at a coral sun. His people are drawn on an orbit around him: the run club, an astronomy callout, the group chat.">
+          <div className="fys-hero-art" role="img" aria-label="Franky at the dunes in the evening light, his photo fading out into dots that gently flow, looking up at a coral sun. His people are drawn on an orbit around him: the run club, an astronomy callout, the group chat.">
             <HeroDots onDrawn={onDrawn} />
             <span className="fys-sun" style={SUN_STYLE} />
             <Art name="hero" className="fys-hero-ink" eager />
@@ -222,8 +222,8 @@ export function SystemLanding({ signupOpen }: { signupOpen: boolean }) {
         </section>
 
         <section className="fys-close" aria-label="Sign up">
-          {/* The full stop is the sun: drawn by the art (close-front), with its rings behind it and the letters. */}
-          <span className="fys-big" aria-hidden="true"><Art name="close-back" unit="em" className="fys-close-back" />vibe<i>.</i><span className="fys-orb" style={ORB_STYLE} /><Art name="close-front" unit="em" className="fys-close-front" /></span>
+          {/* The full stop is the sun (.fys-orb), with its rings behind it and the letters (close-back). */}
+          <span className="fys-big" aria-hidden="true"><Art name="close-back" unit="em" className="fys-close-back" />vibe<i>.</i><span className="fys-orb" style={ORB_STYLE} /></span>
           <div className="fys-row">
             <a href={cta.href} data-warp-trigger className="fys-btn">{cta.label}</a>
             <a href={CLUB_HREF} className="fys-btn fys-ghost">Bring your club</a>
