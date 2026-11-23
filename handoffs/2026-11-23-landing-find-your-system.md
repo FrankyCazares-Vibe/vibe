@@ -1,5 +1,7 @@
 # The landing, rebuilt as "find your system" (Nov 23, 2026)
 
+**Shipped Nov 23, 2026, on Franky's yes ("Ship it"), as PR 5, squash-merged into main.** `LANDING=classic` in Vercel's environment brings the old landing back.
+
 First draft of the record. Franky can change any of it.
 
 ## What changed
