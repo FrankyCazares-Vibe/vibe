@@ -202,3 +202,8 @@ The idea list and its review are in `vibe-marketing/campaigns/2026-11-landing-re
   - Not checked: a real iPhone, Safari, or Android.
 
 Shipped Nov 23, 2026, on Franky's yes ("Ship both"): PR 6 (the questions, the front ring and the small fixes), then PR 7 (the drop, the wave and the faster hero), each squash-merged into main.
+
+## Crisp drawings on iPhone (Nov 23, Franky: "on mobile the drawn wording looks very low quality")
+- **Cause:** every drawing's ink had one SVG filter, the hand library's soft dark halo, there so the cream ink reads over the photo. Safari draws an SVG filter at low resolution, so on an iPhone every handwritten word and line came out blurry. In the iOS simulator: with the filter, blurry; the same file at 3x intrinsic size, still blurry; without the filter, crisp.
+- **Fix (`board/vector-halo.mjs`, run on all ten drawings):** the filter becomes a vector halo. The same ink is drawn once more underneath, in night at 62% (the filter's own tight halo), thickened by the filter's dilate radius (1.2 px on phones, 1.8 on desktop) with a non-scaling stroke. The filter's wide 22% blur goes, since it can't be drawn without a filter.
+- **Re-exports:** `export.mjs` and `export-front.mjs` in the board now run it on what they write.
