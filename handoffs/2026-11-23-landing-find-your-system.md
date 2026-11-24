@@ -259,3 +259,19 @@ Shipped Nov 23, 2026, on Franky's yes ("Ship it"), as PR 12.
   - Chrome at six scales: every rest within 1 px of its share.
 
 Shipped Nov 24, 2026, on Franky's yes ("Ship both"), as PR 14.
+
+## The collapse (Nov 23, Franky: "it moves you into another part of the solar system")
+- **The close's own little system waits, then gathers.** Near the end of the page, the close's hand-drawn rings wait faint and wide. As the coral full stop falls from "before you sign up." into the sun of "vibe.", they gather onto the sun in step with the fall, speeding up as the dot does.
+- **One drawing style all the way (`collapse-rings.tsx`):** the moving rings are the drawn rings' own centrelines, with the same wobble and tilt. The line is thin and cream, never thickens as it scales, and the planets stay round. They are placed from `ART_EXTRA.close.*.orbits` and drawn with the sun's own variables.
+- **On landing** the lines settle into the drawn ink over 0.2 s, and after that nothing runs.
+- **Scrolling back up,** the rings hold until the ink has thinned to its line, then ease out after the dot over 100 ms. A ring never shows twice.
+- **The sun's light** is its own layer now (`.fys-sunglow`), lifted out of `close-back-*.svg`.
+- **Reduced motion and no JavaScript** keep the close as it was.
+- **Measured:**
+  - Safari on the iOS simulator: the landed ink is crisp.
+  - Chrome: 40 traced take-offs at 390 and 1440 showed 0 frames with both the ink and moved rings, and 0 animation frames at rest.
+- **For a later round:**
+  - on a phone the dot's last fall crosses the four FAQ answers for about a third of a screen;
+  - on a reload or back navigation past the close, the dot falls back in (recommendation: place it in the sun at once).
+
+Shipped Nov 24, 2026, on Franky's yes ("Ship both"), as PR 15, after PR 14.

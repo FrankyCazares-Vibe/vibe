@@ -186,6 +186,38 @@ body.vibe-cursor-active:has(.fys-root), body.vibe-cursor-active:has(.fys-root) *
 .fys-ring, .fys-flare { position: absolute; z-index: -1; pointer-events: none; opacity: 0; }
 .fys-ring { left: calc(var(--pox) - 0.36em); top: calc(var(--poy) - 0.108em); width: 0.72em; height: 0.216em; border: 1.6px solid var(--ink); border-radius: 50%; rotate: -10deg; }
 .fys-flare { left: calc(var(--pox) - var(--por) * 2.6); top: calc(var(--poy) - var(--por) * 2.6); width: calc(var(--por) * 5.2); aspect-ratio: 1; border-radius: 50%; background: radial-gradient(closest-side, rgba(255, 92, 53, 0.5), rgba(255, 92, 53, 0)); }
+/* the collapse (collapse-rings.tsx): the close's own rings as lines (each ring's centreline at its own width, from the
+   board's orbit-lines.mjs) and its planets, centred on the sun, gathering onto it as the full stop falls in. Drawn only
+   from when the close is near the screen until the line has settled into ink, and never without JavaScript or with
+   reduced motion. While they move the ink waits unseen ("on", "lift"); on the landing the ink fades in as the lines fade
+   out ("home"), then the attribute goes and the close is today's. Taking off, the ink thins into the line while the
+   rings hold at home, then they move ("lift"). Only opacity. */
+.fys-orbits { display: none; position: absolute; z-index: -1; left: calc(var(--pox) - 1em); top: calc(var(--poy) - 1em); width: 2em; height: 2em; overflow: visible; pointer-events: none; }
+.fys-close[data-collapse] .fys-orbits { display: block; }
+.fys-orbits path { fill: none; stroke: var(--ink); stroke-linecap: round; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
+.fys-orbits .fys-planet { stroke-opacity: 0.95; }
+.fys-orbits-d { display: none; }
+.fys-close:is([data-collapse="on"], [data-collapse="lift"]) :is(.fys-close-back, .fys-close-front) { opacity: 0; }
+.fys-close[data-collapse="home"] .fys-orbits { opacity: 0; }
+@media (prefers-reduced-motion: no-preference) {
+  /* landing: the ink comes in quickly and the line goes evenly, so the ring never dims or doubles as it settles */
+  .fys-close[data-collapse="home"] :is(.fys-close-back, .fys-close-front) { transition: opacity 0.2s cubic-bezier(0.2, 0.7, 0.3, 1); }
+  .fys-close[data-collapse="home"] .fys-orbits { transition: opacity 0.2s linear; }
+  /* taking off: the line is up at once on the ink's own path, and the ink thins into it, gone in 0.1 s, while the rings
+     hold at home (collapse-rings.tsx LIFT_MS), so the ink has gone before the line moves */
+  .fys-close[data-collapse="lift"] :is(.fys-close-back, .fys-close-front) { transition: opacity 0.1s ease-out; }
+  .fys-close[data-collapse="lift"] .fys-orbits { transition: opacity 0.06s ease-out; }
+}
+/* the sun's light (Nov 24; the board's lift-sunglow.mjs took it out of close-back-*.svg): the drawing's own gradient,
+   under the rings. It comes from the dot: while the drop runs it shows only with the full stop in the sun, growing out
+   of it as it lands (as close-ring.tsx's flare fades) and going with it. Without JavaScript, with reduced motion and at
+   rest, it is exactly the drawing's. */
+.fys-sunglow { --a: var(--pga); --b: var(--pgb); position: absolute; z-index: -2; left: calc(var(--pgx) - var(--pgr)); top: calc(var(--pgy) - var(--pgr)); width: calc(var(--pgr) * 2); aspect-ratio: 1; pointer-events: none; background: radial-gradient(closest-side, rgba(255, 92, 53, var(--a)), rgba(255, 92, 53, var(--b)) 45%, rgba(255, 92, 53, 0)); }
+.fys-root[data-drop] .fys-orb:not([data-here]) ~ .fys-sunglow { opacity: 0; transform: scale(0.35); }
+@media (prefers-reduced-motion: no-preference) {
+  .fys-sunglow { transition: opacity 0.9s ease-out 0.15s, transform 1.1s var(--vibe-spring-soft, ease-out) 0.15s; }
+  .fys-root[data-drop] .fys-orb:not([data-here]) ~ .fys-sunglow { transition: opacity 0.25s ease-out, transform 0.25s ease-out; }
+}
 .fys-orb { position: absolute; z-index: 0; left: calc(var(--pox) - var(--por)); top: calc(var(--poy) - var(--por)); width: calc(var(--por) * 2); aspect-ratio: 1; border-radius: 50%; background: var(--coral); transform-origin: 50% 100%; }
 
 /* ---- the coral full stop's fall (coral-drop.tsx; nothing here moves without JavaScript or with reduced motion) ----
@@ -267,6 +299,10 @@ body.vibe-cursor-active:has(.fys-root), body.vibe-cursor-active:has(.fys-root) *
   .fys-big { margin: calc(40 * var(--U)) 0 calc(60 * var(--U)); font-size: calc(170 * var(--U)); translate: none; }
   .fys-orb { left: calc(var(--ox) - var(--or)); top: calc(var(--oy) - var(--or)); width: calc(var(--or) * 2); }
   .fys-ring { left: calc(var(--ox) - 0.36em); top: calc(var(--oy) - 0.108em); }
+  .fys-orbits { left: calc(var(--ox) - 1em); top: calc(var(--oy) - 1em); }
+  .fys-orbits-d { display: inline; }
+  .fys-orbits-p { display: none; }
+  .fys-sunglow { --a: var(--ga); --b: var(--gb); left: calc(var(--gx) - var(--gr)); top: calc(var(--gy) - var(--gr)); width: calc(var(--gr) * 2); }
   .fys-flare { left: calc(var(--ox) - var(--or) * 2.6); top: calc(var(--oy) - var(--or) * 2.6); width: calc(var(--or) * 5.2); }
   .fys-front { clip-path: var(--fclip); }
   .fys-close .fys-row { flex-direction: row; justify-content: center; width: auto; max-width: none; }
