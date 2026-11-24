@@ -12,7 +12,9 @@ import { SYSTEM_WIDE_QUERY } from "./hero-dots";
  * is the "find your system" post's (vibe-marketing/campaigns/2026-11-
  * instagram/find-your-system/make-art.mjs), drawn here on a canvas so it can
  * live: under a mouse the people near
- * the pointer light up (a tap does it on a phone). Nobody lights up at random
+ * the pointer light up (a tap does it on a phone). When the travelling full
+ * stop lands in "your people.", light runs out once from you through the whole
+ * crowd (Nov 23 prototype: "your people light up, starting from you"). Nobody lights up at random
  * (Franky, Nov 23: the random flicker was annoying). Paused off screen; device pixel ratio capped
  * at 2. In the post's own px: 1080 x 1350, placed in the box by
  * ART_EXTRA.planet so the drawn notes land on it.
@@ -101,6 +103,10 @@ export function Planet() {
     let m = [1, 0, 0], raf = 0, onScreen = false, gone = false;
     const sparks: Spark[] = [];
     const lens = { x: 0, y: 0, a: 0, on: false };
+    const still = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    // the wave: once per page view, from you, out to the farthest person
+    const maxD = Math.max(...lit.map((p) => Math.hypot(p.x - yx, p.y - yy)));
+    let wave: { t0: number } | null = null, waved = false;
 
     const layout = () => {
       if (!bctx) return;
@@ -142,6 +148,26 @@ export function Planet() {
         glow(ctx, p.x, p.y - 1, 11, s.coral ? "255,92,53" : "246,241,234", 0.55 * e);
         ctx.globalAlpha = e; ctx.fillStyle = s.coral ? CORAL : CREAM; ctx.beginPath(); person(ctx, p.x, p.y, p.s * 1.08); ctx.fill(); ctx.globalAlpha = 1;
       }
+      if (wave) {
+        const el = now - wave.t0, yu = el / 700;
+        let alive = yu < 1;
+        // you first: your light swells once
+        if (yu >= 0 && yu < 1) { const k = Math.sin(Math.PI * yu); glow(ctx, yx, yy, 46 * (1 + 0.4 * k), "255,92,53", 0.45 * k); }
+        // then the light runs out from you, person by person: up fast, down soft, a little bigger at its peak
+        const lights = new Map<number, [Body, number][]>();
+        for (const p of lit) {
+          const u = el - (120 + (Math.hypot(p.x - yx, p.y - yy) / maxD) * 900);
+          if (u < 0) { alive = true; continue; }
+          if (u > 380) continue;
+          alive = true;
+          const e = u < 110 ? u / 110 : 1 - (u - 110) / 270, k = Math.round(e * 17);
+          if (k > 0) (lights.get(k) ?? lights.set(k, []).get(k)!).push([p, e]);
+        }
+        ctx.fillStyle = CREAM;
+        for (const [k, g] of lights) { ctx.globalAlpha = k / 20; ctx.beginPath(); for (const [p, e] of g) person(ctx, p.x, p.y, p.s * (1 + 0.28 * e)); ctx.fill(); }
+        ctx.globalAlpha = 1;
+        if (!alive) wave = null;
+      }
       if (lens.a > 0.01) {
         ctx.fillStyle = CREAM;
         for (const p of lit) {
@@ -158,7 +184,7 @@ export function Planet() {
       raf = 0;
       if (gone) return;
       draw(now);
-      if (onScreen && !document.hidden && (sparks.length || lens.on || lens.a > 0.01)) raf = requestAnimationFrame(loop);
+      if (onScreen && !document.hidden && (sparks.length || lens.on || lens.a > 0.01 || wave)) raf = requestAnimationFrame(loop);
     };
     const wake = () => { if (!raf && onScreen && !document.hidden) raf = requestAnimationFrame(loop); };
 
@@ -170,7 +196,6 @@ export function Planet() {
     const move = (e: PointerEvent) => { if (e.pointerType !== "mouse") return; [lens.x, lens.y] = toPost(e); lens.on = true; wake(); };
     const leave = () => { lens.on = false; wake(); };
     // a tap: the people round it light up, one after another (with reduced motion, one plain fade each, no flutter)
-    const still = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     const down = (e: PointerEvent) => {
       if (e.pointerType === "mouse") return;
       const [x, y] = toPost(e), now = performance.now();
@@ -188,7 +213,19 @@ export function Planet() {
     sized.observe(c);
     seen.observe(c);
     document.addEventListener("visibilitychange", wake);
+    // start the wave when the full stop lands in "your people." (CoralDrop marks it data-here) and the planet is half on
+    // screen; without the travelling dot, when the planet is half on screen. Never with reduced motion.
+    const startWave = () => { if (waved || still) return; waved = true; wave = { t0: performance.now() }; wake(); };
+    const stop = document.querySelector("#fys-people-title .fys-stop");
+    let half = false;
+    const landed = () => !!stop && stop.hasAttribute("data-here");
+    const dropOn = () => !!document.querySelector(".fys-root[data-drop]");
+    const watch = stop ? new MutationObserver(() => { if (half && landed()) startWave(); }) : null;
+    if (stop) watch?.observe(stop, { attributes: true, attributeFilter: ["data-here"] });
+    const halfSeen = new IntersectionObserver(([e]) => { half = e.intersectionRatio >= 0.5; if (half && (landed() || !dropOn())) startWave(); }, { threshold: [0, 0.5] });
+    halfSeen.observe(c);
     return () => {
+      watch?.disconnect(); halfSeen.disconnect();
       gone = true;
       cancelAnimationFrame(raf);
       sized.disconnect(); seen.disconnect();
