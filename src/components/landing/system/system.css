@@ -184,7 +184,7 @@ body.vibe-cursor-active:has(.fys-root), body.vibe-cursor-active:has(.fys-root) *
 /* The sun of the close: over the rings and the letters, sitting clean. */
 /* the ring of light (close-ring.tsx): the inner ring's shape at -10 degrees, and a faint coral light; still and unseen until the drop lands */
 .fys-ring, .fys-flare { position: absolute; z-index: -1; pointer-events: none; opacity: 0; }
-.fys-ring { left: calc(var(--pox) - 0.36em); top: calc(var(--poy) - 0.108em); width: 0.72em; height: 0.216em; border: 1px solid var(--ink); border-radius: 50%; rotate: -10deg; }
+.fys-ring { left: calc(var(--pox) - 0.36em); top: calc(var(--poy) - 0.108em); width: 0.72em; height: 0.216em; border: 1.6px solid var(--ink); border-radius: 50%; rotate: -10deg; }
 .fys-flare { left: calc(var(--pox) - var(--por) * 2.6); top: calc(var(--poy) - var(--por) * 2.6); width: calc(var(--por) * 5.2); aspect-ratio: 1; border-radius: 50%; background: radial-gradient(closest-side, rgba(255, 92, 53, 0.5), rgba(255, 92, 53, 0)); }
 .fys-orb { position: absolute; z-index: 0; left: calc(var(--pox) - var(--por)); top: calc(var(--poy) - var(--por)); width: calc(var(--por) * 2); aspect-ratio: 1; border-radius: 50%; background: var(--coral); transform-origin: 50% 100%; }
 
