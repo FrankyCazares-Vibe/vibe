@@ -219,3 +219,5 @@ Shipped Nov 23, 2026, on Franky's yes ("Ship it"), as PR 8.
   - The "see you there." photo melts away under its dots over 700 ms (300 ms with reduced motion) instead of swapping in one frame.
   - A club screen that hasn't loaded when the page starts waits unseen and fades up 8 px into place as it arrives (500 ms; the front one 120 ms after the back one; with reduced motion, a 300 ms fade only). On a fast connection the screens are already loaded, so nothing fades.
   - Without JavaScript the screens simply show (tested).
+
+Shipped Nov 23, 2026, on Franky's yes ("Ship it"), as PR 9.
