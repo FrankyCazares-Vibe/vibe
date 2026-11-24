@@ -31,6 +31,9 @@ import { FALL, FOLLOW, leaves } from "./coral-drop";
  *   So a ring never shows twice: the ink is gone before the line leaves its path, however slow the frames. They pick
  *   that lag up over PICKUP (from still to the drop's rate, easing in), so they don't lurch out after the hold.
  *
+ * - Placed at once (coral-drop.tsx's fys-place: the page opened partway down), they're drawn straight for where the
+ *   page is: nothing at all with the drop in the sun or the close out of sight.
+ *
  * Free scrolling, no snapping. While p moves, one rAF a frame writes one transform and one opacity; once it's still,
  * nothing runs. Without JavaScript or with reduced motion the lines aren't even on the page.
  */
@@ -205,10 +208,21 @@ export function CollapseRings({ style }: { style: CSSProperties }) {
       if (!ready) { ready = true; p = goal(); }   // the first time, straight to where the page is
       kick();
     };
+    // the drop placed at once (coral-drop.tsx fys-place: a reload, a back navigation or a link opening the page partway
+    // down): straight to where the page is, with no settle and no lift; in the sun, or out of sight, the close as it is
+    const onPlace = () => {
+      if (!ready || gone) return;
+      cancelAnimationFrame(raf); raf = 0;
+      p = goal();
+      if (here() || !near()) { show(""); return; }
+      if (state !== "on") show("on");
+      paint();
+    };
     // the drop landing in the sun, or leaving it: home on its landing frame
     const landed = new MutationObserver(kick);
     landed.observe(orb, { attributes: true, attributeFilter: ["data-here"] });
     root.addEventListener("fys-measure", onMeasure);
+    root.addEventListener("fys-place", onPlace);
     window.addEventListener("scroll", kick, { passive: true });
     return () => {
       gone = true;
@@ -216,6 +230,7 @@ export function CollapseRings({ style }: { style: CSSProperties }) {
       window.clearTimeout(settleT);
       landed.disconnect();
       root.removeEventListener("fys-measure", onMeasure);
+      root.removeEventListener("fys-place", onPlace);
       window.removeEventListener("scroll", kick);
       delete close.dataset.collapse;
       g.style.transform = g.style.opacity = "";
