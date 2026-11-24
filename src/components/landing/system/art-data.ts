@@ -488,7 +488,12 @@ export const ART_EXTRA = {
         0.12
       ]
     }
+  },
+  "campuses": {
+    "desktop": [[0.0667, 0.5, 0.0233, 0.1633], [0.2267, 0.4706, 0.0183, 0.1283]],
+    "phone": [[0.076, 0.5, 0.0292, 0.2047], [0.2456, 0.4708, 0.0234, 0.1637]]
   }
+
 } as const;
 
 /** Source sizes (px) of the photos and screens. */

@@ -221,3 +221,13 @@ Shipped Nov 23, 2026, on Franky's yes ("Ship it"), as PR 8.
   - Without JavaScript the screens simply show (tested).
 
 Shipped Nov 23, 2026, on Franky's yes ("Ship it"), as PR 9.
+
+## One campus at a time, lit one at a time (Nov 23, Franky: "build the campus lighting next")
+- **The two lit campuses come out of the drawn line** (`board/lift-campuses.mjs` took their coral dots and glows out of `open-*.svg`; `export.mjs` now does it on every re-export) and are drawn by `campus-lights.tsx`, placed from `ART_EXTRA.campuses`.
+- **Until the drop lands in "at a time.",** they sit on the line as faint cream rings. When it lands, Indianapolis lights coral with a small version of the sign-in bounce, then Bloomington 260 ms later.
+- **Bloomington lights in cream, not coral,** so the full stop isn't joined by two more coral dots. That follows the dot's spec (one coral thing in a frame) and the review of motion idea 3. Before this, both campuses were coral. To switch Bloomington back, remove `fys-campus--cream` in `campus-lights.tsx`.
+- **Never left dark:**
+  - a landing further down the page lights them too (a fast flick that skips "at a time.");
+  - so does the line being 60% in view for 2.5 s.
+  - Without JavaScript, with reduced motion, or before the drop starts, they're simply lit.
+- **Tested** on a local production build at 390: calm scroll, fast flick, a pause short of the landing, reduced motion and no JavaScript all end lit, and only the calm scroll and the pause show the faint state first.
