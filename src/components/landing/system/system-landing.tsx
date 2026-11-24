@@ -18,6 +18,7 @@ import { Art } from "./art";
 import { ART_EXTRA } from "./art-data";
 import { CampusLights } from "./campus-lights";
 import { CloseRing } from "./close-ring";
+import { CollapseRings } from "./collapse-rings";
 import { CoralDrop } from "./coral-drop";
 import { DotPhoto } from "./dot-photo";
 import { HeroDots } from "./hero-dots";
@@ -120,6 +121,13 @@ const ORB_STYLE = {
   "--ox": `${ART_EXTRA.close.desktop.orb[0]}em`, "--oy": `${ART_EXTRA.close.desktop.orb[1]}em`, "--or": `${ART_EXTRA.close.desktop.orb[2]}em`,
   "--pox": `${ART_EXTRA.close.phone.orb[0]}em`, "--poy": `${ART_EXTRA.close.phone.orb[1]}em`, "--por": `${ART_EXTRA.close.phone.orb[2]}em`,
 } as CSSProperties;
+
+/** The sun's soft coral light (Nov 24; the board's lift-sunglow.mjs took it out of close-back, so it can come from the
+ *  dot): its centre, radius and light at the centre, in em, per layout; 0.35 of that light at 45%, as the board drew it. */
+const glowVars = (pre: string, [x, y, r, a]: readonly number[]) => ({
+  [`--${pre}gx`]: `${x}em`, [`--${pre}gy`]: `${y}em`, [`--${pre}gr`]: `${r}em`, [`--${pre}ga`]: `${a}`, [`--${pre}gb`]: `${+(a * 0.35).toFixed(4)}`,
+});
+const GLOW_STYLE = { ...glowVars("", ART_EXTRA.close.desktop.glow), ...glowVars("p", ART_EXTRA.close.phone.glow) } as CSSProperties;
 
 /** "see you there.": the night band across his eyes (its outline, fractions of the photo), and Otto in it. */
 const W = ART_EXTRA.window;
@@ -297,8 +305,8 @@ export function SystemLanding({ signupOpen }: { signupOpen: boolean }) {
         </section>
 
         <section className="fys-close" aria-label="Sign up">
-          {/* The full stop is the sun (.fys-orb), with its rings behind it and the letters (close-back), and the inner ring's near side over it (close-front). */}
-          <span className="fys-big" aria-hidden="true"><Art name="close-back" unit="em" className="fys-close-back" />vibe<i>.</i><span className="fys-orb" style={ORB_STYLE} /><span className="fys-front" style={FRONT_STYLE}><Art name="close-front" unit="em" className="fys-close-front" /></span><CloseRing style={ORB_STYLE} /></span>
+          {/* The full stop is the sun (.fys-orb), with its light under everything (.fys-sunglow), its rings behind it and the letters (close-back), and the inner ring's near side over it (close-front). As the full stop falls in, its system gathers onto the sun (collapse-rings.tsx). */}
+          <span className="fys-big" aria-hidden="true"><Art name="close-back" unit="em" className="fys-close-back" />vibe<i>.</i><span className="fys-orb" style={ORB_STYLE} /><span className="fys-sunglow" style={GLOW_STYLE} /><span className="fys-front" style={FRONT_STYLE}><Art name="close-front" unit="em" className="fys-close-front" /></span><CloseRing style={ORB_STYLE} /><CollapseRings style={ORB_STYLE} /></span>
           <div className="fys-row">
             <a href={cta.href} data-warp-trigger className="fys-btn">{cta.label}</a>
             <a href={CLUB_HREF} className="fys-btn fys-ghost">Bring your club</a>

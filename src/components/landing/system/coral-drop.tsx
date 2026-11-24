@@ -23,7 +23,8 @@ import { useEffect, useRef } from "react";
  * really is, mid-bounce included, so it never jumps. The bounce is the
  * sign-in dot's (system.css fys-land and fys-land-em), played with the Web
  * Animations API so a take-off can cancel it. Each landing fires `fys-land`
- * on the page root ({ index, stop, fromAbove }); the planet waits for it.
+ * on the page root ({ index, stop, fromAbove }); the planet waits for it. Each measure fires `fys-measure` ({ L, rest }:
+ * the scroll at which it lands in each stop, and how long it rests); the collapse moves with it.
  *
  * Every full stop on the page is a stop (".fys-stop", in page order, then the
  * close's ".fys-orb"). It is tied to the scroll, so it is always where the
@@ -43,6 +44,14 @@ const REST = 0.34;
 /** The last one, into the close's sun, lands at least this share of a screen before the page's very end (a scroll that
  *  stops a little short, a phone's toolbar coming back), so it never hangs over the sun. */
 const END = 0.08;
+/** It follows the scroll with a little lag (each frame it closes dt x FOLLOW of the gap, about 80 ms behind), so the fall
+ *  flows rather than jumps. The collapse (collapse-rings.tsx) follows with the same lag, so it lands with the drop. */
+export const FOLLOW = 12;
+/** Where the drop falls on from stop i, given where it lands in each (L) and how long it rests (REST of a screen, as
+ *  px): it rests for that, or half the way to the next stop if that's shorter. The collapse starts here too. */
+export const leaves = (L: readonly number[], rest: number, i: number) => L[i] + Math.min(rest, (L[i + 1] - L[i]) * 0.5);
+/** It falls like a drop: u of the way through its fall's scroll, it has come u ** FALL of the way down (slow, then fast). */
+export const FALL = 1.7;
 /** The stretch: at this falling speed (px a second) and up, the most, narrower by X and longer by Y. Kept slight. */
 const STRETCH_AT = 1800, STRETCH_X = 0.12, STRETCH_Y = 0.22;
 /** It has only left a full stop once it is this far into its fall, and no stop bounces twice within this long. */
@@ -111,6 +120,8 @@ export function CoralDrop() {
       L = P.map((p, i) => (i === 0 ? 0 : Math.min(maxScroll, Math.max(0, p.y + hostY - vh * LAND_AT))));
       for (let i = 1; i < L.length; i++) L[i] = Math.max(L[i], L[i - 1] + 1);
       rest = vh * REST;
+      // what moves with the drop (collapse-rings.tsx) hears where it lands, every time that's measured
+      host.dispatchEvent(new CustomEvent("fys-measure", { detail: { L, rest } }));
       R = Math.max(...P.map((p) => p.r));
       dot.style.width = dot.style.height = `${(R * 2).toFixed(1)}px`;
       // the glow scales with the dot: make it 16px at a headline's size, as it was
@@ -123,14 +134,14 @@ export function CoralDrop() {
     const where = () => {
       const s = window.scrollY;
       let i = 0;
-      while (i < L.length - 1 && s >= L[i + 1]) i++;
+      while (i < L.length - 1 && s >= L[i + 1] - (i + 2 === L.length ? 1 : 0)) i++;   // the sun counts as reached a pixel early (a scroll stopping a hair short)
       if (i === L.length - 1) return { i, u: 0 };
-      const span = L[i + 1] - L[i], hold = Math.min(rest, span * 0.5);
-      return { i, u: Math.min(1, Math.max(0, (s - L[i] - hold) / Math.max(1, span - hold))) };
+      const from = leaves(L, rest, i);
+      return { i, u: Math.min(1, Math.max(0, (s - from) / Math.max(1, L[i + 1] - from))) };
     };
     const spot = (i: number, u: number) => {
       const A = P[i], B = P[Math.min(P.length - 1, i + 1)], e = u * u * (3 - 2 * u);
-      return { x: A.x + (B.x - A.x) * e, y: A.y + (B.y - A.y) * Math.pow(u, 1.7), r: A.r + (B.r - A.r) * u };
+      return { x: A.x + (B.x - A.x) * e, y: A.y + (B.y - A.y) * Math.pow(u, FALL), r: A.r + (B.r - A.r) * u };
     };
 
     let here = 0, x = P[0].x, y = P[0].y, r = P[0].r, raf = 0, last = 0, gone = false, hopTimer = 0, hopsOff = false;
@@ -182,7 +193,7 @@ export function CoralDrop() {
       const dt = Math.min(0.05, (now - (last || now)) / 1000); last = now;
       const { i, u } = where(), to = spot(i, u);
       // it follows the scroll with a little lag, so the fall flows rather than jumps
-      const k = Math.min(1, dt * 12), py = y;
+      const k = Math.min(1, dt * FOLLOW), py = y;
       x += (to.x - x) * k; y += (to.y - y) * k; r += (to.r - r) * k;
       if (dt > 0) {
         vy = (y - py) / dt;
