@@ -16,6 +16,7 @@ import { NightSky } from "../night-sky";
 import { frauncesSoft, landingMono } from "../soft-font";
 import { Art } from "./art";
 import { ART_EXTRA } from "./art-data";
+import { CloseRing } from "./close-ring";
 import { CoralDrop } from "./coral-drop";
 import { DotPhoto } from "./dot-photo";
 import { HeroDots } from "./hero-dots";
@@ -135,6 +136,21 @@ export function SystemLanding({ signupOpen }: { signupOpen: boolean }) {
 
   // Where the warp goes, fetched ahead so the jump lands at once.
   useEffect(() => { router.prefetch(LOGIN_HREF); if (cta.href.startsWith("/")) router.prefetch(cta.href); }, [router, cta.href]);
+  // soft arrivals (Nov 23, motion idea 5): a club screen that hasn't loaded yet waits unseen and fades up as it arrives
+  // (system.css data-arrive). Set from here, after checking, so without JavaScript the screens simply show.
+  useEffect(() => {
+    const offs: (() => void)[] = [];
+    document.querySelectorAll<HTMLElement>(".fys-club .fys-screen").forEach((box) => {
+      const img = box.querySelector("img");
+      if (!img || img.complete) return;
+      box.dataset.arrive = "wait";
+      const done = () => { box.dataset.arrive = "in"; };
+      img.addEventListener("load", done, { once: true });
+      img.addEventListener("error", done, { once: true });
+      offs.push(() => { img.removeEventListener("load", done); img.removeEventListener("error", done); delete box.dataset.arrive; });
+    });
+    return () => offs.forEach((off) => off());
+  }, []);
 
   // The warp (kept from the classic landing): any element marked
   // data-warp-trigger streaks the dust outward, then goes to its own href.
@@ -280,7 +296,7 @@ export function SystemLanding({ signupOpen }: { signupOpen: boolean }) {
 
         <section className="fys-close" aria-label="Sign up">
           {/* The full stop is the sun (.fys-orb), with its rings behind it and the letters (close-back), and the inner ring's near side over it (close-front). */}
-          <span className="fys-big" aria-hidden="true"><Art name="close-back" unit="em" className="fys-close-back" />vibe<i>.</i><span className="fys-orb" style={ORB_STYLE} /><span className="fys-front" style={FRONT_STYLE}><Art name="close-front" unit="em" className="fys-close-front" /></span></span>
+          <span className="fys-big" aria-hidden="true"><Art name="close-back" unit="em" className="fys-close-back" />vibe<i>.</i><span className="fys-orb" style={ORB_STYLE} /><span className="fys-front" style={FRONT_STYLE}><Art name="close-front" unit="em" className="fys-close-front" /></span><CloseRing style={ORB_STYLE} /></span>
           <div className="fys-row">
             <a href={cta.href} data-warp-trigger className="fys-btn">{cta.label}</a>
             <a href={CLUB_HREF} className="fys-btn fys-ghost">Bring your club</a>

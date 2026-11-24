@@ -209,3 +209,13 @@ Shipped Nov 23, 2026, on Franky's yes ("Ship both"): PR 6 (the questions, the fr
 - **Re-exports:** `export.mjs` and `export-front.mjs` in the board now run it on what they write.
 
 Shipped Nov 23, 2026, on Franky's yes ("Ship it"), as PR 8.
+
+## The ring of light and soft arrivals (Nov 23, Franky: "build the ring of light and soft arrivals")
+- **The ring of light (`close-ring.tsx`, motion idea 6, the dot's spec: "one thin cream ring out as it lands, gone within a second"):**
+  - When the drop first lands in the sun of "vibe." from above, a 1 px cream ring in the inner ring's own shape and tilt (0.72 × 0.216 em, -10°) runs out from 0.7 to 1.5 times and fades, over 900 ms on the soft spring.
+  - A faint coral light swells behind the sun (2.6 times its radius, up to 40%) and goes.
+  - Once per visit; never on the way back up; never with reduced motion (tested: one ring on the first landing, none after scrolling up and down again, none with reduced motion).
+- **Soft arrivals (motion idea 5):**
+  - The "see you there." photo melts away under its dots over 700 ms (300 ms with reduced motion) instead of swapping in one frame.
+  - A club screen that hasn't loaded when the page starts waits unseen and fades up 8 px into place as it arrives (500 ms; the front one 120 ms after the back one; with reduced motion, a 300 ms fade only). On a fast connection the screens are already loaded, so nothing fades.
+  - Without JavaScript the screens simply show (tested).
