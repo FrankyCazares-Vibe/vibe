@@ -139,3 +139,31 @@ First draft of the record. Franky can change any of it.
 - **The dots drifting in and settling into the photo on load** (offered on the board, not built). Recommendation: only if the static fade feels flat on his phone.
 
 Franky ships on his yes. Don't merge without it.
+
+## After ship: "before you sign up." (Nov 23)
+
+Franky tried the third-party taste skill on the landing (the trial and its notes: `vibe-marketing/campaigns/2026-11-landing-revamp/taste-trial/`). He wasn't a fan, and kept three things from it: an FAQ, telling people how to add Vibe to their home screen, and the skill's checker.
+
+- **New section, before the close:** "Questions / 05", "before you sign up.", with four answers always open (no accordion):
+  - **Is there an app to download?** No download needed: Vibe runs in the browser. Then the home-screen steps, in the app's own words (`settings/notifications-card-view.ts`). Once a store listing is set, the answer points to it instead.
+  - **What does it cost?** Free for students, and so is setting up a club's page.
+  - **Who sees that I went to an event?** The club's officers. Everyone else sees only how many checked in, from 5 up (`checkinCountLine`).
+  - **How does my club get on Vibe?** Email us, and we set up the page in person.
+- **The coral full stop** now also lands in "sign up." on its way down to "vibe.".
+- **The checker, for landing previews:** run `node ~/.claude/skills/design-taste-frontend/scripts/consistency.mjs <preview url> --widths 1440,390 --profile <a temp folder>`.
+  - Read only cut text, overflow (`off-viewport`), `overlap-text` and `tap-size`. On this page all four pass.
+  - Ignore the rest. Its `spill` and `off-grid` findings on every headline come from the halftone padding (round 7), and its one-section, row-lines and scroll-motion rules are its own taste.
+  - `collide` flags only the cookie notice, a fixed banner.
+- **Checked:**
+  - `npm test` passes (4230) and the typecheck is clean.
+  - In the browser at 1440 and 375, the new section has no sideways scroll.
+- **The close's sun and its rings** (Franky: "the ring at the bottom of the orange dot should go over it, and it should be above the ring at the top").
+  - The inner ring is the only one that crosses the sun: its half-height is 0.108 of the font size, under the sun's radius of 0.116.
+  - `close-front` is that same hand-drawn stroke, copied rather than redrawn, by `board/export-front.mjs`. It has no dark outline (over coral the outline read as a smudge).
+  - The page shows it only over the sun's lower half: a half disc cut along the rings' -10° tilt (`FRONT_STYLE`). So the ring's near side runs in front of the sun and its far side behind.
+  - `export.mjs` doesn't know this piece. Re-export it with `node campaigns/2026-11-landing-revamp/board/export-front.mjs <app root>`.
+- **Three small fixes from a motion audit (Nov 23):**
+  - The front ring's clip goes from 1.08 to 1.18 times the sun's radius. The landing squash starts 1.15 times as wide, so for a moment the ring slipped behind the sun's edges.
+  - The planet's description no longer says people light up at random. That was removed in round 6.
+  - With reduced motion, a tap on the planet is one plain fade, with no 14 to 20 Hz flutter.
+- **The handoff's motion notes are out of date.** On a desktop, the night dust still leans with the mouse, and the planet lights up under it. Franky said to remove the hero's hover spotlight, which is gone. These two are still there, and they are his call.

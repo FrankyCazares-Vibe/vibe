@@ -115,6 +115,28 @@ export const ART = {
       ]
     }
   },
+  "close-front": {
+    "desktop": {
+      "w": 570,
+      "h": 319,
+      "view": [
+        0,
+        0,
+        570,
+        319
+      ]
+    },
+    "phone": {
+      "w": 259,
+      "h": 145,
+      "view": [
+        0,
+        0,
+        259,
+        145
+      ]
+    }
+  },
   "close-back": {
     "desktop": {
       "w": 570,

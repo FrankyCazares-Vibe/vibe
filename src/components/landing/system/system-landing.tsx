@@ -3,7 +3,7 @@
 import { KineticWordmark } from "@/components/brand/KineticWordmark";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useState, type CSSProperties } from "react";
+import { useCallback, useEffect, useState, type CSSProperties, type ReactNode } from "react";
 
 import { enabledSchoolSystems } from "@/lib/auth/school-email-domains";
 import { SYSTEM_LABEL } from "@/lib/iu/campuses";
@@ -27,7 +27,8 @@ import "./system.css";
  * landing board (vibe-marketing/campaigns/2026-11-landing-revamp/board,
  * hero 3): his dunes photo fading into dots, a coral sun, his people on a
  * hand-drawn orbit; then made of your people, bring your club, everything
- * looks different (Otto, once), one campus at a time, and the close.
+ * looks different (Otto, once), one campus at a time, before you sign up
+ * (the questions, Nov 23), and the close.
  *
  * The drawn art is static SVG from the board's export (art.tsx); the photo
  * in dots is a canvas (hero-dots.tsx); the dust and the warp into sign-up
@@ -64,6 +65,29 @@ const SCREENS = [
   { stem: "club-chat", dims: [1944, 1642], alt: "A made-up club's chat on Vibe, on a computer: members vote on what to play next week and tap Going for Blitz Night, with the club's events and Announcement Board beside it." },
 ] as const;
 
+/**
+ * "before you sign up.": the questions a student asks first, every answer open (no accordion). Franky kept this
+ * from the taste-skill trial (Nov 23, 2026: vibe-marketing/campaigns/2026-11-landing-revamp/taste-trial), with
+ * how to keep Vibe on a home screen, since there is nothing to download yet. The steps are the app's own
+ * (settings/notifications-card-view.ts). Once a store listing is live, the first answer points to it instead.
+ * Check-in: officers see who came; everyone else sees the count from 5 up (checkinCountLine).
+ */
+const HAS_STORE = Boolean(APP_STORE_URL || PLAY_STORE_URL);
+const FAQ: readonly { q: string; a: ReactNode }[] = [
+  {
+    q: "Is there an app to download?",
+    a: HAS_STORE
+      ? "Yes. Get it from the store link at the bottom of this page, or keep using Vibe in your browser."
+      : "No download needed: Vibe runs in your browser. To keep it on your home screen on iPhone, tap Share in Safari, then Add to Home Screen. On Android, open Chrome’s menu, then Add to Home screen.",
+  },
+  { q: "What does it cost?", a: "Nothing. Vibe is free for students, and so is setting up your club’s page with us." },
+  { q: "Who sees that I went to an event?", a: "The club’s officers. Everyone else only sees how many checked in, once five or more have." },
+  {
+    q: "How does my club get on Vibe?",
+    a: <><a href={CLUB_HREF}>Email us</a>. We’ll meet your officers in person and set up the page together.</>,
+  },
+];
+
 /** The hero's sun: where it sits and how big, per layout (the board's export, art-data.ts). */
 const { desktop: HD, phone: HP } = ART_EXTRA.hero;
 const SUN_STYLE = {
@@ -72,6 +96,24 @@ const SUN_STYLE = {
 } as CSSProperties;
 
 /** The close's coral sun, in em of the wordmark, per layout (the board's export measured it). */
+/**
+ * The near side of the sun's inner ring runs in front of it (Franky, Nov 23, after ship: "the ring at the bottom of
+ * the orange dot should go over it, and it should be above the ring at the top"). close-front is the inner ring's own
+ * stroke again (the board's export-front.mjs), shown only over the sun's lower half: a half disc cut along the rings'
+ * tilt (-10 degrees, export.html), a little wider than the sun so the two strokes meet cleanly at its edge, and wider
+ * than its squash when the drop lands (fys-land starts at 1.15 times its width), so the ring never slips behind it.
+ */
+const RING_TILT = -10;
+function frontClip([cx, cy, r]: readonly number[]): string {
+  const R = r * 1.18, pts: string[] = [];
+  for (let i = 0; i <= 12; i++) {
+    const a = ((RING_TILT + (i / 12) * 180) * Math.PI) / 180;
+    pts.push(`${(cx + R * Math.cos(a)).toFixed(4)}em ${(cy + R * Math.sin(a)).toFixed(4)}em`);
+  }
+  return `polygon(${pts.join(", ")})`;
+}
+const FRONT_STYLE = { "--fclip": frontClip(ART_EXTRA.close.desktop.orb), "--pfclip": frontClip(ART_EXTRA.close.phone.orb) } as CSSProperties;
+
 const ORB_STYLE = {
   "--ox": `${ART_EXTRA.close.desktop.orb[0]}em`, "--oy": `${ART_EXTRA.close.desktop.orb[1]}em`, "--or": `${ART_EXTRA.close.desktop.orb[2]}em`,
   "--pox": `${ART_EXTRA.close.phone.orb[0]}em`, "--poy": `${ART_EXTRA.close.phone.orb[1]}em`, "--por": `${ART_EXTRA.close.phone.orb[2]}em`,
@@ -156,7 +198,7 @@ export function SystemLanding({ signupOpen }: { signupOpen: boolean }) {
               <li><span className="fys-lab">Each other</span><p><strong>Post, follow and message</strong> the people you meet. Make your profile yours.</p></li>
             </ul>
           </div>
-          <div className="fys-pp" role="img" aria-label="A planet made of tiny people, each one a dot, with one coral person on its ring: you. Now and then someone lights up.">
+          <div className="fys-pp" role="img" aria-label="A planet made of tiny people, each one a dot, with one coral person on its ring: you.">
             <div className="fys-pp-clip"><Planet /></div>
             <Art name="people" />
           </div>
@@ -221,9 +263,24 @@ export function SystemLanding({ signupOpen }: { signupOpen: boolean }) {
           </div>
         </section>
 
+        <section className="fys-faq" aria-labelledby="fys-faq-title">
+          <div className="fys-col">
+            <p className="fys-k">Questions<b>/</b>05</p>
+            <h2 id="fys-faq-title" className="fys-hl fys-md"><span>before you</span> <span>sign up<i className="fys-stop">.</i></span></h2>
+          </div>
+          <dl className="fys-faq-list">
+            {FAQ.map((f) => (
+              <div key={f.q}>
+                <dt>{f.q}</dt>
+                <dd>{f.a}</dd>
+              </div>
+            ))}
+          </dl>
+        </section>
+
         <section className="fys-close" aria-label="Sign up">
-          {/* The full stop is the sun (.fys-orb), with its rings behind it and the letters (close-back). */}
-          <span className="fys-big" aria-hidden="true"><Art name="close-back" unit="em" className="fys-close-back" />vibe<i>.</i><span className="fys-orb" style={ORB_STYLE} /></span>
+          {/* The full stop is the sun (.fys-orb), with its rings behind it and the letters (close-back), and the inner ring's near side over it (close-front). */}
+          <span className="fys-big" aria-hidden="true"><Art name="close-back" unit="em" className="fys-close-back" />vibe<i>.</i><span className="fys-orb" style={ORB_STYLE} /><span className="fys-front" style={FRONT_STYLE}><Art name="close-front" unit="em" className="fys-close-front" /></span></span>
           <div className="fys-row">
             <a href={cta.href} data-warp-trigger className="fys-btn">{cta.label}</a>
             <a href={CLUB_HREF} className="fys-btn fys-ghost">Bring your club</a>
