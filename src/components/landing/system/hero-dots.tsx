@@ -19,8 +19,11 @@ import { ART_EXTRA } from "./art-data";
  * flickers at random, and nothing follows the mouse (round 11: the hover
  * spotlight is gone). Where the photo breaks up the dots are dithered:
  * scattered off the grid and uneven in size, so the edge reads as grain.
- * With reduced motion it is still. Redrawn at most 30 times a second,
- * only while on screen; device pixel ratio capped at 2. Every edge fades out,
+ * With reduced motion it is still. Redrawn at most 30 times a second, only
+ * while at least 30% of it is on screen, and only in the band where dots move:
+ * the still part (the photo through the still dots, and the still cream dots)
+ * is drawn once per size (Nov 23: on a phone slowed 4x the hero kept the main
+ * thread 97% busy). Device pixel ratio capped at 2, and at 1.5 on a phone. Every edge fades out,
  * so the dots never stop at a line. The photo comes from the hidden
  * <picture>, so the browser picks AVIF or WebP and the width for the screen.
  */
@@ -84,19 +87,23 @@ class Batch {
 /** One drawn size: the photo in place, the dots that hold still and the ones that flow, and a few coral glows. */
 type Scene = {
   L: Layout; k: number; w2: number; h2: number;
-  photo: HTMLCanvasElement; still: HTMLCanvasElement; stillCream: HTMLCanvasElement;
+  /** the photo in place, and the still part already composed: the photo through the still dots, then the still cream dots */
+  photo: HTMLCanvasElement; base: HTMLCanvasElement;
   holes: Batch; cream: Batch; glows: number[];
+  /** the band where dots move (device px: x, y, w, h), with room for their swell */
+  band: [number, number, number, number];
 };
 
 function canvas(w: number, h: number) { const c = document.createElement("canvas"); c.width = w; c.height = h; return c; }
 
 function build(box: DOMRect, img: HTMLImageElement, grid: Grid): Scene | null {
   const L: Layout = window.matchMedia(SYSTEM_WIDE_QUERY).matches ? ART_EXTRA.hero.desktop : ART_EXTRA.hero.phone;
-  const dpr = Math.min(window.devicePixelRatio || 1, 2), k = (box.width / L.w) * dpr;
+  const wide = window.matchMedia(SYSTEM_WIDE_QUERY).matches;
+  const dpr = Math.min(window.devicePixelRatio || 1, wide ? 2 : 1.5), k = (box.width / L.w) * dpr;
   const w2 = Math.round(box.width * dpr), h2 = Math.round(box.height * dpr);
-  const photo = canvas(w2, h2), still = canvas(w2, h2), stillCream = canvas(w2, h2);
-  const pc = photo.getContext("2d"), sc = still.getContext("2d"), cc = stillCream.getContext("2d");
-  if (!pc || !sc || !cc) return null;
+  const photo = canvas(w2, h2), still = canvas(w2, h2);
+  const pc = photo.getContext("2d"), sc = still.getContext("2d");
+  if (!pc || !sc) return null;
 
   // The photo's px -> design px: his middle (715, 830) sits at a fixed spot in the box.
   const { w: W, h: H, s } = L, ax = W * L.ax, ay = H * L.ay;
@@ -153,11 +160,29 @@ function build(box: DOMRect, img: HTMLImageElement, grid: Grid): Scene | null {
   pc.setTransform(k, 0, 0, k, 0, 0);
   pc.imageSmoothingQuality = "high";
   pc.drawImage(img, X(0), Y(0), PHOTO_W * s, PHOTO_H * s);
+  // the still part, once: the photo through the still dots, then the still cream dots over it
   sc.setTransform(k, 0, 0, k, 0, 0);
   stillHoles.fill(sc, "#fff");
-  cc.setTransform(k, 0, 0, k, 0, 0);
-  stillCreamB.fill(cc, CREAM);
-  return { L, k, w2, h2, photo, still, stillCream, holes, cream, glows };
+  sc.setTransform(1, 0, 0, 1, 0, 0);
+  sc.globalCompositeOperation = "source-in";
+  sc.drawImage(photo, 0, 0);
+  sc.globalCompositeOperation = "source-over";
+  sc.setTransform(k, 0, 0, k, 0, 0);
+  stillCreamB.fill(sc, CREAM);
+  // the band where dots move: every flowing dot and coral glow, at its biggest swell (x 1.5), in device px
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  const grow = (list: number[], step: number) => {
+    for (let i = 0; i < list.length; i += step) {
+      const m = list[i + 2] * 1.5 + 1;
+      x0 = Math.min(x0, list[i] - m); x1 = Math.max(x1, list[i] + m); y0 = Math.min(y0, list[i + 1] - m); y1 = Math.max(y1, list[i + 1] + m);
+    }
+  };
+  for (const g2 of holes.groups.values()) grow(g2, 4);
+  for (const g2 of cream.groups.values()) grow(g2, 4);
+  grow(glows, 4);
+  const bx = Math.max(0, Math.floor(x0 * k) - 2), by = Math.max(0, Math.floor(y0 * k) - 2);
+  const band: [number, number, number, number] = x1 < x0 ? [0, 0, 0, 0] : [bx, by, Math.min(w2, Math.ceil(x1 * k) + 2) - bx, Math.min(h2, Math.ceil(y1 * k) + 2) - by];
+  return { L, k, w2, h2, photo, base: still, holes, cream, glows, band };
 }
 
 const SRC = "/landing/system";
@@ -185,24 +210,28 @@ export function HeroDots({ onDrawn }: { onDrawn?: () => void }) {
     const wave = (time: number) => (x: number, y: number) => 0.62 * Math.sin(x * 0.043 + y * 0.017 - time * 1.5) + 0.38 * Math.sin(x * -0.019 + y * 0.052 + time * 1.05);
 
 
-    // everything, at a moment: the photo through the dots (still ones and flowing ones), the cream dots, the coral glows
-    const paint = (S: Scene, time: number, moving: boolean) => {
+    // one moment, in the band where dots move: the still part as composed, the photo through the flowing dots over it,
+    // the flowing cream dots, the coral glows. Outside the band the canvas keeps the still part, drawn once (full).
+    const paint = (S: Scene, time: number, moving: boolean, full = false) => {
       if (!mctx) return;
-      if (mask.width !== S.w2 || mask.height !== S.h2) { mask.width = S.w2; mask.height = S.h2; }
-      const flow = moving ? wave(time) : undefined;
-      mctx.setTransform(1, 0, 0, 1, 0, 0);
-      mctx.globalCompositeOperation = "copy";
-      mctx.drawImage(S.still, 0, 0);
-      mctx.globalCompositeOperation = "source-over";
-      mctx.setTransform(S.k, 0, 0, S.k, 0, 0);
-      S.holes.fill(mctx, "#fff", flow);
+      const [bx, by, bw, bh] = S.band;
       ctx.setTransform(1, 0, 0, 1, 0, 0);
-      ctx.globalCompositeOperation = "copy";
-      ctx.drawImage(S.photo, 0, 0);
-      ctx.globalCompositeOperation = "destination-in";
-      ctx.drawImage(mask, 0, 0);
-      ctx.globalCompositeOperation = "source-over";
-      ctx.drawImage(S.stillCream, 0, 0);
+      if (full) { ctx.clearRect(0, 0, S.w2, S.h2); ctx.drawImage(S.base, 0, 0); }
+      if (bw < 1 || bh < 1) return;
+      const flow = moving ? wave(time) : undefined;
+      // the photo through the flowing dots, on a canvas the band's size (so no compositing reaches past it)
+      if (mask.width !== bw || mask.height !== bh) { mask.width = bw; mask.height = bh; }
+      mctx.setTransform(1, 0, 0, 1, 0, 0);
+      mctx.clearRect(0, 0, bw, bh);
+      mctx.setTransform(S.k, 0, 0, S.k, -bx, -by);
+      S.holes.fill(mctx, "#fff", flow);
+      mctx.setTransform(1, 0, 0, 1, 0, 0);
+      mctx.globalCompositeOperation = "source-in";
+      mctx.drawImage(S.photo, bx, by, bw, bh, 0, 0, bw, bh);
+      mctx.globalCompositeOperation = "source-over";
+      ctx.clearRect(bx, by, bw, bh);
+      ctx.drawImage(S.base, bx, by, bw, bh, bx, by, bw, bh);
+      ctx.drawImage(mask, bx, by);
       ctx.setTransform(S.k, 0, 0, S.k, 0, 0);
       S.cream.fill(ctx, CREAM, flow);
       ctx.fillStyle = CORAL;
@@ -234,13 +263,14 @@ export function HeroDots({ onDrawn }: { onDrawn?: () => void }) {
       if (!S) return;
       scene = S;
       c.width = S.w2; c.height = S.h2;
-      paint(S, (performance.now() - t0) / 1000, !still);
+      paint(S, (performance.now() - t0) / 1000, !still, true);
       wake();
       if (!told) { told = true; drawn.current?.(); }
     };
     let sizeRaf = 0;
     const sized = new ResizeObserver(() => { cancelAnimationFrame(sizeRaf); sizeRaf = requestAnimationFrame(layout); });
-    const seen = new IntersectionObserver(([e]) => { onScreen = e.isIntersecting; wake(); });
+    // drawn only while at least 30% of it shows (the waves run on the clock, so it picks up where it would be)
+    const seen = new IntersectionObserver(([e]) => { onScreen = e.intersectionRatio >= 0.3; wake(); }, { threshold: [0, 0.3] });
 
 
     const outline = new Image();

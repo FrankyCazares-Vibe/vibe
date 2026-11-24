@@ -167,3 +167,38 @@ Franky tried the third-party taste skill on the landing (the trial and its notes
   - The planet's description no longer says people light up at random. That was removed in round 6.
   - With reduced motion, a tap on the planet is one plain fade, with no 14 to 20 Hz flutter.
 - **The handoff's motion notes are out of date.** On a desktop, the night dust still leans with the mouse, and the planet lights up under it. Franky said to remove the hero's hover spotlight, which is gone. These two are still there, and they are his call.
+
+## Motion, ideas 1 and 2 and a faster hero (Nov 23, Franky: "Yes, build 1 and 2")
+
+The idea list and its review are in `vibe-marketing/campaigns/2026-11-landing-revamp/motion-ideas/README.md`.
+
+- **1. Your people light up, starting from you (`planet.tsx`).**
+  - Trigger: the travelling full stop lands in "your people." from above (`fys-land`) while the planet is at least half on screen. Without the drop, the planet being half on screen starts it.
+  - What happens: your coral light swells once over 700 ms. Then a band of cream runs out from you through the crowd: each person starts 120 ms plus up to 900 ms by distance, lights over 140 ms, dims over 320 ms, and grows up to 1.4 times at the peak. It plays once per visit and never with reduced motion.
+  - Measured on a phone at 2x: it lifts each third of the planet by 50 to 64%, right to left, and settles in about 1.3 s.
+  - Not changed: the desktop mouse lighting and the tap flutter. Removing the mouse lighting is Franky's call.
+- **2. The full stop falls like a real drop (`coral-drop.tsx`, rewritten).**
+  - One dot of one size, moved and scaled by a transform, with no width or height writes each frame. It stretches with its speed, up to 12% narrower and 22% longer at 1800 px a second.
+  - Landings use the sign-in dot's keyframes, played with Web Animations so a take-off can cancel them. Their height scales with the fastest speed of the fall: 0.55 after a slow scroll, 1 (today's bounce) from 1200 px a second.
+  - Coming back up, it settles in (scale 0.92 to 1 over 320 ms) instead of bouncing.
+  - It takes off from where the full stop is on screen, mid-bounce included. Measured: within 1 to 2 px, against up to 0.55em before.
+  - It hands over to the full stop on the same frame, so two coral dots never show at once. A stop never bounces twice within 400 ms. Within 4% of a fall it still counts as resting, so a phone toolbar resizing the page no longer lifts it off.
+  - Each landing fires `fys-land` on `.fys-root` with `{ index, stop, fromAbove }`.
+- **A faster hero (`hero-dots.tsx`).**
+  - The still part (the photo through the still dots, and the still cream dots) is composed once per size. Each frame redraws only the band where dots move, and the flowing photo dots are made on a canvas the band's size.
+  - It pauses when less than 30% of the hero shows, and phones draw at 1.5x instead of 2x.
+  - Pixel check with reduced motion: desktop is identical (25 of 3.6M pixels differ by more than 8 levels). The phone is a little softer at 2x zoom. Nothing changes outside the band.
+- **Measured** on local production builds, on a phone at 390 with its processor slowed 4x:
+
+  | | Hero while scrolling | Frames over 33 ms | p95 |
+  |---|---|---|---|
+  | Before | 27.8 fps | 64.6% | 46.6 ms |
+  | After | 66 fps | 0% | 25.8 ms |
+
+  Desktop at 1440: the hero went from 35 to 57 fps.
+- **Checked:**
+  - `npm test` passes (4230), the typecheck is clean and the build passes. Reduced motion shows no drop and no wave, with every full stop showing.
+  - Across a scripted scroll at 390 (no screen recording), neither the old nor the new page has a frame over 100 ms. The pauses a reviewer saw in the screen recording came from the recorder itself.
+  - Not checked: a real iPhone, Safari, or Android.
+
+Shipped Nov 23, 2026, on Franky's yes ("Ship both"): PR 6 (the questions, the front ring and the small fixes), then PR 7 (the drop, the wave and the faster hero), each squash-merged into main.
