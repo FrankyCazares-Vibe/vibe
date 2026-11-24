@@ -13,8 +13,10 @@ import { SYSTEM_WIDE_QUERY } from "./hero-dots";
  * instagram/find-your-system/make-art.mjs), drawn here on a canvas so it can
  * live: under a mouse the people near
  * the pointer light up (a tap does it on a phone). When the travelling full
- * stop lands in "your people.", light runs out once from you through the whole
- * crowd (Nov 23 prototype: "your people light up, starting from you"). Nobody lights up at random
+ * stop lands in "your people." (CoralDrop's fys-land), light runs out once from
+ * you through the whole crowd (Nov 23, idea 1: "your people light up, starting
+ * from you"): your light swells, then a soft band of cream runs out by
+ * distance and settles. Never with reduced motion. Nobody lights up at random
  * (Franky, Nov 23: the random flicker was annoying). Paused off screen; device pixel ratio capped
  * at 2. In the post's own px: 1080 x 1350, placed in the box by
  * ART_EXTRA.planet so the drawn notes land on it.
@@ -158,13 +160,13 @@ export function Planet() {
         for (const p of lit) {
           const u = el - (120 + (Math.hypot(p.x - yx, p.y - yy) / maxD) * 900);
           if (u < 0) { alive = true; continue; }
-          if (u > 380) continue;
+          if (u > 460) continue;
           alive = true;
-          const e = u < 110 ? u / 110 : 1 - (u - 110) / 270, k = Math.round(e * 17);
+          const e = u < 140 ? u / 140 : 1 - (u - 140) / 320, k = Math.round(e * 20);
           if (k > 0) (lights.get(k) ?? lights.set(k, []).get(k)!).push([p, e]);
         }
         ctx.fillStyle = CREAM;
-        for (const [k, g] of lights) { ctx.globalAlpha = k / 20; ctx.beginPath(); for (const [p, e] of g) person(ctx, p.x, p.y, p.s * (1 + 0.28 * e)); ctx.fill(); }
+        for (const [k, g] of lights) { ctx.globalAlpha = k / 20; ctx.beginPath(); for (const [p, e] of g) person(ctx, p.x, p.y, p.s * (1 + 0.4 * e)); ctx.fill(); }
         ctx.globalAlpha = 1;
         if (!alive) wave = null;
       }
@@ -213,19 +215,22 @@ export function Planet() {
     sized.observe(c);
     seen.observe(c);
     document.addEventListener("visibilitychange", wake);
-    // start the wave when the full stop lands in "your people." (CoralDrop marks it data-here) and the planet is half on
-    // screen; without the travelling dot, when the planet is half on screen. Never with reduced motion.
+    // start the wave when the full stop lands in "your people." from above (CoralDrop's fys-land) and the planet is half
+    // on screen; without the travelling dot, when the planet is half on screen. Once. Never with reduced motion.
     const startWave = () => { if (waved || still) return; waved = true; wave = { t0: performance.now() }; wake(); };
-    const stop = document.querySelector("#fys-people-title .fys-stop");
-    let half = false;
-    const landed = () => !!stop && stop.hasAttribute("data-here");
-    const dropOn = () => !!document.querySelector(".fys-root[data-drop]");
-    const watch = stop ? new MutationObserver(() => { if (half && landed()) startWave(); }) : null;
-    if (stop) watch?.observe(stop, { attributes: true, attributeFilter: ["data-here"] });
-    const halfSeen = new IntersectionObserver(([e]) => { half = e.intersectionRatio >= 0.5; if (half && (landed() || !dropOn())) startWave(); }, { threshold: [0, 0.5] });
+    const root = c.closest<HTMLElement>(".fys-root"), stop = document.querySelector("#fys-people-title .fys-stop");
+    let half = false, landed = false;
+    const onLand = (e: Event) => {
+      const d = (e as CustomEvent<{ stop: Element; fromAbove: boolean }>).detail;
+      if (d.stop !== stop || !d.fromAbove) return;
+      landed = true;
+      if (half) startWave();
+    };
+    root?.addEventListener("fys-land", onLand);
+    const halfSeen = new IntersectionObserver(([e]) => { half = e.intersectionRatio >= 0.5; if (half && (landed || !root?.hasAttribute("data-drop"))) startWave(); }, { threshold: [0, 0.5] });
     halfSeen.observe(c);
     return () => {
-      watch?.disconnect(); halfSeen.disconnect();
+      root?.removeEventListener("fys-land", onLand); halfSeen.disconnect();
       gone = true;
       cancelAnimationFrame(raf);
       sized.disconnect(); seen.disconnect();

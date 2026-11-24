@@ -10,15 +10,26 @@ import { useEffect, useRef } from "react";
  * There is one coral full stop on the page, and it travels. It starts in
  * "yourself." (where it hops now and then), and as the page scrolls it drops
  * from headline to headline: "made of your people.", "bring your club.",
- * "see you there.", "one campus at a time.", and last into "vibe." as its sun.
- * At each one it lands with the sign-in dot's bounce and rests a moment as
- * that headline's full stop before falling on. Scrolling up runs it back.
+ * "see you there.", "one campus at a time.", "before you sign up." and last
+ * into "vibe." as its sun. At each one it lands with the sign-in dot's bounce
+ * and rests a moment as that headline's full stop before falling on.
+ * Scrolling up runs it back.
+ *
+ * It falls like a real drop (Nov 23, after ship, "build 1 and 2"): it
+ * stretches a little with its speed, lands harder after a fast scroll and
+ * softer after a slow one, and coming back up it settles in instead of
+ * bouncing. It hands over to the full stop on the same frame, so two coral
+ * dots never show at once. It takes off from where the full stop
+ * really is, mid-bounce included, so it never jumps. The bounce is the
+ * sign-in dot's (system.css fys-land and fys-land-em), played with the Web
+ * Animations API so a take-off can cancel it. Each landing fires `fys-land`
+ * on the page root ({ index, stop, fromAbove }); the planet waits for it.
  *
  * Every full stop on the page is a stop (".fys-stop", in page order, then the
  * close's ".fys-orb"). It is tied to the scroll, so it is always where the
  * reader is looking. Without JavaScript or with reduced motion every full
- * stop simply sits in its place. Transform only; one small element; no work
- * while it rests.
+ * stop simply sits in its place. Transform and opacity only; one small
+ * element of one size; no work while it rests.
  */
 const FIRST_HOP = 1600, HOP_EVERY = 5200;
 /** It lands when the next full stop reaches this share of the screen's height, */
@@ -28,6 +39,29 @@ const REST = 0.34;
 /** The last one, into the close's sun, lands at least this share of a screen before the page's very end (a scroll that
  *  stops a little short, a phone's toolbar coming back), so it never hangs over the sun. */
 const END = 0.08;
+/** The stretch: at this falling speed (px a second) and up, the most, narrower by X and longer by Y. Kept slight. */
+const STRETCH_AT = 1800, STRETCH_X = 0.12, STRETCH_Y = 0.22;
+/** It has only left a full stop once it is this far into its fall, and no stop bounces twice within this long. */
+const LEFT_AT = 0.04, REBOUNCE_MS = 400;
+/** How hard it lands: from this (a slow scroll) up to 1 (the sign-in dot's own bounce) at this peak speed. */
+const SOFTEST = 0.55, HARDEST_AT = 1200;
+
+const EASE = "cubic-bezier(0.3, 0.7, 0.3, 1)";
+const SNAPPY = "cubic-bezier(0.22, 1, 0.36, 1)";
+/** The sign-in dot's landing (system.css fys-land for the sun, fys-land-em for a headline's), scaled by how hard it lands. */
+function landing(orb: boolean, k: number): Keyframe[] {
+  const sq = (x: number, y: number) => `scale(${(1 + (x - 1) * k).toFixed(3)}, ${(1 + (y - 1) * k).toFixed(3)})`;
+  const up = (v: number) => `translateY(${(-v * k).toFixed(3)}${orb ? "%" : "em"})`;
+  const [h1, h2] = orb ? [95, 32] : [0.35, 0.12];
+  return [
+    { offset: 0, transform: sq(1.15, 0.72) },
+    { offset: 0.28, transform: `${up(h1)} ${sq(0.96, 1.05)}` },
+    { offset: 0.52, transform: `translateY(0) ${sq(1.08, 0.84)}` },
+    { offset: 0.68, transform: up(h2) },
+    { offset: 0.84, transform: `translateY(0) ${sq(1.03, 0.95)}` },
+    { offset: 1, transform: "none" },
+  ];
+}
 
 type Pt = { x: number; y: number; r: number };
 
@@ -63,9 +97,9 @@ export function CoralDrop() {
       const base = y0 + (b.height - (a + d)) / 2 + a;   // the content area sits centred in the box's own height
       return { x: x0 + (m.actualBoundingBoxRight - m.actualBoundingBoxLeft) / 2, y: base + (m.actualBoundingBoxDescent - m.actualBoundingBoxAscent) / 2, r: Math.max(2, (m.actualBoundingBoxRight + m.actualBoundingBoxLeft) / 2) };
     };
-    let P: Pt[] = [], L: number[] = [], rest = 0;
+    let P: Pt[] = [], L: number[] = [], rest = 0, R = 1;
     // each stop's point, and the scroll at which the dot lands there (the first at the top, the last no later than
-    // the page's end, so it can always get there)
+    // the page's end, so it can always get there); the dot is one size, the biggest stop's, scaled to each
     const measure = () => {
       P = stops.map(ink);
       const hostY = host.getBoundingClientRect().top + window.scrollY, vh = window.innerHeight;
@@ -73,6 +107,11 @@ export function CoralDrop() {
       L = P.map((p, i) => (i === 0 ? 0 : Math.min(maxScroll, Math.max(0, p.y + hostY - vh * LAND_AT))));
       for (let i = 1; i < L.length; i++) L[i] = Math.max(L[i], L[i - 1] + 1);
       rest = vh * REST;
+      R = Math.max(...P.map((p) => p.r));
+      dot.style.width = dot.style.height = `${(R * 2).toFixed(1)}px`;
+      // the glow scales with the dot: make it 16px at a headline's size, as it was
+      const head = P.length > 1 ? P[1].r : R;
+      dot.style.boxShadow = `0 0 ${((16 * R) / head).toFixed(1)}px rgba(255, 92, 53, 0.45)`;
     };
     measure();
 
@@ -90,10 +129,47 @@ export function CoralDrop() {
       return { x: A.x + (B.x - A.x) * e, y: A.y + (B.y - A.y) * Math.pow(u, 1.7), r: A.r + (B.r - A.r) * u };
     };
 
-    let here = 0, x = P[0].x, y = P[0].y, raf = 0, last = 0, gone = false, hopTimer = 0;
+    let here = 0, x = P[0].x, y = P[0].y, r = P[0].r, raf = 0, last = 0, gone = false, hopTimer = 0;
+    // its speed straight down (px a second; up is negative), the fastest it went since it last left a stop, and how
+    // stretched it is now (0 to 1, eased so it never jitters)
+    let vy = 0, peak = 0, stretch = 0;
+    const lastBounce = new Map<number, number>();
     const mark = (k: number) => { here = k; stops.forEach((el, j) => { if (j === k) el.dataset.here = ""; else delete el.dataset.here; }); };
-    const place = (r: number) => { dot.style.transform = `translate3d(${(x - r).toFixed(1)}px, ${(y - r).toFixed(1)}px, 0)`; dot.style.width = dot.style.height = `${(r * 2).toFixed(1)}px`; };
-    const bounce = (el: HTMLElement) => { el.classList.remove("is-bouncing"); void el.offsetWidth; el.classList.add("is-bouncing"); };
+    const place = () => {
+      const k = r / R, sx = k * (1 - STRETCH_X * stretch), sy = k * (1 + STRETCH_Y * stretch);
+      dot.style.transform = `translate3d(${(x - R).toFixed(1)}px, ${(y - R).toFixed(1)}px, 0) scale(${sx.toFixed(3)}, ${sy.toFixed(3)})`;
+    };
+    // a full stop's motion: the landing bounce (Web Animations, so it can be cancelled), or the hero's hop (a class)
+    const still = (el: HTMLElement) => { el.getAnimations().forEach((a) => a.cancel()); el.classList.remove("is-bouncing"); };
+    const hopNow = (el: HTMLElement) => { el.classList.remove("is-bouncing"); void el.offsetWidth; el.classList.add("is-bouncing"); };
+    const show = () => { dot.style.opacity = "1"; };
+    // landing: the dot hands over to the full stop on the same frame (never two coral dots at once)
+    const land = (i: number) => {
+      const el = stops[i], fromAbove = vy >= 0, now = performance.now();
+      stretch = 0; place();
+      dot.style.opacity = "0";
+      mark(i);
+      if (i === 0) { window.clearTimeout(hopTimer); hopTimer = window.setTimeout(hop, HOP_EVERY); }   // home: the next hop waits
+      if (now - (lastBounce.get(i) ?? -Infinity) >= REBOUNCE_MS) {
+        lastBounce.set(i, now);
+        still(el);
+        if (fromAbove) el.animate(landing(el.classList.contains("fys-orb"), SOFTEST + (1 - SOFTEST) * Math.min(1, peak / HARDEST_AT)), { duration: 950, easing: EASE });
+        else el.animate([{ transform: "scale(0.92)" }, { transform: "none" }], { duration: 320, easing: SNAPPY });   // up from below: it settles in
+        host.dispatchEvent(new CustomEvent("fys-land", { detail: { index: i, stop: el, fromAbove } }));
+      }
+      peak = 0; stretch = 0; vy = 0;
+    };
+    // leaving a full stop: start from where it really is on screen, mid-bounce included, and stop its bounce
+    const takeOff = () => {
+      const el = stops[here], seen = el.getBoundingClientRect(), at = rect(el);
+      x = P[here].x + (seen.left + seen.width / 2 - (at.left + at.width / 2));
+      y = P[here].y + (seen.top + seen.height / 2 - (at.top + at.height / 2));
+      r = P[here].r;
+      still(el);
+      mark(-1);
+      show();
+      place();
+    };
     mark(0);
 
     const tick = (now: number) => {
@@ -102,31 +178,33 @@ export function CoralDrop() {
       const dt = Math.min(0.05, (now - (last || now)) / 1000); last = now;
       const { i, u } = where(), to = spot(i, u);
       // it follows the scroll with a little lag, so the fall flows rather than jumps
-      const k = Math.min(1, dt * 12);
-      x += (to.x - x) * k; y += (to.y - y) * k;
+      const k = Math.min(1, dt * 12), py = y;
+      x += (to.x - x) * k; y += (to.y - y) * k; r += (to.r - r) * k;
+      if (dt > 0) {
+        vy = (y - py) / dt;
+        peak = Math.max(peak, Math.abs(vy));
+        stretch += (Math.min(1, Math.abs(vy) / STRETCH_AT) - stretch) * Math.min(1, dt * 20);
+      }
       // close enough: it settles into the stop (so a steady scroll still lands it in each headline)
-      if (u === 0 && Math.hypot(P[i].x - x, P[i].y - y) < Math.max(4, P[i].r * 1.5)) {
-        x = P[i].x; y = P[i].y;
-        // landed: the dot becomes that stop's full stop again, with a bounce (not when it simply rests at home)
-        dot.style.opacity = "0";
-        if (here !== i) { mark(i); bounce(stops[i]); }
+      if (u <= LEFT_AT && Math.hypot(P[i].x - x, P[i].y - y) < Math.max(4, P[i].r * 1.5)) {
+        x = P[i].x; y = P[i].y; r = P[i].r;
+        if (here !== i) land(i);
         return;
       }
-      if (here !== -1) { mark(-1); dot.style.opacity = "1"; }
-      place(to.r);
+      if (here !== -1) takeOff();
+      place();
       raf = requestAnimationFrame(tick);
     };
     const go = () => { if (!raf && !gone) { last = 0; raf = requestAnimationFrame(tick); } };
 
     const onScroll = () => {
       const { i, u } = where();
-      if (here !== -1 && i === here && u === 0) return;   // resting where it is
-      if (here !== -1) { x = P[here].x; y = P[here].y; place(P[here].r); }
+      if (here !== -1 && i === here && u <= LEFT_AT) return;   // still resting where it is (a hair of scroll is no take-off)
       go();
     };
-    const onResize = () => { measure(); if (here !== -1) { x = P[here].x; y = P[here].y; } go(); };
+    const onResize = () => { measure(); if (here !== -1) { x = P[here].x; y = P[here].y; r = P[here].r; } go(); };
     // at home, a hop now and then, while the headline is in view
-    const hop = () => { if (here === 0 && !document.hidden && stops[0].getBoundingClientRect().bottom > 0) bounce(stops[0]); hopTimer = window.setTimeout(hop, HOP_EVERY); };
+    const hop = () => { if (here === 0 && !document.hidden && stops[0].getBoundingClientRect().bottom > 0) hopNow(stops[0]); hopTimer = window.setTimeout(hop, HOP_EVERY); };
     hopTimer = window.setTimeout(hop, FIRST_HOP);
     window.addEventListener("scroll", onScroll, { passive: true });
     window.addEventListener("resize", onResize);
@@ -145,7 +223,7 @@ export function CoralDrop() {
       window.removeEventListener("resize", onResize);
       window.removeEventListener("load", onResize);
       sized.disconnect();
-      stops.forEach((el) => { delete el.dataset.here; el.classList.remove("is-bouncing"); });
+      stops.forEach((el) => { delete el.dataset.here; still(el); });
       dot.remove();
       delete host.dataset.drop;
     };
