@@ -164,12 +164,10 @@ body.vibe-cursor-active:has(.fys-root), body.vibe-cursor-active:has(.fys-root) *
 .fys-window img { display: block; width: 100%; height: auto; }
 /* ---- one campus at a time ---- */
 .fys-line { position: relative; width: 100%; aspect-ratio: 342 / 240; margin-top: 30px; }
-/* the two lit campuses (campus-lights.tsx): a soft light round a dot, Indianapolis coral, Bloomington cream; faint rings
+/* the two lit campuses (campus-lights.tsx): a soft coral light round a coral dot; faint rings
    until the drop lands in "at a time." (only while the drop runs: no JavaScript or reduced motion shows them lit) */
 .fys-campus { position: absolute; z-index: 3; left: var(--pcx); top: var(--pcy); width: calc(var(--pcg) * 2); aspect-ratio: 1; translate: -50% -50%; border-radius: 50%; pointer-events: none; background: radial-gradient(closest-side, rgba(255, 92, 53, 0.42), rgba(255, 92, 53, 0.147) 45%, rgba(255, 92, 53, 0)); }
 .fys-campus-dot { position: absolute; left: 50%; top: 50%; width: 14.27%; aspect-ratio: 1; translate: -50% -50%; border-radius: 50%; background: var(--coral); }
-.fys-campus--cream { background: radial-gradient(closest-side, rgba(246, 241, 234, 0.26), rgba(246, 241, 234, 0.09) 45%, rgba(246, 241, 234, 0)); }
-.fys-campus--cream .fys-campus-dot { background: var(--ink); }
 .fys-root[data-drop] .fys-line:not([data-lit]) .fys-campus { background: none; }
 .fys-root[data-drop] .fys-line:not([data-lit]) .fys-campus-dot { background: none; box-shadow: inset 0 0 0 1px rgba(246, 241, 234, 0.4); }
 

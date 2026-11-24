@@ -8,8 +8,8 @@ import { ART_EXTRA } from "./art-data";
  * "one campus at a time." lights one at a time (Nov 23, motion idea 3; Franky: "build the campus lighting next"). The
  * two lit campuses on the drawn line (the board's lift-campuses.mjs took them out of open-*.svg) are drawn here: until
  * the travelling full stop lands in "at a time.", they sit on the line as faint cream rings; when it lands, Indianapolis
- * lights first, coral, with the sign-in dot's little bounce, then Bloomington a beat later in cream, so the full stop
- * isn't joined by two more coral dots (the dot's spec: one coral thing in a frame). Once lit they stay lit.
+ * lights first, coral, with the sign-in dot's little bounce, then Bloomington a beat later, coral too (Franky, Nov 23:
+ * "ship it in coral"). Once lit they stay lit.
  *
  * Never left dark: a landing further down the page lights them too (a fast scroll that skips "at a time."), and so does
  * the line being well in view for a moment. Without JavaScript, with reduced motion, or before the drop starts, they're
@@ -58,7 +58,7 @@ export function CampusLights() {
   return (
     <>
       <span ref={home} className="fys-campus" style={place(0)} aria-hidden="true"><span className="fys-campus-dot" /></span>
-      <span ref={next} className="fys-campus fys-campus--cream" style={place(1)} aria-hidden="true"><span className="fys-campus-dot" /></span>
+      <span ref={next} className="fys-campus" style={place(1)} aria-hidden="true"><span className="fys-campus-dot" /></span>
     </>
   );
 }
