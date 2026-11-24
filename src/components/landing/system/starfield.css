@@ -1,0 +1,31 @@
+/* The starfield camera (starfield.tsx). While it runs, the page's dust is three boxes instead of the root's two tiles:
+   far, mid and near, each fixed behind everything (z-index -1: under the words, the art and the corner's bloom, as the
+   dust is today), each moved up by its share of the scroll in a loop of 877 px. Each holds that depth's stars (made by
+   the board's starfield-split.mjs) where today's two tiles put them, repeating every 877 px: the 877 tile as today, and
+   the 613 tile at 0, 877, 1754... with its top 264 px (-top) right under each, at 613, 1490... So the page's first
+   877 px are today's, star for star. A box is the screen plus one loop tall, or less when the whole scroll moves it
+   less (--fys-sf-travel, set by starfield.tsx); four rows of the 613 tile cover a screen up to 2631 px tall.
+   Without JavaScript or with reduced motion none of this applies and the dust is today's two tiles.
+   Behind the boxes is only the page's night (html's background, system.css): the root and the body step aside. */
+.fys-root[data-starfield] { background: none; }
+:root:has(.fys-root[data-starfield]) body { background: none; }
+.fys-sf {
+  position: fixed; left: 0; top: 0; z-index: -1; width: 100%;
+  height: calc(100vh + var(--fys-sf-travel, 877px)); height: calc(100lvh + var(--fys-sf-travel, 877px));
+  pointer-events: none; contain: strict; will-change: transform;
+  background-image: var(--fys-sf-a), var(--fys-sf-a), var(--fys-sf-a), var(--fys-sf-a), var(--fys-sf-t), var(--fys-sf-t), var(--fys-sf-t), var(--fys-sf-t), var(--fys-sf-b);
+  background-position: 0 0, 0 877px, 0 1754px, 0 2631px, 0 613px, 0 1490px, 0 2367px, 0 3244px, 211px 97px;
+  background-size: 613px 613px, 613px 613px, 613px 613px, 613px 613px, 613px 264px, 613px 264px, 613px 264px, 613px 264px, 877px 877px;
+  background-repeat: repeat-x, repeat-x, repeat-x, repeat-x, repeat-x, repeat-x, repeat-x, repeat-x, repeat;
+}
+.fys-sf-far { --fys-sf-a: url("/landing/system/starfield-far-613.svg"); --fys-sf-t: url("/landing/system/starfield-far-613-top.svg"); --fys-sf-b: url("/landing/system/starfield-far-877.svg"); }
+.fys-sf-mid { --fys-sf-a: url("/landing/system/starfield-mid-613.svg"); --fys-sf-t: url("/landing/system/starfield-mid-613-top.svg"); --fys-sf-b: url("/landing/system/starfield-mid-877.svg"); }
+.fys-sf-near { --fys-sf-a: url("/landing/system/starfield-near-613.svg"); --fys-sf-t: url("/landing/system/starfield-near-613-top.svg"); --fys-sf-b: url("/landing/system/starfield-near-877.svg"); }
+/* Moved by the scroll itself, off the main thread, where the browser can (Chrome 115+, Safari 26+). starfield.tsx sets
+   how many loops the whole scroll is, the loop (--fys-sf-loop: 877 px, or just under it where 877 x the screen's scale
+   isn't a whole number of screen pixels) and steps of exactly one screen pixel, so the stars rest on whole pixels at
+   any scale. */
+@supports (animation-timeline: scroll()) {
+  .fys-sf { animation-name: fys-sf; animation-duration: auto; animation-timing-function: linear; animation-fill-mode: both; animation-timeline: scroll(root block); }
+}
+@keyframes fys-sf { from { transform: translate3d(0, 0, 0); } to { transform: translate3d(0, calc(0px - var(--fys-sf-loop, 877px)), 0); } }
