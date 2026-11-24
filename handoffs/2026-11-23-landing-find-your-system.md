@@ -239,3 +239,10 @@ Shipped Nov 23, 2026, on Franky's yes ("yes ship it in coral"), as PR 10.
 - Still once per visit, never on the way up, and never with reduced motion (tested).
 
 Shipped Nov 23, 2026, on Franky's yes ("Ship it"), as PR 11.
+
+## The hero arrives in one order (Nov 23, Franky: "build the hero arrival order next", motion idea 7)
+- **The order:** the logo's dot lands (done by about 1.4 s), the photo fades into dots, the sun comes up 0.25 s later, and the notes 0.15 s after the sun. Only then does the full stop in "yourself." hop: 0.9 s after the picture is in, and never before 1.8 s. So two coral bounces never fire at once.
+- **The hop:** every 7 s (was 5.2 s) for as long as the reader stays at the top, then never again once they scroll. The taste review said to keep it hopping until a scroll rather than cap it.
+- **A slow photo:** after 3 s the sun and the notes fade in anyway over 0.6 s, in the same order (they used to snap on). The first hop then waits 0.9 s more. The words never wait.
+- **Reduced motion:** everything is still and shows at once, and the picture fades in over 0.3 s once drawn instead of popping in.
+- **Measured** in a browser at 390 (production build): picture visible 0.6 s, sun 0.8 s, notes 1.0 s, first hop 2.1 s, then every 7 s. A scroll at 5 s stopped the hops. With the photo 5 s late: sun 3.6 s, notes 3.7 s, first hop 4.4 s. Reduced motion: no hops, sun and notes at once.

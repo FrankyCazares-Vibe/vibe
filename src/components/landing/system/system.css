@@ -277,11 +277,16 @@ body.vibe-cursor-active:has(.fys-root), body.vibe-cursor-active:has(.fys-root) *
 
 /* ---- motion: the hero's one moment, then calm. Springs (globals.css --vibe-spring-soft), transform and opacity only. ---- */
 @media (prefers-reduced-motion: no-preference) {
+  /* One order (Nov 23, motion idea 7): the picture fades into dots, the sun comes up 0.25 s later, the notes 0.15 s after
+     the sun; the full stop in "yourself." hops only after all of it (coral-drop.tsx). The words never wait. */
   .fys-dots { transition: opacity 1.1s var(--vibe-spring-soft, ease-out), transform 1.4s var(--vibe-spring-soft, ease-out); }
-  .fys-hero-ink, .fys-sun { transition: opacity 0.9s var(--vibe-spring-soft, ease-out) 0.25s; }
-  /* Until the dots are drawn (system-landing.tsx clears data-wait), the picture waits; after 3s it shows anyway. */
+  .fys-sun { transition: opacity 0.9s var(--vibe-spring-soft, ease-out) 0.25s; }
+  .fys-hero-ink { transition: opacity 0.9s var(--vibe-spring-soft, ease-out) 0.4s; }
+  /* Until the dots are drawn (system-landing.tsx clears data-wait), the picture waits; after 3 s the sun and the notes
+     fade in anyway, in the same order (a fade, never a snap) */
   .fys-hero[data-wait] .fys-dots { opacity: 0; transform: scale(1.02); }
-  .fys-hero[data-wait] .fys-hero-ink, .fys-hero[data-wait] .fys-sun { opacity: 0; animation: fys-show 0.01s linear 3s forwards; }
+  .fys-hero[data-wait] .fys-sun { opacity: 0; animation: fys-show 0.6s var(--vibe-spring-soft, ease-out) 3s forwards; }
+  .fys-hero[data-wait] .fys-hero-ink { opacity: 0; animation: fys-show 0.6s var(--vibe-spring-soft, ease-out) 3.15s forwards; }
   /* The sun's light breathes, slowly. */
   .fys-sun::before { animation: fys-breathe 6s ease-in-out infinite alternate; }
 }
@@ -298,4 +303,7 @@ body.vibe-cursor-active:has(.fys-root), body.vibe-cursor-active:has(.fys-root) *
 @media (prefers-reduced-motion: reduce) {
   .fys-btn { transition: none; }
   .fys-root.is-warping::after { animation: none; }
+  /* still, but the picture fades in once it's drawn (300 ms, opacity only) instead of popping in */
+  .fys-dots { transition: opacity 0.3s ease-out; }
+  .fys-hero[data-wait] .fys-dots { opacity: 0; }
 }
