@@ -248,3 +248,14 @@ Shipped Nov 23, 2026, on Franky's yes ("Ship it"), as PR 11.
 - **Measured** in a browser at 390 (production build): picture visible 0.6 s, sun 0.8 s, notes 1.0 s, first hop 2.1 s, then every 7 s. A scroll at 5 s stopped the hops. With the photo 5 s late: sun 3.6 s, notes 3.7 s, first hop 4.4 s. Reduced motion: no hops, sun and notes at once.
 
 Shipped Nov 23, 2026, on Franky's yes ("Ship it"), as PR 12.
+
+## The starfield camera (Nov 23, Franky: "every time you scroll, your scroll is meaningful… it moves you into another part of the solar system")
+- **The dust gets depth.** The stars are the same as before, split by brightness into three depths. Far moves at 6% of the scroll, mid at 30% and near at 70%, while the words move at 100%. Scrolling now reads as travelling through the sky.
+- **How it moves (`starfield.tsx`, `starfield.css`):** each depth is one box of SVG tiles (`public/landing/system/starfield-*.svg`), moved whole by a CSS scroll-driven animation in steps of one screen pixel, so the stars rest sharp. Firefox gets one passive scroll listener instead. Nothing runs at rest.
+- **The switch at load is unseen.** In the first 877 px every star sits where the old tiles put it. Taller windows and pages loaded partway down switch on the first scroll. At fractional scales (Windows at 125% or 150%) a few stars are redrawn a fraction of a pixel differently.
+- **Reduced motion and no JavaScript** keep the old dust.
+- **Measured:**
+  - Safari on the iOS simulator at 3x: 6%, 30% and 70% exactly, and sharp at rest.
+  - Chrome at six scales: every rest within 1 px of its share.
+
+Shipped Nov 24, 2026, on Franky's yes ("Ship both"), as PR 14.
