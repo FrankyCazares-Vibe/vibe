@@ -23,6 +23,7 @@ import { CoralDrop } from "./coral-drop";
 import { DotPhoto } from "./dot-photo";
 import { HeroDots } from "./hero-dots";
 import { Planet } from "./planet";
+import { Starfield } from "./starfield";
 import "./system.css";
 
 /**
@@ -319,6 +320,8 @@ export function SystemLanding({ signupOpen }: { signupOpen: boolean }) {
       {/* No data-warp-trigger in the footer: the warp would hijack these links. */}
       {/* the coral full stop: one dot that drops from headline to headline as the page scrolls, down into "vibe." */}
       <CoralDrop />
+      {/* the starfield camera: the dust behind the page in three depths, moving with the scroll (starfield.tsx) */}
+      <Starfield />
       <footer className="fys-footer">
         <span>© CONNECTVIBE. LLC</span>
         <nav aria-label="Legal and support">
