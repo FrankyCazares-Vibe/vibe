@@ -48,9 +48,13 @@ body.vibe-cursor-active:has(.fys-root), body.vibe-cursor-active:has(.fys-root) *
    --fys-bl, the baseline from the line's padded top, keeps it on the letters at both line heights. Each line's box is
    padded past its letters, because background-clip: text only paints inside the box. The coral full stop stays solid.
    Picked by a judge panel from five effects (vibe-marketing board notes, Nov 23). Without background-clip: text the
-   letters are plain cream. */
+   letters are plain cream.
+   Only where dots are the point (Nov 23, Franky: "I'm not sure if I like all of them having the dots. I feel like they
+   need some differentiation"): the hero ("yourself.", where the photo breaks into dots) and "made of your people."
+   (the planet of dots). Every other headline is solid cream with its coral full stop, so the dotted ones mean
+   something. */
 @supports ((-webkit-background-clip: text) or (background-clip: text)) {
-  .fys-hl span {
+  :is(.fys-hero-hl, #fys-people-title) span {
     padding: 0.16em 0.1em 0.3em;
     margin: -0.16em -0.1em -0.3em;
     --fys-bl: 0.96em;

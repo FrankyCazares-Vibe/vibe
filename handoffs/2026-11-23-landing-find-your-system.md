@@ -275,3 +275,10 @@ Shipped Nov 24, 2026, on Franky's yes ("Ship both"), as PR 14.
   - on a reload or back navigation past the close, the dot falls back in (recommendation: place it in the sun at once).
 
 Shipped Nov 24, 2026, on Franky's yes ("Ship both"), as PR 15, after PR 14.
+
+## Headlines: dots only where they mean something (Nov 23, Franky: "I'm not sure if I like all of them having the dots. I feel like they need some differentiation")
+- The halftone texture stays on the hero ("your campus. your people. yourself.", where the photo breaks into dots) and on "made of your people." (the planet of dots).
+- "bring your club.", "see you there.", "one campus at a time." and "before you sign up." are solid cream with their coral full stop.
+- One selector in `system.css`: `:is(.fys-hero-hl, #fys-people-title) span`. The layout doesn't move, since the padding and its cancelling margin go together.
+
+Shipped Nov 24, 2026, on Franky's yes ("Ship it"), as PR 13.
