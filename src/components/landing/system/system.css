@@ -147,6 +147,17 @@ body.vibe-cursor-active:has(.fys-root), body.vibe-cursor-active:has(.fys-root) *
 .fys-dotphoto img { display: block; width: 100%; height: 100%; object-fit: cover; }
 .fys-dotphoto canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
 .fys-dotphoto[data-dotted] img { opacity: 0; }
+/* soft arrivals (Nov 23): the plain photo melts away under its dots ("make it fade into dots"), and a club screen that
+   loads late fades up into place, the front one a beat after the back one (system-landing.tsx sets data-arrive) */
+.fys-dotphoto img { transition: opacity 700ms var(--vibe-spring-soft, ease-out); }
+.fys-screen[data-arrive="wait"] { opacity: 0; translate: 0 8px; }
+.fys-screen[data-arrive="in"] { transition: opacity 500ms var(--vibe-spring-soft, ease-out), translate 500ms var(--vibe-spring-soft, ease-out); }
+.fys-s2[data-arrive="in"] { transition-delay: 120ms; }
+@media (prefers-reduced-motion: reduce) {
+  .fys-dotphoto img { transition-duration: 300ms; }
+  .fys-screen[data-arrive="wait"] { translate: none; }
+  .fys-screen[data-arrive="in"] { transition: opacity 300ms ease-out; }
+}
 /* Otto, in the night band across the eyes: clipped to the band's outline (the band and its frayed, dotted edge are the eyes-window drawing under him). */
 .fys-window { position: absolute; inset: 0; z-index: 4; pointer-events: none; }
 .fys-window picture { position: absolute; display: block; filter: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.5)); }
@@ -165,6 +176,10 @@ body.vibe-cursor-active:has(.fys-root), body.vibe-cursor-active:has(.fys-root) *
 /* the inner ring's near side, over the sun's lower half only (FRONT_STYLE in system-landing.tsx) */
 .fys-front { position: absolute; inset: 0; z-index: 1; pointer-events: none; clip-path: var(--pfclip); }
 /* The sun of the close: over the rings and the letters, sitting clean. */
+/* the ring of light (close-ring.tsx): the inner ring's shape at -10 degrees, and a faint coral light; still and unseen until the drop lands */
+.fys-ring, .fys-flare { position: absolute; z-index: -1; pointer-events: none; opacity: 0; }
+.fys-ring { left: calc(var(--pox) - 0.36em); top: calc(var(--poy) - 0.108em); width: 0.72em; height: 0.216em; border: 1px solid var(--ink); border-radius: 50%; rotate: -10deg; }
+.fys-flare { left: calc(var(--pox) - var(--por) * 2.6); top: calc(var(--poy) - var(--por) * 2.6); width: calc(var(--por) * 5.2); aspect-ratio: 1; border-radius: 50%; background: radial-gradient(closest-side, rgba(255, 92, 53, 0.5), rgba(255, 92, 53, 0)); }
 .fys-orb { position: absolute; z-index: 0; left: calc(var(--pox) - var(--por)); top: calc(var(--poy) - var(--por)); width: calc(var(--por) * 2); aspect-ratio: 1; border-radius: 50%; background: var(--coral); transform-origin: 50% 100%; }
 
 /* ---- the coral full stop's fall (coral-drop.tsx; nothing here moves without JavaScript or with reduced motion) ----
@@ -244,6 +259,8 @@ body.vibe-cursor-active:has(.fys-root), body.vibe-cursor-active:has(.fys-root) *
   .fys-close { padding: calc(80 * var(--U)) calc(120 * var(--U)) calc(110 * var(--U)); }
   .fys-big { margin: calc(40 * var(--U)) 0 calc(60 * var(--U)); font-size: calc(170 * var(--U)); translate: none; }
   .fys-orb { left: calc(var(--ox) - var(--or)); top: calc(var(--oy) - var(--or)); width: calc(var(--or) * 2); }
+  .fys-ring { left: calc(var(--ox) - 0.36em); top: calc(var(--oy) - 0.108em); }
+  .fys-flare { left: calc(var(--ox) - var(--or) * 2.6); top: calc(var(--oy) - var(--or) * 2.6); width: calc(var(--or) * 5.2); }
   .fys-front { clip-path: var(--fclip); }
   .fys-close .fys-row { flex-direction: row; justify-content: center; width: auto; max-width: none; }
 
