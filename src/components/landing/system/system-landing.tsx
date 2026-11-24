@@ -100,11 +100,12 @@ const SUN_STYLE = {
  * The near side of the sun's inner ring runs in front of it (Franky, Nov 23, after ship: "the ring at the bottom of
  * the orange dot should go over it, and it should be above the ring at the top"). close-front is the inner ring's own
  * stroke again (the board's export-front.mjs), shown only over the sun's lower half: a half disc cut along the rings'
- * tilt (-10 degrees, export.html), a little wider than the sun so the two strokes meet cleanly at its edge.
+ * tilt (-10 degrees, export.html), a little wider than the sun so the two strokes meet cleanly at its edge, and wider
+ * than its squash when the drop lands (fys-land starts at 1.15 times its width), so the ring never slips behind it.
  */
 const RING_TILT = -10;
 function frontClip([cx, cy, r]: readonly number[]): string {
-  const R = r * 1.08, pts: string[] = [];
+  const R = r * 1.18, pts: string[] = [];
   for (let i = 0; i <= 12; i++) {
     const a = ((RING_TILT + (i / 12) * 180) * Math.PI) / 180;
     pts.push(`${(cx + R * Math.cos(a)).toFixed(4)}em ${(cy + R * Math.sin(a)).toFixed(4)}em`);
@@ -197,7 +198,7 @@ export function SystemLanding({ signupOpen }: { signupOpen: boolean }) {
               <li><span className="fys-lab">Each other</span><p><strong>Post, follow and message</strong> the people you meet. Make your profile yours.</p></li>
             </ul>
           </div>
-          <div className="fys-pp" role="img" aria-label="A planet made of tiny people, each one a dot, with one coral person on its ring: you. Now and then someone lights up.">
+          <div className="fys-pp" role="img" aria-label="A planet made of tiny people, each one a dot, with one coral person on its ring: you.">
             <div className="fys-pp-clip"><Planet /></div>
             <Art name="people" />
           </div>

@@ -169,12 +169,15 @@ export function Planet() {
     const host = c.parentElement?.parentElement ?? c;
     const move = (e: PointerEvent) => { if (e.pointerType !== "mouse") return; [lens.x, lens.y] = toPost(e); lens.on = true; wake(); };
     const leave = () => { lens.on = false; wake(); };
-    // a tap: the people round it light up, one after another
+    // a tap: the people round it light up, one after another (with reduced motion, one plain fade each, no flutter)
+    const still = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     const down = (e: PointerEvent) => {
       if (e.pointerType === "mouse") return;
       const [x, y] = toPost(e), now = performance.now();
       lit.map((p, i) => [Math.hypot(p.x - x, p.y - y), i]).sort((a, b) => a[0] - b[0]).slice(0, 8)
-        .forEach(([, i], n) => sparks.push({ i, t0: now + n * 60, dur: 800, coral: false, hz: 14 + Math.random() * 6, ph: Math.random() * Math.PI * 2 }));
+        .forEach(([, i], n) => sparks.push(still
+          ? { i, t0: now, dur: 600, coral: false, hz: 0, ph: Math.PI / 2 }
+          : { i, t0: now + n * 60, dur: 800, coral: false, hz: 14 + Math.random() * 6, ph: Math.random() * Math.PI * 2 }));
       wake();
     };
     host.addEventListener("pointermove", move);

@@ -162,3 +162,8 @@ Franky tried the third-party taste skill on the landing (the trial and its notes
   - `close-front` is that same hand-drawn stroke, copied rather than redrawn, by `board/export-front.mjs`. It has no dark outline (over coral the outline read as a smudge).
   - The page shows it only over the sun's lower half: a half disc cut along the rings' -10° tilt (`FRONT_STYLE`). So the ring's near side runs in front of the sun and its far side behind.
   - `export.mjs` doesn't know this piece. Re-export it with `node campaigns/2026-11-landing-revamp/board/export-front.mjs <app root>`.
+- **Three small fixes from a motion audit (Nov 23):**
+  - The front ring's clip goes from 1.08 to 1.18 times the sun's radius. The landing squash starts 1.15 times as wide, so for a moment the ring slipped behind the sun's edges.
+  - The planet's description no longer says people light up at random. That was removed in round 6.
+  - With reduced motion, a tap on the planet is one plain fade, with no 14 to 20 Hz flutter.
+- **The handoff's motion notes are out of date.** On a desktop, the night dust still leans with the mouse, and the planet lights up under it. Franky said to remove the hero's hover spotlight, which is gone. These two are still there, and they are his call.
