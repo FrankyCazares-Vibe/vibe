@@ -237,3 +237,5 @@ Shipped Nov 23, 2026, on Franky's yes ("yes ship it in coral"), as PR 10.
 ## The ring of light, stronger (Nov 23, Franky: "Make it stronger")
 - The ring starts at 85% (was 55%), is 1.6 px (was 1 px) and runs out to 1.65 times (was 1.5). It moves out on the soft spring but fades evenly over 1.1 s, so it is seen for most of a second. The coral light behind the sun peaks at 55% (was 40%).
 - Still once per visit, never on the way up, and never with reduced motion (tested).
+
+Shipped Nov 23, 2026, on Franky's yes ("Ship it"), as PR 11.
