@@ -8,7 +8,7 @@ import { useEffect, useRef } from "react";
  * like the sign-in screen's dot and the videos' end card.
  *
  * There is one coral full stop on the page, and it travels. It starts in
- * "yourself." (where it hops now and then), and as the page scrolls it drops
+ * "yourself." (where it hops now and then, once the hero has arrived, until you scroll), and as the page scrolls it drops
  * from headline to headline: "made of your people.", "bring your club.",
  * "see you there.", "one campus at a time.", "before you sign up." and last
  * into "vibe." as its sun. At each one it lands with the sign-in dot's bounce
@@ -31,7 +31,11 @@ import { useEffect, useRef } from "react";
  * stop simply sits in its place. Transform and opacity only; one small
  * element of one size; no work while it rests.
  */
-const FIRST_HOP = 1600, HOP_EVERY = 5200;
+/** The hero's one order (Nov 23, motion idea 7): the logo's dot lands, the photo fades into dots, the sun comes up, the
+ *  notes appear (system.css), and only then does the full stop in "yourself." hop: this long after the picture is in
+ *  (the hero's data-wait clears, or its 3 s fallback), never before FIRST_HOP_MIN, then every HOP_EVERY, and never again
+ *  once the reader has scrolled (they have found the thread). */
+const FIRST_HOP_AFTER = 900, FIRST_HOP_MIN = 1800, HOP_EVERY = 7000, PICTURE_FALLBACK = 3000, SCROLLED = 40;
 /** It lands when the next full stop reaches this share of the screen's height, */
 const LAND_AT = 0.42;
 /** and rests there for this share of a screen of scrolling before it falls on. */
@@ -129,7 +133,7 @@ export function CoralDrop() {
       return { x: A.x + (B.x - A.x) * e, y: A.y + (B.y - A.y) * Math.pow(u, 1.7), r: A.r + (B.r - A.r) * u };
     };
 
-    let here = 0, x = P[0].x, y = P[0].y, r = P[0].r, raf = 0, last = 0, gone = false, hopTimer = 0;
+    let here = 0, x = P[0].x, y = P[0].y, r = P[0].r, raf = 0, last = 0, gone = false, hopTimer = 0, hopsOff = false;
     // its speed straight down (px a second; up is negative), the fastest it went since it last left a stop, and how
     // stretched it is now (0 to 1, eased so it never jitters)
     let vy = 0, peak = 0, stretch = 0;
@@ -149,7 +153,7 @@ export function CoralDrop() {
       stretch = 0; place();
       dot.style.opacity = "0";
       mark(i);
-      if (i === 0) { window.clearTimeout(hopTimer); hopTimer = window.setTimeout(hop, HOP_EVERY); }   // home: the next hop waits
+      if (i === 0 && !hopsOff) { window.clearTimeout(hopTimer); hopTimer = window.setTimeout(hop, HOP_EVERY); }   // home: the next hop waits
       if (now - (lastBounce.get(i) ?? -Infinity) >= REBOUNCE_MS) {
         lastBounce.set(i, now);
         still(el);
@@ -198,14 +202,31 @@ export function CoralDrop() {
     const go = () => { if (!raf && !gone) { last = 0; raf = requestAnimationFrame(tick); } };
 
     const onScroll = () => {
+      if (!hopsOff && window.scrollY > SCROLLED) { hopsOff = true; window.clearTimeout(hopTimer); }   // scrolled: no more hops
       const { i, u } = where();
       if (here !== -1 && i === here && u <= LEFT_AT) return;   // still resting where it is (a hair of scroll is no take-off)
       go();
     };
     const onResize = () => { measure(); if (here !== -1) { x = P[here].x; y = P[here].y; r = P[here].r; } go(); };
-    // at home, a hop now and then, while the headline is in view
-    const hop = () => { if (here === 0 && !document.hidden && stops[0].getBoundingClientRect().bottom > 0) hopNow(stops[0]); hopTimer = window.setTimeout(hop, HOP_EVERY); };
-    hopTimer = window.setTimeout(hop, FIRST_HOP);
+    // at home, a hop now and then, while the headline is in view, until the reader scrolls
+    const hop = () => {
+      if (hopsOff) return;
+      if (here === 0 && !document.hidden && stops[0].getBoundingClientRect().bottom > 0) hopNow(stops[0]);
+      hopTimer = window.setTimeout(hop, HOP_EVERY);
+    };
+    // the first hop waits for the hero's picture (and so for the logo's dot, the sun and the notes): never two coral
+    // bounces at once
+    const t0 = performance.now(), hero = host.querySelector<HTMLElement>(".fys-hero");
+    let hopsOn = false, waitFallback = 0;
+    const startHops = () => {
+      if (hopsOn || hopsOff) return;
+      hopsOn = true;
+      window.clearTimeout(waitFallback);
+      hopTimer = window.setTimeout(hop, Math.max(FIRST_HOP_AFTER, FIRST_HOP_MIN - (performance.now() - t0)));
+    };
+    const pictureIn = new MutationObserver(() => { if (!hero?.hasAttribute("data-wait")) { pictureIn.disconnect(); startHops(); } });
+    if (!hero || !hero.hasAttribute("data-wait")) startHops();
+    else { pictureIn.observe(hero, { attributes: true, attributeFilter: ["data-wait"] }); waitFallback = window.setTimeout(startHops, PICTURE_FALLBACK); }
     window.addEventListener("scroll", onScroll, { passive: true });
     window.addEventListener("resize", onResize);
     // the page settles (fonts, pictures) after the first frame: measure again then
@@ -217,7 +238,7 @@ export function CoralDrop() {
     onScroll();
     return () => {
       gone = true;
-      window.clearTimeout(hopTimer);
+      window.clearTimeout(hopTimer); window.clearTimeout(waitFallback); pictureIn.disconnect();
       cancelAnimationFrame(raf);
       window.removeEventListener("scroll", onScroll);
       window.removeEventListener("resize", onResize);
