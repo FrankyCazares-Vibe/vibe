@@ -16,6 +16,7 @@ import { NightSky } from "../night-sky";
 import { frauncesSoft, landingMono } from "../soft-font";
 import { Art } from "./art";
 import { ART_EXTRA } from "./art-data";
+import { CampusLights } from "./campus-lights";
 import { CloseRing } from "./close-ring";
 import { CoralDrop } from "./coral-drop";
 import { DotPhoto } from "./dot-photo";
@@ -275,6 +276,7 @@ export function SystemLanding({ signupOpen }: { signupOpen: boolean }) {
             <p className="fys-body">Open now for {SCHOOLS} students. {signupOpen ? "Sign up free" : "Join the waitlist"} with your school email.</p>
           </div>
           <div className="fys-line" role="img" aria-label="A line of campuses: Indianapolis and Bloomington lit up, the next ones question marks.">
+            <CampusLights />
             <Art name="open" />
           </div>
         </section>
