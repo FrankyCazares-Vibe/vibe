@@ -200,3 +200,5 @@ The idea list and its review are in `vibe-marketing/campaigns/2026-11-landing-re
   - `npm test` passes (4230), the typecheck is clean and the build passes. Reduced motion shows no drop and no wave, with every full stop showing.
   - Across a scripted scroll at 390 (no screen recording), neither the old nor the new page has a frame over 100 ms. The pauses a reviewer saw in the screen recording came from the recorder itself.
   - Not checked: a real iPhone, Safari, or Android.
+
+Shipped Nov 23, 2026, on Franky's yes ("Ship both"): PR 6 (the questions, the front ring and the small fixes), then PR 7 (the drop, the wave and the faster hero), each squash-merged into main.
