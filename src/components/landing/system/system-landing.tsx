@@ -22,6 +22,7 @@ import { CollapseRings } from "./collapse-rings";
 import { CoralDrop } from "./coral-drop";
 import { DotPhoto } from "./dot-photo";
 import { HeroDots } from "./hero-dots";
+import { KeyEcho } from "./key-echo";
 import { Planet } from "./planet";
 import { Starfield } from "./starfield";
 import "./system.css";
@@ -342,14 +343,14 @@ const PLAY_STORE_LINK: StoreLink | null = PLAY_STORE_URL ? { key: "play-store", 
 
 /** The sign-up key (Nov 24, 2026, buttons C): a cream pill whose label speaks like the headlines and ends in a full
  *  stop, ink until you reach for it. In the hero (`seat`) that full stop is a stop on the travelling dot's way down
- *  (coral-drop.tsx counts every .fys-stop), with one thin ring for its landing. The full stop is decoration, so the
+ *  (coral-drop.tsx counts every .fys-stop), with one thin ring for its landing (key-echo.tsx). The full stop is decoration, so the
  *  button's name stays "Sign up free". */
 function SignUpKey({ cta, small = false, seat = false }: { cta: { label: string; href: string }; small?: boolean; seat?: boolean }) {
   return (
     <a href={cta.href} data-warp-trigger className={small ? "fys-cta fys-cta-primary fys-cta-sm" : "fys-cta fys-cta-primary"}>
       <span className="fys-cta-l">
         {cta.label}
-        <span className="fys-cta-end" aria-hidden="true"><i className={seat ? "fys-cta-stop fys-stop" : "fys-cta-stop"}>.</i>{seat && <b className="fys-cta-echo" />}</span>
+        <span className="fys-cta-end" aria-hidden="true"><i className={seat ? "fys-cta-stop fys-stop" : "fys-cta-stop"}>.</i>{seat && <KeyEcho />}</span>
       </span>
     </a>
   );

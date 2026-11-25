@@ -125,7 +125,8 @@ body.vibe-cursor-active:has(.fys-root), body.vibe-cursor-active:has(.fys-root) *
 .fys-cta-stop[data-here]::before { opacity: 0; transition: none; }
 /* while the dot runs, a headline's empty full stop is hidden; the button keeps its ink one */
 .fys-root[data-drop] .fys-cta-stop.fys-stop:not([data-here]) { visibility: visible; }
-/* the echo: one thin ink ring, drawn at its landed size (2.6 dots across, 1 px) round the full stop's centre */
+/* the echo: one thin ink ring, drawn at its landed size (2.6 dots across, 1 px) round the full stop's centre; it runs
+   out once when the dot lands from above (key-echo.tsx), never when it is simply placed or comes back up */
 .fys-cta-echo { position: absolute; left: -0.138em; top: 0.4425em; width: 0.62em; height: 0.62em; border: 1px solid var(--page); border-radius: 50%; opacity: 0; pointer-events: none; }
 
 /* states, by fades (these stay with reduced motion) */
@@ -152,11 +153,7 @@ body.vibe-cursor-active:has(.fys-root), body.vibe-cursor-active:has(.fys-root) *
   .fys-cta-primary:focus-visible .fys-cta-stop { transform: scale(1.15); }
   @media (hover: hover) and (pointer: fine) { .fys-cta-primary:hover .fys-cta-stop { transform: scale(1.15); } }
   .fys-cta-primary:active .fys-cta-stop, .fys-cta-primary:hover:active .fys-cta-stop { transform: scale(1.14, 0.88); transition: transform 90ms var(--vibe-spring-snappy); }
-  /* the dot lands here: coral-drop.tsx plays its own landing on the full stop; one ring runs out with it, once */
-  .fys-root[data-drop] .fys-cta-stop[data-here] + .fys-cta-echo { animation: fys-cta-echo 900ms var(--vibe-spring-soft) both; }
 }
-/* it starts just outside the dot and only shows once it is clear of it, so the dot never looks outlined */
-@keyframes fys-cta-echo { 0% { opacity: 0; transform: scale(0.45); } 12% { opacity: 0.55; } 100% { opacity: 0; transform: scale(1); } }
 @media (prefers-reduced-motion: reduce) {
   /* nothing moves: the full stop still crossfades, and a press dims the key instead of shrinking it */
   .fys-cta-primary:active::after { opacity: 1; }
