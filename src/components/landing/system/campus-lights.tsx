@@ -11,6 +11,8 @@ import { ART_EXTRA } from "./art-data";
  * lights first, coral, with the sign-in dot's little bounce, then Bloomington a beat later, coral too (Franky, Nov 23:
  * "ship it in coral"). Once lit they stay lit.
  *
+ * A page opened past it (a reload, a back navigation) has them lit already, with no bounce.
+ *
  * Never left dark: a landing further down the page lights them too (a fast scroll that skips "at a time."), and so does
  * the line being well in view for a moment. Without JavaScript, with reduced motion, or before the drop starts, they're
  * simply lit (the faint state only applies under CoralDrop's data-drop). Transform and opacity, Web Animations.
@@ -47,13 +49,22 @@ export function CampusLights() {
     };
     const onLand = (e: Event) => { const d = (e as CustomEvent<{ index: number }>).detail; if (at >= 0 && d.index >= at) light(); };
     root.addEventListener("fys-land", onLand);
+    // the page opened past "at a time." (coral-drop.tsx fys-place: a reload, a back navigation): lit already, no bounce
+    const onPlace = (e: Event) => {
+      const d = (e as CustomEvent<{ index: number }>).detail;
+      if (lit || at < 0 || d.index < at) return;
+      lit = true;
+      window.clearTimeout(timer);
+      line.dataset.lit = "";
+    };
+    root.addEventListener("fys-place", onPlace);
     // the safety net: the line well in view for a moment lights it, landing or not
     const seen = new IntersectionObserver(([e]) => {
       window.clearTimeout(timer);
       if (!lit && e.intersectionRatio >= 0.6) timer = window.setTimeout(light, SEEN_MS);
     }, { threshold: [0, 0.6] });
     seen.observe(line);
-    return () => { root.removeEventListener("fys-land", onLand); seen.disconnect(); window.clearTimeout(timer); };
+    return () => { root.removeEventListener("fys-land", onLand); root.removeEventListener("fys-place", onPlace); seen.disconnect(); window.clearTimeout(timer); };
   }, []);
   return (
     <>
