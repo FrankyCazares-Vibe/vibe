@@ -282,3 +282,21 @@ Shipped Nov 24, 2026, on Franky's yes ("Ship both"), as PR 15, after PR 14.
 - One selector in `system.css`: `:is(.fys-hero-hl, #fys-people-title) span`. The layout doesn't move, since the padding and its cancelling margin go together.
 
 Shipped Nov 24, 2026, on Franky's yes ("Ship it"), as PR 13.
+
+## Headings that turn into the next (Nov 24, Franky: "the wording, since it's dotted at the bottom, it like transforms into the next slide… into the next heading")
+- **Picked from four prototypes** (judged on Franky's idea, readability and calm, and craft; `DECISION.md`, the videos and every check are in `vibe-marketing/campaigns/2026-11-landing-revamp/heading-dots/`): A, condense and dissolve, tied to the coral full stop. Runner-up: D, textures.
+- **Each headline forms out of the halftone** as it rises into the screen (done by the time its top is about 89% down) and **goes back to dust as it leaves the top**, starting where the dot takes off (8% of the screen). The words you just read turn to star dust while the next ones form, and the full stop falls between them.
+- At rest the hero and "made of your people." keep their dotted foot (now the class `.fys-dotted`) and the other four headlines are solid, as before.
+- **How:**
+  - The halftone is today's, dot for dot, on a taller tile.
+  - The line where the letters stop being solid (`--fys-line`) moves in whole steps of the dots' repeat, so dots never slide; they only grow or shrink in place.
+  - Chrome 125+ and Safari 26+ run it in CSS on each line's own view timeline (`data-condense="css"`). Firefox and older Safari get the same frames from `heading-dots.tsx` (`"raf"`), which measures on resize, fonts and CoralDrop's `fys-measure` and writes only when a line's step changes.
+  - `coral-drop.tsx` is unchanged.
+- **Every line keeps its padded box always,** so switching it on moves nothing. Between solid lines the extra padding is closed up again.
+- **Reduced motion and no JavaScript:** nothing is set; every headline looks as it does today.
+- **Forced colours:** plain text and no animation.
+- **Selection:** cream on a coral wash.
+- **Measured:** see the PR. Text moves 0 px against the live page; frame times are the same on and off at 4x CPU slowdown; the script and CSS paths draw the same headlines.
+- **For a later look:**
+  - on a desktop the dissolve starts nearer 4% of the screen than 8% (the zones are shares of each line's trip, and desktop lines are taller), so the dot can leave a line a moment before it breaks;
+  - check a real iPhone and a mid-range Android.
