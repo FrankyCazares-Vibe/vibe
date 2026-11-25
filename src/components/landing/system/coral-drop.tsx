@@ -177,12 +177,21 @@ export function CoralDrop() {
       }
       peak = 0; stretch = 0; vy = 0;
     };
-    // leaving a full stop: start from where it really is on screen, mid-bounce included, and stop its bounce
+    // leaving a full stop: start from where it really is on screen, mid-bounce included, and stop its bounce. A key
+    // you're reaching for shows its sun there instead (system.css), risen: leave from the sun, so the dot never jumps
     const takeOff = () => {
-      const el = stops[here], seen = el.getBoundingClientRect(), at = rect(el);
-      x = P[here].x + (seen.left + seen.width / 2 - (at.left + at.width / 2));
-      y = P[here].y + (seen.top + seen.height / 2 - (at.top + at.height / 2));
-      r = P[here].r;
+      const el = stops[here], sun = el.parentElement?.querySelector<HTMLElement>(":scope > .fys-cta-sun > b");
+      if (sun && parseFloat(getComputedStyle(sun).opacity) > 0.5) {
+        const s = sun.getBoundingClientRect(), h = host.getBoundingClientRect();
+        x = s.left + s.width / 2 - h.left;
+        y = s.top + s.height / 2 - h.top;
+        r = s.width / 2;
+      } else {
+        const seen = el.getBoundingClientRect(), at = rect(el);
+        x = P[here].x + (seen.left + seen.width / 2 - (at.left + at.width / 2));
+        y = P[here].y + (seen.top + seen.height / 2 - (at.top + at.height / 2));
+        r = P[here].r;
+      }
       still(el);
       mark(-1);
       show();
