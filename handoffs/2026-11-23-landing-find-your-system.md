@@ -290,13 +290,21 @@ Shipped Nov 24, 2026, on Franky's yes ("Ship it"), as PR 13.
 - **How:**
   - The halftone is today's, dot for dot, on a taller tile.
   - The line where the letters stop being solid (`--fys-line`) moves in whole steps of the dots' repeat, so dots never slide; they only grow or shrink in place.
-  - Chrome 125+ and Safari 26+ run it in CSS on each line's own view timeline (`data-condense="css"`). Firefox and older Safari get the same frames from `heading-dots.tsx` (`"raf"`), which measures on resize, fonts and CoralDrop's `fys-measure` and writes only when a line's step changes.
+  - `heading-dots.tsx` writes it from the scroll in every browser. It measures on resize, fonts and CoralDrop's `fys-measure`, and writes only when a line's step changes, so a line repaints only then.
+  - The curve is `heading-line.ts`, with its tests.
   - `coral-drop.tsx` is unchanged.
 - **Every line keeps its padded box always,** so switching it on moves nothing. Between solid lines the extra padding is closed up again.
+- **Tall screens:** the break starts no lower than 100 px from the top (a phone's is 67 px), so the hero is never dust at first paint and a jump to "bring your club" lands on solid letters.
 - **Reduced motion and no JavaScript:** nothing is set; every headline looks as it does today.
-- **Forced colours:** plain text and no animation.
+- **Forced colours:** plain text.
+- **Print:** every headline prints as ink (before, the dotted ones printed blank).
 - **Selection:** cream on a coral wash.
+- **A review workflow** (two reviewers, each finding re-checked) found five problems, all fixed:
+  - the CSS view-timeline path repainted the visible headline every scroll frame, so the script path is now the only one;
+  - its round() fallback dropped all dots in browsers without round();
+  - tall screens;
+  - print.
 - **Measured:** see the PR. Text moves 0 px against the live page; frame times are the same on and off at 4x CPU slowdown; the script and CSS paths draw the same headlines.
 - **For a later look:**
-  - on a desktop the dissolve starts nearer 4% of the screen than 8% (the zones are shares of each line's trip, and desktop lines are taller), so the dot can leave a line a moment before it breaks;
+  - on a 1440 x 900 desktop the break starts nearer 4% of the screen than 8% (desktop lines are taller), so the dot can leave a line a moment before it breaks;
   - check a real iPhone and a mid-range Android.
