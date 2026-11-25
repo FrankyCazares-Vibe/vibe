@@ -32,7 +32,23 @@ import { useEffect, useRef } from "react";
  * reader is looking. Without JavaScript or with reduced motion every full
  * stop simply sits in its place. Transform and opacity only; one small
  * element of one size; no work while it rests.
+ *
+ * It starts where the page is (Nov 24, Franky: "fix the reload so the dot starts in the sun"). A reload, a back
+ * navigation or a link to a section can open the page partway down, and the browser may move it there a moment after
+ * this starts (Safari: about 30 ms). On those, until the reader first touches, scrolls with a wheel or presses a key (and
+ * for no longer than SETTLE_MS after the page has loaded, SETTLE_MAX_MS after this starts), every move is the page's
+ * own: the dot is placed where that puts it, at once, with no fall, no bounce and no `fys-land`. Instead it fires
+ * `fys-place` ({ index, resting }: the stop it rests in or last left) so what it lights is lit at once too, and sets
+ * data-placing on the root for two frames so nothing fades in (system.css). A fresh visit with no #section has nothing
+ * to restore, so there it never waits: the reader's first swipe, even one begun while the page was still loading, falls.
  */
+/** After the page has loaded (or this starts, if later), a scroll counts as the reader's after this long, even with no
+ *  touch, wheel or key seen (a scrollbar dragged with a mouse some browsers don't report); and never later than
+ *  SETTLE_MAX_MS after this starts (a page whose load is slow or never comes). */
+const SETTLE_MS = 1000, SETTLE_MAX_MS = 3000;
+/** Whether the drop has started before in this document: a later start is a client navigation back to the page, which
+ *  the router may scroll a moment after (the browser's own navigation entry still says how the document first loaded). */
+let startedBefore = false;
 /** The hero's one order (Nov 23, motion idea 7): the logo's dot lands, the photo fades into dots, the sun comes up, the
  *  notes appear (system.css), and only then does the full stop in "yourself." hop: this long after the picture is in
  *  (the hero's data-wait clears, or its 3 s fallback), never before FIRST_HOP_MIN, then every HOP_EVERY, and never again
@@ -112,17 +128,19 @@ export function CoralDrop() {
       return { x: x0 + (m.actualBoundingBoxRight - m.actualBoundingBoxLeft) / 2, y: base + (m.actualBoundingBoxDescent - m.actualBoundingBoxAscent) / 2, r: Math.max(2, (m.actualBoundingBoxRight + m.actualBoundingBoxLeft) / 2) };
     };
     let P: Pt[] = [], L: number[] = [], rest = 0, R = 1;
+    // what moves with the drop (collapse-rings.tsx) hears where it lands, every time that's measured
+    const announce = () => host.dispatchEvent(new CustomEvent("fys-measure", { detail: { L, rest } }));
     // each stop's point, and the scroll at which the dot lands there (the first at the top, the last no later than
-    // the page's end, so it can always get there); the dot is one size, the biggest stop's, scaled to each
-    const measure = () => {
+    // the page's end, so it can always get there); the dot is one size, the biggest stop's, scaled to each. The very
+    // first measure is announced only once the dot is placed, so the collapse starts from where the dot really is.
+    const measure = (tell = true) => {
       P = stops.map(ink);
       const hostY = host.getBoundingClientRect().top + window.scrollY, vh = window.innerHeight;
       const maxScroll = Math.max(0, document.documentElement.scrollHeight - vh - vh * END);
       L = P.map((p, i) => (i === 0 ? 0 : Math.min(maxScroll, Math.max(0, p.y + hostY - vh * LAND_AT))));
       for (let i = 1; i < L.length; i++) L[i] = Math.max(L[i], L[i - 1] + 1);
       rest = vh * REST;
-      // what moves with the drop (collapse-rings.tsx) hears where it lands, every time that's measured
-      host.dispatchEvent(new CustomEvent("fys-measure", { detail: { L, rest } }));
+      if (tell) announce();
       R = Math.max(...P.map((p) => p.r));
       dot.style.width = dot.style.height = `${(R * 2).toFixed(1)}px`;
       // the glow scales with the dot: make it 16px at a headline's size, as it was (the first headline's full stop past
@@ -131,7 +149,7 @@ export function CoralDrop() {
       const head = hi > 0 ? P[hi].r : R;
       dot.style.boxShadow = `0 0 ${((16 * R) / head).toFixed(1)}px rgba(255, 92, 53, 0.45)`;
     };
-    measure();
+    measure(false);
 
     // where the scroll puts the dot: resting at stop i, or falling from i to i + 1 (u from 0 to 1)
     const where = () => {
@@ -147,7 +165,7 @@ export function CoralDrop() {
       return { x: A.x + (B.x - A.x) * e, y: A.y + (B.y - A.y) * Math.pow(u, FALL), r: A.r + (B.r - A.r) * u };
     };
 
-    let here = 0, x = P[0].x, y = P[0].y, r = P[0].r, raf = 0, last = 0, gone = false, hopTimer = 0, hopsOff = false;
+    let here = -1, x = P[0].x, y = P[0].y, r = P[0].r, raf = 0, last = 0, gone = false, hopTimer = 0, hopsOff = false;
     // its speed straight down (px a second; up is negative), the fastest it went since it last left a stop, and how
     // stretched it is now (0 to 1, eased so it never jitters)
     let vy = 0, peak = 0, stretch = 0;
@@ -197,7 +215,6 @@ export function CoralDrop() {
       show();
       place();
     };
-    mark(0);
 
     const tick = (now: number) => {
       raf = 0;
@@ -224,13 +241,53 @@ export function CoralDrop() {
     };
     const go = () => { if (!raf && !gone) { last = 0; raf = requestAnimationFrame(tick); } };
 
+    // Is the page still moving by itself? Yes until the reader's first wheel, touch, press or key, and never longer than
+    // SETTLE_MS after the page has loaded.
+    // A fresh visit with no #section can't be restored partway down, so there nothing waits.
+    const navType = (performance.getEntriesByType?.("navigation")[0] as PerformanceNavigationTiming | undefined)?.type;
+    let readerMoved = !startedBefore && navType === "navigate" && !location.hash, settleBy = 0, placing = 0;
+    startedBefore = true;
+    const settleMax = performance.now() + SETTLE_MAX_MS;
+    const byReader = () => { readerMoved = true; };
+    // (touchmove too: a swipe begun before this started never sends its touchstart here)
+    const INPUTS = ["wheel", "touchstart", "touchmove", "pointerdown", "keydown"] as const;
+    INPUTS.forEach((t) => window.addEventListener(t, byReader, { capture: true, passive: true }));
+    const loaded = () => { settleBy = performance.now() + SETTLE_MS; };
+    if (document.readyState === "complete") loaded();
+    else window.addEventListener("load", loaded, { once: true });
+    const settling = () => !readerMoved && performance.now() < Math.min(settleMax, settleBy || Infinity);
+    // put the dot where the page is, at once: resting in a stop (the stop shows, no bounce) or partway down a fall (the
+    // dot shows there); then tell what it lights, and hold every fade for two frames (system.css data-placing)
+    const placeAt = () => {
+      const { i, u } = where(), to = spot(i, u), resting = u <= LEFT_AT;
+      cancelAnimationFrame(raf); raf = 0;
+      x = to.x; y = to.y; r = to.r; vy = 0; peak = 0; stretch = 0;
+      if (resting) {
+        if (here !== i) { if (here >= 0) still(stops[here]); dot.style.opacity = "0"; mark(i); }
+      } else {
+        if (here >= 0) still(stops[here]);
+        mark(-1); show();
+      }
+      place();
+      host.dataset.placing = "";
+      const mine = ++placing;
+      requestAnimationFrame(() => requestAnimationFrame(() => { if (mine === placing && !gone) delete host.dataset.placing; }));
+      host.dispatchEvent(new CustomEvent("fys-place", { detail: { index: i, resting } }));
+    };
+
     const onScroll = () => {
       if (!hopsOff && window.scrollY > SCROLLED) { hopsOff = true; window.clearTimeout(hopTimer); }   // scrolled: no more hops
+      if (settling()) { placeAt(); return; }
       const { i, u } = where();
       if (here !== -1 && i === here && u <= LEFT_AT) return;   // still resting where it is (a hair of scroll is no take-off)
       go();
     };
-    const onResize = () => { measure(); if (here !== -1) { x = P[here].x; y = P[here].y; r = P[here].r; } go(); };
+    const onResize = () => {
+      measure();
+      if (settling()) { placeAt(); return; }
+      if (here !== -1) { x = P[here].x; y = P[here].y; r = P[here].r; }
+      go();
+    };
     // at home, a hop now and then, while the headline is in view, until the reader scrolls
     const hop = () => {
       if (hopsOff) return;
@@ -250,7 +307,10 @@ export function CoralDrop() {
     const pictureIn = new MutationObserver(() => { if (!hero?.hasAttribute("data-wait")) { pictureIn.disconnect(); startHops(); } });
     if (!hero || !hero.hasAttribute("data-wait")) startHops();
     else { pictureIn.observe(hero, { attributes: true, attributeFilter: ["data-wait"] }); waitFallback = window.setTimeout(startHops, PICTURE_FALLBACK); }
-    window.addEventListener("scroll", onScroll, { passive: true });
+    // first, so the collapse and the campuses hear where the dot is before they react to the same scroll (in the
+    // capture phase, which also sees any inner element scrolling: only the page's own scroll counts)
+    const onPageScroll = (e: Event) => { if (e.target === document || e.target === window) onScroll(); };
+    window.addEventListener("scroll", onPageScroll, { capture: true, passive: true });
     window.addEventListener("resize", onResize);
     // the page settles (fonts, pictures) after the first frame: measure again then
     document.fonts?.ready.then(() => { if (!gone) onResize(); });
@@ -258,14 +318,20 @@ export function CoralDrop() {
     // and whenever the page's height changes (pictures loading lower down move every stop)
     const sized = new ResizeObserver(() => onResize());
     sized.observe(host);
-    onScroll();
+    // start where the page is (the top, or partway down already), then tell the collapse where the dot lands
+    if (window.scrollY > SCROLLED) hopsOff = true;
+    placeAt();
+    announce();
     return () => {
       gone = true;
       window.clearTimeout(hopTimer); window.clearTimeout(waitFallback); pictureIn.disconnect();
       cancelAnimationFrame(raf);
-      window.removeEventListener("scroll", onScroll);
+      window.removeEventListener("scroll", onPageScroll, { capture: true });
       window.removeEventListener("resize", onResize);
       window.removeEventListener("load", onResize);
+      window.removeEventListener("load", loaded);
+      INPUTS.forEach((t) => window.removeEventListener(t, byReader, { capture: true }));
+      delete host.dataset.placing;
       sized.disconnect();
       stops.forEach((el) => { delete el.dataset.here; still(el); });
       dot.remove();

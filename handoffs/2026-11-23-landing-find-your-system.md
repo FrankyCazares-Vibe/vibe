@@ -283,6 +283,15 @@ Shipped Nov 24, 2026, on Franky's yes ("Ship both"), as PR 15, after PR 14.
 
 Shipped Nov 24, 2026, on Franky's yes ("Ship it"), as PR 13.
 
+## The reload starts where the page is (Nov 24, Franky: "fix the reload so the dot starts in the sun")
+- **A reload, Back or a link to a section** opens the page partway down, and the browser restores the scroll a moment after the page starts (Safari about 30 ms later). The travelling dot used to start in the hero and fall to wherever that put it, bouncing and sending the ring of light.
+- **Now the dot is placed, not played.** Until the reader first touches, scrolls with a wheel or presses a key (and for no longer than 1 s after the page loads, 3 s at most), every move is the page's own. The dot goes straight to where it puts it: in the sun at the close, resting in a headline, or held still partway down a fall. `coral-drop.tsx` fires `fys-place` there instead of `fys-land`.
+- **What it lights is already lit:** the close's rings and ink as they rest, the campuses lit with no bounce, the sun's light on with no fade-in, and no ring of light.
+- **A fresh visit never waits** (there is nothing to restore), so the reader's first swipe falls as before, even one begun while the page was loading.
+- **Measured** (Chrome at 390 and 1440 on a production build, and Safari on the iOS simulator): on every restore, 0 frames of the dot in flight, no bounce, no ring; scrolling afterwards falls and lands as before. The table is in the PR.
+
+Shipped Nov 25, 2026, on Franky's yes ("Ship 16, 17 and 18"), as PR 16, before PRs 17 and 18.
+
 ## The buttons speak like the headlines (Nov 24, Franky: "they look very generic and they don't really fit our style")
 - **Picked from four directions** (judged on brand, clarity and craft; the boards and `DECISION.md` are in `vibe-marketing/campaigns/2026-11-landing-revamp/buttons/`): C, type-led, with A's landing ring.
 - **Every button is a pill in the headlines' voice:** lowercase soft Fraunces 900. No coral on any button at rest.
@@ -324,3 +333,5 @@ Shipped Nov 24, 2026, on Franky's yes ("Ship it"), as PR 13.
   - five students asked whether the risen sun reads as a badge (`DECISION.md` has the fallback: `--arc: 15.7deg`);
   - "bring your club"'s i can leave a sliver of at most 0.4 px at 3 of 5 sizes, as before (the gap is half a pixel).
 - **Recommended, separate:** let night fall 120 ms later in the warp (`DECISION.md` item 9), so a quick tap's landing shows before the page goes dark.
+
+Shipped Nov 25, 2026, on Franky's yes ("Ship 16, 17 and 18"), as PR 17, after PR 16.

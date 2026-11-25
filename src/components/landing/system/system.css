@@ -486,6 +486,9 @@ body.vibe-cursor-active:has(.fys-root), body.vibe-cursor-active:has(.fys-root) *
   .fys-sunglow { transition: opacity 0.9s ease-out 0.15s, transform 1.1s var(--vibe-spring-soft, ease-out) 0.15s; }
   .fys-root[data-drop] .fys-orb:not([data-here]) ~ .fys-sunglow { transition: opacity 0.25s ease-out, transform 0.25s ease-out; }
 }
+/* A page opened partway down (a reload, a back navigation, a link to a section) is placed, not played (coral-drop.tsx
+   sets data-placing for two frames): the sun's light and the close's ink are simply there. */
+.fys-root[data-placing] :is(.fys-sunglow, .fys-close-back, .fys-close-front, .fys-orbits) { transition: none !important; }
 .fys-orb { position: absolute; z-index: 0; left: calc(var(--pox) - var(--por)); top: calc(var(--poy) - var(--por)); width: calc(var(--por) * 2); aspect-ratio: 1; border-radius: 50%; background: var(--coral); transform-origin: 50% 100%; }
 
 /* ---- the coral full stop's fall (coral-drop.tsx; nothing here moves without JavaScript or with reduced motion) ----
