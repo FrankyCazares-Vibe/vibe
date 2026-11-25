@@ -282,3 +282,12 @@ Shipped Nov 24, 2026, on Franky's yes ("Ship both"), as PR 15, after PR 14.
 - One selector in `system.css`: `:is(.fys-hero-hl, #fys-people-title) span`. The layout doesn't move, since the padding and its cancelling margin go together.
 
 Shipped Nov 24, 2026, on Franky's yes ("Ship it"), as PR 13.
+
+## The reload starts where the page is (Nov 24, Franky: "fix the reload so the dot starts in the sun")
+- **A reload, Back or a link to a section** opens the page partway down, and the browser restores the scroll a moment after the page starts (Safari about 30 ms later). The travelling dot used to start in the hero and fall to wherever that put it, bouncing and sending the ring of light.
+- **Now the dot is placed, not played.** Until the reader first touches, scrolls with a wheel or presses a key (and for no longer than 1 s after the page loads, 3 s at most), every move is the page's own. The dot goes straight to where it puts it: in the sun at the close, resting in a headline, or held still partway down a fall. `coral-drop.tsx` fires `fys-place` there instead of `fys-land`.
+- **What it lights is already lit:** the close's rings and ink as they rest, the campuses lit with no bounce, the sun's light on with no fade-in, and no ring of light.
+- **A fresh visit never waits** (there is nothing to restore), so the reader's first swipe falls as before, even one begun while the page was loading.
+- **Measured** (Chrome at 390 and 1440 on a production build, and Safari on the iOS simulator): on every restore, 0 frames of the dot in flight, no bounce, no ring; scrolling afterwards falls and lands as before. The table is in the PR.
+
+Shipped Nov 25, 2026, on Franky's yes ("Ship 16, 17 and 18"), as PR 16, before PRs 17 and 18.
