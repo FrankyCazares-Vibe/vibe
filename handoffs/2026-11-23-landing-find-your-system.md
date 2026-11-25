@@ -335,3 +335,31 @@ Shipped Nov 25, 2026, on Franky's yes ("Ship 16, 17 and 18"), as PR 16, before P
 - **Recommended, separate:** let night fall 120 ms later in the warp (`DECISION.md` item 9), so a quick tap's landing shows before the page goes dark.
 
 Shipped Nov 25, 2026, on Franky's yes ("Ship 16, 17 and 18"), as PR 17, after PR 16.
+
+## Headings that turn into the next (Nov 24, Franky: "the wording, since it's dotted at the bottom, it like transforms into the next slide… into the next heading")
+- **Picked from four prototypes** (judged on Franky's idea, readability and calm, and craft; `DECISION.md`, the videos and every check are in `vibe-marketing/campaigns/2026-11-landing-revamp/heading-dots/`): A, condense and dissolve, tied to the coral full stop. Runner-up: D, textures.
+- **Each headline forms out of the halftone** as it rises into the screen (done by the time its top is about 89% down) and **goes back to dust as it leaves the top**, starting where the dot takes off (8% of the screen). The words you just read turn to star dust while the next ones form, and the full stop falls between them.
+- At rest the hero and "made of your people." keep their dotted foot (now the class `.fys-dotted`) and the other four headlines are solid, as before.
+- **How:**
+  - The halftone is today's, dot for dot, on a taller tile.
+  - The line where the letters stop being solid (`--fys-line`) moves in whole steps of the dots' repeat, so dots never slide; they only grow or shrink in place.
+  - `heading-dots.tsx` writes it from the scroll in every browser. It measures on resize, fonts and CoralDrop's `fys-measure`, and writes only when a line's step changes, so a line repaints only then.
+  - The curve is `heading-line.ts`, with its tests.
+  - `coral-drop.tsx` is unchanged.
+- **Every line keeps its padded box always,** so switching it on moves nothing. Between solid lines the extra padding is closed up again.
+- **Tall screens:** the break starts no lower than 100 px from the top (a phone's is 67 px), so the hero is never dust at first paint and a jump to "bring your club" lands on solid letters.
+- **Reduced motion and no JavaScript:** nothing is set; every headline looks as it does today.
+- **Forced colours:** plain text.
+- **Print:** every headline prints as ink (before, the dotted ones printed blank).
+- **Selection:** cream on a coral wash.
+- **A review workflow** (two reviewers, each finding re-checked) found five problems, all fixed:
+  - the CSS view-timeline path repainted the visible headline every scroll frame, so the script path is now the only one;
+  - its round() fallback dropped all dots in browsers without round();
+  - tall screens;
+  - print.
+- **Measured:** see the PR. Text moves 0 px against the live page; frame times are the same on and off at 4x CPU slowdown; the script and CSS paths draw the same headlines.
+- **For a later look:**
+  - on a 1440 x 900 desktop the break starts nearer 4% of the screen than 8% (desktop lines are taller), so the dot can leave a line a moment before it breaks;
+  - check a real iPhone and a mid-range Android.
+
+Shipped Nov 25, 2026, on Franky's yes ("Ship 16, 17 and 18"), as PR 18, after PRs 16 and 17.

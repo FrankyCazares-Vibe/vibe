@@ -22,6 +22,7 @@ import { CollapseRings } from "./collapse-rings";
 import { CoralDrop } from "./coral-drop";
 import { CtaPress } from "./cta-press";
 import { DotPhoto } from "./dot-photo";
+import { HeadingDots } from "./heading-dots";
 import { HeroDots } from "./hero-dots";
 import { KeyEcho } from "./key-echo";
 import { Planet } from "./planet";
@@ -207,7 +208,7 @@ export function SystemLanding({ signupOpen }: { signupOpen: boolean }) {
           </div>
           <div className="fys-hero-copy">
             <p className="fys-k">Open now<b>/</b>IU + Purdue</p>
-            <h1 id="fys-title" className="fys-hl fys-hero-hl"><span>your campus.</span> <span>your people.</span> <span>yourself<i className="fys-stop">.</i></span></h1>
+            <h1 id="fys-title" className="fys-hl fys-hero-hl fys-dotted"><span>your campus.</span> <span>your people.</span> <span>yourself<i className="fys-stop">.</i></span></h1>
             <p className="fys-body">Vibe is the social app for your campus, built around clubs. Find your clubs, your events, and each other. <strong>Free with your school email.</strong></p>
             <div className="fys-row">
               <SignUpKey cta={cta} seat />
@@ -219,7 +220,7 @@ export function SystemLanding({ signupOpen }: { signupOpen: boolean }) {
         <section className="fys-people" aria-labelledby="fys-people-title">
           <div className="fys-col">
             <p className="fys-k">Your people<b>/</b>01</p>
-            <h2 id="fys-people-title" className="fys-hl fys-md"><span>made of</span> <span>your people<i className="fys-stop">.</i></span></h2>
+            <h2 id="fys-people-title" className="fys-hl fys-md fys-dotted"><span>made of</span> <span>your people<i className="fys-stop">.</i></span></h2>
             <ul className="fys-three">
               <li><span className="fys-lab">Clubs</span><p><strong>Follow any club</strong> to see its events. Join it to talk in its chats.</p></li>
               <li><span className="fys-lab">Events</span><p><strong>See what’s on</strong> this week, and check in at the door with a code.</p></li>
@@ -322,6 +323,8 @@ export function SystemLanding({ signupOpen }: { signupOpen: boolean }) {
       {/* No data-warp-trigger in the footer: the warp would hijack these links. */}
       {/* the coral full stop: one dot that drops from headline to headline as the page scrolls, down into "vibe." */}
       <CoralDrop />
+      {/* the heading dots: each headline condenses out of dots as it rises into view and goes back to dust as it leaves, as the full stop takes off */}
+      <HeadingDots />
       {/* the starfield camera: the dust behind the page in three depths, moving with the scroll (starfield.tsx) */}
       <Starfield />
       {/* the buttons' press: a beat that plays to its end however short the tap (cta-press.tsx) */}

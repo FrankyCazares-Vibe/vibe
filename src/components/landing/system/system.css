@@ -51,19 +51,55 @@ body.vibe-cursor-active:has(.fys-root), body.vibe-cursor-active:has(.fys-root) *
    letters are plain cream.
    Only where dots are the point (Nov 23, Franky: "I'm not sure if I like all of them having the dots. I feel like they
    need some differentiation"): the hero ("yourself.", where the photo breaks into dots) and "made of your people."
-   (the planet of dots). Every other headline is solid cream with its coral full stop, so the dotted ones mean
-   something. */
+   (the planet of dots), marked .fys-dotted. Every other headline is solid cream with its coral full stop, so the
+   dotted ones mean something. (The hero's dots sit at --fys-bl 0.96em, as they always have.)
+   Every line keeps its padded box always, so the heading dots (below) switching on never moves a line; between solid
+   lines the extra 0.16em the padding opens is closed up again. */
+.fys-hl span { padding: 0.16em 0.1em 0.3em; margin: -0.16em -0.1em -0.3em; }
+.fys-hl:not(.fys-dotted) span + span { margin-top: -0.46em; }
 @supports ((-webkit-background-clip: text) or (background-clip: text)) {
-  :is(.fys-hero-hl, #fys-people-title) span {
-    padding: 0.16em 0.1em 0.3em;
-    margin: -0.16em -0.1em -0.3em;
+  .fys-dotted span {
     --fys-bl: 0.96em;
     color: transparent;
     background: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 4.5 150' preserveAspectRatio='none'><path fill='%23F6F1EA' d='M0 0V70H4.5V0ZM-2.75 70a2.75 2.75 0 1 0 5.5 0a2.75 2.75 0 1 0 -5.5 0ZM1.75 70a2.75 2.75 0 1 0 5.5 0a2.75 2.75 0 1 0 -5.5 0ZM-0.325 73.9a2.575 2.575 0 1 0 5.15 0a2.575 2.575 0 1 0 -5.15 0ZM-2.4 77.8a2.4 2.4 0 1 0 4.8 0a2.4 2.4 0 1 0 -4.8 0ZM2.1 77.8a2.4 2.4 0 1 0 4.8 0a2.4 2.4 0 1 0 -4.8 0ZM0.043 81.7a2.207 2.207 0 1 0 4.414 0a2.207 2.207 0 1 0 -4.414 0ZM-2.014 85.6a2.014 2.014 0 1 0 4.029 0a2.014 2.014 0 1 0 -4.029 0ZM2.486 85.6a2.014 2.014 0 1 0 4.029 0a2.014 2.014 0 1 0 -4.029 0ZM0.429 89.5a1.821 1.821 0 1 0 3.643 0a1.821 1.821 0 1 0 -3.643 0ZM-1.629 93.4a1.629 1.629 0 1 0 3.257 0a1.629 1.629 0 1 0 -3.257 0ZM2.871 93.4a1.629 1.629 0 1 0 3.257 0a1.629 1.629 0 1 0 -3.257 0ZM0.795 97.3a1.455 1.455 0 1 0 2.911 0a1.455 1.455 0 1 0 -2.911 0ZM-1.321 101.2a1.321 1.321 0 1 0 2.642 0a1.321 1.321 0 1 0 -2.642 0ZM3.179 101.2a1.321 1.321 0 1 0 2.642 0a1.321 1.321 0 1 0 -2.642 0ZM1.063 105.1a1.187 1.187 0 1 0 2.374 0a1.187 1.187 0 1 0 -2.374 0ZM-1.053 109a1.053 1.053 0 1 0 2.106 0a1.053 1.053 0 1 0 -2.106 0ZM3.447 109a1.053 1.053 0 1 0 2.106 0a1.053 1.053 0 1 0 -2.106 0ZM1.35 112.9a0.9 0.9 0 1 0 1.8 0a0.9 0.9 0 1 0 -1.8 0ZM-0.9 116.8a0.9 0.9 0 1 0 1.8 0a0.9 0.9 0 1 0 -1.8 0ZM3.6 116.8a0.9 0.9 0 1 0 1.8 0a0.9 0.9 0 1 0 -1.8 0ZM1.35 120.7a0.9 0.9 0 1 0 1.8 0a0.9 0.9 0 1 0 -1.8 0ZM-0.9 124.6a0.9 0.9 0 1 0 1.8 0a0.9 0.9 0 1 0 -1.8 0ZM3.6 124.6a0.9 0.9 0 1 0 1.8 0a0.9 0.9 0 1 0 -1.8 0ZM1.35 128.5a0.9 0.9 0 1 0 1.8 0a0.9 0.9 0 1 0 -1.8 0ZM-0.9 132.4a0.9 0.9 0 1 0 1.8 0a0.9 0.9 0 1 0 -1.8 0ZM3.6 132.4a0.9 0.9 0 1 0 1.8 0a0.9 0.9 0 1 0 -1.8 0ZM1.35 136.3a0.9 0.9 0 1 0 1.8 0a0.9 0.9 0 1 0 -1.8 0ZM-0.9 140.2a0.9 0.9 0 1 0 1.8 0a0.9 0.9 0 1 0 -1.8 0ZM3.6 140.2a0.9 0.9 0 1 0 1.8 0a0.9 0.9 0 1 0 -1.8 0ZM1.35 144.1a0.9 0.9 0 1 0 1.8 0a0.9 0.9 0 1 0 -1.8 0ZM-0.9 148a0.9 0.9 0 1 0 1.8 0a0.9 0.9 0 1 0 -1.8 0ZM3.6 148a0.9 0.9 0 1 0 1.8 0a0.9 0.9 0 1 0 -1.8 0ZM1.35 151.9a0.9 0.9 0 1 0 1.8 0a0.9 0.9 0 1 0 -1.8 0Z'/></svg>") 0 calc(var(--fys-bl) - 0.96em) / 0.045em 1.5em repeat-x;
     -webkit-background-clip: text;
     background-clip: text;
   }
-  .fys-hl.fys-hero-hl span { --fys-bl: 1.02em; }
+}
+
+/* ---- the heading dots (Nov 24, Franky: "it like transforms into the next heading"; heading-dots.tsx) ----
+   --fys-line is where a line of type stops being solid and today's halftone starts, from where today's dotted foot
+   starts (0, about the middle of the lowercase). The halftone is today's, dot for dot (tools/tile.mjs): above the line
+   solid cream, below it dots that shrink, then the finest dots (dust).
+     --fys-hold  where it rests: 0.546em (7 steps, the first at which every line is solid, tools/calibrate.js), or 0 for
+                 the hero and "made of your people." (today's dotted foot)
+     --fys-dust  -0.858em (-11 steps): above the letters, so every letter is the finest dots
+   heading-dots.tsx writes it from the scroll, in whole steps of the grid's repeat (two rows, 0.078em), so the dots never
+   slide: they only grow or shrink in place, and a line is repainted only when its step changes. With reduced motion,
+   or without JavaScript (which sets data-condense), none of this applies; nor in print, where the letters are ink. */
+@media screen and (prefers-reduced-motion: no-preference) {
+  @supports ((-webkit-background-clip: text) or (background-clip: text)) {
+    .fys-root[data-condense] .fys-hl span {
+      --fys-bl: 0.96em; --fys-hold: 0.546em; --fys-dust: -0.858em; --fys-line: var(--fys-hold);
+      color: transparent;
+      background: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 4.5 340' preserveAspectRatio='none'><path fill='%23F6F1EA' d='M0 0V160H4.5V0ZM-2.75 160a2.75 2.75 0 1 0 5.5 0a2.75 2.75 0 1 0 -5.5 0ZM1.75 160a2.75 2.75 0 1 0 5.5 0a2.75 2.75 0 1 0 -5.5 0ZM-0.325 163.9a2.575 2.575 0 1 0 5.15 0a2.575 2.575 0 1 0 -5.15 0ZM-2.4 167.8a2.4 2.4 0 1 0 4.8 0a2.4 2.4 0 1 0 -4.8 0ZM2.1 167.8a2.4 2.4 0 1 0 4.8 0a2.4 2.4 0 1 0 -4.8 0ZM0.043 171.7a2.207 2.207 0 1 0 4.414 0a2.207 2.207 0 1 0 -4.414 0ZM-2.014 175.6a2.014 2.014 0 1 0 4.028 0a2.014 2.014 0 1 0 -4.028 0ZM2.486 175.6a2.014 2.014 0 1 0 4.028 0a2.014 2.014 0 1 0 -4.028 0ZM0.429 179.5a1.821 1.821 0 1 0 3.642 0a1.821 1.821 0 1 0 -3.642 0ZM-1.629 183.4a1.629 1.629 0 1 0 3.258 0a1.629 1.629 0 1 0 -3.258 0ZM2.871 183.4a1.629 1.629 0 1 0 3.258 0a1.629 1.629 0 1 0 -3.258 0ZM0.795 187.3a1.455 1.455 0 1 0 2.91 0a1.455 1.455 0 1 0 -2.91 0ZM-1.321 191.2a1.321 1.321 0 1 0 2.642 0a1.321 1.321 0 1 0 -2.642 0ZM3.179 191.2a1.321 1.321 0 1 0 2.642 0a1.321 1.321 0 1 0 -2.642 0ZM1.063 195.1a1.187 1.187 0 1 0 2.374 0a1.187 1.187 0 1 0 -2.374 0ZM-1.053 199a1.053 1.053 0 1 0 2.106 0a1.053 1.053 0 1 0 -2.106 0ZM3.447 199a1.053 1.053 0 1 0 2.106 0a1.053 1.053 0 1 0 -2.106 0ZM1.35 202.9a0.9 0.9 0 1 0 1.8 0a0.9 0.9 0 1 0 -1.8 0ZM-0.9 206.8a0.9 0.9 0 1 0 1.8 0a0.9 0.9 0 1 0 -1.8 0ZM3.6 206.8a0.9 0.9 0 1 0 1.8 0a0.9 0.9 0 1 0 -1.8 0ZM1.35 210.7a0.9 0.9 0 1 0 1.8 0a0.9 0.9 0 1 0 -1.8 0ZM-0.9 214.6a0.9 0.9 0 1 0 1.8 0a0.9 0.9 0 1 0 -1.8 0ZM3.6 214.6a0.9 0.9 0 1 0 1.8 0a0.9 0.9 0 1 0 -1.8 0ZM1.35 218.5a0.9 0.9 0 1 0 1.8 0a0.9 0.9 0 1 0 -1.8 0ZM-0.9 222.4a0.9 0.9 0 1 0 1.8 0a0.9 0.9 0 1 0 -1.8 0ZM3.6 222.4a0.9 0.9 0 1 0 1.8 0a0.9 0.9 0 1 0 -1.8 0ZM1.35 226.3a0.9 0.9 0 1 0 1.8 0a0.9 0.9 0 1 0 -1.8 0ZM-0.9 230.2a0.9 0.9 0 1 0 1.8 0a0.9 0.9 0 1 0 -1.8 0ZM3.6 230.2a0.9 0.9 0 1 0 1.8 0a0.9 0.9 0 1 0 -1.8 0ZM1.35 234.1a0.9 0.9 0 1 0 1.8 0a0.9 0.9 0 1 0 -1.8 0ZM-0.9 238a0.9 0.9 0 1 0 1.8 0a0.9 0.9 0 1 0 -1.8 0ZM3.6 238a0.9 0.9 0 1 0 1.8 0a0.9 0.9 0 1 0 -1.8 0ZM1.35 241.9a0.9 0.9 0 1 0 1.8 0a0.9 0.9 0 1 0 -1.8 0ZM-0.9 245.8a0.9 0.9 0 1 0 1.8 0a0.9 0.9 0 1 0 -1.8 0ZM3.6 245.8a0.9 0.9 0 1 0 1.8 0a0.9 0.9 0 1 0 -1.8 0ZM1.35 249.7a0.9 0.9 0 1 0 1.8 0a0.9 0.9 0 1 0 -1.8 0ZM-0.9 253.6a0.9 0.9 0 1 0 1.8 0a0.9 0.9 0 1 0 -1.8 0ZM3.6 253.6a0.9 0.9 0 1 0 1.8 0a0.9 0.9 0 1 0 -1.8 0ZM1.35 257.5a0.9 0.9 0 1 0 1.8 0a0.9 0.9 0 1 0 -1.8 0ZM-0.9 261.4a0.9 0.9 0 1 0 1.8 0a0.9 0.9 0 1 0 -1.8 0ZM3.6 261.4a0.9 0.9 0 1 0 1.8 0a0.9 0.9 0 1 0 -1.8 0ZM1.35 265.3a0.9 0.9 0 1 0 1.8 0a0.9 0.9 0 1 0 -1.8 0ZM-0.9 269.2a0.9 0.9 0 1 0 1.8 0a0.9 0.9 0 1 0 -1.8 0ZM3.6 269.2a0.9 0.9 0 1 0 1.8 0a0.9 0.9 0 1 0 -1.8 0ZM1.35 273.1a0.9 0.9 0 1 0 1.8 0a0.9 0.9 0 1 0 -1.8 0ZM-0.9 277a0.9 0.9 0 1 0 1.8 0a0.9 0.9 0 1 0 -1.8 0ZM3.6 277a0.9 0.9 0 1 0 1.8 0a0.9 0.9 0 1 0 -1.8 0ZM1.35 280.9a0.9 0.9 0 1 0 1.8 0a0.9 0.9 0 1 0 -1.8 0ZM-0.9 284.8a0.9 0.9 0 1 0 1.8 0a0.9 0.9 0 1 0 -1.8 0ZM3.6 284.8a0.9 0.9 0 1 0 1.8 0a0.9 0.9 0 1 0 -1.8 0ZM1.35 288.7a0.9 0.9 0 1 0 1.8 0a0.9 0.9 0 1 0 -1.8 0ZM-0.9 292.6a0.9 0.9 0 1 0 1.8 0a0.9 0.9 0 1 0 -1.8 0ZM3.6 292.6a0.9 0.9 0 1 0 1.8 0a0.9 0.9 0 1 0 -1.8 0ZM1.35 296.5a0.9 0.9 0 1 0 1.8 0a0.9 0.9 0 1 0 -1.8 0ZM-0.9 300.4a0.9 0.9 0 1 0 1.8 0a0.9 0.9 0 1 0 -1.8 0ZM3.6 300.4a0.9 0.9 0 1 0 1.8 0a0.9 0.9 0 1 0 -1.8 0ZM1.35 304.3a0.9 0.9 0 1 0 1.8 0a0.9 0.9 0 1 0 -1.8 0ZM-0.9 308.2a0.9 0.9 0 1 0 1.8 0a0.9 0.9 0 1 0 -1.8 0ZM3.6 308.2a0.9 0.9 0 1 0 1.8 0a0.9 0.9 0 1 0 -1.8 0ZM1.35 312.1a0.9 0.9 0 1 0 1.8 0a0.9 0.9 0 1 0 -1.8 0ZM-0.9 316a0.9 0.9 0 1 0 1.8 0a0.9 0.9 0 1 0 -1.8 0ZM3.6 316a0.9 0.9 0 1 0 1.8 0a0.9 0.9 0 1 0 -1.8 0ZM1.35 319.9a0.9 0.9 0 1 0 1.8 0a0.9 0.9 0 1 0 -1.8 0ZM-0.9 323.8a0.9 0.9 0 1 0 1.8 0a0.9 0.9 0 1 0 -1.8 0ZM3.6 323.8a0.9 0.9 0 1 0 1.8 0a0.9 0.9 0 1 0 -1.8 0ZM1.35 327.7a0.9 0.9 0 1 0 1.8 0a0.9 0.9 0 1 0 -1.8 0ZM-0.9 331.6a0.9 0.9 0 1 0 1.8 0a0.9 0.9 0 1 0 -1.8 0ZM3.6 331.6a0.9 0.9 0 1 0 1.8 0a0.9 0.9 0 1 0 -1.8 0ZM1.35 335.5a0.9 0.9 0 1 0 1.8 0a0.9 0.9 0 1 0 -1.8 0ZM-0.9 339.4a0.9 0.9 0 1 0 1.8 0a0.9 0.9 0 1 0 -1.8 0ZM3.6 339.4a0.9 0.9 0 1 0 1.8 0a0.9 0.9 0 1 0 -1.8 0Z'/></svg>") 0 calc(var(--fys-bl) - 1.86em + var(--fys-line)) / 0.045em 3.4em repeat-x;
+      -webkit-background-clip: text;
+      background-clip: text;
+    }
+    .fys-root[data-condense] .fys-dotted span { --fys-hold: 0em; }
+  }
+}
+/* The letters are transparent text over the halftone, so give selections and high-contrast modes real colour: selected
+   letters stay cream on a coral wash (the full stop stays coral), and in forced colours every headline is plain text. */
+.fys-hl ::selection { color: var(--ink); background: rgba(255, 92, 53, 0.42); }
+.fys-hl i::selection { color: var(--coral); }
+@media (forced-colors: active) {
+  .fys-hl span, .fys-root[data-condense] .fys-hl span { color: CanvasText; background: none; -webkit-background-clip: border-box; background-clip: border-box; }
+  .fys-hl i { color: CanvasText; }
+}
+/* print: backgrounds don't print, so the halftone headlines would come out blank; they print as plain ink */
+@media print {
+  .fys-hl span { color: var(--ink); background: none; -webkit-background-clip: border-box; background-clip: border-box; }
 }
 .fys-hl.fys-md { font-size: calc(46 * var(--P)); }
 /* The hero's three lines (the tagline, since Nov 23): smaller, so "your people." fits a phone. */
