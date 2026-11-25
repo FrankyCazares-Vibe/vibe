@@ -9,6 +9,7 @@ import { useEffect, useRef } from "react";
  *
  * There is one coral full stop on the page, and it travels. It starts in
  * "yourself." (where it hops now and then, once the hero has arrived, until you scroll), and as the page scrolls it drops
+ * first into the full stop of the hero's "sign up free." key (Nov 24, buttons C: system-landing.tsx SignUpKey), then
  * from headline to headline: "made of your people.", "bring your club.",
  * "see you there.", "one campus at a time.", "before you sign up." and last
  * into "vibe." as its sun. At each one it lands with the sign-in dot's bounce
@@ -142,8 +143,10 @@ export function CoralDrop() {
       if (tell) announce();
       R = Math.max(...P.map((p) => p.r));
       dot.style.width = dot.style.height = `${(R * 2).toFixed(1)}px`;
-      // the glow scales with the dot: make it 16px at a headline's size, as it was
-      const head = P.length > 1 ? P[1].r : R;
+      // the glow scales with the dot: make it 16px at a headline's size, as it was (the first headline's full stop past
+      // home, not stop 1, which is the sign-up key's small one since Nov 24)
+      const hi = stops.findIndex((el, j) => j > 0 && !!el.closest(".fys-hl"));
+      const head = hi > 0 ? P[hi].r : R;
       dot.style.boxShadow = `0 0 ${((16 * R) / head).toFixed(1)}px rgba(255, 92, 53, 0.45)`;
     };
     measure(false);
@@ -192,12 +195,21 @@ export function CoralDrop() {
       }
       peak = 0; stretch = 0; vy = 0;
     };
-    // leaving a full stop: start from where it really is on screen, mid-bounce included, and stop its bounce
+    // leaving a full stop: start from where it really is on screen, mid-bounce included, and stop its bounce. A key
+    // you're reaching for shows its sun there instead (system.css), risen: leave from the sun, so the dot never jumps
     const takeOff = () => {
-      const el = stops[here], seen = el.getBoundingClientRect(), at = rect(el);
-      x = P[here].x + (seen.left + seen.width / 2 - (at.left + at.width / 2));
-      y = P[here].y + (seen.top + seen.height / 2 - (at.top + at.height / 2));
-      r = P[here].r;
+      const el = stops[here], sun = el.parentElement?.querySelector<HTMLElement>(":scope > .fys-cta-sun > b");
+      if (sun && parseFloat(getComputedStyle(sun).opacity) > 0.5) {
+        const s = sun.getBoundingClientRect(), h = host.getBoundingClientRect();
+        x = s.left + s.width / 2 - h.left;
+        y = s.top + s.height / 2 - h.top;
+        r = s.width / 2;
+      } else {
+        const seen = el.getBoundingClientRect(), at = rect(el);
+        x = P[here].x + (seen.left + seen.width / 2 - (at.left + at.width / 2));
+        y = P[here].y + (seen.top + seen.height / 2 - (at.top + at.height / 2));
+        r = P[here].r;
+      }
       still(el);
       mark(-1);
       show();

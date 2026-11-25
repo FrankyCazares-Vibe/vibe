@@ -20,8 +20,10 @@ import { CampusLights } from "./campus-lights";
 import { CloseRing } from "./close-ring";
 import { CollapseRings } from "./collapse-rings";
 import { CoralDrop } from "./coral-drop";
+import { CtaPress } from "./cta-press";
 import { DotPhoto } from "./dot-photo";
 import { HeroDots } from "./hero-dots";
+import { KeyEcho } from "./key-echo";
 import { Planet } from "./planet";
 import { Starfield } from "./starfield";
 import "./system.css";
@@ -190,8 +192,8 @@ export function SystemLanding({ signupOpen }: { signupOpen: boolean }) {
       <header className="fys-bar">
         <KineticWordmark className="fys-wm" dotClassName="fys-wm-dot" />
         <nav aria-label="Account">
-          <a href={LOGIN_HREF} data-warp-trigger className="fys-tl">Log in</a>
-          <a href={cta.href} data-warp-trigger className="fys-btn fys-btn-sm">{cta.label}</a>
+          <a href={LOGIN_HREF} data-warp-trigger className="fys-cta fys-cta-link" aria-label="Log in"><span className="fys-cta-l">Log <Ti />n</span></a>
+          <SignUpKey cta={cta} small />
         </nav>
       </header>
 
@@ -208,8 +210,8 @@ export function SystemLanding({ signupOpen }: { signupOpen: boolean }) {
             <h1 id="fys-title" className="fys-hl fys-hero-hl"><span>your campus.</span> <span>your people.</span> <span>yourself<i className="fys-stop">.</i></span></h1>
             <p className="fys-body">Vibe is the social app for your campus, built around clubs. Find your clubs, your events, and each other. <strong>Free with your school email.</strong></p>
             <div className="fys-row">
-              <a href={cta.href} data-warp-trigger className="fys-btn">{cta.label}</a>
-              <a href="#fys-club" className="fys-btn fys-ghost">Bring your club</a>
+              <SignUpKey cta={cta} seat />
+              <ClubPill href="#fys-club" />
             </div>
           </div>
         </section>
@@ -250,7 +252,7 @@ export function SystemLanding({ signupOpen }: { signupOpen: boolean }) {
               <li><span className="fys-n">02</span><span><strong>The board.</strong> Officers post the news.</span></li>
               <li><span className="fys-n">03</span><span><strong>The chat.</strong> Members talk, plan and say who’s going.</span></li>
             </ol>
-            <div className="fys-row"><a href={CLUB_HREF} className="fys-btn">Bring your club</a></div>
+            <div className="fys-row"><ClubPill href={CLUB_HREF} /></div>
           </div>
         </section>
 
@@ -309,10 +311,10 @@ export function SystemLanding({ signupOpen }: { signupOpen: boolean }) {
           {/* The full stop is the sun (.fys-orb), with its light under everything (.fys-sunglow), its rings behind it and the letters (close-back), and the inner ring's near side over it (close-front). As the full stop falls in, its system gathers onto the sun (collapse-rings.tsx). */}
           <span className="fys-big" aria-hidden="true"><Art name="close-back" unit="em" className="fys-close-back" />vibe<i>.</i><span className="fys-orb" style={ORB_STYLE} /><span className="fys-sunglow" style={GLOW_STYLE} /><span className="fys-front" style={FRONT_STYLE}><Art name="close-front" unit="em" className="fys-close-front" /></span><CloseRing style={ORB_STYLE} /><CollapseRings style={ORB_STYLE} /></span>
           <div className="fys-row">
-            <a href={cta.href} data-warp-trigger className="fys-btn">{cta.label}</a>
-            <a href={CLUB_HREF} className="fys-btn fys-ghost">Bring your club</a>
+            <SignUpKey cta={cta} />
+            <ClubPill href={CLUB_HREF} />
           </div>
-          <p className="fys-fine">Already have an account? <a href={LOGIN_HREF} data-warp-trigger>Log in</a></p>
+          <p className="fys-fine">Already have an account? <a href={LOGIN_HREF} data-warp-trigger aria-label="Log in">Log <Ti />n</a></p>
           <StoreLinks />
         </section>
       </main>
@@ -322,6 +324,8 @@ export function SystemLanding({ signupOpen }: { signupOpen: boolean }) {
       <CoralDrop />
       {/* the starfield camera: the dust behind the page in three depths, moving with the scroll (starfield.tsx) */}
       <Starfield />
+      {/* the buttons' press: a beat that plays to its end however short the tap (cta-press.tsx) */}
+      <CtaPress />
       <footer className="fys-footer">
         <span>© CONNECTVIBE. LLC</span>
         <nav aria-label="Legal and support">
@@ -339,6 +343,43 @@ export function SystemLanding({ signupOpen }: { signupOpen: boolean }) {
 type StoreLink = { key: string; href: string; store: string };
 const APP_STORE_LINK: StoreLink | null = APP_STORE_URL ? { key: "app-store", href: APP_STORE_URL, store: "the App Store" } : null;
 const PLAY_STORE_LINK: StoreLink | null = PLAY_STORE_URL ? { key: "play-store", href: PLAY_STORE_URL, store: "Google Play" } : null;
+
+/** The sign-up key (Nov 24, 2026, buttons C): a cream pill whose label speaks like the headlines and ends in a full
+ *  stop, ink until you reach for it. In the hero (`seat`) that full stop is a stop on the travelling dot's way down
+ *  (coral-drop.tsx counts every .fys-stop), with one thin ring for its landing (key-echo.tsx). The full stop is decoration, so the
+ *  button's name stays "Sign up free".
+ *  Its hover and press (Nov 25, "the sun rises"): reach for it and the full stop rises as a coral sun with its own light
+ *  (.fys-cta-sun, .fys-cta-sunlight); press it and the sun sets back with the drop's bounce and one thin ring
+ *  (.fys-cta-ring). KeyEcho stays right after the full stop: it finds it as its previous sibling. */
+function SignUpKey({ cta, small = false, seat = false }: { cta: { label: string; href: string }; small?: boolean; seat?: boolean }) {
+  return (
+    <a href={cta.href} data-warp-trigger className={small ? "fys-cta fys-cta-primary fys-cta-sm" : "fys-cta fys-cta-primary"}>
+      <span className="fys-cta-l">
+        {cta.label}
+        <span className="fys-cta-end" aria-hidden="true">
+          <i className={seat ? "fys-cta-stop fys-stop" : "fys-cta-stop"}>.</i>{seat && <KeyEcho />}
+          <b className="fys-cta-sunlight"><b /></b><b className="fys-cta-sun"><b /></b><b className="fys-cta-ring" />
+        </span>
+      </span>
+    </a>
+  );
+}
+
+/** "bring your club" (Nov 24, buttons C: night with a 1 px cream line). Reach for it and the dot of its i rises as a
+ *  cream moon with a faint light; press it and the moon sets and the pill's line lights (Nov 25). The i is split in
+ *  <Ti />, so the link carries its name. */
+function ClubPill({ href }: { href: string }) {
+  return <a href={href} className="fys-cta fys-cta-ghost" aria-label="Bring your club"><span className="fys-cta-l">Br<Ti />ng your club</span></a>;
+}
+
+/** An i whose dot can rise (Nov 25, the buttons' hover and press). The letter stays in the text, unpainted, and the
+ *  run of text stays whole (only inline boxes, no positioned elements), so find-in-page, copying and translation see
+ *  "bring" and "log in". It is drawn by two copies of itself, its own pseudo-elements (system.css .fys-ti): its stem,
+ *  and its dot, which turns on an arm. At rest the two copies are the letter. The empty <b> carries the moon's light
+ *  (bring your club). Used in "bring your club" and both "log in" links, each of which has an aria-label. */
+function Ti() {
+  return <span className="fys-ti">i<b aria-hidden="true" /></span>;
+}
 
 function storeLinksFor(platform: Platform | null): StoreLink[] {
   if (isIosPlatform(platform)) return APP_STORE_LINK ? [APP_STORE_LINK] : [];

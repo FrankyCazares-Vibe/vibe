@@ -291,3 +291,47 @@ Shipped Nov 24, 2026, on Franky's yes ("Ship it"), as PR 13.
 - **Measured** (Chrome at 390 and 1440 on a production build, and Safari on the iOS simulator): on every restore, 0 frames of the dot in flight, no bounce, no ring; scrolling afterwards falls and lands as before. The table is in the PR.
 
 Shipped Nov 25, 2026, on Franky's yes ("Ship 16, 17 and 18"), as PR 16, before PRs 17 and 18.
+
+## The buttons speak like the headlines (Nov 24, Franky: "they look very generic and they don't really fit our style")
+- **Picked from four directions** (judged on brand, clarity and craft; the boards and `DECISION.md` are in `vibe-marketing/campaigns/2026-11-landing-revamp/buttons/`): C, type-led, with A's landing ring.
+- **Every button is a pill in the headlines' voice:** lowercase soft Fraunces 900. No coral on any button at rest.
+- **Sign-up is a cream key** with dark words, like the Light app icon. Its label ends in a full stop: ink at rest, coral when you reach for it (hover on a mouse, a press, keyboard focus). Cream always means sign-up.
+- **"bring your club" is night with a 1 px cream line, everywhere** (it was a coral pill in its own section). "log in" is the same voice with no pill.
+- **The travelling dot rests in the hero's key:** on the first scroll it drops out of "yourself." into the key's full stop and rests there, coral, with one thin ring as it lands. Then it falls on to "made of your people." as before. It is just another `.fys-stop` (`SignUpKey` in `system-landing.tsx`), so `coral-drop.tsx` needs no change and the planet, the campus lights, the collapse and the ring of light still find their own stops. The ring is `key-echo.tsx`: like the close's ring of light, it plays only when the dot lands from above, never coming back up, and only once the reader has touched, scrolled or pressed a key (a reload or Back to the key's rest can fly the dot in by itself; PR 16 stops that flight). The dot's glow is sized from the first headline's full stop, not from stop 1, which is now the key's small one.
+- **Phones stack every pair full width** (max 420 px), and so does the hero's pair when its column is under 390 px (desktops under about 1000 px).
+- **Fixed on the way:**
+  - the top bar's sign-up is 44 px on desktop (it was 54);
+  - the close's "Log in" link is 50 x 44 (it was 38 x 44);
+  - with WCAG text spacing on a 320 to 375 px phone, the top bar's "join the waitlist." wraps inside its pill instead of running off the screen.
+- **A review workflow** (two reviewers, each finding re-checked) found four problems, all fixed:
+  - the glow sizing;
+  - the ring on a restored scroll;
+  - the hover swell snapping after a landing bounce (the swell is now on `scale`, so it adds to the bounce);
+  - the text-spacing overflow.
+- **Reduced motion:** nothing moves; the full stop still crossfades, and a press dims the key.
+- **No JavaScript:** everything is in place, and the key's full stop is ink.
+- **Forced colours:** every pill keeps a system-colour edge.
+- **Measured (Chrome at 390 and 1440, Safari on the iOS simulator):** see the PR. Labels read 15.3:1 to 17.49:1 against the real pixels behind them; every target is at least 44 px tall; no frame shows two coral dots.
+- **Brand guide (Franky's OK needed):** "Pills for anything you tap" stays word for word. Two lines would be added:
+  - after "DM Sans 600 to 700 for buttons": "(the landing's buttons use soft Fraunces 900, lowercase, like its headlines)";
+  - in the dot spec: "It can rest in the sign-up button's full stop."
+
+### Hover and press: "the sun rises" (Nov 25, Franky: "add some creativity to it, especially when you hover over it and press it", then "the same to sign up, log in, and bring your club")
+- **Picked from four prototypes** (judged on brand, phone and craft; `vibe-marketing/campaigns/2026-11-landing-revamp/buttons-motion/DECISION.md`). One move at three volumes: reach for a button and a body rises out of its own label on a short arc; press it and the body sets back with the travelling dot's bounce, and the landing shows in a line.
+  - **Sign up:** the full stop rises as a coral sun with its own light, and lands with one thin ink ring. Still the only coral on any button.
+  - **Bring your club:** the i's dot rises as a cream moon with a faint light; a press lights the pill's line.
+  - **Log in** (both): the i's dot rises as a small planet; a press lights its underline.
+- **A phone sees it:** a touch has no hover, so a tap hops the body up first (70 to 80 ms), then sets it. The beat plays to its end however short the tap: about 1 s on sign-up.
+- **`cta-press.tsx`** plays the press as classes on the link (`.is-down`, `.is-hop`, `.is-set`, `.is-quick`, `.is-cancel`), so the movement stays in CSS. A touch that becomes a scroll before the landing goes back with no bounce. Enter plays it too. Without JavaScript, `:active` plays a simpler press.
+- **The i** is one letter in the text, drawn over by its own `::before` (stem) and `::after` (dot), so find-in-page, copying and translation see "bring" and "log in" whole. Each link keeps its aria-label.
+- **The travelling dot:** while it flies, the hero key's sun is held down, so there is only ever one coral dot. If you're already reaching for the key when the dot lands, the sun is lit where it landed and rises from there; when it leaves, it leaves from the risen sun (`coral-drop.tsx` take-off).
+- **Reduced motion:** fades only; the key dims on press. **Forced colours:** no sun, rings or copies; the full stop stays.
+- **A second workflow** measured the build and reviewed the code, with two skeptics on each finding. It confirmed 9 problems, all fixed (the list is in `DECISION.md`). The biggest: the minifier wrote timings in seconds, so a quick tap lost the bounce on the built site.
+- **Measured (Chrome on the production build, Safari on the iOS 26.4 simulator):** label contrast in every frame at least 7.15:1; touch feedback on the touch frame; never two coral dots; the i exact at rest at 6 widths; 4,230 tests pass. The films are in `buttons-motion/real/`.
+- **Not done:**
+  - an iPhone and VoiceOver;
+  - five students asked whether the risen sun reads as a badge (`DECISION.md` has the fallback: `--arc: 15.7deg`);
+  - "bring your club"'s i can leave a sliver of at most 0.4 px at 3 of 5 sizes, as before (the gap is half a pixel).
+- **Recommended, separate:** let night fall 120 ms later in the warp (`DECISION.md` item 9), so a quick tap's landing shows before the page goes dark.
+
+Shipped Nov 25, 2026, on Franky's yes ("Ship 16, 17 and 18"), as PR 17, after PR 16.
