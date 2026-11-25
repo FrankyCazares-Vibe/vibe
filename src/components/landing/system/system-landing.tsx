@@ -190,8 +190,8 @@ export function SystemLanding({ signupOpen }: { signupOpen: boolean }) {
       <header className="fys-bar">
         <KineticWordmark className="fys-wm" dotClassName="fys-wm-dot" />
         <nav aria-label="Account">
-          <a href={LOGIN_HREF} data-warp-trigger className="fys-tl">Log in</a>
-          <a href={cta.href} data-warp-trigger className="fys-btn fys-btn-sm">{cta.label}</a>
+          <a href={LOGIN_HREF} data-warp-trigger className="fys-cta fys-cta-link"><span className="fys-cta-l">Log in</span></a>
+          <SignUpKey cta={cta} small />
         </nav>
       </header>
 
@@ -208,8 +208,8 @@ export function SystemLanding({ signupOpen }: { signupOpen: boolean }) {
             <h1 id="fys-title" className="fys-hl fys-hero-hl"><span>your campus.</span> <span>your people.</span> <span>yourself<i className="fys-stop">.</i></span></h1>
             <p className="fys-body">Vibe is the social app for your campus, built around clubs. Find your clubs, your events, and each other. <strong>Free with your school email.</strong></p>
             <div className="fys-row">
-              <a href={cta.href} data-warp-trigger className="fys-btn">{cta.label}</a>
-              <a href="#fys-club" className="fys-btn fys-ghost">Bring your club</a>
+              <SignUpKey cta={cta} seat />
+              <a href="#fys-club" className="fys-cta fys-cta-ghost"><span className="fys-cta-l">Bring your club</span></a>
             </div>
           </div>
         </section>
@@ -250,7 +250,7 @@ export function SystemLanding({ signupOpen }: { signupOpen: boolean }) {
               <li><span className="fys-n">02</span><span><strong>The board.</strong> Officers post the news.</span></li>
               <li><span className="fys-n">03</span><span><strong>The chat.</strong> Members talk, plan and say who’s going.</span></li>
             </ol>
-            <div className="fys-row"><a href={CLUB_HREF} className="fys-btn">Bring your club</a></div>
+            <div className="fys-row"><a href={CLUB_HREF} className="fys-cta fys-cta-ghost"><span className="fys-cta-l">Bring your club</span></a></div>
           </div>
         </section>
 
@@ -309,8 +309,8 @@ export function SystemLanding({ signupOpen }: { signupOpen: boolean }) {
           {/* The full stop is the sun (.fys-orb), with its light under everything (.fys-sunglow), its rings behind it and the letters (close-back), and the inner ring's near side over it (close-front). As the full stop falls in, its system gathers onto the sun (collapse-rings.tsx). */}
           <span className="fys-big" aria-hidden="true"><Art name="close-back" unit="em" className="fys-close-back" />vibe<i>.</i><span className="fys-orb" style={ORB_STYLE} /><span className="fys-sunglow" style={GLOW_STYLE} /><span className="fys-front" style={FRONT_STYLE}><Art name="close-front" unit="em" className="fys-close-front" /></span><CloseRing style={ORB_STYLE} /><CollapseRings style={ORB_STYLE} /></span>
           <div className="fys-row">
-            <a href={cta.href} data-warp-trigger className="fys-btn">{cta.label}</a>
-            <a href={CLUB_HREF} className="fys-btn fys-ghost">Bring your club</a>
+            <SignUpKey cta={cta} />
+            <a href={CLUB_HREF} className="fys-cta fys-cta-ghost"><span className="fys-cta-l">Bring your club</span></a>
           </div>
           <p className="fys-fine">Already have an account? <a href={LOGIN_HREF} data-warp-trigger>Log in</a></p>
           <StoreLinks />
@@ -339,6 +339,21 @@ export function SystemLanding({ signupOpen }: { signupOpen: boolean }) {
 type StoreLink = { key: string; href: string; store: string };
 const APP_STORE_LINK: StoreLink | null = APP_STORE_URL ? { key: "app-store", href: APP_STORE_URL, store: "the App Store" } : null;
 const PLAY_STORE_LINK: StoreLink | null = PLAY_STORE_URL ? { key: "play-store", href: PLAY_STORE_URL, store: "Google Play" } : null;
+
+/** The sign-up key (Nov 24, 2026, buttons C): a cream pill whose label speaks like the headlines and ends in a full
+ *  stop, ink until you reach for it. In the hero (`seat`) that full stop is a stop on the travelling dot's way down
+ *  (coral-drop.tsx counts every .fys-stop), with one thin ring for its landing. The full stop is decoration, so the
+ *  button's name stays "Sign up free". */
+function SignUpKey({ cta, small = false, seat = false }: { cta: { label: string; href: string }; small?: boolean; seat?: boolean }) {
+  return (
+    <a href={cta.href} data-warp-trigger className={small ? "fys-cta fys-cta-primary fys-cta-sm" : "fys-cta fys-cta-primary"}>
+      <span className="fys-cta-l">
+        {cta.label}
+        <span className="fys-cta-end" aria-hidden="true"><i className={seat ? "fys-cta-stop fys-stop" : "fys-cta-stop"}>.</i>{seat && <b className="fys-cta-echo" />}</span>
+      </span>
+    </a>
+  );
+}
 
 function storeLinksFor(platform: Platform | null): StoreLink[] {
   if (isIosPlatform(platform)) return APP_STORE_LINK ? [APP_STORE_LINK] : [];

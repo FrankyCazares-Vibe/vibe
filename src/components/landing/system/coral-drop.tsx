@@ -9,6 +9,7 @@ import { useEffect, useRef } from "react";
  *
  * There is one coral full stop on the page, and it travels. It starts in
  * "yourself." (where it hops now and then, once the hero has arrived, until you scroll), and as the page scrolls it drops
+ * first into the full stop of the hero's "sign up free." key (Nov 24, buttons C: system-landing.tsx SignUpKey), then
  * from headline to headline: "made of your people.", "bring your club.",
  * "see you there.", "one campus at a time.", "before you sign up." and last
  * into "vibe." as its sun. At each one it lands with the sign-in dot's bounce

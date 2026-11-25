@@ -72,15 +72,101 @@ body.vibe-cursor-active:has(.fys-root), body.vibe-cursor-active:has(.fys-root) *
 .fys-body { margin: 16px 0 0; max-width: 31em; font-size: 15.5px; line-height: 1.55; color: var(--ink2); }
 .fys-body strong { color: var(--ink); font-weight: 600; }
 
-/* ---- buttons: pills, 52px (44px in the top bar) ---- */
-.fys-row { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-top: 22px; }
-.fys-btn { display: inline-flex; align-items: center; justify-content: center; height: 52px; padding: 0 22px; border-radius: 999px; background: var(--coral); color: #160A06; font: 700 16px/1 "DM Sans", sans-serif; text-decoration: none; white-space: nowrap; transition: transform 0.2s var(--vibe-spring-soft, ease), box-shadow 0.2s ease; }
-.fys-btn:hover { transform: translateY(-1px); box-shadow: 0 10px 30px rgba(255, 92, 53, 0.35); }
-.fys-btn-sm { height: 44px; padding: 0 18px; font-size: 15px; }
-.fys-ghost { background: transparent; color: var(--ink); box-shadow: inset 0 0 0 1.5px rgba(246, 241, 234, 0.3); }
-.fys-ghost:hover { box-shadow: inset 0 0 0 1.5px rgba(246, 241, 234, 0.55); background: rgba(246, 241, 234, 0.04); }
-.fys-tl { display: inline-flex; align-items: center; min-height: 44px; padding: 0 8px; color: var(--ink); font: 600 15px/1 "DM Sans", sans-serif; text-decoration: none; }
+/* ---- buttons (Nov 24, 2026, buttons C "type-led": campaigns/2026-11-landing-revamp/buttons/DECISION.md) ----
+   - Every button is a pill in the headlines' voice: lowercase soft Fraunces 900. No coral on any button at rest.
+   - Sign-up is a cream pill (the C Light app icon: dark words on cream); its label ends in a full stop, which in the
+     hero is a stop on the travelling dot's way down (coral-drop.tsx): on the first scroll the dot drops out of
+     "yourself." into the key and rests there, with one thin ring as it lands. Cream always means sign-up.
+   - "bring your club" is night with a 1 px cream line, everywhere. "log in" is the same voice with no pill.
+   - Motion: transform and opacity only, on the app's springs. Hover only on fine pointers. Works without JavaScript. */
+/* phones: one action per line, full width (max 420), on purpose, so the pair never depends on a few px of fit */
+.fys-row { display: flex; flex-direction: column; align-items: stretch; gap: 10px; width: 100%; max-width: 420px; margin-top: 24px; }
+@media (min-width: 600px) { .fys-row { flex-direction: row; flex-wrap: wrap; align-items: center; width: auto; max-width: none; } }
+/* the hero's pair stacks the same way whenever its column is under 390 px (a desktop under about 1000 px wide), with
+   room to spare for "join the waitlist." (.fys-hero-copy is the container) */
+@container (max-width: 389px) { .fys-row { flex-direction: column; align-items: stretch; width: 100%; max-width: 420px; } }
+
+.fys-cta {
+  --h: 54px; --fs: 18px; --pad: 20px; --stop-ink: var(--ink);
+  position: relative; display: inline-flex; align-items: center; justify-content: center;
+  min-width: 44px; min-height: var(--h); padding: 0 var(--pad);
+  /* invisible here; forced colours draw it, so every pill keeps its edge there */
+  border: 1px solid transparent; border-radius: 999px;
+  color: var(--ink); text-decoration: none; white-space: nowrap; text-transform: lowercase;
+  font-family: var(--font-soft), "Fraunces", Georgia, serif; font-weight: 900; font-size: var(--fs);
+  /* opsz 36, not the headlines' 144: at 16 to 20 px, 144 closes the counters of a, e and s */
+  font-variation-settings: "SOFT" 100, "opsz" 36; letter-spacing: -0.01em; word-spacing: 0.03em; line-height: 1;
+  -webkit-tap-highlight-color: transparent; touch-action: manipulation;
+}
+/* lowercase is centred on its x-height band (Safari 18.2+, Chrome 133+; older ones sit about 1 px low) */
+.fys-cta-l { display: block; text-box: trim-both ex alphabetic; }
+.fys-cta-primary { --stop-ink: var(--page); background: var(--ink); color: var(--page); }
+/* night inside the line dims any dust star behind the words; the bloom still shows through */
+.fys-cta-ghost { border-color: rgba(246, 241, 234, 0.5); background: rgba(12, 11, 11, 0.62); }
+.fys-cta-ghost::after, .fys-cta-primary::after { content: ""; position: absolute; inset: -1px; border-radius: inherit; pointer-events: none; opacity: 0; }
+.fys-cta-ghost::after { box-shadow: inset 0 0 0 1px rgba(246, 241, 234, 0.9); background: rgba(246, 241, 234, 0.05); }
+.fys-cta-primary::after { background: rgba(12, 11, 11, 0.1); }
+.fys-cta-sm { --h: 44px; --fs: 16px; --pad: 16px; }
+.fys-cta-link { --h: 44px; --fs: 16px; --pad: 10px; }
+/* phones under 360 px (an old SE): the top bar still fits "join the waitlist." beside "log in" */
+@media (max-width: 359px) { .fys-cta-sm { --fs: 14px; --pad: 12px; } .fys-cta-link { --fs: 15px; --pad: 6px; } }
+.fys-cta-link .fys-cta-l { position: relative; }
+.fys-cta-link .fys-cta-l::after { content: ""; position: absolute; left: 0; right: 0; bottom: -0.32em; height: 2px; border-radius: 1px; background: currentColor; opacity: 0; }
+
+/* the full stop: the glyph's own space, drawn as ink (::before) with a coral copy over it (::after) for the reach
+   states. The travelling dot turns the glyph itself coral, on its landing frame. */
+.fys-cta-end { position: relative; display: inline-block; }
+.fys-cta-stop { position: relative; display: inline-block; margin-left: 0.01em; font-style: normal; color: transparent; transform-origin: 50% 87%; }
+.fys-cta-stop::before, .fys-cta-stop::after { content: "."; position: absolute; left: 0; top: 0; }
+.fys-cta-stop::before { color: var(--stop-ink); }
+.fys-cta-stop::after { color: var(--coral); opacity: 0; }
+/* the dot is here (coral-drop.tsx sets data-here): the glyph is coral at once, no crossfade, so it never shows twice */
+.fys-cta-stop[data-here] { color: var(--coral); }
+.fys-cta-stop[data-here]::before { opacity: 0; transition: none; }
+/* while the dot runs, a headline's empty full stop is hidden; the button keeps its ink one */
+.fys-root[data-drop] .fys-cta-stop.fys-stop:not([data-here]) { visibility: visible; }
+/* the echo: one thin ink ring, drawn at its landed size (2.6 dots across, 1 px) round the full stop's centre */
+.fys-cta-echo { position: absolute; left: -0.138em; top: 0.4425em; width: 0.62em; height: 0.62em; border: 1px solid var(--page); border-radius: 50%; opacity: 0; pointer-events: none; }
+
+/* states, by fades (these stay with reduced motion) */
+.fys-cta-stop::before, .fys-cta-stop::after, .fys-cta-ghost::after, .fys-cta-primary::after, .fys-cta-link .fys-cta-l::after { transition: opacity 200ms var(--vibe-spring-soft); }
+.fys-cta-primary:is(:focus-visible, :active) .fys-cta-stop::after { opacity: 1; }
+.fys-cta-primary:is(:focus-visible, :active) .fys-cta-stop::before { opacity: 0; }
+.fys-cta-ghost:active::after { opacity: 1; }
+@media (hover: hover) and (pointer: fine) {
+  .fys-cta-primary:hover .fys-cta-stop::after { opacity: 1; }
+  .fys-cta-primary:hover .fys-cta-stop::before { opacity: 0; }
+  .fys-cta-ghost:hover::after { opacity: 1; }
+  .fys-cta-link:hover .fys-cta-l::after { opacity: 1; }
+}
+/* focus: a 2 px cream ring 3 px out that follows the pill (on the cream key the night gap makes it a double ring) */
 .fys-root a:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; }
+
+/* movement: only with motion allowed */
+@media (prefers-reduced-motion: no-preference) {
+  /* press: the app's .vibe-press, to 96% in 90 ms and back on SNAPPY */
+  .fys-cta { transition: transform 320ms var(--vibe-spring-snappy); }
+  .fys-cta:active { transform: scale(0.96); transition-duration: 90ms; }
+  /* reach: the full stop swells from the baseline on SOFT (a transition, so leaving mid-way never snaps) */
+  .fys-cta-stop { transition: transform 420ms var(--vibe-spring-soft); }
+  .fys-cta-primary:focus-visible .fys-cta-stop { transform: scale(1.15); }
+  @media (hover: hover) and (pointer: fine) { .fys-cta-primary:hover .fys-cta-stop { transform: scale(1.15); } }
+  .fys-cta-primary:active .fys-cta-stop, .fys-cta-primary:hover:active .fys-cta-stop { transform: scale(1.14, 0.88); transition: transform 90ms var(--vibe-spring-snappy); }
+  /* the dot lands here: coral-drop.tsx plays its own landing on the full stop; one ring runs out with it, once */
+  .fys-root[data-drop] .fys-cta-stop[data-here] + .fys-cta-echo { animation: fys-cta-echo 900ms var(--vibe-spring-soft) both; }
+}
+/* it starts just outside the dot and only shows once it is clear of it, so the dot never looks outlined */
+@keyframes fys-cta-echo { 0% { opacity: 0; transform: scale(0.45); } 12% { opacity: 0.55; } 100% { opacity: 0; transform: scale(1); } }
+@media (prefers-reduced-motion: reduce) {
+  /* nothing moves: the full stop still crossfades, and a press dims the key instead of shrinking it */
+  .fys-cta-primary:active::after { opacity: 1; }
+  .fys-cta-echo { display: none; }
+}
+@media (forced-colors: active) {
+  .fys-cta { border-color: LinkText; }
+  .fys-cta-primary { border-width: 2px; }
+  .fys-cta-ghost::after, .fys-cta-primary::after, .fys-cta-echo { display: none; }
+}
 
 /* ---- top bar ---- */
 .fys-bar { z-index: 6; display: flex; align-items: center; justify-content: space-between; height: 64px; max-width: 1600px; margin: 0 auto; padding: 0 max(20px, env(safe-area-inset-left)); padding-top: env(safe-area-inset-top); }
@@ -106,7 +192,7 @@ body.vibe-cursor-active:has(.fys-root), body.vibe-cursor-active:has(.fys-root) *
 /* The light (it breathes, below), then the coral sun itself. */
 .fys-sun::before { content: ""; position: absolute; left: 50%; top: 50%; width: 700%; height: 700%; translate: -50% -50%; border-radius: 50%; background: radial-gradient(closest-side, rgba(255, 92, 53, 0.42), rgba(255, 92, 53, 0.147) 45%, rgba(255, 92, 53, 0)); }
 .fys-sun::after { content: ""; position: absolute; inset: 0; border-radius: 50%; background: var(--coral); }
-.fys-hero-copy { position: relative; z-index: 5; max-width: 608px; margin: 0 auto; padding: 0 24px; }
+.fys-hero-copy { position: relative; z-index: 5; max-width: 608px; margin: 0 auto; padding: 0 24px; container-type: inline-size; }
 /* ---- made of your people ---- */
 .fys-people, .fys-club, .fys-eyes, .fys-open { position: relative; display: flex; flex-direction: column; max-width: 608px; margin: 0 auto; padding: 90px 24px 70px; }
 .fys-col { display: contents; }
@@ -242,7 +328,9 @@ body.vibe-cursor-active:has(.fys-root), body.vibe-cursor-active:has(.fys-root) *
 @keyframes fys-land { 0% { transform: scale(1.15, 0.72); } 28% { transform: translateY(-95%) scale(0.96, 1.05); } 52% { transform: translateY(0) scale(1.08, 0.84); } 68% { transform: translateY(-32%); } 84% { transform: translateY(0) scale(1.03, 0.95); } 100% { transform: none; } }
 .fys-close .fys-row { flex-direction: column; align-items: stretch; width: 100%; max-width: 420px; margin-top: 34px; }
 .fys-fine { margin: 14px 0 0; font-size: 14px; line-height: 1.5; color: var(--muted); }
-.fys-fine a { display: inline-flex; align-items: center; min-height: 44px; color: var(--ink2); }
+/* "Already have an account? Log in": the body's sans, underlined, padded to 50 x 44 without moving the words */
+.fys-fine a { display: inline-flex; align-items: center; justify-content: center; min-width: 44px; min-height: 44px; padding: 0 6px; margin: 0 -6px; color: var(--ink2); text-decoration: underline; text-decoration-thickness: 1px; text-decoration-color: rgba(207, 200, 190, 0.5); text-underline-offset: 4px; -webkit-tap-highlight-color: transparent; }
+@media (hover: hover) and (pointer: fine) { .fys-fine a:hover { text-decoration-color: currentColor; } }
 .fys-stores { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px 24px; margin-top: 8px; }
 .fys-stores a { color: rgba(246, 241, 234, 0.8); font-size: 13px; font-weight: 600; text-decoration: none; }
 .fys-stores b { color: var(--coral); }
@@ -262,8 +350,12 @@ body.vibe-cursor-active:has(.fys-root), body.vibe-cursor-active:has(.fys-root) *
   .fys-hl.fys-hero-hl { font-size: calc(78 * var(--U)); }
   .fys-hero-copy .fys-body { margin-top: 30px; }
   .fys-body { margin-top: 24px; font-size: clamp(15px, calc(17 * var(--U)), 18px); }
-  .fys-btn { height: 54px; padding: 0 28px; }
-  .fys-row { margin-top: 34px; }
+  .fys-row { gap: 12px; margin-top: 36px; }
+  /* 56 px, 20 px type and 28 px sides at 1440, scaling with the page's design px (--U) like everything else on it */
+  .fys-cta { --h: clamp(52px, calc(56 * var(--U)), 56px); --fs: clamp(17px, calc(20 * var(--U)), 20px); --pad: clamp(18px, calc(28 * var(--U)), 28px); }
+  /* after the line above, so the top bar keeps its 44 px (before, the desktop button height won: 54 px) */
+  .fys-cta-sm { --h: 44px; --fs: 17px; --pad: 18px; }
+  .fys-cta-link { --h: 44px; --fs: 17px; --pad: 10px; }
 
   .fys-bar { height: 76px; padding: 0 calc(48 * var(--U)); }
   .fys-wm { font-size: 32px; }
@@ -341,7 +433,6 @@ body.vibe-cursor-active:has(.fys-root), body.vibe-cursor-active:has(.fys-root) *
 :root:has(.fys-root.is-warping) .vibe-cookie-notice { opacity: 0; transition: opacity 0.3s ease; }
 @keyframes fys-night { from { opacity: 0; } }
 @media (prefers-reduced-motion: reduce) {
-  .fys-btn { transition: none; }
   .fys-root.is-warping::after { animation: none; }
   /* still, but the picture fades in once it's drawn (300 ms, opacity only) instead of popping in */
   .fys-dots { transition: opacity 0.3s ease-out; }

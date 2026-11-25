@@ -282,3 +282,21 @@ Shipped Nov 24, 2026, on Franky's yes ("Ship both"), as PR 15, after PR 14.
 - One selector in `system.css`: `:is(.fys-hero-hl, #fys-people-title) span`. The layout doesn't move, since the padding and its cancelling margin go together.
 
 Shipped Nov 24, 2026, on Franky's yes ("Ship it"), as PR 13.
+
+## The buttons speak like the headlines (Nov 24, Franky: "they look very generic and they don't really fit our style")
+- **Picked from four directions** (judged on brand, clarity and craft; the boards and `DECISION.md` are in `vibe-marketing/campaigns/2026-11-landing-revamp/buttons/`): C, type-led, with A's landing ring.
+- **Every button is a pill in the headlines' voice:** lowercase soft Fraunces 900. No coral on any button at rest.
+- **Sign-up is a cream key** with dark words, like the Light app icon. Its label ends in a full stop: ink at rest, coral when you reach for it (hover on a mouse, a press, keyboard focus). Cream always means sign-up.
+- **"bring your club" is night with a 1 px cream line, everywhere** (it was a coral pill in its own section). "log in" is the same voice with no pill.
+- **The travelling dot rests in the hero's key:** on the first scroll it drops out of "yourself." into the key's full stop and rests there, coral, with one thin ring as it lands. Then it falls on to "made of your people." as before. It is just another `.fys-stop` (`SignUpKey` in `system-landing.tsx`), so `coral-drop.tsx` needs no change and the planet, the campus lights, the collapse and the ring of light still find their own stops.
+- **Phones stack every pair full width** (max 420 px), and so does the hero's pair when its column is under 390 px (desktops under about 1000 px).
+- **Fixed on the way:**
+  - the top bar's sign-up is 44 px on desktop (it was 54);
+  - the close's "Log in" link is 50 x 44 (it was 38 x 44).
+- **Reduced motion:** nothing moves; the full stop still crossfades, and a press dims the key.
+- **No JavaScript:** everything is in place, and the key's full stop is ink.
+- **Forced colours:** every pill keeps a system-colour edge.
+- **Measured (Chrome at 390 and 1440, Safari on the iOS simulator):** see the PR. Labels read 15.3:1 to 17.49:1 against the real pixels behind them; every target is at least 44 px tall; no frame shows two coral dots.
+- **Brand guide (Franky's OK needed):** "Pills for anything you tap" stays word for word. Two lines would be added:
+  - after "DM Sans 600 to 700 for buttons": "(the landing's buttons use soft Fraunces 900, lowercase, like its headlines)";
+  - in the dot spec: "It can rest in the sign-up button's full stop."
