@@ -322,10 +322,10 @@ export function SystemLanding({ signupOpen }: { signupOpen: boolean }) {
       {/* No data-warp-trigger in the footer: the warp would hijack these links. */}
       {/* the coral full stop: one dot that drops from headline to headline as the page scrolls, down into "vibe." */}
       <CoralDrop />
-      {/* the buttons' press: a beat that plays to its end however short the tap (cta-press.tsx) */}
-      <CtaPress />
       {/* the starfield camera: the dust behind the page in three depths, moving with the scroll (starfield.tsx) */}
       <Starfield />
+      {/* the buttons' press: a beat that plays to its end however short the tap (cta-press.tsx) */}
+      <CtaPress />
       <footer className="fys-footer">
         <span>© CONNECTVIBE. LLC</span>
         <nav aria-label="Legal and support">
