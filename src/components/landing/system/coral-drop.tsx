@@ -125,8 +125,10 @@ export function CoralDrop() {
       host.dispatchEvent(new CustomEvent("fys-measure", { detail: { L, rest } }));
       R = Math.max(...P.map((p) => p.r));
       dot.style.width = dot.style.height = `${(R * 2).toFixed(1)}px`;
-      // the glow scales with the dot: make it 16px at a headline's size, as it was
-      const head = P.length > 1 ? P[1].r : R;
+      // the glow scales with the dot: make it 16px at a headline's size, as it was (the first headline's full stop past
+      // home, not stop 1, which is the sign-up key's small one since Nov 24)
+      const hi = stops.findIndex((el, j) => j > 0 && !!el.closest(".fys-hl"));
+      const head = hi > 0 ? P[hi].r : R;
       dot.style.boxShadow = `0 0 ${((16 * R) / head).toFixed(1)}px rgba(255, 92, 53, 0.45)`;
     };
     measure();

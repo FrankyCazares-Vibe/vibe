@@ -107,6 +107,10 @@ body.vibe-cursor-active:has(.fys-root), body.vibe-cursor-active:has(.fys-root) *
 .fys-cta-ghost::after { box-shadow: inset 0 0 0 1px rgba(246, 241, 234, 0.9); background: rgba(246, 241, 234, 0.05); }
 .fys-cta-primary::after { background: rgba(12, 11, 11, 0.1); }
 .fys-cta-sm { --h: 44px; --fs: 16px; --pad: 16px; }
+/* the top bar gives way rather than running off a narrow phone (WCAG 1.4.12 text spacing with "join the waitlist."):
+   the key may wrap inside a taller pill; at normal spacing it never needs to */
+.fys-bar nav { min-width: 0; }
+.fys-bar .fys-cta-sm { min-width: 0; white-space: normal; text-align: center; }
 .fys-cta-link { --h: 44px; --fs: 16px; --pad: 10px; }
 /* phones under 360 px (an old SE): the top bar still fits "join the waitlist." beside "log in" */
 @media (max-width: 359px) { .fys-cta-sm { --fs: 14px; --pad: 12px; } .fys-cta-link { --fs: 15px; --pad: 6px; } }
@@ -148,11 +152,13 @@ body.vibe-cursor-active:has(.fys-root), body.vibe-cursor-active:has(.fys-root) *
   /* press: the app's .vibe-press, to 96% in 90 ms and back on SNAPPY */
   .fys-cta { transition: transform 320ms var(--vibe-spring-snappy); }
   .fys-cta:active { transform: scale(0.96); transition-duration: 90ms; }
-  /* reach: the full stop swells from the baseline on SOFT (a transition, so leaving mid-way never snaps) */
-  .fys-cta-stop { transition: transform 420ms var(--vibe-spring-soft); }
-  .fys-cta-primary:focus-visible .fys-cta-stop { transform: scale(1.15); }
-  @media (hover: hover) and (pointer: fine) { .fys-cta-primary:hover .fys-cta-stop { transform: scale(1.15); } }
-  .fys-cta-primary:active .fys-cta-stop, .fys-cta-primary:hover:active .fys-cta-stop { transform: scale(1.14, 0.88); transition: transform 90ms var(--vibe-spring-snappy); }
+  /* reach: the full stop swells from the baseline on SOFT (a transition, so leaving mid-way never snaps). On `scale`,
+     not `transform`, so it adds to the travelling dot's landing bounce (coral-drop.tsx animates `transform`) instead
+     of being replaced by it and snapping back when the bounce ends */
+  .fys-cta-stop { transition: scale 420ms var(--vibe-spring-soft); }
+  .fys-cta-primary:focus-visible .fys-cta-stop { scale: 1.15; }
+  @media (hover: hover) and (pointer: fine) { .fys-cta-primary:hover .fys-cta-stop { scale: 1.15; } }
+  .fys-cta-primary:active .fys-cta-stop, .fys-cta-primary:hover:active .fys-cta-stop { scale: 1.14 0.88; transition: scale 90ms var(--vibe-spring-snappy); }
 }
 @media (prefers-reduced-motion: reduce) {
   /* nothing moves: the full stop still crossfades, and a press dims the key instead of shrinking it */

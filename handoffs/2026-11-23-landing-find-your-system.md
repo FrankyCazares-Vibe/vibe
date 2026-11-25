@@ -288,11 +288,17 @@ Shipped Nov 24, 2026, on Franky's yes ("Ship it"), as PR 13.
 - **Every button is a pill in the headlines' voice:** lowercase soft Fraunces 900. No coral on any button at rest.
 - **Sign-up is a cream key** with dark words, like the Light app icon. Its label ends in a full stop: ink at rest, coral when you reach for it (hover on a mouse, a press, keyboard focus). Cream always means sign-up.
 - **"bring your club" is night with a 1 px cream line, everywhere** (it was a coral pill in its own section). "log in" is the same voice with no pill.
-- **The travelling dot rests in the hero's key:** on the first scroll it drops out of "yourself." into the key's full stop and rests there, coral, with one thin ring as it lands. Then it falls on to "made of your people." as before. It is just another `.fys-stop` (`SignUpKey` in `system-landing.tsx`), so `coral-drop.tsx` needs no change and the planet, the campus lights, the collapse and the ring of light still find their own stops. The ring is `key-echo.tsx`: like the close's ring of light, it plays only when the dot lands from above, never when the dot comes back up or is simply placed (a reload).
+- **The travelling dot rests in the hero's key:** on the first scroll it drops out of "yourself." into the key's full stop and rests there, coral, with one thin ring as it lands. Then it falls on to "made of your people." as before. It is just another `.fys-stop` (`SignUpKey` in `system-landing.tsx`), so `coral-drop.tsx` needs no change and the planet, the campus lights, the collapse and the ring of light still find their own stops. The ring is `key-echo.tsx`: like the close's ring of light, it plays only when the dot lands from above, never coming back up, and only once the reader has touched, scrolled or pressed a key (a reload or Back to the key's rest can fly the dot in by itself; PR 16 stops that flight). The dot's glow is sized from the first headline's full stop, not from stop 1, which is now the key's small one.
 - **Phones stack every pair full width** (max 420 px), and so does the hero's pair when its column is under 390 px (desktops under about 1000 px).
 - **Fixed on the way:**
   - the top bar's sign-up is 44 px on desktop (it was 54);
-  - the close's "Log in" link is 50 x 44 (it was 38 x 44).
+  - the close's "Log in" link is 50 x 44 (it was 38 x 44);
+  - with WCAG text spacing on a 320 to 375 px phone, the top bar's "join the waitlist." wraps inside its pill instead of running off the screen.
+- **A review workflow** (two reviewers, each finding re-checked) found four problems, all fixed:
+  - the glow sizing;
+  - the ring on a restored scroll;
+  - the hover swell snapping after a landing bounce (the swell is now on `scale`, so it adds to the bounce);
+  - the text-spacing overflow.
 - **Reduced motion:** nothing moves; the full stop still crossfades, and a press dims the key.
 - **No JavaScript:** everything is in place, and the key's full stop is ink.
 - **Forced colours:** every pill keeps a system-colour edge.
