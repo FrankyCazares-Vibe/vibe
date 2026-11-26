@@ -363,3 +363,11 @@ Shipped Nov 25, 2026, on Franky's yes ("Ship 16, 17 and 18"), as PR 17, after PR
   - check a real iPhone and a mid-range Android.
 
 Shipped Nov 25, 2026, on Franky's yes ("Ship 16, 17 and 18"), as PR 18, after PRs 16 and 17.
+
+## Two button glitches fixed (Nov 26, Franky: "Yes, fix them", after the check before shipping PRs 16 to 18)
+- **The hero key's sun no longer drops back on a slow reload.** With the pointer resting on "sign up free." while the page loaded slowly, the risen coral sun fell back into the full stop when the page's script started, then rose again. `coral-drop.tsx` now marks the page as the dot's (`data-drop`) in the same step as its first placement, so no style pass ever sees the dot "in the air" before it has a place. Measured with the page's scripts held back 250 and 900 ms: production drops the sun from up to 17.5° to 0°; now it carries on (17.5° to 17.5°, 15.6° to 15.7°).
+- **One ring at a time in the key.** Tapping the key just after the dot landed in it played the landing ring (`key-echo.tsx`) and the press ring together for up to about 0.8 s. Now the newer one wins and the older one crossfades out:
+  - a press that commits (after a touch's hop, so a swipe that starts on the key leaves the landing ring alone) dims the landing ring where it is, linearly, over the press's fall plus 40 ms;
+  - a landing stops a press ring that hasn't shown yet, or fades a showing one's window out over 120 ms.
+  - Over 28 press-and-landing timings at 390 and 1440, frames with both rings showing went from 414 to 69, and what is left is those short crossfades (at most 0.41 opacity). A swipe on the key no longer shortens the landing ring.
+- **Checked:** the restore traces, the landing order, the key's ring and the button suite all match production; 4,237 tests pass; an independent review and a break-it pass (a skeptic on each finding) found nothing serious, and their four small points are in this fix.

@@ -17,7 +17,10 @@ import { useEffect, useRef } from "react";
  *   ever left held.
  * Every change is a class on the link, so the movement stays on CSS transitions; with reduced motion it is only
  * fades. Without this script, :active plays a simpler press (system.css reads data-press on the root). It never
- * touches the full stop's glyph or data-here (coral-drop.tsx) or .fys-cta-echo (key-echo.tsx).
+ * touches the full stop's glyph or data-here (coral-drop.tsx). One touch of key-echo.tsx's .fys-cta-echo: once a press
+ * commits (it sets, after a touch's hop, so a touch that turns into a scroll leaves it alone), a landing ring still
+ * running in its key dims where it is, linearly over the fall and 40 ms more, as the press's own ring comes in (Nov 26;
+ * for the other order, key-echo.tsx stops the press's ring or fades it out).
  */
 const SEL = ".fys-cta, .fys-fine a";
 const BEAT = ["is-down", "is-hop", "is-set", "is-quick", "is-cancel"];
@@ -37,6 +40,15 @@ export function CtaPress() {
       return v.endsWith("ms") ? n : v.endsWith("s") ? n * 1000 : n;
     };
     const clear = (b: Beat) => { window.clearTimeout(b.t); window.clearTimeout(b.up); };
+    // a landing ring still running: let it go dim where it is, from wherever it has got to (backwards fill, so the
+    // frame before the dim starts doesn't drop to the ring's base of 0)
+    const dim = (el: HTMLElement, ms: number) => {
+      const running = el.getAnimations().filter((x) => x.playState === "running");
+      if (!running.length) return;
+      const cs = getComputedStyle(el), from = { opacity: cs.opacity, transform: cs.transform };
+      running.forEach((x) => x.cancel());
+      el.animate([from, { opacity: "0", transform: from.transform }], { duration: Math.max(60, ms), fill: "backwards" });
+    };
 
     const press = (a: HTMLElement, hop: boolean) => {
       const old = beats.get(a);
@@ -53,6 +65,7 @@ export function CtaPress() {
         a.classList.add("is-set");
         if (hop) a.classList.add("is-quick");
         const fall = still.matches ? 0 : num(a, "--fall");
+        a.querySelectorAll<HTMLElement>(".fys-cta-echo").forEach((el) => dim(el, fall + 40));
         b.landAt = performance.now() + fall;
         b.end = still.matches ? b.landAt : b.landAt + Math.max(num(a, "--land"), num(a, "--beat"));
       };

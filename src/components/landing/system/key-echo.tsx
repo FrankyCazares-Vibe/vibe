@@ -27,6 +27,17 @@ export function KeyEcho() {
     const onLand = (e: Event) => {
       const d = (e as CustomEvent<{ stop: Element; fromAbove: boolean }>).detail;
       if (d.stop !== stop || !d.fromAbove || !byReader) return;
+      // a press's ring in this key (cta-press.tsx, system.css .fys-cta-ring): the newer landing wins (Nov 26). Not
+      // shown yet (still in its delay, the press's fall), it simply doesn't play; showing, its window fades out where
+      // it is, linearly over 120 ms, and then it stops.
+      const win = r.parentElement?.querySelector<HTMLElement>(":scope > .fys-cta-ring");
+      const press = (win?.getAnimations({ subtree: true }) ?? []).filter((a) => a.playState === "running" && (a as CSSAnimation).animationName === "fys-cta-ring");
+      press.forEach((a) => {
+        const t = a.effect?.getComputedTiming();
+        if (Number(t?.localTime ?? 0) < Number(a.effect?.getTiming().delay ?? 0)) { a.cancel(); return; }
+        const fade = win!.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 120, fill: "forwards" });
+        fade.finished.then(() => { a.cancel(); fade.cancel(); }, () => {});
+      });
       r.getAnimations().forEach((a) => a.cancel());
       // per-keyframe easing, so it fades in fast and out slowly, as the board's CSS did
       r.animate([

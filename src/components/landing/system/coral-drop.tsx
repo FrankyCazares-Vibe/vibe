@@ -106,7 +106,6 @@ export function CoralDrop() {
     dot.className = "fys-drop";
     dot.setAttribute("aria-hidden", "true");
     host.appendChild(dot);
-    host.dataset.drop = "";
 
     // a full stop's ink, in the page root's own px: a headline's from the font's own measures (its <i> box is wider
     // than the dot), the close's sun from its own box
@@ -321,6 +320,10 @@ export function CoralDrop() {
     // start where the page is (the top, or partway down already), then tell the collapse where the dot lands
     if (window.scrollY > SCROLLED) hopsOff = true;
     placeAt();
+    // only now does the page hand its full stops to the dot (system.css [data-drop]): set in the same step as the first
+    // placement, so no style pass ever sees the dot running with no stop of its own, which reads as "in the air" and
+    // would set a sign-up key's risen sun back down under a resting pointer (Nov 26). Nothing above measures it.
+    host.dataset.drop = "";
     announce();
     return () => {
       gone = true;
