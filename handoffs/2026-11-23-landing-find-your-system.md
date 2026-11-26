@@ -371,3 +371,5 @@ Shipped Nov 25, 2026, on Franky's yes ("Ship 16, 17 and 18"), as PR 18, after PR
   - a landing stops a press ring that hasn't shown yet, or fades a showing one's window out over 120 ms.
   - Over 28 press-and-landing timings at 390 and 1440, frames with both rings showing went from 414 to 69, and what is left is those short crossfades (at most 0.41 opacity). A swipe on the key no longer shortens the landing ring.
 - **Checked:** the restore traces, the landing order, the key's ring and the button suite all match production; 4,237 tests pass; an independent review and a break-it pass (a skeptic on each finding) found nothing serious, and their four small points are in this fix.
+
+Shipped Nov 26, 2026, on Franky's yes ("Ship it"), as PR 19.
