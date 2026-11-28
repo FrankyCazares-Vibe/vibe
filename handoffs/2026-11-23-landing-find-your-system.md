@@ -382,3 +382,5 @@ Shipped Nov 26, 2026, on Franky's yes ("Ship it"), as PR 19.
   - a jump to a section (the hero's "bring your club" link) sets the lines for where the jump lands from the click itself, since the browser paints the first frame at the new place before any scroll event; and Back or Forward between the top and #fys-club repaints on hashchange. Dust frames: jumps 0 of 20 (live 16 of 20, seen with a scripted click; a real tap in headless Chrome didn't show it on live either), Back and Forward 0 of 48 (live 39 of 48).
   - Not covered: a load slow enough that the page's scripts arrive after the first paint still shows the old look until they do, as before; only an inline script could reach that, and it only matters on restores partway down.
 - **Checked:** 4,237 tests pass; an independent review and a break-it pass found nothing serious, and their small points are in this change.
+
+Shipped Nov 28, 2026, on Franky's yes ("Ship it"), as PR 20.
