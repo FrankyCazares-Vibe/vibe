@@ -660,10 +660,14 @@ body.vibe-cursor-active:has(.fys-root), body.vibe-cursor-active:has(.fys-root) *
 
 /* Leaving for log in or sign-up (system-landing.tsx): night falls over the whole page (the picture, the notes, the
    travelling dot, the static dust) while the hero's dust, pinned over the screen above it, streaks outward
-   (night-sky.tsx). Pinned, it plays from the close's buttons too. The curtain also takes any second click. */
-.fys-root.is-warping::after { content: ""; position: fixed; inset: 0; z-index: 41; background: var(--page); animation: fys-night 0.4s ease both; }
+   (night-sky.tsx). Pinned, it plays from the close's buttons too. The curtain also takes any second click. Night
+   waits 120 ms (Nov 28; buttons-motion/DECISION.md item 9), so a quick tap's press lands and rings in the light:
+   measured on a 90 ms tap, night at the ring's peak is 0 to 2% on a desktop and 4 to 16% on a phone (it was 58 to 74%).
+   Night is still whole by about 520 ms, before the page changes at 750 ms (WARP_DURATION_MS). The cookie notice leaves
+   with the night, and takes no tap while it goes (it sits above the curtain). */
+.fys-root.is-warping::after { content: ""; position: fixed; inset: 0; z-index: 41; background: var(--page); animation: fys-night 0.4s ease 120ms both; }
 .fys-root.is-warping .fys-hero .vln-sky { position: fixed; inset: 0; z-index: 42; }
-:root:has(.fys-root.is-warping) .vibe-cookie-notice { opacity: 0; transition: opacity 0.3s ease; }
+:root:has(.fys-root.is-warping) .vibe-cookie-notice { opacity: 0; pointer-events: none; transition: opacity 0.3s ease 120ms; }
 @keyframes fys-night { from { opacity: 0; } }
 @media (prefers-reduced-motion: reduce) {
   .fys-root.is-warping::after { animation: none; }

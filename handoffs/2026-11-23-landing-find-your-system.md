@@ -373,3 +373,12 @@ Shipped Nov 25, 2026, on Franky's yes ("Ship 16, 17 and 18"), as PR 18, after PR
 - **Checked:** the restore traces, the landing order, the key's ring and the button suite all match production; 4,237 tests pass; an independent review and a break-it pass (a skeptic on each finding) found nothing serious, and their four small points are in this fix.
 
 Shipped Nov 26, 2026, on Franky's yes ("Ship it"), as PR 19.
+
+## Polish: night waits for a quick tap, and the heading dots on jumps and reloads (Nov 28, Franky: "Yes, do both")
+- **Night falls 120 ms later in the warp** (`buttons-motion/DECISION.md` item 9). A quick tap's press now lands and rings in the light: on a 90 ms tap, night at the ring's peak is 0 to 2% on a desktop and 4 to 16% on a phone (it was 58 to 74%). Night is still whole before the page changes at 750 ms. The cookie notice leaves with the night.
+- **The warp takes one activation.** Pressing Enter on "log in" again mid-warp loaded the page twice (a full page load, then the client jump); a tap on the cookie notice (it sits above the curtain) opened the privacy page and then jumped to sign-up anyway. Now a second activation does nothing, the notice takes no tap while it leaves, and the warp's timer is cleared if the page goes elsewhere first. Every double click, double tap and double Enter measured makes one navigation.
+- **Heading dots, two timing edges** (`heading-dots.tsx`):
+  - it sets its lines before the first paint after hydration (a layout effect): a reload partway down showed one frame of the old look at the screen's edges; 12 wrong line-frames on today's main, 0 now (same machine);
+  - a jump to a section (the hero's "bring your club" link) sets the lines for where the jump lands from the click itself, since the browser paints the first frame at the new place before any scroll event; and Back or Forward between the top and #fys-club repaints on hashchange. Dust frames: jumps 0 of 20 (live 16 of 20, seen with a scripted click; a real tap in headless Chrome didn't show it on live either), Back and Forward 0 of 48 (live 39 of 48).
+  - Not covered: a load slow enough that the page's scripts arrive after the first paint still shows the old look until they do, as before; only an inline script could reach that, and it only matters on restores partway down.
+- **Checked:** 4,237 tests pass; an independent review and a break-it pass found nothing serious, and their small points are in this change.

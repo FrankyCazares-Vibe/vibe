@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useLayoutEffect, useRef } from "react";
 import { FALL } from "./coral-drop";
 import { HOLD, STEP, lineAt } from "./heading-line";
 
@@ -22,13 +22,18 @@ import { HOLD, STEP, lineAt } from "./heading-line";
  * only does arithmetic and writes --fys-line where a step changed. With reduced motion, or without JavaScript, nothing
  * is set and every headline looks as it does today. Starfield, the collapse and "vibe." are untouched; the wordmark
  * never dissolves.
+ *
+ * Two edges of time (Nov 28): it sets its lines before the first paint after hydration (a layout effect), and a jump to
+ * a section (an in-page #link) sets them for where the jump lands from the click itself, in the same step as the jump:
+ * the browser paints the first frame at the new place before any scroll event, which showed "bring your club." as dust.
+ * Back and Forward between hash entries repaint on hashchange, which arrives with the scroll already restored.
  */
 
 type Line = { el: HTMLElement; hero: boolean; hold: number; top: number; h: number; step: number };
 
 export function HeadingDots() {
   const marker = useRef<HTMLSpanElement>(null);
-  useEffect(() => {
+  useLayoutEffect(() => {
     const root = marker.current?.closest<HTMLElement>(".fys-root");
     if (!root || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
     if (!CSS.supports("(-webkit-background-clip: text) or (background-clip: text)")) return;
@@ -44,14 +49,27 @@ export function HeadingDots() {
       const y = window.scrollY;
       for (const l of lines) { const b = l.el.getBoundingClientRect(); l.top = b.top + y; l.h = b.height; }
     };
-    const paint = () => {
-      raf = 0;
-      if (gone) return;
-      const y = window.scrollY;
+    const paintAt = (y: number) => {
       for (const l of lines) {
         const step = Math.round(lineAt(l.top - y, vh, l.h, l.hold, l.hero, l.top, FALL) / STEP);
         if (step !== l.step) { l.step = step; l.el.style.setProperty("--fys-line", `${(step * STEP).toFixed(3)}em`); }
       }
+    };
+    const paint = () => { raf = 0; if (!gone) paintAt(window.scrollY); };
+    // a click on an in-page link: where the browser's jump will put the page (the target's top, less its scroll margin
+    // and the page's scroll padding, inside the page's range), painted now; the scroll event that follows confirms it
+    const onClick = (e: MouseEvent) => {
+      if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+      const a = (e.target as Element | null)?.closest?.<HTMLAnchorElement>('a[href^="#"]');
+      const id = a?.getAttribute("href")?.slice(1);
+      // as the browser does: the id as written, then decoded (a malformed escape is just not found)
+      let to = id ? document.getElementById(id) : null;
+      if (!to && id) { try { to = document.getElementById(decodeURIComponent(id)); } catch { to = null; } }
+      if (!to || !root.contains(to)) return;
+      const page = document.documentElement;
+      const pad = parseFloat(getComputedStyle(page).scrollPaddingTop) || 0, margin = parseFloat(getComputedStyle(to).scrollMarginTop) || 0;
+      const y = to.getBoundingClientRect().top + window.scrollY - margin - pad;
+      paintAt(Math.max(0, Math.min(page.scrollHeight - window.innerHeight, y)));
     };
     const onScroll = () => { if (!raf) raf = requestAnimationFrame(paint); };
     const onResize = () => { measure(); paint(); };
@@ -66,6 +84,9 @@ export function HeadingDots() {
     measure(); paint();
     window.addEventListener("scroll", onScroll, { passive: true });
     window.addEventListener("resize", onResize);
+    document.addEventListener("click", onClick);
+    // Back and Forward between the top and a #section: the scroll is restored by hashchange, before the scroll event
+    window.addEventListener("hashchange", paint);
     root.addEventListener("fys-measure", onMeasure);
     document.fonts?.ready.then(() => { if (!gone) onResize(); });
     const sized = new ResizeObserver(onResize);
@@ -75,6 +96,8 @@ export function HeadingDots() {
       cancelAnimationFrame(raf);
       window.removeEventListener("scroll", onScroll);
       window.removeEventListener("resize", onResize);
+      document.removeEventListener("click", onClick);
+      window.removeEventListener("hashchange", paint);
       root.removeEventListener("fys-measure", onMeasure);
       sized.disconnect();
       lines.forEach((l) => l.el.style.removeProperty("--fys-line"));
