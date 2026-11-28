@@ -3,7 +3,7 @@
 import { KineticWordmark } from "@/components/brand/KineticWordmark";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useState, type CSSProperties, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 
 import { enabledSchoolSystems } from "@/lib/auth/school-email-domains";
 import { SYSTEM_LABEL } from "@/lib/iu/campuses";
@@ -143,6 +143,7 @@ export function SystemLanding({ signupOpen }: { signupOpen: boolean }) {
   const router = useRouter();
   const cta = landingCta(signupOpen);
   const [warping, setWarping] = useState(false);
+  const warpTimer = useRef(0);
   // The hero's picture and its notes fade in together once the dots are drawn (system.css).
   const [drawn, setDrawn] = useState(false);
   const onDrawn = useCallback(() => setDrawn(true), []);
@@ -172,7 +173,10 @@ export function SystemLanding({ signupOpen }: { signupOpen: boolean }) {
   // so it plays from the close's buttons too. It goes at once with reduced motion.
   useEffect(() => {
     function onClick(e: MouseEvent) {
-      if (warping || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+      // once it's going, a second activation of a link does nothing: a pointer meets the curtain (system.css), but a
+      // key (Enter again) doesn't hit-test, and would follow the link itself (Nov 28)
+      if (warping) { if ((e.target as HTMLElement | null)?.closest?.("a[href]")) e.preventDefault(); return; }
+      if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
       const trigger = (e.target as HTMLElement | null)?.closest("[data-warp-trigger]");
       if (!trigger) return;
       e.preventDefault();
@@ -182,11 +186,13 @@ export function SystemLanding({ signupOpen }: { signupOpen: boolean }) {
       const still = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
       setWarping(true);
       router.prefetch(dest);
-      window.setTimeout(() => router.push(dest), still ? 0 : WARP_DURATION_MS);
+      warpTimer.current = window.setTimeout(() => router.push(dest), still ? 0 : WARP_DURATION_MS);
     }
     document.addEventListener("click", onClick, true);
     return () => document.removeEventListener("click", onClick, true);
   }, [router, warping]);
+  // the page went somewhere else first (a link above the curtain): the warp's own jump is off
+  useEffect(() => () => window.clearTimeout(warpTimer.current), []);
 
   return (
     <div className={`fys-root ${frauncesSoft.variable} ${landingMono.variable}${warping ? " is-warping" : ""}`}>
