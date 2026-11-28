@@ -6,6 +6,7 @@ import { Suspense, useEffect, useRef, useState } from "react";
 
 import { SuspendedActions, useOwnHandle } from "@/app/account/suspended/suspended-actions";
 import { isSafeRelativePath } from "@/lib/auth/login-next";
+import { SCHOOL_CODE_LIFE_WORDS, SCHOOL_CODE_WINDOW_SEC } from "@/lib/auth/school-code-life";
 import { isSchoolEmail, SCHOOL_DOMAINS_HEADLINE_LABEL } from "@/lib/auth/school-email-domains";
 import { useAppShell } from "@/lib/native/use-app-shell";
 import { isIosPlatform } from "@/lib/pwa/display-mode";
@@ -26,7 +27,7 @@ const RESEND_COOLDOWN_SEC = 60;
 const ONBOARDING_PATH = "/onboarding";
 const OFFLINE = "We couldn't reach Vibe. Check your connection and try again.";
 const SIGNED_OUT =
-  "You were signed out. Sign in, then type the same code again. It works for at least 30 minutes after we sent it.";
+  `You were signed out. Sign in, then type the same code again. It works for at least ${SCHOOL_CODE_LIFE_WORDS} after we sent it.`;
 const SIGNED_OUT_SEND = "You were signed out. Sign in to send your school email.";
 // The one 5xx body from /request written for students (a failed send). Any
 // other 5xx text can name server config, so it shows OFFLINE instead. Newer
@@ -38,10 +39,10 @@ const SEND_FAILED = "We couldn't send the email right now. Try again in a minute
  * The address the last email went to, per tab, so the code box is still here
  * after "You were signed out. Sign in" sends the student through login and
  * back. Never in a URL. Bound to the account that asked (a code only works
- * for that user id) and to the 30-minute code window.
+ * for that user id) and to the code's window (school-code-life.ts).
  */
 const SENT_KEY = "vibe.schoolEmailSent.v1";
-const SENT_TTL_MS = 30 * 60 * 1000;
+const SENT_TTL_MS = SCHOOL_CODE_WINDOW_SEC * 1000;
 
 type SentRecord = { sentTo: string; userId: string; at: number };
 
@@ -114,7 +115,7 @@ function SendFailureLine({ failure }: { failure: { to: string; resend: boolean }
         )}
       </strong>{" "}
       {failure.resend
-        ? "The code in the last one works for 30 minutes after it was sent. Try sending again in a minute."
+        ? `The code in the last one works for at least ${SCHOOL_CODE_LIFE_WORDS} after it was sent. Try sending again in a minute.`
         : "Check the address for typos. If it's right, try again in a minute."}
     </div>
   );
@@ -727,6 +728,14 @@ function SchoolEmailInner() {
                 your phone? Just type the code here.
               </p>
             )}
+            {/* Nov 28, 2026: school inboxes were holding these for about 30
+                minutes (school-code-life.ts), so say the code outlives the
+                wait and that a resend never cancels an earlier email. */}
+            <p className="vibe-auth-tip">
+              School inboxes can hold mail from new apps for a while. The code
+              works for at least {SCHOOL_CODE_LIFE_WORDS}, and sending again
+              never cancels the first email, so a late one still works.
+            </p>
           </form>
         ) : (
           <form onSubmit={onSubmit} className="vibe-auth-form">

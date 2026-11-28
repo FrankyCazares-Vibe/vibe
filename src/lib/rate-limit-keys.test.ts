@@ -240,7 +240,7 @@ const STUBS: Record<string, string> = {
   "@/lib/auth/school-email-token": dataModule(
     "export const isSchoolVerifySecretConfigured = () => true;\n" +
       "export const normalizeSchoolEmail = (s) => s.trim().toLowerCase();\n" +
-      "export const SCHOOL_CODE_LENGTH = 8;\nexport const SCHOOL_CODE_WINDOW_SEC = 1800;\n" +
+      "export const SCHOOL_CODE_LENGTH = 8;\nexport const SCHOOL_CODE_WINDOW_SEC = 21600;\n" +
       "export const schoolEmailCode = () => '12345678';\nexport const signSchoolEmailToken = () => 'tok';",
   ),
   "@/lib/legal/require-terms": dataModule("export async function requireTermsAccepted() { return null; }"),

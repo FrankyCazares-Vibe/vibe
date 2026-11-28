@@ -53,8 +53,11 @@ function pageCopy(): string {
 // password typed there again right after the code (and the sign-up page
 // records its own tick); every other confirmation meets the "Choose your
 // password" screen or /auth/terms, which ask for the tick again.
+// Nov 28, 2026: sign-up takes any email the person can open now, so the
+// school email's one-step line names its case and the other email gets its own.
 const SECTION_2 = [
-  "Typing it confirms your account and verifies your school email in one step.",
+  "If it is your school email, typing the code confirms your account and verifies your school email in one step.",
+  "If it is another email, typing the code confirms your account, and Vibe then asks for your school email and emails it a code of its own.",
   "The password that works is the one chosen by the person who types the code, so confirming removes any password set for your address before then.",
   "If you type the code on the page where you just typed your password (the sign-up page or Log in), Vibe sets that password again at once.",
   "If you confirm anywhere else, Vibe asks you to choose a password.",
@@ -76,6 +79,8 @@ const OLD = [
   "a password set for your address before you confirmed it stops working",
   "If your account is confirmed before it has a password",
   "and which screen you accepted on",
+  // Before Nov 28, 2026: sign-up asked for the school email only.
+  "Sign-up asks for your school email, a password",
 ] as const;
 
 /** The text between two markers, folded onto one line. */

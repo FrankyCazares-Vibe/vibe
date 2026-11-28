@@ -1,6 +1,8 @@
 import "server-only";
 import { createHmac, randomBytes, timingSafeEqual } from "crypto";
 
+import { SCHOOL_CODE_WINDOW_SEC } from "./school-code-life";
+
 export type SchoolEmailPayload = {
   userId: string;
   email: string;
@@ -95,14 +97,15 @@ export function verifySchoolEmailToken(
  * Outlook's in-app browser. The code proves the same thing — the person can
  * read the inbox — and is typed where they are already signed in.
  *
- * Stateless (no table): HMAC over user id + canonical address + a 30-minute
- * window. Verification accepts the current and previous window, so a code
- * lives at least 30 minutes, and a resend inside a window repeats the same
+ * Stateless (no table): HMAC over user id + canonical address + a window of
+ * SCHOOL_CODE_WINDOW_SEC (6 hours since Nov 28, 2026: school-code-life.ts
+ * says why). Verification accepts the current and previous window, so a code
+ * lives at least one window, and a resend inside a window repeats the same
  * code instead of invalidating the old email. Brute force is bounded by the
  * fail-closed limiters on the confirm-code route, not here.
  */
 export const SCHOOL_CODE_LENGTH = 8;
-export const SCHOOL_CODE_WINDOW_SEC = 1800;
+export { SCHOOL_CODE_WINDOW_SEC };
 
 const SCHOOL_CODE_RE = /^\d{8}$/;
 
