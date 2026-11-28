@@ -83,23 +83,25 @@ export function Sections1To3() {
         do not ask for a date of birth or check age any other way.
       </LegalP>
       <LegalP>
-        <strong>Making an account.</strong> Sign-up asks for your school email,
-        a password and the checkbox. While we let people in one group at a time
+        <strong>Making an account.</strong> Sign-up asks for an email, a
+        password and the checkbox. The email can be your school email or
+        another one you can open right away. While we let people in one group at a time
         (a wave), it also asks for an access code: the one we emailed you, or
         a shared one a cofounder gave you. Signing up
         through a club link needs no access code (
-        <Sec to="11">section 11</Sec>). We email a code to your school email. Typing it confirms your account and verifies
-        your school email in one step. The password that works is the one
+        <Sec to="11">section 11</Sec>). We email a code to the email you signed
+        up with. If it is your school email, typing the code confirms your
+        account and verifies your school email in one step. If it is another
+        email, typing the code confirms your account, and Vibe then asks for
+        your school email and emails it a code of its own. The password that works is the one
         chosen by the person who types the code, so confirming removes any
         password set for your address before then. If you type the code on
         the page where you just typed your password (the sign-up page or Log
         in), Vibe sets that password again at once. If you confirm anywhere
         else, Vibe asks you to choose a password. Unless you confirm on the
         sign-up page, Vibe also asks you to check the box again. You then set
-        up a profile. Some
-        accounts sign in with a different email and verify a school email as a
-        separate step: accounts made before sign-up worked this way, and a few
-        that we add ourselves.
+        up a profile. Some older accounts, and a few that we add ourselves,
+        also sign in with a different email.
       </LegalP>
       <LegalP>
         <strong>What &ldquo;verified&rdquo; means.</strong> We send a

@@ -1,5 +1,6 @@
 import "server-only";
 import { createResendClient } from "@/lib/resend";
+import { SCHOOL_CODE_LIFE_WORDS } from "@/lib/auth/school-code-life";
 import { signinHintEmail } from "@/lib/auth/signin-hint";
 import { getSiteUrl } from "@/lib/auth/site-url";
 import { sendLogged } from "@/lib/email/send-log";
@@ -249,16 +250,17 @@ export async function sendSchoolVerificationEmail(
   // the subject. `verifyUrl` is no longer sent (the link route still answers
   // older emails). Keep this message this small.
   void verifyUrl;
+  const line = `Type it on the Vibe page where you asked for this email. It works for at least ${SCHOOL_CODE_LIFE_WORDS}.`;
   const outcome = await sendLogged("school_verification", to, userId, () =>
     createResendClient().emails.send({
       from: getFrom(),
       to: [to],
       subject: `${code} is your Vibe code`,
-      html: codeOnlyEmailHtml(code, "Type it on the Vibe page where you asked for this email. It works for 30 minutes."),
+      html: codeOnlyEmailHtml(code, line),
       text: [
         `Your Vibe code is: ${code}`,
         "",
-        "Type it on the Vibe page where you asked for this email. It works for 30 minutes.",
+        line,
         "",
         "Never share this code. Vibe will never ask you for it. If you didn't start this, ignore this email.",
         "Questions: help@connectvibe.app",

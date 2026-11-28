@@ -262,7 +262,7 @@ export async function POST(req: Request) {
   }
 
   const token = signSchoolEmailToken(user.id, schoolEmail);
-  // Same code for every send inside a 30-minute window, so a resend never
+  // Same code for every send inside one window (school-code-life.ts), so a resend never
   // invalidates the email the student is already reading.
   const code = schoolEmailCode(user.id, schoolEmail);
   const site = getSiteOriginForRequest(req);

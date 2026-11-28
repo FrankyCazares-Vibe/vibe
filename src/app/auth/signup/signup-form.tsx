@@ -65,6 +65,16 @@ import { gateRefusalCopy } from "@/lib/waitlist/view";
 /** GoTrue's per-address resend cooldown. */
 const RESEND_COOLDOWN_SEC = 60;
 
+/**
+ * When the "Nothing yet?" help appears under the code box. Measured Nov 28,
+ * 2026 on production: every code sent to a personal inbox was typed within
+ * 2 minutes of sign-up (median 24 seconds, 9 in 10 within a minute), while
+ * no code sent to a school inbox since Oct 8 was typed at all (0 of 3), and
+ * Franky saw school emails land about 30 minutes late. A minute is past the
+ * usual wait, so the help only shows to someone who is really waiting.
+ */
+const NOTHING_YET_AFTER_MS = 60_000;
+
 const OFFLINE = "We couldn't reach Vibe. Check your connection and try again.";
 const EMAIL_CAP =
   "We can't send confirmation emails right now. Try again in a few minutes.";
@@ -151,12 +161,14 @@ function openLegalInApp(e: React.MouseEvent<HTMLAnchorElement>) {
 /**
  * The "Check your email" view shown after signUp sends (or recently sent) a
  * confirmation email. `rateLimitedUntil` (epoch ms) is set when this submit
- * hit the per-address cooldown instead of sending.
+ * hit the per-address cooldown instead of sending. `since` (epoch ms) is when
+ * the view opened, for the "Nothing yet?" help.
  */
 type PendingSignup = {
   email: string;
   cooldownSec: number;
   rateLimitedUntil: number | null;
+  since: number;
 };
 
 /**
@@ -222,6 +234,9 @@ export function SignupForm({
   const codeInput = useRef<HTMLInputElement>(null);
   const emailInput = useRef<HTMLInputElement>(null);
   const [focusCode, setFocusCode] = useState(0);
+  const [focusEmail, setFocusEmail] = useState(0);
+  // The pending view (by its `since`) whose "Nothing yet?" help is showing.
+  const [nothingYetFor, setNothingYetFor] = useState<number | null>(null);
   // The "are you a person" box (TurnstileBox). With no site key it is "off"
   // for good: no box, the button never waits, and signUp sends what it
   // always sent.
@@ -249,9 +264,38 @@ export function SignupForm({
     el.setSelectionRange(el.value.length, el.value.length);
   }, [focusCode]);
 
-  // School email first (S75): the tip is for an address that is complete
-  // and is NOT a school one. A hint, not a block: the Vibe team's own
-  // accounts and the store review accounts sign up with other addresses.
+  // "Use another email" emptied the address: the cursor goes there, once the
+  // form is back on screen.
+  useEffect(() => {
+    if (!focusEmail) return;
+    emailInput.current?.focus();
+  }, [focusEmail]);
+
+  // The "Nothing yet?" help, a minute after the pending view opened. Checked
+  // against the deadline on return too: iOS pauses timers while the student
+  // is off in their mail app, and that is exactly when the minute passes.
+  const pendingSince = pending?.since ?? null;
+  useEffect(() => {
+    if (pendingSince === null) return;
+    const due = pendingSince + NOTHING_YET_AFTER_MS;
+    const show = () => setNothingYetFor(pendingSince);
+    const onVisible = () => {
+      if (Date.now() >= due) show();
+    };
+    const id = window.setTimeout(show, Math.max(0, due - Date.now()));
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      window.clearTimeout(id);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [pendingSince]);
+  const nothingYet = pendingSince !== null && nothingYetFor === pendingSince;
+
+  // School email first (S75), and since Nov 28, 2026 any email the person can
+  // open now: the tip is for an address that is complete and is NOT a school
+  // one, and it says what comes next rather than warning. A club link still
+  // needs the school address (the gate checks it), so there it stays a
+  // heads-up.
   const typedEmail = email.trim();
   const otherEmailTyped = /^[^@\s]+@[^@\s]+\.[^@\s]{2,}$/.test(typedEmail) && !isSchoolEmail(typedEmail);
   // While sign-up is closed, an invite email's code is now spent: starting
@@ -394,6 +438,7 @@ export function SignupForm({
               email: address,
               cooldownSec: sec,
               rateLimitedUntil: Date.now() + sec * 1000,
+              since: Date.now(),
             });
             return;
           }
@@ -430,6 +475,7 @@ export function SignupForm({
         email: address,
         cooldownSec: RESEND_COOLDOWN_SEC,
         rateLimitedUntil: null,
+        since: Date.now(),
       });
     } catch {
       // Thrown rather than returned (storage blocked, an unexpected bug).
@@ -450,6 +496,16 @@ export function SignupForm({
     setPending(null);
     setError(null);
     setMaybeExisting(false);
+  }
+
+  // The school inbox is holding the code: back to the form with the password
+  // and the ticked box kept and the address empty, for one the person can
+  // open now. The code sent to the school address stays valid for its hour;
+  // the school email is checked on the next screen either way.
+  function onUseAnotherEmail() {
+    onStartOver();
+    setEmail("");
+    setFocusEmail((n) => n + 1);
   }
 
   if (pending) {
@@ -534,6 +590,40 @@ export function SignupForm({
             }}
           />
 
+          {/* A minute on this view (NOTHING_YET_AFTER_MS). For a
+              school address, the way out is an email the person can open now:
+              the school email is checked on the next screen either way. A
+              club link needs the school address and a code from an invite
+              email is tied to it, so those only get the inbox advice. */}
+          {nothingYet ? (
+            <div
+              role="status"
+              className="vibe-auth-banner vibe-auth-banner--info"
+              style={{ overflowWrap: "anywhere" }}
+            >
+              <strong>Nothing yet?</strong>{" "}
+              {!club && !codeTied && isSchoolEmail(pending.email) ? (
+                <>
+                  School inboxes can hold email from new apps like Vibe for a
+                  while. Look in Junk first. Or use an email you can open right
+                  now: a personal one usually gets its code in under a minute,
+                  and you&apos;ll add your school email next.
+                  <span style={{ display: "block", marginTop: 8 }}>
+                    <button
+                      type="button"
+                      className="vibe-auth-disclosure"
+                      onClick={onUseAnotherEmail}
+                    >
+                      Use another email
+                    </button>
+                  </span>
+                </>
+              ) : (
+                <>Look in Junk or Spam, then send a new code below.</>
+              )}
+            </div>
+          ) : null}
+
           <div className="vibe-auth-recovery">
             <ResendConfirmation
               initialEmail={pending.email}
@@ -608,10 +698,13 @@ export function SignupForm({
             <h1 className="vibe-auth-headline">
               Create your account<span className="vibe-auth-dot">.</span>
             </h1>
+            {/* Nov 28, 2026: school inboxes were holding the code (see
+                NOTHING_YET_AFTER_MS), so any email the person can open now is
+                welcome. A school one still does it in one step. */}
             <p className="vibe-auth-sub">
-              Use your <strong>school email</strong>, the one ending in{" "}
-              <code className="vibe-auth-code">.edu</code>. We&apos;ll send it a
-              code to confirm you&apos;re a student.
+              Use your <strong>school email</strong> to confirm you&apos;re a
+              student in one step. Or use any email you can open right now,
+              and add your school email next.
             </p>
           </>
         )}
@@ -673,8 +766,10 @@ export function SignupForm({
 
           <label className="vibe-auth-field">
             <span className="vibe-auth-label-row">
-              <span className="vibe-auth-label">School email</span>
-              <span className="vibe-auth-label-hint">your .edu</span>
+              <span className="vibe-auth-label">{club ? "School email" : "Email"}</span>
+              <span className="vibe-auth-label-hint">
+                {club ? "your .edu" : "school or personal"}
+              </span>
             </span>
             <input
               ref={emailInput}
@@ -700,8 +795,18 @@ export function SignupForm({
               className="vibe-auth-tip"
               style={{ marginTop: -8 }}
             >
-              Heads up: that isn&apos;t an IU or Purdue email. Use your school
-              email here — you can add a personal one once you&apos;re in.
+              {club ? (
+                <>
+                  Heads up: that isn&apos;t an IU or Purdue email. Use your
+                  school email here — you can add a personal one once
+                  you&apos;re in.
+                </>
+              ) : (
+                <>
+                  That works. Next you&apos;ll add your IU or Purdue email,
+                  which is what lets you into campus.
+                </>
+              )}
             </p>
           ) : null}
 

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { SCHOOL_CODE_LIFE_WORDS } from "@/lib/auth/school-code-life";
 import { applySchoolEmailVerification } from "@/lib/auth/school-email-apply";
 import {
   isSchoolVerifySecretConfigured,
@@ -144,7 +145,7 @@ export async function POST(req: Request) {
       {
         ok: false,
         code: "code_invalid",
-        error: "That code didn't match. Check the newest email — codes work for 30 minutes.",
+        error: `That code didn't match. Check the newest email — codes work for at least ${SCHOOL_CODE_LIFE_WORDS}.`,
       },
       { status: 400 },
     );
